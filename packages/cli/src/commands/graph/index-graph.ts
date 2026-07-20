@@ -1,14 +1,9 @@
 import { Command, Option } from 'commander'
-import { acquireGraphIndexLock, runIndexProjectGraph, type IndexResult } from '@specd/sdk'
-import { spawn } from 'node:child_process'
+import { runIndexProjectGraph, type IndexResult } from '@specd/sdk'
 import { output, parseFormat } from '../../formatter.js'
 import { cliError } from '../../handle-error.js'
 import { resolveSdkHostContext } from '../../helpers/sdk-host.js'
 import { resolveGraphCliContext } from './resolve-graph-cli-context.js'
-
-const GRAPH_INDEX_WORKER_ENV = 'SPECD_GRAPH_INDEX_WORKER'
-const GRAPH_INDEX_LOCK_HELD_ENV = 'SPECD_GRAPH_INDEX_LOCK_HELD'
-const GRAPH_INDEX_NO_WORKER_ENV = 'SPECD_GRAPH_INDEX_NO_WORKER'
 
 /**
  * Registers the `graph index` command.
@@ -63,10 +58,6 @@ JSON/TOON output schema:
           cliError('--config and --path are mutually exclusive', opts.format, 1)
         }
 
-        const isWorker = process.env[GRAPH_INDEX_WORKER_ENV] === 'true'
-        const lockHeld = process.env[GRAPH_INDEX_LOCK_HELD_ENV] === 'true'
-        const noWorker = process.env[GRAPH_INDEX_NO_WORKER_ENV] === 'true'
-
         let context: Awaited<ReturnType<typeof resolveGraphCliContext>>
         try {
           context = await resolveGraphCliContext({
@@ -84,71 +75,27 @@ JSON/TOON output schema:
 
         const { config, kernel } = context
 
-        let lockRelease: (() => void) | null = null
         try {
-          lockRelease = !isWorker && !lockHeld ? acquireGraphIndexLock(config) : null
-        } catch (err: unknown) {
-          cliError(
-            err instanceof Error ? err.message : 'failed to acquire indexing lock',
-            opts.format,
-            3,
-          )
-          return
-        }
-
-        try {
-          if (!isWorker && !noWorker) {
-            const workerArgs = [...process.argv.slice(2)]
-            const workerEnv = {
-              ...process.env,
-              [GRAPH_INDEX_WORKER_ENV]: 'true',
-              [GRAPH_INDEX_LOCK_HELD_ENV]: 'true',
-            }
-
-            const worker = spawn(process.argv[0]!, [process.argv[1]!, ...workerArgs], {
-              stdio: 'inherit',
-              env: workerEnv,
-            })
-
-            const forwardSignal = (sig: NodeJS.Signals): void => {
-              worker.kill(sig)
-            }
-            process.on('SIGINT', forwardSignal)
-            process.on('SIGTERM', forwardSignal)
-
-            worker.on('exit', (code, signal) => {
-              process.removeListener('SIGINT', forwardSignal)
-              process.removeListener('SIGTERM', forwardSignal)
-              if (lockRelease) lockRelease()
-              if (code !== 0 || signal) {
-                process.stderr.write(`Worker exited with code ${code} and signal ${signal}\n`)
-                process.exit(code ?? 1)
+          const host = await resolveSdkHostContext(config, kernel)
+          const result = await runIndexProjectGraph(host, {
+            force: opts.force,
+            ...(opts.excludePath !== undefined ? { excludePaths: opts.excludePath } : {}),
+            onProgress: (percent, phase) => {
+              if (fmt === 'text') {
+                const pct = Math.round(percent)
+                process.stdout.write(`\rIndexing: ${pct}% ${phase}${' '.repeat(20)}`)
               }
-              process.exit(0)
-            })
-          } else {
-            const host = await resolveSdkHostContext(config, kernel)
-            const result = await runIndexProjectGraph(host, {
-              force: opts.force,
-              ...(opts.excludePath !== undefined ? { excludePaths: opts.excludePath } : {}),
-              onProgress: (percent, phase) => {
-                if (fmt === 'text') {
-                  const pct = Math.round(percent)
-                  process.stdout.write(`\rIndexing: ${pct}% ${phase}${' '.repeat(20)}`)
-                }
-              },
-            })
+            },
+          })
 
-            if (fmt === 'text') {
-              process.stdout.write('\n')
-              output(formatTextIndexResult(result), 'text')
-            } else {
-              output(result, fmt)
-            }
-            process.exit(0)
+          if (fmt === 'text') {
+            process.stdout.write('\n')
+            output(formatTextIndexResult(result), 'text')
+          } else {
+            output(result, fmt)
           }
+          process.exit(0)
         } catch (err) {
-          if (lockRelease) lockRelease()
           cliError(err instanceof Error ? err.message : 'indexing failed', opts.format, 3)
         }
       },

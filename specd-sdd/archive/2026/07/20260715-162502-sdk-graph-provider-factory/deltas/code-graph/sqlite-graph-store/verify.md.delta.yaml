@@ -1,0 +1,17 @@
+- op: added
+  description: 'Add verification coverage for the new SQLite storage-generation requirement'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Destructive recreation'
+  content: |
+    ### Requirement: Storage generation sidecar
+
+    #### Scenario: SQLite exposes generation changes through the sidecar
+
+    - **GIVEN** a SQLite-backed graph root using a sidecar such as `graph/storage.epoch`
+    - **WHEN** the store is opened before and after a destructive recreate
+    - **THEN** the owning provider can observe that the generation changed

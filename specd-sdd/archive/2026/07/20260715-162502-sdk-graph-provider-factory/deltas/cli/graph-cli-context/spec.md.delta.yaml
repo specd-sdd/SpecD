@@ -1,0 +1,18 @@
+- op: modified
+  description: 'Exclude graph stats from the shared provider-context contract because stats owns its SDK host bootstrap.'
+  selector:
+    type: section
+    matches: 'Requirement: Graph command platform imports'
+  content: |
+    Graph command handlers (`search`, `hotspots`, `impact`) MUST obtain shared provider lifecycle through `withProvider` in this module. `graph stats` MUST bootstrap through `openSpecdHost` and manage its provider lifecycle through the SDK without `resolveGraphCliContext` or a pre-open lock probe.
+
+    `graph index` MUST delegate indexing orchestration to `runIndexProjectGraph` from `@specd/sdk`; it does not open a long-lived provider through `withProvider` because the worker subprocess performs indexing in isolation.
+
+    Graph command handlers MUST obtain host symbols from `@specd/sdk` via this module or `cli:host-context`.
+- op: modified
+  description: 'Remove the obsolete stats lock-precheck requirement.'
+  selector:
+    type: section
+    matches: 'Requirement: Lock helpers via SDK barrel'
+  content: |
+    Graph commands MUST NOT perform host-managed pre-open lock probes. Provider availability errors, including indexing-busy state, SHALL be surfaced by the opened provider lifecycle owned by the SDK.

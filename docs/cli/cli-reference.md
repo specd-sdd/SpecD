@@ -1142,10 +1142,11 @@ specd graph index --exclude-path "packages/generated/*" --exclude-path "tmp/"
 
 #### Shared indexing lock
 
-`graph index` is the writer-side owner of a shared graph CLI lock stored under `{configPath}/graph/index.lock`.
+`graph index` is the writer-side owner of a shared graph lock stored under `{configPath}/graph/index.lock`.
 
-- while this lock is held, `graph search`, `graph hotspots`, `graph stats`, and `graph impact` fail fast before opening the provider
-- the user-facing message is: `The code graph is currently being indexed. Try again in a few seconds.`
+- while this lock is held, provider-backed read commands such as `graph search`, `graph hotspots`, `graph stats`, and `graph impact` may fail with `GRAPH_BUSY`
+- long-lived hosts may also surface `GRAPH_PROVIDER_STALE` if the backing storage generation changes after they opened a provider
+- the user-facing busy message remains: `The code graph is currently being indexed. Try again in a few seconds.`
 - the lock is removed when `graph index` exits normally and is also cleaned up on termination signals
 
 ---
@@ -1158,7 +1159,7 @@ specd graph search <query> [options]
 
 Search for symbols, specs, or documents in the code graph. Context resolution follows the same configured-vs-bootstrap rules as `graph index`.
 
-If a graph index is currently running, this command fails fast with: `The code graph is currently being indexed. Try again in a few seconds.`
+If a graph index is currently running, this command may return `GRAPH_BUSY` with the message: `The code graph is currently being indexed. Try again in a few seconds.`
 
 | Option                       | Description                                                                     |
 | ---------------------------- | ------------------------------------------------------------------------------- |
@@ -1219,7 +1220,7 @@ specd graph hotspots [options]
 
 List the most connected symbols in the graph ranked by coupling risk. Context resolution follows the same configured-vs-bootstrap rules as `graph index`.
 
-If a graph index is currently running, this command fails fast with: `The code graph is currently being indexed. Try again in a few seconds.`
+If a graph index is currently running, this command may return `GRAPH_BUSY` with the message: `The code graph is currently being indexed. Try again in a few seconds.`
 
 | Option                       | Description                                                                                                 |
 | ---------------------------- | ----------------------------------------------------------------------------------------------------------- |
@@ -1266,7 +1267,7 @@ specd graph stats [options]
 
 Print summary statistics for the current code graph. Text output includes files, documents, symbols, specs, relation counts, and the last indexed timestamp. JSON/TOON output also includes `stale`, `currentRef`, and `fingerprintMismatch`. Context resolution follows the same configured-vs-bootstrap rules as `graph index`.
 
-If a graph index is currently running, this command fails fast with: `The code graph is currently being indexed. Try again in a few seconds.`
+If a graph index is currently running, this command may return `GRAPH_BUSY` with the message: `The code graph is currently being indexed. Try again in a few seconds.`
 
 | Option                      | Description                                                    |
 | --------------------------- | -------------------------------------------------------------- |
@@ -1292,7 +1293,7 @@ specd graph impact [options]
 
 Analyze dependents or dependencies of a spec, a symbol, or one or more files. Context resolution follows the same configured-vs-bootstrap rules as `graph index`.
 
-If a graph index is currently running, this command fails fast with: `The code graph is currently being indexed. Try again in a few seconds.`
+If a graph index is currently running, this command may return `GRAPH_BUSY` with the message: `The code graph is currently being indexed. Try again in a few seconds.`
 
 File selectors accept three forms:
 

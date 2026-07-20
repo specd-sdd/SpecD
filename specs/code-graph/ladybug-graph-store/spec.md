@@ -8,9 +8,9 @@
 
 ### Requirement: Ladybug-backed implementation
 
-`LadybugGraphStore` SHALL implement the `GraphStore` contract using LadybugDB as the storage engine. It is an infrastructure adapter and owns all backend-specific concerns that are not part of the abstract `GraphStore` port.
+`LadybugGraphStore` SHALL implement the `GraphStore` contract using LadybugDB as the storage engine while preserving the abstract semantics defined by `code-graph:graph-store`.
 
-Within a composition that supports multiple registered graph-store backends, the Ladybug adapter is identified by the backend id `ladybug`. It remains available as an explicitly selectable concrete backend even when another backend becomes the default.
+Within a composition that supports multiple registered graph-store backends, the stable backend id for this adapter SHALL remain `ladybug`.
 
 The adapter MUST:
 
@@ -18,6 +18,9 @@ The adapter MUST:
 - execute the Ladybug-specific schema DDL on first use
 - keep backend-specific schema version state
 - translate the abstract graph-store operations into Ladybug queries and bulk-load operations
+- defer any runtime-specific native loading or backend readiness work until `open()`
+
+`close()` MUST be idempotent.
 
 ### Requirement: Config-derived persistence layout
 
@@ -32,15 +35,24 @@ The concrete database files, lock files, WAL files, and CSV scratch files owned 
 
 ### Requirement: Destructive recreation
 
-`LadybugGraphStore` SHALL implement the abstract `GraphStore.recreate()` capability using Ladybug-specific persistence cleanup under the configured graph root.
+`LadybugGraphStore` SHALL implement the abstract `GraphStore.recreate()` capability using Ladybug-specific destructive reset behavior.
 
-When `recreate()` is invoked, the adapter MUST ensure that the next indexing run starts from an empty Ladybug backend without requiring callers to know any Ladybug-specific filenames. The implementation MAY close and reopen connections as needed, but the observable effect MUST be that:
+When `recreate()` is invoked, the adapter MUST ensure that the next indexing run starts from a clean Ladybug storage generation:
 
 - all persisted Ladybug graph data under `{configPath}/graph` is discarded
 - any backend-owned companion artifacts such as lock or WAL files are also discarded when they belong to the same graph persistence root
+- the persisted storage-generation marker for that graph root is rotated
 - the backend is ready to be opened again and rebuilt from scratch
 
-Callers such as `graph index --force` MUST depend on this abstract recreation behavior rather than deleting `.lbug`, `.wal`, `.lock`, or any other backend-specific artifacts directly.
+Callers such as `graph index --force` MUST depend on this abstract recreation behavior through provider-owned indexing semantics rather than by deleting Ladybug files directly.
+
+### Requirement: Storage generation sidecar
+
+The Ladybug-backed graph persistence under `{configPath}/graph` SHALL persist a storage-generation sidecar compatible with the shared `code-graph:graph-store` stale-detection contract.
+
+A sidecar such as `graph/storage.epoch` is an acceptable realization.
+
+On `open()`, the adapter MUST make the current generation observable to the owning provider. On destructive recreation, the adapter MUST rotate that generation so older open providers can detect that they are stale and must be reopened.
 
 ### Requirement: Ladybug schema ownership
 
@@ -121,6 +133,8 @@ At minimum, the schema MUST persist:
 | IMPORTS       | File   | File   | Indexer analysis                             |
 | DEFINES       | File   | Symbol | Indexer analysis                             |
 | CALLS         | Symbol | Symbol | Indexer analysis                             |
+| CONSTRUCTS    | Symbol | Symbol | Indexer analysis                             |
+| USES_TYPE     | Symbol | Symbol | Indexer analysis                             |
 | EXPORTS       | File   | Symbol | Indexer analysis                             |
 | DEPENDS_ON    | Spec   | Spec   | Spec indexing                                |
 | COVERS_FILE   | Spec   | File   | Archived file-level implementation linkage   |
@@ -135,7 +149,7 @@ Relationship tables have no persisted edge properties unless a requirement expli
 
 ### Requirement: Full-text search implementation
 
-`LadybugGraphStore` SHALL implement symbol, spec, and document search using Ladybug's full-text search facilities.
+`LadybugGraphStore` SHALL provide full-text search for symbols, specs, and documents while preserving the identity-aware discovery and ranking contract from `code-graph:graph-store`.
 
 The adapter MUST:
 
@@ -143,43 +157,22 @@ The adapter MUST:
 - index symbols using both the stored symbol name and the backend-specific expanded search text used for compound-name matching
 - index spec title, description, and full content for spec search
 - index document paths and full textual content
-- keep the existing Ladybug discovery paths in place:
-  - `QUERY_FTS_INDEX`-based discovery for symbols and specs
-  - manual document candidate discovery for documents
-- join multiple search tokens using the `OR` operator in the sanitized FTS query so that results matching any of the terms are returned (discovery mode)
+- use `QUERY_FTS_INDEX`-based discovery for symbols, specs, and documents; `document_fts` MUST be the primary document discovery path
+- join multiple search tokens using the `OR` operator in the sanitized FTS query so that results matching any of the terms are returned
 - expand raw query tokens with the shared specd/code-aware lexical policy before applying identity-aware ranking
-- supplement the backend-native candidate set with identity-derived candidates when the native tokenization path would otherwise miss a strong identity hit required by the abstract contract
-- prioritize **exact canonical identity matches** during search by applying a score boost to nodes where the query exactly matches the primary identity column
-- prioritize **strong non-exact identity matches** ahead of generic content-only matches, including:
-  - symbol declared-name equality when comment-only hits would otherwise rank higher
-  - spec-id prefix, suffix, substring, and real component matches
-  - document canonical-path or config-relative-path prefix, suffix, substring, and real component matches
-- rerank the discovered candidate set using backend-local ranking logic after candidate retrieval rather than replacing candidate generation with whole-query string matching
-- count how many expanded query tokens match the selected identity fields and use that token coverage to rank candidates that satisfy more of the query intent above candidates satisfying fewer identity tokens
+- supplement every backend-native candidate set, including specs and documents, with identity-derived candidates when native tokenization would otherwise miss an exact, prefix, suffix, component, or strong substring match on the canonical identity
+- prioritize exact canonical identity matches and strong non-exact identity matches ahead of generic content-only matches
+- rerank the discovered candidate set using backend-local ranking logic after candidate retrieval
+- count matching expanded identity tokens and prefer candidates matching more query intent
 - return results ordered from highest to lowest relevance after identity preference is applied
-- rebuild or recreate FTS indexes when required by the backend after bulk data changes
-- derive match-aware snippets and the corresponding 1-based line range from persisted file source content or FTS matches
+- rebuild or recreate FTS indexes when required after bulk data changes
+- derive match-aware snippets and corresponding 1-based line ranges from persisted content or FTS matches
 
-Observable Ladybug ordering semantics MUST hold:
+Observable Ladybug ordering semantics MUST hold: exact identity matches rank first; identity-oriented hits outrank content-only hits; exact token matches outrank prefix matches; prefix outranks suffix; suffix outranks arbitrary substring; real components outrank arbitrary substring-only hits; and candidates matching more expanded identity tokens outrank fewer-token candidates.
 
-- exact canonical identity matches rank first
-- identity-oriented non-exact hits rank ahead of body-only/comment-only/content-only hits
-- exact token identity matches outrank prefix token matches
-- prefix token matches outrank suffix token matches
-- suffix token matches outrank arbitrary substring token matches
-- real identity-component matches outrank arbitrary substring-only hits on the same identity field
-- candidates matching more expanded identity tokens outrank candidates matching fewer expanded identity tokens when generic text relevance is otherwise competing
-- generic term frequency in spec/document body content MUST NOT outrank a stronger spec-id, symbol-name, or document-path match for the same query intent
+The Ladybug FTS schema MUST include `symbol_fts` for `Symbol.searchName` and comments, `spec_fts` for `Spec.title`, description, and content, and `document_fts` for `Document.content`, canonical path, and any alternate path field needed for document identity preference.
 
-The Ladybug FTS schema MUST include:
-
-- **`symbol_fts`** — covering `Symbol.searchName` and `Symbol.comment`
-- **`spec_fts`** — covering `Spec.title`, `Spec.description`, and `Spec.content`
-- **`document_fts`** — covering `Document.content`, `Document.path`, and any backend-maintained alternate path search field needed to preserve document identity preference
-
-The implementation MAY use stemming, weighted ranking, identity boost unions, or other backend-supported ranking/indexing options, provided the abstract graph-store contract remains satisfied.
-
-Persisted `File` content used for snippet extraction SHALL NOT, by itself, become a separate full-text searchable file category in this change.
+The implementation MAY use stemming, weighted ranking, identity boost unions, or other backend-supported ranking/indexing options, provided the abstract graph-store contract remains satisfied. Persisted `File` content used for snippets SHALL NOT by itself become a separate full-text searchable file category.
 
 ### Requirement: Schema versioning
 

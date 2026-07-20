@@ -50,6 +50,11 @@ describe('@specd/core public barrel', () => {
     expect(typeof corePublic.createArchiveRepository).toBe('function')
   })
 
+  it('exports the VCS adapter port on the public root as a runtime value', () => {
+    expect(typeof corePublic.VcsAdapter).toBe('function')
+    expect(corePorts.VcsAdapter).toBe(corePublic.VcsAdapter)
+  })
+
   it('constructs a change repository without createKernel', () => {
     const repo = corePublic.createSpecRepository(
       'fs',

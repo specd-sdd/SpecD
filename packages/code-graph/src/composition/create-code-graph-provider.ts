@@ -1,20 +1,20 @@
 import { type SpecdConfig } from '@specd/core'
 import { LadybugGraphStore } from '../infrastructure/ladybug/ladybug-graph-store.js'
-import { SQLiteGraphStore } from '../infrastructure/sqlite/sqlite-graph-store.js'
 import { AdapterRegistry } from '../infrastructure/tree-sitter/adapter-registry.js'
 import { TypeScriptLanguageAdapter } from '../infrastructure/tree-sitter/typescript-language-adapter.js'
 import { PythonLanguageAdapter } from '../infrastructure/tree-sitter/python-language-adapter.js'
 import { GoLanguageAdapter } from '../infrastructure/tree-sitter/go-language-adapter.js'
 import { PhpLanguageAdapter } from '../infrastructure/tree-sitter/php-language-adapter.js'
 import { IndexCodeGraph } from '../application/use-cases/index-code-graph.js'
-import { CodeGraphProvider } from './code-graph-provider.js'
+import { CodeGraphProviderImpl, type CodeGraphProvider } from './code-graph-provider.js'
 import {
-  type CodeGraphFactoryOptions,
+  type CodeGraphCompositionOptions,
   type CodeGraphOptions,
   type GraphStoreFactory,
   type GraphStoreFactoryOptions,
 } from './graph-store-factory.js'
 import { GraphStoreRegistryError } from '../domain/errors/graph-store-registry-error.js'
+import { createSqliteGraphStoreFactory } from './create-sqlite-graph-store-factory.js'
 
 const DEFAULT_GRAPH_STORE_ID = 'sqlite'
 
@@ -24,11 +24,7 @@ const LADYBUG_GRAPH_STORE_FACTORY: GraphStoreFactory = {
   },
 }
 
-const SQLITE_GRAPH_STORE_FACTORY: GraphStoreFactory = {
-  create(options: GraphStoreFactoryOptions) {
-    return new SQLiteGraphStore(options.storagePath)
-  },
-}
+const SQLITE_GRAPH_STORE_FACTORY: GraphStoreFactory = createSqliteGraphStoreFactory()
 
 const BUILTIN_GRAPH_STORE_FACTORIES: Readonly<Record<string, GraphStoreFactory>> = {
   ladybug: LADYBUG_GRAPH_STORE_FACTORY,
@@ -49,7 +45,7 @@ const BUILTIN_GRAPH_STORE_FACTORIES: Readonly<Record<string, GraphStoreFactory>>
  */
 export function createCodeGraphProvider(
   options: SpecdConfig | CodeGraphOptions,
-  factoryOptions?: CodeGraphFactoryOptions,
+  factoryOptions?: CodeGraphCompositionOptions,
 ): CodeGraphProvider {
   const storagePath = isSpecdConfig(options) ? options.configPath : options.storagePath
   const projectRoot = isSpecdConfig(options) ? options.projectRoot : options.projectRoot
@@ -75,7 +71,7 @@ export function createCodeGraphProvider(
 
   const indexer = new IndexCodeGraph(store, registry)
 
-  return new CodeGraphProvider(store, indexer, projectRoot)
+  return new CodeGraphProviderImpl(store, indexer, projectRoot)
 }
 
 /**

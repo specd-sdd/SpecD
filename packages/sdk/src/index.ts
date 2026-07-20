@@ -22,8 +22,6 @@ export {
 export * from './core-reexports.js'
 
 export {
-  acquireGraphIndexLock,
-  assertGraphIndexUnlocked,
   createGetGraphHealth,
   createBootstrapGraphConfig,
   createCodeGraphProvider,
@@ -34,7 +32,7 @@ export {
   detectFingerprintMismatch,
   parseFingerprintMap,
   buildProjectGraphConfig,
-  normalizeFileSelectorPath,
+  GraphProviderStaleError,
   SpecNotFoundError as GraphSpecNotFoundError,
   computeWorkspaceFingerprint,
   computeRootFingerprint,

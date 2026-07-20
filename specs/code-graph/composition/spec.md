@@ -8,27 +8,30 @@ Consumers of `@specd/code-graph` should not need to know how the store, indexer,
 
 ### Requirement: CodeGraphProvider facade
 
-`CodeGraphProvider` SHALL be the top-level API object that wraps all code graph functionality. It exposes:
+`CodeGraphProvider` SHALL be the top-level API object that wraps all code graph functionality behind one lifecycle-managed facade.
 
-- **Indexing**: `index(options: IndexOptions): Promise<IndexResult>` — runs `IndexCodeGraph`
-- **Querying**: `getSymbol(id)`, `findSymbols(query)`, `getFile(path)`, `getDocument(path)`, `findFilesByConfigRelativePath(configRelativePath)`, `findDocumentsByConfigRelativePath(configRelativePath)`, `getSpec(specId)`, `getSpecDependencies(specId)`, `getSpecDependents(specId)`, `getCoveredFiles(specId)`, `getCoveringSpecsForFile(filePath)`, `getCoveredSymbols(specId)`, `getCoveringSpecsForSymbol(symbolId)`, `getStatistics()` — delegates to `GraphStore`
-- **Search**: `searchSymbols(options: SearchOptions)`, `searchSpecs(options: SearchOptions)`, `searchDocuments(options: SearchOptions)` — full-text search with exact-match prioritization, delegates to `GraphStore`
-- **Maintenance**: `clear(): Promise<void>`, `recreate(): Promise<void>` — removes all data or recreates store
-- **Traversal**: `getUpstream(symbolId, options?)`, `getDownstream(symbolId, options?)` — delegates to traversal functions
-- **Impact**: `analyzeImpact(target, direction)`, `analyzeFileImpact(filePath, direction)`, `analyzeFilesImpact(filePaths, direction, maxDepth)`, `analyzeSpecImpact(specId, direction)`, `detectChanges(changedFiles)`, `getHotspots(options?)` — delegates to impact/traversal functions
-- **Selector Normalization**: `resolveFileSelector(selector: string): Promise<ResolvedFileSelector[]>`, `resolveSymbolSelector(selector: string): Promise<ResolvedSymbolSelector[]>` — resolves project-relative or absolute paths to canonical graph identities
-- **Lock Management**: `assertGraphIndexUnlocked()`, `acquireGraphIndexLock()` — checks or holds the indexing process mutex lock
-- **Lifecycle**: `open(): Promise<void>`, `close(): Promise<void>` — manages the store connection
+Public responsibilities include:
 
-`getSpec(specId)` returns `undefined` when the spec is not indexed. Callers that require a spec to exist (for example CLI spec impact) SHALL throw `SpecNotFoundError` after checking the result.
+- Indexing: `index(options: IndexOptions): Promise<IndexResult>` — runs `IndexCodeGraph` and owns any provider-internal force-reset or lock policy required by indexing
+- Querying: `getSymbol(id)`, `findSymbols(query)`, `getFile(path)`, `getDocument(path)`, `findFilesByConfigRelativePath(configRelativePath)`, `findDocumentsByConfigRelativePath(configRelativePath)`, `getSpec(specId)`, `getSpecDependencies(specId)`, `getSpecDependents(specId)`, `getCoveredFiles(specId)`, `getCoveringSpecsForFile(filePath)`, `getCoveredSymbols(specId)`, `getCoveringSpecsForSymbol(symbolId)`, `getStatistics()` — delegates to `GraphStore`
+- Search: `searchSymbols(options: SearchOptions)`, `searchSpecs(options: SearchOptions)`, `searchDocuments(options: SearchOptions)` — full-text search with exact-match prioritization, delegates to `GraphStore`
+- Maintenance: `clear(): Promise<void>` — clears persisted graph contents while preserving the provider lifecycle contract
+- Traversal: `getUpstream(symbolId, options?)`, `getDownstream(symbolId, options?)` — delegates to traversal functions
+- Impact: `analyzeImpact(target, direction)`, `analyzeFileImpact(filePath, direction)`, `analyzeFilesImpact(filePaths, direction, maxDepth)`, `analyzeSpecImpact(specId, direction)`, `detectChanges(changedFiles)`, `getHotspots(options?)` — delegates to impact/traversal functions
+- Selector normalization: `resolveFileSelector(selector: string): Promise<ResolvedFileSelector[]>`, `resolveSymbolSelector(selector: string): Promise<ResolvedSymbolSelector[]>` — resolves project-relative or absolute paths to canonical graph identities
+- Lifecycle: `open(): Promise<void>`, `close(): Promise<void>` — manages the store connection and backend resource lifetime
+
+`getSpec(specId)` returns `undefined` when the spec is not indexed. Callers that require existence MAY throw domain-specific errors above the provider layer.
+
+Public callers MUST NOT depend on `recreate()` or on exposed lock-helper methods. Force-reset behavior and indexing locks are provider-owned internal concerns.
 
 ### Requirement: Factory function
 
 Two factory signatures are provided:
 
-**Primary (workspace-aware):**
+Primary (workspace-aware):
 
-`createCodeGraphProvider(config: SpecdConfig, options?: CodeGraphFactoryOptions): CodeGraphProvider` accepts a `SpecdConfig` from `@specd/core` plus optional internal composition overrides and:
+`createCodeGraphProvider(config: SpecdConfig, options?: CodeGraphCompositionOptions): CodeGraphProvider`
 
 1. Derives the graph storage root from `config.configPath`
 2. Resolves the active graph-store backend id using `options.graphStoreId` when provided, otherwise the built-in default backend id
@@ -39,49 +42,52 @@ Two factory signatures are provided:
 7. Creates `IndexCodeGraph` with the selected store and adapter registry
 8. Returns a `CodeGraphProvider` wired to all components
 
-**Legacy (standalone):**
+Legacy (standalone):
 
 `createCodeGraphProvider(options: CodeGraphOptions): CodeGraphProvider` accepts:
 
-- **`storagePath`** (`string`, required) — filesystem root allocated to the selected concrete graph-store backend
-- **`graphStoreId`** (`string`, optional) — selected backend id; when omitted, uses the built-in default backend id
-- **`graphStoreFactories`** (optional additive registrations) — external graph-store factories merged with the built-in graph-store registry before backend selection
-- **`adapters`** (`LanguageAdapter[]`, optional) — additional language adapters to register beyond the 4 built-in adapters
+- `storagePath` (string, required) — filesystem root allocated to the selected concrete graph-store backend
+- `graphStoreId` (string, optional) — selected backend id; when omitted, uses the built-in default backend id
+- `graphStoreFactories` (optional additive registrations) — external graph-store factories merged with the built-in graph-store registry before backend selection
+- `adapters` (`LanguageAdapter[]`, optional) — additional language adapters to register beyond the 4 built-in adapters
 
-The provider is stateless regarding project configuration; it uses `SpecdConfig` to derive its internal storage root but does not cache it. Workspaces and graph-specific rules are passed to `index()` via `IndexOptions` at each call.
+The provider is stateless regarding project configuration; it uses `SpecdConfig` only to derive composition inputs such as storage path and project root.
 
-`CodeGraphFactoryOptions` SHALL support the same additive graph-store selection model as `CodeGraphOptions`, except that the storage root is derived from `SpecdConfig`.
+`CodeGraphCompositionOptions` SHALL support the same additive graph-store selection model and adapter-extension model as `CodeGraphOptions`.
 
-The factory detects which overload is being used by checking for the `projectRoot` property (present on `SpecdConfig`) vs the `storagePath` property (present on `CodeGraphOptions`).
+The factory detects which overload is being used by checking for the project-root-bearing `SpecdConfig` shape.
 
 The built-in graph-store registry SHALL include at least:
 
 - `ladybug` — the Ladybug-backed implementation
 - `sqlite` — the SQLite-backed implementation
 
-The built-in default graph-store id SHALL be `sqlite`. `ladybug` remains available only by explicit selection.
+The built-in default graph-store id SHALL be `sqlite`. `ladybug` remains available only when explicitly selected.
 
-Callers MUST NOT construct `CodeGraphProvider` directly — the constructor is not part of the public API.
+Factory creation MUST remain synchronous. Any backend-native module loading or runtime-specific binding resolution required by a built-in or external store MUST happen during `open()`, not during `createCodeGraphProvider(...)`.
+
+`CodeGraphProvider` SHALL be a type-only public interface describing the provider lifecycle and query surface. The concrete implementation class, its constructor, `GraphStore`, and `IndexCodeGraph` inputs MUST remain internal to the package. Callers MUST obtain the interface only from `createCodeGraphProvider(...)` and MUST NOT construct a provider directly.
 
 ### Requirement: Package exports
 
 The `@specd/code-graph` `"."` public barrel SHALL export only:
 
-- **Composition & Wiring**: `createCodeGraphProvider`, `CodeGraphProvider`, `CodeGraphFactoryOptions`, `CodeGraphOptions`, `GraphStoreFactory`, `GraphStoreFactoryOptions`
-- **Host use cases**: `GetGraphHealth`, `GetGraphHealthInput`, `GetGraphHealthResult`, `createGetGraphHealth`, `IndexProjectGraph`, `IndexProjectGraphInput`, `createIndexProjectGraph`, `GetSpecCoverage`, `GetSpecCoverageInput`, `GetSpecCoverageResult`, `createGetSpecCoverage`, `GetChangeSpecCoverage`, `GetChangeSpecCoverageInput`, `GetChangeSpecCoverageResult`, `createGetChangeSpecCoverage`
-- **VCS & Config**: `buildProjectGraphConfig`, `createBootstrapGraphConfig`, `GraphConfigOverrides`
-- **Lock Management**: `acquireGraphIndexLock`, `assertGraphIndexUnlocked`
-- **Indexer & Discovery (public types only)**: `IndexOptions`, `IndexProgressCallback`, `ProjectGraphConfig`, `WorkspaceIndexTarget`, `DiscoveredSpec`, `IndexResult`, `IndexError`, `WorkspaceIndexBreakdown`, `DiscoverFilesOptions`, `DEFAULT_EXCLUDE_PATHS`
-- **Traversal & Impact**: `TraversalOptions`, `TraversalResult`, `ImpactResult`, `FileImpactResult`, `ChangeDetectionResult`, `RiskLevel`, `analyzeFilesImpact`
-- **Hotspots**: `DEFAULT_HOTSPOT_KINDS`, `HotspotEntry`, `HotspotOptions`, `HotspotResult`
-- **Search**: `SearchOptions`, `expandSymbolName`, `expandSearchQuery`, `expandSearchToken`
-- **Staleness & Fingerprint**: `isGraphStale`, `computeGraphFingerprint`, `computeRootFingerprint`, `computeWorkspaceFingerprint`, `parseFingerprintMap`, `serializeFingerprintMap`, `detectFingerprintMismatch`, `GraphFingerprintInput`
-- **Language Adapter**: `LanguageAdapter`
-- **Model/Vocabulary**: `FileNode`, `DocumentNode`, `SymbolNode`, `SpecNode`, `Relation`, `SymbolKind`, `RelationType`, `SymbolQuery`, `GraphStatistics`, `ImportDeclaration`, `ImportDeclarationKind`, `SourceLocation`, `BindingScopeKind`, `BindingSourceKind`, `BindingScope`, `BindingFact`, `CallForm`, `CallFact`, `ResolvedDependency`
-- **Errors**: `SpecdCodeGraphError` and its subclasses (such as `StoreNotOpenError`, `InvalidSymbolKindError`, `InvalidRelationTypeError`, `DuplicateSymbolIdError`, `SpecNotFoundError`)
-- **Version**: `CODE_GRAPH_VERSION`
+- Composition & wiring: `createCodeGraphProvider`, type-only `CodeGraphProvider`, `CodeGraphCompositionOptions`, `CodeGraphOptions`, `GraphStoreFactory`, `GraphStoreFactoryOptions`, `createSqliteGraphStoreFactory`
+- Host use cases: `GetGraphHealth`, `GetGraphHealthInput`, `GetGraphHealthResult`, `createGetGraphHealth`, `IndexProjectGraph`, `IndexProjectGraphInput`, `createIndexProjectGraph`, `GetSpecCoverage`, `GetSpecCoverageInput`, `GetSpecCoverageResult`, `createGetSpecCoverage`, `GetChangeSpecCoverage`, `GetChangeSpecCoverageInput`, `GetChangeSpecCoverageResult`, `createGetChangeSpecCoverage`
+- VCS & Config: `buildProjectGraphConfig`, `createBootstrapGraphConfig`, `GraphConfigOverrides`
+- Indexer & Discovery (public types only): `IndexOptions`, `IndexProgressCallback`, `ProjectGraphConfig`, `WorkspaceIndexTarget`, `DiscoveredSpec`, `IndexResult`, `IndexError`, `WorkspaceIndexBreakdown`, `DiscoverFilesOptions`, `DEFAULT_EXCLUDE_PATHS`
+- Traversal & Impact: `TraversalOptions`, `TraversalResult`, `ImpactResult`, `FileImpactResult`, `ChangeDetectionResult`, `RiskLevel`, `analyzeFilesImpact`
+- Hotspots: `DEFAULT_HOTSPOT_KINDS`, `HotspotEntry`, `HotspotOptions`, `HotspotResult`
+- Search: `SearchOptions`, `expandSymbolName`, `expandSearchQuery`, `expandSearchToken`
+- Staleness & Fingerprint: `isGraphStale`, `computeGraphFingerprint`, `computeRootFingerprint`, `computeWorkspaceFingerprint`, `parseFingerprintMap`, `serializeFingerprintMap`, `detectFingerprintMismatch`, `GraphFingerprintInput`
+- Language Adapter: `LanguageAdapter`
+- Model/Vocabulary: `FileNode`, `DocumentNode`, `SymbolNode`, `SpecNode`, `Relation`, `SymbolKind`, `RelationType`, `SymbolQuery`, `GraphStatistics`, `ImportDeclaration`, `ImportDeclarationKind`, `SourceLocation`, `BindingScopeKind`, `BindingSourceKind`, `BindingScope`, `BindingFact`, `CallForm`, `CallFact`, `ResolvedDependency`
+- Errors: `SpecdCodeGraphError` and its subclasses (such as `StoreNotOpenError`, `InvalidSymbolKindError`, `InvalidRelationTypeError`, `DuplicateSymbolIdError`, `SpecNotFoundError`, `GraphProviderStaleError`)
+- Version: `CODE_GRAPH_VERSION`
 
-The following MUST be exported only from `"./internal"`, not from `"."`: `InMemoryIndexSession`, `IndexSession`, `RegisterFileInput`, `RegisterAnalysisInput`, concrete graph-store adapter classes, and indexer implementation modules.
+Lock-management helpers and provider-internal recreation/reset helpers MUST NOT be exported from `"."`.
+
+The following MUST be exported only from `"./internal"`, not from `"."`: `InMemoryIndexSession`, concrete store adapter symbols, and other composition internals not required by public hosts.
 
 ### Requirement: Public and internal entry points
 
@@ -94,9 +100,15 @@ The following MUST be exported only from `"./internal"`, not from `"."`: `InMemo
 
 ### Requirement: Lifecycle management
 
-Callers MUST call `open()` before using any query, traversal, or indexing method, and `close()` when done. The `CodeGraphProvider` delegates these calls to the underlying `GraphStore`. Methods called before `open()` or after `close()` throw `StoreNotOpenError`.
+Callers MUST call `open()` before using any query, traversal, or indexing method, unless a higher-level helper such as `withOpenGraphProvider` manages that lifecycle on their behalf.
 
-The provider does not auto-open or auto-close — callers manage the lifecycle explicitly. This follows the same pattern as database connections and avoids hidden state transitions.
+The provider does not auto-open or auto-close. Lifecycle remains explicit.
+
+`open()` is the required async boundary for backend readiness. Built-in or external backends MAY defer runtime-specific binding resolution, native module loading, schema preparation, or storage-generation checks until `open()`.
+
+`close()` MUST be idempotent. Calling it more than once, or combining it with future `Symbol.asyncDispose` support, MUST NOT fail merely because the provider was already closed.
+
+Long-lived hosts such as HTTP APIs, MCP servers, and Electron processes MUST be able to create a provider synchronously, `await open()` it under host control, reuse it while healthy, and explicitly `close()` it during shutdown or replacement.
 
 ### Requirement: Dependency on @specd/core
 
@@ -115,13 +127,14 @@ Host use cases receive an already-open `CodeGraphProvider`. They MUST NOT replac
 
 ## Constraints
 
-- `createCodeGraphProvider` is the only construction path — `CodeGraphProvider` constructor is not exported
+- `createCodeGraphProvider` is the only construction path — `CodeGraphProvider` is exported type-only and no provider constructor is exported
 - Internal components and store adapter implementations are exported only from `"./internal"`
 - The `LanguageAdapter` interface is exported from `"."` so consumers can write custom adapters
 - Graph-store backend selection is registry-driven and internal to composition; it is not a `specd.yaml` setting
 - The provider builds exactly one active `GraphStore` per construction path, selected by backend id from the merged graph-store registry
-- `CodeGraphProvider` holds no domain logic — it only delegates
+- `CodeGraphProvider` holds no domain logic — it delegates and enforces provider-owned lifecycle and availability policy
 - Lifecycle is explicit — no auto-open, no auto-close
+- Provider-owned indexing locks and destructive recreation helpers are internal implementation details, not part of the public facade
 - Depends on `@specd/core` for `SpecdConfig` type
 
 ## Examples

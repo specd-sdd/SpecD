@@ -27,19 +27,19 @@
     {
       "requirement": "Symbol impact analysis",
       "rules": [
-        "When `--symbol` is provided:\n\n1. Resolves graph context using explicit config, autodetected config, or bootstrap mode according to the graph CLI precedence rules\n2. Resolves the selector through `resolveSymbolSelector(symbolSelector)` to support bare names, qualified names, and full graph symbol ids (for example `packages/core/src/auth.ts:function:validate`)\n3. If no symbol matches, outputs `No symbol found matching \"<selector>\".` and exits with code 0\n4. If one symbol matches, calls `analyzeImpact(symbolId, direction)` and outputs the result\n5. If multiple symbols match, analyzes each one and outputs all results"
+        "When `--symbol` is provided:\n\n1. Resolves graph context via `resolveGraphCliContext` using explicit config, autodetected config, or bootstrap mode\n2. Opens the provider through `withProvider`\n3. Resolves the selector through `resolveSymbolSelector(symbolSelector)` to support bare names, qualified names, and full graph symbol ids (for example `packages/core/src/auth.ts:function:validate`)\n4. If no symbol matches, outputs `No symbol found matching \"<selector>\".` and exits with code 0\n5. If one symbol matches, calls `analyzeImpact(symbolId, direction)` and outputs the result\n6. If multiple symbols match, analyzes each one and outputs all results\n\nPlatform symbols MUST come from `@specd/sdk`. The CLI MUST NOT open or close the provider outside `withProvider`."
       ]
     },
     {
       "requirement": "Spec impact analysis",
       "rules": [
-        "When `--spec` is provided:\n\n1. Resolves graph context using explicit config, autodetected config, or bootstrap mode according to the graph CLI precedence rules\n2. Creates a `CodeGraphProvider` from the resolved graph context\n3. Opens the provider\n4. Loads the spec via `getSpec(specId)`. If no indexed spec node exists, the provider SHALL throw `SpecNotFoundError` with the requested spec id\n5. Calls `analyzeSpecImpact(specId, direction)`\n6. Outputs the resulting `ImpactResult`\n7. Closes the provider and exits\n\nThe CLI SHALL let `SpecNotFoundError` propagate to the global error handler so the command fails with exit code 1 and a machine-readable `SPEC_NOT_FOUND` error code.\n\nSpec impact MUST reflect requirement-aware graph relations, not just code-structure traversal. At minimum it includes:\n\n- `DEPENDS_ON` between specs\n- `COVERS_FILE` between specs and files\n- `COVERS_SYMBOL` between specs and symbols"
+        "When `--spec` is provided:\n\n1. Resolves graph context via `resolveGraphCliContext` using explicit config, autodetected config, or bootstrap mode\n2. Opens the provider through `withProvider`\n3. Loads the spec via `getSpec(specId)`. If no indexed spec node exists, the provider SHALL throw `SpecNotFoundError` with the requested spec id\n4. Calls `analyzeSpecImpact(specId, direction)`\n5. Outputs the resulting `ImpactResult`\n\nThe CLI SHALL let `SpecNotFoundError` propagate to the global error handler so the command fails with exit code 1 and a machine-readable `SPEC_NOT_FOUND` error code.\n\nSpec impact MUST reflect requirement-aware graph relations, not just code-structure traversal. At minimum it includes:\n\n- `DEPENDS_ON` between specs\n- `COVERS_FILE` between specs and files\n- `COVERS_SYMBOL` between specs and symbols\n\nPlatform symbols MUST come from `@specd/sdk`. The CLI MUST NOT open or close the provider outside `withProvider`."
       ]
     },
     {
       "requirement": "Concurrent indexing guard",
       "rules": [
-        "Before attempting to open the provider, the command SHALL query the lock status from the provider. If indexing is currently in progress, it SHALL fail fast with a short user-facing retry-later message."
+        "Before impact analysis reads from the graph, the command MUST rely on provider-owned availability checks rather than querying a host-managed pre-open lock state.\n\nIf the provider reports that the graph is busy or stale after opening, the command SHALL surface that provider error through the normal CLI infrastructure-error path."
       ]
     },
     {
@@ -51,7 +51,7 @@
     {
       "requirement": "Error cases",
       "rules": [
-        "Exactly one of `--file`, `--symbol`, or `--spec` must be provided. If none or more than one is given, the command exits with code 1 and prints `error: provide exactly one of --file, --symbol, or --spec`.\n\nIf both `--config` and `--path` are passed, the command SHALL fail with a CLI error before attempting graph access.\n\nIf a `--file` input without a workspace prefix does not resolve by config-relative path, the command SHALL fail with a not-found error that includes the normalized config-relative path it searched.\n\nIf a `--file` input without a workspace prefix resolves to more than one canonical graph file, the command SHALL fail with an ambiguity error listing the matching workspace-prefixed paths rather than guessing a workspace.\n\nIf `--spec` references no indexed spec node, the command SHALL fail with a not-found error that includes the requested spec id.\n\nIf the shared graph indexing lock is present, the command SHALL exit with code 3 after printing a user-facing retry-later message.\n\nIf the provider cannot be opened, the command exits with code 3."
+        "Exactly one of `--file`, `--symbol`, or `--spec` must be provided. If none or more than one are passed, the command SHALL fail with a CLI error and exit code 1.\n\nIf both `--config` and `--path` are passed, the command SHALL fail with a CLI error and exit code 1.\n\nIf a `--file` input without a workspace prefix does not resolve by config-relative path or project-relative path, the command SHALL fail with a user-facing resolution error.\n\nIf a `--file` input without a workspace prefix resolves to more than one canonical graph file, the command SHALL fail with a user-facing ambiguity error.\n\nIf `--spec` references no indexed spec node, the command SHALL fail with a not-found error for that spec id.\n\nIf the provider reports `GRAPH_BUSY` or `GRAPH_PROVIDER_STALE`, the command SHALL exit with code 3 through the standard infrastructure error path.\n\nIf the provider cannot be opened, the command exits with code 3."
       ]
     }
   ],
@@ -249,12 +249,12 @@
     },
     {
       "requirement": "Concurrent indexing guard",
-      "name": "Impact analysis fails fast while the indexing lock is present",
-      "given": ["a graph index process currently holds the shared graph indexing lock"],
+      "name": "Impact analysis surfaces provider busy after open",
+      "given": ["the provider reports GRAPH_BUSY during impact analysis"],
       "when": ["specd graph impact --file src/auth.ts is run"],
       "then": [
-        "the command exits with code 3 before opening the provider",
-        "AND it prints a short retry-later message explaining that the graph is currently being indexed"
+        "the command exits with code 3",
+        "AND it uses the infrastructure error path rather than a separate pre-open lock probe"
       ]
     },
     {
@@ -348,7 +348,11 @@
     {
       "requirement": "Error cases",
       "name": "Infrastructure error exits with code 3",
-      "given": ["the provider cannot be opened"],
+      "given": [
+        "the provider cannot be opened",
+        "OR the provider reports GRAPH_BUSY",
+        "OR the provider reports GRAPH_PROVIDER_STALE"
+      ],
       "when": ["specd graph impact --file core:src/auth.ts is run"],
       "then": [
         "stderr contains a fatal: prefixed error message",
@@ -361,13 +365,13 @@
       {
         "specId": "cli:graph-impact",
         "file": "cli:src/commands/graph/impact.ts",
-        "symbol": "registerGraphImpact"
+        "symbol": "handleFilesImpact"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:be517cc6da80ee7c9865c1932043c8ecb690557037c84fb1dbbbbc150d5ae1df",
-    "verify.md": "sha256:f97cbf5f14fa5d9500984a03406ab7a8166476aba2c449d026851a6cd02cdb0c"
+    "spec.md": "sha256:ee7ba1ff02afa543f072f215c2da56a9f13b4d74b9c3174afb8f8847cd6ef2a9",
+    "verify.md": "sha256:cd396c07a936af73303065dc5b57d8e1e173b92b03962c9ae7692a6d6f40202b"
   },
   "generatedBy": "core"
 }

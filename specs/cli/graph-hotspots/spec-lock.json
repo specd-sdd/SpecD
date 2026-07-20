@@ -4,10 +4,5 @@
     "version": 1
   },
   "dependsOn": ["cli:entrypoint", "core:config", "code-graph:composition", "cli:graph-cli-context"],
-  "implementation": [
-    {
-      "file": "cli:src/commands/graph/hotspots.ts",
-      "symbols": ["registerGraphHotspots"]
-    }
-  ]
+  "implementation": []
 }

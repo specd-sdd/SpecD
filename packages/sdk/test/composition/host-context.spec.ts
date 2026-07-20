@@ -8,6 +8,9 @@ let providerCallCount = 0
 
 const createKernel = vi.fn(async () => mockKernel)
 const createDefaultConfigLoader = vi.fn(async () => ({ load, resolvePath }))
+const createVcsAdapter = vi.fn()
+const createBootstrapGraphConfig = vi.fn()
+class ConfigNotFoundError extends Error {}
 const createCodeGraphProvider = vi.fn(() => {
   providerCallCount += 1
   return providerCallCount === 1 ? mockProviderA : mockProviderB
@@ -18,10 +21,13 @@ const resolvePath = vi.fn()
 vi.mock('@specd/core', () => ({
   createKernel,
   createDefaultConfigLoader,
+  createVcsAdapter,
+  ConfigNotFoundError,
 }))
 
 vi.mock('@specd/code-graph', () => ({
   createCodeGraphProvider,
+  createBootstrapGraphConfig,
 }))
 
 const { createSdkContext, openSpecdHost } = await import('../../src/composition/host-context.js')
@@ -41,8 +47,18 @@ describe('createSdkContext', () => {
     const ctx = await createSdkContext(sampleConfig)
     expect(createKernel).toHaveBeenCalledWith(sampleConfig, undefined)
     ctx.createGraphProvider()
-    expect(createCodeGraphProvider).toHaveBeenCalledWith(sampleConfig)
+    expect(createCodeGraphProvider).toHaveBeenCalledWith(sampleConfig, undefined)
     expect(ctx.kernel).toBe(mockKernel)
+  })
+
+  it('forwards graph composition options into createGraphProvider', async () => {
+    const graphOptions = { graphStoreId: 'ladybug' }
+    const ctx = await createSdkContext(sampleConfig, { graph: graphOptions })
+
+    ctx.createGraphProvider()
+
+    expect(createKernel).toHaveBeenCalledWith(sampleConfig, undefined)
+    expect(createCodeGraphProvider).toHaveBeenCalledWith(sampleConfig, graphOptions)
   })
 
   it('returns a new provider on each createGraphProvider call', async () => {
@@ -98,10 +114,20 @@ describe('openSpecdHost', () => {
     expect('warnings' in result).toBe(false)
   })
 
-  it('forwards kernelOptions to createKernel', async () => {
+  it('forwards sdk options to createKernel and createGraphProvider', async () => {
     const kernelOptions = { additionalDestinations: [] }
-    await openSpecdHost({ kernelOptions })
+    const graphOptions = { graphStoreId: 'ladybug' }
+
+    const result = await openSpecdHost({
+      options: {
+        kernel: kernelOptions,
+        graph: graphOptions,
+      },
+    })
+
+    result.createGraphProvider()
     expect(createKernel).toHaveBeenCalledWith(sampleConfig, kernelOptions)
+    expect(createCodeGraphProvider).toHaveBeenCalledWith(sampleConfig, graphOptions)
   })
 
   it('uses forced configPath when provided', async () => {
@@ -124,5 +150,29 @@ describe('openSpecdHost', () => {
       }),
     ).rejects.toThrow('openSpecdHost accepts either configPath or startDir, but never both')
     expect(createDefaultConfigLoader).not.toHaveBeenCalled()
+  })
+
+  it('uses a synthetic graph host only when discovery fallback is enabled', async () => {
+    const syntheticConfig = { ...sampleConfig, projectRoot: '/tmp/repository' } as SpecdConfig
+    load.mockRejectedValue(new ConfigNotFoundError('missing config'))
+    createVcsAdapter.mockResolvedValue({ rootDir: vi.fn().mockReturnValue('/tmp/repository') })
+    createBootstrapGraphConfig.mockReturnValue(syntheticConfig)
+
+    const result = await openSpecdHost({
+      startDir: '/tmp/repository/subdir',
+      allowBootstrapFallback: true,
+      options: { graph: { graphStoreId: 'ladybug' } },
+    })
+
+    expect(createVcsAdapter).toHaveBeenCalledWith('/tmp/repository/subdir')
+    expect(createBootstrapGraphConfig).toHaveBeenCalledWith({
+      projectRoot: '/tmp/repository',
+      vcsRoot: '/tmp/repository',
+    })
+    expect(result.configFilePath).toBeNull()
+    result.createGraphProvider()
+    expect(createCodeGraphProvider).toHaveBeenCalledWith(syntheticConfig, {
+      graphStoreId: 'ladybug',
+    })
   })
 })

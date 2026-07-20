@@ -1,12 +1,13 @@
 // Composition
 export { createCodeGraphProvider } from './composition/create-code-graph-provider.js'
+export { createSqliteGraphStoreFactory } from './composition/create-sqlite-graph-store-factory.js'
 export {
-  type CodeGraphFactoryOptions,
+  type CodeGraphCompositionOptions,
   type CodeGraphOptions,
   type GraphStoreFactory,
   type GraphStoreFactoryOptions,
 } from './composition/graph-store-factory.js'
-export type { CodeGraphProvider } from './composition/code-graph-provider.js'
+export { type CodeGraphProvider } from './composition/code-graph-provider.js'
 
 // Host use cases
 export {
@@ -100,7 +101,6 @@ export { expandSymbolName } from './domain/services/expand-symbol-name.js'
 export { expandSearchQuery, expandSearchToken } from './domain/services/expand-search-query.js'
 export { isGraphStale } from './domain/services/is-graph-stale.js'
 export { analyzeFilesImpact } from './domain/services/analyze-files-impact.js'
-export { normalizeFileSelectorPath } from './application/services/resolve-graph-selector.js'
 export {
   computeGraphFingerprint,
   computeRootFingerprint,
@@ -110,9 +110,6 @@ export {
   detectFingerprintMismatch,
   type GraphFingerprintInput,
 } from './application/use-cases/_shared/compute-graph-fingerprint.js'
-
-// Infrastructure
-export { acquireGraphIndexLock, assertGraphIndexUnlocked } from './infrastructure/index-lock.js'
 
 // Application services
 export { createBootstrapGraphConfig } from './application/services/bootstrap-graph-config.js'
@@ -126,6 +123,8 @@ export { SpecdCodeGraphError } from './domain/errors/specd-code-graph-error.js'
 export { InvalidSymbolKindError } from './domain/errors/invalid-symbol-kind-error.js'
 export { InvalidRelationTypeError } from './domain/errors/invalid-relation-type-error.js'
 export { DuplicateSymbolIdError } from './domain/errors/duplicate-symbol-id-error.js'
+export { GraphBusyError } from './domain/errors/graph-busy-error.js'
+export { GraphProviderStaleError } from './domain/errors/graph-provider-stale-error.js'
 export { StoreNotOpenError } from './domain/errors/store-not-open-error.js'
 export { SpecNotFoundError } from './domain/errors/spec-not-found-error.js'
 

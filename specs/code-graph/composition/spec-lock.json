@@ -16,8 +16,25 @@
   ],
   "implementation": [
     {
-      "file": "code-graph:src/public.ts",
-      "symbols": ["CODE_GRAPH_VERSION"]
+      "file": "code-graph:src/composition/graph-store-factory.ts",
+      "symbols": ["CodeGraphCompositionOptions"]
+    },
+    {
+      "file": "code-graph:src/public.ts"
+    },
+    {
+      "file": "code-graph:src/composition/code-graph-provider.ts",
+      "symbols": ["CodeGraphProvider", "CodeGraphProviderImpl"]
+    },
+    {
+      "file": "code-graph:src/composition/create-code-graph-provider.ts",
+      "symbols": ["createCodeGraphProvider"]
+    },
+    {
+      "file": "code-graph:src/composition/index.ts"
+    },
+    {
+      "file": "code-graph:test/barrel.spec.ts"
     }
   ]
 }

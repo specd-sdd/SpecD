@@ -1,4 +1,4 @@
-import { type GraphStore } from '../domain/ports/graph-store.js'
+import { type GraphStore, type StorageGenerationSnapshot } from '../domain/ports/graph-store.js'
 import { type IndexCodeGraph } from '../application/use-cases/index-code-graph.js'
 import { type IndexOptions } from '../domain/value-objects/index-options.js'
 import { type IndexResult } from '../domain/value-objects/index-result.js'
@@ -32,17 +32,100 @@ import { analyzeFileImpact } from '../domain/services/analyze-file-impact.js'
 import { analyzeSpecImpact } from '../domain/services/analyze-spec-impact.js'
 import { detectChanges } from '../domain/services/detect-changes.js'
 import { computeHotspots } from '../domain/services/compute-hotspots.js'
-import { type SpecdConfig } from '@specd/core'
 import { analyzeFilesImpact } from '../domain/services/analyze-files-impact.js'
-import { assertGraphIndexUnlocked, acquireGraphIndexLock } from '../infrastructure/index-lock.js'
+import { StoreNotOpenError } from '../domain/errors/store-not-open-error.js'
+import { GraphProviderStaleError } from '../domain/errors/graph-provider-stale-error.js'
+import {
+  assertGraphIndexUnlockedByStoragePath,
+  acquireGraphIndexLockByStoragePath,
+} from '../infrastructure/index-lock.js'
 
 /**
- * High-level facade for the code graph subsystem.
- * Provides methods for indexing, querying, traversal, impact analysis, and change detection.
+ * Public, factory-created facade for the code graph subsystem.
+ *
+ * This is intentionally a type-only contract. The concrete implementation and
+ * its store/indexer constructor dependencies remain inside composition.
  */
-export class CodeGraphProvider {
+export interface CodeGraphProvider {
+  open(): Promise<void>
+  close(): Promise<void>
+  [Symbol.asyncDispose](): Promise<void>
+  index(options: IndexOptions): Promise<IndexResult>
+  getSymbol(id: string): Promise<SymbolNode | undefined>
+  findSymbols(query: SymbolQuery): Promise<SymbolNode[]>
+  getFile(path: string): Promise<FileNode | undefined>
+  getDocument(path: string): Promise<DocumentNode | undefined>
+  findFilesByConfigRelativePath(configRelativePath: string): Promise<FileNode[]>
+  findDocumentsByConfigRelativePath(configRelativePath: string): Promise<DocumentNode[]>
+  resolveFileSelector(input: string): Promise<ResolvedFileSelector[]>
+  resolveSymbolSelector(input: string): Promise<ResolvedSymbolSelector[]>
+  getSpec(specId: string): Promise<SpecNode | undefined>
+  getSpecDependencies(specId: string): Promise<Relation[]>
+  getSpecDependents(specId: string): Promise<Relation[]>
+  getCoveredFiles(specId: string): Promise<Relation[]>
+  getCoveringSpecsForFile(filePath: string): Promise<Relation[]>
+  getCoveredSymbols(specId: string): Promise<Relation[]>
+  getCoveringSpecsForSymbol(symbolId: string): Promise<Relation[]>
+  getStatistics(): Promise<GraphStatistics>
+  getUpstream(symbolId: string, options?: TraversalOptions): Promise<TraversalResult>
+  getDownstream(symbolId: string, options?: TraversalOptions): Promise<TraversalResult>
+  analyzeImpact(
+    target: string,
+    direction: 'upstream' | 'downstream' | 'both',
+    maxDepth?: number,
+  ): Promise<ImpactResult>
+  analyzeFileImpact(
+    filePath: string,
+    direction: 'upstream' | 'downstream' | 'both',
+    maxDepth?: number,
+  ): Promise<FileImpactResult>
+  analyzeFilesImpact(
+    filePaths: string[],
+    direction: 'upstream' | 'downstream' | 'both',
+    maxDepth?: number,
+  ): Promise<FileImpactResult>
+  analyzeSpecImpact(
+    specId: string,
+    direction: 'upstream' | 'downstream' | 'both',
+    maxDepth?: number,
+  ): Promise<SpecImpactResult>
+  clear(): Promise<void>
+  detectChanges(changedFiles: string[], maxDepth?: number): Promise<ChangeDetectionResult>
+  getHotspots(options?: HotspotOptions): Promise<HotspotResult>
+  searchSymbols(options: SearchOptions): Promise<
+    Array<{
+      symbol: SymbolNode
+      score: number
+      snippet: string
+      startLine: number
+      endLine: number
+    }>
+  >
+  searchSpecs(
+    options: SearchOptions,
+  ): Promise<
+    Array<{ spec: SpecNode; score: number; snippet: string; startLine: number; endLine: number }>
+  >
+  searchDocuments(options: SearchOptions): Promise<
+    Array<{
+      document: DocumentNode
+      score: number
+      snippet: string
+      startLine: number
+      endLine: number
+    }>
+  >
+}
+
+/**
+ * Internal implementation of the factory-created graph provider.
+ */
+export class CodeGraphProviderImpl implements CodeGraphProvider {
+  private _isOpen = false
+  private _storageGeneration: StorageGenerationSnapshot | null = null
+
   /**
-   * Creates a new CodeGraphProvider.
+   * Creates a new internal graph provider.
    * @param store - The underlying graph store.
    * @param indexer - The indexing use case.
    * @param projectRoot - Optional project root path to make configuration paths relative.
@@ -57,14 +140,33 @@ export class CodeGraphProvider {
    * Opens the underlying graph store.
    */
   async open(): Promise<void> {
+    if (this._isOpen) {
+      return
+    }
+
     await this.store.open()
+    this._storageGeneration = await this.store.getStorageGeneration()
+    this._isOpen = true
   }
 
   /**
    * Closes the underlying graph store and releases resources.
    */
   async close(): Promise<void> {
+    if (!this._isOpen) {
+      return
+    }
+
     await this.store.close()
+    this._isOpen = false
+    this._storageGeneration = null
+  }
+
+  /**
+   * Releases provider resources when used with `await using`.
+   */
+  async [Symbol.asyncDispose](): Promise<void> {
+    await this.close()
   }
 
   /**
@@ -73,7 +175,15 @@ export class CodeGraphProvider {
    * @returns A summary of the indexing result.
    */
   async index(options: IndexOptions): Promise<IndexResult> {
-    return this.indexer.execute(options)
+    this.assertProviderOpen()
+    return this.withIndexLock(async () => {
+      if (options.force === true) {
+        await this.store.recreate()
+      }
+      const result = await this.indexer.execute(options)
+      this._storageGeneration = await this.store.getStorageGeneration()
+      return result
+    })
   }
 
   /**
@@ -82,6 +192,7 @@ export class CodeGraphProvider {
    * @returns The symbol node, or undefined if not found.
    */
   async getSymbol(id: string): Promise<SymbolNode | undefined> {
+    await this.assertAvailable()
     return this.store.getSymbol(id)
   }
 
@@ -91,6 +202,7 @@ export class CodeGraphProvider {
    * @returns An array of matching symbol nodes.
    */
   async findSymbols(query: SymbolQuery): Promise<SymbolNode[]> {
+    await this.assertAvailable()
     return this.store.findSymbols(query)
   }
 
@@ -100,6 +212,7 @@ export class CodeGraphProvider {
    * @returns The file node, or undefined if not found.
    */
   async getFile(path: string): Promise<FileNode | undefined> {
+    await this.assertAvailable()
     return this.store.getFile(path)
   }
 
@@ -109,6 +222,7 @@ export class CodeGraphProvider {
    * @returns The document node, or undefined if not found.
    */
   async getDocument(path: string): Promise<DocumentNode | undefined> {
+    await this.assertAvailable()
     return this.store.getDocument(path)
   }
 
@@ -118,6 +232,7 @@ export class CodeGraphProvider {
    * @returns Matching file nodes.
    */
   async findFilesByConfigRelativePath(configRelativePath: string): Promise<FileNode[]> {
+    await this.assertAvailable()
     return this.store.findFilesByConfigRelativePath(configRelativePath)
   }
 
@@ -127,6 +242,7 @@ export class CodeGraphProvider {
    * @returns Matching document nodes.
    */
   async findDocumentsByConfigRelativePath(configRelativePath: string): Promise<DocumentNode[]> {
+    await this.assertAvailable()
     return this.store.findDocumentsByConfigRelativePath(configRelativePath)
   }
 
@@ -136,6 +252,7 @@ export class CodeGraphProvider {
    * @returns Matching canonical file or document entries.
    */
   async resolveFileSelector(input: string): Promise<ResolvedFileSelector[]> {
+    await this.assertAvailable()
     return resolveFileSelector(input, {
       store: this.store,
       ...(this.projectRoot !== undefined ? { projectRoot: this.projectRoot } : {}),
@@ -148,6 +265,7 @@ export class CodeGraphProvider {
    * @returns Matching canonical symbol entries.
    */
   async resolveSymbolSelector(input: string): Promise<ResolvedSymbolSelector[]> {
+    await this.assertAvailable()
     return resolveSymbolSelector(input, {
       store: this.store,
       ...(this.projectRoot !== undefined ? { projectRoot: this.projectRoot } : {}),
@@ -160,6 +278,7 @@ export class CodeGraphProvider {
    * @returns The spec node, or undefined if not found.
    */
   async getSpec(specId: string): Promise<SpecNode | undefined> {
+    await this.assertAvailable()
     return this.store.getSpec(specId)
   }
 
@@ -169,6 +288,7 @@ export class CodeGraphProvider {
    * @returns An array of dependency relations.
    */
   async getSpecDependencies(specId: string): Promise<Relation[]> {
+    await this.assertAvailable()
     return this.store.getSpecDependencies(specId)
   }
 
@@ -178,6 +298,7 @@ export class CodeGraphProvider {
    * @returns An array of dependent relations.
    */
   async getSpecDependents(specId: string): Promise<Relation[]> {
+    await this.assertAvailable()
     return this.store.getSpecDependents(specId)
   }
 
@@ -187,6 +308,7 @@ export class CodeGraphProvider {
    * @returns File coverage relations.
    */
   async getCoveredFiles(specId: string): Promise<Relation[]> {
+    await this.assertAvailable()
     return this.store.getCoveredFiles(specId)
   }
 
@@ -196,7 +318,8 @@ export class CodeGraphProvider {
    * @returns File coverage relations keyed by spec.
    */
   async getCoveringSpecsForFile(filePath: string): Promise<Relation[]> {
-    return this.store.getCoveringSpecs(filePath)
+    await this.assertAvailable()
+    return this.store.getCoveringSpecsForFile(filePath)
   }
 
   /**
@@ -205,6 +328,7 @@ export class CodeGraphProvider {
    * @returns Symbol coverage relations.
    */
   async getCoveredSymbols(specId: string): Promise<Relation[]> {
+    await this.assertAvailable()
     return this.store.getCoveredSymbols(specId)
   }
 
@@ -214,7 +338,8 @@ export class CodeGraphProvider {
    * @returns Symbol coverage relations keyed by spec.
    */
   async getCoveringSpecsForSymbol(symbolId: string): Promise<Relation[]> {
-    return this.store.getSymbolCoveringSpecs(symbolId)
+    await this.assertAvailable()
+    return this.store.getCoveringSpecsForSymbol(symbolId)
   }
 
   /**
@@ -222,6 +347,7 @@ export class CodeGraphProvider {
    * @returns The graph statistics.
    */
   async getStatistics(): Promise<GraphStatistics> {
+    await this.assertAvailable()
     return this.store.getStatistics()
   }
 
@@ -232,6 +358,7 @@ export class CodeGraphProvider {
    * @returns The traversal result with visited nodes and edges.
    */
   async getUpstream(symbolId: string, options?: TraversalOptions): Promise<TraversalResult> {
+    await this.assertAvailable()
     return getUpstream(this.store, symbolId, options)
   }
 
@@ -242,6 +369,7 @@ export class CodeGraphProvider {
    * @returns The traversal result with visited nodes and edges.
    */
   async getDownstream(symbolId: string, options?: TraversalOptions): Promise<TraversalResult> {
+    await this.assertAvailable()
     return getDownstream(this.store, symbolId, options)
   }
 
@@ -249,7 +377,7 @@ export class CodeGraphProvider {
    * Analyzes the impact (blast radius) of changes to a symbol.
    * @param target - The symbol identifier to analyze.
    * @param direction - Direction of impact analysis.
-   * @param maxDepth - Maximum traversal depth (default: 3).
+   * @param maxDepth - Maximum traversal depth.
    * @returns The impact result with affected symbols and risk levels.
    */
   async analyzeImpact(
@@ -257,6 +385,7 @@ export class CodeGraphProvider {
     direction: 'upstream' | 'downstream' | 'both',
     maxDepth?: number,
   ): Promise<ImpactResult> {
+    await this.assertAvailable()
     return analyzeImpact(this.store, target, direction, maxDepth)
   }
 
@@ -264,7 +393,7 @@ export class CodeGraphProvider {
    * Analyzes the impact (blast radius) of changes to a file.
    * @param filePath - The file path to analyze.
    * @param direction - Direction of impact analysis.
-   * @param maxDepth - Maximum traversal depth (default: 3).
+   * @param maxDepth - Maximum traversal depth.
    * @returns The file impact result with affected files and risk levels.
    */
   async analyzeFileImpact(
@@ -272,6 +401,7 @@ export class CodeGraphProvider {
     direction: 'upstream' | 'downstream' | 'both',
     maxDepth?: number,
   ): Promise<FileImpactResult> {
+    await this.assertAvailable()
     return analyzeFileImpact(this.store, filePath, direction, maxDepth)
   }
 
@@ -279,7 +409,7 @@ export class CodeGraphProvider {
    * Analyzes the aggregate impact (blast radius) of changes to multiple files.
    * @param filePaths - The file paths to analyze.
    * @param direction - Direction of impact analysis.
-   * @param maxDepth - Maximum traversal depth (default: 3).
+   * @param maxDepth - Maximum traversal depth.
    * @returns The combined files impact result.
    */
   async analyzeFilesImpact(
@@ -287,6 +417,7 @@ export class CodeGraphProvider {
     direction: 'upstream' | 'downstream' | 'both',
     maxDepth?: number,
   ): Promise<FileImpactResult> {
+    await this.assertAvailable()
     return analyzeFilesImpact(this.store, filePaths, direction, maxDepth)
   }
 
@@ -302,6 +433,7 @@ export class CodeGraphProvider {
     direction: 'upstream' | 'downstream' | 'both',
     maxDepth?: number,
   ): Promise<SpecImpactResult> {
+    await this.assertAvailable()
     return analyzeSpecImpact(this.store, specId, direction, maxDepth)
   }
 
@@ -310,40 +442,36 @@ export class CodeGraphProvider {
    * @returns A promise that resolves when the store is cleared.
    */
   async clear(): Promise<void> {
-    return this.store.clear()
-  }
-
-  /**
-   * Recreates the underlying persistent graph storage.
-   * @returns A promise that resolves when persisted state has been reset.
-   */
-  async recreate(): Promise<void> {
-    return this.store.recreate()
+    this.assertProviderOpen()
+    await this.withIndexLock(async () => {
+      await this.store.clear()
+      this._storageGeneration = await this.store.getStorageGeneration()
+    })
   }
 
   /**
    * Detects the scope of changes given a set of modified files.
    * @param changedFiles - Array of file paths that have changed.
-   * @param maxDepth - Maximum traversal depth (default: 3).
+   * @param maxDepth - Maximum traversal depth.
    * @returns The change detection result with affected symbols and flows.
    */
   async detectChanges(changedFiles: string[], maxDepth?: number): Promise<ChangeDetectionResult> {
+    await this.assertAvailable()
     return detectChanges(this.store, changedFiles, maxDepth)
   }
 
   /**
    * Computes hotspot scores for all symbols in the graph.
-   * Ranks symbols by how much would break if they changed.
    * @param options - Optional filtering and limiting options.
    * @returns The hotspot result with ranked entries.
    */
   async getHotspots(options?: HotspotOptions): Promise<HotspotResult> {
+    await this.assertAvailable()
     return computeHotspots(this.store, options)
   }
 
   /**
    * Full-text search across symbols (name and comment).
-   * Filters are applied at the store level before LIMIT.
    * @param options - Search options including query, limit, and filters.
    * @returns Matching symbols with BM25 scores, ordered by relevance.
    */
@@ -356,12 +484,12 @@ export class CodeGraphProvider {
       endLine: number
     }>
   > {
+    await this.assertAvailable()
     return this.store.searchSymbols(options)
   }
 
   /**
    * Full-text search across specs (title, description, and content).
-   * Filters are applied at the store level before LIMIT.
    * @param options - Search options including query, limit, and filters.
    * @returns Matching specs with BM25 scores and snippets, ordered by relevance.
    */
@@ -370,12 +498,12 @@ export class CodeGraphProvider {
   ): Promise<
     Array<{ spec: SpecNode; score: number; snippet: string; startLine: number; endLine: number }>
   > {
+    await this.assertAvailable()
     return this.store.searchSpecs(options)
   }
 
   /**
    * Full-text search across documents (path and content).
-   * Filters are applied at the store level before LIMIT.
    * @param options - Search options including query, limit, and filters.
    * @returns Matching documents with scores and snippets, ordered by relevance.
    */
@@ -388,24 +516,56 @@ export class CodeGraphProvider {
       endLine: number
     }>
   > {
+    await this.assertAvailable()
     return this.store.searchDocuments(options)
   }
 
   /**
-   * Asserts that the graph index is currently unlocked.
-   * @param config - The active project configuration.
-   * @throws {Error} If the indexing lock is currently held.
+   * Throws when the provider has not been opened.
+   * @throws {StoreNotOpenError} When the provider has not been opened.
    */
-  assertGraphIndexUnlocked(config: SpecdConfig): void {
-    assertGraphIndexUnlocked(config)
+  private assertProviderOpen(): void {
+    if (!this._isOpen) {
+      throw new StoreNotOpenError()
+    }
   }
 
   /**
-   * Acquires the indexing lock for the graph.
-   * @param config - The active project configuration.
-   * @returns A release function to release the lock.
+   * Ensures the provider is open, not busy, and still bound to the current storage generation.
+   * @throws {StoreNotOpenError} When the provider has not been opened.
+   * @throws {GraphProviderStaleError} When the storage generation changed after open.
    */
-  acquireGraphIndexLock(config: SpecdConfig): () => void {
-    return acquireGraphIndexLock(config)
+  private async assertAvailable(): Promise<void> {
+    this.assertProviderOpen()
+    assertGraphIndexUnlockedByStoragePath(this.store.storagePath)
+
+    const currentGeneration = await this.store.getStorageGeneration()
+    const cachedGeneration = this._storageGeneration
+
+    if (cachedGeneration === null) {
+      this._storageGeneration = currentGeneration
+      return
+    }
+
+    if (currentGeneration.mtimeMs !== cachedGeneration.mtimeMs) {
+      if (currentGeneration.token !== cachedGeneration.token) {
+        throw new GraphProviderStaleError()
+      }
+      this._storageGeneration = currentGeneration
+    }
+  }
+
+  /**
+   * Runs a provider-maintenance operation while holding the shared graph index lock.
+   * @param fn - Operation to execute while the lock is held.
+   * @returns The operation result.
+   */
+  private async withIndexLock<T>(fn: () => Promise<T>): Promise<T> {
+    const release = acquireGraphIndexLockByStoragePath(this.store.storagePath)
+    try {
+      return await fn()
+    } finally {
+      release()
+    }
   }
 }

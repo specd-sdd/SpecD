@@ -81,6 +81,15 @@
 - **THEN** it uses `GraphStore.recreate()`
 - **AND** it does not need to know backend-specific database files, lock files, WAL files, or schema artifacts
 
+### Requirement: Storage generation tracking
+
+#### Scenario: Recreate rotates the persisted storage generation
+
+- **GIVEN** a persisted graph store with an existing storage-generation marker
+- **WHEN** `recreate()` completes
+- **THEN** the next opened provider observes a different storage generation
+- **AND** previously opened providers can detect that they are stale
+
 ### Requirement: Atomic file-level upsert
 
 #### Scenario: Upsert replaces all data for a file

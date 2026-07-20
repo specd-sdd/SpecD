@@ -12,15 +12,10 @@
   "implementation": [
     {
       "file": "code-graph:src/application/use-cases/get-graph-health.ts",
-      "symbols": ["GetGraphHealth", "GetGraphHealthInput", "GetGraphHealthResult"]
+      "symbols": ["GetGraphHealth"]
     },
     {
-      "file": "code-graph:src/composition/use-cases/get-graph-health.ts",
-      "symbols": ["createGetGraphHealth"]
-    },
-    {
-      "file": "code-graph:src/application/ports/code-graph-host-port.ts",
-      "symbols": ["CodeGraphHostPort"]
+      "file": "code-graph:test/application/use-cases/get-graph-health.spec.ts"
     }
   ]
 }

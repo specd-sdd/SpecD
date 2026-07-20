@@ -40,7 +40,7 @@ Search ranking MUST prioritize primary identities at the top of the result set a
 
 ### Requirement: Search behaviour
 
-The command uses the shared graph CLI context model (`cli:graph-cli-context`) to resolve explicit config, autodetected config, or bootstrap mode before opening a `CodeGraphProvider` via `withProvider`.
+The command uses the shared graph CLI context model (`cli:graph-cli-context`) to resolve host bootstrap and provider lifecycle.
 
 Platform symbols MUST come from `@specd/sdk`.
 
@@ -50,9 +50,9 @@ It delegates to:
 - `provider.searchSpecs(options)` — search across spec title, description, and content
 - `provider.searchDocuments(options)` — search across document paths and textual content
 
-The concrete scoring and indexing strategy are implementation concerns of the active graph-store backend. Results are returned ordered by score descending — highest relevance first — with primary-identity matches boosted ahead of generic content-only hits. Broad retrieval across backend-searchable fields remains in place; identity-aware logic changes ranking, not category coverage.
+The concrete scoring and indexing strategy are implementation concerns of the active backend, subject to the shared ranking guarantees of `code-graph:graph-store`.
 
-Backends MUST apply a shared specd/code-aware lexical token expansion before identity-aware ranking. That expansion MUST preserve the normalized original token and MUST additionally expand useful specd/code shapes such as:
+Backends MUST apply a shared specd/code-aware lexical token expansion before identity-aware ranking, including examples such as:
 
 - `core:change` into tokens including `core:change`, `core`, and `change`
 - `ArchiveChange` into tokens including `archivechange`, `archive`, and `change`
@@ -69,21 +69,9 @@ Observable ranking semantics MUST hold across backends:
 - prefix, suffix, substring, segment, or path-component matches on a primary identity MUST rank ahead of results that match only through generic textual frequency in descriptions, comments, or document/spec body content
 - symbol results matching on declared identity MUST outrank otherwise stronger comment-only hits for the same query intent
 
-Search results SHALL carry preview context together with the ranked hit, including the matched text and the 1-based line range (`startLine` to `endLine`) from the source content, even when text-mode snippet rendering is not requested.
+Search results SHALL carry preview context together with the ranked hit, including line-range information suitable for text and structured output.
 
-Preview sources SHALL follow these rules:
-
-- symbol previews SHALL be derived from persisted source-file content addressed through the symbol's file path and line location
-- spec previews SHALL be derived from matched spec content when available, falling back to description context only when no better body excerpt is available
-- document previews SHALL be derived from matched document content rather than from the beginning of the document
-
-A symbol hit MAY be ranked because of symbol identity or attached comment text, but the preferred preview SHALL still be a code snippet around the symbol location unless no useful source snippet can be produced.
-
-The `--kind` option SHALL accept exactly one comma-separated list value. Each token SHALL be trimmed and validated against the allowed `SymbolKind` values before the provider query is executed. Any invalid token SHALL cause a CLI error and SHALL prevent the search from running.
-
-The validated kind list SHALL be passed to the query layer as a multi-kind filter rather than being collapsed to a single last value.
-
-Before attempting to open the provider, the command SHALL check the shared graph indexing lock used by `graph index`. If indexing is currently in progress, the command SHALL fail fast with a short user-facing retry-later message instead of surfacing backend lock errors.
+The command MUST NOT perform a host-managed pre-open lock probe. Busy and stale availability semantics are owned by the provider.
 
 ### Requirement: Output format
 
@@ -142,7 +130,9 @@ Structured output details:
 
 ### Requirement: Error cases
 
-If the provider cannot be opened, the command exits with code 3 (same as other graph commands). The `process.exit(0)` pattern applies — LadybugDB native threads require explicit exit.
+If the provider cannot be opened, the command exits with code 3 (same as other graph commands).
+
+If the provider reports `GRAPH_BUSY` or `GRAPH_PROVIDER_STALE` while serving the search request, the command SHALL exit with code 3 through the standard infrastructure error path.
 
 ### Requirement: Command signature (filters)
 
@@ -158,7 +148,7 @@ The command accepts the following filter options applied at the store level:
 
 - The CLI does not contain search logic — it delegates to `CodeGraphProvider.searchSymbols`, `CodeGraphProvider.searchSpecs`, and `CodeGraphProvider.searchDocuments`
 - Search depends on the active graph-store backend having prepared its search indexes during indexing or store maintenance
-- The command checks the shared graph indexing lock before opening the provider and fails fast while indexing is in progress
+- Busy and stale availability semantics are enforced by the provider after open; the CLI does not fail fast through a separate pre-open lock probe
 - The `process.exit(0)` pattern is required after closing the provider
 
 ## Examples

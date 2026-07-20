@@ -54,6 +54,10 @@ Missing or empty results MUST be represented as an empty array, not as `null`.
 
 `VcsAdapter` MUST be declared as an abstract class, not a TypeScript interface. It MUST accept `cwd` as a protected read-only constructor parameter, which represents the working directory context.
 
+### Requirement: Public port export
+
+`@specd/core` SHALL export the `VcsAdapter` abstract class as a runtime value from its supported public API. Consumers that require the typed VCS contract MUST import the port from `@specd/core` and MUST NOT import it from an internal application path.
+
 ### Requirement: Null fallback implementation
 
 A `NullVcsAdapter` implementation MUST exist for environments where no VCS is detected. It MUST satisfy the following contract:

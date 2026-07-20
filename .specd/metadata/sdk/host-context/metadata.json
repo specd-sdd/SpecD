@@ -1,7 +1,7 @@
 {
   "title": "SDK Host Context",
   "description": "Hosts need one call that loads project config, builds the kernel, and exposes a graph-provider factory bound to the same resolved config. Without this, every adapter repeats `createConfigLoader` + `createKernel` + `createCodeGraphProvider` wiring and risks config drift between kernel and graph subsystems.",
-  "dependsOn": ["sdk:composition", "core:kernel", "core:composition"],
+  "dependsOn": ["sdk:composition", "core:kernel", "core:composition", "code-graph:composition"],
   "context": [
     "Hosts need one call that loads project config, builds the kernel, and exposes a graph-provider factory bound to the same resolved config. Without this, every adapter repeats `createConfigLoader` + `createKernel` + `createCodeGraphProvider` wiring and risks config drift between kernel and graph subsystems."
   ],
@@ -9,19 +9,19 @@
     {
       "requirement": "SdkHostContext shape",
       "rules": [
-        "`SdkHostContext` SHALL be a readonly object:\n\n```typescript\ninterface SdkHostContext {\n  readonly kernel: Kernel\n  readonly createGraphProvider: () => CodeGraphProvider\n}\n```\n\nThe context MUST NOT store a duplicate copy of `SpecdConfig`. Config reads MUST go through `kernel.project.getConfig.execute()`."
+        "SdkHostContext SHALL be a readonly object:\n\n```ts\ninterface SdkHostContext {\n  readonly kernel: Kernel\n  readonly createGraphProvider: () => CodeGraphProvider\n}\n```\n\nThe context MUST NOT store a duplicate copy of `SpecdConfig`. Config reads MUST go through `kernel.project.getConfig.execute()`.\n\nThe graph-provider factory MUST remain synchronous and MUST return a fresh `CodeGraphProvider` instance on every call."
       ]
     },
     {
       "requirement": "createSdkContext",
       "rules": [
-        "`createSdkContext(config: SpecdConfig, options?: KernelOptions): Promise<SdkHostContext>` SHALL:\n\n1. Await `createKernel(config, options)` from `@specd/core`\n2. Return `{ kernel, createGraphProvider: () => createCodeGraphProvider(config) }`\n\n`createGraphProvider` MUST close over the same `config` instance passed to `createKernel`. Each call to `createGraphProvider()` MUST return a new `CodeGraphProvider` instance (not a shared singleton)."
+        "`createSdkContext(config: SpecdConfig, options?: SdkContextOptions): Promise<SdkHostContext>` SHALL:\n\n1. Await `createKernel(config, options?.kernel)` from `@specd/core`\n2. Return `{ kernel, createGraphProvider: () => createCodeGraphProvider(config, options?.graph) }`\n\n`SdkContextOptions` SHALL be an SDK-owned bootstrap shape:\n\n```ts\ninterface SdkContextOptions {\n  readonly kernel?: KernelOptions\n  readonly graph?: CodeGraphCompositionOptions\n}\n```\n\n`createGraphProvider` MUST close over the same `config` instance passed to `createKernel`.\n\nWhen `options?.graph` is omitted, `createGraphProvider()` MUST preserve the default `@specd/code-graph` composition behavior."
       ]
     },
     {
       "requirement": "openSpecdHost",
       "rules": [
-        "`openSpecdHost(input?: OpenSpecdHostInput): Promise<OpenSpecdHostResult>` SHALL:\n\n1. Reject any call that provides both `input.configPath` and `input.startDir`, because forced-file bootstrap and discovery-root bootstrap are distinct modes and the caller MUST choose one explicitly\n2. Use `createDefaultConfigLoader()` to load config:\n   - `input.configPath` maps to loader forced mode when provided\n   - otherwise `input.startDir` maps to loader discovery mode when provided\n   - otherwise discovery mode starts from `process.cwd()`\n3. Await `createSdkContext(config, input.kernelOptions)`\n4. Return `{ config, configFilePath, ...ctx }` where `configFilePath` is the absolute path to the loaded `specd.yaml`, or `null` when not locatable\n\nConfiguration warnings exposed through `SpecdConfig.warnings` SHALL remain attached to the returned `config` object unchanged. `OpenSpecdHostResult` MUST NOT add a separate top-level `warnings` field or any alternate warning collection that duplicates `config.warnings`.\n\n`OpenSpecdHostInput` MAY include optional `startDir` for host-selected discovery roots and optional `kernelOptions` for host-specific logging or kernel overrides (e.g. CLI log destinations)."
+        "`openSpecdHost(input?: OpenSpecdHostInput): Promise<OpenSpecdHostResult>` SHALL:\n\n1. Reject any call that provides both `input.configPath` and `input.startDir`, because forced-file bootstrap and discovery-root bootstrap are distinct modes and the caller MUST choose one explicitly\n2. Use `createDefaultConfigLoader()` to load config:\n   - `input.configPath` maps to loader forced mode when provided\n   - otherwise `input.startDir` maps to loader discovery mode when provided\n   - otherwise discovery mode starts from `process.cwd()`\n3. Await `createSdkContext(config, input.options)`\n4. Return `{ config, configFilePath, ...ctx }` where `configFilePath` is the absolute path to the loaded `specd.yaml`, or `null` when not locatable\n\nConfiguration warnings exposed through `SpecdConfig.warnings` SHALL remain attached to `config`; `openSpecdHost` MUST NOT duplicate them as a top-level result field.\n\n`OpenSpecdHostInput` MAY include optional `startDir` for host-selected discovery roots, and MAY include `options?: SdkContextOptions` so the same kernel and graph composition options are available through both host bootstrap entry points.\n\n`OpenSpecdHostInput` SHALL also support `allowBootstrapFallback?: boolean`, defaulting to `false`. When it is `true` and discovery from `startDir` (or `process.cwd()`) finds no configuration, `openSpecdHost` SHALL resolve the VCS root and construct a synthetic graph-capable configuration for that root. It MUST preserve the normal error when no VCS root can be resolved, and it MUST NOT apply this fallback to an explicit `configPath` request."
       ]
     },
     {
@@ -103,9 +103,14 @@
     },
     {
       "requirement": "openSpecdHost",
-      "name": "Kernel options forwarded",
-      "when": ["openSpecdHost({ kernelOptions: { ... } }) is called"],
-      "then": ["createKernel receives the provided options"]
+      "name": "SDK composition options are forwarded",
+      "when": [
+        "openSpecdHost({ options: { kernel: { ... }, graph: { graphStoreId: 'sqlite' } } }) is called"
+      ],
+      "then": [
+        "createKernel receives the provided kernel options",
+        "AND createGraphProvider forwards the provided graph options to createCodeGraphProvider"
+      ]
     },
     {
       "requirement": "openSpecdHost",
@@ -121,6 +126,27 @@
       "then": [
         "warning diagnostics are available through config.warnings",
         "AND no separate top-level warnings field is required or exposed"
+      ]
+    },
+    {
+      "requirement": "openSpecdHost",
+      "name": "Opt-in bootstrap fallback constructs a graph host",
+      "given": ["discovery from startDir finds no specd.yaml and a VCS root exists"],
+      "when": ["openSpecdHost({ startDir, allowBootstrapFallback: true }) is called"],
+      "then": [
+        "it returns a synthetic graph-capable host rooted at that VCS repository",
+        "AND config discovery remains the behavior when the flag is omitted or false"
+      ]
+    },
+    {
+      "requirement": "openSpecdHost",
+      "name": "Explicit configuration never falls back",
+      "when": [
+        "openSpecdHost({ configPath, allowBootstrapFallback: true }) cannot load configPath"
+      ],
+      "then": [
+        "the explicit configuration error propagates",
+        "AND no synthetic fallback is created"
       ]
     },
     {
@@ -141,7 +167,17 @@
       {
         "specId": "sdk:host-context",
         "file": "sdk:src/composition/host-context.ts",
-        "symbol": "OpenSpecdHostResult"
+        "symbol": "SdkContextOptions"
+      },
+      {
+        "specId": "sdk:host-context",
+        "file": "sdk:src/composition/host-context.ts",
+        "symbol": "OpenSpecdHostInput"
+      },
+      {
+        "specId": "sdk:host-context",
+        "file": "sdk:src/composition/host-context.ts",
+        "symbol": "createSdkContext"
       },
       {
         "specId": "sdk:host-context",
@@ -151,8 +187,8 @@
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:1f84f6ccd6cf5796e34b809135dd4f52ce04fc443e69bd9f6c417cbcf17e1655",
-    "verify.md": "sha256:25ce5242cd5272ea4e675d28d3c7f6143b79548d8f94861b35fd1f3bf9974173"
+    "spec.md": "sha256:0982bcba7411d5de34e13d0865fd04cf85b886645e5f6aa331b340067311a736",
+    "verify.md": "sha256:9a2f5dddbb0e993553eef8bcc7f8ab1235981ee3fdeb2dc8a0e4e8b750f1eda2"
   },
   "generatedBy": "core"
 }

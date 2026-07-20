@@ -2120,6 +2120,104 @@
           "files": ["tasks"]
         }
       ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-20T16:47:33.028Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'sdk-graph-provider-factory' was archived with overlapping specs: cli:graph-cli-context, cli:graph-hotspots, cli:graph-impact, cli:graph-search, cli:graph-stats, code-graph:composition, code-graph:ladybug-graph-store, code-graph:sqlite-graph-store, sdk:with-open-graph-provider",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:ladybug-graph-store",
+            "code-graph:composition",
+            "sdk:with-open-graph-provider",
+            "cli:graph-cli-context",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "cli:graph-hotspots",
+            "cli:graph-search",
+            "code-graph:sqlite-graph-store"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:ladybug-graph-store",
+            "code-graph:composition",
+            "sdk:with-open-graph-provider",
+            "cli:graph-cli-context",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "cli:graph-hotspots",
+            "cli:graph-search",
+            "code-graph:sqlite-graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-20T16:47:43.580Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'sdk-graph-provider-factory' was archived with overlapping specs: cli:graph-cli-context, cli:graph-hotspots, cli:graph-impact, cli:graph-search, cli:graph-stats, code-graph:composition, code-graph:ladybug-graph-store, code-graph:sqlite-graph-store, sdk:with-open-graph-provider",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:ladybug-graph-store",
+            "code-graph:composition",
+            "sdk:with-open-graph-provider",
+            "cli:graph-cli-context",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "cli:graph-hotspots",
+            "cli:graph-search",
+            "code-graph:sqlite-graph-store"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:ladybug-graph-store",
+            "code-graph:composition",
+            "sdk:with-open-graph-provider",
+            "cli:graph-cli-context",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "cli:graph-hotspots",
+            "cli:graph-search",
+            "code-graph:sqlite-graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
     }
   ]
 }

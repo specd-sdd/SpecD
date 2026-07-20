@@ -9,13 +9,13 @@
     {
       "requirement": "withOpenGraphProvider signature",
       "rules": [
-        "`withOpenGraphProvider<T>(ctx: SdkHostContext, fn: (provider: CodeGraphProvider) => Promise<T>): Promise<T>` SHALL:\n\n1. Call `ctx.createGraphProvider()` to obtain a provider\n2. Call `provider.open()`\n3. Invoke `fn(provider)` and return its result\n4. Call `provider.close()` in a `finally` block after `fn` completes or throws"
+        "`withOpenGraphProvider<T>(ctx: SdkHostContext, fn: (provider: CodeGraphProvider) => Promise<T>, options?: WithOpenGraphProviderOptions): Promise<T>` SHALL:\n\n1. Call `ctx.createGraphProvider()` to obtain a provider\n2. If `options.beforeOpen` is provided, await it after provider creation and before `provider.open()`\n3. Call `provider.open()`\n4. Invoke `fn(provider)` and return its result\n5. Call `provider.close()` after `fn` completes or throws\n6. If `options.afterClose` is provided, await it after the helper finishes its close path, including error cleanup paths\n\n`WithOpenGraphProviderOptions` SHALL support:\n\n```ts\ninterface WithOpenGraphProviderOptions {\n  readonly beforeOpen?: (provider: CodeGraphProvider) => Promise<void>\n  readonly afterClose?: (provider: CodeGraphProvider) => Promise<void>\n}\n```"
       ]
     },
     {
       "requirement": "Error propagation",
       "rules": [
-        "When `fn` throws, `withOpenGraphProvider` MUST still attempt `provider.close()`. Close failures during error cleanup MUST NOT mask the original error from `fn`. The original error MUST propagate to the caller."
+        "When `fn` throws, `withOpenGraphProvider` MUST still attempt `provider.close()`. Close failures during error cleanup MUST NOT mask the original error from `fn`. The original error MUST propagate to the caller.\n\nWhen `beforeOpen` succeeds but `provider.open()` later fails, the helper MUST still run the close/cleanup path and MUST still invoke `afterClose` after that cleanup attempt.\n\nWhen `fn` succeeds and the primary `close()` path fails, the close failure MAY propagate to the caller. When `afterClose` fails after a successful operation, that cleanup failure MAY propagate as the terminal helper failure."
       ]
     },
     {
@@ -27,7 +27,7 @@
     {
       "requirement": "Optional beforeOpen hook",
       "rules": [
-        "`withOpenGraphProvider` MAY accept an optional `beforeOpen` callback invoked after provider creation and before `open()`, for host-specific setup (e.g. lock acquisition in CLI). When omitted, the flow proceeds directly to `open()`."
+        "`withOpenGraphProvider` MAY accept optional lifecycle hooks invoked around `open()` and `close()` for host-specific setup and teardown.\n\n`beforeOpen` is invoked after provider creation and before `open()`.\n\n`afterClose` is invoked after the helper has attempted to close the provider, regardless of whether the operation succeeded, threw, or failed during `open()` after `beforeOpen` had already run.\n\nThese hooks exist for host-local orchestration concerns; they MUST NOT change the underlying `CodeGraphProvider` contract, which remains directly usable by long-lived hosts without this helper."
       ]
     }
   ],
@@ -54,6 +54,24 @@
       "given": ["fn throws"],
       "when": ["withOpenGraphProvider runs"],
       "then": ["provider.close() is still invoked"]
+    },
+    {
+      "requirement": "Error propagation",
+      "name": "Open failure cleans up without beforeOpen",
+      "given": [
+        "ctx.createGraphProvider() returns a provider",
+        "AND no beforeOpen hook is supplied",
+        "AND provider.open() rejects with error E"
+      ],
+      "when": ["withOpenGraphProvider completes"],
+      "then": ["provider.close() is attempted", "AND error E propagates to the caller"]
+    },
+    {
+      "requirement": "Error propagation",
+      "name": "afterClose runs after open failure cleanup",
+      "given": ["provider.open() rejects after provider creation", "AND afterClose is supplied"],
+      "when": ["withOpenGraphProvider completes"],
+      "then": ["afterClose(provider) runs after the close attempt"]
     },
     {
       "requirement": "No process exit side effects",
@@ -83,8 +101,8 @@
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:e1575d2f3cfb9f748b8ae98278a92b7fb5ab9363e0d704d197b4076d1986576c",
-    "verify.md": "sha256:70233cb88202cb0e5c34b0942eab60e08e048077d5c61a45143f72d8376ef042"
+    "spec.md": "sha256:c96df715aec44c340d432ef80975cef0aceed18bcac9dfcf7c88d856d404cc20",
+    "verify.md": "sha256:45d9709c63dbaa3b423d0dce874ff77155ba0b0c5bafc6f0ad2eff88712c4637"
   },
   "generatedBy": "core"
 }

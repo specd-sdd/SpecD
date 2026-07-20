@@ -12,7 +12,7 @@
   "implementation": [
     {
       "file": "code-graph:src/infrastructure/sqlite/sqlite-graph-store.ts",
-      "symbols": ["SQLiteGraphStore", "searchSymbols", "searchSpecs", "searchDocuments"]
+      "symbols": ["SQLiteGraphStore"]
     },
     {
       "file": "code-graph:test/infrastructure/sqlite/sqlite-graph-store.spec.ts"

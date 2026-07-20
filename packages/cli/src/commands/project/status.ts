@@ -54,7 +54,9 @@ JSON/TOON output schema:
         const fmt = parseFormat(opts.format)
         const host = await openSpecdHost({
           ...(opts.config !== undefined ? { configPath: opts.config } : {}),
-          kernelOptions: buildCliKernelOptions(),
+          options: {
+            kernel: buildCliKernelOptions(),
+          },
         })
         const { config, kernel } = {
           config: host.config,

@@ -14,6 +14,7 @@ Hosts (`graph index`, SDK `runIndexProjectGraph`) currently assemble workspace t
 - `workspaces`
 - `graphConfig`
 - `codeGraphVersion`
+- `vcsRoot`
 - optional `vcsRef`
 - optional `onProgress`
 
@@ -21,7 +22,9 @@ and MUST return the resulting `IndexResult` unchanged.
 
 ### Requirement: Supports force recreate
 
-When `input.force` is `true`, `IndexProjectGraph` MUST call `provider.recreate()` before `provider.index()`. When `force` is `false` or omitted, it MUST NOT recreate the store.
+When `input.force` is true, `IndexProjectGraph` MUST pass that intent through the `IndexOptions` forwarded to `provider.index(...)`.
+
+`IndexProjectGraph` MUST NOT call `provider.recreate()` directly. The provider owns any destructive reset, storage-generation rotation, and lock policy required to honor force reindex semantics.
 
 ### Requirement: Accepts open provider and prepared inputs
 
@@ -32,11 +35,14 @@ When `input.force` is `true`, `IndexProjectGraph` MUST call `provider.recreate()
 - `workspaces: WorkspaceIndexTarget[]`
 - `graphConfig: ProjectGraphConfig`
 - `codeGraphVersion: string`
+- `vcsRoot: string | null`
 - optional `vcsRef: string`
 - optional `force: boolean`
 - optional `onProgress: IndexProgressCallback`
 
-The use case MUST NOT resolve workspaces from `specd.yaml`, acquire locks, or spawn worker processes — callers supply prepared targets and config.
+`vcsRoot` MUST be forwarded unchanged to the `IndexOptions` passed to `provider.index(...)`.
+
+The use case MUST NOT resolve workspaces from `specd.yaml`, acquire locks, spawn subprocesses, or perform direct destructive reset calls against the provider or store.
 
 ### Requirement: Factory wires dependencies
 

@@ -14,9 +14,13 @@ Hosts (`graph stats`, `project status --graph`, SDK snapshot builders) need grap
 - `currentRef: string | null` — current VCS ref from `createVcsAdapter(config.projectRoot)`, or `null` when unavailable
 - `fingerprintMismatch: boolean | null` — derivation mismatch when workspaces and `codeGraphVersion` allow comparison, else `null`
 
-### Requirement: Asserts indexing lock before statistics
+### Requirement: Provider-owned availability and error propagation
 
-When `input.assertUnlocked` is `true` (default), `GetGraphHealth` MUST call `provider.assertGraphIndexUnlocked()` before reading statistics. When `false`, lock assertion is skipped (for hosts that already checked).
+`GetGraphHealth` MUST rely on `provider.getStatistics()` for graph availability checks.
+
+The use case MUST NOT call externally exposed lock helpers or accept a caller-controlled lock-assertion escape hatch.
+
+If the provider reports that the graph is busy or stale, the use case MUST let that provider error propagate unchanged to the caller.
 
 ### Requirement: Computes VCS staleness
 
@@ -33,8 +37,7 @@ When `input.workspaces` is provided and `stats.graphFingerprint` is not `null`, 
 - `config: SpecdConfig`
 - `provider: CodeGraphProvider` (already opened)
 - `codeGraphVersion: string`
-- optional `workspaces` for fingerprint comparison
-- optional `assertUnlocked: boolean` (default `true`)
+- optional workspaces for fingerprint comparison
 
 The use case MUST NOT open or close the provider.
 

@@ -12,20 +12,19 @@ built-in default graph-store backend once it satisfies the full Ladybug feature 
 
 ### Requirement: SQLite-backed implementation
 
-`SQLiteGraphStore` SHALL implement the `GraphStore` contract using SQLite as the
-storage engine. It is an infrastructure adapter and owns all backend-specific concerns
-that are not part of the abstract `GraphStore` port.
+`SQLiteGraphStore` SHALL implement the `GraphStore` contract using SQLite as the storage engine while preserving the abstract semantics defined by `code-graph:graph-store`.
 
-Within a composition that supports multiple registered graph-store backends, the
-SQLite adapter is identified by the backend id `sqlite`.
+Within a composition that supports multiple registered graph-store backends, the stable backend id for this adapter SHALL remain `sqlite`.
 
 The adapter MUST:
 
 - open and close a SQLite database connection safely
 - execute the SQLite-specific schema DDL on first use
 - keep backend-specific schema version state
-- translate the abstract graph-store operations into SQLite queries, transactions, and
-  full-text search operations
+- translate the abstract graph-store operations into SQLite queries, transactions, and full-text search operations
+- support runtime-specific database-module binding through adapter construction or factory composition, while deferring any native module loading required by that binding until `open()`
+
+`close()` MUST be idempotent.
 
 ### Requirement: Config-derived persistence layout
 
@@ -57,18 +56,22 @@ behaviors that Ladybug previously backed, including:
 
 ### Requirement: Destructive recreation
 
-`SQLiteGraphStore` SHALL implement the abstract `GraphStore.recreate()` capability
-using SQLite-specific persistence cleanup under the configured graph root.
+`SQLiteGraphStore` SHALL implement the abstract `GraphStore.recreate()` capability using SQLite-specific destructive reset behavior.
 
-When `recreate()` is invoked, the adapter MUST ensure that the next indexing run starts
-from an empty SQLite backend without requiring callers to know any SQLite-specific
-filenames. The implementation MAY close and reopen connections as needed, but the
-observable effect MUST be that:
+When `recreate()` is invoked, the adapter MUST ensure that the next indexing run starts from a clean SQLite storage generation:
 
 - all persisted SQLite graph data under `{configPath}/graph` is discarded
-- any backend-owned companion artifacts such as WAL or shared-memory files are also
-  discarded when they belong to the same graph persistence root
+- any backend-owned companion artifacts such as WAL or shared-memory files are also discarded when they belong to the same graph persistence root
+- the persisted storage-generation marker for that graph root is rotated
 - the backend is ready to be opened again and rebuilt from scratch
+
+### Requirement: Storage generation sidecar
+
+The SQLite-backed graph persistence under `{configPath}/graph` SHALL persist a storage-generation sidecar compatible with the shared `code-graph:graph-store` stale-detection contract.
+
+A sidecar such as `graph/storage.epoch` is an acceptable realization.
+
+On `open()`, the adapter MUST make the current generation observable to the owning provider. On destructive recreation, the adapter MUST rotate that generation so older open providers can detect that they are stale and must be reopened.
 
 ### Requirement: SQLite schema ownership
 

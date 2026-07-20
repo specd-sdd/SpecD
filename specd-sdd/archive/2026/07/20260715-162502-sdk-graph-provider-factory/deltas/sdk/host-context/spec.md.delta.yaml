@@ -1,0 +1,72 @@
+- op: modified
+  description: 'Replace kernel-only bootstrap options with SDK-owned host options that forward graph composition'
+  selector:
+    type: section
+    matches: 'Requirement: SdkHostContext shape'
+  content: |
+    SdkHostContext SHALL be a readonly object:
+
+    ```ts
+    interface SdkHostContext {
+      readonly kernel: Kernel
+      readonly createGraphProvider: () => CodeGraphProvider
+    }
+    ```
+
+    The context MUST NOT store a duplicate copy of `SpecdConfig`. Config reads MUST go through `kernel.project.getConfig.execute()`.
+
+    The graph-provider factory MUST remain synchronous and MUST return a fresh `CodeGraphProvider` instance on every call.
+- op: modified
+  description: 'Define SDK-owned options shared by createSdkContext and openSpecdHost'
+  selector:
+    type: section
+    matches: 'Requirement: createSdkContext'
+  content: |
+    `createSdkContext(config: SpecdConfig, options?: SdkContextOptions): Promise<SdkHostContext>` SHALL:
+
+    1. Await `createKernel(config, options?.kernel)` from `@specd/core`
+    2. Return `{ kernel, createGraphProvider: () => createCodeGraphProvider(config, options?.graph) }`
+
+    `SdkContextOptions` SHALL be an SDK-owned bootstrap shape:
+
+    ```ts
+    interface SdkContextOptions {
+      readonly kernel?: KernelOptions
+      readonly graph?: CodeGraphCompositionOptions
+    }
+    ```
+
+    `createGraphProvider` MUST close over the same `config` instance passed to `createKernel`.
+
+    When `options?.graph` is omitted, `createGraphProvider()` MUST preserve the default `@specd/code-graph` composition behavior.
+- op: modified
+  description: 'Make openSpecdHost reuse the same SDK-owned options block'
+  selector:
+    type: section
+    matches: 'Requirement: openSpecdHost'
+  content: |
+    `openSpecdHost(input?: OpenSpecdHostInput): Promise<OpenSpecdHostResult>` SHALL:
+
+    1. Reject any call that provides both `input.configPath` and `input.startDir`, because forced-file bootstrap and discovery-root bootstrap are distinct modes and the caller MUST choose one explicitly
+    2. Use `createDefaultConfigLoader()` to load config:
+       - `input.configPath` maps to loader forced mode when provided
+       - otherwise `input.startDir` maps to loader discovery mode when provided
+       - otherwise discovery mode starts from `process.cwd()`
+    3. Await `createSdkContext(config, input.options)`
+    4. Return `{ config, configFilePath, ...ctx }` where `configFilePath` is the absolute path to the loaded `specd.yaml`, or `null` when not locatable
+
+    Configuration warnings exposed through `SpecdConfig.warnings` SHALL remain attached to `config`; `openSpecdHost` MUST NOT duplicate them as a top-level result field.
+
+    `OpenSpecdHostInput` MAY include optional `startDir` for host-selected discovery roots, and MAY include `options?: SdkContextOptions` so the same kernel and graph composition options are available through both host bootstrap entry points.
+
+    `OpenSpecdHostInput` SHALL also support `allowBootstrapFallback?: boolean`, defaulting to `false`. When it is `true` and discovery from `startDir` (or `process.cwd()`) finds no configuration, `openSpecdHost` SHALL resolve the VCS root and construct a synthetic graph-capable configuration for that root. It MUST preserve the normal error when no VCS root can be resolved, and it MUST NOT apply this fallback to an explicit `configPath` request.
+- op: modified
+  description: 'Add code-graph composition dependency because host bootstrap now forwards graph composition options'
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`sdk:composition`](../composition/spec.md) — package placement and export surface
+    - [`core:kernel`](../../../../specs/core/kernel/spec.md) — `Kernel` type and `createKernel`
+    - [`core:composition`](../../../../specs/core/composition/spec.md) — `createDefaultConfigLoader` factory
+    - [`code-graph:composition`](../../../../specs/code-graph/composition/spec.md) — `CodeGraphCompositionOptions` and `createCodeGraphProvider(...)`

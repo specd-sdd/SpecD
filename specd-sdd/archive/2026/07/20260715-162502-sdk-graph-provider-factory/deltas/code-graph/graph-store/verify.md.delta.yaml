@@ -1,0 +1,18 @@
+- op: added
+  description: 'Add verification coverage for the new storage generation tracking requirement'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Store recreation'
+  content: |
+    ### Requirement: Storage generation tracking
+
+    #### Scenario: Recreate rotates the persisted storage generation
+
+    - **GIVEN** a persisted graph store with an existing storage-generation marker
+    - **WHEN** `recreate()` completes
+    - **THEN** the next opened provider observes a different storage generation
+    - **AND** previously opened providers can detect that they are stale

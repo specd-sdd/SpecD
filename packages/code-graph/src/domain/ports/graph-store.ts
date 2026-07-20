@@ -8,6 +8,16 @@ import { type GraphStatistics } from '../value-objects/graph-statistics.js'
 import { type SearchOptions } from '../value-objects/search-options.js'
 
 /**
+ * Persisted graph-storage generation snapshot used for stale-provider detection.
+ */
+export interface StorageGenerationSnapshot {
+  /** Opaque generation token persisted by the backend. */
+  readonly token: string
+  /** Sidecar modification time in milliseconds since epoch. */
+  readonly mtimeMs: number
+}
+
+/**
  * Abstract base class defining the contract for graph storage backends.
  */
 export abstract class GraphStore {
@@ -258,7 +268,7 @@ export abstract class GraphStore {
    * @param filePath - The canonical workspace-prefixed file path.
    * @returns An array of COVERS_FILE relations.
    */
-  abstract getCoveringSpecs(filePath: string): Promise<Relation[]>
+  abstract getCoveringSpecsForFile(filePath: string): Promise<Relation[]>
 
   /**
    * Returns all symbol-coverage relations originating from the given spec.
@@ -272,7 +282,7 @@ export abstract class GraphStore {
    * @param symbolId - The symbol id to find covering specs for.
    * @returns An array of COVERS_SYMBOL relations.
    */
-  abstract getSymbolCoveringSpecs(symbolId: string): Promise<Relation[]>
+  abstract getCoveringSpecsForSymbol(symbolId: string): Promise<Relation[]>
 
   /**
    * Returns all symbols exported by the given file.
@@ -319,9 +329,7 @@ export abstract class GraphStore {
    * @param options - Search options including query, limit, and filters.
    * @returns Matching symbols with BM25 scores and snippets, ordered by relevance.
    */
-  abstract searchSymbols(
-    options: SearchOptions,
-  ): Promise<
+  abstract searchSymbols(options: SearchOptions): Promise<
     Array<{
       symbol: SymbolNode
       score: number
@@ -351,9 +359,7 @@ export abstract class GraphStore {
    * @param options - Search options including query, limit, and filters.
    * @returns Matching documents with scores and snippets, ordered by relevance.
    */
-  abstract searchDocuments(
-    options: SearchOptions,
-  ): Promise<
+  abstract searchDocuments(options: SearchOptions): Promise<
     Array<{
       document: DocumentNode
       score: number
@@ -395,4 +401,10 @@ export abstract class GraphStore {
    * @returns A promise that resolves when persistent state has been reset.
    */
   abstract recreate(): Promise<void>
+
+  /**
+   * Returns the current persisted storage-generation snapshot.
+   * @returns Current generation token and modification time.
+   */
+  abstract getStorageGeneration(): Promise<StorageGenerationSnapshot>
 }

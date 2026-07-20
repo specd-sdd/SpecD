@@ -78,11 +78,9 @@ The command SHALL pass all requested filters through to the provider, including 
 
 ### Requirement: Concurrent indexing guard
 
-Before attempting to open the provider, `graph hotspots` SHALL check the shared graph indexing lock used by `graph index`.
+Before hotspot retrieval, the command MUST rely on provider-owned availability checks rather than querying a host-managed pre-open lock state.
 
-If indexing is currently in progress, the command SHALL fail fast with a short user-facing retry-later message indicating that the graph is being indexed and should be queried again in a few seconds.
-
-This guard exists so the command does not surface backend lock failures opportunistically while another CLI process is rebuilding the graph.
+If the provider reports that the graph is busy or stale after opening, the command SHALL surface that provider error through the normal CLI infrastructure-error path.
 
 ### Requirement: Output format
 
@@ -102,11 +100,11 @@ In `json` or `toon` mode, the command SHALL output an object containing `totalSy
 
 ### Requirement: Error cases
 
-If both `--config` and `--path` are passed, the command SHALL fail with a CLI error before attempting any graph access.
+If both `--config` and `--path` are passed, the command SHALL fail with a CLI error and exit code 1.
 
-If the shared graph indexing lock is present, the command SHALL exit with code 3 after printing a user-facing retry-later message.
+If the provider reports `GRAPH_BUSY` or `GRAPH_PROVIDER_STALE`, the command SHALL exit with code 3 through the standard infrastructure error path.
 
-If the provider cannot be opened or hotspot retrieval fails due to an infrastructure error, the command SHALL exit with code 3.
+If the provider cannot be opened or hotspot retrieval fails due to another infrastructure error, the command SHALL exit with code 3.
 
 ### Requirement: CLI reference documentation
 
@@ -125,7 +123,7 @@ The CLI help text for `specd graph hotspots` and the existing reference document
 - Hotspot computation remains delegated to the graph provider; the CLI does not implement scoring
 - `--kind` validation SHALL use the same allowed kind set as the code graph symbol model
 - Bootstrap mode SHALL not reinterpret `--config`; it is selected only by `--path` or by missing config
-- The command checks the shared graph indexing lock (via `@specd/sdk` re-export) before opening the provider and fails fast while indexing is in progress
+- Busy and stale availability semantics are enforced by the provider after open; the CLI does not fail fast through a separate pre-open lock probe
 
 ## Spec Dependencies
 

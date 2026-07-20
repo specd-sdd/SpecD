@@ -92,7 +92,9 @@ export async function resolveCliContext(options?: {
 }): Promise<CliContext> {
   const host = await openSpecdHost({
     ...(options?.configPath !== undefined ? { configPath: options.configPath } : {}),
-    kernelOptions: buildCliKernelOptions({ onLog: options?.onLog }),
+    options: {
+      kernel: buildCliKernelOptions({ onLog: options?.onLog }),
+    },
   })
   // SDK returns warnings on config; CLI owns formatting and emission.
   if (host.config.warnings !== undefined && host.config.warnings.length > 0) {

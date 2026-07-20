@@ -1,4 +1,5 @@
 import { GetGraphHealth } from '../../application/use-cases/get-graph-health.js'
+import { createVcsAdapter } from '@specd/core'
 
 /**
  * Constructs a stateless `GetGraphHealth` use case.
@@ -6,5 +7,5 @@ import { GetGraphHealth } from '../../application/use-cases/get-graph-health.js'
  * @returns A new `GetGraphHealth` instance
  */
 export function createGetGraphHealth(): GetGraphHealth {
-  return new GetGraphHealth()
+  return new GetGraphHealth(createVcsAdapter)
 }

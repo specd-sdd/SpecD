@@ -31,11 +31,11 @@
 - **THEN** it resolves context via `resolveGraphCliContext` and opens via `withProvider`
 - **AND** platform symbols are sourced from `@specd/sdk`
 
-#### Scenario: Graph stats uses shared context module
+#### Scenario: Graph stats owns SDK host bootstrap
 
 - **WHEN** `specd graph stats` executes
-- **THEN** it resolves context via `resolveGraphCliContext` and opens via `withProvider`
-- **AND** platform symbols are sourced from `@specd/sdk`
+- **THEN** it uses `openSpecdHost` and SDK-managed provider lifecycle
+- **AND** it does not use `resolveGraphCliContext` or a host-managed lock probe
 
 #### Scenario: Graph index uses SDK orchestration without withProvider
 
@@ -45,7 +45,8 @@
 
 ### Requirement: Lock helpers via SDK barrel
 
-#### Scenario: Stats uses assertGraphIndexUnlocked from SDK
+#### Scenario: Provider availability replaces host lock probes
 
-- **WHEN** `specd graph stats` checks the indexing lock
-- **THEN** it imports `assertGraphIndexUnlocked` from `@specd/sdk`
+- **WHEN** a graph command uses an opened provider while indexing is active
+- **THEN** the provider lifecycle surfaces the availability error
+- **AND** no handler performs a pre-open lock probe

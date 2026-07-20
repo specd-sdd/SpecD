@@ -1,0 +1,53 @@
+- op: removed
+  description: 'Remove the old host-managed lock scenario from search behaviour'
+  selector:
+    type: section
+    matches: 'Scenario: Search fails fast while indexing lock is present'
+    parent:
+      type: section
+      matches: 'Requirement: Search behaviour'
+
+- op: added
+  description: 'Add provider-owned busy semantics to search behaviour'
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Search behaviour'
+    after:
+      type: section
+      matches: 'Scenario: Invalid kind token fails before query execution'
+  content: |
+    #### Scenario: Search surfaces provider busy after open
+
+    - **GIVEN** the provider reports `GRAPH_BUSY` while serving the search request
+    - **WHEN** `specd graph search "kernel"` is run
+    - **THEN** the command exits with code 3 through the standard infrastructure error path
+    - **AND** it does not query a host-managed pre-open lock state
+
+- op: removed
+  description: 'Remove the old single-scenario error-cases requirement'
+  selector:
+    type: section
+    matches: 'Requirement: Error cases'
+
+- op: added
+  description: 'Add error-case verification for provider open, busy, and stale failures'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Search behaviour'
+  content: |
+    ### Requirement: Error cases
+
+    #### Scenario: Provider cannot be opened exits with code 3
+
+    - **WHEN** the provider fails to open
+    - **THEN** the command exits with code 3
+
+    #### Scenario: Provider busy or stale exits with code 3
+
+    - **WHEN** the provider reports `GRAPH_BUSY` or `GRAPH_PROVIDER_STALE` while serving the search request
+    - **THEN** the command exits with code 3 through the standard infrastructure error path

@@ -1,7 +1,6 @@
 {
   "name": "graph-staleness-dirty-fingerprint",
   "createdAt": "2026-06-29T08:10:09.775Z",
-  "updatedAt": "2026-07-15T11:11:26.725Z",
   "description": "Improve code-graph freshness detection with vcs-group/workspace content scopes, diff fingerprints, and cached stale state without persisting user paths",
   "schema": {
     "name": "schema-std",
@@ -344,6 +343,64 @@
         {
           "type": "verify",
           "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-20T16:47:33.041Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'sdk-graph-provider-factory' was archived with overlapping specs: code-graph:get-graph-health",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:get-graph-health"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:get-graph-health"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-20T16:47:43.595Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'sdk-graph-provider-factory' was archived with overlapping specs: code-graph:get-graph-health",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:get-graph-health"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:get-graph-health"]
         },
         {
           "type": "design",

@@ -21,7 +21,6 @@ const INDEX_RESULT: IndexResult = {
 
 function makeProvider(): CodeGraphHostPort {
   return {
-    recreate: vi.fn().mockResolvedValue(undefined),
     index: vi.fn().mockResolvedValue(INDEX_RESULT),
   } as unknown as CodeGraphHostPort
 }
@@ -50,12 +49,12 @@ describe('IndexProjectGraph', () => {
       force: false,
     })
 
-    expect(provider.recreate).not.toHaveBeenCalled()
     expect(provider.index).toHaveBeenCalledOnce()
+    expect(provider.index).toHaveBeenCalledWith(expect.not.objectContaining({ force: true }))
     expect(result).toBe(INDEX_RESULT)
   })
 
-  it('recreates before index when force is true', async () => {
+  it('forwards force=true to provider.index', async () => {
     const provider = makeProvider()
 
     await new IndexProjectGraph().execute({
@@ -64,7 +63,7 @@ describe('IndexProjectGraph', () => {
       force: true,
     })
 
-    expect(provider.recreate).toHaveBeenCalledBefore(provider.index as ReturnType<typeof vi.fn>)
+    expect(provider.index).toHaveBeenCalledWith(expect.objectContaining({ force: true }))
   })
 
   it('forwards onProgress to provider.index', async () => {
@@ -78,5 +77,30 @@ describe('IndexProjectGraph', () => {
     })
 
     expect(provider.index).toHaveBeenCalledWith(expect.objectContaining({ onProgress }))
+  })
+
+  it('forwards a non-null vcsRoot to provider.index', async () => {
+    const provider = makeProvider()
+    const vcsRoot = '/repo'
+
+    await new IndexProjectGraph().execute({
+      provider,
+      ...baseInput,
+      vcsRoot,
+    })
+
+    expect(provider.index).toHaveBeenCalledWith(expect.objectContaining({ vcsRoot }))
+  })
+
+  it('forwards null vcsRoot to provider.index', async () => {
+    const provider = makeProvider()
+
+    await new IndexProjectGraph().execute({
+      provider,
+      ...baseInput,
+      vcsRoot: null,
+    })
+
+    expect(provider.index).toHaveBeenCalledWith(expect.objectContaining({ vcsRoot: null }))
   })
 })

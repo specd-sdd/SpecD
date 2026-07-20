@@ -1,0 +1,18 @@
+- op: modified
+  description: 'Rename verify section to the new provider-owned availability requirement and replace old lock scenarios'
+  selector:
+    type: section
+    matches: 'Requirement: Asserts indexing lock before statistics'
+  rename: 'Requirement: Provider-owned availability and error propagation'
+  content: |
+    #### Scenario: Busy provider error propagates unchanged
+
+    - **GIVEN** the provider reports `GRAPH_BUSY` from `getStatistics()`
+    - **WHEN** `GetGraphHealth.execute()` runs
+    - **THEN** the same busy error propagates to the caller
+
+    #### Scenario: Stale provider error propagates unchanged
+
+    - **GIVEN** the provider reports `GRAPH_PROVIDER_STALE` from `getStatistics()`
+    - **WHEN** `GetGraphHealth.execute()` runs
+    - **THEN** the same stale-provider error propagates to the caller

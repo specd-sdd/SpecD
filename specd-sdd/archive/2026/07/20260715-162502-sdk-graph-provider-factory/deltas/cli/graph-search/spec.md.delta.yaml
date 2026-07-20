@@ -1,0 +1,57 @@
+- op: modified
+  description: 'Replace CLI lock probe with provider-owned availability checks'
+  selector:
+    type: section
+    matches: 'Requirement: Search behaviour'
+  content: |
+    The command uses the shared graph CLI context model (`cli:graph-cli-context`) to resolve host bootstrap and provider lifecycle.
+
+    Platform symbols MUST come from `@specd/sdk`.
+
+    It delegates to:
+
+    - `provider.searchSymbols(options)` — search across symbol search text and symbol comments
+    - `provider.searchSpecs(options)` — search across spec title, description, and content
+    - `provider.searchDocuments(options)` — search across document paths and textual content
+
+    The concrete scoring and indexing strategy are implementation concerns of the active backend, subject to the shared ranking guarantees of `code-graph:graph-store`.
+
+    Backends MUST apply a shared specd/code-aware lexical token expansion before identity-aware ranking, including examples such as:
+
+    - `core:change` into tokens including `core:change`, `core`, and `change`
+    - `ArchiveChange` into tokens including `archivechange`, `archive`, and `change`
+
+    Observable ranking semantics MUST hold across backends:
+
+    - exact canonical identity matches MUST rank ahead of every non-exact result in the same category
+    - exact primary-name matches for symbols and exact spec-id/path-component matches for specs/documents MUST rank ahead of body-only or comment-only hits
+    - exact token identity matches MUST rank ahead of prefix token matches
+    - prefix token matches MUST rank ahead of suffix token matches
+    - suffix token matches MUST rank ahead of arbitrary substring token matches
+    - real identity-component or path-component matches MUST rank ahead of arbitrary substring-only hits on the same identity field
+    - candidates matching more expanded identity tokens MUST rank ahead of candidates matching fewer expanded identity tokens when generic text relevance is otherwise competing
+    - prefix, suffix, substring, segment, or path-component matches on a primary identity MUST rank ahead of results that match only through generic textual frequency in descriptions, comments, or document/spec body content
+    - symbol results matching on declared identity MUST outrank otherwise stronger comment-only hits for the same query intent
+
+    Search results SHALL carry preview context together with the ranked hit, including line-range information suitable for text and structured output.
+
+    The command MUST NOT perform a host-managed pre-open lock probe. Busy and stale availability semantics are owned by the provider.
+- op: modified
+  description: 'Surface busy/stale provider errors directly'
+  selector:
+    type: section
+    matches: 'Requirement: Error cases'
+  content: |
+    If the provider cannot be opened, the command exits with code 3 (same as other graph commands).
+
+    If the provider reports `GRAPH_BUSY` or `GRAPH_PROVIDER_STALE` while serving the search request, the command SHALL exit with code 3 through the standard infrastructure error path.
+- op: modified
+  description: 'Drop CLI lock probing from constraints'
+  selector:
+    type: section
+    matches: 'Constraints'
+  content: |
+    - The CLI does not contain search logic — it delegates to `CodeGraphProvider.searchSymbols`, `CodeGraphProvider.searchSpecs`, and `CodeGraphProvider.searchDocuments`
+    - Search depends on the active graph-store backend having prepared its search indexes during indexing or store maintenance
+    - Busy and stale availability semantics are enforced by the provider after open; the CLI does not fail fast through a separate pre-open lock probe
+    - The `process.exit(0)` pattern is required after closing the provider

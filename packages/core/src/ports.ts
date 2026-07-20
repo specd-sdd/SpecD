@@ -33,7 +33,7 @@ export {
 } from './application/ports/external-hook-runner.js'
 export { type ActorResolver } from './application/ports/actor-resolver.js'
 export { type ImplementationDetector } from './application/ports/implementation-detector.js'
-export { type VcsAdapter } from './application/ports/vcs-adapter.js'
+export { VcsAdapter } from './application/ports/vcs-adapter.js'
 export { type FileReader } from './application/ports/file-reader.js'
 export { type DiffGenerator, type DiffGeneratorInput } from './application/ports/diff-generator.js'
 export {

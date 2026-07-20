@@ -1,8 +1,7 @@
 /* eslint-disable jsdoc/require-jsdoc, @typescript-eslint/require-await */
 import { existsSync, mkdirSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
-import Database, { type Statement } from 'better-sqlite3'
-import { GraphStore } from '../../domain/ports/graph-store.js'
+import { GraphStore, type StorageGenerationSnapshot } from '../../domain/ports/graph-store.js'
 import { StoreNotOpenError } from '../../domain/errors/store-not-open-error.js'
 import { expandSearchQuery } from '../../domain/services/expand-search-query.js'
 import { expandSymbolName } from '../../domain/services/expand-symbol-name.js'
@@ -20,9 +19,32 @@ import { createSpecNode, type SpecNode } from '../../domain/value-objects/spec-n
 import { createSymbolNode, type SymbolNode } from '../../domain/value-objects/symbol-node.js'
 import { type SymbolQuery } from '../../domain/value-objects/symbol-query.js'
 import { SQLITE_SCHEMA_DDL, SQLITE_SCHEMA_VERSION } from './schema.js'
+import {
+  ensureStorageGeneration,
+  readStorageGeneration,
+  rotateStorageGeneration,
+} from '../storage-generation.js'
 
-type SqliteDatabase = InstanceType<typeof Database>
-type SqliteStatement = Statement
+type SqliteBindValue = unknown
+
+interface SqliteStatement {
+  run(...params: SqliteBindValue[]): unknown
+  get(...params: SqliteBindValue[]): unknown
+  all(...params: SqliteBindValue[]): unknown[]
+}
+
+interface SqliteDatabase {
+  readonly open: boolean
+  close(): void
+  exec(sql: string): void
+  pragma(pragma: string): unknown
+  prepare(sql: string): SqliteStatement
+  transaction<TArgs extends unknown[]>(fn: (...args: TArgs) => void): (...args: TArgs) => void
+}
+
+interface SqliteDatabaseModule {
+  readonly default: new (path: string, options?: { readonly?: boolean | undefined }) => unknown
+}
 const SYMBOL_DEPENDENCY_RELATION_TYPES = [
   RelationType.Calls,
   RelationType.Constructs,
@@ -77,17 +99,28 @@ export class SQLiteGraphStore extends GraphStore {
   private readonly graphDir: string
   private readonly tmpDir: string
   private readonly dbPath: string
+  private readonly loadDatabaseModule: () => Promise<SqliteDatabaseModule>
 
   /**
    * Creates a new SQLite-backed graph store under the provided storage root.
    *
    * @param storagePath - Root path owning `graph/` and `tmp/` directories.
+   * @param options - Optional runtime overrides for database-module loading.
+   * @param options.loadDatabaseModule - Lazy loader for the SQLite runtime module.
    */
-  constructor(storagePath: string) {
+  constructor(
+    storagePath: string,
+    options?: {
+      readonly loadDatabaseModule?: (() => Promise<SqliteDatabaseModule>) | undefined
+    },
+  ) {
     super(storagePath)
     this.graphDir = join(storagePath, 'graph')
     this.tmpDir = join(storagePath, 'tmp')
     this.dbPath = join(this.graphDir, 'code-graph.sqlite')
+    this.loadDatabaseModule =
+      options?.loadDatabaseModule ??
+      (async () => (await import('better-sqlite3')) as unknown as SqliteDatabaseModule)
   }
 
   async open(): Promise<void> {
@@ -95,18 +128,15 @@ export class SQLiteGraphStore extends GraphStore {
     mkdirSync(this.graphDir, { recursive: true })
     mkdirSync(this.tmpDir, { recursive: true })
 
-    this.migrateSchemaIfNeeded()
+    ensureStorageGeneration(this.storagePath)
+    await this.migrateSchemaIfNeeded()
 
-    const db = new Database(this.dbPath)
-    db.pragma('foreign_keys = ON')
-    db.pragma('journal_mode = WAL')
-    db.pragma(`busy_timeout = ${SQLiteGraphStore.SQLITE_BUSY_TIMEOUT_MS}`)
-    db.pragma('synchronous = NORMAL')
-    db.pragma('temp_store = MEMORY')
-    db.exec(SQLITE_SCHEMA_DDL)
+    const DatabaseModule = (await this.loadDatabaseModule()).default
+    const db = new DatabaseModule(this.dbPath) as SqliteDatabase
+    this.configureDatabase(db)
     this.db = db
 
-    this.ensureSchemaVersion()
+    await this.ensureSchemaVersion()
     this.loadMetadata()
   }
 
@@ -370,7 +400,7 @@ export class SQLiteGraphStore extends GraphStore {
     return this.getRelationsBySource(RelationType.CoversFile, specId)
   }
 
-  async getCoveringSpecs(filePath: string): Promise<Relation[]> {
+  async getCoveringSpecsForFile(filePath: string): Promise<Relation[]> {
     return this.getRelationsByTarget(RelationType.CoversFile, filePath)
   }
 
@@ -378,7 +408,7 @@ export class SQLiteGraphStore extends GraphStore {
     return this.getRelationsBySource(RelationType.CoversSymbol, specId)
   }
 
-  async getSymbolCoveringSpecs(symbolId: string): Promise<Relation[]> {
+  async getCoveringSpecsForSymbol(symbolId: string): Promise<Relation[]> {
     return this.getRelationsByTarget(RelationType.CoversSymbol, symbolId)
   }
 
@@ -751,9 +781,37 @@ export class SQLiteGraphStore extends GraphStore {
       rawTokens: query.rawTokens,
       expandedTokens: query.expandedTokens,
     })
+    const identityCandidates = buildIdentityCandidatePredicateSql({
+      canonicalExpr: 'lower(s.spec_id)',
+      canonicalComponentsExpr: buildIdentityComponentsExpr('lower(s.spec_id)'),
+      expandedTokens: query.expandedTokens,
+    })
     const rows = this.ensureOpen()
       .prepare(
         `
+          WITH raw_candidates AS (
+            SELECT
+              s.spec_id,
+              (-bm25(spec_fts)) AS text_score,
+              snippet(spec_fts, 3, '', '', '...', 32) AS snippet
+            FROM spec_fts
+            INNER JOIN specs s ON s.spec_id = spec_fts.spec_id
+            WHERE spec_fts MATCH ?
+
+            UNION ALL
+
+            SELECT
+              s.spec_id,
+              0.0 AS text_score,
+              '' AS snippet
+            FROM specs s
+            WHERE ${identityCandidates.sql}
+          ),
+          candidates AS (
+            SELECT spec_id, max(text_score) AS text_score, max(snippet) AS snippet
+            FROM raw_candidates
+            GROUP BY spec_id
+          )
           SELECT
             s.spec_id,
             s.path,
@@ -764,15 +822,14 @@ export class SQLiteGraphStore extends GraphStore {
             s.depends_on_json,
             s.workspace,
             ${ranking.selectSql},
-            (-bm25(spec_fts)) AS text_score,
-            snippet(spec_fts, 3, '', '', '...', 32) as snippet
-          FROM spec_fts
-          INNER JOIN specs s ON s.spec_id = spec_fts.spec_id
-          WHERE spec_fts MATCH ?
+            c.text_score,
+            c.snippet
+          FROM candidates c
+          INNER JOIN specs s ON s.spec_id = c.spec_id
           ORDER BY identity_tier DESC, identity_token_hits DESC, identity_match_strength DESC, text_score DESC
         `,
       )
-      .all(...ranking.params, query.ftsQuery) as Array<{
+      .all(query.ftsQuery, ...identityCandidates.params, ...ranking.params) as Array<{
       spec_id: string
       path: string
       title: string
@@ -832,9 +889,39 @@ export class SQLiteGraphStore extends GraphStore {
       rawTokens: query.rawTokens,
       expandedTokens: query.expandedTokens,
     })
+    const identityCandidates = buildIdentityCandidatePredicateSql({
+      canonicalExpr: 'lower(d.path)',
+      canonicalComponentsExpr: buildIdentityComponentsExpr('lower(d.path)'),
+      alternateExpr: 'lower(d.config_relative_path)',
+      alternateComponentsExpr: buildIdentityComponentsExpr('lower(d.config_relative_path)'),
+      expandedTokens: query.expandedTokens,
+    })
     const rows = this.ensureOpen()
       .prepare(
         `
+          WITH raw_candidates AS (
+            SELECT
+              d.path,
+              (-bm25(document_fts)) AS text_score,
+              snippet(document_fts, 2, '', '', '...', 32) AS snippet
+            FROM document_fts
+            INNER JOIN documents d ON d.path = document_fts.path
+            WHERE document_fts MATCH ?
+
+            UNION ALL
+
+            SELECT
+              d.path,
+              0.0 AS text_score,
+              '' AS snippet
+            FROM documents d
+            WHERE ${identityCandidates.sql}
+          ),
+          candidates AS (
+            SELECT path, max(text_score) AS text_score, max(snippet) AS snippet
+            FROM raw_candidates
+            GROUP BY path
+          )
           SELECT
             d.path,
             d.config_relative_path,
@@ -842,15 +929,14 @@ export class SQLiteGraphStore extends GraphStore {
             d.content,
             d.workspace,
             ${ranking.selectSql},
-            (-bm25(document_fts)) AS text_score,
-            snippet(document_fts, 2, '', '', '...', 32) as snippet
-          FROM document_fts
-          INNER JOIN documents d ON d.path = document_fts.path
-          WHERE document_fts MATCH ?
+            c.text_score,
+            c.snippet
+          FROM candidates c
+          INNER JOIN documents d ON d.path = c.path
           ORDER BY identity_tier DESC, identity_token_hits DESC, identity_match_strength DESC, text_score DESC
         `,
       )
-      .all(...ranking.params, query.ftsQuery) as Array<{
+      .all(query.ftsQuery, ...identityCandidates.params, ...ranking.params) as Array<{
       path: string
       config_relative_path: string
       content_hash: string
@@ -1005,12 +1091,18 @@ export class SQLiteGraphStore extends GraphStore {
     const wasOpen = this.db !== undefined
     await this.close()
     rmSync(this.graphDir, { recursive: true, force: true })
+    rotateStorageGeneration(this.storagePath)
     this._lastIndexedAt = undefined
     this._lastIndexedRef = null
     this._graphFingerprint = null
     if (wasOpen) {
       await this.open()
     }
+  }
+
+  async getStorageGeneration(): Promise<StorageGenerationSnapshot> {
+    this.ensureOpen()
+    return readStorageGeneration(this.storagePath)
   }
 
   private ensureOpen(): SqliteDatabase {
@@ -1020,10 +1112,11 @@ export class SQLiteGraphStore extends GraphStore {
     return this.db
   }
 
-  private migrateSchemaIfNeeded(): void {
+  private async migrateSchemaIfNeeded(): Promise<void> {
     if (!existsSync(this.dbPath)) return
     try {
-      const db = new Database(this.dbPath, { readonly: true })
+      const DatabaseModule = (await this.loadDatabaseModule()).default
+      const db = new DatabaseModule(this.dbPath, { readonly: true }) as SqliteDatabase
       try {
         const row = db.prepare("SELECT value FROM meta WHERE key = 'schemaVersion'").get() as
           | { value: string }
@@ -1040,7 +1133,7 @@ export class SQLiteGraphStore extends GraphStore {
     }
   }
 
-  private ensureSchemaVersion(): void {
+  private async ensureSchemaVersion(): Promise<void> {
     const db = this.ensureOpen()
     const current = db.prepare('SELECT value FROM meta WHERE key = ?').get('schemaVersion') as
       | { value: string }
@@ -1054,16 +1147,21 @@ export class SQLiteGraphStore extends GraphStore {
       this.db = undefined
       this.preparedStatements.clear()
       rmSync(this.dbPath, { force: true })
-      const freshDb = new Database(this.dbPath)
-      freshDb.pragma('foreign_keys = ON')
-      freshDb.pragma('journal_mode = WAL')
-      freshDb.pragma(`busy_timeout = ${SQLiteGraphStore.SQLITE_BUSY_TIMEOUT_MS}`)
-      freshDb.pragma('synchronous = NORMAL')
-      freshDb.pragma('temp_store = MEMORY')
-      freshDb.exec(SQLITE_SCHEMA_DDL)
+      const DatabaseModule = (await this.loadDatabaseModule()).default
+      const freshDb = new DatabaseModule(this.dbPath) as SqliteDatabase
+      this.configureDatabase(freshDb)
       this.db = freshDb
       this.setMeta(freshDb, 'schemaVersion', String(SQLITE_SCHEMA_VERSION))
     }
+  }
+
+  private configureDatabase(db: SqliteDatabase): void {
+    db.pragma('foreign_keys = ON')
+    db.pragma('journal_mode = WAL')
+    db.pragma(`busy_timeout = ${SQLiteGraphStore.SQLITE_BUSY_TIMEOUT_MS}`)
+    db.pragma('synchronous = NORMAL')
+    db.pragma('temp_store = MEMORY')
+    db.exec(SQLITE_SCHEMA_DDL)
   }
 
   private loadMetadata(): void {

@@ -1,7 +1,6 @@
 {
   "name": "file-impact-covering-specs",
   "createdAt": "2026-06-07T19:21:16.735Z",
-  "updatedAt": "2026-07-15T11:11:40.420Z",
   "description": "Extend graph file impact output to include covering specs derived from reverse spec↔code coverage links.",
   "schema": {
     "name": "schema-std",
@@ -556,6 +555,64 @@
       },
       "cause": "spec-overlap-conflict",
       "message": "Invalidated because change '12-cli-mcp-sdk-migration' was archived with overlapping specs: cli:graph-impact",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["cli:graph-impact"]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:graph-impact"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-20T16:47:33.037Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'sdk-graph-provider-factory' was archived with overlapping specs: cli:graph-impact",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["cli:graph-impact"]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:graph-impact"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-20T16:47:43.593Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'sdk-graph-provider-factory' was archived with overlapping specs: cli:graph-impact",
       "affectedArtifacts": [
         {
           "type": "specs",

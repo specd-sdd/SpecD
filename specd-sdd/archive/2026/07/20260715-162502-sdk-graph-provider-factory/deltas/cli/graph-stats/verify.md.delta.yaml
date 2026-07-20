@@ -1,0 +1,95 @@
+- op: modified
+  description: 'Align stats health delegation verify with openSpecdHost (not graph-cli-context)'
+  selector:
+    type: section
+    matches: 'Scenario: Command delegates health to GetGraphHealth via SDK'
+  content: |
+    - **WHEN** `specd graph stats` is executed in configured mode with kernel available
+    - **THEN** it obtains host context via `openSpecdHost` from `@specd/sdk`
+    - **AND** it opens the provider via `withOpenGraphProvider` from `@specd/sdk`
+    - **AND** it calls `GetGraphHealth.execute()` with workspaces from `ListWorkspaces`
+    - **AND** it does not call `resolveGraphCliContext`
+
+- op: removed
+  description: 'Remove the old pre-open lock scenario'
+  selector:
+    type: section
+    matches: 'Requirement: Concurrent indexing guard'
+
+- op: added
+  description: 'Verify stats enables the SDK bootstrap fallback without the shared CLI context'
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Statistics retrieval'
+    after:
+      type: section
+      matches: 'Scenario: Command delegates health to GetGraphHealth via SDK'
+  content: |
+    #### Scenario: Path and no-config stats use opt-in SDK bootstrap fallback
+
+    - **GIVEN** a VCS repository without a discoverable specd.yaml
+    - **WHEN** `specd graph stats --path <repo>` or `specd graph stats` runs there
+    - **THEN** stats calls `openSpecdHost` with `allowBootstrapFallback: true`
+    - **AND** it obtains graph health without `resolveGraphCliContext`
+
+- op: added
+  description: 'Verify successful stats exits only after SDK lifecycle cleanup'
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Statistics retrieval'
+    after:
+      type: section
+      matches: 'Scenario: Path and no-config stats use opt-in SDK bootstrap fallback'
+  content: |
+    #### Scenario: Successful stats exits after provider cleanup
+
+    - **WHEN** `specd graph stats` completes successfully
+    - **THEN** `process.exit(0)` is called only after `withOpenGraphProvider` completes its close path
+
+- op: added
+  description: 'Add provider-owned busy verification in the same requirement position'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Statistics retrieval'
+  content: |
+    ### Requirement: Concurrent indexing guard
+
+    #### Scenario: Stats surface provider busy after open
+
+    - **GIVEN** the provider reports `GRAPH_BUSY` while serving graph health
+    - **WHEN** `specd graph stats` is run
+    - **THEN** the command exits with code 3
+    - **AND** it uses the infrastructure error path rather than a separate pre-open lock probe
+
+- op: removed
+  description: 'Remove the old infrastructure error scenario'
+  selector:
+    type: section
+    matches: 'Requirement: Error cases'
+
+- op: added
+  description: 'Add error-case verification covering busy and stale provider failures'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Output format'
+  content: |
+    ### Requirement: Error cases
+
+    #### Scenario: Infrastructure error exits with code 3
+
+    - **GIVEN** the provider cannot be opened
+    - **OR** the provider reports `GRAPH_BUSY`
+    - **OR** the provider reports `GRAPH_PROVIDER_STALE`
+    - **WHEN** `specd graph stats` is run
+    - **THEN** stderr contains a `fatal:` prefixed error message
+    - **AND** the process exits with code 3

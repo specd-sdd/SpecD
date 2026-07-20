@@ -24,5 +24,5 @@ export async function resolveSdkHostContext(
       createGraphProvider: () => createCodeGraphProvider(config),
     }
   }
-  return createSdkContext(config, buildCliKernelOptions())
+  return createSdkContext(config, { kernel: buildCliKernelOptions() })
 }

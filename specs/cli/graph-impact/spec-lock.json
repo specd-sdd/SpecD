@@ -13,7 +13,7 @@
   "implementation": [
     {
       "file": "cli:src/commands/graph/impact.ts",
-      "symbols": ["registerGraphImpact"]
+      "symbols": ["handleFilesImpact"]
     }
   ]
 }

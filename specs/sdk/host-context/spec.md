@@ -8,9 +8,9 @@ Hosts need one call that loads project config, builds the kernel, and exposes a 
 
 ### Requirement: SdkHostContext shape
 
-`SdkHostContext` SHALL be a readonly object:
+SdkHostContext SHALL be a readonly object:
 
-```typescript
+```ts
 interface SdkHostContext {
   readonly kernel: Kernel
   readonly createGraphProvider: () => CodeGraphProvider
@@ -19,14 +19,27 @@ interface SdkHostContext {
 
 The context MUST NOT store a duplicate copy of `SpecdConfig`. Config reads MUST go through `kernel.project.getConfig.execute()`.
 
+The graph-provider factory MUST remain synchronous and MUST return a fresh `CodeGraphProvider` instance on every call.
+
 ### Requirement: createSdkContext
 
-`createSdkContext(config: SpecdConfig, options?: KernelOptions): Promise<SdkHostContext>` SHALL:
+`createSdkContext(config: SpecdConfig, options?: SdkContextOptions): Promise<SdkHostContext>` SHALL:
 
-1. Await `createKernel(config, options)` from `@specd/core`
-2. Return `{ kernel, createGraphProvider: () => createCodeGraphProvider(config) }`
+1. Await `createKernel(config, options?.kernel)` from `@specd/core`
+2. Return `{ kernel, createGraphProvider: () => createCodeGraphProvider(config, options?.graph) }`
 
-`createGraphProvider` MUST close over the same `config` instance passed to `createKernel`. Each call to `createGraphProvider()` MUST return a new `CodeGraphProvider` instance (not a shared singleton).
+`SdkContextOptions` SHALL be an SDK-owned bootstrap shape:
+
+```ts
+interface SdkContextOptions {
+  readonly kernel?: KernelOptions
+  readonly graph?: CodeGraphCompositionOptions
+}
+```
+
+`createGraphProvider` MUST close over the same `config` instance passed to `createKernel`.
+
+When `options?.graph` is omitted, `createGraphProvider()` MUST preserve the default `@specd/code-graph` composition behavior.
 
 ### Requirement: openSpecdHost
 
@@ -37,12 +50,14 @@ The context MUST NOT store a duplicate copy of `SpecdConfig`. Config reads MUST 
    - `input.configPath` maps to loader forced mode when provided
    - otherwise `input.startDir` maps to loader discovery mode when provided
    - otherwise discovery mode starts from `process.cwd()`
-3. Await `createSdkContext(config, input.kernelOptions)`
+3. Await `createSdkContext(config, input.options)`
 4. Return `{ config, configFilePath, ...ctx }` where `configFilePath` is the absolute path to the loaded `specd.yaml`, or `null` when not locatable
 
-Configuration warnings exposed through `SpecdConfig.warnings` SHALL remain attached to the returned `config` object unchanged. `OpenSpecdHostResult` MUST NOT add a separate top-level `warnings` field or any alternate warning collection that duplicates `config.warnings`.
+Configuration warnings exposed through `SpecdConfig.warnings` SHALL remain attached to `config`; `openSpecdHost` MUST NOT duplicate them as a top-level result field.
 
-`OpenSpecdHostInput` MAY include optional `startDir` for host-selected discovery roots and optional `kernelOptions` for host-specific logging or kernel overrides (e.g. CLI log destinations).
+`OpenSpecdHostInput` MAY include optional `startDir` for host-selected discovery roots, and MAY include `options?: SdkContextOptions` so the same kernel and graph composition options are available through both host bootstrap entry points.
+
+`OpenSpecdHostInput` SHALL also support `allowBootstrapFallback?: boolean`, defaulting to `false`. When it is `true` and discovery from `startDir` (or `process.cwd()`) finds no configuration, `openSpecdHost` SHALL resolve the VCS root and construct a synthetic graph-capable configuration for that root. It MUST preserve the normal error when no VCS root can be resolved, and it MUST NOT apply this fallback to an explicit `configPath` request.
 
 ### Requirement: Config mutation boundary
 
@@ -53,3 +68,4 @@ Host context bootstrap MUST NOT perform config file writes. `initProject`, `addP
 - [`sdk:composition`](../composition/spec.md) — package placement and export surface
 - [`core:kernel`](../../../../specs/core/kernel/spec.md) — `Kernel` type and `createKernel`
 - [`core:composition`](../../../../specs/core/composition/spec.md) — `createDefaultConfigLoader` factory
+- [`code-graph:composition`](../../../../specs/code-graph/composition/spec.md) — `CodeGraphCompositionOptions` and `createCodeGraphProvider(...)`

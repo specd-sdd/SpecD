@@ -1,5 +1,5 @@
-import { describe, afterEach, expect, it } from 'vitest'
-import { existsSync, mkdtempSync, rmSync } from 'node:fs'
+import { describe, afterEach, expect, it, vi } from 'vitest'
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { LadybugGraphStore } from '../../../src/infrastructure/ladybug/ladybug-graph-store.js'
@@ -187,10 +187,67 @@ describe('LadybugGraphStore hierarchy persistence', () => {
     await store.close()
 
     expect(existsSync(join(tempDir, 'graph', 'code-graph.lbug'))).toBe(true)
+    expect(existsSync(join(tempDir, 'graph', 'storage.epoch'))).toBe(true)
 
     await store.recreate()
 
-    expect(existsSync(join(tempDir, 'graph'))).toBe(false)
+    expect(existsSync(join(tempDir, 'graph', 'code-graph.lbug'))).toBe(false)
+    expect(existsSync(join(tempDir, 'graph', 'storage.epoch'))).toBe(true)
+  })
+
+  it('recreates the storage generation sidecar after schema migration', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-test-'))
+    const store = new LadybugGraphStore(tempDir)
+    await store.open()
+    const conn = (store as unknown as { conn: { query: (query: string) => Promise<unknown> } }).conn
+    await conn.query("MATCH (m:Meta {key: 'schemaVersion'}) SET m.value = '1'")
+    await store.close()
+
+    const epochPath = join(tempDir, 'graph', 'storage.epoch')
+    writeFileSync(epochPath, 'stale-generation')
+
+    const migrated = new LadybugGraphStore(tempDir)
+    await migrated.open()
+
+    expect(readFileSync(epochPath, 'utf8')).not.toBe('stale-generation')
+    await expect(migrated.getStatistics()).resolves.toMatchObject({ fileCount: 0 })
+    await migrated.close()
+  })
+
+  it('keeps file data when a transactional removal fails', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-test-'))
+    const file = createFileNode({
+      path: 'core:src/atomic.ts',
+      configRelativePath: 'packages/core/src/atomic.ts',
+      language: 'typescript',
+      contentHash: 'sha256:atomic',
+      workspace: 'core',
+    })
+    const symbol = createSymbolNode({
+      name: 'atomicRemoval',
+      kind: SymbolKind.Function,
+      filePath: file.path,
+      line: 1,
+      column: 0,
+    })
+    const store = new LadybugGraphStore(tempDir)
+    await store.open()
+    await store.bulkLoad({ files: [file], symbols: [symbol], specs: [], relations: [] })
+
+    const local = store as unknown as {
+      deleteFileLocalState: (conn: unknown, path: string) => Promise<void>
+      conn: unknown
+    }
+    const originalDelete = local.deleteFileLocalState.bind(store)
+    vi.spyOn(local, 'deleteFileLocalState').mockImplementation(async (conn, path) => {
+      await originalDelete(conn, path)
+      throw new Error('simulated removal failure')
+    })
+
+    await expect(store.removeFile(file.path)).rejects.toThrow('simulated removal failure')
+    await expect(store.getFile(file.path)).resolves.toMatchObject({ path: file.path })
+    await expect(store.getSymbol(symbol.id)).resolves.toMatchObject({ id: symbol.id })
+    await store.close()
   })
 
   it('recreate on an open store reopens the store for subsequent operations', async () => {
@@ -280,6 +337,7 @@ describe('LadybugGraphStore hierarchy persistence', () => {
       specs: [strongSpec, weakSpec],
       relations: [],
     })
+    await store.rebuildFtsIndexes()
 
     const symbolHits = await store.searchSymbols({ query: 'ArchiveChange' })
     const specHits = await store.searchSpecs({ query: 'core:change' })

@@ -1,14 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { EventEmitter } from 'node:events'
 import { captureStdout } from './helpers.js'
-
-vi.mock('node:child_process', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('node:child_process')>()
-  return {
-    ...actual,
-    spawn: vi.fn(),
-  }
-})
 
 vi.mock('../../src/helpers/sdk-host.js', () => ({
   resolveSdkHostContext: vi.fn(),
@@ -22,8 +13,6 @@ vi.mock('@specd/sdk', async (importOriginal) => {
       ref: vi.fn().mockResolvedValue('abc1234def'),
       rootDir: vi.fn().mockResolvedValue('/project'),
     }),
-    acquireGraphIndexLock: vi.fn(() => vi.fn()),
-    assertGraphIndexUnlocked: vi.fn(),
     runIndexProjectGraph: vi.fn(),
     createSdkContext: vi.fn(),
   }
@@ -40,7 +29,6 @@ import * as resolveCtx from '../../src/commands/graph/resolve-graph-cli-context.
 import { registerGraphIndex } from '../../src/commands/graph/index-graph.js'
 import { runIndexProjectGraph } from '@specd/sdk'
 import { resolveSdkHostContext } from '../../src/helpers/sdk-host.js'
-import { spawn } from 'node:child_process'
 
 const mockIndexResult = {
   filesIndexed: 10,
@@ -128,13 +116,11 @@ function makeIndexProgram() {
 
 afterEach(() => {
   vi.restoreAllMocks()
-  delete process.env.SPECD_GRAPH_INDEX_NO_WORKER
 })
 
 describe('graph index', () => {
   it('delegates indexing to runIndexProjectGraph in configured mode', async () => {
     setup('configured')
-    process.env.SPECD_GRAPH_INDEX_NO_WORKER = 'true'
 
     const program = makeIndexProgram()
     await runIndex(program, 'graph', 'index')
@@ -152,7 +138,6 @@ describe('graph index', () => {
 
   it('delegates indexing in bootstrap mode', async () => {
     setup('bootstrap')
-    process.env.SPECD_GRAPH_INDEX_NO_WORKER = 'true'
 
     const program = makeIndexProgram()
     await runIndex(program, 'graph', 'index', '--path', '/tmp/repo')
@@ -162,7 +147,6 @@ describe('graph index', () => {
 
   it('uses no-config fallback path by passing no overrides', async () => {
     setup('bootstrap')
-    process.env.SPECD_GRAPH_INDEX_NO_WORKER = 'true'
 
     const program = makeIndexProgram()
     await runIndex(program, 'graph', 'index')
@@ -175,7 +159,6 @@ describe('graph index', () => {
 
   it('forwards exclude-path to runIndexProjectGraph', async () => {
     setup('configured')
-    process.env.SPECD_GRAPH_INDEX_NO_WORKER = 'true'
 
     const program = makeIndexProgram()
     await runIndex(program, 'graph', 'index', '--exclude-path', 'foo,bar')
@@ -188,7 +171,6 @@ describe('graph index', () => {
 
   it('forwards --force to runIndexProjectGraph', async () => {
     setup('bootstrap')
-    process.env.SPECD_GRAPH_INDEX_NO_WORKER = 'true'
 
     const program = makeIndexProgram()
     await runIndex(program, 'graph', 'index', '--path', '/tmp/repo', '--force')
@@ -201,7 +183,6 @@ describe('graph index', () => {
 
   it('renders the text summary block required by the CLI contract', async () => {
     const { getStdout } = setup('configured')
-    process.env.SPECD_GRAPH_INDEX_NO_WORKER = 'true'
 
     const program = makeIndexProgram()
     await runIndex(program, 'graph', 'index')
@@ -218,36 +199,8 @@ describe('graph index', () => {
     expect(stdout).toContain('3 documents')
   })
 
-  it('acquires the shared graph index lock before indexing', async () => {
-    const { config } = setup('configured')
-    process.env.SPECD_GRAPH_INDEX_NO_WORKER = 'true'
-
-    const program = makeIndexProgram()
-    await runIndex(program, 'graph', 'index')
-
-    const { acquireGraphIndexLock } = await import('@specd/sdk')
-    expect(acquireGraphIndexLock).toHaveBeenCalledWith(config)
-  })
-
-  it('exits with code 3 when lock acquisition throws', async () => {
-    setup('configured')
-    const { acquireGraphIndexLock } = await import('@specd/sdk')
-    vi.mocked(acquireGraphIndexLock).mockImplementationOnce(() => {
-      throw new Error('lock failed')
-    })
-    mockProcessExit()
-
-    const program = makeIndexProgram()
-    await expect(program.parseAsync(['node', 'specd', 'graph', 'index'])).rejects.toThrow(
-      ExitSentinel,
-    )
-
-    expect(process.exit).toHaveBeenCalledWith(3)
-  })
-
   it('exits with code 3 when runIndexProjectGraph throws', async () => {
     setup('configured')
-    process.env.SPECD_GRAPH_INDEX_NO_WORKER = 'true'
     vi.mocked(runIndexProjectGraph).mockRejectedValueOnce(new Error('indexing failed'))
     mockProcessExit()
 
@@ -257,29 +210,5 @@ describe('graph index', () => {
     )
 
     expect(process.exit).toHaveBeenCalledWith(3)
-  })
-
-  it('spawns a worker subprocess with worker env flags by default', async () => {
-    setup('configured')
-    delete process.env.SPECD_GRAPH_INDEX_NO_WORKER
-
-    const worker = new EventEmitter() as ReturnType<typeof spawn> & {
-      kill: ReturnType<typeof vi.fn>
-    }
-    worker.kill = vi.fn()
-    vi.mocked(spawn).mockReturnValue(worker)
-    mockProcessExit()
-
-    const program = makeIndexProgram()
-    const pending = runIndex(program, 'graph', 'index')
-
-    worker.emit('exit', 0, null)
-
-    await pending
-
-    expect(spawn).toHaveBeenCalledOnce()
-    const spawnOptions = vi.mocked(spawn).mock.calls[0]?.[2] as { env?: NodeJS.ProcessEnv }
-    expect(spawnOptions.env?.SPECD_GRAPH_INDEX_WORKER).toBe('true')
-    expect(spawnOptions.env?.SPECD_GRAPH_INDEX_LOCK_HELD).toBe('true')
   })
 })

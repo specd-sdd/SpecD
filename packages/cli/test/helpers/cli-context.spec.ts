@@ -15,7 +15,7 @@ import { openSpecdHost } from '@specd/sdk'
 describe('resolveCliContext', () => {
   afterEach(() => vi.restoreAllMocks())
 
-  it('maps -vv to trace console destination via openSpecdHost kernelOptions', async () => {
+  it('maps -vv to trace console destination via openSpecdHost options.kernel', async () => {
     const config = makeMockConfig()
     const kernel = makeMockKernel()
     vi.mocked(openSpecdHost).mockResolvedValue({
@@ -33,7 +33,7 @@ describe('resolveCliContext', () => {
     expect(openSpecdHost).toHaveBeenCalled()
     const call = vi.mocked(openSpecdHost).mock.calls[0]?.[0]
     expect(call?.startDir).toBeUndefined()
-    expect(call?.kernelOptions?.additionalDestinations?.[0]).toMatchObject({
+    expect(call?.options?.kernel?.additionalDestinations?.[0]).toMatchObject({
       target: 'console',
       level: 'trace',
     })

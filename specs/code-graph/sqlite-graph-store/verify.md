@@ -50,6 +50,14 @@
   with it
 - **AND** callers do not target SQLite filenames directly
 
+### Requirement: Storage generation sidecar
+
+#### Scenario: SQLite exposes generation changes through the sidecar
+
+- **GIVEN** a SQLite-backed graph root using a sidecar such as `graph/storage.epoch`
+- **WHEN** the store is opened before and after a destructive recreate
+- **THEN** the owning provider can observe that the generation changed
+
 ### Requirement: SQLite schema ownership
 
 #### Scenario: Physical schema remains backend-specific

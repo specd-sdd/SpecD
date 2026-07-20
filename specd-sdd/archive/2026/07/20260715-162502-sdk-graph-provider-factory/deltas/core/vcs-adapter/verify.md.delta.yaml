@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'Existing factory verification already covers createVcsAdapter(cwd) returning GitVcsAdapter in a Git repository.'

@@ -1,0 +1,47 @@
+- op: modified
+  description: 'Include required vcsRoot in the IndexOptions field list forwarded by execute'
+  selector:
+    type: section
+    matches: 'Requirement: Executes project indexing'
+  content: |
+    `IndexProjectGraph.execute(input)` MUST call `provider.index()` with an `IndexOptions` object built from:
+
+    - `projectRoot`
+    - `workspaces`
+    - `graphConfig`
+    - `codeGraphVersion`
+    - `vcsRoot`
+    - optional `vcsRef`
+    - optional `onProgress`
+
+    and MUST return the resulting `IndexResult` unchanged.
+- op: modified
+  description: 'Move force-recreate behavior inside provider.index'
+  selector:
+    type: section
+    matches: 'Requirement: Supports force recreate'
+  content: |
+    When `input.force` is true, `IndexProjectGraph` MUST pass that intent through the `IndexOptions` forwarded to `provider.index(...)`.
+
+    `IndexProjectGraph` MUST NOT call `provider.recreate()` directly. The provider owns any destructive reset, storage-generation rotation, and lock policy required to honor force reindex semantics.
+- op: modified
+  description: 'Clarify that use case remains orchestration-only while provider owns lifecycle side effects'
+  selector:
+    type: section
+    matches: 'Requirement: Accepts open provider and prepared inputs'
+  content: |
+    `IndexProjectGraphInput` MUST include:
+
+    - `provider: CodeGraphProvider` (already opened)
+    - `projectRoot: string`
+    - `workspaces: WorkspaceIndexTarget[]`
+    - `graphConfig: ProjectGraphConfig`
+    - `codeGraphVersion: string`
+    - `vcsRoot: string | null`
+    - optional `vcsRef: string`
+    - optional `force: boolean`
+    - optional `onProgress: IndexProgressCallback`
+
+    `vcsRoot` MUST be forwarded unchanged to the `IndexOptions` passed to `provider.index(...)`.
+
+    The use case MUST NOT resolve workspaces from `specd.yaml`, acquire locks, spawn subprocesses, or perform direct destructive reset calls against the provider or store.

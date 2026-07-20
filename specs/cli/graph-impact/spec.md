@@ -46,23 +46,24 @@ Platform symbols MUST come from `@specd/sdk`.
 
 When `--symbol` is provided:
 
-1. Resolves graph context using explicit config, autodetected config, or bootstrap mode according to the graph CLI precedence rules
-2. Resolves the selector through `resolveSymbolSelector(symbolSelector)` to support bare names, qualified names, and full graph symbol ids (for example `packages/core/src/auth.ts:function:validate`)
-3. If no symbol matches, outputs `No symbol found matching "<selector>".` and exits with code 0
-4. If one symbol matches, calls `analyzeImpact(symbolId, direction)` and outputs the result
-5. If multiple symbols match, analyzes each one and outputs all results
+1. Resolves graph context via `resolveGraphCliContext` using explicit config, autodetected config, or bootstrap mode
+2. Opens the provider through `withProvider`
+3. Resolves the selector through `resolveSymbolSelector(symbolSelector)` to support bare names, qualified names, and full graph symbol ids (for example `packages/core/src/auth.ts:function:validate`)
+4. If no symbol matches, outputs `No symbol found matching "<selector>".` and exits with code 0
+5. If one symbol matches, calls `analyzeImpact(symbolId, direction)` and outputs the result
+6. If multiple symbols match, analyzes each one and outputs all results
+
+Platform symbols MUST come from `@specd/sdk`. The CLI MUST NOT open or close the provider outside `withProvider`.
 
 ### Requirement: Spec impact analysis
 
 When `--spec` is provided:
 
-1. Resolves graph context using explicit config, autodetected config, or bootstrap mode according to the graph CLI precedence rules
-2. Creates a `CodeGraphProvider` from the resolved graph context
-3. Opens the provider
-4. Loads the spec via `getSpec(specId)`. If no indexed spec node exists, the provider SHALL throw `SpecNotFoundError` with the requested spec id
-5. Calls `analyzeSpecImpact(specId, direction)`
-6. Outputs the resulting `ImpactResult`
-7. Closes the provider and exits
+1. Resolves graph context via `resolveGraphCliContext` using explicit config, autodetected config, or bootstrap mode
+2. Opens the provider through `withProvider`
+3. Loads the spec via `getSpec(specId)`. If no indexed spec node exists, the provider SHALL throw `SpecNotFoundError` with the requested spec id
+4. Calls `analyzeSpecImpact(specId, direction)`
+5. Outputs the resulting `ImpactResult`
 
 The CLI SHALL let `SpecNotFoundError` propagate to the global error handler so the command fails with exit code 1 and a machine-readable `SPEC_NOT_FOUND` error code.
 
@@ -72,9 +73,13 @@ Spec impact MUST reflect requirement-aware graph relations, not just code-struct
 - `COVERS_FILE` between specs and files
 - `COVERS_SYMBOL` between specs and symbols
 
+Platform symbols MUST come from `@specd/sdk`. The CLI MUST NOT open or close the provider outside `withProvider`.
+
 ### Requirement: Concurrent indexing guard
 
-Before attempting to open the provider, the command SHALL query the lock status from the provider. If indexing is currently in progress, it SHALL fail fast with a short user-facing retry-later message.
+Before impact analysis reads from the graph, the command MUST rely on provider-owned availability checks rather than querying a host-managed pre-open lock state.
+
+If the provider reports that the graph is busy or stale after opening, the command SHALL surface that provider error through the normal CLI infrastructure-error path.
 
 ### Requirement: Output format
 
@@ -153,17 +158,17 @@ The JSON output MUST include aggregate impact fields to support automated risk a
 
 ### Requirement: Error cases
 
-Exactly one of `--file`, `--symbol`, or `--spec` must be provided. If none or more than one is given, the command exits with code 1 and prints `error: provide exactly one of --file, --symbol, or --spec`.
+Exactly one of `--file`, `--symbol`, or `--spec` must be provided. If none or more than one are passed, the command SHALL fail with a CLI error and exit code 1.
 
-If both `--config` and `--path` are passed, the command SHALL fail with a CLI error before attempting graph access.
+If both `--config` and `--path` are passed, the command SHALL fail with a CLI error and exit code 1.
 
-If a `--file` input without a workspace prefix does not resolve by config-relative path, the command SHALL fail with a not-found error that includes the normalized config-relative path it searched.
+If a `--file` input without a workspace prefix does not resolve by config-relative path or project-relative path, the command SHALL fail with a user-facing resolution error.
 
-If a `--file` input without a workspace prefix resolves to more than one canonical graph file, the command SHALL fail with an ambiguity error listing the matching workspace-prefixed paths rather than guessing a workspace.
+If a `--file` input without a workspace prefix resolves to more than one canonical graph file, the command SHALL fail with a user-facing ambiguity error.
 
-If `--spec` references no indexed spec node, the command SHALL fail with a not-found error that includes the requested spec id.
+If `--spec` references no indexed spec node, the command SHALL fail with a not-found error for that spec id.
 
-If the shared graph indexing lock is present, the command SHALL exit with code 3 after printing a user-facing retry-later message.
+If the provider reports `GRAPH_BUSY` or `GRAPH_PROVIDER_STALE`, the command SHALL exit with code 3 through the standard infrastructure error path.
 
 If the provider cannot be opened, the command exits with code 3.
 

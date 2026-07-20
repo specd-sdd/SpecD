@@ -19,17 +19,19 @@
 
 ### Requirement: Supports force recreate
 
-#### Scenario: Force rebuild
+#### Scenario: Force rebuild is forwarded to the provider
 
 - **GIVEN** `force: true`
 - **WHEN** `IndexProjectGraph.execute()` runs
-- **THEN** `provider.recreate()` is called before `provider.index()`
+- **THEN** `provider.index()` receives `force: true`
+- **AND** `IndexProjectGraph` does not call `provider.recreate()` directly
 
-#### Scenario: No recreate without force
+#### Scenario: Non-forced indexing does not request recreation
 
 - **GIVEN** `force` is omitted or `false`
 - **WHEN** `IndexProjectGraph.execute()` runs
-- **THEN** `provider.recreate()` is not called
+- **THEN** `provider.index()` receives the non-forced options
+- **AND** `IndexProjectGraph` does not call `provider.recreate()` directly
 
 ### Requirement: Accepts open provider and prepared inputs
 
@@ -38,6 +40,12 @@
 - **GIVEN** a mock provider
 - **WHEN** `IndexProjectGraph.execute()` runs
 - **THEN** it does not call lock helpers or read `specd.yaml`
+
+#### Scenario: VCS root is forwarded to provider indexing
+
+- **GIVEN** an `IndexProjectGraphInput` containing `vcsRoot`
+- **WHEN** `IndexProjectGraph.execute()` runs
+- **THEN** `provider.index()` receives the same `vcsRoot` value
 
 ### Requirement: Factory wires dependencies
 

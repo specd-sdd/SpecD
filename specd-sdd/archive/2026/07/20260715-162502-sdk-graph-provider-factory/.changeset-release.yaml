@@ -1,0 +1,16 @@
+releases:
+  sdk:host-context: minor
+  sdk:with-open-graph-provider: minor
+  code-graph:composition: minor
+  code-graph:index-project-graph: patch
+  code-graph:get-graph-health: patch
+  code-graph:graph-store: minor
+  code-graph:ladybug-graph-store: minor
+  code-graph:sqlite-graph-store: minor
+  cli:graph-stats: minor
+  cli:graph-impact: patch
+  cli:graph-search: patch
+  cli:graph-hotspots: patch
+  cli:graph-cli-context: minor
+  core:vcs-adapter-port: minor
+  core:vcs-adapter: minor

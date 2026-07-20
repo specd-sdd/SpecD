@@ -23,13 +23,13 @@
     {
       "requirement": "Statistics retrieval",
       "rules": [
-        "The command obtains host context via `openSpecdHost` from `@specd/sdk`, opens the graph provider through `withOpenGraphProvider(ctx, fn)`, and delegates statistics, VCS ref resolution, staleness calculation, and fingerprint comparison to `GetGraphHealth.execute()` inside the callback. It outputs the returned result fields, closes the provider via the SDK lifecycle wrapper, and exits.\n\nThe command MUST pass `ListWorkspaces` results (when kernel is available) as `workspaces` input for fingerprint comparison.\n\nGraph context and provider lifecycle MUST go through `cli:graph-cli-context` and `@specd/sdk` symbols."
+        "The command obtains host context via `openSpecdHost` from `@specd/sdk`, opens the graph provider through the SDK lifecycle helper, and delegates health computation to `createGetGraphHealth`.\n\nFor `--config`, the command uses the explicit configuration path. For `--path` and the no-config fallback, it calls `openSpecdHost` with `allowBootstrapFallback: true` so the SDK first discovers a project configuration and otherwise creates a synthetic graph host from the resolved VCS root. `graph stats` MUST NOT call `resolveGraphCliContext`.\n\nThe command MUST pass `ListWorkspaces` results when the host has a configured kernel; synthetic bootstrap uses its generated default workspace."
       ]
     },
     {
       "requirement": "Concurrent indexing guard",
       "rules": [
-        "Before attempting to open the provider, `graph stats` SHALL query the lock status from the provider. If indexing is currently in progress, the command SHALL fail fast with a short user-facing retry-later message."
+        "`graph stats` MUST NOT perform a host-managed pre-open lock probe before opening the provider.\n\nInstead, the command relies on provider-owned availability checks surfaced through `GetGraphHealth` and provider reads."
       ]
     },
     {
@@ -41,7 +41,7 @@
     {
       "requirement": "Error cases",
       "rules": [
-        "If the shared graph indexing lock is present, the command SHALL exit with code 3 after printing a user-facing retry-later message.\n\nIf the provider cannot be opened or statistics retrieval fails due to an infrastructure error, the command exits with code 3."
+        "If the provider reports `GRAPH_BUSY`, the command SHALL fail with the standard graph-busy infrastructure error path and exit code 3.\n\nIf the provider reports `GRAPH_PROVIDER_STALE`, the command SHALL fail with the standard infrastructure error path and exit code 3.\n\nIf the provider cannot be opened or statistics retrieval fails due to another infrastructure error, the command SHALL exit with code 3."
       ]
     }
   ],
@@ -49,7 +49,8 @@
     "Health orchestration runs inside withOpenGraphProvider from @specd/sdk; the CLI does not manage provider lifecycle inline",
     "process.exit(0) is called explicitly after the SDK wrapper closes the provider",
     "Zero-value relation counts are omitted from text output for readability",
-    "Bootstrap mode (--path) resolves host context through openSpecdHost with the appropriate config path input"
+    "Bootstrap mode (--path) resolves host context through openSpecdHost with the appropriate config path input",
+    "Graph-busy and provider-stale availability semantics are owned by the provider, not by a CLI-managed pre-open lock probe"
   ],
   "scenarios": [
     {
@@ -80,9 +81,28 @@
       "name": "Command delegates health to GetGraphHealth via SDK",
       "when": ["specd graph stats is executed in configured mode with kernel available"],
       "then": [
-        "it opens the provider via withOpenGraphProvider from @specd/sdk",
+        "it obtains host context via openSpecdHost from @specd/sdk",
+        "AND it opens the provider via withOpenGraphProvider from @specd/sdk",
         "AND it calls GetGraphHealth.execute() with workspaces from ListWorkspaces",
-        "AND graph context and lifecycle go through cli:graph-cli-context"
+        "AND it does not call resolveGraphCliContext"
+      ]
+    },
+    {
+      "requirement": "Statistics retrieval",
+      "name": "Path and no-config stats use opt-in SDK bootstrap fallback",
+      "given": ["a VCS repository without a discoverable specd.yaml"],
+      "when": ["specd graph stats --path <repo> or specd graph stats runs there"],
+      "then": [
+        "stats calls openSpecdHost with allowBootstrapFallback: true",
+        "AND it obtains graph health without resolveGraphCliContext"
+      ]
+    },
+    {
+      "requirement": "Statistics retrieval",
+      "name": "Successful stats exits after provider cleanup",
+      "when": ["specd graph stats completes successfully"],
+      "then": [
+        "process.exit(0) is called only after withOpenGraphProvider completes its close path"
       ]
     },
     {
@@ -102,12 +122,12 @@
     },
     {
       "requirement": "Concurrent indexing guard",
-      "name": "Stats fail fast while the indexing lock is present",
-      "given": ["a graph index process currently holds the shared graph indexing lock"],
+      "name": "Stats surface provider busy after open",
+      "given": ["the provider reports GRAPH_BUSY while serving graph health"],
       "when": ["specd graph stats is run"],
       "then": [
-        "the command exits with code 3 before opening the provider",
-        "AND it prints a short retry-later message explaining that the graph is currently being indexed"
+        "the command exits with code 3",
+        "AND it uses the infrastructure error path rather than a separate pre-open lock probe"
       ]
     },
     {
@@ -173,7 +193,11 @@
     {
       "requirement": "Error cases",
       "name": "Infrastructure error exits with code 3",
-      "given": ["the provider cannot be opened (e.g. database file is corrupted)"],
+      "given": [
+        "the provider cannot be opened",
+        "OR the provider reports GRAPH_BUSY",
+        "OR the provider reports GRAPH_PROVIDER_STALE"
+      ],
       "when": ["specd graph stats is run"],
       "then": [
         "stderr contains a fatal: prefixed error message",
@@ -182,6 +206,12 @@
     }
   ],
   "implementation": {
+    "files": [
+      {
+        "specId": "cli:graph-stats",
+        "file": "cli:test/commands/graph-stats.spec.ts"
+      }
+    ],
     "symbols": [
       {
         "specId": "cli:graph-stats",
@@ -191,8 +221,8 @@
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:2234b8b91d0ae1c4ba8a61c2ef807e82eeb00ef24ae2cbc4b921f9cf49af99b5",
-    "verify.md": "sha256:9fee4da117bce97f84d57a988126333af65ee03f5dec7d5c3ec72eb183d950d4"
+    "spec.md": "sha256:08de5423d7040554fcd2711796151bef11a415ea12078da4c629e352875f4a0f",
+    "verify.md": "sha256:8c8bd63d5ff05755c4fa90a707fa1381dafb8851ba74f2593080f96a91326e21"
   },
   "generatedBy": "core"
 }

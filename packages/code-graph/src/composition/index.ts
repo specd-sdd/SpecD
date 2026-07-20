@@ -1,7 +1,8 @@
-export { CodeGraphProvider } from './code-graph-provider.js'
+export { type CodeGraphProvider } from './code-graph-provider.js'
 export { createCodeGraphProvider } from './create-code-graph-provider.js'
+export { createSqliteGraphStoreFactory } from './create-sqlite-graph-store-factory.js'
 export {
-  type CodeGraphFactoryOptions,
+  type CodeGraphCompositionOptions,
   type CodeGraphOptions,
   type GraphStoreFactory,
   type GraphStoreFactoryOptions,

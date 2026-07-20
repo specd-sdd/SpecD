@@ -1,10 +1,20 @@
 import { closeSync, existsSync, mkdirSync, openSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { type SpecdConfig } from '@specd/core'
+import { GraphBusyError } from '../domain/errors/graph-busy-error.js'
 
 /** User-facing message shown when the code graph is locked for indexing. */
 export const GRAPH_INDEX_LOCK_MESSAGE =
   'The code graph is currently being indexed. Try again in a few seconds.'
+
+/**
+ * Returns the shared lock path for a graph storage root.
+ * @param storagePath - Root path that owns graph persistence.
+ * @returns Absolute lock file path.
+ */
+export function getGraphIndexLockPathForStoragePath(storagePath: string): string {
+  return join(storagePath, 'graph', 'index.lock')
+}
 
 /**
  * Returns the shared lock path for graph indexing.
@@ -12,7 +22,7 @@ export const GRAPH_INDEX_LOCK_MESSAGE =
  * @returns Absolute lock file path.
  */
 export function getGraphIndexLockPath(config: SpecdConfig): string {
-  return join(config.configPath, 'graph', 'index.lock')
+  return getGraphIndexLockPathForStoragePath(config.configPath)
 }
 
 /**
@@ -21,8 +31,17 @@ export function getGraphIndexLockPath(config: SpecdConfig): string {
  * @throws {Error} If the shared graph indexing lock is currently held.
  */
 export function assertGraphIndexUnlocked(config: SpecdConfig): void {
-  if (existsSync(getGraphIndexLockPath(config))) {
-    throw new Error(GRAPH_INDEX_LOCK_MESSAGE)
+  assertGraphIndexUnlockedByStoragePath(config.configPath)
+}
+
+/**
+ * Throws when another process is currently indexing the graph storage root.
+ * @param storagePath - Root path that owns graph persistence.
+ * @throws {GraphBusyError} If the shared graph indexing lock is currently held.
+ */
+export function assertGraphIndexUnlockedByStoragePath(storagePath: string): void {
+  if (existsSync(getGraphIndexLockPathForStoragePath(storagePath))) {
+    throw new GraphBusyError(GRAPH_INDEX_LOCK_MESSAGE)
   }
 }
 
@@ -34,7 +53,17 @@ export function assertGraphIndexUnlocked(config: SpecdConfig): void {
  * @throws {Error} If another process already owns the indexing lock.
  */
 export function acquireGraphIndexLock(config: SpecdConfig): () => void {
-  const lockPath = getGraphIndexLockPath(config)
+  return acquireGraphIndexLockByStoragePath(config.configPath)
+}
+
+/**
+ * Acquires the shared graph indexing lock for a storage root and returns a release callback.
+ * @param storagePath - Root path that owns graph persistence.
+ * @returns Release callback.
+ * @throws {GraphBusyError} If another process already owns the indexing lock.
+ */
+export function acquireGraphIndexLockByStoragePath(storagePath: string): () => void {
+  const lockPath = getGraphIndexLockPathForStoragePath(storagePath)
   mkdirSync(dirname(lockPath), { recursive: true })
 
   try {
@@ -42,7 +71,7 @@ export function acquireGraphIndexLock(config: SpecdConfig): () => void {
     writeFileSync(fd, `${String(process.pid)}\n`, 'utf-8')
     closeSync(fd)
   } catch {
-    throw new Error(GRAPH_INDEX_LOCK_MESSAGE)
+    throw new GraphBusyError(GRAPH_INDEX_LOCK_MESSAGE)
   }
 
   let released = false

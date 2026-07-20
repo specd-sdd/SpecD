@@ -3,6 +3,7 @@ export {
   openSpecdHost,
   type OpenSpecdHostInput,
   type OpenSpecdHostResult,
+  type SdkContextOptions,
   type SdkHostContext,
 } from './host-context.js'
 export {
