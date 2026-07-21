@@ -1,0 +1,990 @@
+{
+  "name": "hook-live-progress",
+  "createdAt": "2026-07-14T16:41:17.297Z",
+  "description": "Add live hook progress streaming so long-running workflow hooks remain observable to both humans and agents while they execute. The change extends the core hook runner and hook progress pipeline, unifies transition and run-hooks presentation through a shared CLI presenter, and finalizes the stdout/stderr split for text versus structured hook output.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "core:hook-runner-port",
+    "core:run-step-hooks",
+    "cli:change-run-hooks",
+    "cli:change-transition"
+  ],
+  "specDependsOn": {
+    "core:hook-runner-port": ["default:_global/architecture"],
+    "core:run-step-hooks": [
+      "core:hook-execution-model",
+      "core:hook-runner-port",
+      "core:external-hook-runner-port",
+      "core:schema-format",
+      "core:config",
+      "core:change",
+      "core:template-variables",
+      "core:archive-repository-port",
+      "core:composition-resolver"
+    ],
+    "cli:change-run-hooks": ["cli:entrypoint", "core:run-step-hooks", "core:hook-execution-model"],
+    "cli:change-transition": [
+      "cli:entrypoint",
+      "core:change",
+      "core:transition-change",
+      "core:hook-execution-model",
+      "core:get-status"
+    ]
+  },
+  "invalidationPolicy": "downstream",
+  "trackedImplementationFiles": [
+    {
+      "file": ".specd/metadata/cli/entrypoint/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/ports/hook-runner.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/run-step-hooks.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/transition-change.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/infrastructure/node/hook-runner.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/change/_hook-progress-presenter.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/change/run-hooks.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/change/transition.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/helpers.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/guide/workflow.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/cli/cli-reference.md",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/run-step-hooks.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/change-transition.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/transition-change.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/infrastructure/node/hook-runner.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/_hook-progress-presenter.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/change-run-hooks.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/formatter.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/change.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/formatter.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "test.txt",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/core/use-cases.md",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/archive-change.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/archive-change-batch-restore.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/archive-change.spec.ts",
+      "state": "ignored"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "core:hook-runner-port",
+      "file": "packages/core/src/application/ports/hook-runner.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["HookRunnerProgressEvent", "OnHookRunnerProgress", "HookRunner"]
+    },
+    {
+      "specId": "core:run-step-hooks",
+      "file": "packages/core/src/application/use-cases/run-step-hooks.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["HookProgressEvent", "RunStepHooks"]
+    },
+    {
+      "specId": "core:hook-runner-port",
+      "file": "packages/core/src/infrastructure/node/hook-runner.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["NodeHookRunner"]
+    },
+    {
+      "specId": "cli:change-run-hooks",
+      "file": "packages/cli/src/commands/change/_hook-progress-presenter.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["HookPresenterEvent", "HookProgressPresenter", "createHookProgressPresenter"]
+    },
+    {
+      "specId": "cli:change-transition",
+      "file": "packages/cli/src/commands/change/_hook-progress-presenter.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["HookPresenterEvent", "HookProgressPresenter", "createHookProgressPresenter"]
+    },
+    {
+      "specId": "cli:change-run-hooks",
+      "file": "packages/cli/src/commands/change/run-hooks.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["registerChangeRunHooks"]
+    },
+    {
+      "specId": "cli:change-transition",
+      "file": "packages/cli/src/commands/change/transition.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["registerChangeTransition"]
+    },
+    {
+      "specId": "core:hook-runner-port",
+      "file": "packages/core/test/application/use-cases/helpers.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["makeHookRunner"]
+    },
+    {
+      "specId": "core:run-step-hooks",
+      "file": "packages/core/test/application/use-cases/run-step-hooks.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:hook-runner-port",
+      "file": "packages/core/test/infrastructure/node/hook-runner.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:change-transition",
+      "file": "packages/cli/test/commands/change-transition.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:change-run-hooks",
+      "file": "packages/cli/test/commands/change-run-hooks.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:change-run-hooks",
+      "file": "packages/cli/test/commands/_hook-progress-presenter.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:change-transition",
+      "file": "packages/cli/test/commands/_hook-progress-presenter.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:change-transition",
+      "file": "packages/cli/src/formatter.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:change-transition",
+      "file": "packages/cli/test/commands/change.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:change-run-hooks",
+      "file": "packages/cli/test/formatter.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:change-transition",
+      "file": "packages/cli/test/formatter.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:change-run-hooks",
+      "file": "packages/cli/src/formatter.ts",
+      "fileLinkExplicit": true
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:558ac2e94d6cd65c55751a2ba42ac031ba788a6dd532af3b19fa02c73fad86bf"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:hook-runner-port",
+          "filename": "deltas/core/hook-runner-port/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:cbd29949080e8c99fd2059f3b278c895c0ddae87f0f1f6e6d65c98efa11d450a"
+        },
+        {
+          "key": "core:run-step-hooks",
+          "filename": "deltas/core/run-step-hooks/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:4191983e2b9809cd5ffc8139d1115b79acc9065d24946fce60b91d1e5fc1a34c"
+        },
+        {
+          "key": "cli:change-run-hooks",
+          "filename": "deltas/cli/change-run-hooks/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:c6e8e28bcde534ac4e316741dec704687a73d0aa5c4355a56199f596abc23b33"
+        },
+        {
+          "key": "cli:change-transition",
+          "filename": "deltas/cli/change-transition/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:460f7d36852feae66cbb6ce19d07f833d625e9243e8320a9549b1ccabfc912e0"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:hook-runner-port",
+          "filename": "deltas/core/hook-runner-port/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:5a7f59e4d1b6e7020e3e710dd87eb81a66f6f8a5275ea37ef1f8d4481f5f9b09"
+        },
+        {
+          "key": "core:run-step-hooks",
+          "filename": "deltas/core/run-step-hooks/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:dfef9f5c95659ca6a277aa70195c4980507353c927257f37cceb1c92f8508f3c"
+        },
+        {
+          "key": "cli:change-run-hooks",
+          "filename": "deltas/cli/change-run-hooks/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:7ab2e7a009d84edc3da4b9dcda27cd608a03bcb28741dac81b6f3d0c11feceb5"
+        },
+        {
+          "key": "cli:change-transition",
+          "filename": "deltas/cli/change-transition/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:fa41ef6f0bc617d2369400d040bd50c4ae7b7233891ac7bcd085d35aa1ebb1ac"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:472fd2a278ef61fd4d8d7a620efdb135d333dbb08865224a305ee3545326adf8"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:0d3431095fc9470b67fa7edae90fa33666c729855cb406a96c508f4556b74dc3"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-07-14T16:41:17.297Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": [
+        "core:hook-runner-port",
+        "core:run-step-hooks",
+        "cli:change-run-hooks",
+        "cli:change-transition"
+      ],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-14T16:41:17.317Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "core:hook-runner-port"
+        },
+        {
+          "type": "specs",
+          "key": "core:run-step-hooks"
+        },
+        {
+          "type": "specs",
+          "key": "cli:change-run-hooks"
+        },
+        {
+          "type": "specs",
+          "key": "cli:change-transition"
+        },
+        {
+          "type": "verify",
+          "key": "core:hook-runner-port"
+        },
+        {
+          "type": "verify",
+          "key": "core:run-step-hooks"
+        },
+        {
+          "type": "verify",
+          "key": "cli:change-run-hooks"
+        },
+        {
+          "type": "verify",
+          "key": "cli:change-transition"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-14T16:43:20.669Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-14T16:48:30.601Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:hook-runner-port",
+            "core:run-step-hooks",
+            "cli:change-run-hooks",
+            "cli:change-transition"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:hook-runner-port",
+            "core:run-step-hooks",
+            "cli:change-run-hooks",
+            "cli:change-transition"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-14T16:49:19.308Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:hook-runner-port",
+            "core:run-step-hooks",
+            "cli:change-run-hooks",
+            "cli:change-transition"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:hook-runner-port",
+            "core:run-step-hooks",
+            "cli:change-run-hooks",
+            "cli:change-transition"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-14T16:52:18.243Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:hook-runner-port",
+            "core:run-step-hooks",
+            "cli:change-run-hooks",
+            "cli:change-transition"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:hook-runner-port",
+            "core:run-step-hooks",
+            "cli:change-run-hooks",
+            "cli:change-transition"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-14T17:01:56.827Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]; specs [cli:change-run-hooks, cli:change-transition]; verify [cli:change-run-hooks, cli:change-transition]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["cli:change-run-hooks", "cli:change-transition"]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:change-run-hooks", "cli:change-transition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-14T17:07:01.673Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-14T17:12:50.170Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-15T08:16:39.352Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:hook-runner-port",
+            "core:run-step-hooks",
+            "cli:change-run-hooks",
+            "cli:change-transition"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:hook-runner-port",
+            "core:run-step-hooks",
+            "cli:change-run-hooks",
+            "cli:change-transition"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-15T08:16:39.352Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-15T08:39:11.628Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-15T08:39:25.718Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-15T08:40:23.782Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-15T08:44:30.685Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-15T09:13:34.807Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:hook-runner-port",
+            "core:run-step-hooks",
+            "cli:change-run-hooks",
+            "cli:change-transition"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:hook-runner-port",
+            "core:run-step-hooks",
+            "cli:change-run-hooks",
+            "cli:change-transition"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-15T09:13:34.807Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-15T09:19:33.032Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-15T09:20:24.991Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-15T09:31:14.565Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-15T09:36:03.291Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-15T09:49:22.577Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-15T10:01:32.248Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:hook-runner-port",
+            "core:run-step-hooks",
+            "cli:change-run-hooks",
+            "cli:change-transition"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:hook-runner-port",
+            "core:run-step-hooks",
+            "cli:change-run-hooks",
+            "cli:change-transition"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-15T10:01:32.248Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-15T10:38:14.132Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-15T10:52:55.011Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-15T10:59:51.017Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-15T11:08:57.810Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-15T11:09:16.054Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "description-updated",
+      "at": "2026-07-15T11:12:10.634Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "description": "Add live hook progress streaming so long-running workflow hooks remain observable to both humans and agents while they execute. The change extends the core hook runner and hook progress pipeline, unifies transition and run-hooks presentation through a shared CLI presenter, and finalizes the stdout/stderr split for text versus structured hook output."
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-07-15T11:12:51.769Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Implementation link \"cli:change-transition\" points outside workspace \"cli\" codeRoot.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-07-15T11:13:19.722Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Implementation link \"cli:change-transition\" points outside workspace \"cli\" codeRoot.",
+      "commitStarted": false
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-15T11:13:32.585Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-07-15T11:13:32.660Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

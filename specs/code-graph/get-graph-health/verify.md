@@ -18,19 +18,19 @@
 - **WHEN** `GetGraphHealth.execute()` runs
 - **THEN** `stale` is `null`
 
-### Requirement: Asserts indexing lock before statistics
+### Requirement: Provider-owned availability and error propagation
 
-#### Scenario: Lock held and assertUnlocked true
+#### Scenario: Busy provider error propagates unchanged
 
-- **GIVEN** the graph indexing lock is held
-- **WHEN** `GetGraphHealth.execute({ assertUnlocked: true })` runs
-- **THEN** it throws before calling `getStatistics()`
+- **GIVEN** the provider reports `GRAPH_BUSY` from `getStatistics()`
+- **WHEN** `GetGraphHealth.execute()` runs
+- **THEN** the same busy error propagates to the caller
 
-#### Scenario: Lock held and assertUnlocked false
+#### Scenario: Stale provider error propagates unchanged
 
-- **GIVEN** the graph indexing lock is held
-- **WHEN** `GetGraphHealth.execute({ assertUnlocked: false })` runs
-- **THEN** it proceeds to `getStatistics()` without asserting the lock
+- **GIVEN** the provider reports `GRAPH_PROVIDER_STALE` from `getStatistics()`
+- **WHEN** `GetGraphHealth.execute()` runs
+- **THEN** the same stale-provider error propagates to the caller
 
 ### Requirement: Computes VCS staleness
 

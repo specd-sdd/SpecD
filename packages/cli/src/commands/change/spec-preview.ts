@@ -1,7 +1,6 @@
 /* eslint-disable jsdoc/require-jsdoc */
 import * as path from 'node:path'
 import chalk from 'chalk'
-import { createTwoFilesPatch } from 'diff'
 import { type Command } from 'commander'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError, cliError } from '../../handle-error.js'
@@ -11,6 +10,7 @@ interface PreviewFile {
   readonly filename: string
   readonly merged: string
   readonly base: string | null
+  readonly diff?: string
   readonly status: 'merged' | 'no-op' | 'missing'
 }
 
@@ -21,6 +21,7 @@ function isPreviewFile(value: unknown): value is PreviewFile {
     typeof candidate['filename'] === 'string' &&
     typeof candidate['merged'] === 'string' &&
     (candidate['base'] === null || typeof candidate['base'] === 'string') &&
+    (candidate['diff'] === undefined || typeof candidate['diff'] === 'string') &&
     (candidate['status'] === 'merged' ||
       candidate['status'] === 'no-op' ||
       candidate['status'] === 'missing')
@@ -58,7 +59,11 @@ export function registerChangeSpecPreview(parent: Command): void {
       ) => {
         try {
           const { kernel } = await resolveCliContext({ configPath: opts.config })
-          let result = await kernel.changes.preview.execute({ name, specId })
+          let result = await kernel.changes.preview.execute({
+            name,
+            specId,
+            ...(opts.diff === true ? { includeDiff: true } : {}),
+          })
 
           // Warnings to stderr
           for (const warning of result.warnings) {
@@ -129,20 +134,11 @@ export function registerChangeSpecPreview(parent: Command): void {
 
             if (opts.diff === true) {
               for (const file of sortedFiles) {
-                if (file.status === 'no-op' || file.status === 'missing') {
+                if (file.diff === undefined) {
                   continue
                 }
-                const diffStr = createTwoFilesPatch(
-                  `a/${file.filename} (base)`,
-                  `b/${file.filename} (merged)`,
-                  file.base ?? '',
-                  file.merged,
-                  undefined,
-                  undefined,
-                  { context: 3 },
-                )
                 output(`--- ${file.filename} ---`, 'text')
-                const lines = diffStr.split('\n')
+                const lines = file.diff.split('\n')
                 for (const line of lines) {
                   if (line.startsWith('+')) {
                     output(chalk.green(line), 'text')
@@ -162,24 +158,7 @@ export function registerChangeSpecPreview(parent: Command): void {
               }
             }
           } else {
-            if (opts.diff === true) {
-              // JSON/TOON: include non-colorized diff strings
-              const filesWithDiff = asPreviewFiles(result.files).map((file) => ({
-                ...file,
-                diff: createTwoFilesPatch(
-                  `a/${file.filename} (base)`,
-                  `b/${file.filename} (merged)`,
-                  file.base ?? '',
-                  file.merged,
-                  undefined,
-                  undefined,
-                  { context: 3 },
-                ),
-              }))
-              output({ ...result, files: filesWithDiff }, fmt)
-            } else {
-              output(result, fmt)
-            }
+            output(result, fmt)
           }
         } catch (err) {
           handleError(err, opts.format)

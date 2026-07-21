@@ -8,6 +8,10 @@
     {
       "file": "core:src/application/specd-config.ts",
       "symbols": ["SpecdConfig", "SpecdWorkspaceConfig"]
+    },
+    {
+      "file": "core:src/infrastructure/fs/config-loader.ts",
+      "symbols": ["parseRawAdapter"]
     }
   ]
 }

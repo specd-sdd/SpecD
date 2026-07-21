@@ -1,9 +1,9 @@
 {
   "title": "Change Run Hooks",
-  "description": "Agent-driven workflow steps declare `run:` hooks that must be executed at step boundaries, but agents interact with specd through CLI commands — they cannot call use cases directly. `specd change run-hooks` is the CLI command that lets agents execute `run:` hooks for a given step and phase, with clear exit codes that signal whether to proceed or stop. It delegates to the `RunStepHooks` use case and formats the results for agent or human consumption.",
+  "description": "Agent-driven workflow steps declare `run:` hooks that must be executed at step boundaries, but agents interact with specd through CLI commands — they cannot call use cases directly. `specd change run-hooks` is the CLI command that lets agents execute `run:` hooks for a given step and phase, with clear exit codes that signal whether to proceed or stop. It delegates to the `RunStepHooks` use case and formats the results for agent or human consumption.\n\nFor long-running hooks, the command must also make in-flight execution visible instead of appearing silent until process exit.",
   "dependsOn": ["cli:entrypoint", "core:run-step-hooks", "core:hook-execution-model"],
   "context": [
-    "Agent-driven workflow steps declare `run:` hooks that must be executed at step boundaries, but agents interact with specd through CLI commands — they cannot call use cases directly. `specd change run-hooks` is the CLI command that lets agents execute `run:` hooks for a given step and phase, with clear exit codes that signal whether to proceed or stop. It delegates to the `RunStepHooks` use case and formats the results for agent or human consumption."
+    "Agent-driven workflow steps declare `run:` hooks that must be executed at step boundaries, but agents interact with specd through CLI commands — they cannot call use cases directly. `specd change run-hooks` is the CLI command that lets agents execute `run:` hooks for a given step and phase, with clear exit codes that signal whether to proceed or stop. It delegates to the `RunStepHooks` use case and formats the results for agent or human consumption.\n\nFor long-running hooks, the command must also make in-flight execution visible instead of appearing silent until process exit."
   ],
   "rules": [
     {
@@ -21,13 +21,13 @@
     {
       "requirement": "Exit code 0 on success",
       "rules": [
-        "When all hooks execute successfully (or no hooks match), the command exits with code 0.\n\nWhen no `run:` hooks exist for the given step+phase, the command prints `no hooks to run` to stdout (text format) or `{ \"result\": \"ok\", \"hooks\": [] }` (json/toon format) and exits with code 0."
+        "When all hooks execute successfully (or no hooks match), the command exits with code 0.\n\nWhen no `run:` hooks exist for the given step+phase:\n\n- `text` prints `no hooks to run` to stdout\n- `json` and `toon` emit a terminal stdout `stream: \"run-hooks\"` record with `event.type: \"complete\"` and `result: { result: \"ok\", hooks: [] }`\n\nWhen hooks do run successfully:\n\n- `text` leaves progress on stderr and emits a final human-readable summary on stdout\n- `json` and `toon` emit a terminal stdout `stream: \"run-hooks\"` `complete` record carrying the successful hook results"
       ]
     },
     {
       "requirement": "Exit code 2 on hook failure",
       "rules": [
-        "When any `run:` hook exits with a non-zero code, the command exits with code 2 (per the entrypoint spec's hook failure convention). The hook's stdout and stderr are forwarded to the CLI's stdout and stderr respectively."
+        "When any `run:` hook exits with a non-zero code, the command exits with code 2 (per the entrypoint spec's hook failure convention).\n\nIn `text`, in-flight progress and failed-hook context are rendered to stderr, and stdout still carries the final human-readable summary.\n\nIn `json` and `toon`, stdout emits a terminal `stream: \"run-hooks\"` `complete` record whose result identifies `code: \"HOOK_FAILED\"`, the executed hooks, and `failedHooks`."
       ]
     },
     {
@@ -39,13 +39,25 @@
     {
       "requirement": "Text output format",
       "rules": [
-        "When `--format` is `text` (default):\n\n- For each executed hook, print a result line to stdout:\n  - Success: `ok: <hook-id>`\n  - Failure: `failed: <hook-id> (exit code <n>)` followed by the hook's stderr on subsequent lines\n- When all hooks succeed: no additional summary line\n- When a pre-hook fails: only the hooks up to and including the failure are printed (fail-fast)\n- When post-hooks fail: all hooks are printed, with failures clearly marked"
+        "When `--format` is `text` (default), the command MUST render append-only progress that keeps previously executed hooks visible.\n\nFor a running hook, the text output MUST show:\n\n- the hook status, which MAY include a lightweight spinner such as `[⠋ running]`\n- the hook ID\n- the command being executed\n- recent observable output while the hook remains active\n\nWhen a hook completes successfully, the command MUST leave a visible historical record for that hook instead of erasing it while the next hook starts.\n\nWhen a hook fails, the command MUST show the full output for the failed hook rather than only a short summary line.\n\nWhen all hooks succeed, the rendered history MUST remain understandable without requiring the user to infer what happened from a single final line."
+      ]
+    },
+    {
+      "requirement": "Long-running hook observability",
+      "rules": [
+        "The command MUST NOT remain silent for the full duration of a long-running hook when progress information is available from the hook execution pipeline.\n\nIf a hook stays active without emitting new stdout/stderr, the command MUST surface liveness through progress output rather than forcing the caller to wait for final process exit to learn that the hook is still running."
+      ]
+    },
+    {
+      "requirement": "Shared hook progress presentation",
+      "rules": [
+        "The command MUST use the same hook progress presentation model as `specd change transition` for equivalent hook events.\n\nThe CLI implementation MUST centralize that presentation logic in a shared helper so the two commands do not drift in:\n\n- running-status labels\n- recent-output tail rendering\n- liveness signalling\n- failed-hook full-output rendering"
       ]
     },
     {
       "requirement": "JSON output format",
       "rules": [
-        "When `--format` is `json` or `toon`, output to stdout:\n\nOn success:\n\n```json\n{\n  \"result\": \"ok\",\n  \"hooks\": [{ \"id\": \"<hook-id>\", \"command\": \"<expanded-command>\", \"exitCode\": 0, \"success\": true }]\n}\n```\n\nOn failure:\n\n```json\n{\n  \"result\": \"error\",\n  \"code\": \"HOOK_FAILED\",\n  \"hooks\": [\n    { \"id\": \"<hook-id>\", \"command\": \"<expanded-command>\", \"exitCode\": 0, \"success\": true },\n    {\n      \"id\": \"<hook-id>\",\n      \"command\": \"<expanded-command>\",\n      \"exitCode\": 1,\n      \"success\": false,\n      \"stderr\": \"<stderr>\"\n    }\n  ],\n  \"failedHook\": { \"id\": \"<hook-id>\", \"exitCode\": 1 }\n}\n```\n\n`failedHook` is present only for pre-phase failures (fail-fast). For post-phase failures, `failedHook` is omitted and the consumer inspects the `hooks` array."
+        "When `--format` is `json` or `toon`, all machine-readable output MUST be emitted on stdout as a newline-delimited structured stream.\n\nHook lifecycle updates MUST be emitted as `stream: \"hook-progress\"` records so consumers can observe:\n\n- hook start\n- hook output activity\n- liveness signals for long-running hooks without new output\n- hook completion\n\nAfter execution completes, the command MUST emit one terminal `stream: \"run-hooks\"` record whose event type is `complete`.\n\nThat terminal record MUST contain the final hook results with `id`, `command`, `exitCode`, and `success`, plus any captured output required by the error contract.\n\nThe terminal `complete` record MUST expose `failedHooks` so consumers can identify every failed hook result without re-deriving that subset from raw output."
       ]
     },
     {
@@ -60,7 +72,8 @@
     "The command does not perform state transitions — it only executes hooks",
     "The command does not validate step availability — the agent is responsible for calling it at the appropriate time",
     "Exit code 2 is used exclusively for hook failures, consistent with the entrypoint spec",
-    "Hook stdout/stderr is forwarded verbatim in text mode; captured in JSON mode"
+    "In text, progress is rendered to stderr and the final human-readable summary is rendered to stdout",
+    "In json and toon, machine-readable progress and the final complete record are emitted on stdout; stderr is reserved for non-structured diagnostics"
   ],
   "scenarios": [
     {
@@ -80,19 +93,23 @@
     },
     {
       "requirement": "Exit code 0 on success",
-      "name": "All hooks succeed",
+      "name": "All hooks succeed with human-readable summary",
       "given": [
         "the implementing step has pre-hooks [{ id: \"test\", run: \"pnpm test\" }]",
         "AND pnpm test exits with code 0"
       ],
-      "when": ["specd change run-hooks add-auth implementing --phase pre"],
-      "then": ["the command exits with code 0", "AND stdout contains ok: test"]
+      "when": ["specd change run-hooks add-auth implementing --phase pre is run"],
+      "then": [
+        "the command exits with code 0",
+        "AND stderr shows hook progress while the hook runs",
+        "AND stdout ends with a human-readable hook summary"
+      ]
     },
     {
       "requirement": "Exit code 0 on success",
       "name": "No hooks to run",
       "given": ["the implementing step has no run: hooks in the post phase"],
-      "when": ["specd change run-hooks add-auth implementing --phase post"],
+      "when": ["specd change run-hooks add-auth implementing --phase post is run"],
       "then": ["the command exits with code 0", "AND stdout contains no hooks to run"]
     },
     {
@@ -100,13 +117,13 @@
       "name": "Pre-hook failure exits code 2",
       "given": [
         "the implementing step has pre-hooks [{ id: \"test\", run: \"pnpm test\" }]",
-        "AND pnpm test exits with code 1 and stderr Tests failed"
+        "AND pnpm test exits with code 1 and emits failure output"
       ],
       "when": ["specd change run-hooks add-auth implementing --phase pre"],
       "then": [
         "the command exits with code 2",
-        "AND stdout contains failed: test (exit code 1)",
-        "AND stderr from the hook is forwarded"
+        "AND stderr retains the failed hook context",
+        "AND stdout still ends with the final hook summary"
       ]
     },
     {
@@ -146,35 +163,111 @@
       ],
       "when": ["specd change run-hooks add-auth implementing --phase post"],
       "then": [
-        "stdout contains failed: test (exit code 1) and ok: lint",
-        "AND both hooks were executed (fail-soft for post phase)"
+        "the text output keeps both hooks visible in execution order",
+        "AND the failed hook remains visibly marked as failed",
+        "AND the later successful hook remains visible after it completes"
+      ]
+    },
+    {
+      "requirement": "Text output format",
+      "name": "Running hook shows active status and recent output",
+      "given": ["a hook emits output incrementally while it is still running"],
+      "when": ["specd change run-hooks is executed in text mode"],
+      "then": [
+        "the active hook is rendered with visible running status",
+        "AND the command being executed is shown",
+        "AND recent output remains visible while the hook is still in flight"
+      ]
+    },
+    {
+      "requirement": "Text output format",
+      "name": "Failed hook shows full output",
+      "given": ["a hook fails after emitting multiple lines of output"],
+      "when": ["specd change run-hooks is executed in text mode"],
+      "then": [
+        "the failed hook output includes the full output for that hook",
+        "AND the caller does not need to infer failure context from a single short line"
+      ]
+    },
+    {
+      "requirement": "Long-running hook observability",
+      "name": "Quiet long-running hook still surfaces liveness",
+      "given": ["a hook remains active for a meaningful interval without new stdout or stderr"],
+      "when": ["specd change run-hooks is executed"],
+      "then": [
+        "the command still emits observable progress before the hook exits",
+        "AND the caller can distinguish \"still running\" from \"finished with no output\""
+      ]
+    },
+    {
+      "requirement": "Shared hook progress presentation",
+      "name": "Equivalent hook events render with the same presentation contract as transition",
+      "given": [
+        "specd change run-hooks and specd change transition observe the same sequence of hook events"
+      ],
+      "when": ["both commands render hook progress in the same output format"],
+      "then": [
+        "running status, recent output, liveness, and failed-hook output follow the same presentation rules"
       ]
     },
     {
       "requirement": "JSON output format",
-      "name": "Successful hooks in JSON format",
+      "name": "Structured stdout stream reports hook progress before completion",
+      "given": ["a long-running hook emits output before exit"],
+      "when": ["specd change run-hooks add-auth implementing --phase pre --format json"],
+      "then": [
+        "stdout emits newline-delimited stream: \"hook-progress\" records before terminal completion",
+        "AND those records preserve which hook is active"
+      ]
+    },
+    {
+      "requirement": "JSON output format",
+      "name": "Structured stdout stream reports liveness for quiet hook",
+      "given": ["a hook remains active without emitting new output"],
+      "when": ["specd change run-hooks add-auth implementing --phase pre --format toon"],
+      "then": ["stdout emits a liveness signal before the hook exits"]
+    },
+    {
+      "requirement": "JSON output format",
+      "name": "Structured stream ends with complete record carrying final success result",
       "given": [
         "pre-hooks [{ id: \"test\", run: \"pnpm test\" }]",
         "AND pnpm test exits with code 0"
       ],
       "when": ["specd change run-hooks add-auth implementing --phase pre --format json"],
       "then": [
-        "stdout contains JSON with \"result\": \"ok\" and a hooks array with one entry",
-        "AND the hook entry has \"id\": \"test\", \"success\": true, \"exitCode\": 0"
+        "the final stdout record is stream: \"run-hooks\"",
+        "AND its event type is complete",
+        "AND its result contains the final hook result array"
       ]
     },
     {
       "requirement": "JSON output format",
-      "name": "Failed pre-hook in JSON format",
+      "name": "Failed pre-hook in structured output retains final failure details",
       "given": [
         "pre-hooks [{ id: \"test\", run: \"pnpm test\" }, { id: \"lint\", run: \"pnpm lint\" }]",
         "AND pnpm test exits with code 1"
       ],
       "when": ["specd change run-hooks add-auth implementing --phase pre --format json"],
       "then": [
-        "stdout contains JSON with \"result\": \"error\", \"code\": \"HOOK_FAILED\"",
-        "AND hooks contains only one entry (fail-fast: lint was not run)",
-        "AND failedHook identifies the test hook"
+        "the final stdout record is stream: \"run-hooks\" with event.type: \"complete\"",
+        "AND its result identifies \"code\": \"HOOK_FAILED\"",
+        "AND hooks contains only the executed pre-hook results",
+        "AND failedHooks contains the test hook result"
+      ]
+    },
+    {
+      "requirement": "JSON output format",
+      "name": "Failed post-hooks expose all failures in failedHooks",
+      "given": [
+        "post-hooks [{ id: \"test\", run: \"pnpm test\" }, { id: \"lint\", run: \"pnpm lint\" }]",
+        "AND both hooks exit with code 1"
+      ],
+      "when": ["specd change run-hooks add-auth implementing --phase post --format json is run"],
+      "then": [
+        "the final structured result has \"result\": \"error\"",
+        "AND hooks contains both executed hooks",
+        "AND failedHooks contains both failed hook results in execution order"
       ]
     },
     {
@@ -187,14 +280,57 @@
       "when": ["specd change run-hooks add-auth archiving --phase pre"],
       "then": [
         "the command exits with code 0",
-        "AND stdout contains ok: test",
+        "AND stderr shows hook progress while the hook runs",
+        "AND stdout ends with a final human-readable hook summary",
         "AND no archive operation is performed"
       ]
     }
   ],
+  "implementation": {
+    "files": [
+      {
+        "specId": "cli:change-run-hooks",
+        "file": "cli:test/commands/change-run-hooks.spec.ts"
+      },
+      {
+        "specId": "cli:change-run-hooks",
+        "file": "cli:test/commands/_hook-progress-presenter.spec.ts"
+      },
+      {
+        "specId": "cli:change-run-hooks",
+        "file": "cli:test/formatter.spec.ts"
+      },
+      {
+        "specId": "cli:change-run-hooks",
+        "file": "cli:src/formatter.ts"
+      }
+    ],
+    "symbols": [
+      {
+        "specId": "cli:change-run-hooks",
+        "file": "cli:src/commands/change/_hook-progress-presenter.ts",
+        "symbol": "HookPresenterEvent"
+      },
+      {
+        "specId": "cli:change-run-hooks",
+        "file": "cli:src/commands/change/_hook-progress-presenter.ts",
+        "symbol": "HookProgressPresenter"
+      },
+      {
+        "specId": "cli:change-run-hooks",
+        "file": "cli:src/commands/change/_hook-progress-presenter.ts",
+        "symbol": "createHookProgressPresenter"
+      },
+      {
+        "specId": "cli:change-run-hooks",
+        "file": "cli:src/commands/change/run-hooks.ts",
+        "symbol": "registerChangeRunHooks"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:3525d872ac348b718667441c8e08a4d062bc912c9d7d5bdfdf69d2976f0a6026",
-    "verify.md": "sha256:7d982b2db6a54a5d8fec815383645f8659b8571a3ca0fd3629b76b07cd767927"
+    "spec.md": "sha256:20b5784f7cc0efd597ff4ecf6ad289d6c48f40e1d0b46ec6e017ab7488635e41",
+    "verify.md": "sha256:50f41439f3041ea02abb03a3731ed2ae8c1c854d40aa7470e7334fab12b415b4"
   },
   "generatedBy": "core"
 }

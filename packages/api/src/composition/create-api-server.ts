@@ -75,8 +75,10 @@ export async function createApiServer(options: CreateApiServerOptions): Promise<
 
   const logRing = new LogRingBuffer(500)
   const sdkHost = await createSdkContext(config, {
-    logRing,
-    logFormatter: createLogFormatter({ colorize: false }),
+    kernel: {
+      logRing,
+      logFormatter: createLogFormatter({ colorize: false }),
+    },
   })
   Logger.info('API kernel booted', { projectRoot: config.projectRoot })
   const kernelActor = await resolveKernelActor(config)

@@ -24,13 +24,25 @@ Use `@specd/sdk` when building a host that needs:
 ```typescript
 import { openSpecdHost, createSdkContext } from '@specd/sdk'
 
-// Full host bootstrap (loads specd.yaml)
+// Forced-file bootstrap when the host already knows the exact config file
 const host = await openSpecdHost({ configPath: '/path/to/specd.yaml' })
+
+// Discovery-root bootstrap when the host chooses a directory at runtime
+const selectedHost = await openSpecdHost({ startDir: '/path/to/project/subdir' })
+
 const config = await host.kernel.project.getConfig.execute()
 
 // Kernel-only when you already have a resolved SpecdConfig
 const { kernel } = await createSdkContext(config)
 ```
+
+Choose exactly one bootstrap input:
+
+- `configPath` for forced-file mode
+- `startDir` for discovery-root mode
+- neither field to fall back to discovery from `process.cwd()`
+
+Do not pass `configPath` and `startDir` together.
 
 `openSpecdHost` returns:
 
@@ -38,6 +50,10 @@ const { kernel } = await createSdkContext(config)
 - `configFilePath` — absolute path to `specd.yaml`, or `null`
 - `kernel` — wired specd kernel
 - `createGraphProvider()` — factory bound to the same config
+
+Bootstrap warnings remain on `config.warnings`. `openSpecdHost` does not expose a
+duplicate top-level `warnings` field, so hosts should consume diagnostics from the
+resolved config and decide how to present them.
 
 Config **reads** go through `kernel.project.getConfig`. Config **writes** (`initProject`, `addPlugin`, `removePlugin`) use `createConfigWriter()` from `@specd/sdk` — not the kernel.
 
@@ -51,7 +67,50 @@ await withOpenGraphProvider(host, async (provider) => {
 })
 ```
 
-Optional `beforeOpen` supports host-specific setup (e.g. CLI index lock acquisition).
+`withOpenGraphProvider` is the short-lived host helper. It opens the provider,
+runs your callback, and always closes it. Optional hooks are available when the
+host needs setup or teardown around the provider lifecycle:
+
+```typescript
+import { withOpenGraphProvider } from '@specd/sdk'
+
+await withOpenGraphProvider(host, async (provider) => provider.getStatistics(), {
+  beforeOpen: async () => {
+    // host-local setup
+  },
+  afterClose: async () => {
+    // host-local cleanup
+  },
+})
+```
+
+For long-lived hosts, keep the provider instance explicitly and reopen it when a
+stale generation error is raised:
+
+```typescript
+import { GraphProviderStaleError, openSpecdHost } from '@specd/sdk'
+
+const host = await openSpecdHost({ startDir: process.cwd() })
+const provider = host.createGraphProvider()
+
+await provider.open()
+
+try {
+  await provider.searchSymbols({ query: 'openSpecdHost' })
+} catch (error) {
+  if (error instanceof GraphProviderStaleError) {
+    await provider.close()
+    await provider.open()
+  } else {
+    throw error
+  }
+}
+
+await provider.close()
+```
+
+Provider creation is synchronous. Runtime-native backend loading happens in
+`provider.open()`, not when `createGraphProvider()` is called.
 
 ## Orchestration
 
@@ -79,7 +138,7 @@ Both return structured data — formatting stays in CLI presenters.
 | `resolveCliContext`                    | `openSpecdHost` + `buildCliKernelOptions`        |
 | `project status`                       | `buildProjectStatusSnapshot`                     |
 | `graph stats`                          | `withOpenGraphProvider` + `createGetGraphHealth` |
-| `graph index` (worker)                 | `runIndexProjectGraph`                           |
+| `graph index`                          | `runIndexProjectGraph`                           |
 | `graph search` / `hotspots` / `impact` | `withOpenGraphProvider` via `withProvider`       |
 
 ## Re-exports
@@ -89,7 +148,7 @@ The SDK root exports explicit symbols from the curated `@specd/core` and `@specd
 - `createDefaultConfigLoader`, `createConfigWriter`, `createKernel`, kernel-equivalent `createX` factories, and repository factories
 - Standalone `createX` factories (e.g. `createGetStatus`, `createResolveSchema`) for hosts that need a single use case without `createKernel`
 - Host orchestration: `openSpecdHost`, `withOpenGraphProvider`, `buildProjectStatusSnapshot`, `runIndexProjectGraph`
-- Graph helpers: `acquireGraphIndexLock`, `assertGraphIndexUnlocked`, `createGetGraphHealth`, `GetGraphHealthResult`, `IndexResult`, `HotspotResult`
+- Graph helpers: `createGetGraphHealth`, `GetGraphHealthResult`, `IndexResult`, `HotspotResult`, `GraphProviderStaleError`
 - `SDK_VERSION`, `CORE_VERSION`, `CODE_GRAPH_VERSION`
 
 For package-level semantics (domain model, graph indexing, plugin ports), see the **Core** and **Code graph** package reference sections.

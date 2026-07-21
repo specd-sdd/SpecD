@@ -1,0 +1,67 @@
+- op: modified
+  description: 'Remove pre-open lock probing from impact command'
+  selector:
+    type: section
+    matches: 'Requirement: Concurrent indexing guard'
+  content: |
+    Before impact analysis reads from the graph, the command MUST rely on provider-owned availability checks rather than querying a host-managed pre-open lock state.
+
+    If the provider reports that the graph is busy or stale after opening, the command SHALL surface that provider error through the normal CLI infrastructure-error path.
+- op: modified
+  description: 'Align symbol impact with shared CLI graph context lifecycle'
+  selector:
+    type: section
+    matches: 'Requirement: Symbol impact analysis'
+  content: |
+    When `--symbol` is provided:
+
+    1. Resolves graph context via `resolveGraphCliContext` using explicit config, autodetected config, or bootstrap mode
+    2. Opens the provider through `withProvider`
+    3. Resolves the selector through `resolveSymbolSelector(symbolSelector)` to support bare names, qualified names, and full graph symbol ids (for example `packages/core/src/auth.ts:function:validate`)
+    4. If no symbol matches, outputs `No symbol found matching "<selector>".` and exits with code 0
+    5. If one symbol matches, calls `analyzeImpact(symbolId, direction)` and outputs the result
+    6. If multiple symbols match, analyzes each one and outputs all results
+
+    Platform symbols MUST come from `@specd/sdk`. The CLI MUST NOT open or close the provider outside `withProvider`.
+- op: modified
+  description: 'Align spec impact with shared CLI graph context lifecycle'
+  selector:
+    type: section
+    matches: 'Requirement: Spec impact analysis'
+  content: |
+    When `--spec` is provided:
+
+    1. Resolves graph context via `resolveGraphCliContext` using explicit config, autodetected config, or bootstrap mode
+    2. Opens the provider through `withProvider`
+    3. Loads the spec via `getSpec(specId)`. If no indexed spec node exists, the provider SHALL throw `SpecNotFoundError` with the requested spec id
+    4. Calls `analyzeSpecImpact(specId, direction)`
+    5. Outputs the resulting `ImpactResult`
+
+    The CLI SHALL let `SpecNotFoundError` propagate to the global error handler so the command fails with exit code 1 and a machine-readable `SPEC_NOT_FOUND` error code.
+
+    Spec impact MUST reflect requirement-aware graph relations, not just code-structure traversal. At minimum it includes:
+
+    - `DEPENDS_ON` between specs
+    - `COVERS_FILE` between specs and files
+    - `COVERS_SYMBOL` between specs and symbols
+
+    Platform symbols MUST come from `@specd/sdk`. The CLI MUST NOT open or close the provider outside `withProvider`.
+- op: modified
+  description: 'Align error handling with provider-owned busy/stale semantics'
+  selector:
+    type: section
+    matches: 'Requirement: Error cases'
+  content: |
+    Exactly one of `--file`, `--symbol`, or `--spec` must be provided. If none or more than one are passed, the command SHALL fail with a CLI error and exit code 1.
+
+    If both `--config` and `--path` are passed, the command SHALL fail with a CLI error and exit code 1.
+
+    If a `--file` input without a workspace prefix does not resolve by config-relative path or project-relative path, the command SHALL fail with a user-facing resolution error.
+
+    If a `--file` input without a workspace prefix resolves to more than one canonical graph file, the command SHALL fail with a user-facing ambiguity error.
+
+    If `--spec` references no indexed spec node, the command SHALL fail with a not-found error for that spec id.
+
+    If the provider reports `GRAPH_BUSY` or `GRAPH_PROVIDER_STALE`, the command SHALL exit with code 3 through the standard infrastructure error path.
+
+    If the provider cannot be opened, the command exits with code 3.

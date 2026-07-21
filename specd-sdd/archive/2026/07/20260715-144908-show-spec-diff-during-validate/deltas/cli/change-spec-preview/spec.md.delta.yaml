@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'The command contract already supports artifact-filtered diff fallback; this change updates validate guidance, not spec-preview behavior.'

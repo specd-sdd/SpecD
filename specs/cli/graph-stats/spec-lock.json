@@ -16,6 +16,9 @@
     {
       "file": "cli:src/commands/graph/stats.ts",
       "symbols": ["registerGraphStats"]
+    },
+    {
+      "file": "cli:test/commands/graph-stats.spec.ts"
     }
   ]
 }

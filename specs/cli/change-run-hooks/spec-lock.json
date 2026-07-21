@@ -1,0 +1,29 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["cli:entrypoint", "core:run-step-hooks", "core:hook-execution-model"],
+  "implementation": [
+    {
+      "file": "cli:src/commands/change/_hook-progress-presenter.ts",
+      "symbols": ["HookPresenterEvent", "HookProgressPresenter", "createHookProgressPresenter"]
+    },
+    {
+      "file": "cli:src/commands/change/run-hooks.ts",
+      "symbols": ["registerChangeRunHooks"]
+    },
+    {
+      "file": "cli:test/commands/change-run-hooks.spec.ts"
+    },
+    {
+      "file": "cli:test/commands/_hook-progress-presenter.spec.ts"
+    },
+    {
+      "file": "cli:test/formatter.spec.ts"
+    },
+    {
+      "file": "cli:src/formatter.ts"
+    }
+  ]
+}

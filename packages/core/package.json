@@ -10,6 +10,7 @@
     "dist/"
   ],
   "dependencies": {
+    "diff": "^8.0.4",
     "ignore": "^7.0.0",
     "mdast-util-from-markdown": "^2.0.3",
     "mdast-util-to-markdown": "^2.1.2",
@@ -43,5 +44,8 @@
     "test": "vitest run",
     "release:publish": "pnpm publish --access public",
     "lint": "eslint ."
+  },
+  "devDependencies": {
+    "@types/diff": "^8.0.0"
   }
 }

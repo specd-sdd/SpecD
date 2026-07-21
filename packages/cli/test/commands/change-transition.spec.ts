@@ -167,6 +167,49 @@ describe('Pre- and post-hooks', () => {
 
     expect(process.exit).toHaveBeenCalledWith(2)
   })
+
+  it('renders compact failed hook output to stderr before transition failure', async () => {
+    const { kernel, stderr } = setup()
+    kernel.changes.status.execute.mockResolvedValue({
+      change: makeMockChange({ name: 'my-change', state: 'drafting' }),
+      artifactStatuses: [],
+    })
+    kernel.changes.transition.execute.mockImplementation(async (_input, onProgress) => {
+      onProgress?.({ type: 'hook-start', phase: 'pre', hookId: 'lint', command: 'pnpm lint' })
+      onProgress?.({
+        type: 'hook-output',
+        phase: 'pre',
+        hookId: 'lint',
+        stream: 'stdout',
+        line: 'line-a',
+      })
+      onProgress?.({
+        type: 'hook-output',
+        phase: 'pre',
+        hookId: 'lint',
+        stream: 'stderr',
+        line: 'line-b',
+      })
+      onProgress?.({ type: 'hook-done', phase: 'pre', hookId: 'lint', success: false, exitCode: 1 })
+      throw new HookFailedError('lint', 1, 'line-a\nline-b\n')
+    })
+
+    const program = makeProgram()
+    registerChangeTransition(program.command('change'))
+    await program
+      .parseAsync(['node', 'specd', 'change', 'transition', 'my-change', 'designing'])
+      .catch(() => {})
+
+    const output = stderr()
+    const failedBlock = output.slice(output.lastIndexOf('[failed]'))
+    expect(output).toContain('[failed] pre › lint')
+    expect(output).toContain('  exit: 1')
+    expect(output).toContain(
+      '[all hooks done] hooks=1 done=0 failed=1 -------------------------------------',
+    )
+    expect(failedBlock).not.toContain('full output:')
+    expect(process.exit).toHaveBeenCalledWith(2)
+  })
 })
 
 describe('Output on success', () => {
@@ -190,13 +233,18 @@ describe('Output on success', () => {
   })
 
   it('JSON output on successful transition', async () => {
-    const { kernel, stdout } = setup()
+    const { kernel, stdout, stderr } = setup()
     kernel.changes.status.execute.mockResolvedValue({
       change: makeMockChange({ name: 'my-change', state: 'drafting' }),
       artifactStatuses: [],
     })
-    kernel.changes.transition.execute.mockResolvedValue({
-      change: makeMockChange({ name: 'my-change', state: 'designing' }),
+    kernel.changes.transition.execute.mockImplementation(async (_input, onProgress) => {
+      onProgress?.({ type: 'hook-start', phase: 'pre', hookId: 'lint', command: 'pnpm lint' })
+      onProgress?.({ type: 'hook-done', phase: 'pre', hookId: 'lint', success: true, exitCode: 0 })
+      onProgress?.({ type: 'transitioned', from: 'drafting', to: 'designing' })
+      return {
+        change: makeMockChange({ name: 'my-change', state: 'designing' }),
+      }
     })
 
     const program = makeProgram()
@@ -212,11 +260,68 @@ describe('Output on success', () => {
       'json',
     ])
 
-    const parsed = JSON.parse(stdout())
-    expect(parsed.result).toBe('ok')
-    expect(parsed.name).toBe('my-change')
-    expect(parsed.from).toBe('drafting')
-    expect(parsed.to).toBe('designing')
+    expect(stderr()).toBe('')
+    const lines = stdout()
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line) as Record<string, unknown>)
+    expect(lines[0]).toEqual({
+      stream: 'hook-progress',
+      event: { type: 'hook-start', phase: 'pre', hookId: 'lint', command: 'pnpm lint' },
+    })
+    expect(lines[1]).toEqual({
+      stream: 'hook-progress',
+      event: { type: 'hook-done', phase: 'pre', hookId: 'lint', success: true, exitCode: 0 },
+    })
+    expect(lines[2]).toEqual({
+      stream: 'change-transition',
+      event: { type: 'transitioned', from: 'drafting', to: 'designing' },
+    })
+    expect(lines[3]).toEqual({
+      stream: 'change-transition',
+      event: {
+        type: 'complete',
+        result: { result: 'ok', name: 'my-change', from: 'drafting', to: 'designing' },
+      },
+    })
+  })
+
+  it('renders hook progress to stderr before transition success', async () => {
+    const { kernel, stderr } = setup()
+    kernel.changes.status.execute.mockResolvedValue({
+      change: makeMockChange({ name: 'my-change', state: 'drafting' }),
+      artifactStatuses: [],
+    })
+    kernel.changes.transition.execute.mockImplementation(async (_input, onProgress) => {
+      onProgress?.({ type: 'hook-start', phase: 'pre', hookId: 'lint', command: 'pnpm lint' })
+      onProgress?.({
+        type: 'hook-output',
+        phase: 'pre',
+        hookId: 'lint',
+        stream: 'stdout',
+        line: 'running lint',
+      })
+      onProgress?.({ type: 'hook-heartbeat', phase: 'pre', hookId: 'lint', elapsedMs: 5000 })
+      onProgress?.({ type: 'hook-done', phase: 'pre', hookId: 'lint', success: true, exitCode: 0 })
+      onProgress?.({ type: 'transitioned', from: 'drafting', to: 'designing' })
+      return {
+        change: makeMockChange({ name: 'my-change', state: 'designing' }),
+      }
+    })
+
+    const program = makeProgram()
+    registerChangeTransition(program.command('change'))
+    await program.parseAsync(['node', 'specd', 'change', 'transition', 'my-change', 'designing'])
+
+    const output = stderr()
+    expect(output).toContain('[running] pre › lint')
+    expect(output).toContain('running lint')
+    expect(output).toContain('[done] pre › lint')
+    expect(output).toContain('  exit: 0')
+    expect(output).not.toContain('last output:')
+    expect(output).toContain(
+      '[all hooks done] hooks=1 done=1 failed=0 -------------------------------------',
+    )
   })
 })
 
@@ -481,9 +586,17 @@ describe('--skip-hooks flag', () => {
       'json',
     ])
 
-    const parsed = JSON.parse(stdout())
-    expect(parsed.result).toBe('ok')
-    expect(parsed.postHookFailures).toBeUndefined()
+    const lines = stdout()
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line) as { stream: string; event: Record<string, unknown> })
+    expect(lines.at(-1)).toEqual({
+      stream: 'change-transition',
+      event: {
+        type: 'complete',
+        result: { result: 'ok', name: 'my-change', from: 'drafting', to: 'designing' },
+      },
+    })
   })
 })
 

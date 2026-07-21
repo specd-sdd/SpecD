@@ -49,21 +49,43 @@
 
 - **GIVEN** a change where all artifacts pass validation
 - **AND** validation reports file `deltas/core/core/config/spec.md.delta.yaml`
-- **WHEN** `specd change validate my-change core:config --artifact specs` is run
+- **WHEN** `specd change validate my-change core:config` is run
 - **THEN** stdout contains `validated my-change/core:config: all artifacts pass`
 - **AND** stdout contains `file: deltas/core/core/config/spec.md.delta.yaml`
-- **AND** stdout contains `specd change spec-preview my-change core:config`
+- **AND** stdout contains `specd changes spec-preview my-change core:config`
 - **AND** the process exits with code 0
 
 #### Scenario: Pass with notes
 
 - **GIVEN** a change where artifacts pass but there are optimization notes
 - **AND** validation reports file `deltas/core/core/config/spec.md.delta.yaml`
-- **WHEN** `specd change validate my-change core:config --artifact specs` is run
+- **WHEN** `specd change validate my-change core:config` is run
 - **THEN** stdout contains a pass message with `pass (N note(s))`
 - **AND** stdout contains `note:` lines for each note
 - **AND** stdout contains `file: deltas/core/core/config/spec.md.delta.yaml`
-- **AND** stdout contains `specd change spec-preview my-change core:config`
+- **AND** stdout contains `specd changes spec-preview my-change core:config`
+- **AND** the process exits with code 0
+
+#### Scenario: Successful delta-backed spec artifact validation shows inline diff
+
+- **GIVEN** `specs` is a `scope: spec` artifact backed by an existing delta-applied base file
+- **AND** validation succeeds for `specd change validate my-change core:config --artifact specs`
+- **AND** the delta merge materializes successfully for review
+- **WHEN** text output is rendered
+- **THEN** stdout contains the validated file path lines
+- **AND** stdout contains the structural-validation reminder note
+- **AND** stdout renders the unified diff for only the validated artifact
+- **AND** stdout does NOT contain a `specd changes spec-preview` follow-up hint
+
+#### Scenario: Diff-generation failure after successful validation falls back to preview note
+
+- **GIVEN** validation succeeds for `specd change validate my-change core:config --artifact specs`
+- **AND** inline diff review qualifies for that target
+- **AND** diff generation raises `DiffGenerationError` after merge preview has already succeeded
+- **WHEN** text output is rendered
+- **THEN** stdout still reports validation success
+- **AND** stdout omits inline diff output
+- **AND** stdout includes a `note:` telling the reviewer to run `specd changes spec-preview my-change core:config --diff --artifact specs`
 - **AND** the process exits with code 0
 
 #### Scenario: JSON output on pass includes notes and files
@@ -87,6 +109,15 @@
 - **AND** stdout contains `error:` lines for each failure
 - **AND** stdout contains `note:` lines for each note
 - **AND** the process exits with code 1
+
+#### Scenario: Failed single-artifact spec validation omits inline diff review
+
+- **GIVEN** `specs` is a delta-backed `scope: spec` artifact
+- **AND** `specd change validate my-change core:config --artifact specs` fails validation
+- **WHEN** text output is rendered
+- **THEN** stdout reports only the validation failure details
+- **AND** stdout does NOT render an inline diff
+- **AND** stdout does NOT present any merged review surface as a trustworthy checkpoint
 
 #### Scenario: JSON output on failure includes notes and files
 

@@ -1,0 +1,26 @@
+- op: modified
+  description: 'Replace external lock assertion semantics with provider-owned availability behavior'
+  selector:
+    type: section
+    matches: 'Requirement: Asserts indexing lock before statistics'
+  rename: 'Requirement: Provider-owned availability and error propagation'
+  content: |
+    `GetGraphHealth` MUST rely on `provider.getStatistics()` for graph availability checks.
+
+    The use case MUST NOT call externally exposed lock helpers or accept a caller-controlled lock-assertion escape hatch.
+
+    If the provider reports that the graph is busy or stale, the use case MUST let that provider error propagate unchanged to the caller.
+- op: modified
+  description: 'Remove assertUnlocked from input contract'
+  selector:
+    type: section
+    matches: 'Requirement: Accepts open provider and project inputs'
+  content: |
+    `GetGraphHealthInput` MUST include:
+
+    - `config: SpecdConfig`
+    - `provider: CodeGraphProvider` (already opened)
+    - `codeGraphVersion: string`
+    - optional workspaces for fingerprint comparison
+
+    The use case MUST NOT open or close the provider.

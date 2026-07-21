@@ -1,0 +1,800 @@
+{
+  "name": "show-spec-diff-during-validate",
+  "createdAt": "2026-07-15T14:49:08.314Z",
+  "description": "This change makes successful single-artifact spec validation show the merged inline diff directly when the target is an existing delta-backed scope: spec artifact, so reviewers can inspect risky removals or contract breakage without leaving changes validate. It also introduces a dedicated DiffGenerationError path in core preview/diff generation, keeps --all unchanged, and updates skill guidance so agents treat the inline diff as the immediate review surface while preserving spec-preview as the fallback and broader merged-review tool.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "cli:change-validate",
+    "cli:change-spec-preview",
+    "core:preview-spec",
+    "core:validate-artifacts",
+    "skills:workflow-automation",
+    "core:diff-generator"
+  ],
+  "specDependsOn": {
+    "cli:change-validate": [
+      "cli:entrypoint",
+      "core:change",
+      "core:validate-artifacts",
+      "core:spec-id-format",
+      "core:preview-spec"
+    ],
+    "cli:change-spec-preview": ["core:preview-spec"],
+    "core:preview-spec": [
+      "core:delta-format",
+      "core:artifact-parser-port",
+      "core:change-layout",
+      "core:file-reader-port",
+      "core:composition-resolver",
+      "core:diff-generator"
+    ],
+    "core:validate-artifacts": [
+      "core:change",
+      "core:change-layout",
+      "core:change-manifest",
+      "core:lifecycle-engine",
+      "core:delta-format",
+      "core:selector-model",
+      "core:storage",
+      "default:_global/architecture",
+      "core:spec-id-format",
+      "core:schema-format",
+      "core:composition-resolver"
+    ],
+    "skills:workflow-automation": ["cli:command-resource-naming", "skills:agents"],
+    "core:diff-generator": []
+  },
+  "invalidationPolicy": "downstream",
+  "trackedImplementationFiles": [
+    {
+      "file": "packages/core/src/infrastructure/diff/diff-generator.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/ports/diff-generator.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/composition-resolver.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/preview-spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/preview-spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/diff-generator.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/change/validate.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/skills/templates/skills/specd-design/SKILL.md.tpl",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/skills/templates/skills/specd-verify/SKILL.md.tpl",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/skills/templates/shared/shared.md.tpl",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/change-validate.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/preview-spec.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/infrastructure/diff/diff-generator.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/skills/CHANGELOG.md",
+      "state": "ignored"
+    },
+    {
+      "file": "MAIN_FOLLOW_UPS.md",
+      "state": "ignored"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "core:diff-generator",
+      "file": "packages/core/src/infrastructure/diff/diff-generator.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["DiffDiffGenerator"]
+    },
+    {
+      "specId": "core:diff-generator",
+      "file": "packages/core/src/application/ports/diff-generator.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["DiffGenerationError"]
+    },
+    {
+      "specId": "core:diff-generator",
+      "file": "packages/core/src/composition/composition-resolver.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["getDiffGenerator"]
+    },
+    {
+      "specId": "core:preview-spec",
+      "file": "packages/core/src/application/use-cases/preview-spec.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["PreviewSpec"]
+    },
+    {
+      "specId": "core:preview-spec",
+      "file": "packages/core/src/composition/use-cases/preview-spec.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["resolvePreviewSpecDeps", "createPreviewSpec"]
+    },
+    {
+      "specId": "core:diff-generator",
+      "file": "packages/core/src/composition/diff-generator.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["createDefaultDiffGenerator"]
+    },
+    {
+      "specId": "cli:change-validate",
+      "file": "packages/cli/src/commands/change/validate.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["registerChangeValidate", "executeSingle", "executeBatch"]
+    },
+    {
+      "specId": "skills:workflow-automation",
+      "file": "packages/skills/templates/skills/specd-design/SKILL.md.tpl",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "skills:workflow-automation",
+      "file": "packages/skills/templates/skills/specd-verify/SKILL.md.tpl",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "skills:workflow-automation",
+      "file": "packages/skills/templates/shared/shared.md.tpl",
+      "fileLinkExplicit": true
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:fd16b3637ee884a6f9a7fb435ee4dba19373e0a08717c1e7605965d2fc5d61a7"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "cli:change-validate",
+          "filename": "deltas/cli/change-validate/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:396fd17d7a050f375f23acf8bc6566645915d2b34bb8e22684164dd861dc44ae"
+        },
+        {
+          "key": "cli:change-spec-preview",
+          "filename": "deltas/cli/change-spec-preview/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:36ec6d5b9594c7d8a1d695ad8c7ac9ee26015640aac8767818ab978d4d4d6029"
+        },
+        {
+          "key": "core:preview-spec",
+          "filename": "deltas/core/preview-spec/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:693180b5427dd8e3f5524abf484cceb8a40862a28cec8b7a66cf6661606dba07"
+        },
+        {
+          "key": "core:validate-artifacts",
+          "filename": "deltas/core/validate-artifacts/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:5712fdf40fe4a483a95291500b06bed940bb208b44509168334dc12c78441ced"
+        },
+        {
+          "key": "skills:workflow-automation",
+          "filename": "deltas/skills/workflow-automation/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:2e4c506d8eff28785fa2cfc6b631eaf1e1639dc1560aed3c7684410f16b7d131"
+        },
+        {
+          "key": "core:diff-generator",
+          "filename": "deltas/core/diff-generator/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:7575a752405da41aeea8629f57bc15e89b510479ba3e0f7e40f94a332f6f5392"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "cli:change-validate",
+          "filename": "deltas/cli/change-validate/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:8a4639b0cd032f6987e67807fe0da56579ca85bff23e8e6048409bb3df77fe52"
+        },
+        {
+          "key": "cli:change-spec-preview",
+          "filename": "deltas/cli/change-spec-preview/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:9a7bdc95745dc8c2908cd244471d6dfa11a816664d251e655bfbc4ed541a81aa"
+        },
+        {
+          "key": "core:preview-spec",
+          "filename": "deltas/core/preview-spec/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:019df239709d22fc85f5cd74cf25f3879a11fef0ba1a7ce38e588f2f6e2d8ec5"
+        },
+        {
+          "key": "core:validate-artifacts",
+          "filename": "deltas/core/validate-artifacts/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:4f309ae7faa7412ad30400ac429e1072069462eebfc21de2c4c29427d68a7e96"
+        },
+        {
+          "key": "skills:workflow-automation",
+          "filename": "deltas/skills/workflow-automation/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:15533524e77fed6da1becd280dfc7c649a299d9a6d9eb8b9214de6650c23dc81"
+        },
+        {
+          "key": "core:diff-generator",
+          "filename": "deltas/core/diff-generator/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:8cc73bb19624ca3be61c4ac2682c9c54dc23a2d5f46ecfec9a4fb03d86e402a0"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:939bbb2b36f20d8a09cb48937d3e598ab6c67b589fd70f052c19ed46707945b9"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:8d3d8b2e3e9a23bb2ca9af66836ff42454b0180a1c13399da838d8c4f61ed6db"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-07-15T14:49:08.314Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": [
+        "cli:change-validate",
+        "cli:change-spec-preview",
+        "core:preview-spec",
+        "core:validate-artifacts",
+        "skills:workflow-automation"
+      ],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-15T14:49:08.343Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "cli:change-validate"
+        },
+        {
+          "type": "specs",
+          "key": "cli:change-spec-preview"
+        },
+        {
+          "type": "specs",
+          "key": "core:preview-spec"
+        },
+        {
+          "type": "specs",
+          "key": "core:validate-artifacts"
+        },
+        {
+          "type": "specs",
+          "key": "skills:workflow-automation"
+        },
+        {
+          "type": "verify",
+          "key": "cli:change-validate"
+        },
+        {
+          "type": "verify",
+          "key": "cli:change-spec-preview"
+        },
+        {
+          "type": "verify",
+          "key": "core:preview-spec"
+        },
+        {
+          "type": "verify",
+          "key": "core:validate-artifacts"
+        },
+        {
+          "type": "verify",
+          "key": "skills:workflow-automation"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-15T14:51:01.496Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-15T14:54:13.581Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:change-validate",
+            "cli:change-spec-preview",
+            "core:preview-spec",
+            "core:validate-artifacts",
+            "skills:workflow-automation"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:change-validate",
+            "cli:change-spec-preview",
+            "core:preview-spec",
+            "core:validate-artifacts",
+            "skills:workflow-automation"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-15T14:55:21.542Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:change-validate",
+            "cli:change-spec-preview",
+            "core:preview-spec",
+            "core:validate-artifacts",
+            "skills:workflow-automation"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:change-validate",
+            "cli:change-spec-preview",
+            "core:preview-spec",
+            "core:validate-artifacts",
+            "skills:workflow-automation"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-15T14:57:12.973Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:change-validate",
+            "cli:change-spec-preview",
+            "core:preview-spec",
+            "core:validate-artifacts",
+            "skills:workflow-automation"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:change-validate",
+            "cli:change-spec-preview",
+            "core:preview-spec",
+            "core:validate-artifacts",
+            "skills:workflow-automation"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-15T15:00:57.051Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:change-validate",
+            "cli:change-spec-preview",
+            "core:preview-spec",
+            "core:validate-artifacts",
+            "skills:workflow-automation"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:change-validate",
+            "cli:change-spec-preview",
+            "core:preview-spec",
+            "core:validate-artifacts",
+            "skills:workflow-automation"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-15T15:01:39.107Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:change-validate",
+            "cli:change-spec-preview",
+            "core:preview-spec",
+            "core:validate-artifacts",
+            "skills:workflow-automation"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:change-validate",
+            "cli:change-spec-preview",
+            "core:preview-spec",
+            "core:validate-artifacts",
+            "skills:workflow-automation"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-15T15:02:42.510Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:change-validate",
+            "cli:change-spec-preview",
+            "core:preview-spec",
+            "core:validate-artifacts",
+            "skills:workflow-automation"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:change-validate",
+            "cli:change-spec-preview",
+            "core:preview-spec",
+            "core:validate-artifacts",
+            "skills:workflow-automation"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-15T15:02:42.516Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:diff-generator"
+        },
+        {
+          "type": "verify",
+          "key": "core:diff-generator"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-15T15:09:54.030Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [cli:change-validate]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["cli:change-validate"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-15T15:14:26.312Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-15T15:16:46.153Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-15T15:49:23.004Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-15T15:53:49.891Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-15T15:54:16.385Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "description-updated",
+      "at": "2026-07-15T16:04:20.969Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "description": "This change makes successful single-artifact spec validation show the merged inline diff directly when the target is an existing delta-backed scope: spec artifact, so reviewers can inspect risky removals or contract breakage without leaving changes validate. It also introduces a dedicated DiffGenerationError path in core preview/diff generation, keeps --all unchanged, and updates skill guidance so agents treat the inline diff as the immediate review surface while preserving spec-preview as the fallback and broader merged-review tool."
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-15T16:04:34.092Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-07-15T16:04:34.218Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

@@ -15,7 +15,7 @@
     {
       "requirement": "Factory signature and return type",
       "rules": [
-        "`createDefaultConfigLoader(options)` SHALL accept an `FsConfigLoaderOptions` discriminated union and return a `ConfigLoader`. The options union has two forms:\n\n- `{ startDir: string }` — discovery mode\n- `{ configPath: string }` — forced mode\n\n`createDefaultConfigLoader()` MAY resolve a `VcsAdapter` internally to derive the repository boundary, but that adapter is not part of `FsConfigLoaderOptions`, and the returned `ConfigLoader` MUST depend only on the resolved `rootPath` data.\n\nThe returned `ConfigLoader` is an abstract class that accepts `rootPath` in its constructor:\n\n```typescript\nexport abstract class ConfigLoader {\n  constructor(protected readonly rootPath: string | null) {}\n  abstract load(): Promise<SpecdConfig>\n  abstract resolvePath(): Promise<string | null>\n}\n```"
+        "`createDefaultConfigLoader(options)` SHALL accept an `FsConfigLoaderOptions` discriminated union and return a `ConfigLoader`. The options union has two forms:\n\n- `{ startDir: string }` — discovery mode\n- `{ configPath: string }` — forced mode\n\nDelivery hosts that select a project directory at runtime MAY pass `{ startDir }` to preserve normal config discovery semantics without mutating `process.cwd()`. They MUST NOT treat `{ configPath }` as an equivalent substitute for directory-based discovery.\n\n`createDefaultConfigLoader()` MAY resolve a `VcsAdapter` internally to derive the repository boundary, but that adapter is not part of `FsConfigLoaderOptions`, and the returned `ConfigLoader` MUST depend only on the resolved `rootPath` data.\n\nThe returned `ConfigLoader` is an abstract class that accepts `rootPath` in its constructor:\n\n```typescript\nexport abstract class ConfigLoader {\n  constructor(protected readonly rootPath: string | null) {}\n  abstract load(): Promise<SpecdConfig>\n  abstract resolvePath(): Promise<string | null>\n}\n```"
       ]
     },
     {
@@ -127,6 +127,16 @@
         "AND it is bounded by a resolved rootPath value rather than retaining a VcsAdapter",
         "AND it exposes a load() method returning Promise<SpecdConfig>",
         "AND it exposes a resolvePath() method returning Promise<string | null>"
+      ]
+    },
+    {
+      "requirement": "Factory signature and return type",
+      "name": "startDir preserves discovery semantics for host-selected roots",
+      "given": ["a delivery host knows the directory it wants to bootstrap from"],
+      "when": ["it constructs the loader with { startDir: '/selected/project/subdir' }"],
+      "then": [
+        "the loader performs normal discovery from that directory",
+        "AND the host does not need to substitute { configPath } for directory-based discovery"
       ]
     },
     {
@@ -640,8 +650,8 @@
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:51972ac98e3d33f3d0804f3824df8bdb84b49000952aa160ee9bafeaa93b7ef8",
-    "verify.md": "sha256:6285bbd0750a1059a4f842ff1cd36bfcb3abbbd66d57b0138d950ba476a54b1f"
+    "spec.md": "sha256:b77955ae84b0d0995cd8a4b15ca09dd9658dafdbe7c6e298f575c8c201e70511",
+    "verify.md": "sha256:467137ae1901b71822fceb7ce317ac4adf9cdac56664290d8332b8c75e0ce903"
   },
   "generatedBy": "core"
 }

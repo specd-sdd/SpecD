@@ -24,7 +24,7 @@ CLI-only concerns retained in `withProvider`:
 
 ### Requirement: Graph command platform imports
 
-Graph command handlers (`search`, `hotspots`, `impact`, `stats`) MUST obtain shared provider lifecycle through `withProvider` in this module.
+Graph command handlers (`search`, `hotspots`, `impact`) MUST obtain shared provider lifecycle through `withProvider` in this module. `graph stats` MUST bootstrap through `openSpecdHost` and manage its provider lifecycle through the SDK without `resolveGraphCliContext` or a pre-open lock probe.
 
 `graph index` MUST delegate indexing orchestration to `runIndexProjectGraph` from `@specd/sdk`; it does not open a long-lived provider through `withProvider` because the worker subprocess performs indexing in isolation.
 
@@ -32,7 +32,7 @@ Graph command handlers MUST obtain host symbols from `@specd/sdk` via this modul
 
 ### Requirement: Lock helpers via SDK barrel
 
-Graph commands that call `assertGraphIndexUnlocked` or `acquireGraphIndexLock` MUST import those symbols from the `@specd/sdk` public barrel.
+Graph commands MUST NOT perform host-managed pre-open lock probes. Provider availability errors, including indexing-busy state, SHALL be surfaced by the opened provider lifecycle owned by the SDK.
 
 ## Spec Dependencies
 

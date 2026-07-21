@@ -12,6 +12,13 @@
 - **AND** it exposes a `load()` method returning `Promise<SpecdConfig>`
 - **AND** it exposes a `resolvePath()` method returning `Promise<string | null>`
 
+#### Scenario: startDir preserves discovery semantics for host-selected roots
+
+- **GIVEN** a delivery host knows the directory it wants to bootstrap from
+- **WHEN** it constructs the loader with `{ startDir: '/selected/project/subdir' }`
+- **THEN** the loader performs normal discovery from that directory
+- **AND** the host does not need to substitute `{ configPath }` for directory-based discovery
+
 ### Requirement: Path probe
 
 #### Scenario: Discovery mode returns resolved chain root path

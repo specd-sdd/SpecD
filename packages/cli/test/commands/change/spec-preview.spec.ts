@@ -52,6 +52,7 @@ describe('change spec-preview', () => {
             filename: 'spec.md',
             base: 'context line 1\nremoved line\ncontext line 2',
             merged: 'context line 1\nadded line\ncontext line 2',
+            diff: '@@ -1,3 +1,3 @@\n context line 1\n-removed line\n+added line\n context line 2',
             status: 'merged',
           },
         ],
@@ -71,6 +72,11 @@ describe('change spec-preview', () => {
       ])
 
       const out = stdout()
+      expect(kernel.changes.preview.execute).toHaveBeenCalledWith({
+        name: 'feat',
+        specId: 'auth/login',
+        includeDiff: true,
+      })
       expect(out).toContain('[cyan]@@ -1,3 +1,3 @@[/cyan]') // Hunk header
       expect(out).toContain('[dim] context line 1[/dim]') // Context
       expect(out).toContain('[red]-removed line[/red]') // Removal
@@ -185,6 +191,7 @@ describe('change spec-preview', () => {
           filename: 'spec.md',
           base: '# Old',
           merged: '# New',
+          diff: '--- a/spec.md (base)\n+++ b/spec.md (merged)\n@@ -1 +1 @@\n-# Old\n+# New',
           status: 'merged',
         },
         {
@@ -211,7 +218,8 @@ describe('change spec-preview', () => {
 
     const out = stdout()
     expect(out).toContain('--- spec.md ---')
-    expect(out).toMatch(/#\s*Old|#\s*New/)
+    expect(out).toContain('[red]-# Old[/red]')
+    expect(out).toContain('[green]+# New[/green]')
     expect(out).not.toContain('--- verify.md ---')
   })
 
@@ -268,6 +276,7 @@ describe('change spec-preview', () => {
           filename: 'spec.md',
           base: '# Old',
           merged: '# New',
+          diff: '--- a/spec.md (base)\n+++ b/spec.md (merged)\n@@ -1 +1 @@\n-# Old\n+# New',
           status: 'merged',
         },
       ],
@@ -476,7 +485,13 @@ describe('change spec-preview', () => {
         specId: 'default:auth/login',
         changeName: 'feat',
         files: [
-          { filename: 'spec.md', base: '# Old Spec', merged: '# New Spec', status: 'merged' },
+          {
+            filename: 'spec.md',
+            base: '# Old Spec',
+            merged: '# New Spec',
+            diff: '--- a/spec.md (base)\n+++ b/spec.md (merged)\n@@ -1 +1 @@\n-# Old Spec\n+# New Spec',
+            status: 'merged',
+          },
           { filename: 'verify.md', base: '# Old Verify', merged: '# New Verify', status: 'merged' },
         ],
         warnings: [],

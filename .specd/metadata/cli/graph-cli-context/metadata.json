@@ -27,13 +27,13 @@
     {
       "requirement": "Graph command platform imports",
       "rules": [
-        "Graph command handlers (`search`, `hotspots`, `impact`, `stats`) MUST obtain shared provider lifecycle through `withProvider` in this module.\n\n`graph index` MUST delegate indexing orchestration to `runIndexProjectGraph` from `@specd/sdk`; it does not open a long-lived provider through `withProvider` because the worker subprocess performs indexing in isolation.\n\nGraph command handlers MUST obtain host symbols from `@specd/sdk` via this module or `cli:host-context`."
+        "Graph command handlers (`search`, `hotspots`, `impact`) MUST obtain shared provider lifecycle through `withProvider` in this module. `graph stats` MUST bootstrap through `openSpecdHost` and manage its provider lifecycle through the SDK without `resolveGraphCliContext` or a pre-open lock probe.\n\n`graph index` MUST delegate indexing orchestration to `runIndexProjectGraph` from `@specd/sdk`; it does not open a long-lived provider through `withProvider` because the worker subprocess performs indexing in isolation.\n\nGraph command handlers MUST obtain host symbols from `@specd/sdk` via this module or `cli:host-context`."
       ]
     },
     {
       "requirement": "Lock helpers via SDK barrel",
       "rules": [
-        "Graph commands that call `assertGraphIndexUnlocked` or `acquireGraphIndexLock` MUST import those symbols from the `@specd/sdk` public barrel."
+        "Graph commands MUST NOT perform host-managed pre-open lock probes. Provider availability errors, including indexing-busy state, SHALL be surfaced by the opened provider lifecycle owned by the SDK."
       ]
     }
   ],
@@ -73,11 +73,11 @@
     },
     {
       "requirement": "Graph command platform imports",
-      "name": "Graph stats uses shared context module",
+      "name": "Graph stats owns SDK host bootstrap",
       "when": ["specd graph stats executes"],
       "then": [
-        "it resolves context via resolveGraphCliContext and opens via withProvider",
-        "AND platform symbols are sourced from @specd/sdk"
+        "it uses openSpecdHost and SDK-managed provider lifecycle",
+        "AND it does not use resolveGraphCliContext or a host-managed lock probe"
       ]
     },
     {
@@ -91,28 +91,25 @@
     },
     {
       "requirement": "Lock helpers via SDK barrel",
-      "name": "Stats uses assertGraphIndexUnlocked from SDK",
-      "when": ["specd graph stats checks the indexing lock"],
-      "then": ["it imports assertGraphIndexUnlocked from @specd/sdk"]
+      "name": "Provider availability replaces host lock probes",
+      "when": ["a graph command uses an opened provider while indexing is active"],
+      "then": [
+        "the provider lifecycle surfaces the availability error",
+        "AND no handler performs a pre-open lock probe"
+      ]
     }
   ],
   "implementation": {
-    "symbols": [
+    "files": [
       {
         "specId": "cli:graph-cli-context",
-        "file": "cli:src/commands/graph/resolve-graph-cli-context.ts",
-        "symbol": "resolveGraphCliContext"
-      },
-      {
-        "specId": "cli:graph-cli-context",
-        "file": "cli:src/commands/graph/with-provider.ts",
-        "symbol": "withProvider"
+        "file": "cli:test/commands/graph-stats.spec.ts"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:10dded5048103ea1a7972e2e9c91f7c814053921c4df1815d633e1a4d9c91303",
-    "verify.md": "sha256:d8d2c7b4204be8705f08fa12954a5d9374a832a44521e38b06f12113f63ab133"
+    "spec.md": "sha256:c4d80e8fb89f1e8c81a0d2efadd91cf33ee0b8b0d585407d0447ccd75f7dd16d",
+    "verify.md": "sha256:05f62e498461bfbc3d2c21f0c6958141c64ca7e87f1b7c78a29f53ab3e293a52"
   },
   "generatedBy": "core"
 }

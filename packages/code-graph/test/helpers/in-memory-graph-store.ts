@@ -1,4 +1,4 @@
-import { GraphStore } from '../../src/domain/ports/graph-store.js'
+import { GraphStore, type StorageGenerationSnapshot } from '../../src/domain/ports/graph-store.js'
 import { type DocumentNode } from '../../src/domain/value-objects/document-node.js'
 import { type FileNode } from '../../src/domain/value-objects/file-node.js'
 import { type SymbolNode } from '../../src/domain/value-objects/symbol-node.js'
@@ -30,6 +30,7 @@ function isSymbolDependencyRelationType(relationType: RelationType): boolean {
 
 export class InMemoryGraphStore extends GraphStore {
   private _isOpen = false
+  private _generation = 0
   private files = new Map<string, FileNode>()
   private documents = new Map<string, DocumentNode>()
   private symbols = new Map<string, SymbolNode>()
@@ -324,7 +325,7 @@ export class InMemoryGraphStore extends GraphStore {
     return this.getRelationsBySource(RelationType.CoversFile, specId)
   }
 
-  async getCoveringSpecs(filePath: string): Promise<Relation[]> {
+  async getCoveringSpecsForFile(filePath: string): Promise<Relation[]> {
     this.ensureOpen()
     return this.getRelationsByTarget(RelationType.CoversFile, filePath)
   }
@@ -334,7 +335,7 @@ export class InMemoryGraphStore extends GraphStore {
     return this.getRelationsBySource(RelationType.CoversSymbol, specId)
   }
 
-  async getSymbolCoveringSpecs(symbolId: string): Promise<Relation[]> {
+  async getCoveringSpecsForSymbol(symbolId: string): Promise<Relation[]> {
     this.ensureOpen()
     return this.getRelationsByTarget(RelationType.CoversSymbol, symbolId)
   }
@@ -614,6 +615,15 @@ export class InMemoryGraphStore extends GraphStore {
     this._lastIndexedAt = undefined
     this._lastIndexedRef = null
     this._graphFingerprint = null
+    this._generation += 1
+  }
+
+  async getStorageGeneration(): Promise<StorageGenerationSnapshot> {
+    this.ensureOpen()
+    return {
+      token: `memory-${String(this._generation)}`,
+      mtimeMs: this._generation,
+    }
   }
 }
 

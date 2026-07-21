@@ -1,7 +1,7 @@
 {
   "name": "implementation-review-symbol-resolution",
   "createdAt": "2026-06-30T19:17:06.571Z",
-  "updatedAt": "2026-07-06T21:25:41.037Z",
+  "updatedAt": "2026-07-15T11:11:27.943Z",
   "description": "Harden implementation review symbol resolution for TypeScript links so stale diagnostics distinguish real breakage from imprecise links.",
   "schema": {
     "name": "schema-std",

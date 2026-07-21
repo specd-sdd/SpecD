@@ -1,0 +1,30 @@
+- op: modified
+  description: 'Replace host-managed lock check with provider-owned availability semantics'
+  selector:
+    type: section
+    matches: 'Requirement: Concurrent indexing guard'
+  content: |
+    Before hotspot retrieval, the command MUST rely on provider-owned availability checks rather than querying a host-managed pre-open lock state.
+
+    If the provider reports that the graph is busy or stale after opening, the command SHALL surface that provider error through the normal CLI infrastructure-error path.
+- op: modified
+  description: 'Align hotspot error handling with busy/stale provider errors'
+  selector:
+    type: section
+    matches: 'Requirement: Error cases'
+  content: |
+    If both `--config` and `--path` are passed, the command SHALL fail with a CLI error and exit code 1.
+
+    If the provider reports `GRAPH_BUSY` or `GRAPH_PROVIDER_STALE`, the command SHALL exit with code 3 through the standard infrastructure error path.
+
+    If the provider cannot be opened or hotspot retrieval fails due to another infrastructure error, the command SHALL exit with code 3.
+- op: modified
+  description: 'Drop separate CLI lock guard from constraints'
+  selector:
+    type: section
+    matches: 'Constraints'
+  content: |
+    - Hotspot computation remains delegated to the graph provider; the CLI does not implement scoring
+    - `--kind` validation SHALL use the same allowed kind set as the code graph symbol model
+    - Bootstrap mode SHALL not reinterpret `--config`; it is selected only by `--path` or by missing config
+    - Busy and stale availability semantics are enforced by the provider after open; the CLI does not fail fast through a separate pre-open lock probe

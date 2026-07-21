@@ -1,0 +1,47 @@
+- op: modified
+  description: 'Update Text dashboard requirements for multi-line workspace wrapping, full-width layout, graph box, and archived changes'
+  selector:
+    type: section
+    matches: 'Requirement: Text dashboard'
+  content: |
+    In `text` mode the command outputs:
+
+    1. **Banner** — the SpecD ASCII logo rendered above the dashboard box.
+    2. **Config line** — a plain text line `Using config: <relative-path>` printed to stdout before any box decoration. `<relative-path>` is the path to the loaded `specd.yaml` relative to `process.cwd()`.
+    3. **Outer container** — a rounded `boxen` box with the title `SpecD project dashboard` centred at the top and a cyan border.
+    4. **Project box** — a full-width inner box labelled `Project` showing:
+       - `root:` — absolute path to the project root. If the value would cause the row to overflow the inner box width, the value wraps to continuation lines indented to align with the start of the value column.
+       - `schema:` — the schema reference from `specd.yaml`.
+       - `workspaces:` — comma-separated list of workspace names. If the value exceeds available inner width, it wraps to continuation lines indented to align with the start of the value column, wrapping on word/comma boundaries without splitting workspace names mid-word.
+    5. **Specs box** — an inner box labelled `Specs` rendering a 2-column aligned table of total spec count and per-workspace breakdown (including empty workspaces with 0 count), dynamically padded to the longest workspace name.
+    6. **Changes box** — an inner box labelled `Changes` rendering a 2-column aligned table with each change state on its own line (`active`, `drafts`, `discarded`, `archived`).
+    7. **Graph box** — an inner box labelled `Graph` showing graph freshness timestamp, staleness indicator, document count (`docs:`), file count (`files:`), symbol count (`symbols:`), relation count (`relations:`), and indexed languages (`languages:`) when graph diagnostics are available.
+    8. **Layout** — the Project and Graph boxes span the full inner width of the dashboard; Specs and Changes sub-boxes are rendered side by side, matching the full container width.
+
+- op: modified
+  description: 'Update JSON and toon output requirement to delegate execution to project status'
+  selector:
+    type: section
+    matches: 'Requirement: JSON and toon output'
+  content: |
+    In `json` or `toon` mode, `specd project dashboard` delegates execution directly to `specd project status`, producing the canonical project status JSON/TOON output schema without executing separate dashboard formatting.
+
+- op: modified
+  description: 'Update Data sources requirement to mandate buildProjectStatusSnapshot'
+  selector:
+    type: section
+    matches: 'Requirement: Data sources'
+  content: |
+    All metrics and diagnostics are fetched via `buildProjectStatusSnapshot(host, { includeGraph: true })` from `@specd/sdk` (or host composition), ensuring complete parity with `specd project status`.
+
+- op: modified
+  description: 'Add wrapping constraint for workspaces row'
+  selector:
+    type: section
+    matches: 'Constraints'
+  content: |
+    - The outer dashboard box MUST have a minimum inner width of at least the default `boxen` width plus 10 characters.
+    - When `root:` or `workspaces:` values would overflow the inner box width, they MUST wrap to continuation lines, indented to align with the value column start position.
+    - ANSI escape codes must be stripped before measuring string lengths for column alignment and overflow detection.
+    - The command is read-only; it never modifies any files.
+    - The `Using config:` line is always printed to stdout in text mode, even when the banner is suppressed.

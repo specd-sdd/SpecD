@@ -1,0 +1,4 @@
+releases:
+  sdk:host-context: patch
+  cli:host-context: patch
+  core:config: patch

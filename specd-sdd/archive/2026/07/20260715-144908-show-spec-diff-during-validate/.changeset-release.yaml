@@ -1,0 +1,7 @@
+releases:
+  cli:change-validate: minor
+  cli:change-spec-preview: patch
+  core:preview-spec: minor
+  core:validate-artifacts: patch
+  skills:workflow-automation: patch
+  core:diff-generator: minor

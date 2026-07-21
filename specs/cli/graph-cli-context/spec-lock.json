@@ -12,12 +12,7 @@
   ],
   "implementation": [
     {
-      "file": "cli:src/commands/graph/resolve-graph-cli-context.ts",
-      "symbols": ["resolveGraphCliContext"]
-    },
-    {
-      "file": "cli:src/commands/graph/with-provider.ts",
-      "symbols": ["withProvider"]
+      "file": "cli:test/commands/graph-stats.spec.ts"
     }
   ]
 }

@@ -367,12 +367,9 @@ export class ArchiveChange {
         step: 'archiving',
         phase: 'pre',
       })
-      if (!preResult.success && preResult.failedHook !== null) {
-        throw new HookFailedError(
-          preResult.failedHook.command,
-          preResult.failedHook.exitCode,
-          preResult.failedHook.stderr,
-        )
+      const failedHook = preResult.failedHooks[0]
+      if (!preResult.success && failedHook !== undefined) {
+        throw new HookFailedError(failedHook.command, failedHook.exitCode, failedHook.stderr)
       }
       Logger.debug('ArchiveChange pre-archive hooks completed', {
         change: change.name,

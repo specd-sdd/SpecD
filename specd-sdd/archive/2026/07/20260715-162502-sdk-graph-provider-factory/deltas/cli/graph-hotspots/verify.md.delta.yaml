@@ -1,0 +1,56 @@
+- op: removed
+  description: 'Remove the old host-managed lock scenario'
+  selector:
+    type: section
+    matches: 'Requirement: Concurrent indexing guard'
+
+- op: added
+  description: 'Add provider-owned busy verification in the same requirement position'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Hotspot retrieval'
+  content: |
+    ### Requirement: Concurrent indexing guard
+
+    #### Scenario: Hotspots surface provider busy after open
+
+    - **GIVEN** the provider reports `GRAPH_BUSY` during hotspot retrieval
+    - **WHEN** `specd graph hotspots` is run
+    - **THEN** the command exits with code 3
+    - **AND** it uses the infrastructure error path rather than a separate pre-open lock probe
+
+- op: removed
+  description: 'Remove the old error-case requirement body'
+  selector:
+    type: section
+    matches: 'Requirement: Error cases'
+
+- op: added
+  description: 'Add error-case verification covering provider busy and stale failures'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Output format'
+  content: |
+    ### Requirement: Error cases
+
+    #### Scenario: Mutually exclusive context flags fail fast
+
+    - **WHEN** `specd graph hotspots --config ./specd.yaml --path .` is run
+    - **THEN** the command exits with a CLI error before any graph provider is opened
+
+    #### Scenario: Infrastructure error exits with code 3
+
+    - **GIVEN** the provider cannot be opened or hotspot retrieval fails due to another infrastructure error
+    - **OR** the provider reports `GRAPH_BUSY`
+    - **OR** the provider reports `GRAPH_PROVIDER_STALE`
+    - **WHEN** `specd graph hotspots` is run
+    - **THEN** stderr contains a `fatal:` prefixed error message
+    - **AND** the process exits with code 3

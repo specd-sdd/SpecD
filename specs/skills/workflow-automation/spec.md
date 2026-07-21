@@ -55,7 +55,13 @@ Agents SHALL treat `specd changes validate` as structural/state validation only.
 
 Agents MUST perform content review of requirements, constraints, and intent alignment before progressing lifecycle steps that depend on artifact correctness.
 
-When overlap or drift risk exists for spec deltas, agents SHALL verify merged content with `specd changes spec-preview <change-name> <specId>` before accepting the delta outcome.
+For successful individual validation of an existing delta-backed `scope: spec` artifact, agents SHALL review the inline diff shown by `specd changes validate` as the immediate review surface for unintended removals, contract breakage, or other risky edits.
+
+If that inline diff is unavailable because validation failed or because diff generation reported the dedicated non-fatal failure path, agents SHALL fall back to:
+
+`specd changes spec-preview <change-name> <specId> --diff --artifact <artifactId>`
+
+When overlap or drift risk exists for broader spec-delta review outside that narrow single-validate path, agents SHALL verify merged content with `specd changes spec-preview <change-name> <specId>` before accepting the delta outcome.
 
 When review only needs one spec-scoped artifact, agents SHOULD prefer `specd changes spec-preview <change-name> <specId> --artifact <artifactId>` to reduce unnecessary output volume.
 

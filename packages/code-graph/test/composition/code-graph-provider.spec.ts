@@ -5,9 +5,8 @@ import { tmpdir } from 'node:os'
 import { type SpecRepository, type Spec } from '@specd/core'
 import { createCodeGraphProvider } from '../../src/composition/create-code-graph-provider.js'
 import { createBootstrapGraphConfig } from '../../src/application/services/bootstrap-graph-config.js'
-import { type GraphStoreFactory } from '../../src/composition/graph-store-factory.js'
-import { SymbolKind } from '../../src/domain/value-objects/symbol-kind.js'
 import { StoreNotOpenError } from '../../src/domain/errors/store-not-open-error.js'
+import { GraphProviderStaleError } from '../../src/domain/errors/graph-provider-stale-error.js'
 import { InMemoryGraphStore } from '../helpers/in-memory-graph-store.js'
 
 const makeMockRepo = (specs: Spec[] = []): SpecRepository =>
@@ -65,12 +64,12 @@ describe('CodeGraphProvider', () => {
     await provider.close()
   })
 
-  it('allows explicit selection of the ladybug backend', async () => {
-    tempDir = mkdtempSync(join(tmpdir(), 'specd-graph-provider-ladybug-explicit-'))
+  it('allows explicit selection of the sqlite backend', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'specd-graph-provider-sqlite-explicit-'))
     const provider = await createCodeGraphProvider({
       storagePath: tempDir,
       projectRoot: tempDir,
-      graphStoreId: 'ladybug',
+      graphStoreId: 'sqlite',
     })
     await provider.open()
 
@@ -181,18 +180,59 @@ describe('CodeGraphProvider', () => {
     await expect(provider.close()).resolves.not.toThrow()
   })
 
-  it('recreate on an open provider keeps the store ready for subsequent operations', async () => {
-    tempDir = mkdtempSync(join(tmpdir(), 'specd-graph-provider-recreate-open-'))
+  it('clear on an open provider keeps the store ready for subsequent operations', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'specd-graph-provider-clear-open-'))
+    const customStore = new InMemoryGraphStore()
     const provider = await createCodeGraphProvider({
       storagePath: tempDir,
       projectRoot: tempDir,
+      graphStoreFactories: {
+        custom: {
+          create: () => customStore,
+        },
+      },
+      graphStoreId: 'custom',
     })
     await provider.open()
-    await provider.recreate()
+    await provider.clear()
 
     const stats = await provider.getStatistics()
     expect(stats.fileCount).toBe(0)
 
     await provider.close()
+  })
+
+  it('throws GraphProviderStaleError when the backing store generation changes externally', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'specd-graph-provider-stale-'))
+    const customStore = new InMemoryGraphStore()
+    const provider = await createCodeGraphProvider({
+      storagePath: tempDir,
+      projectRoot: tempDir,
+      graphStoreFactories: {
+        custom: {
+          create: () => customStore,
+        },
+      },
+      graphStoreId: 'custom',
+    })
+    await provider.open()
+    await customStore.recreate()
+
+    await expect(provider.getStatistics()).rejects.toThrow(GraphProviderStaleError)
+
+    await provider.close()
+  })
+
+  it('supports async disposal', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'specd-graph-provider-dispose-'))
+    const provider = await createCodeGraphProvider({
+      storagePath: tempDir,
+      projectRoot: tempDir,
+    })
+    await provider.open()
+
+    await provider[Symbol.asyncDispose]()
+
+    await expect(provider.getStatistics()).rejects.toThrow(StoreNotOpenError)
   })
 })

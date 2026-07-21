@@ -1,0 +1,33 @@
+- op: modified
+  description: 'Verify that the factory-only provider surface is type-only and non-constructible.'
+  selector:
+    type: section
+    matches: 'Requirement: Factory function'
+  content: |
+    #### Scenario: Primary factory with SpecdConfig
+
+    - **WHEN** `createCodeGraphProvider(config)` is called with a `SpecdConfig`
+    - **THEN** the graph storage root is derived from `config.configPath`
+    - **AND** the returned provider can be opened, used for indexing and queries, and closed without error
+
+    #### Scenario: Factory resolves storage root from SpecdConfig.configPath
+
+    - **GIVEN** a valid `SpecdConfig` with `configPath` set
+    - **WHEN** `createCodeGraphProvider(config)` is called
+    - **THEN** the provider storage root is derived from `config.configPath`
+    - **AND** the provider can be opened, used for indexing and queries, and closed without error
+
+    #### Scenario: Provider construction is factory-only
+
+    - **WHEN** a consumer imports from `@specd/code-graph`
+    - **THEN** `CodeGraphProvider` is available only as a type
+    - **AND** constructing a provider directly is rejected at compile time
+
+- op: modified
+  description: 'Rename stale CodeGraphFactoryOptions verify wording to CodeGraphCompositionOptions'
+  selector:
+    type: section
+    matches: 'Scenario: Graph-store composition types are exported'
+  content: |
+    - **WHEN** a consumer wants to register or select a backend explicitly
+    - **THEN** `GraphStoreFactory`, `CodeGraphOptions`, and `CodeGraphCompositionOptions` are available as imports

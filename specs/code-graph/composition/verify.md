@@ -42,6 +42,12 @@
 - **THEN** the provider storage root is derived from `config.configPath`
 - **AND** the provider can be opened, used for indexing and queries, and closed without error
 
+#### Scenario: Provider construction is factory-only
+
+- **WHEN** a consumer imports from `@specd/code-graph`
+- **THEN** `CodeGraphProvider` is available only as a type
+- **AND** constructing a provider directly is rejected at compile time
+
 ### Requirement: Package exports
 
 #### Scenario: Internal components not exported
@@ -57,7 +63,7 @@
 #### Scenario: Graph-store composition types are exported
 
 - **WHEN** a consumer wants to register or select a backend explicitly
-- **THEN** `GraphStoreFactory`, `CodeGraphOptions`, and `CodeGraphFactoryOptions` are available as imports
+- **THEN** `GraphStoreFactory`, `CodeGraphOptions`, and `CodeGraphCompositionOptions` are available as imports
 
 #### Scenario: Model types are exported
 

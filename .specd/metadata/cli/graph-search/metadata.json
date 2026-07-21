@@ -22,7 +22,7 @@
     {
       "requirement": "Search behaviour",
       "rules": [
-        "The command uses the shared graph CLI context model (`cli:graph-cli-context`) to resolve explicit config, autodetected config, or bootstrap mode before opening a `CodeGraphProvider` via `withProvider`.\n\nPlatform symbols MUST come from `@specd/sdk`.\n\nIt delegates to:\n\n- `provider.searchSymbols(options)` — search across symbol search text and symbol comments\n- `provider.searchSpecs(options)` — search across spec title, description, and content\n- `provider.searchDocuments(options)` — search across document paths and textual content\n\nThe concrete scoring and indexing strategy are implementation concerns of the active graph-store backend. Results are returned ordered by score descending — highest relevance first — with primary-identity matches boosted ahead of generic content-only hits. Broad retrieval across backend-searchable fields remains in place; identity-aware logic changes ranking, not category coverage.\n\nBackends MUST apply a shared specd/code-aware lexical token expansion before identity-aware ranking. That expansion MUST preserve the normalized original token and MUST additionally expand useful specd/code shapes such as:\n\n- `core:change` into tokens including `core:change`, `core`, and `change`\n- `ArchiveChange` into tokens including `archivechange`, `archive`, and `change`\n\nObservable ranking semantics MUST hold across backends:\n\n- exact canonical identity matches MUST rank ahead of every non-exact result in the same category\n- exact primary-name matches for symbols and exact spec-id/path-component matches for specs/documents MUST rank ahead of body-only or comment-only hits\n- exact token identity matches MUST rank ahead of prefix token matches\n- prefix token matches MUST rank ahead of suffix token matches\n- suffix token matches MUST rank ahead of arbitrary substring token matches\n- real identity-component or path-component matches MUST rank ahead of arbitrary substring-only hits on the same identity field\n- candidates matching more expanded identity tokens MUST rank ahead of candidates matching fewer expanded identity tokens when generic text relevance is otherwise competing\n- prefix, suffix, substring, segment, or path-component matches on a primary identity MUST rank ahead of results that match only through generic textual frequency in descriptions, comments, or document/spec body content\n- symbol results matching on declared identity MUST outrank otherwise stronger comment-only hits for the same query intent\n\nSearch results SHALL carry preview context together with the ranked hit, including the matched text and the 1-based line range (`startLine` to `endLine`) from the source content, even when text-mode snippet rendering is not requested.\n\nPreview sources SHALL follow these rules:\n\n- symbol previews SHALL be derived from persisted source-file content addressed through the symbol's file path and line location\n- spec previews SHALL be derived from matched spec content when available, falling back to description context only when no better body excerpt is available\n- document previews SHALL be derived from matched document content rather than from the beginning of the document\n\nA symbol hit MAY be ranked because of symbol identity or attached comment text, but the preferred preview SHALL still be a code snippet around the symbol location unless no useful source snippet can be produced.\n\nThe `--kind` option SHALL accept exactly one comma-separated list value. Each token SHALL be trimmed and validated against the allowed `SymbolKind` values before the provider query is executed. Any invalid token SHALL cause a CLI error and SHALL prevent the search from running.\n\nThe validated kind list SHALL be passed to the query layer as a multi-kind filter rather than being collapsed to a single last value.\n\nBefore attempting to open the provider, the command SHALL check the shared graph indexing lock used by `graph index`. If indexing is currently in progress, the command SHALL fail fast with a short user-facing retry-later message instead of surfacing backend lock errors."
+        "The command uses the shared graph CLI context model (`cli:graph-cli-context`) to resolve host bootstrap and provider lifecycle.\n\nPlatform symbols MUST come from `@specd/sdk`.\n\nIt delegates to:\n\n- `provider.searchSymbols(options)` — search across symbol search text and symbol comments\n- `provider.searchSpecs(options)` — search across spec title, description, and content\n- `provider.searchDocuments(options)` — search across document paths and textual content\n\nThe concrete scoring and indexing strategy are implementation concerns of the active backend, subject to the shared ranking guarantees of `code-graph:graph-store`.\n\nBackends MUST apply a shared specd/code-aware lexical token expansion before identity-aware ranking, including examples such as:\n\n- `core:change` into tokens including `core:change`, `core`, and `change`\n- `ArchiveChange` into tokens including `archivechange`, `archive`, and `change`\n\nObservable ranking semantics MUST hold across backends:\n\n- exact canonical identity matches MUST rank ahead of every non-exact result in the same category\n- exact primary-name matches for symbols and exact spec-id/path-component matches for specs/documents MUST rank ahead of body-only or comment-only hits\n- exact token identity matches MUST rank ahead of prefix token matches\n- prefix token matches MUST rank ahead of suffix token matches\n- suffix token matches MUST rank ahead of arbitrary substring token matches\n- real identity-component or path-component matches MUST rank ahead of arbitrary substring-only hits on the same identity field\n- candidates matching more expanded identity tokens MUST rank ahead of candidates matching fewer expanded identity tokens when generic text relevance is otherwise competing\n- prefix, suffix, substring, segment, or path-component matches on a primary identity MUST rank ahead of results that match only through generic textual frequency in descriptions, comments, or document/spec body content\n- symbol results matching on declared identity MUST outrank otherwise stronger comment-only hits for the same query intent\n\nSearch results SHALL carry preview context together with the ranked hit, including line-range information suitable for text and structured output.\n\nThe command MUST NOT perform a host-managed pre-open lock probe. Busy and stale availability semantics are owned by the provider."
       ]
     },
     {
@@ -34,7 +34,7 @@
     {
       "requirement": "Error cases",
       "rules": [
-        "If the provider cannot be opened, the command exits with code 3 (same as other graph commands). The `process.exit(0)` pattern applies — LadybugDB native threads require explicit exit."
+        "If the provider cannot be opened, the command exits with code 3 (same as other graph commands).\n\nIf the provider reports `GRAPH_BUSY` or `GRAPH_PROVIDER_STALE` while serving the search request, the command SHALL exit with code 3 through the standard infrastructure error path."
       ]
     },
     {
@@ -47,7 +47,7 @@
   "constraints": [
     "The CLI does not contain search logic — it delegates to CodeGraphProvider.searchSymbols, CodeGraphProvider.searchSpecs, and CodeGraphProvider.searchDocuments",
     "Search depends on the active graph-store backend having prepared its search indexes during indexing or store maintenance",
-    "The command checks the shared graph indexing lock before opening the provider and fails fast while indexing is in progress",
+    "Busy and stale availability semantics are enforced by the provider after open; the CLI does not fail fast through a separate pre-open lock probe",
     "The process.exit(0) pattern is required after closing the provider"
   ],
   "scenarios": [
@@ -180,12 +180,12 @@
     },
     {
       "requirement": "Search behaviour",
-      "name": "Search fails fast while indexing lock is present",
-      "given": ["a graph index process currently holds the shared graph indexing lock"],
+      "name": "Search surfaces provider busy after open",
+      "given": ["the provider reports GRAPH_BUSY while serving the search request"],
       "when": ["specd graph search \"kernel\" is run"],
       "then": [
-        "the command exits with code 3 before opening the provider",
-        "AND it prints a short retry-later message explaining that the graph is currently being indexed"
+        "the command exits with code 3 through the standard infrastructure error path",
+        "AND it does not query a host-managed pre-open lock state"
       ]
     },
     {
@@ -345,6 +345,14 @@
       "name": "Provider cannot be opened exits with code 3",
       "when": ["the provider fails to open"],
       "then": ["the command exits with code 3"]
+    },
+    {
+      "requirement": "Error cases",
+      "name": "Provider busy or stale exits with code 3",
+      "when": [
+        "the provider reports GRAPH_BUSY or GRAPH_PROVIDER_STALE while serving the search request"
+      ],
+      "then": ["the command exits with code 3 through the standard infrastructure error path"]
     },
     {
       "requirement": "Output format",
@@ -532,18 +540,10 @@
       ]
     }
   ],
-  "implementation": {
-    "symbols": [
-      {
-        "specId": "cli:graph-search",
-        "file": "cli:src/commands/graph/search.ts",
-        "symbol": "registerGraphSearch"
-      }
-    ]
-  },
+  "implementation": {},
   "contentHashes": {
-    "spec.md": "sha256:1027a55a0aff5710785ecae5a232ba82e0ea229b710d763ca3e79c58b509fa31",
-    "verify.md": "sha256:0e91add2a4e89f859ee6dd73c8186e0738d6de2b546e1dfed8af9ee6c55cceec"
+    "spec.md": "sha256:3d6c648493dba4aee3fef1e8bd9a280cc16b869dcb5ec66a631405cdd0622025",
+    "verify.md": "sha256:042b0bd622fb76afe37e0347b5457e4804c8da88dcce2497d57993571c998588"
   },
   "generatedBy": "core"
 }

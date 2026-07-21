@@ -5,22 +5,16 @@ import {
   computeWorkspaceFingerprint,
   serializeFingerprintMap,
 } from '../../../src/application/use-cases/_shared/compute-graph-fingerprint.js'
-import { GRAPH_INDEX_LOCK_MESSAGE } from '../../../src/infrastructure/index-lock.js'
 import { type GraphStatistics } from '../../../src/domain/value-objects/graph-statistics.js'
 import { type CodeGraphHostPort } from '../../../src/application/ports/code-graph-host-port.js'
 import { type WorkspaceIndexTarget } from '../../../src/domain/value-objects/index-options.js'
-import { type SpecdConfig } from '@specd/core'
+import { type SpecdConfig, type VcsAdapter } from '@specd/core'
 import { buildProjectGraphConfig } from '../../../src/application/services/build-project-graph-config.js'
+import { GraphBusyError } from '../../../src/domain/errors/graph-busy-error.js'
+import { GraphProviderStaleError } from '../../../src/domain/errors/graph-provider-stale-error.js'
 
-vi.mock('@specd/core', async () => {
-  const actual = await vi.importActual<typeof import('@specd/core')>('@specd/core')
-  return {
-    ...actual,
-    createVcsAdapter: vi.fn(),
-  }
-})
-
-import { createVcsAdapter } from '@specd/core'
+const createVcsAdapter = vi.fn<(projectRoot: string) => Promise<VcsAdapter>>()
+const getGraphHealth = (): GetGraphHealth => new GetGraphHealth(createVcsAdapter)
 
 const BASE_STATS: GraphStatistics = {
   fileCount: 1,
@@ -36,7 +30,6 @@ const BASE_STATS: GraphStatistics = {
 
 function makeProvider(stats: GraphStatistics = BASE_STATS): CodeGraphHostPort {
   return {
-    assertGraphIndexUnlocked: vi.fn(),
     getStatistics: vi.fn().mockResolvedValue(stats),
   } as unknown as CodeGraphHostPort
 }
@@ -111,11 +104,10 @@ describe('GetGraphHealth', () => {
       ref: vi.fn().mockResolvedValue('abc1234'),
     } as never)
 
-    const result = await new GetGraphHealth().execute({
+    const result = await getGraphHealth().execute({
       config,
       provider: makeProvider(),
       codeGraphVersion: '1.0.0',
-      assertUnlocked: false,
     })
 
     expect(result.stale).toBe(false)
@@ -128,11 +120,10 @@ describe('GetGraphHealth', () => {
       ref: vi.fn().mockResolvedValue('abc1234'),
     } as never)
 
-    const result = await new GetGraphHealth().execute({
+    const result = await getGraphHealth().execute({
       config,
       provider: makeProvider({ ...BASE_STATS, lastIndexedRef: null }),
       codeGraphVersion: '1.0.0',
-      assertUnlocked: false,
     })
 
     expect(result.stale).toBeNull()
@@ -143,53 +134,13 @@ describe('GetGraphHealth', () => {
       ref: vi.fn().mockResolvedValue('def5678'),
     } as never)
 
-    const result = await new GetGraphHealth().execute({
+    const result = await getGraphHealth().execute({
       config,
       provider: makeProvider(),
       codeGraphVersion: '1.0.0',
-      assertUnlocked: false,
     })
 
     expect(result.stale).toBe(true)
-  })
-
-  it('asserts lock before statistics by default', async () => {
-    const provider = makeProvider()
-    vi.mocked(provider.assertGraphIndexUnlocked).mockImplementation(() => {
-      throw new Error(GRAPH_INDEX_LOCK_MESSAGE)
-    })
-
-    await expect(
-      new GetGraphHealth().execute({
-        config,
-        provider,
-        codeGraphVersion: '1.0.0',
-      }),
-    ).rejects.toThrow(GRAPH_INDEX_LOCK_MESSAGE)
-
-    expect(provider.getStatistics).not.toHaveBeenCalled()
-  })
-
-  it('skips lock assertion when assertUnlocked is false', async () => {
-    vi.mocked(createVcsAdapter).mockResolvedValue({
-      ref: vi.fn().mockResolvedValue(null),
-    } as never)
-
-    const provider = makeProvider()
-    vi.mocked(provider.assertGraphIndexUnlocked).mockImplementation(() => {
-      throw new Error(GRAPH_INDEX_LOCK_MESSAGE)
-    })
-
-    await expect(
-      new GetGraphHealth().execute({
-        config,
-        provider,
-        codeGraphVersion: '1.0.0',
-        assertUnlocked: false,
-      }),
-    ).resolves.toBeDefined()
-
-    expect(provider.getStatistics).toHaveBeenCalled()
   })
 
   it('returns fingerprintMismatch null without workspaces', async () => {
@@ -197,11 +148,10 @@ describe('GetGraphHealth', () => {
       ref: vi.fn().mockResolvedValue('abc1234'),
     } as never)
 
-    const result = await new GetGraphHealth().execute({
+    const result = await getGraphHealth().execute({
       config,
       provider: makeProvider({ ...BASE_STATS, graphFingerprint: '{"core":"abc"}' }),
       codeGraphVersion,
-      assertUnlocked: false,
     })
 
     expect(result.fingerprintMismatch).toBeNull()
@@ -212,7 +162,7 @@ describe('GetGraphHealth', () => {
       ref: vi.fn().mockResolvedValue('abc1234'),
     } as never)
 
-    const result = await new GetGraphHealth().execute({
+    const result = await getGraphHealth().execute({
       config,
       provider: makeProvider({
         ...BASE_STATS,
@@ -220,7 +170,6 @@ describe('GetGraphHealth', () => {
       }),
       codeGraphVersion,
       workspaces,
-      assertUnlocked: false,
     })
 
     expect(result.stale).toBe(false)
@@ -233,7 +182,7 @@ describe('GetGraphHealth', () => {
       ref: vi.fn().mockResolvedValue('abc1234'),
     } as never)
 
-    const result = await new GetGraphHealth().execute({
+    const result = await getGraphHealth().execute({
       config,
       provider: makeProvider({
         ...BASE_STATS,
@@ -241,7 +190,6 @@ describe('GetGraphHealth', () => {
       }),
       codeGraphVersion: '2.0.0',
       workspaces,
-      assertUnlocked: false,
     })
 
     expect(result.fingerprintMismatch).toBe(true)
@@ -260,14 +208,56 @@ describe('GetGraphHealth', () => {
       close,
     } as unknown as CodeGraphHostPort
 
-    await new GetGraphHealth().execute({
+    await getGraphHealth().execute({
       config,
       provider,
       codeGraphVersion,
-      assertUnlocked: false,
     })
 
     expect(open).not.toHaveBeenCalled()
     expect(close).not.toHaveBeenCalled()
+  })
+
+  it('returns stale null when the VCS adapter is unavailable', async () => {
+    createVcsAdapter.mockRejectedValue(new Error('VCS unavailable'))
+
+    const result = await getGraphHealth().execute({
+      config,
+      provider: makeProvider(),
+      codeGraphVersion,
+    })
+
+    expect(result.currentRef).toBeNull()
+    expect(result.stale).toBeNull()
+  })
+
+  it('propagates GRAPH_BUSY from provider.getStatistics unchanged', async () => {
+    const busy = new GraphBusyError('graph is being indexed')
+    const provider = {
+      getStatistics: vi.fn().mockRejectedValue(busy),
+    } as unknown as CodeGraphHostPort
+
+    await expect(
+      getGraphHealth().execute({
+        config,
+        provider,
+        codeGraphVersion,
+      }),
+    ).rejects.toBe(busy)
+  })
+
+  it('propagates GRAPH_PROVIDER_STALE from provider.getStatistics unchanged', async () => {
+    const stale = new GraphProviderStaleError('provider storage generation is stale')
+    const provider = {
+      getStatistics: vi.fn().mockRejectedValue(stale),
+    } as unknown as CodeGraphHostPort
+
+    await expect(
+      getGraphHealth().execute({
+        config,
+        provider,
+        codeGraphVersion,
+      }),
+    ).rejects.toBe(stale)
   })
 })

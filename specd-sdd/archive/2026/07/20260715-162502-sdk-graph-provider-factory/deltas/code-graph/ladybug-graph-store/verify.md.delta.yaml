@@ -1,0 +1,34 @@
+- op: added
+  description: 'Add verification coverage for the new Ladybug storage-generation requirement'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Destructive recreation'
+  content: |
+    ### Requirement: Storage generation sidecar
+
+    #### Scenario: Ladybug exposes generation changes through the sidecar
+
+    - **GIVEN** a Ladybug-backed graph root using a sidecar such as `graph/storage.epoch`
+    - **WHEN** the store is opened before and after a destructive recreate
+    - **THEN** the owning provider can observe that the generation changed
+
+- op: added
+  description: 'Verify Ladybug document FTS and spec identity fallback'
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Full-text search implementation'
+    after:
+      type: section
+      matches: 'Scenario: Ladybug search ranks strong identity matches first'
+  content: |
+    #### Scenario: Ladybug discovers document and spec identity hits outside FTS tokenization
+
+    - **GIVEN** a document and a spec whose canonical identities are missed by backend tokenization
+    - **WHEN** Ladybug searches their path or spec-id suffix/component
+    - **THEN** document search uses `document_fts` plus identity candidates
+    - **AND** spec search supplements FTS candidates before ranking

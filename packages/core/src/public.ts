@@ -53,6 +53,7 @@ export {
 } from './application/specd-config.js'
 export { Logger } from './application/logger.js'
 export { TemplateExpander } from './application/template-expander.js'
+export { VcsAdapter } from './application/ports/vcs-adapter.js'
 export type { SchemaRawResult } from './application/ports/schema-registry.js'
 export type {
   LogDestination,

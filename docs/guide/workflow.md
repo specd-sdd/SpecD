@@ -343,6 +343,13 @@ Hooks let you attach automated actions or AI guidance to lifecycle transitions. 
 - **Pre hooks** run before the change enters a step. If a pre hook fails, the transition is blocked.
 - **Post hooks** run after the change enters a step. If a post hook fails, the transition is not rolled back.
 
+When shell hooks are long-running, SpecD keeps them observable while they are
+in flight. In human-facing `text` output, completed hooks remain visible,
+active hooks show recent output plus a running indicator, and quiet hooks emit
+liveness updates. In `json` and `toon`, in-flight hook progress is emitted on
+`stderr` as structured events while the final command result remains on
+`stdout`.
+
 ### Hook types
 
 | Type           | Description                                                                              |

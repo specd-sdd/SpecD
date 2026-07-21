@@ -188,6 +188,10 @@ export function handleError(err: unknown, format?: string): never {
       return cliError(err.message, format, 1, code, { metadata })
     }
 
+    if (code === 'GRAPH_BUSY' || code === 'GRAPH_PROVIDER_STALE') {
+      return cliError(err.message, format, 3, code, { metadata })
+    }
+
     // All other SpecdError subtypes → exit 1
     return cliError(err.message, format, 1, code, { metadata })
   }

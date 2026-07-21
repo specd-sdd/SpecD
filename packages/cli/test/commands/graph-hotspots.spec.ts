@@ -20,14 +20,12 @@ vi.mock('@specd/sdk', async () => {
   const actual = await vi.importActual<typeof import('@specd/sdk')>('@specd/sdk')
   return {
     ...actual,
-    assertGraphIndexUnlocked: vi.fn(),
   }
 })
 
 import { resolveGraphCliContext } from '../../src/commands/graph/resolve-graph-cli-context.js'
 import { withProvider } from '../../src/commands/graph/with-provider.js'
 import { registerGraphHotspots } from '../../src/commands/graph/hotspots.js'
-import { assertGraphIndexUnlocked } from '@specd/sdk'
 
 function setup() {
   const config = makeMockConfig()
@@ -95,17 +93,6 @@ describe('graph hotspots', () => {
       configPath: undefined,
       repoPath: '/tmp/repo',
     })
-  })
-
-  it('checks the shared index lock before opening the provider', async () => {
-    setup()
-
-    const program = makeHotspotsProgram()
-    await program.parseAsync(['node', 'specd', 'graph', 'hotspots'])
-
-    expect(assertGraphIndexUnlocked).toHaveBeenCalledWith(
-      expect.objectContaining({ configPath: '/project/.specd/config' }),
-    )
   })
 
   it('keeps implicit defaults when no explicit filter is provided', async () => {

@@ -1,0 +1,24 @@
+- op: added
+  description: Verify consumers receive the VCS port through Core's public API.
+  position:
+    parent:
+      type: section
+      matches: Requirements
+    after:
+      type: section
+      matches: 'Requirement: Abstract class base'
+  content: |
+    ### Requirement: Public port export
+
+    #### Scenario: VcsAdapter is available from the Core public API
+
+    - **WHEN** a consumer imports `VcsAdapter` from `@specd/core`
+    - **THEN** the import SHALL resolve to the abstract VCS adapter class as a runtime value
+- op: modified
+  description: 'Align base detection with its default-null contract.'
+  selector:
+    type: section
+    matches: 'Scenario: Git detection inside git repo'
+  content: |
+    - **WHEN** `VcsAdapter.detect(cwd)` is called on the abstract base class
+    - **THEN** it resolves to `null`

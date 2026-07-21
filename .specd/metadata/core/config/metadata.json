@@ -9,7 +9,7 @@
     {
       "requirement": "Config file location and format",
       "rules": [
-        "`specd.yaml` must be a valid YAML file. specd discovers and resolves configuration using the following strategy, in order:\n\n1. **`--config` flag** — if the CLI is invoked with `--config path/to/file.yaml`, that file becomes the single explicit entrypoint. specd MUST resolve that file and only its own `extends` chain. Normal filename discovery MUST NOT add any additional layers on top of the explicit chain.\n2. **Walk up from CWD, bounded by the VCS root** — specd walks up from the current working directory, checking each directory for discoverable config candidates. The walk stops at the **first directory containing any matching config files** (nearest to CWD) or at the VCS root (the nearest ancestor directory containing a `.git/`, `.hg/`, or `.svn/` directory, or as resolved by the active VCS adapter), whichever comes first. If no discoverable config files are found before or at the VCS root, specd exits with an error.\n3. **CWD only, when not inside a VCS repository** — if no VCS root ancestor exists, specd checks only the current working directory and stops there. It does not walk further up.\n\nWithin the selected directory, normal discovery MUST evaluate candidate files in this order:\n\n1. `specd.yaml`\n2. `specd.*.yaml` in ascending alphabetical order\n3. `specd.local.yaml`\n4. `specd.local.*.yaml` in ascending alphabetical order\n\nA discovered file without `extends` becomes a standalone root from that point. A discovered file with `extends: true` MUST inherit from the previous active layer in the resolved chain. A discovered file with `extends: <path>` MUST only activate when that explicit base file is already part of the active chain being resolved; otherwise the discovered file is ignored during normal discovery.\n\nThe search never goes above the VCS repository root. This prevents accidentally picking up a config from a parent repository in nested or sibling monorepo layouts.\n\nSome command families may explicitly define a bootstrap mode that intentionally operates without loading project config. When they do, this requirement still governs normal configured operation and the meaning of `--config` remains unchanged: it is always an explicit config file entrypoint, never a repository root selector."
+        "`specd.yaml` must be a valid YAML file. specd discovers and resolves configuration using the following strategy, in order:\n\n1. **`--config` flag** — if the CLI is invoked with `--config path/to/file.yaml`, that file becomes the single explicit entrypoint. specd MUST resolve that file and only its own `extends` chain. Normal filename discovery MUST NOT add any additional layers on top of the explicit chain.\n2. **Walk up from CWD, bounded by the VCS root** — specd walks up from the current working directory, checking each directory for discoverable config candidates. The walk stops at the **first directory containing any matching config files** (nearest to CWD) or at the VCS root (the nearest ancestor directory containing a `.git/`, `.hg/`, or `.svn/` directory, or as resolved by the active VCS adapter), whichever comes first. If no discoverable config files are found before or at the VCS root, specd exits with an error.\n3. **CWD only, when not inside a VCS repository** — if no VCS root ancestor exists, specd checks only the current working directory and stops there. It does not walk further up.\n\nWithin the selected directory, normal discovery MUST evaluate candidate files in this order:\n\n1. `specd.yaml`\n2. `specd.*.yaml` in ascending alphabetical order\n3. `specd.local.yaml`\n4. `specd.local.*.yaml` in ascending alphabetical order\n\nA discovered file without `extends` becomes a standalone root from that point. A discovered file with `extends: true` MUST inherit from the previous active layer in the resolved chain. A discovered file with `extends: <path>` MUST only activate when that explicit base file is already part of the active chain being resolved; otherwise the discovered file is ignored during normal discovery.\n\nThe search never goes above the VCS repository root. This prevents accidentally picking up a config from a parent repository in nested or sibling monorepo layouts.\n\nHosts that expose their own bootstrap API MAY accept an explicit discovery root instead of relying on the process current working directory. When they do, they MUST apply the same discovery strategy from that supplied directory. This discovery-root mode remains distinct from explicit file-entry modes such as `--config`, which always mean forced-file bootstrap rather than directory-based discovery.\n\nSome command families may explicitly define a bootstrap mode that intentionally operates without loading project config. When they do, this requirement still governs normal configured operation and the meaning of `--config` remains unchanged: it is always an explicit config file entrypoint, never a repository root selector."
       ]
     },
     {
@@ -171,7 +171,7 @@
     {
       "requirement": "Legacy configuration warnings",
       "rules": [
-        "To encourage migration to the new generalized configuration format, the loader MUST collect a warning when a legacy configuration block is resolved:\n\n- A warning string is generated: `\"Legacy configuration format detected at '<field-path>'. Please migrate to 'adapter: { type: \\\"fs\\\", config: ... }' (the legacy format will be removed in future versions).\"`\n- The warnings are exposed via `config.warnings` as a list of strings: `readonly warnings?: readonly string[]`.\n- Delivery hosts MUST print these warnings to standard error (`console.warn`) upon successful loading of the configuration."
+        "Legacy-compatible config parsing SHALL surface advisory warnings through `SpecdConfig.warnings`.\n\nThese warnings MUST be non-fatal diagnostics about configuration shape or compatibility, not startup-blocking errors. They SHALL be produced during config loading, preserved on the resolved config object, and remain available for host bootstrap consumers to report without recomputing or reformatting them.\n\n#### Scenario: Legacy config format emits warnings\n\n- **GIVEN** a config file declares a legacy workspace spec adapter format:\n- **WHEN** config is loaded\n- **THEN** it resolves successfully\n- **AND** `config.warnings` contains a warning string for `'workspaces.default.specs'`\n\n#### Scenario: Omitted storage defaults do not emit legacy configuration warnings\n\n- **GIVEN** a config file that completely omits the `storage` key\n- **WHEN** config is loaded\n- **THEN** it resolves successfully\n- **AND** `config.warnings` is undefined or does not contain warnings for storage"
       ]
     },
     {
@@ -200,6 +200,16 @@
       "given": ["target directory is not inside any VCS repository"],
       "when": ["config discovery runs"],
       "then": ["it checks only the current working directory"]
+    },
+    {
+      "requirement": "Config file location and format",
+      "name": "Host bootstrap may supply an explicit discovery root",
+      "given": ["a host bootstrap API accepts a discovery root input"],
+      "when": ["discovery runs from that supplied directory"],
+      "then": [
+        "it uses the same candidate ordering and VCS-bounded walk as cwd-based discovery",
+        "AND it remains distinct from explicit file-entry modes such as --config"
+      ]
     },
     {
       "requirement": "Privacy settings",
@@ -1141,6 +1151,23 @@
       ]
     },
     {
+      "requirement": "Legacy configuration warnings",
+      "name": "Warning-bearing config remains non-fatal",
+      "given": ["config loading detects a legacy-compatible warning condition"],
+      "when": ["the config is resolved"],
+      "then": ["loading succeeds without converting the warning into a startup error"]
+    },
+    {
+      "requirement": "Legacy configuration warnings",
+      "name": "Hosts can consume warnings from resolved config",
+      "given": ["config loading resolves warnings"],
+      "when": ["a delivery host receives the resolved SpecdConfig"],
+      "then": [
+        "the host can read those diagnostics from config.warnings",
+        "AND the host does not need to recompute or reinterpret the warning messages"
+      ]
+    },
+    {
       "requirement": "Project context instructions",
       "name": "Context entries injected before spec content",
       "given": [
@@ -1327,12 +1354,17 @@
         "specId": "core:config",
         "file": "core:src/application/specd-config.ts",
         "symbol": "SpecdWorkspaceConfig"
+      },
+      {
+        "specId": "core:config",
+        "file": "core:src/infrastructure/fs/config-loader.ts",
+        "symbol": "parseRawAdapter"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:b8928b649084bf315b289b835e346e6413325ddb5dbcaffebe2616f31eacf5ed",
-    "verify.md": "sha256:dddd73ca47903c30d19db08855854ab851837c3795482955c706cc8a828cad32"
+    "spec.md": "sha256:0d6e7c8a5444cf516c467d86ae511dc7e0e02856bbf21d1468e23c0315a947b1",
+    "verify.md": "sha256:de2b436010b6e5bb7aa3085e4cd89af29305e089faf971b522419fd3d5f9b143"
   },
   "generatedBy": "core"
 }

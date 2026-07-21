@@ -22,15 +22,17 @@ specd graph stats [--config <path> | --path <path>] [--format text|json|toon]
 
 ### Requirement: Statistics retrieval
 
-The command obtains host context via `openSpecdHost` from `@specd/sdk`, opens the graph provider through `withOpenGraphProvider(ctx, fn)`, and delegates statistics, VCS ref resolution, staleness calculation, and fingerprint comparison to `GetGraphHealth.execute()` inside the callback. It outputs the returned result fields, closes the provider via the SDK lifecycle wrapper, and exits.
+The command obtains host context via `openSpecdHost` from `@specd/sdk`, opens the graph provider through the SDK lifecycle helper, and delegates health computation to `createGetGraphHealth`.
 
-The command MUST pass `ListWorkspaces` results (when kernel is available) as `workspaces` input for fingerprint comparison.
+For `--config`, the command uses the explicit configuration path. For `--path` and the no-config fallback, it calls `openSpecdHost` with `allowBootstrapFallback: true` so the SDK first discovers a project configuration and otherwise creates a synthetic graph host from the resolved VCS root. `graph stats` MUST NOT call `resolveGraphCliContext`.
 
-Graph context and provider lifecycle MUST go through `cli:graph-cli-context` and `@specd/sdk` symbols.
+The command MUST pass `ListWorkspaces` results when the host has a configured kernel; synthetic bootstrap uses its generated default workspace.
 
 ### Requirement: Concurrent indexing guard
 
-Before attempting to open the provider, `graph stats` SHALL query the lock status from the provider. If indexing is currently in progress, the command SHALL fail fast with a short user-facing retry-later message.
+`graph stats` MUST NOT perform a host-managed pre-open lock probe before opening the provider.
+
+Instead, the command relies on provider-owned availability checks surfaced through `GetGraphHealth` and provider reads.
 
 ### Requirement: Output format
 
@@ -77,9 +79,11 @@ In `json` or `toon` mode, the full `GraphStatistics` object is output as-is, wit
 
 ### Requirement: Error cases
 
-If the shared graph indexing lock is present, the command SHALL exit with code 3 after printing a user-facing retry-later message.
+If the provider reports `GRAPH_BUSY`, the command SHALL fail with the standard graph-busy infrastructure error path and exit code 3.
 
-If the provider cannot be opened or statistics retrieval fails due to an infrastructure error, the command exits with code 3.
+If the provider reports `GRAPH_PROVIDER_STALE`, the command SHALL fail with the standard infrastructure error path and exit code 3.
+
+If the provider cannot be opened or statistics retrieval fails due to another infrastructure error, the command SHALL exit with code 3.
 
 ## Constraints
 
@@ -87,6 +91,7 @@ If the provider cannot be opened or statistics retrieval fails due to an infrast
 - `process.exit(0)` is called explicitly after the SDK wrapper closes the provider
 - Zero-value relation counts are omitted from text output for readability
 - Bootstrap mode (`--path`) resolves host context through `openSpecdHost` with the appropriate config path input
+- Graph-busy and provider-stale availability semantics are owned by the provider, not by a CLI-managed pre-open lock probe
 
 ## Examples
 

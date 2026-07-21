@@ -3,6 +3,14 @@ import { type TemplateVariables } from '../template-expander.js'
 
 export type { HookResult, TemplateVariables }
 
+/** Progress event emitted by shell hook runners while a hook remains active. */
+export type HookRunnerProgressEvent =
+  | { type: 'output'; stream: 'stdout' | 'stderr'; line: string }
+  | { type: 'heartbeat'; elapsedMs: number }
+
+/** Callback for receiving in-flight hook runner progress. */
+export type OnHookRunnerProgress = (event: HookRunnerProgressEvent) => void
+
 /**
  * Port for executing `run:` hook commands.
  *
@@ -29,5 +37,9 @@ export interface HookRunner {
    * @param variables - Values for template variable substitution
    * @returns The process exit code and all captured output
    */
-  run(command: string, variables: TemplateVariables): Promise<HookResult>
+  run(
+    command: string,
+    variables: TemplateVariables,
+    onProgress?: OnHookRunnerProgress,
+  ): Promise<HookResult>
 }

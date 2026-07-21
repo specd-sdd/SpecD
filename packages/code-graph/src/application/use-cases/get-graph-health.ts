@@ -1,4 +1,4 @@
-import { createVcsAdapter, type SpecdConfig } from '@specd/core'
+import { type SpecdConfig, type VcsAdapter } from '@specd/core'
 import { type CodeGraphHostPort } from '../ports/code-graph-host-port.js'
 import { type GraphStatistics } from '../../domain/value-objects/graph-statistics.js'
 import { type WorkspaceIndexTarget } from '../../domain/value-objects/index-options.js'
@@ -15,7 +15,6 @@ export interface GetGraphHealthInput {
   readonly provider: CodeGraphHostPort
   readonly codeGraphVersion: string
   readonly workspaces?: readonly WorkspaceIndexTarget[]
-  readonly assertUnlocked?: boolean
 }
 
 /** Graph statistics enriched with staleness and fingerprint diagnostics. */
@@ -29,6 +28,10 @@ export interface GetGraphHealthResult extends GraphStatistics {
  * Returns graph statistics plus VCS staleness and derivation fingerprint diagnostics.
  */
 export class GetGraphHealth {
+  /** Creates graph health diagnostics with a composition-supplied VCS resolver.
+   * @param createVcsAdapter - Resolver for the current VCS reference.
+   */
+  constructor(private readonly createVcsAdapter: (projectRoot: string) => Promise<VcsAdapter>) {}
   /**
    * Executes the use case.
    *
@@ -36,15 +39,11 @@ export class GetGraphHealth {
    * @returns Enriched graph health snapshot
    */
   async execute(input: GetGraphHealthInput): Promise<GetGraphHealthResult> {
-    if (input.assertUnlocked !== false) {
-      input.provider.assertGraphIndexUnlocked(input.config)
-    }
-
     const stats = await input.provider.getStatistics()
 
     let currentRef: string | null = null
     try {
-      const vcs = await createVcsAdapter(input.config.projectRoot)
+      const vcs = await this.createVcsAdapter(input.config.projectRoot)
       currentRef = await vcs.ref()
     } catch {
       // No VCS or ref unavailable

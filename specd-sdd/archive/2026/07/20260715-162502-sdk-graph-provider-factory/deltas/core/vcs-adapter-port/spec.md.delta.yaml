@@ -1,0 +1,13 @@
+- op: added
+  description: Export the VCS application port from Core's supported public API.
+  position:
+    parent:
+      type: section
+      matches: Requirements
+    after:
+      type: section
+      matches: 'Requirement: Abstract class base'
+  content: |
+    ### Requirement: Public port export
+
+    `@specd/core` SHALL export the `VcsAdapter` abstract class as a runtime value from its supported public API. Consumers that require the typed VCS contract MUST import the port from `@specd/core` and MUST NOT import it from an internal application path.

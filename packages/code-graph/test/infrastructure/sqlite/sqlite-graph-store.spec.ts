@@ -183,10 +183,12 @@ describe('SQLiteGraphStore', () => {
     await store.close()
 
     expect(existsSync(join(tempDir, 'graph', 'code-graph.sqlite'))).toBe(true)
+    expect(existsSync(join(tempDir, 'graph', 'storage.epoch'))).toBe(true)
 
     await store.recreate()
 
-    expect(existsSync(join(tempDir, 'graph'))).toBe(false)
+    expect(existsSync(join(tempDir, 'graph', 'code-graph.sqlite'))).toBe(false)
+    expect(existsSync(join(tempDir, 'graph', 'storage.epoch'))).toBe(true)
   })
 
   it('recreate on an open store reopens the store for subsequent operations', async () => {
@@ -441,6 +443,68 @@ describe('SQLiteGraphStore', () => {
     expect(specHits[0]?.spec.specId).toBe(strongSpec.specId)
     expect(documentHits[0]?.document.path).toBe(strongDocument.path)
 
+    await store.close()
+  })
+
+  it('discovers exact identities when the FTS indexes are unavailable', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-test-'))
+    const file = createFileNode({
+      path: 'core:src/identity.ts',
+      configRelativePath: 'packages/core/src/identity.ts',
+      language: 'typescript',
+      contentHash: 'sha256:identity-file',
+      workspace: 'core',
+      content: 'export function findIdentity() {}',
+    })
+    const symbol = createSymbolNode({
+      name: 'findIdentity',
+      kind: SymbolKind.Function,
+      filePath: file.path,
+      line: 1,
+      column: 0,
+    })
+    const spec = createSpecNode({
+      specId: 'core:identity',
+      path: 'identity',
+      title: 'Identity',
+      description: 'Identity lookup',
+      contentHash: 'sha256:identity-spec',
+      content: 'Defines identity lookup behavior.',
+      workspace: 'core',
+    })
+    const document = createDocumentNode({
+      path: 'root:docs/identity.md',
+      configRelativePath: 'docs/identity.md',
+      contentHash: 'sha256:identity-document',
+      content: '# Identity',
+      workspace: 'root',
+    })
+
+    const store = new SQLiteGraphStore(tempDir)
+    await store.open()
+    await store.bulkLoad({
+      files: [file],
+      documents: [document],
+      symbols: [symbol],
+      specs: [spec],
+      relations: [],
+    })
+    await store.close()
+
+    const database = new Database(join(tempDir, 'graph', 'code-graph.sqlite'))
+    database.exec('DELETE FROM symbol_fts; DELETE FROM spec_fts; DELETE FROM document_fts;')
+    database.close()
+
+    await store.open()
+    await expect(store.searchSymbols({ query: symbol.name })).resolves.toMatchObject([
+      { symbol: { id: symbol.id } },
+    ])
+    await expect(store.searchSpecs({ query: spec.specId })).resolves.toMatchObject([
+      { spec: { specId: spec.specId } },
+    ])
+    await expect(
+      store.searchDocuments({ query: document.configRelativePath }),
+    ).resolves.toMatchObject([{ document: { path: document.path } }])
     await store.close()
   })
 

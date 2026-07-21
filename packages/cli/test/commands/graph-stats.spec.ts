@@ -9,24 +9,13 @@ import {
   ExitSentinel,
 } from './helpers.js'
 
-vi.mock('../../src/helpers/sdk-host.js', () => ({
-  resolveSdkHostContext: vi.fn(),
-}))
-
-vi.mock('../../src/commands/graph/resolve-graph-cli-context.js', () => ({
-  resolveGraphCliContext: vi.fn(),
-}))
-
-vi.mock('../../src/commands/graph/with-provider.js', () => ({
-  withProvider: vi.fn(),
-}))
-
 vi.mock('@specd/sdk', async () => {
   const actual = await vi.importActual<typeof import('@specd/sdk')>('@specd/sdk')
   return {
     ...actual,
-    assertGraphIndexUnlocked: vi.fn(),
     createGetGraphHealth: vi.fn(),
+    openSpecdHost: vi.fn(),
+    withOpenGraphProvider: vi.fn(),
     createVcsAdapter: vi.fn().mockResolvedValue({
       ref: vi.fn().mockResolvedValue('abc1234def'),
     }),
@@ -35,13 +24,11 @@ vi.mock('@specd/sdk', async () => {
 
 import {
   createVcsAdapter,
-  assertGraphIndexUnlocked,
   createGetGraphHealth,
+  openSpecdHost,
+  withOpenGraphProvider,
   type GetGraphHealthInput,
 } from '@specd/sdk'
-import { resolveGraphCliContext } from '../../src/commands/graph/resolve-graph-cli-context.js'
-import { resolveSdkHostContext } from '../../src/helpers/sdk-host.js'
-import { withProvider } from '../../src/commands/graph/with-provider.js'
 import { parseFingerprintMap, detectFingerprintMismatch, buildProjectGraphConfig } from '@specd/sdk'
 import { codeGraphVersion } from '@specd/sdk'
 import { registerGraphStats } from '../../src/commands/graph/stats.js'
@@ -82,18 +69,11 @@ function setup(
       })),
     )
   }
-  vi.mocked(resolveSdkHostContext).mockImplementation(async (_cfg, k) => ({
-    kernel: k!,
-    createGraphProvider: vi.fn(),
-  }))
-
-  vi.mocked(resolveGraphCliContext).mockResolvedValue({
-    mode,
+  vi.mocked(openSpecdHost).mockResolvedValue({
     config,
     configFilePath: mode === 'configured' ? '/project/specd.yaml' : null,
-    kernel,
-    projectRoot: '/project',
-    vcsRoot: '/project',
+    kernel: kernel ?? makeMockKernel(),
+    createGraphProvider: vi.fn(),
   })
 
   if (options.vcsError === true) {
@@ -110,7 +90,7 @@ function setup(
       ...statOverrides,
     }),
   }
-  vi.mocked(withProvider).mockImplementation(async (_config, _fmt, fn) => {
+  vi.mocked(withOpenGraphProvider).mockImplementation(async (_host, fn) => {
     await fn(mockProvider as never)
   })
   vi.mocked(createGetGraphHealth).mockImplementation(
@@ -164,7 +144,7 @@ function setup(
   const getStdout = captureStdout()
   const getStderr = captureStderr()
   mockProcessExit()
-  return { mockProvider, getStdout, getStderr }
+  return { config, mockProvider, getStdout, getStderr }
 }
 
 function parseStdoutJson(getStdout: () => string): Record<string, unknown> {
@@ -195,60 +175,66 @@ function makeStatsProgram() {
 afterEach(() => vi.restoreAllMocks())
 
 describe('graph stats', () => {
-  it('delegates graph access through withProvider', async () => {
-    setup()
+  it('delegates graph access through the SDK lifecycle helper', async () => {
+    const { config } = setup()
 
     const program = makeStatsProgram()
     await runStats(program, 'graph', 'stats')
 
-    expect(withProvider).toHaveBeenCalled()
+    expect(withOpenGraphProvider).toHaveBeenCalledWith(
+      expect.objectContaining({ config }),
+      expect.any(Function),
+    )
   })
 
-  it('passes explicit config path to graph context resolution', async () => {
+  it('exits with code 0 only after the SDK lifecycle helper completes', async () => {
+    const order: string[] = []
+    setup()
+    vi.mocked(withOpenGraphProvider).mockImplementation(async (_host, fn) => {
+      await fn({ getStatistics: vi.fn().mockResolvedValue(DEFAULT_STATS) } as never)
+      order.push('close')
+    })
+    vi.mocked(process.exit).mockImplementation(((code?: number) => {
+      order.push(`exit:${String(code ?? 0)}`)
+      throw new ExitSentinel(code ?? 0)
+    }) as never)
+
+    const program = makeStatsProgram()
+    await runStats(program, 'graph', 'stats')
+
+    expect(order).toEqual(['close', 'exit:0'])
+  })
+
+  it('passes explicit config path to SDK host bootstrap', async () => {
     setup()
 
     const program = makeStatsProgram()
     await runStats(program, 'graph', 'stats', '--config', '/tmp/other/specd.yaml')
 
-    expect(resolveGraphCliContext).toHaveBeenCalledWith({
+    expect(openSpecdHost).toHaveBeenCalledWith({
       configPath: '/tmp/other/specd.yaml',
-      repoPath: undefined,
     })
   })
 
-  it('passes explicit bootstrap path to graph context resolution', async () => {
+  it('passes explicit bootstrap path to SDK host bootstrap', async () => {
     setup('bootstrap')
 
     const program = makeStatsProgram()
     await runStats(program, 'graph', 'stats', '--path', '/tmp/repo')
 
-    expect(resolveGraphCliContext).toHaveBeenCalledWith({
-      configPath: undefined,
-      repoPath: '/tmp/repo',
+    expect(openSpecdHost).toHaveBeenCalledWith({
+      startDir: '/tmp/repo',
+      allowBootstrapFallback: true,
     })
   })
 
-  it('uses no-config fallback path by passing no overrides', async () => {
+  it('uses no-config fallback path', async () => {
     setup('bootstrap')
 
     const program = makeStatsProgram()
     await runStats(program, 'graph', 'stats')
 
-    expect(resolveGraphCliContext).toHaveBeenCalledWith({
-      configPath: undefined,
-      repoPath: undefined,
-    })
-  })
-
-  it('checks the shared index lock before opening the provider', async () => {
-    setup()
-
-    const program = makeStatsProgram()
-    await runStats(program, 'graph', 'stats')
-
-    expect(assertGraphIndexUnlocked).toHaveBeenCalledWith(
-      expect.objectContaining({ configPath: '/project/.specd/config' }),
-    )
+    expect(openSpecdHost).toHaveBeenCalledWith({ allowBootstrapFallback: true })
   })
 
   it('rejects --config and --path together', async () => {
@@ -472,20 +458,5 @@ describe('graph stats — staleness detection', () => {
       '⚠ Derivation fingerprint mismatch — code-graph version or workspace configuration changed since last index',
     )
     expect(getStdout()).not.toContain('Derivation fingerprint mismatch')
-  })
-
-  it('exits with code 3 when lock check fails', async () => {
-    setup('configured')
-    vi.mocked(assertGraphIndexUnlocked).mockImplementationOnce(() => {
-      throw new Error('graph is locked')
-    })
-    mockProcessExit()
-
-    const program = makeStatsProgram()
-    await expect(program.parseAsync(['node', 'specd', 'graph', 'stats'])).rejects.toThrow(
-      ExitSentinel,
-    )
-
-    expect(process.exit).toHaveBeenCalledWith(3)
   })
 })

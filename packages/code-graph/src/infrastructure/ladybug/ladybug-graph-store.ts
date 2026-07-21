@@ -1,5 +1,5 @@
-import { Database, Connection, type QueryResult, type LbugValue } from 'lbug'
-import { GraphStore } from '../../domain/ports/graph-store.js'
+import type { Database, Connection, QueryResult, LbugValue } from 'lbug'
+import { GraphStore, type StorageGenerationSnapshot } from '../../domain/ports/graph-store.js'
 import { createDocumentNode, type DocumentNode } from '../../domain/value-objects/document-node.js'
 import { type FileNode } from '../../domain/value-objects/file-node.js'
 import { type SymbolNode } from '../../domain/value-objects/symbol-node.js'
@@ -16,6 +16,19 @@ import { expandSymbolName } from '../../domain/services/expand-symbol-name.js'
 import { matchesExclude } from '../../domain/services/matches-exclude.js'
 import { mkdirSync, existsSync, writeFileSync, unlinkSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
+import {
+  ensureStorageGeneration,
+  readStorageGeneration,
+  rotateStorageGeneration,
+} from '../storage-generation.js'
+
+/**
+ * Runtime-loadable Ladybug module shape.
+ */
+interface LbugModule {
+  readonly Database: new (path: string) => Database
+  readonly Connection: new (db: Database) => Connection
+}
 
 const SYMBOL_DEPENDENCY_RELATION_TYPES = [RT.Calls, RT.Constructs, RT.UsesType] as const
 
@@ -128,6 +141,7 @@ export class LadybugGraphStore extends GraphStore {
   private _lastIndexedAt: string | undefined
   private _lastIndexedRef: string | null = null
   private _graphFingerprint: string | null = null
+  private readonly loadLbugModule: () => Promise<LbugModule> = async () => import('lbug')
 
   /**
    * Asserts the store is open and the connection is available.
@@ -158,6 +172,9 @@ export class LadybugGraphStore extends GraphStore {
    * Opens the database, initializes the schema, and loads metadata.
    */
   async open(): Promise<void> {
+    if (this._isOpen) {
+      return
+    }
     if (!existsSync(this.graphDir)) {
       mkdirSync(this.graphDir, { recursive: true })
     }
@@ -166,10 +183,12 @@ export class LadybugGraphStore extends GraphStore {
     }
 
     await this.migrateSchemaIfNeeded()
+    ensureStorageGeneration(this.storagePath)
 
-    this.db = new Database(this.dbPath)
+    const lbug = await this.loadLbugModule()
+    this.db = new lbug.Database(this.dbPath)
     await this.db.init()
-    this.conn = new Connection(this.db)
+    this.conn = new lbug.Connection(this.db)
     await this.conn.init()
 
     for (const statement of SCHEMA_DDL.split(';')) {
@@ -228,9 +247,10 @@ export class LadybugGraphStore extends GraphStore {
     if (!existsSync(this.dbPath)) return
 
     try {
-      const db = new Database(this.dbPath)
+      const lbug = await this.loadLbugModule()
+      const db = new lbug.Database(this.dbPath)
       await db.init()
-      const conn = new Connection(db)
+      const conn = new lbug.Connection(db)
       await conn.init()
 
       const rows = await exec(conn, "MATCH (m:Meta {key: 'schemaVersion'}) RETURN m.value AS v")
@@ -327,6 +347,7 @@ export class LadybugGraphStore extends GraphStore {
     for (const [table, name] of [
       ['Symbol', 'symbol_fts'],
       ['Spec', 'spec_fts'],
+      ['Document', 'document_fts'],
     ] as const) {
       try {
         await conn.query(`CALL DROP_FTS_INDEX('${table}', '${name}')`)
@@ -338,6 +359,7 @@ export class LadybugGraphStore extends GraphStore {
     // Recreate
     await this.createFtsIndex('Symbol', 'symbol_fts', ['searchName', 'comment'])
     await this.createFtsIndex('Spec', 'spec_fts', ['specId', 'title', 'description', 'content'])
+    await this.createFtsIndex('Document', 'document_fts', ['path', 'content'])
   }
 
   /**
@@ -434,7 +456,14 @@ export class LadybugGraphStore extends GraphStore {
   async removeFile(filePath: string): Promise<void> {
     this.ensureOpen()
     const conn = this.conn!
-    await this.deleteFileLocalState(conn, filePath)
+    await conn.query('BEGIN TRANSACTION')
+    try {
+      await this.deleteFileLocalState(conn, filePath)
+      await conn.query('COMMIT')
+    } catch (error) {
+      await conn.query('ROLLBACK').catch(() => {})
+      throw error
+    }
     await this.rebuildFtsIndexes()
   }
 
@@ -1090,7 +1119,7 @@ export class LadybugGraphStore extends GraphStore {
    * @param filePath - Canonical file path.
    * @returns File coverage relations keyed by spec.
    */
-  async getCoveringSpecs(filePath: string): Promise<Relation[]> {
+  async getCoveringSpecsForFile(filePath: string): Promise<Relation[]> {
     this.ensureOpen()
     const rows = await execPrepared(
       this.conn!,
@@ -1134,7 +1163,7 @@ export class LadybugGraphStore extends GraphStore {
    * @param symbolId - Canonical symbol identifier.
    * @returns Symbol coverage relations keyed by spec.
    */
-  async getSymbolCoveringSpecs(symbolId: string): Promise<Relation[]> {
+  async getCoveringSpecsForSymbol(symbolId: string): Promise<Relation[]> {
     this.ensureOpen()
     const rows = await execPrepared(
       this.conn!,
@@ -1554,13 +1583,7 @@ export class LadybugGraphStore extends GraphStore {
       params,
     )
 
-    const results: Array<{
-      spec: SpecNode
-      score: number
-      snippet: string
-      startLine: number
-      endLine: number
-    }> = []
+    const candidates = new Map<string, { spec: SpecNode; nativeScore: number }>()
     for (const row of rows) {
       const specId = row['specId'] as string
       const depRows = await execPrepared(
@@ -1568,29 +1591,60 @@ export class LadybugGraphStore extends GraphStore {
         `MATCH (s:Spec {specId: $specId})-[:DEPENDS_ON]->(t:Spec) RETURN t.specId AS target`,
         { specId },
       )
-      const content = (row['content'] as string) ?? ''
-      const { snippet, startLine, endLine } = this.extractMatchSnippet(content, [
-        ...query.rawTokens,
-        ...query.expandedTokens,
-      ])
-      results.push({
+      candidates.set(specId, {
+        nativeScore: Number(row['nativeScore'] ?? 0),
         spec: {
           specId,
           path: row['path'] as string,
           title: row['title'] as string,
           description: (row['description'] as string) ?? '',
           contentHash: row['contentHash'] as string,
-          content,
+          content: (row['content'] as string) ?? '',
           dependsOn: depRows.map((r) => r['target'] as string),
           workspace: (row['workspace'] as string) ?? '',
         },
+      })
+    }
+    for (const spec of await this.getAllSpecs()) {
+      if (
+        !candidates.has(spec.specId) &&
+        matchesExpandedIdentity(query.expandedTokens, spec.specId, spec.path)
+      ) {
+        candidates.set(spec.specId, { spec, nativeScore: 0 })
+      }
+    }
+
+    const results: Array<{
+      spec: SpecNode
+      score: number
+      snippet: string
+      startLine: number
+      endLine: number
+    }> = []
+    for (const { spec, nativeScore } of candidates.values()) {
+      if (options.workspace && spec.workspace !== options.workspace) continue
+      if (options.excludeWorkspaces?.includes(spec.workspace)) continue
+      if (
+        options.excludePaths?.some((pattern) =>
+          new RegExp(pattern.replaceAll('.', '\\.').replaceAll('*', '.*'), 'i').test(spec.path),
+        )
+      )
+        continue
+      const content = spec.content
+      const { snippet, startLine, endLine } = this.extractMatchSnippet(content, [
+        ...query.rawTokens,
+        ...query.expandedTokens,
+      ])
+      results.push({
+        spec,
         score: composeIdentitySearchScore(
           rankIdentityMatch({
             normalizedQuery: query.normalizedQuery,
             rawTokens: query.rawTokens,
             expandedTokens: query.expandedTokens,
-            canonicalIdentity: specId,
-            nativeScore: Number(row['nativeScore'] ?? 0),
+            canonicalIdentity: spec.specId,
+            alternateIdentity: spec.path,
+            nativeScore,
           }),
         ),
         snippet,
@@ -1620,6 +1674,14 @@ export class LadybugGraphStore extends GraphStore {
     const query = prepareExpandedSearchQuery(options.query)
     if (query.ftsQuery.length === 0) return []
 
+    const ftsRows = await execPrepared(
+      this.conn!,
+      `CALL QUERY_FTS_INDEX('Document', 'document_fts', $query, k := 1000) RETURN node.path AS path, score AS nativeScore LIMIT 1000`,
+      { query: query.ftsQuery },
+    )
+    const nativeScores = new Map(
+      ftsRows.map((row) => [row['path'] as string, Number(row['nativeScore'] ?? 0)]),
+    )
     const documents = await this.getAllDocuments()
     const results: Array<{
       document: DocumentNode
@@ -1632,8 +1694,14 @@ export class LadybugGraphStore extends GraphStore {
     for (const document of documents) {
       const text =
         `${document.path} ${document.configRelativePath} ${document.content}`.toLowerCase()
-      const nativeScore = countContentTokenHits(text, query.expandedTokens)
-      if (nativeScore === 0) continue
+      const nativeScore =
+        nativeScores.get(document.path) ?? countContentTokenHits(text, query.expandedTokens)
+      if (
+        nativeScore === 0 &&
+        !matchesExpandedIdentity(query.expandedTokens, document.path, document.configRelativePath)
+      ) {
+        continue
+      }
       if (options.workspace && document.workspace !== options.workspace) continue
       if (options.excludeWorkspaces?.includes(document.workspace)) continue
       if (options.excludePaths && options.excludePaths.length > 0) {
@@ -1754,6 +1822,7 @@ export class LadybugGraphStore extends GraphStore {
     }
 
     rmSync(this.graphDir, { recursive: true, force: true })
+    rotateStorageGeneration(this.storagePath)
     this._lastIndexedAt = undefined
     this._lastIndexedRef = null
     this._graphFingerprint = null
@@ -1761,6 +1830,15 @@ export class LadybugGraphStore extends GraphStore {
     if (wasOpen) {
       await this.open()
     }
+  }
+
+  /**
+   * Returns the current storage-generation snapshot for stale-provider detection.
+   * @returns The current storage-generation snapshot.
+   */
+  getStorageGeneration(): Promise<StorageGenerationSnapshot> {
+    this.ensureOpen()
+    return Promise.resolve(readStorageGeneration(this.storagePath))
   }
 
   /**

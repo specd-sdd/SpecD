@@ -117,7 +117,13 @@ already returned the full merged content needed for the spec-scoped requirement 
 scenario artifacts, use that output. If context is still incomplete (summaries/metadata
 only or missing required merged details), if raw deltas are the only artifact content
 you have, or if overlap/drift/stale-base risk exists, use `spec-preview` to get the
-final merged spec-scoped artifacts with deltas applied:
+final merged spec-scoped artifacts with deltas applied.
+
+Do not treat the inline diff from `specd changes validate` as a replacement for this
+step when verification needs the full merged artifact content; that inline diff is only
+the immediate review surface for the narrow successful single-artifact validate flow.
+
+For merged artifact retrieval, run:
 
 ```bash
 specd changes spec-preview <name> <specId> --format toon

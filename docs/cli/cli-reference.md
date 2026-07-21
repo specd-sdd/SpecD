@@ -124,6 +124,19 @@ The resolved target still goes through the normal `TransitionChange` flow, so
 approval-gate routing, `requires` checks, task completion gating, and hook
 execution behave exactly as they do for an explicit target.
 
+When transition hooks run, `change transition` uses the same hook-progress
+presentation as `change run-hooks`:
+
+- In `text` format, completed hooks stay visible, the active hook shows a
+  running state, recent output remains visible, and quiet hooks still emit
+  liveness updates.
+- In `json` and `toon`, all machine-readable output is emitted on `stdout` as a
+  newline-delimited stream of structured records. Hook events use
+  `stream: "hook-progress"`. Transition lifecycle events use
+  `stream: "change-transition"`. The final result is emitted as a terminal
+  `complete` event in that same stream. `stderr` is reserved for text-mode
+  progress and non-structured process diagnostics.
+
 | Option                      | Description                                                                                                        |
 | --------------------------- | ------------------------------------------------------------------------------------------------------------------ |
 | `--next`                    | Resolve the next logical lifecycle target from the current state. Mutually exclusive with `<step>`.                |
@@ -532,6 +545,20 @@ specd changes run-hooks <name> <step> [options]
 ```
 
 Execute the `run:` hooks defined for a lifecycle step outside of a transition. Useful for re-running hooks after a failure or for manual invocation.
+
+`change run-hooks` shares the same live hook-progress presentation as
+`change transition`:
+
+- In `text` format, progress is visible while the hook is still running. The
+  active hook shows its command, recent output, and liveness updates. Completed
+  hooks remain visible instead of being overwritten by the next hook.
+- In `json` and `toon`, all machine-readable output is emitted on `stdout` as a
+  newline-delimited stream of structured records. Hook progress uses
+  `stream: "hook-progress"`, and the final result is emitted as a terminal
+  `stream: "run-hooks"` record with `event.type: "complete"`. `stderr` is
+  reserved for text-mode progress and non-structured process diagnostics.
+- On hook failure, the failed hook's full output is shown instead of only a
+  short summary line.
 
 | Option                      | Description                        |
 | --------------------------- | ---------------------------------- |
@@ -1002,12 +1029,12 @@ Display the full contents of the `project-metadata.json` file.
 specd project dashboard [options]
 ````
 
-Display a project-level dashboard showing schema, workspaces, spec counts, and change activity. Also runs automatically when `specd` is invoked with no subcommand and a config is present (see [Invocation](#invocation)).
+Display a project-level dashboard showing schema, workspaces, spec counts, change activity (including archived changes), and Code Graph diagnostics. Also runs automatically when `specd` is invoked with no subcommand and a config is present (see [Invocation](#invocation)). In `json` or `toon` mode, execution delegates directly to `specd project status --format <fmt>`.
 
-| Option                      | Description       |
-| --------------------------- | ----------------- |
-| `--format text\|json\|toon` | Output format.    |
-| `--config <path>`           | Config file path. |
+| Option                      | Description                                                    |
+| --------------------------- | -------------------------------------------------------------- |
+| `--format text\|json\|toon` | Output format. `json` and `toon` delegate to `project status`. |
+| `--config <path>`           | Config file path.                                              |
 
 ### project status
 
@@ -1115,10 +1142,11 @@ specd graph index --exclude-path "packages/generated/*" --exclude-path "tmp/"
 
 #### Shared indexing lock
 
-`graph index` is the writer-side owner of a shared graph CLI lock stored under `{configPath}/graph/index.lock`.
+`graph index` is the writer-side owner of a shared graph lock stored under `{configPath}/graph/index.lock`.
 
-- while this lock is held, `graph search`, `graph hotspots`, `graph stats`, and `graph impact` fail fast before opening the provider
-- the user-facing message is: `The code graph is currently being indexed. Try again in a few seconds.`
+- while this lock is held, provider-backed read commands such as `graph search`, `graph hotspots`, `graph stats`, and `graph impact` may fail with `GRAPH_BUSY`
+- long-lived hosts may also surface `GRAPH_PROVIDER_STALE` if the backing storage generation changes after they opened a provider
+- the user-facing busy message remains: `The code graph is currently being indexed. Try again in a few seconds.`
 - the lock is removed when `graph index` exits normally and is also cleaned up on termination signals
 
 ---
@@ -1131,7 +1159,7 @@ specd graph search <query> [options]
 
 Search for symbols, specs, or documents in the code graph. Context resolution follows the same configured-vs-bootstrap rules as `graph index`.
 
-If a graph index is currently running, this command fails fast with: `The code graph is currently being indexed. Try again in a few seconds.`
+If a graph index is currently running, this command may return `GRAPH_BUSY` with the message: `The code graph is currently being indexed. Try again in a few seconds.`
 
 | Option                       | Description                                                                     |
 | ---------------------------- | ------------------------------------------------------------------------------- |
@@ -1192,7 +1220,7 @@ specd graph hotspots [options]
 
 List the most connected symbols in the graph ranked by coupling risk. Context resolution follows the same configured-vs-bootstrap rules as `graph index`.
 
-If a graph index is currently running, this command fails fast with: `The code graph is currently being indexed. Try again in a few seconds.`
+If a graph index is currently running, this command may return `GRAPH_BUSY` with the message: `The code graph is currently being indexed. Try again in a few seconds.`
 
 | Option                       | Description                                                                                                 |
 | ---------------------------- | ----------------------------------------------------------------------------------------------------------- |
@@ -1239,7 +1267,7 @@ specd graph stats [options]
 
 Print summary statistics for the current code graph. Text output includes files, documents, symbols, specs, relation counts, and the last indexed timestamp. JSON/TOON output also includes `stale`, `currentRef`, and `fingerprintMismatch`. Context resolution follows the same configured-vs-bootstrap rules as `graph index`.
 
-If a graph index is currently running, this command fails fast with: `The code graph is currently being indexed. Try again in a few seconds.`
+If a graph index is currently running, this command may return `GRAPH_BUSY` with the message: `The code graph is currently being indexed. Try again in a few seconds.`
 
 | Option                      | Description                                                    |
 | --------------------------- | -------------------------------------------------------------- |
@@ -1265,7 +1293,7 @@ specd graph impact [options]
 
 Analyze dependents or dependencies of a spec, a symbol, or one or more files. Context resolution follows the same configured-vs-bootstrap rules as `graph index`.
 
-If a graph index is currently running, this command fails fast with: `The code graph is currently being indexed. Try again in a few seconds.`
+If a graph index is currently running, this command may return `GRAPH_BUSY` with the message: `The code graph is currently being indexed. Try again in a few seconds.`
 
 File selectors accept three forms:
 

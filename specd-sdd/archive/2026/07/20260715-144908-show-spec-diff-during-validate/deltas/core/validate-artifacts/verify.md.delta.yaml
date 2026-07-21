@@ -1,0 +1,2 @@
+- op: no-op
+  description: Structural validation behavior and verify coverage remain unchanged because inline diff review is handled by CLI and PreviewSpec after successful validation.

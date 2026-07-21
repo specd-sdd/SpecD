@@ -10,6 +10,7 @@ import { type ArchiveRepository } from '../application/ports/archive-repository.
 import { type ArtifactParserRegistry } from '../application/ports/artifact-parser.js'
 import { type ChangeRepository } from '../application/ports/change-repository.js'
 import { type ContentHasher } from '../application/ports/content-hasher.js'
+import { type DiffGenerator } from '../application/ports/diff-generator.js'
 import { type FileReader } from '../application/ports/file-reader.js'
 import { type FileWriter } from '../application/ports/file-writer.js'
 import { type HookRunner } from '../application/ports/hook-runner.js'
@@ -40,6 +41,7 @@ import {
   resolveActorResolver,
 } from './actor-resolver.js'
 import { buildCompileContextConfig } from './build-compile-context-config.js'
+import { createDefaultDiffGenerator } from './diff-generator.js'
 import { getDefaultWorkspace } from './get-default-workspace.js'
 import {
   createBuiltinCompositionRegistry,
@@ -182,6 +184,13 @@ export interface CompositionResolver {
    * @returns The parser registry
    */
   getArtifactParserRegistry(): ArtifactParserRegistry
+
+  /**
+   * Returns the shared diff generator.
+   *
+   * @returns The diff generator
+   */
+  getDiffGenerator(): DiffGenerator
 
   /**
    * Returns the shared extractor transform registry.
@@ -342,6 +351,7 @@ export function createCompositionResolver(
   let vcsAdapterPromise: Promise<VcsAdapter> | undefined
   let hookRunner: HookRunner | undefined
   let parserRegistry: ArtifactParserRegistry | undefined
+  let diffGenerator: DiffGenerator | undefined
   let extractorTransforms: ExtractorTransformRegistry | undefined
   let contentHasher: ContentHasher | undefined
   let fileReader: FileReader | undefined
@@ -590,6 +600,12 @@ export function createCompositionResolver(
       if (parserRegistry !== undefined) return parserRegistry
       parserRegistry = registry.parsers
       return parserRegistry
+    },
+
+    getDiffGenerator(): DiffGenerator {
+      if (diffGenerator !== undefined) return diffGenerator
+      diffGenerator = createDefaultDiffGenerator()
+      return diffGenerator
     },
 
     getExtractorTransforms(): ExtractorTransformRegistry {

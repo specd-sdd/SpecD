@@ -55,6 +55,7 @@ describe('output', () => {
   it('writes JSON with trailing newline', () => {
     output({ key: 'value' }, 'json')
     const written = captured()
+    expect(written).toBe('{"key":"value"}\n')
     expect(() => JSON.parse(written) as unknown).not.toThrow()
     expect(JSON.parse(written) as unknown).toEqual({ key: 'value' })
   })

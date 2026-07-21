@@ -102,12 +102,12 @@
 - **THEN** the command exits with code 1
 - **AND** the search query is not executed
 
-#### Scenario: Search fails fast while indexing lock is present
+#### Scenario: Search surfaces provider busy after open
 
-- **GIVEN** a `graph index` process currently holds the shared graph indexing lock
+- **GIVEN** the provider reports `GRAPH_BUSY` while serving the search request
 - **WHEN** `specd graph search "kernel"` is run
-- **THEN** the command exits with code 3 before opening the provider
-- **AND** it prints a short retry-later message explaining that the graph is currently being indexed
+- **THEN** the command exits with code 3 through the standard infrastructure error path
+- **AND** it does not query a host-managed pre-open lock state
 
 #### Scenario: Search delegates document queries to the provider
 
@@ -218,6 +218,11 @@
 
 - **WHEN** the provider fails to open
 - **THEN** the command exits with code 3
+
+#### Scenario: Provider busy or stale exits with code 3
+
+- **WHEN** the provider reports `GRAPH_BUSY` or `GRAPH_PROVIDER_STALE` while serving the search request
+- **THEN** the command exits with code 3 through the standard infrastructure error path
 
 ### Requirement: Output format
 

@@ -36,6 +36,14 @@
 - **AND** any Ladybug-owned companion artifacts in the same graph root are discarded with it
 - **AND** callers do not target `.lbug`, `.wal`, or `.lock` files directly
 
+### Requirement: Storage generation sidecar
+
+#### Scenario: Ladybug exposes generation changes through the sidecar
+
+- **GIVEN** a Ladybug-backed graph root using a sidecar such as `graph/storage.epoch`
+- **WHEN** the store is opened before and after a destructive recreate
+- **THEN** the owning provider can observe that the generation changed
+
 ### Requirement: Ladybug schema ownership
 
 #### Scenario: Physical schema remains backend-specific
@@ -184,6 +192,13 @@
 - **WHEN** `searchSymbols({ query: 'change' })` is called on the Ladybug backend
 - **THEN** the backend still returns that symbol as a candidate
 - **AND** it is ordered by the same identity-strength ladder instead of being omitted for lack of native tokenizer coverage
+
+#### Scenario: Ladybug discovers document and spec identity hits outside FTS tokenization
+
+- **GIVEN** a document and a spec whose canonical identities are missed by backend tokenization
+- **WHEN** Ladybug searches their path or spec-id suffix/component
+- **THEN** document search uses `document_fts` plus identity candidates
+- **AND** spec search supplements FTS candidates before ranking
 
 ### Requirement: Schema versioning
 

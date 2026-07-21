@@ -1,14 +1,19 @@
 {
-  "schema": {
-    "name": "schema-std",
-    "version": 1
-  },
+  "version": 1,
+  "specId": "cli:change-validate",
+  "artifactHashes": {},
   "dependsOn": [
     "cli:entrypoint",
     "core:change",
     "core:validate-artifacts",
     "core:validate-change-batch",
-    "core:spec-id-format"
+    "core:spec-id-format",
+    "core:preview-spec"
   ],
-  "implementation": []
+  "implementation": [
+    {
+      "file": "cli:src/commands/change/validate.ts",
+      "symbols": ["registerChangeValidate", "executeSingle", "executeBatch"]
+    }
+  ]
 }

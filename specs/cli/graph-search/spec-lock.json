@@ -11,10 +11,5 @@
     "code-graph:graph-store",
     "cli:graph-cli-context"
   ],
-  "implementation": [
-    {
-      "file": "cli:src/commands/graph/search.ts",
-      "symbols": ["registerGraphSearch"]
-    }
-  ]
+  "implementation": []
 }

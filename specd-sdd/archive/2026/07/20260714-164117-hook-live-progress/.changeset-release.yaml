@@ -1,0 +1,5 @@
+releases:
+  core:hook-runner-port: minor
+  core:run-step-hooks: minor
+  cli:change-run-hooks: minor
+  cli:change-transition: minor

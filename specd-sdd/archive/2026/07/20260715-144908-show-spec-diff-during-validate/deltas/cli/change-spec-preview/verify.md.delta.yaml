@@ -1,0 +1,2 @@
+- op: no-op
+  description: Existing verify coverage remains valid because this change only relies on the already-supported diff preview fallback path.

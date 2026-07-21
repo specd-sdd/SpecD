@@ -21,13 +21,13 @@
     {
       "requirement": "Text output — diff mode (--diff)",
       "rules": [
-        "When `--diff` is present, the command MUST generate a unified diff locally from the `base` and `merged` fields returned by `PreviewSpec`, using the `diff` npm package's `createTwoFilesPatch` function with 3 lines of context. The diff MUST be colorized using `chalk`:\n\n- Lines starting with `+` (additions) — green\n- Lines starting with `-` (removals) — red\n- Lines starting with `@@` (hunk headers) — cyan\n- All other lines (context) — dim\n\nEach file's diff MUST be preceded by a `--- <filename> ---` separator line. Files with no changes (no-op deltas) MUST be omitted from the diff output entirely.\n\nIf `--artifact <name>` is provided, the command MUST only output the diff for the requested artifact. If the requested artifact has no changes, the command SHALL exit with code 0 and output nothing (or a message indicating no changes if applicable to text format), matching the default diff behavior for individual files."
+        "When `--diff` is present, the command MUST request diff-enabled preview output from `PreviewSpec` and consume the `diff` field returned on preview file entries. The CLI SHALL NOT generate unified diffs locally from `base` and `merged`.\n\nThe diff MUST be colorized using `chalk`:\n\n- Lines starting with `+` (additions) — green\n- Lines starting with `-` (removals) — red\n- Lines starting with `@@` (hunk headers) — cyan\n- All other lines (context) — dim\n\nEach file's diff MUST be preceded by a `--- <filename> ---` separator line. Files without returned diff output MUST be omitted from diff mode output entirely; this includes `no-op` and `missing` entries.\n\nIf `--artifact <name>` is provided, the command MUST only output the diff for the requested artifact. If the requested artifact has no diff output, the command SHALL exit with code 0 and output nothing (or a message indicating no changes if applicable to text format), matching the default diff behavior for individual files."
       ]
     },
     {
       "requirement": "JSON/TOON output",
       "rules": [
-        "JSON and TOON output MUST return the `PreviewSpecResult` object from the use case. When `--diff` is present, the CLI MUST generate non-colorized unified diff strings and include them as a `diff` field on each file entry. When `--diff` is absent, file entries include `base` and `merged` fields as returned by the use case.\n\nIf `--artifact <name>` is provided, the `files` array in the result object SHALL contain exactly one entry for the requested artifact."
+        "JSON and TOON output MUST return the `PreviewSpecResult` object from the use case. When `--diff` is present, the CLI MUST request diff-enabled preview output and forward the returned `diff` fields unchanged. The CLI SHALL NOT synthesize diff strings for structured output.\n\nWhen `--diff` is absent, file entries include `base` and `merged` fields as returned by the use case.\n\nIf `--artifact <name>` is provided, the `files` array in the result object SHALL contain exactly one entry for the requested artifact."
       ]
     },
     {
@@ -50,11 +50,11 @@
     }
   ],
   "constraints": [
-    "The CLI command delegates merge logic to PreviewSpec but owns diff generation via the diff npm package",
+    "The CLI command delegates merge logic and diff generation to PreviewSpec; CLI-specific responsibilities are artifact filtering, text rendering, warning presentation, and ANSI colorization",
     "Colorization applies only to text format output; JSON/TOON output is never colorized",
     "The chalk library (already a dependency of @specd/cli) is used for colorization",
-    "The diff npm package is a dependency of @specd/cli, not @specd/core",
-    "Artifact filtering resolve IDs to filenames using the same logic as specd spec show."
+    "The concrete diff-generation library is not a responsibility of @specd/cli; it belongs to core's default DiffGenerator implementation",
+    "Artifact filtering resolve IDs to filenames using the same logic as specd spec show"
   ],
   "scenarios": [
     {
@@ -94,46 +94,58 @@
     {
       "requirement": "Text output — diff mode (--diff)",
       "name": "Additions colored green",
-      "given": ["a delta that adds lines to a spec"],
+      "given": ["a diff-enabled preview result that contains added lines"],
       "when": ["the command is invoked with --diff --format text"],
       "then": ["lines starting with + are rendered in green"]
     },
     {
       "requirement": "Text output — diff mode (--diff)",
       "name": "Removals colored red",
-      "given": ["a delta that removes lines from a spec"],
+      "given": ["a diff-enabled preview result that contains removed lines"],
       "when": ["the command is invoked with --diff --format text"],
       "then": ["lines starting with - are rendered in red"]
     },
     {
       "requirement": "Text output — diff mode (--diff)",
       "name": "Hunk headers colored cyan",
-      "given": ["a delta producing a diff"],
+      "given": ["a diff-enabled preview result that contains hunk headers"],
       "when": ["the command is invoked with --diff --format text"],
       "then": ["lines starting with @@ are rendered in cyan"]
     },
     {
       "requirement": "Text output — diff mode (--diff)",
       "name": "Context lines dimmed",
-      "given": ["a delta producing a diff with context lines"],
+      "given": ["a diff-enabled preview result with context lines"],
       "when": ["the command is invoked with --diff --format text"],
       "then": ["unchanged context lines are rendered in dim"]
     },
     {
       "requirement": "Text output — diff mode (--diff)",
       "name": "No-change files omitted in diff mode",
-      "given": ["a change with a no-op delta for one artifact and a real delta for another"],
+      "given": [
+        "a diff-enabled preview result where one file has diff output and another does not"
+      ],
       "when": ["the command is invoked with --diff"],
-      "then": ["only the artifact with real changes appears in the output"]
+      "then": ["only the file with returned diff output appears in the text output"]
     },
     {
       "requirement": "Text output — diff mode (--diff)",
       "name": "Filtered artifact in diff mode",
-      "given": ["a change with deltas in spec.md and verify.md"],
+      "given": ["a change with diff output for spec.md and verify.md"],
       "when": ["specd change spec-preview my-change my-spec --diff --artifact specs is run"],
       "then": [
         "stdout contains --- spec.md --- and the colorized diff for spec.md",
         "AND stdout DOES NOT contain --- verify.md ---"
+      ]
+    },
+    {
+      "requirement": "Text output — diff mode (--diff)",
+      "name": "CLI does not synthesize unified diff text",
+      "given": ["PreviewSpec returns a precomputed diff string for a merged file"],
+      "when": ["the command is invoked with --diff"],
+      "then": [
+        "the CLI renders that returned diff",
+        "AND it does not regenerate a unified diff from base and merged"
       ]
     },
     {
@@ -145,10 +157,13 @@
     },
     {
       "requirement": "JSON/TOON output",
-      "name": "JSON diff output includes non-colorized diff",
-      "given": ["a valid change with deltas"],
+      "name": "JSON diff output forwards non-colorized diff",
+      "given": ["a valid change with diff-enabled preview output"],
       "when": ["the command is invoked with --diff --format json"],
-      "then": ["each file entry includes a diff field as a plain string without ANSI color codes"]
+      "then": [
+        "each file entry includes the diff field returned by PreviewSpec",
+        "AND the string contains no ANSI color codes"
+      ]
     },
     {
       "requirement": "JSON/TOON output",
@@ -242,9 +257,10 @@
       ]
     }
   ],
+  "implementation": {},
   "contentHashes": {
-    "spec.md": "sha256:abf18454b15617245698e4a6da133f86fbe7d399626a3f5221cee0640616ba16",
-    "verify.md": "sha256:b1afb239e5f26368a3d8d6f4eedaacc88681e31b2f2d7c096846c382c132e930"
+    "spec.md": "sha256:e3dd21fee67f57b29cb031d890b7a494be119da9e762af5bc8ef0013e3b9521d",
+    "verify.md": "sha256:dbcd44ed95fb906c3f118d144ca140627aa9abe8b8d61142630264ba830852c3"
   },
   "generatedBy": "core"
 }

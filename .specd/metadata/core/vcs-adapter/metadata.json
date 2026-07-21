@@ -142,37 +142,14 @@
     "files": [
       {
         "specId": "core:vcs-adapter",
-        "file": "core:test/infrastructure/git/vcs-adapter.spec.ts"
-      },
-      {
-        "specId": "core:vcs-adapter",
-        "file": "core:test/infrastructure/hg/vcs-adapter.spec.ts"
-      },
-      {
-        "specId": "core:vcs-adapter",
-        "file": "core:test/infrastructure/svn/vcs-adapter.spec.ts"
+        "file": "core:test/composition/vcs-adapter.spec.ts"
       }
     ],
     "symbols": [
       {
         "specId": "core:vcs-adapter",
-        "file": "core:src/infrastructure/git/vcs-adapter.ts",
-        "symbol": "GitVcsAdapter"
-      },
-      {
-        "specId": "core:vcs-adapter",
-        "file": "core:src/infrastructure/hg/vcs-adapter.ts",
-        "symbol": "HgVcsAdapter"
-      },
-      {
-        "specId": "core:vcs-adapter",
-        "file": "core:src/infrastructure/svn/vcs-adapter.ts",
-        "symbol": "SvnVcsAdapter"
-      },
-      {
-        "specId": "core:vcs-adapter",
-        "file": "core:src/infrastructure/null/vcs-adapter.ts",
-        "symbol": "NullVcsAdapter"
+        "file": "core:src/composition/vcs-adapter.ts",
+        "symbol": "createVcsAdapter"
       }
     ]
   },

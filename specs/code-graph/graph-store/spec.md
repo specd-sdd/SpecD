@@ -37,21 +37,37 @@ Backends MAY represent those concepts differently internally, but they MUST pres
 
 ### Requirement: Connection lifecycle
 
-`GraphStore` SHALL expose explicit `open(): Promise<void>` and `close(): Promise<void>` methods. All query and mutation methods MUST throw `StoreNotOpenError` (extending `CodeGraphError`) if called before `open()` or after `close()`.
+`GraphStore` SHALL expose explicit `open(): Promise<void>` and `close(): Promise<void>` operations together with any backend-specific lifecycle state needed by the adapter.
 
-The `open()` method prepares the concrete backend for read/write operations. The `close()` method flushes pending writes and releases resources. Any backend-specific schema initialization, migrations, or index preparation remain implementation concerns.
+The `open()` method prepares the concrete backend for read/write operations. It MAY perform backend-native module loading, runtime-specific binding resolution, schema preparation, or storage-generation checks required before the store can serve requests.
+
+The `close()` method releases backend resources and MUST be idempotent. Calling `close()` more than once, or combining it with future async-dispose support, MUST NOT fail merely because the store was already closed.
 
 ### Requirement: Store recreation
 
-`GraphStore` SHALL provide `recreate(): Promise<void>` as the abstract destructive reset operation for backends that need to drop and rebuild their persisted graph state.
+`GraphStore` SHALL provide `recreate(): Promise<void>` as the abstract destructive reset capability used by provider-owned indexing flows.
 
-`recreate()` is stronger than `clear()`: it resets the backend's persisted storage layout rather than merely deleting graph rows from an already-open store. Callers such as `graph index --force` MUST use this abstract capability instead of deleting backend-specific files or directories directly.
+`recreate()` is stronger than `clear()`: it resets the backend's persisted storage layer, not just the logical graph contents.
 
-The concrete backend owns how recreation is performed. A backend MAY delete files, recreate directories, rebuild schemas, reopen connections, or combine those steps, provided the observable result is the same:
+The concrete backend owns how recreation is performed. A backend MAY delete files, recreate schema state, rotate generation metadata, or rebuild internal search artifacts, provided all of the following hold after `recreate()` completes:
 
 - all previously indexed graph data is gone
 - the persisted backend state is ready for a fresh indexing run
 - callers do not need to know backend-specific filenames, lockfiles, WAL files, or schema artifacts
+
+Host-facing code MUST NOT depend on backend-specific reset mechanics or on direct store recreation APIs. The owning `CodeGraphProvider` decides when recreation is required as part of `index(...)`, `clear()`, or other internal maintenance paths.
+
+### Requirement: Storage generation tracking
+
+Every persisted `GraphStore` backend SHALL maintain a storage-generation marker that lets already-open providers detect when another process has destructively replaced the underlying graph storage.
+
+At minimum:
+
+- the backend SHALL persist a generation marker within the graph storage root
+- destructive recreation SHALL rotate that generation marker
+- the backend SHALL expose enough behavior for the owning provider to cache the current generation at `open()` time and compare it later before serving reads
+
+The abstract contract does not require a specific file format, but a sidecar such as `graph/storage.epoch` is a valid realization.
 
 ### Requirement: Atomic file-level upsert
 
@@ -200,7 +216,8 @@ Generic text matching (BM25 or equivalent) SHALL still participate in retrieval 
 - All mutations are atomic at the file level — no partial updates
 - `StoreNotOpenError` is thrown on any operation when the store is not open
 - The abstract store contract does not prescribe a specific backend, physical schema, or filesystem layout
-- Destructive force-reset behavior is modeled through `recreate()`, not through caller-managed backend file deletion
+- Destructive reset behavior is modeled through `recreate()` as a backend capability owned by provider/indexing flows, not through caller-managed backend file deletion
+- Persisted storage generation markers exist to support provider-owned stale detection across processes
 - No dependency on `@specd/core` — error types extend `CodeGraphError`
 
 ## Spec Dependencies

@@ -983,7 +983,7 @@ describe('TransitionChange', () => {
       const runStepHooks = makeRunStepHooks({
         execute: async (input) => {
           calls.push({ name: input.name, step: input.step, phase: input.phase })
-          return { hooks: [], success: true, failedHook: null }
+          return { hooks: [], success: true, failedHooks: [] }
         },
       })
       const uc = makeUseCase(makeChangeRepository([change]), { schema: hookSchema, runStepHooks })
@@ -1014,17 +1014,19 @@ describe('TransitionChange', () => {
                 },
               ],
               success: false,
-              failedHook: {
-                id: 'lint',
-                command: 'pnpm lint',
-                exitCode: 1,
-                stdout: '',
-                stderr: 'err',
-                success: false,
-              },
+              failedHooks: [
+                {
+                  id: 'lint',
+                  command: 'pnpm lint',
+                  exitCode: 1,
+                  stdout: '',
+                  stderr: 'err',
+                  success: false,
+                },
+              ],
             }
           }
-          return { hooks: [], success: true, failedHook: null }
+          return { hooks: [], success: true, failedHooks: [] }
         },
       })
       const uc = makeUseCase(makeChangeRepository([change]), { schema: hookSchema, runStepHooks })
@@ -1055,17 +1057,19 @@ describe('TransitionChange', () => {
                 },
               ],
               success: false,
-              failedHook: {
-                id: 'lint',
-                command: 'pnpm lint',
-                exitCode: 1,
-                stdout: '',
-                stderr: 'err',
-                success: false,
-              },
+              failedHooks: [
+                {
+                  id: 'lint',
+                  command: 'pnpm lint',
+                  exitCode: 1,
+                  stdout: '',
+                  stderr: 'err',
+                  success: false,
+                },
+              ],
             }
           }
-          return { hooks: [], success: true, failedHook: null }
+          return { hooks: [], success: true, failedHooks: [] }
         },
       })
       const uc = makeUseCase(repo, { schema: hookSchema, runStepHooks })
@@ -1099,17 +1103,19 @@ describe('TransitionChange', () => {
                 },
               ],
               success: false,
-              failedHook: {
-                id: 'lint',
-                command: 'pnpm lint',
-                exitCode: 1,
-                stdout: '',
-                stderr: 'err',
-                success: false,
-              },
+              failedHooks: [
+                {
+                  id: 'lint',
+                  command: 'pnpm lint',
+                  exitCode: 1,
+                  stdout: '',
+                  stderr: 'err',
+                  success: false,
+                },
+              ],
             }
           }
-          return { hooks: [], success: true, failedHook: null }
+          return { hooks: [], success: true, failedHooks: [] }
         },
       })
       const uc = makeUseCase(makeChangeRepository([change]), { schema: hookSchema, runStepHooks })
@@ -1166,7 +1172,7 @@ describe('TransitionChange', () => {
       const runStepHooks = makeRunStepHooks({
         execute: async (input) => {
           calls.push({ step: input.step, phase: input.phase })
-          return { hooks: [], success: true, failedHook: null }
+          return { hooks: [], success: true, failedHooks: [] }
         },
       })
       const uc = makeUseCase(makeChangeRepository([change]), {
@@ -1191,7 +1197,7 @@ describe('TransitionChange', () => {
       const runStepHooks = makeRunStepHooks({
         execute: async (input) => {
           calls.push({ step: input.step, phase: input.phase })
-          return { hooks: [], success: true, failedHook: null }
+          return { hooks: [], success: true, failedHooks: [] }
         },
       })
       const uc = makeUseCase(makeChangeRepository([change]), { schema: hookSchema, runStepHooks })
@@ -1213,7 +1219,7 @@ describe('TransitionChange', () => {
       const runStepHooks = makeRunStepHooks({
         execute: async (input) => {
           calls.push({ step: input.step, phase: input.phase })
-          return { hooks: [], success: true, failedHook: null }
+          return { hooks: [], success: true, failedHooks: [] }
         },
       })
       const designingSchema = makeSchema({
@@ -1267,7 +1273,7 @@ describe('TransitionChange', () => {
       const runStepHooks = makeRunStepHooks({
         execute: async (input) => {
           order.push(`${input.step}.${input.phase}`)
-          return { hooks: [], success: true, failedHook: null }
+          return { hooks: [], success: true, failedHooks: [] }
         },
       })
       const uc = makeUseCase(makeChangeRepository([change]), {
@@ -1311,17 +1317,19 @@ describe('TransitionChange', () => {
             return {
               hooks: [],
               success: false,
-              failedHook: {
-                id: 'test',
-                command: 'pnpm test',
-                exitCode: 1,
-                stdout: '',
-                stderr: 'fail',
-                success: false,
-              },
+              failedHooks: [
+                {
+                  id: 'test',
+                  command: 'pnpm test',
+                  exitCode: 1,
+                  stdout: '',
+                  stderr: 'fail',
+                  success: false,
+                },
+              ],
             }
           }
-          return { hooks: [], success: true, failedHook: null }
+          return { hooks: [], success: true, failedHooks: [] }
         },
       })
       const uc = makeUseCase(makeChangeRepository([change]), {
@@ -1363,7 +1371,7 @@ describe('TransitionChange', () => {
       const runStepHooks = makeRunStepHooks({
         execute: async (input) => {
           calls.push({ step: input.step, phase: input.phase })
-          return { hooks: [], success: true, failedHook: null }
+          return { hooks: [], success: true, failedHooks: [] }
         },
       })
       const uc = makeUseCase(makeChangeRepository([change]), {
@@ -1406,7 +1414,7 @@ describe('TransitionChange', () => {
       const runStepHooks = makeRunStepHooks({
         execute: async (input) => {
           calls.push({ step: input.step, phase: input.phase })
-          return { hooks: [], success: true, failedHook: null }
+          return { hooks: [], success: true, failedHooks: [] }
         },
       })
       const uc = makeUseCase(makeChangeRepository([change]), {
@@ -1451,7 +1459,7 @@ describe('TransitionChange', () => {
             onProgress?.({ type: 'hook-start', hookId: 'lint', command: 'pnpm lint' })
             onProgress?.({ type: 'hook-done', hookId: 'lint', success: true, exitCode: 0 })
           }
-          return { hooks: [], success: true, failedHook: null }
+          return { hooks: [], success: true, failedHooks: [] }
         },
       })
       const uc = makeUseCase(makeChangeRepository([change]), { schema: hookSchema, runStepHooks })
@@ -1477,6 +1485,44 @@ describe('TransitionChange', () => {
         hookId: 'lint',
         success: true,
         exitCode: 0,
+      })
+    })
+
+    it('emits hook-output and hook-heartbeat progress events with phase:pre', async () => {
+      const change = makeReadyChange('my-change')
+      const runStepHooks = makeRunStepHooks({
+        execute: async (input, onProgress) => {
+          if (input.phase === 'pre') {
+            onProgress?.({ type: 'hook-start', hookId: 'lint', command: 'pnpm lint' })
+            onProgress?.({
+              type: 'hook-output',
+              hookId: 'lint',
+              stream: 'stdout',
+              line: 'running lint',
+            })
+            onProgress?.({ type: 'hook-heartbeat', hookId: 'lint', elapsedMs: 5000 })
+            onProgress?.({ type: 'hook-done', hookId: 'lint', success: true, exitCode: 0 })
+          }
+          return { hooks: [], success: true, failedHooks: [] }
+        },
+      })
+      const uc = makeUseCase(makeChangeRepository([change]), { schema: hookSchema, runStepHooks })
+
+      const events: TransitionProgressEvent[] = []
+      await uc.execute({ name: 'my-change', to: 'implementing' }, (event) => events.push(event))
+
+      expect(events).toContainEqual({
+        type: 'hook-output',
+        phase: 'pre',
+        hookId: 'lint',
+        stream: 'stdout',
+        line: 'running lint',
+      })
+      expect(events).toContainEqual({
+        type: 'hook-heartbeat',
+        phase: 'pre',
+        hookId: 'lint',
+        elapsedMs: 5000,
       })
     })
 
@@ -1508,7 +1554,7 @@ describe('TransitionChange', () => {
             onProgress?.({ type: 'hook-start', hookId: 'notify', command: 'notify-slack' })
             onProgress?.({ type: 'hook-done', hookId: 'notify', success: true, exitCode: 0 })
           }
-          return { hooks: [], success: true, failedHook: null }
+          return { hooks: [], success: true, failedHooks: [] }
         },
       })
       const uc = makeUseCase(makeChangeRepository([change]), { schema: postSchema, runStepHooks })
@@ -1569,7 +1615,7 @@ describe('TransitionChange', () => {
             onProgress?.({ type: 'hook-start', hookId: 'lint', command: 'pnpm lint' })
             onProgress?.({ type: 'hook-done', hookId: 'lint', success: true, exitCode: 0 })
           }
-          return { hooks: [], success: true, failedHook: null }
+          return { hooks: [], success: true, failedHooks: [] }
         },
       })
       const uc = makeUseCase(makeChangeRepository([change]), { schema, runStepHooks })
@@ -1618,7 +1664,7 @@ describe('TransitionChange', () => {
         { type: 'transitioned', from: 'drafting', to: 'designing', at: new Date(), by: actor },
         { type: 'transitioned', from: 'designing', to: 'ready', at: new Date(), by: actor },
       ])
-      const executeSpy = vi.fn().mockResolvedValue({ hooks: [], success: true, failedHook: null })
+      const executeSpy = vi.fn().mockResolvedValue({ hooks: [], success: true, failedHooks: [] })
       const runStepHooks = makeRunStepHooks({ execute: executeSpy })
       const schema = makeSchema({ workflow: [] })
       const uc = makeUseCase(makeChangeRepository([change]), { schema, runStepHooks })
@@ -1857,7 +1903,7 @@ describe('TransitionChange', () => {
         { type: 'transitioned', from: 'archivable', to: 'archiving', at: createdAt, by: actor },
       ])
       const hooks = makeRunStepHooks({
-        execute: vi.fn().mockResolvedValue({ hooks: [], success: true, failedHook: null }),
+        execute: vi.fn().mockResolvedValue({ hooks: [], success: true, failedHooks: [] }),
       })
       const uc = makeUseCase(makeChangeRepository([change]), { runStepHooks: hooks })
 

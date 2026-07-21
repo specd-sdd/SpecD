@@ -1,0 +1,53 @@
+- op: modified
+  description: 'Update Changes box scenario to include archived count'
+  selector:
+    type: section
+    matches: 'Scenario: Changes box shows active, drafts, and discarded'
+  rename: 'Scenario: Changes box shows active, drafts, discarded, and archived'
+  content: |
+    - **GIVEN** a project with 2 active changes, 1 draft, 1 discarded, and 5 archived changes
+    - **WHEN** `specd project dashboard` is run
+    - **THEN** stdout contains `active`, `drafts`, `discarded`, and `archived` as separate aligned table rows in the `Changes` box
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Text dashboard'
+    after:
+      type: section
+      matches: 'Scenario: Long project root wraps to value column'
+  content: |
+    #### Scenario: Long workspaces list wraps to value column
+
+    - **GIVEN** a project with 15 workspaces whose combined names exceed the inner box width
+    - **WHEN** `specd project dashboard` is run
+    - **THEN** the workspaces list wraps to continuation lines indented to the value column start
+    - **AND** the box border remains intact
+
+    #### Scenario: Graph box displays health diagnostics when graph is available
+
+    - **GIVEN** a project with indexed code graph
+    - **WHEN** `specd project dashboard` is run in text mode
+    - **THEN** stdout contains a Graph box displaying graph freshness, document count (`docs:`), file/symbol counts, relation count (`relations:`), and indexed languages (`languages:`)
+
+- op: modified
+  description: 'Update JSON output scenario to verify redirection to project status'
+  selector:
+    type: section
+    matches: 'Scenario: JSON output is valid JSON with expected fields'
+  content: |
+    - **WHEN** `specd project dashboard --format json` is run
+    - **THEN** execution is redirected to `specd project status --format json`
+    - **AND** stdout is valid JSON containing `projectRoot`, `schemaRef`, `workspaces`, `specs`, `changes`, and `graph` keys
+
+- op: modified
+  description: 'Update Data sources scenario to match buildProjectStatusSnapshot'
+  selector:
+    type: section
+    matches: 'Scenario: All four data queries run before output is produced'
+  rename: 'Scenario: Dashboard metrics match buildProjectStatusSnapshot'
+  content: |
+    - **GIVEN** a valid project
+    - **WHEN** `specd project dashboard` is run
+    - **THEN** the spec, change, and graph metrics match the data produced by `buildProjectStatusSnapshot`

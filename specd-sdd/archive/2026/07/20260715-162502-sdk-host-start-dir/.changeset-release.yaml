@@ -1,0 +1,4 @@
+releases:
+  sdk:host-context: minor
+  core:config-loader: patch
+  core:config: patch

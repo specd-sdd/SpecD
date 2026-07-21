@@ -27,9 +27,22 @@
 #### Scenario: Command delegates health to GetGraphHealth via SDK
 
 - **WHEN** `specd graph stats` is executed in configured mode with kernel available
-- **THEN** it opens the provider via `withOpenGraphProvider` from `@specd/sdk`
+- **THEN** it obtains host context via `openSpecdHost` from `@specd/sdk`
+- **AND** it opens the provider via `withOpenGraphProvider` from `@specd/sdk`
 - **AND** it calls `GetGraphHealth.execute()` with workspaces from `ListWorkspaces`
-- **AND** graph context and lifecycle go through `cli:graph-cli-context`
+- **AND** it does not call `resolveGraphCliContext`
+
+#### Scenario: Path and no-config stats use opt-in SDK bootstrap fallback
+
+- **GIVEN** a VCS repository without a discoverable specd.yaml
+- **WHEN** `specd graph stats --path <repo>` or `specd graph stats` runs there
+- **THEN** stats calls `openSpecdHost` with `allowBootstrapFallback: true`
+- **AND** it obtains graph health without `resolveGraphCliContext`
+
+#### Scenario: Successful stats exits after provider cleanup
+
+- **WHEN** `specd graph stats` completes successfully
+- **THEN** `process.exit(0)` is called only after `withOpenGraphProvider` completes its close path
 
 #### Scenario: Command obtains orchestrated project structure
 
@@ -44,12 +57,12 @@
 
 ### Requirement: Concurrent indexing guard
 
-#### Scenario: Stats fail fast while the indexing lock is present
+#### Scenario: Stats surface provider busy after open
 
-- **GIVEN** a `graph index` process currently holds the shared graph indexing lock
+- **GIVEN** the provider reports `GRAPH_BUSY` while serving graph health
 - **WHEN** `specd graph stats` is run
-- **THEN** the command exits with code 3 before opening the provider
-- **AND** it prints a short retry-later message explaining that the graph is currently being indexed
+- **THEN** the command exits with code 3
+- **AND** it uses the infrastructure error path rather than a separate pre-open lock probe
 
 ### Requirement: Output format
 
@@ -101,7 +114,9 @@
 
 #### Scenario: Infrastructure error exits with code 3
 
-- **GIVEN** the provider cannot be opened (e.g. database file is corrupted)
+- **GIVEN** the provider cannot be opened
+- **OR** the provider reports `GRAPH_BUSY`
+- **OR** the provider reports `GRAPH_PROVIDER_STALE`
 - **WHEN** `specd graph stats` is run
 - **THEN** stderr contains a `fatal:` prefixed error message
 - **AND** the process exits with code 3

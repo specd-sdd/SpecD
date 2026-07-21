@@ -85,6 +85,20 @@
 - **WHEN** artifacts contain requirement wording that could diverge from intent
 - **THEN** the workflow still requires explicit content review before progression
 
+#### Scenario: Successful single-artifact spec validation uses inline diff review
+
+- **GIVEN** an existing delta-backed `scope: spec` artifact is validated with `specd changes validate <change-name> <specId> --artifact <artifactId>`
+- **AND** validation succeeds
+- **WHEN** the command renders an inline diff for that artifact
+- **THEN** the agent reviews that inline diff as the immediate surface for unintended removals, contract breakage, or other risky edits
+
+#### Scenario: Inline diff unavailability falls back to diff preview command
+
+- **GIVEN** review is needed for an existing delta-backed `scope: spec` artifact
+- **AND** inline diff is unavailable because validation failed or because diff generation reported its dedicated non-fatal failure
+- **WHEN** the agent chooses a review surface
+- **THEN** it runs `specd changes spec-preview <change-name> <specId> --diff --artifact <artifactId>`
+
 #### Scenario: Overlap or drift risk requires merged preview
 
 - **GIVEN** overlap or drift risk is detected for a spec delta

@@ -31,20 +31,25 @@ export const BUILTIN_VCS_PROVIDERS: readonly VcsProvider[] = [
  * Auto-detects the active VCS in the given directory and returns the
  * corresponding {@link VcsAdapter} implementation.
  *
- * Probes providers in the supplied order. Falls back to
+ * Registered external providers are probed first, in registration order,
+ * then the built-in git, hg, and svn probes run. Falls back to
  * {@link NullVcsAdapter} when no provider detects a VCS.
  *
  * @param cwd - Directory to probe; defaults to `process.cwd()`
- * @param providers - Detection providers in priority order
+ * @param providers - Optional external detection providers (ordered prefix)
  * @returns A `VcsAdapter` for the detected VCS
  */
 export async function createVcsAdapter(
   cwd?: string,
-  providers: readonly VcsProvider[] = BUILTIN_VCS_PROVIDERS,
+  providers?: readonly VcsProvider[],
 ): Promise<VcsAdapter> {
   const dir = cwd ?? process.cwd()
+  const orderedProviders =
+    providers === undefined || providers.length === 0
+      ? BUILTIN_VCS_PROVIDERS
+      : [...providers, ...BUILTIN_VCS_PROVIDERS]
 
-  for (const provider of providers) {
+  for (const provider of orderedProviders) {
     const adapter = await provider.detect(dir)
     if (adapter !== null) {
       return adapter

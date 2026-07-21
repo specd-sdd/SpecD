@@ -7,7 +7,7 @@
 #### Scenario: Constructor receives required dependencies
 
 - **WHEN** `RunStepHooks` is instantiated
-- **THEN** it receives `ChangeRepository`, `ArchiveRepository`, `HookRunner`, and `SchemaProvider`
+- **THEN** it receives `ChangeRepository`, `ArchiveRepository`, `HookRunner`, `ReadonlyMap<string, ExternalHookRunner>`, and `SchemaProvider`
 - **AND** they are stored as instance properties for use during `execute`
 
 ### Requirement: Input
@@ -20,12 +20,31 @@
 
 ### Requirement: Progress callback
 
-#### Scenario: Progress callback receives hook start and done events
+#### Scenario: Progress callback receives hook start, output, heartbeat, and done events
 
 - **GIVEN** `onProgress` callback is provided to `execute`
 - **WHEN** hooks are executed
 - **THEN** the callback receives `{ type: 'hook-start', hookId, command }` before each hook
+- **AND** receives output events that preserve hook ID and stdout/stderr identity while the hook is running
+- **AND** receives heartbeat events when a hook remains active without new output
 - **AND** receives `{ type: 'hook-done', hookId, success, exitCode }` after each hook
+
+### Requirement: Runner progress relay
+
+#### Scenario: Shell hook progress is relayed before completion
+
+- **GIVEN** a shell `run:` hook emits output while running
+- **AND** `onProgress` callback is provided to `RunStepHooks.execute`
+- **WHEN** the hook is executed
+- **THEN** `RunStepHooks` forwards that progress through `onProgress` before the hook completes
+- **AND** the relayed events identify the active hook
+
+#### Scenario: Relayed progress does not change fail-fast behaviour
+
+- **GIVEN** a pre-phase shell hook emits progress and then exits with a non-zero code
+- **WHEN** the phase is executed
+- **THEN** the progress events are still emitted before failure
+- **AND** subsequent pre hooks are still skipped
 
 ### Requirement: Change lookup
 
@@ -81,7 +100,7 @@
 
 - **GIVEN** a schema with workflow steps `[designing, implementing, verifying, archiving]`
 - **WHEN** `RunStepHooks.execute` is called with `step: "ready"` and `phase: "pre"`
-- **THEN** the result is `{ hooks: [], success: true, failedHook: null }`
+- **THEN** the result is `{ hooks: [], success: true, failedHooks: [] }`
 
 ### Requirement: Hook collection
 
@@ -159,7 +178,7 @@
 - **THEN** the result contains one hook result (for `test`) with `success: false`
 - **AND** `lint` was never executed
 - **AND** `result.success` is `false`
-- **AND** `result.failedHook` identifies the `test` hook
+- **AND** `result.failedHooks` contains exactly the `test` hook result
 
 #### Scenario: All pre-hooks succeed
 
@@ -168,7 +187,7 @@
 - **WHEN** `RunStepHooks.execute` is called with `phase: "pre"`
 - **THEN** the result contains two hook results, both with `success: true`
 - **AND** `result.success` is `true`
-- **AND** `result.failedHook` is `null`
+- **AND** `result.failedHooks` is empty
 
 ### Requirement: Post-phase execution (fail-soft)
 
@@ -181,7 +200,7 @@
 - **THEN** both hooks are executed
 - **AND** the result contains two hook results
 - **AND** `result.success` is `false`
-- **AND** `result.failedHook` is `null` (fail-soft, no single failed hook)
+- **AND** `result.failedHooks` contains exactly the `test` hook result
 
 ### Requirement: Result shape
 
@@ -189,7 +208,21 @@
 
 - **GIVEN** a step with no `run:` hooks in the pre phase (only `instruction:` hooks or no hooks at all)
 - **WHEN** `RunStepHooks.execute` is called with `phase: "pre"`
-- **THEN** the result is `{ hooks: [], success: true, failedHook: null }`
+- **THEN** the result is `{ hooks: [], success: true, failedHooks: [] }`
+
+#### Scenario: Final hook result remains complete after in-flight progress
+
+- **GIVEN** a hook emits output progress before exiting
+- **WHEN** `RunStepHooks.execute` completes
+- **THEN** the returned hook entry still contains the complete captured stdout and stderr
+- **AND** the final hook entry still includes the final exit code and success flag
+
+#### Scenario: failedHooks includes every failed hook result in execution order
+
+- **GIVEN** multiple hooks are executed and more than one exits with a non-zero code
+- **WHEN** `RunStepHooks.execute` completes
+- **THEN** `failedHooks` contains each failed hook result in the order those hooks were executed
+- **AND** successful hook results remain present only in `hooks`
 
 ### Requirement: Works for any step
 

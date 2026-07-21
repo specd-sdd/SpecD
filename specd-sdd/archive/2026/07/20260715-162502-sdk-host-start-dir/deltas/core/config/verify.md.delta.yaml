@@ -1,0 +1,24 @@
+- op: modified
+  description: 'Verify that host-provided discovery roots remain distinct from forced-file bootstrap'
+  selector:
+    type: section
+    matches: '^Requirement: Config file location and format$'
+  content: |
+    #### Scenario: Discover config walking up to VCS root
+
+    - **GIVEN** target directory is inside a subfolder of a VCS repository
+    - **WHEN** config discovery runs
+    - **THEN** it walks up the directory structure and stops at the nearest VCS root
+
+    #### Scenario: No VCS repo checks only CWD
+
+    - **GIVEN** target directory is not inside any VCS repository
+    - **WHEN** config discovery runs
+    - **THEN** it checks only the current working directory
+
+    #### Scenario: Host bootstrap may supply an explicit discovery root
+
+    - **GIVEN** a host bootstrap API accepts a discovery root input
+    - **WHEN** discovery runs from that supplied directory
+    - **THEN** it uses the same candidate ordering and VCS-bounded walk as cwd-based discovery
+    - **AND** it remains distinct from explicit file-entry modes such as `--config`

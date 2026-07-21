@@ -37,7 +37,7 @@ Semantic/content review is a separate workflow obligation and SHALL be performed
 ### Requirement: Output on success
 
 In `text` mode (default), when all artifacts pass, the command prints the validated artifact paths.
-For spec-scoped validation targets, it also prints a merged-preview hint:
+For spec-scoped validation targets that do **not** qualify for inline diff review, it also prints a merged-preview hint:
 
 ```text
 validated <name>/<workspace:capability-path>: all artifacts pass
@@ -64,7 +64,27 @@ note: inspect merged spec output with `specd changes spec-preview <name> <worksp
 
 The listed file paths MUST come from `ValidateArtifacts` result metadata and MUST be the exact paths validated for the requested spec/artifact. Any non-blocking suggestion MUST be labeled as a `note`.
 
-In `json` or `toon` mode, the output includes a `notes` array:
+For a successful individual validation of an existing delta-backed `scope: spec` artifact, the command SHALL use inline diff review instead of the separate merged-preview hint. In that case:
+
+- the invocation MUST target one spec and one artifact (`--artifact <artifactId>`)
+- the validated file MUST be delta-backed against an existing base artifact
+- validation MUST have succeeded
+- the delta merge used for review MUST have materialized successfully
+
+In that qualifying case, text output SHALL:
+
+- keep the validated file path lines
+- keep the structural-validation reminder note
+- omit the standard `spec-preview` follow-up hint
+- render the unified diff for the validated artifact only
+
+If diff generation fails with the dedicated `DiffGenerationError` after validation has already succeeded, the command SHALL still report success, omit the inline diff, and print a `note:` telling the reviewer to run:
+
+```text
+specd changes spec-preview <name> <workspace:capability-path> --diff --artifact <artifactId>
+```
+
+In `json` or `toon` mode, the output continues to include a `notes` array:
 
 ```json
 {
@@ -80,7 +100,7 @@ The process exits with code 0 when `passed` is `true`.
 ### Requirement: Output on failure
 
 In `text` mode, the command prints each failure to stdout, exits with code 1, and includes any expected file paths that could not be validated.
-For spec-scoped validation targets, it also prints a merged-preview hint:
+For spec-scoped validation targets, it may also print a merged-preview hint only when that merged review surface remains trustworthy:
 
 ```text
 validation failed <name>/<workspace:capability-path>:
@@ -99,6 +119,13 @@ note: inspect merged spec output with `specd changes spec-preview <name> <worksp
 ```
 
 For change-scoped validation targets, no preview hint is emitted.
+
+Inline diff review MUST NOT be emitted on a failed validation result.
+
+When delta validation fails or delta application fails before a trustworthy merged result exists, the command SHALL report the failure only. In that case it SHALL:
+
+- omit inline diff output
+- avoid presenting any inline review surface that could be mistaken for a trustworthy merged checkpoint
 
 Missing path lines MUST be derived from `ValidateArtifacts` result metadata. For an existing spec with a delta-capable artifact, this path is the expected `deltas/.../*.delta.yaml` file, even if a direct `specs/...` file exists.
 
@@ -170,3 +197,4 @@ specd change validate update-billing default:billing/invoices --artifact specs
 - [`core:validate-artifacts`](../../core/validate-artifacts/spec.md) — validation result shape and expected artifact file paths
 - [`core:spec-id-format`](../../core/spec-id-format/spec.md) — canonical `workspace:capabilityPath` format
 - [`core:validate-change-batch`](../../core/validate-change-batch/spec.md) — batch validation use case delegated to by `--all`
+- [`core:preview-spec`](../../core/preview-spec/spec.md) — inline diff review for successful single-artifact spec-delta validation reuses the preview merge/diff surface

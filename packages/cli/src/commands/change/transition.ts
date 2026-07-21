@@ -7,11 +7,34 @@ import {
   VALID_TRANSITIONS,
   InvalidStateTransitionError,
 } from '@specd/sdk'
-import { createSpinner, type Spinner } from 'nanospinner'
 import { resolveCliContext } from '../../helpers/cli-context.js'
-import { output, parseFormat } from '../../formatter.js'
+import { output, parseFormat, serializeOutput, type OutputFormat } from '../../formatter.js'
 import { handleError, cliError } from '../../handle-error.js'
 import { parseCommaSeparatedValues } from '../../helpers/parse-comma-values.js'
+import { createHookProgressPresenter, type HookPresenterEvent } from './_hook-progress-presenter.js'
+
+/**
+ * Renders the separator written to stderr after transition hooks complete.
+ *
+ * @param result - Aggregate hook completion counts observed during the transition.
+ * @param result.hooks - Total number of hooks observed.
+ * @param result.done - Hooks that completed successfully.
+ * @param result.failed - Hooks that failed.
+ * @returns One-line summary marker followed by a blank line.
+ */
+function renderAllHooksDoneMarker(result: { hooks: number; done: number; failed: number }): string {
+  return `[all hooks done] hooks=${result.hooks} done=${result.done} failed=${result.failed} -------------------------------------\n\n`
+}
+
+/**
+ * Writes one structured stream record for machine-readable transition output.
+ *
+ * @param format - Structured output format.
+ * @param record - Stream record payload.
+ */
+function writeStructuredRecord(format: Exclude<OutputFormat, 'text'>, record: unknown): void {
+  process.stdout.write(`${serializeOutput(record, format)}\n`)
+}
 
 const VALID_HOOK_PHASES = new Set<HookPhaseSelector>([
   'source.pre',
@@ -113,58 +136,84 @@ function resolveNextTarget(fromState: ChangeState, format?: string): ChangeState
 
 /**
  * Builds an `OnTransitionProgress` callback that renders step-by-step
- * feedback to stderr in text format. Returns a no-op for structured formats.
+ * feedback to stderr in text format and stdout stream records for structured formats.
  *
- * @param isText - Whether to render visual progress (true for text format)
+ * @param format - The CLI output format for visual or structured progress
  * @returns The progress callback and collected events
  */
-function makeProgressRenderer(isText: boolean): {
+function makeProgressRenderer(format: OutputFormat): {
   onProgress: OnTransitionProgress
   events: TransitionProgressEvent[]
+  finishHookStream(): void
 } {
   const events: TransitionProgressEvent[] = []
+  const presenter = createHookProgressPresenter({
+    format,
+    stream: format === 'text' ? process.stderr : process.stdout,
+    autoFinalizeOnDone: true,
+  })
+  let sawHookEvent = false
+  let renderedHookCompletion = false
+  const hookResults = new Map<string, boolean>()
 
-  if (!isText) {
-    return { onProgress: (evt) => events.push(evt), events }
+  const hookKeyFor = (event: Extract<HookPresenterEvent, { hookId: string }>): string =>
+    `${event.phase ?? 'none'}:${event.hookId}`
+
+  const finishHookStream = (): void => {
+    presenter.flush()
+    if (format !== 'text' || !sawHookEvent || renderedHookCompletion) return
+    const doneCount = Array.from(hookResults.values()).filter(Boolean).length
+    const failedCount = hookResults.size - doneCount
+    process.stderr.write(
+      renderAllHooksDoneMarker({
+        hooks: hookResults.size,
+        done: doneCount,
+        failed: failedCount,
+      }),
+    )
+    renderedHookCompletion = true
   }
-
-  let activeSpinner: Spinner | null = null
 
   const onProgress: OnTransitionProgress = (evt) => {
     events.push(evt)
 
     switch (evt.type) {
       case 'requires-check': {
+        if (format !== 'text') {
+          writeStructuredRecord(format, { stream: 'change-transition', event: evt })
+          break
+        }
         const mark = evt.satisfied ? '✓' : '✗'
         const status = evt.satisfied ? 'satisfied' : 'not satisfied'
         process.stderr.write(`  ${mark} requires ${evt.artifactId} [${status}]\n`)
         break
       }
-      case 'hook-start': {
-        activeSpinner = createSpinner(`${evt.phase} › ${evt.hookId}: ${evt.command}`, {
-          stream: process.stderr,
-        }).start()
+      case 'hook-start':
+      case 'hook-output':
+      case 'hook-heartbeat': {
+        sawHookEvent = true
+        presenter.onEvent(evt)
         break
       }
       case 'hook-done': {
-        if (activeSpinner !== null) {
-          if (evt.success) {
-            activeSpinner.success({ text: `${evt.phase} › ${evt.hookId} (exit ${evt.exitCode})` })
-          } else {
-            activeSpinner.error({ text: `${evt.phase} › ${evt.hookId} (exit ${evt.exitCode})` })
-          }
-          activeSpinner = null
-        }
+        sawHookEvent = true
+        hookResults.set(hookKeyFor(evt), evt.success)
+        presenter.onEvent(evt)
         break
       }
       case 'transitioned': {
+        finishHookStream()
+        if (format !== 'text') {
+          writeStructuredRecord(format, { stream: 'change-transition', event: evt })
+          break
+        }
         process.stderr.write(`  ✓ ${evt.from} → ${evt.to}\n`)
         break
       }
     }
   }
 
-  return { onProgress, events }
+  return { onProgress, events, finishHookStream }
 }
 
 /**
@@ -190,14 +239,10 @@ export function registerChangeTransition(parent: Command): void {
       'after',
       `
 JSON/TOON output schema:
-  {
-    result: "ok" | "failure"
-    name: string
-    from: string
-    to: string
-    blockers?: Array<{ code: string, message: string }>
-    nextAction?: { targetStep: string, actionType: string, reason: string, command: string | null }
-  }
+  Stream records on stdout:
+    { stream: "hook-progress", event: ... }
+    { stream: "change-transition", event: ... }
+    { stream: "change-transition", event: { type: "complete", result: ... } }
 `,
     )
     .action(
@@ -233,7 +278,7 @@ JSON/TOON output schema:
             opts.format,
           )
 
-          const { onProgress } = makeProgressRenderer(fmt === 'text')
+          const progressRenderer = makeProgressRenderer(fmt)
 
           try {
             const result = await kernel.changes.transition.execute(
@@ -242,23 +287,27 @@ JSON/TOON output schema:
                 to: requestedTarget,
                 skipHookPhases,
               },
-              onProgress,
+              progressRenderer.onProgress,
             )
 
             if (fmt === 'text') {
               output(`transitioned ${name}: ${fromState} → ${result.change.state}`, 'text')
             } else {
-              output(
-                {
-                  result: 'ok',
-                  name,
-                  from: fromState,
-                  to: result.change.state,
+              writeStructuredRecord(fmt, {
+                stream: 'change-transition',
+                event: {
+                  type: 'complete',
+                  result: {
+                    result: 'ok',
+                    name,
+                    from: fromState,
+                    to: result.change.state,
+                  },
                 },
-                fmt,
-              )
+              })
             }
           } catch (err) {
+            progressRenderer.finishHookStream()
             if (err instanceof InvalidStateTransitionError) {
               const status = await kernel.changes.status.execute({
                 name,
@@ -277,17 +326,20 @@ JSON/TOON output schema:
                 process.stderr.write(`  reason:  ${status.nextAction.reason}\n`)
                 process.exit(1)
               } else {
-                output(
-                  {
-                    result: 'failure',
-                    name,
-                    from: fromState,
-                    to: requestedTarget,
-                    blockers: status.blockers,
-                    nextAction: status.nextAction,
+                writeStructuredRecord(fmt, {
+                  stream: 'change-transition',
+                  event: {
+                    type: 'complete',
+                    result: {
+                      result: 'failure',
+                      name,
+                      from: fromState,
+                      to: requestedTarget,
+                      blockers: status.blockers,
+                      nextAction: status.nextAction,
+                    },
                   },
-                  fmt,
-                )
+                })
                 process.exit(1)
               }
             }

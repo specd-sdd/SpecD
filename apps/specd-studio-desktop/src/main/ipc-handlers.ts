@@ -17,8 +17,6 @@ import {
   type IndexResult,
 } from '@specd/code-graph-electron'
 import {
-  acquireGraphIndexLock,
-  assertGraphIndexUnlocked,
   codeGraphVersion,
   createDefaultConfigLoader,
   createGetGraphHealth,
@@ -266,8 +264,10 @@ async function getHost(): Promise<DesktopHostContext> {
       const config = await loader.load()
       logRing = new LogRingBuffer(1000)
       const { kernel } = await createSdkContext(config, {
-        logRing,
-        logFormatter: createLogFormatter({ colorize: false }),
+        kernel: {
+          logRing,
+          logFormatter: createLogFormatter({ colorize: false }),
+        },
       })
       Logger.info('Desktop kernel booted', { projectRoot: config.projectRoot })
       return {
@@ -725,7 +725,6 @@ async function buildDesktopProjectStatusSnapshot(host: DesktopHostContext): Prom
         provider,
         codeGraphVersion,
         workspaces: [...workspaces],
-        assertUnlocked: false,
       })
     })
   } catch {
@@ -1773,16 +1772,14 @@ async function handlePortMethod(envelope: IpcRequestEnvelope): Promise<IpcRespon
     }
     case 'getGraphStatus': {
       const host = await getHost()
-      assertGraphIndexUnlocked(host.config)
       const getGraphHealth = createGetGraphHealth()
-      const workspaces = await kernel.project.listWorkspaces.execute()
+      const workspaces = await host.kernel.project.listWorkspaces.execute()
       const result = await withGraphProvider(async (provider) => {
         const health = await getGraphHealth.execute({
           config: host.config,
           provider,
           codeGraphVersion,
           workspaces: [...workspaces],
-          assertUnlocked: false,
         })
         return toGraphStatusDto(health)
       })
@@ -1792,7 +1789,6 @@ async function handlePortMethod(envelope: IpcRequestEnvelope): Promise<IpcRespon
       const [input = {}] = params as [GraphIndexInput?]
       const host = await getHost()
       const indexResult = await withGraphProvider(async (provider) => {
-        await Promise.resolve(acquireGraphIndexLock(host.config))
         const workspaces = await host.kernel.project.listWorkspaces.execute()
         const graphConfig = buildProjectGraphConfig(host.config)
         const vcs = await createVcsAdapter(host.config.projectRoot).catch(() => null)

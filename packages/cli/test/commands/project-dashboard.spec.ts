@@ -1,44 +1,111 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import {
   makeMockConfig,
-  makeMockChange,
   makeMockKernel,
   makeProgram,
   mockProcessExit,
   captureStdout,
   captureStderr,
 } from './helpers.js'
-import { ConfigValidationError } from '@specd/sdk'
+import {
+  ConfigValidationError,
+  openSpecdHost,
+  buildProjectStatusSnapshot,
+  type BuildProjectStatusSnapshotResult,
+} from '@specd/sdk'
+import { registerProjectDashboard } from '../../src/commands/project/dashboard.js'
+import { registerProjectStatus } from '../../src/commands/project/status.js'
 
 vi.mock('../../src/helpers/cli-context.js', () => ({
-  resolveCliContext: vi.fn(),
   buildCliKernelOptions: vi.fn(() => ({})),
 }))
 
-import { resolveCliContext } from '../../src/helpers/cli-context.js'
-import { registerProjectDashboard } from '../../src/commands/project/dashboard.js'
+vi.mock('@specd/sdk', async (importOriginal) => {
+  const mod = await importOriginal<typeof import('@specd/sdk')>()
+  return {
+    ...mod,
+    openSpecdHost: vi.fn(),
+    buildProjectStatusSnapshot: vi.fn(),
+  }
+})
 
 function setup() {
   const config = makeMockConfig()
   const kernel = makeMockKernel()
-  vi.mocked(resolveCliContext).mockResolvedValue({
-    config: config,
-    configFilePath: null,
-    kernel: kernel,
+  Object.assign(kernel, {
+    project: {
+      listWorkspaces: vi.fn().mockResolvedValue([
+        {
+          name: 'default',
+          prefix: '_global',
+          ownership: 'owned',
+          codeRoot: '/project',
+          isExternal: false,
+        },
+      ]),
+      getProjectContext: vi.fn().mockResolvedValue({ warnings: [], contextEntries: [], specs: [] }),
+    },
   })
+
+  const mockSnapshot: BuildProjectStatusSnapshotResult = {
+    summary: {
+      activeCount: 1,
+      draftCount: 1,
+      discardedCount: 0,
+      archivedCount: 5,
+      specsByWorkspace: { default: 2 },
+      workspaceCount: 1,
+    },
+    graphHealth: {
+      currentRef: 'abc1234',
+      documentCount: 5,
+      specCount: 2,
+      lastIndexedRef: 'abc1234',
+      graphFingerprint: 'fp123',
+      lastIndexedAt: '2026-07-20T12:00:00.000Z',
+      stale: false,
+      fingerprintMismatch: false,
+      fileCount: 10,
+      symbolCount: 50,
+      relationCounts: {
+        IMPORTS: 0,
+        DEFINES: 0,
+        CALLS: 0,
+        CONSTRUCTS: 0,
+        USES_TYPE: 0,
+        EXPORTS: 0,
+        DEPENDS_ON: 0,
+        COVERS_FILE: 0,
+        COVERS_SYMBOL: 0,
+        EXTENDS: 0,
+        IMPLEMENTS: 0,
+        OVERRIDES: 0,
+      },
+      languages: ['typescript'],
+    },
+    approvals: { specEnabled: false, signoffEnabled: false },
+    llmOptimizedContext: false,
+  }
+
+  vi.mocked(openSpecdHost).mockResolvedValue({
+    config,
+    configFilePath: '/project/specd.yaml',
+    kernel,
+    createGraphProvider: vi.fn(),
+  })
+  vi.mocked(buildProjectStatusSnapshot).mockResolvedValue(mockSnapshot)
+
   const stdout = captureStdout()
   const stderr = captureStderr()
   mockProcessExit()
-  return { config, kernel, stdout, stderr }
+  return { config, kernel, mockSnapshot, stdout, stderr }
 }
 
 afterEach(() => vi.restoreAllMocks())
 
 describe('project dashboard', () => {
   it('command name is dashboard', async () => {
-    const { kernel } = setup()
-    kernel.specs.list.execute.mockResolvedValue([])
-    kernel.changes.list.execute.mockResolvedValue([])
+    setup()
 
     const program = makeProgram()
     const projectCmd = program.command('project')
@@ -49,22 +116,15 @@ describe('project dashboard', () => {
     expect(projectCmd.commands.find((c) => c.name() === 'overview')).toBeUndefined()
   })
 
-  it('outputs JSON with expected fields', async () => {
-    const { kernel, stdout } = setup()
-    kernel.specs.list.execute.mockResolvedValue([
-      { workspace: 'default', path: 'auth/login', title: 'Login' },
-      { workspace: 'default', path: 'auth/register', title: 'Register' },
-    ])
-    kernel.changes.list.execute.mockResolvedValue([
-      makeMockChange({ name: 'feat-a', state: 'designing' }),
-    ])
-    kernel.changes.listDrafts.execute.mockResolvedValue([
-      makeMockChange({ name: 'feat-b', state: 'designing' }),
-    ])
-    kernel.changes.listDiscarded.execute.mockResolvedValue([])
+  it('delegates non-text formats to project status', async () => {
+    setup()
 
     const program = makeProgram()
-    registerProjectDashboard(program.command('project'))
+    const projectCmd = program.command('project')
+    registerProjectStatus(projectCmd)
+    registerProjectDashboard(projectCmd)
+
+    const stdout = captureStdout()
     await program.parseAsync(['node', 'specd', 'project', 'dashboard', '--format', 'json'])
 
     const parsed = JSON.parse(stdout())
@@ -72,23 +132,18 @@ describe('project dashboard', () => {
     expect(parsed.schemaRef).toBe('@specd/schema-std')
     expect(Array.isArray(parsed.workspaces)).toBe(true)
     expect(parsed.specs.total).toBe(2)
-    expect(parsed.specs.byWorkspace.default).toBe(2)
-    expect(parsed.changes.active).toBe(1)
-    expect(parsed.changes.drafts).toBe(1)
-    expect(parsed.changes.discarded).toBe(0)
+    expect(parsed.changes.archived).toBe(5)
   })
 
   it('JSON output contains no banner, config line, or box characters', async () => {
-    const { kernel, stdout } = setup()
-    kernel.specs.list.execute.mockResolvedValue([
-      { workspace: 'default', path: 'auth/login', title: 'Login' },
-    ])
-    kernel.changes.list.execute.mockResolvedValue([])
-    kernel.changes.listDrafts.execute.mockResolvedValue([])
-    kernel.changes.listDiscarded.execute.mockResolvedValue([])
+    setup()
 
     const program = makeProgram()
-    registerProjectDashboard(program.command('project'))
+    const projectCmd = program.command('project')
+    registerProjectStatus(projectCmd)
+    registerProjectDashboard(projectCmd)
+
+    const stdout = captureStdout()
     await program.parseAsync(['node', 'specd', 'project', 'dashboard', '--format', 'json'])
 
     const out = stdout()
@@ -113,21 +168,6 @@ describe('project dashboard', () => {
     expect(configIdx).toBeLessThan(boxenIdx)
   })
 
-  it('"Using config:" line shows relative path from CWD', async () => {
-    const { stdout } = setup()
-
-    const program = makeProgram()
-    registerProjectDashboard(program.command('project'))
-    // config.projectRoot is '/project' from makeMockConfig
-    await program.parseAsync(['node', 'specd', 'project', 'dashboard'])
-
-    const out = stdout()
-    // The config path should be relative (must not start with /)
-    const configLine = out.split('\n').find((l) => l.startsWith('Using config:'))
-    expect(configLine).toBeDefined()
-    expect(configLine).not.toMatch(/^Using config: \//)
-  })
-
   it('text output includes banner before box', async () => {
     const { stdout } = setup()
 
@@ -136,15 +176,13 @@ describe('project dashboard', () => {
     await program.parseAsync(['node', 'specd', 'project', 'dashboard'])
 
     const out = stdout()
-    // Banner contains SpecD ASCII art (the corner char of the logo)
     expect(out).toMatch(/┌─┐/)
-    // Banner appears before the boxen title
     const bannerIdx = out.indexOf('┌─┐')
     const boxenIdx = out.indexOf('╭')
     expect(bannerIdx).toBeLessThan(boxenIdx)
   })
 
-  it('text output contains project root and schema', async () => {
+  it('text output contains project root, schema, workspaces, archived changes, and graph info', async () => {
     const { stdout } = setup()
 
     const program = makeProgram()
@@ -155,6 +193,9 @@ describe('project dashboard', () => {
     expect(out).toContain('/project')
     expect(out).toContain('@specd/schema-std')
     expect(out).toContain('default')
+    expect(out).toContain('archived')
+    expect(out).toContain('Graph')
+    expect(out).toContain('freshness:')
   })
 
   it('text output uses "project dashboard" as boxen title', async () => {
@@ -169,15 +210,31 @@ describe('project dashboard', () => {
     expect(out).not.toContain('project overview')
   })
 
-  it('project root wraps when longer than box width', async () => {
+  it('project root and workspaces wrap when longer than box width', async () => {
     const config = makeMockConfig({
       projectRoot: '/very/long/path/that/definitely/exceeds/the/project/box/width/limit',
     })
-    vi.mocked(resolveCliContext).mockResolvedValue({
+    const mockSnapshot: BuildProjectStatusSnapshotResult = {
+      summary: {
+        activeCount: 1,
+        draftCount: 1,
+        discardedCount: 0,
+        archivedCount: 0,
+        specsByWorkspace: { default: 2 },
+        workspaceCount: 1,
+      },
+      graphHealth: null,
+      approvals: { specEnabled: false, signoffEnabled: false },
+      llmOptimizedContext: false,
+    }
+    vi.mocked(openSpecdHost).mockResolvedValue({
       config,
-      configFilePath: null,
+      configFilePath: '/project/specd.yaml',
       kernel: makeMockKernel(),
+      createGraphProvider: vi.fn(),
     })
+    vi.mocked(buildProjectStatusSnapshot).mockResolvedValue(mockSnapshot)
+
     const stdout = captureStdout()
     mockProcessExit()
 
@@ -186,15 +243,13 @@ describe('project dashboard', () => {
     await program.parseAsync(['node', 'specd', 'project', 'dashboard'])
 
     const out = stdout()
-    // The long path should be present in the output
     expect(out).toContain('/very/long/path/that/definitely/exceeds')
-    // The box should still render (contains box chars)
     expect(out).toMatch(/╭/)
   })
 
   it('exits 1 when config is missing', async () => {
     const { stderr } = setup()
-    vi.mocked(resolveCliContext).mockRejectedValue(
+    vi.mocked(openSpecdHost).mockRejectedValue(
       new ConfigValidationError('specd.yaml', 'config file not found'),
     )
 
@@ -206,17 +261,29 @@ describe('project dashboard', () => {
     expect(stderr()).toMatch(/error:/)
   })
 
-  it('queries all four data sources', async () => {
-    const { kernel } = setup()
-    captureStdout()
+  it('renders all dashboard TUI inner box lines with uniform character width', async () => {
+    const { stdout } = setup()
 
     const program = makeProgram()
     registerProjectDashboard(program.command('project'))
-    await program.parseAsync(['node', 'specd', 'project', 'dashboard', '--format', 'json'])
+    await program.parseAsync(['node', 'specd', 'project', 'dashboard'])
 
-    expect(kernel.specs.list.execute).toHaveBeenCalled()
-    expect(kernel.changes.list.execute).toHaveBeenCalled()
-    expect(kernel.changes.listDrafts.execute).toHaveBeenCalled()
-    expect(kernel.changes.listDiscarded.execute).toHaveBeenCalled()
+    const out = stdout()
+
+    function stripAnsiCodes(s: string): string {
+      return s.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '')
+    }
+
+    // Extract inner sub-box lines (all lines between outer boxen borders starting with '│ │')
+    const innerBoxLines = out
+      .split('\n')
+      .filter((line) => line.includes('│ │') || line.includes('│ ╭─') || line.includes('│ ╰─'))
+      .map((line) => stripAnsiCodes(line))
+
+    expect(innerBoxLines.length).toBeGreaterThan(0)
+    const expectedSubBoxWidth = innerBoxLines[0]?.length
+    for (const line of innerBoxLines) {
+      expect(line.length).toBe(expectedSubBoxWidth)
+    }
   })
 })

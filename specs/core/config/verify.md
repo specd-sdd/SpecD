@@ -16,6 +16,13 @@
 - **WHEN** config discovery runs
 - **THEN** it checks only the current working directory
 
+#### Scenario: Host bootstrap may supply an explicit discovery root
+
+- **GIVEN** a host bootstrap API accepts a discovery root input
+- **WHEN** discovery runs from that supplied directory
+- **THEN** it uses the same candidate ordering and VCS-bounded walk as cwd-based discovery
+- **AND** it remains distinct from explicit file-entry modes such as `--config`
+
 ### Requirement: Privacy settings
 
 #### Scenario: Mode hash requires salt
@@ -713,6 +720,19 @@
 - **WHEN** config is loaded
 - **THEN** it resolves successfully
 - **AND** `config.warnings` is undefined or does not contain warnings for storage
+
+#### Scenario: Warning-bearing config remains non-fatal
+
+- **GIVEN** config loading detects a legacy-compatible warning condition
+- **WHEN** the config is resolved
+- **THEN** loading succeeds without converting the warning into a startup error
+
+#### Scenario: Hosts can consume warnings from resolved config
+
+- **GIVEN** config loading resolves warnings
+- **WHEN** a delivery host receives the resolved `SpecdConfig`
+- **THEN** the host can read those diagnostics from `config.warnings`
+- **AND** the host does not need to recompute or reinterpret the warning messages
 
 ### Requirement: Project context instructions
 

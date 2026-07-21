@@ -33,7 +33,11 @@ export async function withProvider(
     readonly host?: SdkHostContext
   },
 ): Promise<void> {
-  const ctx = options?.host ?? (await createSdkContext(config, buildCliKernelOptions()))
+  const ctx =
+    options?.host ??
+    (await createSdkContext(config, {
+      kernel: buildCliKernelOptions(),
+    }))
 
   const forceExit = (): void => {
     process.exit(130)

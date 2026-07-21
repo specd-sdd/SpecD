@@ -14,7 +14,7 @@
     {
       "requirement": "Ladybug-backed implementation",
       "rules": [
-        "`LadybugGraphStore` SHALL implement the `GraphStore` contract using LadybugDB as the storage engine. It is an infrastructure adapter and owns all backend-specific concerns that are not part of the abstract `GraphStore` port.\n\nWithin a composition that supports multiple registered graph-store backends, the Ladybug adapter is identified by the backend id `ladybug`. It remains available as an explicitly selectable concrete backend even when another backend becomes the default.\n\nThe adapter MUST:\n\n- open and close a Ladybug database connection safely\n- execute the Ladybug-specific schema DDL on first use\n- keep backend-specific schema version state\n- translate the abstract graph-store operations into Ladybug queries and bulk-load operations"
+        "`LadybugGraphStore` SHALL implement the `GraphStore` contract using LadybugDB as the storage engine while preserving the abstract semantics defined by `code-graph:graph-store`.\n\nWithin a composition that supports multiple registered graph-store backends, the stable backend id for this adapter SHALL remain `ladybug`.\n\nThe adapter MUST:\n\n- open and close a Ladybug database connection safely\n- execute the Ladybug-specific schema DDL on first use\n- keep backend-specific schema version state\n- translate the abstract graph-store operations into Ladybug queries and bulk-load operations\n- defer any runtime-specific native loading or backend readiness work until `open()`\n\n`close()` MUST be idempotent."
       ]
     },
     {
@@ -26,7 +26,13 @@
     {
       "requirement": "Destructive recreation",
       "rules": [
-        "`LadybugGraphStore` SHALL implement the abstract `GraphStore.recreate()` capability using Ladybug-specific persistence cleanup under the configured graph root.\n\nWhen `recreate()` is invoked, the adapter MUST ensure that the next indexing run starts from an empty Ladybug backend without requiring callers to know any Ladybug-specific filenames. The implementation MAY close and reopen connections as needed, but the observable effect MUST be that:\n\n- all persisted Ladybug graph data under `{configPath}/graph` is discarded\n- any backend-owned companion artifacts such as lock or WAL files are also discarded when they belong to the same graph persistence root\n- the backend is ready to be opened again and rebuilt from scratch\n\nCallers such as `graph index --force` MUST depend on this abstract recreation behavior rather than deleting `.lbug`, `.wal`, `.lock`, or any other backend-specific artifacts directly."
+        "`LadybugGraphStore` SHALL implement the abstract `GraphStore.recreate()` capability using Ladybug-specific destructive reset behavior.\n\nWhen `recreate()` is invoked, the adapter MUST ensure that the next indexing run starts from a clean Ladybug storage generation:\n\n- all persisted Ladybug graph data under `{configPath}/graph` is discarded\n- any backend-owned companion artifacts such as lock or WAL files are also discarded when they belong to the same graph persistence root\n- the persisted storage-generation marker for that graph root is rotated\n- the backend is ready to be opened again and rebuilt from scratch\n\nCallers such as `graph index --force` MUST depend on this abstract recreation behavior through provider-owned indexing semantics rather than by deleting Ladybug files directly."
+      ]
+    },
+    {
+      "requirement": "Storage generation sidecar",
+      "rules": [
+        "The Ladybug-backed graph persistence under `{configPath}/graph` SHALL persist a storage-generation sidecar compatible with the shared `code-graph:graph-store` stale-detection contract.\n\nA sidecar such as `graph/storage.epoch` is an acceptable realization.\n\nOn `open()`, the adapter MUST make the current generation observable to the owning provider. On destructive recreation, the adapter MUST rotate that generation so older open providers can detect that they are stale and must be reopened."
       ]
     },
     {
@@ -44,13 +50,13 @@
     {
       "requirement": "Relationship tables",
       "rules": [
-        "The Ladybug schema SHALL define relationship tables for the persisted relation types used by the code graph.\n\nAt minimum, the schema MUST persist:\n\n| Relationship  | From   | To     | Populated by                                 |\n| ------------- | ------ | ------ | -------------------------------------------- |\n| IMPORTS       | File   | File   | Indexer analysis                             |\n| DEFINES       | File   | Symbol | Indexer analysis                             |\n| CALLS         | Symbol | Symbol | Indexer analysis                             |\n| EXPORTS       | File   | Symbol | Indexer analysis                             |\n| DEPENDS\\_ON    | Spec   | Spec   | Spec indexing                                |\n| COVERS\\_FILE   | Spec   | File   | Archived file-level implementation linkage   |\n| COVERS\\_SYMBOL | Spec   | Symbol | Archived symbol-level implementation linkage |\n| EXTENDS       | Symbol | Symbol | Indexer analysis                             |\n| IMPLEMENTS    | Symbol | Symbol | Indexer analysis                             |\n| OVERRIDES     | Symbol | Symbol | Indexer analysis                             |\n\nThe schema MUST provide persisted `COVERS_FILE` and `COVERS_SYMBOL` relation families so the backend can support requirement-aware impact and lookup. `COVERS_SYMBOL` relations MUST preserve edge metadata so symbol-level implementation links can surface `stale` state after reload.\n\nRelationship tables have no persisted edge properties unless a requirement explicitly adds them. `COVERS_SYMBOL` is that explicit case and MUST retain metadata required by the abstract relation contract."
+        "The Ladybug schema SHALL define relationship tables for the persisted relation types used by the code graph.\n\nAt minimum, the schema MUST persist:\n\n| Relationship  | From   | To     | Populated by                                 |\n| ------------- | ------ | ------ | -------------------------------------------- |\n| IMPORTS       | File   | File   | Indexer analysis                             |\n| DEFINES       | File   | Symbol | Indexer analysis                             |\n| CALLS         | Symbol | Symbol | Indexer analysis                             |\n| CONSTRUCTS    | Symbol | Symbol | Indexer analysis                             |\n| USES\\_TYPE     | Symbol | Symbol | Indexer analysis                             |\n| EXPORTS       | File   | Symbol | Indexer analysis                             |\n| DEPENDS\\_ON    | Spec   | Spec   | Spec indexing                                |\n| COVERS\\_FILE   | Spec   | File   | Archived file-level implementation linkage   |\n| COVERS\\_SYMBOL | Spec   | Symbol | Archived symbol-level implementation linkage |\n| EXTENDS       | Symbol | Symbol | Indexer analysis                             |\n| IMPLEMENTS    | Symbol | Symbol | Indexer analysis                             |\n| OVERRIDES     | Symbol | Symbol | Indexer analysis                             |\n\nThe schema MUST provide persisted `COVERS_FILE` and `COVERS_SYMBOL` relation families so the backend can support requirement-aware impact and lookup. `COVERS_SYMBOL` relations MUST preserve edge metadata so symbol-level implementation links can surface `stale` state after reload.\n\nRelationship tables have no persisted edge properties unless a requirement explicitly adds them. `COVERS_SYMBOL` is that explicit case and MUST retain metadata required by the abstract relation contract."
       ]
     },
     {
       "requirement": "Full-text search implementation",
       "rules": [
-        "`LadybugGraphStore` SHALL implement symbol, spec, and document search using Ladybug's full-text search facilities.\n\nThe adapter MUST:\n\n- create the Ladybug FTS indexes needed to satisfy the abstract `GraphStore.searchSymbols()`, `GraphStore.searchSpecs()`, and `GraphStore.searchDocuments()` contract\n- index symbols using both the stored symbol name and the backend-specific expanded search text used for compound-name matching\n- index spec title, description, and full content for spec search\n- index document paths and full textual content\n- keep the existing Ladybug discovery paths in place:\n  - `QUERY_FTS_INDEX`-based discovery for symbols and specs\n  - manual document candidate discovery for documents\n- join multiple search tokens using the `OR` operator in the sanitized FTS query so that results matching any of the terms are returned (discovery mode)\n- expand raw query tokens with the shared specd/code-aware lexical policy before applying identity-aware ranking\n- supplement the backend-native candidate set with identity-derived candidates when the native tokenization path would otherwise miss a strong identity hit required by the abstract contract\n- prioritize **exact canonical identity matches** during search by applying a score boost to nodes where the query exactly matches the primary identity column\n- prioritize **strong non-exact identity matches** ahead of generic content-only matches, including:\n  - symbol declared-name equality when comment-only hits would otherwise rank higher\n  - spec-id prefix, suffix, substring, and real component matches\n  - document canonical-path or config-relative-path prefix, suffix, substring, and real component matches\n- rerank the discovered candidate set using backend-local ranking logic after candidate retrieval rather than replacing candidate generation with whole-query string matching\n- count how many expanded query tokens match the selected identity fields and use that token coverage to rank candidates that satisfy more of the query intent above candidates satisfying fewer identity tokens\n- return results ordered from highest to lowest relevance after identity preference is applied\n- rebuild or recreate FTS indexes when required by the backend after bulk data changes\n- derive match-aware snippets and the corresponding 1-based line range from persisted file source content or FTS matches\n\nObservable Ladybug ordering semantics MUST hold:\n\n- exact canonical identity matches rank first\n- identity-oriented non-exact hits rank ahead of body-only/comment-only/content-only hits\n- exact token identity matches outrank prefix token matches\n- prefix token matches outrank suffix token matches\n- suffix token matches outrank arbitrary substring token matches\n- real identity-component matches outrank arbitrary substring-only hits on the same identity field\n- candidates matching more expanded identity tokens outrank candidates matching fewer expanded identity tokens when generic text relevance is otherwise competing\n- generic term frequency in spec/document body content MUST NOT outrank a stronger spec-id, symbol-name, or document-path match for the same query intent\n\nThe Ladybug FTS schema MUST include:\n\n- **`symbol_fts`** — covering `Symbol.searchName` and `Symbol.comment`\n- **`spec_fts`** — covering `Spec.title`, `Spec.description`, and `Spec.content`\n- **`document_fts`** — covering `Document.content`, `Document.path`, and any backend-maintained alternate path search field needed to preserve document identity preference\n\nThe implementation MAY use stemming, weighted ranking, identity boost unions, or other backend-supported ranking/indexing options, provided the abstract graph-store contract remains satisfied.\n\nPersisted `File` content used for snippet extraction SHALL NOT, by itself, become a separate full-text searchable file category in this change."
+        "`LadybugGraphStore` SHALL provide full-text search for symbols, specs, and documents while preserving the identity-aware discovery and ranking contract from `code-graph:graph-store`.\n\nThe adapter MUST:\n\n- create the Ladybug FTS indexes needed to satisfy the abstract `GraphStore.searchSymbols()`, `GraphStore.searchSpecs()`, and `GraphStore.searchDocuments()` contract\n- index symbols using both the stored symbol name and the backend-specific expanded search text used for compound-name matching\n- index spec title, description, and full content for spec search\n- index document paths and full textual content\n- use `QUERY_FTS_INDEX`-based discovery for symbols, specs, and documents; `document_fts` MUST be the primary document discovery path\n- join multiple search tokens using the `OR` operator in the sanitized FTS query so that results matching any of the terms are returned\n- expand raw query tokens with the shared specd/code-aware lexical policy before applying identity-aware ranking\n- supplement every backend-native candidate set, including specs and documents, with identity-derived candidates when native tokenization would otherwise miss an exact, prefix, suffix, component, or strong substring match on the canonical identity\n- prioritize exact canonical identity matches and strong non-exact identity matches ahead of generic content-only matches\n- rerank the discovered candidate set using backend-local ranking logic after candidate retrieval\n- count matching expanded identity tokens and prefer candidates matching more query intent\n- return results ordered from highest to lowest relevance after identity preference is applied\n- rebuild or recreate FTS indexes when required after bulk data changes\n- derive match-aware snippets and corresponding 1-based line ranges from persisted content or FTS matches\n\nObservable Ladybug ordering semantics MUST hold: exact identity matches rank first; identity-oriented hits outrank content-only hits; exact token matches outrank prefix matches; prefix outranks suffix; suffix outranks arbitrary substring; real components outrank arbitrary substring-only hits; and candidates matching more expanded identity tokens outrank fewer-token candidates.\n\nThe Ladybug FTS schema MUST include `symbol_fts` for `Symbol.searchName` and comments, `spec_fts` for `Spec.title`, description, and content, and `document_fts` for `Document.content`, canonical path, and any alternate path field needed for document identity preference.\n\nThe implementation MAY use stemming, weighted ranking, identity boost unions, or other backend-supported ranking/indexing options, provided the abstract graph-store contract remains satisfied. Persisted `File` content used for snippets SHALL NOT by itself become a separate full-text searchable file category."
       ]
     },
     {
@@ -132,6 +138,13 @@
         "AND any Ladybug-owned companion artifacts in the same graph root are discarded with it",
         "AND callers do not target .lbug, .wal, or .lock files directly"
       ]
+    },
+    {
+      "requirement": "Storage generation sidecar",
+      "name": "Ladybug exposes generation changes through the sidecar",
+      "given": ["a Ladybug-backed graph root using a sidecar such as graph/storage.epoch"],
+      "when": ["the store is opened before and after a destructive recreate"],
+      "then": ["the owning provider can observe that the generation changed"]
     },
     {
       "requirement": "Ladybug schema ownership",
@@ -340,6 +353,18 @@
       ]
     },
     {
+      "requirement": "Full-text search implementation",
+      "name": "Ladybug discovers document and spec identity hits outside FTS tokenization",
+      "given": [
+        "a document and a spec whose canonical identities are missed by backend tokenization"
+      ],
+      "when": ["Ladybug searches their path or spec-id suffix/component"],
+      "then": [
+        "document search uses document_fts plus identity candidates",
+        "AND spec search supplements FTS candidates before ranking"
+      ]
+    },
+    {
       "requirement": "Schema versioning",
       "name": "Incompatible schema version permits rebuild strategy",
       "given": [
@@ -419,22 +444,11 @@
     }
   ],
   "implementation": {
-    "files": [
-      {
-        "specId": "code-graph:ladybug-graph-store",
-        "file": "code-graph:test/infrastructure/ladybug/ladybug-graph-store.spec.ts"
-      }
-    ],
     "symbols": [
       {
         "specId": "code-graph:ladybug-graph-store",
         "file": "code-graph:src/infrastructure/ladybug/ladybug-graph-store.ts",
         "symbol": "LadybugGraphStore"
-      },
-      {
-        "specId": "code-graph:ladybug-graph-store",
-        "file": "code-graph:src/infrastructure/ladybug/ladybug-graph-store.ts",
-        "symbol": "searchSymbols"
       },
       {
         "specId": "code-graph:ladybug-graph-store",
@@ -449,10 +463,8 @@
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:43ab25a180780293fce96c113a91e3ea9afeb0458edd448fc69439fdef86cf5c",
-    "verify.md": "sha256:6887092e86f3c512b4dc9b94b88d7b774d6b88aaf827f4c8c08fd353a1746437"
+    "spec.md": "sha256:38e9dbfdcb0e23fffde20b38edf1e0a289d2b8eb73bcf04106070d0d2f4a441a",
+    "verify.md": "sha256:e3ac72971fb0f37a5705ee3f2f70d10d858e5e838a7ac22cea197515293457a6"
   },
-  "generatedBy": "agent",
-  "optimizedDescription": "Ladybug-backed `GraphStore` adapter spec: backend id, rooted layout, schema, FTS/reranking, recreate, bulk load, metadata, prepared queries.",
-  "optimizedContext": "# Ladybug Graph Store\n## Rules\n- `LadybugGraphStore` implements `GraphStore` with backend id `ladybug`; adapter owns connection lifecycle, schema DDL, schema version, query/bulk-load translation.\n- Persistence roots derive from `configPath`: graph data under `{configPath}/graph`, scratch under `{configPath}/tmp`; create on demand.\n- `recreate()` discards all Ladybug-owned persisted graph state plus companion artifacts under graph root; callers never target `.lbug`, `.wal`, `.lock` directly.\n- Adapter owns physical schema. Node tables: `File`, `Symbol`, `Spec`, `Document`, `Meta`.\n- `File` persists canonical path, workspace, `contentHash`, full `content`. `Symbol` persists `id`, `name`, backend `searchName`, kind, file path, location, comment. `Spec` persists identity, path, title, description, `contentHash`, concatenated content, workspace. `Document` persists `path`, `configRelativePath`, `contentHash`, `content`, workspace.\n- Persist relationship tables for all required graph relations, including `COVERS_FILE`, `COVERS_SYMBOL`, `EXTENDS`, `IMPLEMENTS`, `OVERRIDES`.\n- `COVERS_SYMBOL` metadata must survive persistence and reload, including stale markers.\n- Search uses Ladybug FTS with `symbol_fts`, `spec_fts`, `document_fts`; symbol/spec discovery keeps `QUERY_FTS_INDEX`; document discovery may be manual.\n- Search joins tokens with `OR`, expands specd/code-shaped tokens, supplements native candidates with identity-derived candidates when needed, reranks candidate set locally, returns snippets plus 1-based line ranges.\n- Ordering must honor identity ladder: exact canonical identity first; strong non-exact identity before content-only; exact token > prefix > suffix > substring; real component > arbitrary substring; more matched identity tokens rank higher.\n- Track backend schema version in metadata; incompatible versions may require destructive rebuild instead of migration.\n- Bulk loading may use run-scoped CSV scratch files under `{configPath}/tmp`; clean after success, best effort after failure.\n- Persist store metadata required by `GraphStore`, including `lastIndexedAt` and `lastIndexedRef`.\n- Use Ladybug prepared statements for user/external values via bound `$param` inputs. Direct `conn.query()` allowed for DDL, compile-time constants, COPY, admin queries without external values.\n## Constraints\n- Ladybug behavior here is backend-specific, not portable graph-store contract.\n- Stable backend selector is `ladybug`.\n- All persisted and scratch artifacts stay rooted under `configPath`.\n- Storage-agnostic consumers and CLI flows depend on `code-graph:graph-store`, not Ladybug schema details."
+  "generatedBy": "core"
 }

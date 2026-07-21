@@ -1,5 +1,5 @@
 import { Command, Option } from 'commander'
-import { type SearchOptions, assertGraphIndexUnlocked } from '@specd/sdk'
+import { type SearchOptions } from '@specd/sdk'
 import { output, parseFormat } from '../../formatter.js'
 import { cliError } from '../../handle-error.js'
 import { parseGraphKinds } from './parse-graph-kinds.js'
@@ -174,8 +174,6 @@ Exclude examples:
             1,
           ),
         )
-        assertGraphIndexUnlocked(config)
-
         await withProvider(config, opts.format, async (provider) => {
           await warnGraphStale(provider, config, kernel)
           const searchOptions: SearchOptions = {

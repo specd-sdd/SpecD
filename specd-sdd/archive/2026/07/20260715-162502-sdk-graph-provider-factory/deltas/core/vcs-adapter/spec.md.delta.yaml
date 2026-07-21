@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'The factory requirements already define Git detection through createVcsAdapter; only verification coverage changes.'

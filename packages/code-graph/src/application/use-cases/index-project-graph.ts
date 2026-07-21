@@ -30,16 +30,13 @@ export class IndexProjectGraph {
    * @returns Index result from the provider
    */
   async execute(input: IndexProjectGraphInput): Promise<IndexResult> {
-    if (input.force === true) {
-      await input.provider.recreate()
-    }
-
     return input.provider.index({
       projectRoot: input.projectRoot,
       workspaces: [...input.workspaces],
       graphConfig: input.graphConfig,
       codeGraphVersion: input.codeGraphVersion,
       vcsRoot: input.vcsRoot,
+      ...(input.force === true ? { force: true } : {}),
       ...(input.vcsRef !== undefined ? { vcsRef: input.vcsRef } : {}),
       ...(input.onProgress !== undefined ? { onProgress: input.onProgress } : {}),
     })

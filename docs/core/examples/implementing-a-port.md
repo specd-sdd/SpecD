@@ -487,6 +487,18 @@ When the CLI is invoked with `--config path/to/specd.yaml`, use forced mode inst
 const loader = await createDefaultConfigLoader({ configPath: options.config })
 ```
 
+If you are building a host that already selects a runtime directory, prefer the SDK host
+entrypoint instead of rebuilding the bootstrap flow manually:
+
+```typescript
+import { openSpecdHost } from '@specd/sdk'
+
+const host = await openSpecdHost({ startDir: '/selected/project/subdir' })
+```
+
+That keeps directory-based discovery semantics intact. Use `configPath` only when the host
+intentionally wants forced-file bootstrap.
+
 ### Using a single use-case factory
 
 If you only need one use case, call its factory directly instead of building the full kernel:

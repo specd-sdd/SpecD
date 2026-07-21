@@ -774,9 +774,17 @@ describe('change transition', () => {
       'json',
     ])
 
-    const parsed = JSON.parse(stdout())
-    expect(parsed.result).toBe('ok')
-    expect(parsed.to).toBe('implementing')
+    const lines = stdout()
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line) as { stream: string; event: Record<string, unknown> })
+    expect(lines.at(-1)).toEqual({
+      stream: 'change-transition',
+      event: {
+        type: 'complete',
+        result: { result: 'ok', name: 'feat', from: 'designing', to: 'implementing' },
+      },
+    })
   })
 
   it('JSON output includes from and to fields', async () => {
@@ -821,11 +829,17 @@ describe('change transition', () => {
       'json',
     ])
 
-    const parsed = JSON.parse(stdout())
-    expect(parsed.result).toBe('ok')
-    expect(parsed.name).toBe('my-change')
-    expect(parsed.from).toBe('drafting')
-    expect(parsed.to).toBe('designing')
+    const lines = stdout()
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line) as { stream: string; event: Record<string, unknown> })
+    expect(lines.at(-1)).toEqual({
+      stream: 'change-transition',
+      event: {
+        type: 'complete',
+        result: { result: 'ok', name: 'my-change', from: 'drafting', to: 'designing' },
+      },
+    })
   })
 
   it('does not pass approval flags to transition execute (baked at kernel construction)', async () => {

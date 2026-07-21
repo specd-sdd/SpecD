@@ -32,6 +32,30 @@ describe('NodeHookRunner', () => {
       expect(result.stderr().trim()).toBe('err')
     })
 
+    it('emits stdout and stderr progress before completion', async () => {
+      const events: Array<{ type: string; stream?: string; line?: string }> = []
+
+      const result = await runner.run('printf "line1\\n"; printf "line2\\n" >&2', {}, (event) =>
+        events.push(event),
+      )
+
+      expect(events).toContainEqual({ type: 'output', stream: 'stdout', line: 'line1' })
+      expect(events).toContainEqual({ type: 'output', stream: 'stderr', line: 'line2' })
+      expect(result.stdout()).toContain('line1')
+      expect(result.stderr()).toContain('line2')
+    })
+
+    it('emits a heartbeat for a quiet but still-running process', async () => {
+      const events: Array<{ type: string; elapsedMs?: number }> = []
+
+      const result = await runner.run('sleep 5.2', {}, (event) => events.push(event))
+
+      expect(result.exitCode()).toBe(0)
+      expect(
+        events.some((event) => event.type === 'heartbeat' && (event.elapsedMs ?? 0) >= 5000),
+      ).toBe(true)
+    }, 10000)
+
     it('returns non-zero exit code on failure', async () => {
       const result = await runner.run('exit 42', {})
 

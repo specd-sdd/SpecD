@@ -25,7 +25,7 @@ export interface GraphStoreFactory {
 /**
  * Optional composition overrides for the primary `SpecdConfig` factory overload.
  */
-export interface CodeGraphFactoryOptions {
+export interface CodeGraphCompositionOptions {
   /** Selected backend id; when omitted, the built-in default is used. */
   readonly graphStoreId?: string
   /** Additional graph-store factories merged additively with the built-ins. */
@@ -37,7 +37,7 @@ export interface CodeGraphFactoryOptions {
 /**
  * Legacy standalone provider-construction options.
  */
-export interface CodeGraphOptions extends CodeGraphFactoryOptions {
+export interface CodeGraphOptions extends CodeGraphCompositionOptions {
   /** Filesystem root allocated to the selected graph-store backend. */
   readonly storagePath: string
   /** Optional project root used for selector normalization. */

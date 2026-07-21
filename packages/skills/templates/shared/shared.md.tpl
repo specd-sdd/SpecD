@@ -218,7 +218,19 @@ whether a delta preserves important existing text.
 
 After validation succeeds, review the content that matters for the current phase:
 
-- For spec/verify deltas, review the merged output, not only the raw delta.
+- For successful individual validation of an existing delta-backed `scope: spec`
+  artifact, review the inline diff shown by `specd changes validate` first. Use it
+  to catch unintended removals, contract breakage, or other risky edits without
+  switching commands.
+- If that inline diff is unavailable because validation failed or because diff
+  generation reported its dedicated non-fatal failure path, run:
+
+```bash
+specd changes spec-preview <name> <specId> --diff --artifact <artifactId>
+```
+
+- For broader spec/verify delta review, review the merged output, not only the raw
+  delta.
 - For design/tasks, compare the artifact content against the latest user intent and
   upstream artifacts.
 - When overlap, drift, or stale-base risk exists, run:
@@ -227,8 +239,8 @@ After validation succeeds, review the content that matters for the current phase
 specd changes spec-preview <name> <specId> --format text
 ```
 
-Use the preview as the authoritative merged-content checkpoint before accepting the
-delta outcome.
+Use merged preview as the authoritative checkpoint whenever review needs more than
+the narrow inline-diff validate path.
 
 Important scope rule:
 

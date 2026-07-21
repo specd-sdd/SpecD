@@ -25,13 +25,12 @@ vi.mock('@specd/sdk', async () => {
   const actual = await vi.importActual<typeof import('@specd/sdk')>('@specd/sdk')
   return {
     ...actual,
-    assertGraphIndexUnlocked: vi.fn(),
   }
 })
 
 import { resolveGraphCliContext } from '../../src/commands/graph/resolve-graph-cli-context.js'
 import { withProvider } from '../../src/commands/graph/with-provider.js'
-import { assertGraphIndexUnlocked, type ImpactResult } from '@specd/sdk'
+import { type ImpactResult } from '@specd/sdk'
 import { registerGraphImpact } from '../../src/commands/graph/impact.js'
 
 function setup() {
@@ -155,28 +154,6 @@ function makeImpactProgram() {
 afterEach(() => vi.restoreAllMocks())
 
 describe('graph impact', () => {
-  it('checks the shared index lock before opening the provider', async () => {
-    const { mockProvider } = setup()
-    mockProvider.analyzeFileImpact.mockResolvedValue({
-      target: 'src/auth.ts',
-      directDependents: 0,
-      indirectDependents: 0,
-      transitiveDependents: 0,
-      riskLevel: 'LOW',
-      affectedFiles: [],
-      affectedSymbols: [],
-      affectedProcesses: [],
-      symbols: [],
-    })
-
-    const program = makeImpactProgram()
-    await program.parseAsync(['node', 'specd', 'graph', 'impact', '--file', 'src/auth.ts'])
-
-    expect(assertGraphIndexUnlocked).toHaveBeenCalledWith(
-      expect.objectContaining({ configPath: '/project/.specd/config' }),
-    )
-  })
-
   describe('--direction option', () => {
     it('maps dependents alias to upstream provider direction', async () => {
       const { mockProvider } = setup()
@@ -1025,6 +1002,11 @@ describe('graph impact', () => {
 
     it('outputs valid JSON with per-file breakdown for multiple files', async () => {
       const { mockProvider, getStdout } = setup()
+      mockProvider.getFile.mockImplementation(async (path: string) => ({
+        path,
+        configRelativePath: `packages/core/${path.startsWith('core:') ? path.slice('core:'.length) : path}`,
+        workspace: 'core',
+      }))
       mockProvider.resolveFileSelector.mockResolvedValueOnce([
         {
           canonicalPath: 'core:src/a.ts',
@@ -1087,6 +1069,8 @@ describe('graph impact', () => {
       expect(parsed).toHaveProperty('affectedFiles')
       expect(parsed).toHaveProperty('perFile')
       expect(parsed.targets).toEqual(['core:src/a.ts', 'core:src/b.ts'])
+      expect(parsed.affectedFiles).toEqual(['packages/core/src/x.ts'])
+      expect(parsed.perFile[0].result.affectedFiles).toEqual(['packages/core/src/x.ts'])
     })
 
     it('resolves project-relative symbol selectors through provider normalization', async () => {
@@ -1130,20 +1114,5 @@ describe('graph impact', () => {
         'packages/core/src/auth.ts:function:validate',
       )
     })
-  })
-
-  it('exits with code 3 when lock check fails', async () => {
-    setup()
-    vi.mocked(assertGraphIndexUnlocked).mockImplementationOnce(() => {
-      throw new Error('graph is locked')
-    })
-    mockProcessExit()
-
-    const program = makeImpactProgram()
-    await expect(
-      program.parseAsync(['node', 'specd', 'graph', 'impact', '--file', 'src/auth.ts']),
-    ).rejects.toThrow(ExitSentinel)
-
-    expect(process.exit).toHaveBeenCalledWith(3)
   })
 })

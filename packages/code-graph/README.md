@@ -98,6 +98,45 @@ const hotspots = await graph.getHotspots({ limit: 10 })
 await graph.close()
 ```
 
+Short-lived host pattern:
+
+```ts
+import { openSpecdHost, withOpenGraphProvider } from '@specd/sdk'
+
+const host = await openSpecdHost({ startDir: process.cwd() })
+
+const stats = await withOpenGraphProvider(host, async (provider) => {
+  return provider.getStatistics()
+})
+```
+
+Long-lived host pattern with stale-provider recovery:
+
+```ts
+import { GraphProviderStaleError, openSpecdHost } from '@specd/sdk'
+
+const host = await openSpecdHost({ startDir: process.cwd() })
+const provider = host.createGraphProvider()
+
+await provider.open()
+
+try {
+  await provider.searchSymbols({ query: 'createCodeGraphProvider' })
+} catch (error) {
+  if (error instanceof GraphProviderStaleError) {
+    await provider.close()
+    await provider.open()
+  } else {
+    throw error
+  }
+}
+
+await provider.close()
+```
+
+`createGraphProvider()` is synchronous. Native backend loading happens lazily in
+`provider.open()`.
+
 To force the legacy backend explicitly:
 
 ```ts

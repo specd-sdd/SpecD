@@ -10,6 +10,13 @@
 - **THEN** it is declared as an abstract class
 - **AND** it has a protected constructor that receives `cwd`
 
+### Requirement: Public port export
+
+#### Scenario: VcsAdapter is available from the Core public API
+
+- **WHEN** a consumer imports `VcsAdapter` from `@specd/core`
+- **THEN** the import SHALL resolve to the abstract VCS adapter class as a runtime value
+
 ### Requirement: rootDir returns the repository root
 
 #### Scenario: rootDir outside a repository
@@ -141,6 +148,5 @@
 
 #### Scenario: Git detection inside git repo
 
-- **GIVEN** a directory inside a git repository
-- **WHEN** `VcsAdapter.detect(cwd)` is called
-- **THEN** the promise MUST resolve to a `GitVcsAdapter` instance
+- **WHEN** `VcsAdapter.detect(cwd)` is called on the abstract base class
+- **THEN** it resolves to `null`

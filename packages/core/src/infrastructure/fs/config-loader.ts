@@ -945,7 +945,9 @@ function applyEnvOverrides(raw: Record<string, unknown>): void {
 
 /**
  * Parses and normalizes the type and config block from raw adapter configuration,
- * handling legacy compatibility formats and collecting warnings when legacy format is used.
+ * handling legacy compatibility formats and collecting non-fatal warnings when a
+ * legacy format is used. These warnings are preserved on the resolved
+ * {@link SpecdConfig} for host bootstrap consumers.
  *
  * @param raw - Raw config object
  * @param adapterVal - Raw value of the adapter property

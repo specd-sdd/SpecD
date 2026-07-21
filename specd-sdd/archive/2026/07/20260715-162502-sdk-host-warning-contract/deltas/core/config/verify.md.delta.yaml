@@ -1,0 +1,32 @@
+- op: modified
+  description: Add verification that config warnings remain non-fatal bootstrap diagnostics for hosts.
+  selector:
+    type: section
+    matches: '^Requirement: Legacy configuration warnings$'
+  content: |
+    #### Scenario: Legacy config format emits warnings
+
+    - **GIVEN** a config file declares a legacy workspace spec adapter format:
+    - **WHEN** config is loaded
+    - **THEN** it resolves successfully
+    - **AND** `config.warnings` contains a warning string for `'workspaces.default.specs'`
+
+    #### Scenario: Omitted storage defaults do not emit legacy configuration warnings
+
+    - **GIVEN** a config file that completely omits the `storage` key
+    - **WHEN** config is loaded
+    - **THEN** it resolves successfully
+    - **AND** `config.warnings` is undefined or does not contain warnings for storage
+
+    #### Scenario: Warning-bearing config remains non-fatal
+
+    - **GIVEN** config loading detects a legacy-compatible warning condition
+    - **WHEN** the config is resolved
+    - **THEN** loading succeeds without converting the warning into a startup error
+
+    #### Scenario: Hosts can consume warnings from resolved config
+
+    - **GIVEN** config loading resolves warnings
+    - **WHEN** a delivery host receives the resolved `SpecdConfig`
+    - **THEN** the host can read those diagnostics from `config.warnings`
+    - **AND** the host does not need to recompute or reinterpret the warning messages

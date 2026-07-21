@@ -1,7 +1,5 @@
 import {
   type SymbolKind,
-  acquireGraphIndexLock,
-  assertGraphIndexUnlocked,
   codeGraphVersion,
   createGetGraphHealth,
   ChangeNotFoundError,
@@ -42,7 +40,6 @@ export function registerGraphRoutes(app: FastifyInstance): void {
     '/graph/status',
     { ...apiRouteSchema({ response: { 200: 'GraphStatusDto' } }) },
     apiHandler(async (ctx) => {
-      assertGraphIndexUnlocked(ctx.config)
       const getGraphHealth = createGetGraphHealth()
       const workspaces = await ctx.kernel.project.listWorkspaces.execute()
       const provider = ctx.createGraphProvider()
@@ -53,7 +50,6 @@ export function registerGraphRoutes(app: FastifyInstance): void {
           provider,
           codeGraphVersion,
           workspaces: [...workspaces],
-          assertUnlocked: false,
         })
         return toGraphStatusDto(health)
       } finally {
@@ -74,9 +70,6 @@ export function registerGraphRoutes(app: FastifyInstance): void {
       const body = (req.body ?? {}) as { force?: boolean }
       const result = await runIndexProjectGraph(ctx, {
         ...(body.force === true ? { force: true } : {}),
-        beforeOpen: async () => {
-          await Promise.resolve(acquireGraphIndexLock(ctx.config))
-        },
       })
       return toGraphIndexResultDto(result)
     }),

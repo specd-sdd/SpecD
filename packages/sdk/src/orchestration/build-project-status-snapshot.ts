@@ -74,7 +74,6 @@ export async function buildProjectStatusSnapshot(
         provider,
         codeGraphVersion,
         workspaces: [...workspaces],
-        assertUnlocked: false,
       })
       if (includeHotspots) {
         try {

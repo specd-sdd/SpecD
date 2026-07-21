@@ -61,6 +61,14 @@ export type TransitionProgressEvent =
       total: number
     }
   | { type: 'hook-start'; phase: 'pre' | 'post'; hookId: string; command: string }
+  | {
+      type: 'hook-output'
+      phase: 'pre' | 'post'
+      hookId: string
+      stream: 'stdout' | 'stderr'
+      line: string
+    }
+  | { type: 'hook-heartbeat'; phase: 'pre' | 'post'; hookId: string; elapsedMs: number }
   | { type: 'hook-done'; phase: 'pre' | 'post'; hookId: string; success: boolean; exitCode: number }
   | { type: 'transitioned'; from: ChangeState; to: ChangeState }
 
@@ -324,15 +332,19 @@ export class TransitionChange {
     onProgress?: OnTransitionProgress,
   ): Promise<void> {
     const hookProgress: OnHookProgress = (evt) => {
-      onProgress?.({ ...evt, phase } as TransitionProgressEvent)
+      switch (evt.type) {
+        case 'hook-start':
+        case 'hook-output':
+        case 'hook-heartbeat':
+        case 'hook-done':
+          onProgress?.({ ...evt, phase })
+          break
+      }
     }
     const result = await this._runStepHooks.execute({ name, step, phase }, hookProgress)
-    if (!result.success && result.failedHook !== null) {
-      throw new HookFailedError(
-        result.failedHook.command,
-        result.failedHook.exitCode,
-        result.failedHook.stderr,
-      )
+    const failedHook = result.failedHooks[0]
+    if (!result.success && failedHook !== undefined) {
+      throw new HookFailedError(failedHook.command, failedHook.exitCode, failedHook.stderr)
     }
   }
 

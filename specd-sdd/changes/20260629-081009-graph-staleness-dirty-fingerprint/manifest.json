@@ -353,6 +353,64 @@
           "files": ["tasks"]
         }
       ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-20T16:47:33.041Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'sdk-graph-provider-factory' was archived with overlapping specs: code-graph:get-graph-health",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:get-graph-health"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:get-graph-health"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-20T16:47:43.595Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'sdk-graph-provider-factory' was archived with overlapping specs: code-graph:get-graph-health",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:get-graph-health"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:get-graph-health"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
     }
   ]
 }

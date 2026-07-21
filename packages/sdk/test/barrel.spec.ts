@@ -44,9 +44,8 @@ describe('@specd/sdk barrel', () => {
   })
 
   it('re-exports host-adapter code-graph symbols', () => {
-    expect(typeof sdk.acquireGraphIndexLock).toBe('function')
-    expect(typeof sdk.assertGraphIndexUnlocked).toBe('function')
     expect(typeof sdk.createGetGraphHealth).toBe('function')
+    expect(typeof sdk.GraphProviderStaleError).toBe('function')
     expect(typeof sdk.GraphSpecNotFoundError).toBe('function')
     expect(typeof sdk.codeGraphVersion).toBe('string')
     expect(typeof sdk.getCodeGraphVersion).toBe('function')

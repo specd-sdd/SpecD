@@ -2,13 +2,13 @@
 
 ## Purpose
 
-During an active change, agents and humans need to see what a spec will look like after its deltas are applied — but the canonical spec remains untouched until archive. `PreviewSpec` fills this gap by applying a change's delta artifacts to the base spec content and returning the merged result per artifact file, without mutating anything. It is the single source of delta-merge logic for read-only preview, consumed both by `CompileContext` (for materialized views) and by the CLI preview command (for human review).
+During an active change, agents and humans need to see what a spec will look like after its deltas are applied — and some delivery mechanisms also need a reusable unified diff view of those changes — but the canonical spec remains untouched until archive. `PreviewSpec` fills this gap by applying a change's delta artifacts to the base spec content and returning the merged result per artifact file, with optional unified diff output when explicitly requested. It is the single source of delta-merge logic for read-only preview, consumed both by `CompileContext` (for materialized views) and by preview-oriented delivery mechanisms.
 
 ## Requirements
 
 ### Requirement: Ports and constructor
 
-`PreviewSpec` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `SchemaProvider`, and `ArtifactParserRegistry`.
+`PreviewSpec` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `SchemaProvider`, `ArtifactParserRegistry`, and `DiffGenerator`.
 
 ```typescript
 class PreviewSpec {
@@ -17,6 +17,7 @@ class PreviewSpec {
     specs: ReadonlyMap<string, SpecRepository>,
     schemaProvider: SchemaProvider,
     parsers: ArtifactParserRegistry,
+    diffGenerator: DiffGenerator,
   )
 }
 ```
@@ -29,6 +30,7 @@ All are injected at kernel composition time, not passed per invocation.
 
 - `name` — the change name
 - `specId` — the fully-qualified spec ID to preview (e.g. `core:compile-context`); MUST be one of the change's `specIds`
+- `includeDiff` — optional boolean flag; when `true`, `PreviewSpec` SHALL generate unified diff output for preview entries whose status is `merged`. When omitted or `false`, `PreviewSpec` SHALL NOT generate diff output.
 
 ### Requirement: Spec ID validation
 
@@ -66,6 +68,28 @@ This avoids manually deriving filenames from the schema — the change entity al
 
 The result MUST order artifact files as: the file named `spec.md` first (if present), then all remaining files in alphabetical order. This ordering applies to both merged content and diff output.
 
+### Requirement: Diff generation
+
+When `includeDiff` is `true`, `PreviewSpec` MUST generate a plain unified diff for each preview entry whose status is `merged`.
+
+Diff generation MUST use the injected `DiffGenerator` capability and the same file entry's preview content:
+
+- `filename` — the artifact filename being previewed
+- `base` — the original content before delta application; when `base` is `null`, the diff generator MUST receive an empty string as the base side
+- `merged` — the merged content after delta application
+
+When `includeDiff` is `false` or omitted, `PreviewSpec` SHALL NOT invoke `DiffGenerator`.
+
+Preview entries with status `no-op` or `missing` MUST NOT include generated diff output.
+
+If `DiffGenerator` raises the dedicated `DiffGenerationError` for one file, `PreviewSpec` MUST:
+
+- add a warning describing the diff-generation failure
+- continue returning the preview entry's `base`, `merged`, and `status`
+- omit the `diff` field for that entry
+
+Handling `DiffGenerationError` SHALL NOT downgrade a successfully merged preview entry to `missing`.
+
 ### Requirement: Result shape
 
 `PreviewSpec.execute` MUST return a `PreviewSpecResult`:
@@ -78,6 +102,11 @@ interface PreviewSpecFileEntry {
   readonly base: string | null
   /** The merged content (after delta application). */
   readonly merged: string
+  /**
+   * Optional unified diff generated from `base` and `merged`.
+   * Present only when `includeDiff` is true and the file status is `merged`.
+   */
+  readonly diff?: string
   /**
    * The preview status of this file.
    * - 'merged': delta applied successfully with changes, or new spec file
@@ -94,7 +123,7 @@ interface PreviewSpecResult {
   readonly changeName: string
   /** Per-file preview entries, ordered per the artifact file ordering requirement. */
   readonly files: readonly PreviewSpecFileEntry[]
-  /** Warnings encountered during preview (e.g. parser errors, missing base). */
+  /** Warnings encountered during preview (e.g. parser errors, missing base, diff-generation failures). */
   readonly warnings: readonly string[]
 }
 ```
@@ -105,6 +134,8 @@ If delta application fails for an artifact file (e.g. selector resolution failur
 
 1. Add a warning describing the failure and the affected filename
 2. Include the file in the result with status `missing`
+
+If diff generation fails through the dedicated `DiffGenerationError`, `PreviewSpec` MUST also avoid throwing. It treats that case as a warning-producing partial result rather than as a failed preview.
 
 The preview MUST always succeed — partial results are acceptable, total failure is not.
 
@@ -122,20 +153,23 @@ The config-based `createPreviewSpec(config, options?)` form MUST derive `Preview
 - `specs: ReadonlyMap<string, SpecRepository>`
 - `schemaProvider: SchemaProvider`
 - `parsers: ArtifactParserRegistry`
+- `diffGenerator: DiffGenerator`
 
 The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
 
 ## Constraints
 
 - `PreviewSpec` is read-only — it MUST NOT mutate any canonical spec content, change state, or artifact status
-- Diff generation is NOT part of `PreviewSpec` — it is the CLI adapter's responsibility. `PreviewSpec` returns `base` and `merged` only.
+- Diff generation is part of `PreviewSpec` only when `includeDiff` is explicitly requested; callers that do not request it MUST keep the existing preview path without generated diff output
+- `PreviewSpec` returns plain data only — it MUST NOT apply ANSI colorization or host-specific presentation formatting to diff output
 - `PreviewSpec` does not validate deltas — validation is `ValidateArtifacts`' concern
 - `PreviewSpec` does not check whether deltas are validated (complete status) — it applies whatever delta files exist; callers like `CompileContext` may choose to skip unvalidated deltas
 
 ## Spec Dependencies
 
-- [`core:delta-format`](../delta-format/spec.md)
-- [`core:artifact-parser-port`](../artifact-parser-port/spec.md)
-- [`core:change-layout`](../change-layout/spec.md)
-- [`core:file-reader-port`](../file-reader-port/spec.md)
-- [`core:composition-resolver`](../composition-resolver/spec.md)
+- [`core:delta-format`](../delta-format/spec.md) — delta files define how preview merges are applied
+- [`core:artifact-parser-port`](../artifact-parser-port/spec.md) — preview merges parse, apply, and serialize artifact content through this port
+- [`core:change-layout`](../change-layout/spec.md) — preview resolves artifact filenames from change layout conventions
+- [`core:file-reader-port`](../file-reader-port/spec.md) — preview-oriented workflows consume preview content as read-only text
+- [`core:composition-resolver`](../composition-resolver/spec.md) — config-based factory wiring resolves `PreviewSpec` dependencies through shared composition
+- [`core:diff-generator`](../diff-generator/spec.md) — unified diff generation is delegated to this internal capability

@@ -1,0 +1,465 @@
+{
+  "name": "fix-project-dashboard-snapshot",
+  "createdAt": "2026-07-20T16:32:22.217Z",
+  "description": "Refactor specd project dashboard to use buildProjectStatusSnapshot and improve TUI wrapping for workspaces and graph stats",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": ["cli:project-dashboard"],
+  "specDependsOn": {
+    "cli:project-dashboard": ["cli:entrypoint", "core:config"]
+  },
+  "invalidationPolicy": "downstream",
+  "trackedImplementationFiles": [
+    {
+      "file": "EXPLORATION_STORAGE_ABSTRACTION.md",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/commands/project/dashboard.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/cli/cli-reference.md",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/project-dashboard.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/entrypoint.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "EXPLORATION_SPECD_BRANCH_MERGE_SKILL.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-specs-lists.svg",
+      "state": "ignored"
+    },
+    {
+      "file": "specd.svg",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-changes-hooks.svg",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-changes-status.svg",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-changes-validate.svg",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-skill.svg",
+      "state": "ignored"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "cli:project-dashboard",
+      "file": "packages/cli/src/commands/project/dashboard.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["registerProjectDashboard"]
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:2b4e351f84ed8d73e9c0681c134687b7b33e23f44cef19f4b3f34526e2111154"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "cli:project-dashboard",
+          "filename": "deltas/cli/project-dashboard/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:f3ced27ec3c0d8f2e549a690f1f1894ad4349dd37905e7aa0bc93679d1ba5fe7"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "cli:project-dashboard",
+          "filename": "deltas/cli/project-dashboard/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:feda49abc3f2a4a8be9ed4611c3c4d241cdf036e8e617f2403bf2a24c0c5214d"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:936a59ba21b22fb3c7c700c527b8ef0940b120d8dc71e5a3f03b7f6a4c657c52"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:a2b4cb1ee8381b9affb91a0e51ccfeb6d1a9e11ae5b9d43948194e0668bc76de"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-07-20T16:32:22.217Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": ["cli:project-dashboard"],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-20T16:32:22.230Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "cli:project-dashboard"
+        },
+        {
+          "type": "verify",
+          "key": "cli:project-dashboard"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-20T16:33:35.875Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-20T16:36:18.201Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-20T16:41:51.867Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["cli:project-dashboard"]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:project-dashboard"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-20T16:41:51.867Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-20T16:42:23.042Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-20T17:02:22.839Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-20T17:12:17.022Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:project-dashboard]; verify [cli:project-dashboard]; design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["cli:project-dashboard"]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:project-dashboard"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-20T17:12:17.022Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-20T18:18:31.416Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-20T18:44:00.182Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-20T19:15:43.507Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-20T19:31:44.370Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:project-dashboard]; verify [cli:project-dashboard]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["cli:project-dashboard"]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:project-dashboard"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-20T19:31:44.370Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-20T19:31:57.934Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-20T19:32:00.805Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-20T19:32:04.749Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-20T19:39:46.244Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-20T19:40:01.796Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-20T21:57:19.987Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-07-20T21:57:20.019Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

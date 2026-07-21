@@ -12,7 +12,27 @@
   ],
   "implementation": [
     {
-      "file": "cli:src/commands/change/transition.ts"
+      "file": "cli:src/commands/change/_hook-progress-presenter.ts",
+      "symbols": ["HookPresenterEvent", "HookProgressPresenter", "createHookProgressPresenter"]
+    },
+    {
+      "file": "cli:src/commands/change/transition.ts",
+      "symbols": ["registerChangeTransition"]
+    },
+    {
+      "file": "cli:test/commands/change-transition.spec.ts"
+    },
+    {
+      "file": "cli:test/commands/_hook-progress-presenter.spec.ts"
+    },
+    {
+      "file": "cli:src/formatter.ts"
+    },
+    {
+      "file": "cli:test/commands/change.spec.ts"
+    },
+    {
+      "file": "cli:test/formatter.spec.ts"
     }
   ]
 }

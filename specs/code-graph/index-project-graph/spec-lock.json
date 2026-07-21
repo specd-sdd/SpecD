@@ -15,8 +15,7 @@
       "symbols": ["IndexProjectGraph", "IndexProjectGraphInput"]
     },
     {
-      "file": "code-graph:src/composition/use-cases/index-project-graph.ts",
-      "symbols": ["createIndexProjectGraph"]
+      "file": "code-graph:test/application/use-cases/index-project-graph.spec.ts"
     }
   ]
 }

@@ -1,0 +1,129 @@
+- op: modified
+  description: 'Refine success output so inline diff review replaces redundant spec-preview guidance for successful single-artifact spec deltas.'
+  selector:
+    type: section
+    matches: '^Requirement: Output on success$'
+  content: |
+    In `text` mode (default), when all artifacts pass, the command prints the validated artifact paths.
+    For spec-scoped validation targets that do **not** qualify for inline diff review, it also prints a merged-preview hint:
+
+    ```text
+    validated <name>/<workspace:capability-path>: all artifacts pass
+      file: <path>
+      file: <path>
+    note: inspect merged spec output with `specd changes spec-preview <name> <workspace:capability-path>`
+    ```
+
+    In `text` mode, when there are notes but no failures:
+
+    ```text
+    validated <name>/<workspace:capability-path>: pass (N note(s))
+      file: <path>
+    note: <artifactId> — <description>
+    ...
+    note: inspect merged spec output with `specd changes spec-preview <name> <workspace:capability-path>`
+    ```
+
+    When validation targets a spec-scoped artifact via `--artifact <artifactId>`, the preview hint SHOULD include the same artifact filter:
+
+    ```text
+    note: inspect merged spec output with `specd changes spec-preview <name> <workspace:capability-path> --artifact <artifactId>`
+    ```
+
+    The listed file paths MUST come from `ValidateArtifacts` result metadata and MUST be the exact paths validated for the requested spec/artifact. Any non-blocking suggestion MUST be labeled as a `note`.
+
+    For a successful individual validation of an existing delta-backed `scope: spec` artifact, the command SHALL use inline diff review instead of the separate merged-preview hint. In that case:
+
+    - the invocation MUST target one spec and one artifact (`--artifact <artifactId>`)
+    - the validated file MUST be delta-backed against an existing base artifact
+    - validation MUST have succeeded
+    - the delta merge used for review MUST have materialized successfully
+
+    In that qualifying case, text output SHALL:
+
+    - keep the validated file path lines
+    - keep the structural-validation reminder note
+    - omit the standard `spec-preview` follow-up hint
+    - render the unified diff for the validated artifact only
+
+    If diff generation fails with the dedicated `DiffGenerationError` after validation has already succeeded, the command SHALL still report success, omit the inline diff, and print a `note:` telling the reviewer to run:
+
+    ```text
+    specd changes spec-preview <name> <workspace:capability-path> --diff --artifact <artifactId>
+    ```
+
+    In `json` or `toon` mode, the output continues to include a `notes` array:
+
+    ```json
+    {
+      "passed": true,
+      "failures": [],
+      "notes": [{ "artifactId": "...", "description": "..." }],
+      "files": [{ "artifactId": "...", "key": "...", "filename": "...", "status": "validated" }]
+    }
+    ```
+
+    The process exits with code 0 when `passed` is `true`.
+
+- op: modified
+  description: 'Clarify failure-path behavior so failed validation never surfaces a trustworthy inline diff.'
+  selector:
+    type: section
+    matches: '^Requirement: Output on failure$'
+  content: |
+    In `text` mode, the command prints each failure to stdout, exits with code 1, and includes any expected file paths that could not be validated.
+    For spec-scoped validation targets, it may also print a merged-preview hint only when that merged review surface remains trustworthy:
+
+    ```text
+    validation failed <name>/<workspace:capability-path>:
+      missing: <path>
+        error: <artifactId> — <description>
+        ...
+        note: <artifactId> — <description>
+        ...
+      note: inspect merged spec output with `specd changes spec-preview <name> <workspace:capability-path>`
+    ```
+
+    When validation targets a spec-scoped artifact via `--artifact <artifactId>`, the preview hint SHOULD include the same artifact filter:
+
+    ```text
+    note: inspect merged spec output with `specd changes spec-preview <name> <workspace:capability-path> --artifact <artifactId>`
+    ```
+
+    For change-scoped validation targets, no preview hint is emitted.
+
+    Inline diff review MUST NOT be emitted on a failed validation result.
+
+    When delta validation fails or delta application fails before a trustworthy merged result exists, the command SHALL report the failure only. In that case it SHALL:
+
+    - omit inline diff output
+    - avoid presenting any inline review surface that could be mistaken for a trustworthy merged checkpoint
+
+    Missing path lines MUST be derived from `ValidateArtifacts` result metadata. For an existing spec with a delta-capable artifact, this path is the expected `deltas/.../*.delta.yaml` file, even if a direct `specs/...` file exists.
+
+    For dependency-blocked failures, `<description>` MUST be rendered exactly from the core validation failure entry and therefore MUST preserve dependency status context. Because core dependency interpretation is lifecycle-engine-driven, the CLI MUST surface that wording verbatim instead of replacing it with generic "incomplete dependency" wording or recomputing blocker semantics locally.
+
+    In `json` or `toon` mode:
+
+    ```json
+    {
+      "passed": false,
+      "failures": [{ "artifactId": "...", "description": "...", "filename": "..." }],
+      "notes": [],
+      "files": [{ "artifactId": "...", "key": "...", "filename": "...", "status": "missing" }]
+    }
+    ```
+
+    The process exits with code 1 when `passed` is `false`, regardless of format.
+
+- op: modified
+  description: 'Record the additional dependency on PreviewSpec for inline diff review.'
+  selector:
+    type: section
+    matches: '^Spec Dependencies$'
+  content: |
+    - [`cli:entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
+    - [`core:change`](../../core/change/spec.md) — artifact status, validation, approval invalidation
+    - [`core:validate-artifacts`](../../core/validate-artifacts/spec.md) — validation result shape and expected artifact file paths
+    - [`core:spec-id-format`](../../core/spec-id-format/spec.md) — canonical `workspace:capabilityPath` format
+    - [`core:preview-spec`](../../core/preview-spec/spec.md) — inline diff review for successful single-artifact spec-delta validation reuses the preview merge/diff surface

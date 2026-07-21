@@ -10,11 +10,25 @@ import {
 import { renderBanner } from '../src/banner.js'
 import { CLI_VERSION, CODE_GRAPH_VERSION, CORE_VERSION, SDK_VERSION } from '../src/version.js'
 
+vi.mock('@specd/sdk', async (importOriginal) => {
+  const mod = await importOriginal<typeof import('@specd/sdk')>()
+  return {
+    ...mod,
+    openSpecdHost: vi.fn(),
+    buildProjectStatusSnapshot: vi.fn(),
+  }
+})
+
 vi.mock('../src/helpers/cli-context.js', () => ({
   resolveCliContext: vi.fn(),
   buildCliKernelOptions: vi.fn(() => ({})),
 }))
 
+import {
+  openSpecdHost,
+  buildProjectStatusSnapshot,
+  type BuildProjectStatusSnapshotResult,
+} from '@specd/sdk'
 import { resolveCliContext } from '../src/helpers/cli-context.js'
 import { registerProjectDashboard } from '../src/commands/project/dashboard.js'
 import { registerProjectInit } from '../src/commands/project/init.js'
@@ -204,11 +218,48 @@ describe('auto-dashboard default action', () => {
   function setupDashboard() {
     const config = makeMockConfig()
     const kernel = makeMockKernel()
+    Object.assign(kernel, {
+      project: {
+        listWorkspaces: vi.fn().mockResolvedValue([
+          {
+            name: 'default',
+            prefix: '_global',
+            ownership: 'owned',
+            codeRoot: '/project',
+            isExternal: false,
+          },
+        ]),
+        getProjectContext: vi
+          .fn()
+          .mockResolvedValue({ warnings: [], contextEntries: [], specs: [] }),
+      },
+    })
+
     vi.mocked(resolveCliContext).mockResolvedValue({
       config: config,
       configFilePath: null,
       kernel: kernel,
     })
+    vi.mocked(openSpecdHost).mockResolvedValue({
+      config,
+      configFilePath: '/project/specd.yaml',
+      kernel,
+      createGraphProvider: vi.fn(),
+    })
+    const snapshot: BuildProjectStatusSnapshotResult = {
+      summary: {
+        activeCount: 0,
+        draftCount: 0,
+        discardedCount: 0,
+        archivedCount: 0,
+        specsByWorkspace: { default: 0 },
+        workspaceCount: 1,
+      },
+      graphHealth: null,
+      approvals: { specEnabled: false, signoffEnabled: false },
+      llmOptimizedContext: false,
+    }
+    vi.mocked(buildProjectStatusSnapshot).mockResolvedValue(snapshot)
     const stdout = captureStdout()
     const stderr = captureStderr()
     mockProcessExit()

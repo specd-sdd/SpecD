@@ -26,13 +26,19 @@
     {
       "requirement": "Connection lifecycle",
       "rules": [
-        "`GraphStore` SHALL expose explicit `open(): Promise<void>` and `close(): Promise<void>` methods. All query and mutation methods MUST throw `StoreNotOpenError` (extending `CodeGraphError`) if called before `open()` or after `close()`.\n\nThe `open()` method prepares the concrete backend for read/write operations. The `close()` method flushes pending writes and releases resources. Any backend-specific schema initialization, migrations, or index preparation remain implementation concerns."
+        "`GraphStore` SHALL expose explicit `open(): Promise<void>` and `close(): Promise<void>` operations together with any backend-specific lifecycle state needed by the adapter.\n\nThe `open()` method prepares the concrete backend for read/write operations. It MAY perform backend-native module loading, runtime-specific binding resolution, schema preparation, or storage-generation checks required before the store can serve requests.\n\nThe `close()` method releases backend resources and MUST be idempotent. Calling `close()` more than once, or combining it with future async-dispose support, MUST NOT fail merely because the store was already closed."
       ]
     },
     {
       "requirement": "Store recreation",
       "rules": [
-        "`GraphStore` SHALL provide `recreate(): Promise<void>` as the abstract destructive reset operation for backends that need to drop and rebuild their persisted graph state.\n\n`recreate()` is stronger than `clear()`: it resets the backend's persisted storage layout rather than merely deleting graph rows from an already-open store. Callers such as `graph index --force` MUST use this abstract capability instead of deleting backend-specific files or directories directly.\n\nThe concrete backend owns how recreation is performed. A backend MAY delete files, recreate directories, rebuild schemas, reopen connections, or combine those steps, provided the observable result is the same:\n\n- all previously indexed graph data is gone\n- the persisted backend state is ready for a fresh indexing run\n- callers do not need to know backend-specific filenames, lockfiles, WAL files, or schema artifacts"
+        "`GraphStore` SHALL provide `recreate(): Promise<void>` as the abstract destructive reset capability used by provider-owned indexing flows.\n\n`recreate()` is stronger than `clear()`: it resets the backend's persisted storage layer, not just the logical graph contents.\n\nThe concrete backend owns how recreation is performed. A backend MAY delete files, recreate schema state, rotate generation metadata, or rebuild internal search artifacts, provided all of the following hold after `recreate()` completes:\n\n- all previously indexed graph data is gone\n- the persisted backend state is ready for a fresh indexing run\n- callers do not need to know backend-specific filenames, lockfiles, WAL files, or schema artifacts\n\nHost-facing code MUST NOT depend on backend-specific reset mechanics or on direct store recreation APIs. The owning `CodeGraphProvider` decides when recreation is required as part of `index(...)`, `clear()`, or other internal maintenance paths."
+      ]
+    },
+    {
+      "requirement": "Storage generation tracking",
+      "rules": [
+        "Every persisted `GraphStore` backend SHALL maintain a storage-generation marker that lets already-open providers detect when another process has destructively replaced the underlying graph storage.\n\nAt minimum:\n\n- the backend SHALL persist a generation marker within the graph storage root\n- destructive recreation SHALL rotate that generation marker\n- the backend SHALL expose enough behavior for the owning provider to cache the current generation at `open()` time and compare it later before serving reads\n\nThe abstract contract does not require a specific file format, but a sidecar such as `graph/storage.epoch` is a valid realization."
       ]
     },
     {
@@ -89,7 +95,8 @@
     "All mutations are atomic at the file level — no partial updates",
     "StoreNotOpenError is thrown on any operation when the store is not open",
     "The abstract store contract does not prescribe a specific backend, physical schema, or filesystem layout",
-    "Destructive force-reset behavior is modeled through recreate(), not through caller-managed backend file deletion",
+    "Destructive reset behavior is modeled through recreate() as a backend capability owned by provider/indexing flows, not through caller-managed backend file deletion",
+    "Persisted storage generation markers exist to support provider-owned stale detection across processes",
     "No dependency on @specd/core — error types extend CodeGraphError"
   ],
   "scenarios": [
@@ -192,6 +199,16 @@
       "then": [
         "it uses GraphStore.recreate()",
         "AND it does not need to know backend-specific database files, lock files, WAL files, or schema artifacts"
+      ]
+    },
+    {
+      "requirement": "Storage generation tracking",
+      "name": "Recreate rotates the persisted storage generation",
+      "given": ["a persisted graph store with an existing storage-generation marker"],
+      "when": ["recreate() completes"],
+      "then": [
+        "the next opened provider observes a different storage generation",
+        "AND previously opened providers can detect that they are stale"
       ]
     },
     {
@@ -571,48 +588,27 @@
     }
   ],
   "implementation": {
-    "files": [
-      {
-        "specId": "code-graph:graph-store",
-        "file": "code-graph:test/domain/ports/graph-store.contract.ts"
-      },
-      {
-        "specId": "code-graph:graph-store",
-        "file": "code-graph:src/domain/services/expand-search-query.ts"
-      },
-      {
-        "specId": "code-graph:graph-store",
-        "file": "code-graph:src/index.ts"
-      }
-    ],
     "symbols": [
+      {
+        "specId": "code-graph:graph-store",
+        "file": "code-graph:src/domain/ports/graph-store.ts",
+        "symbol": "GraphStore"
+      },
+      {
+        "specId": "code-graph:graph-store",
+        "file": "code-graph:src/composition/code-graph-provider.ts",
+        "symbol": "CodeGraphProviderImpl"
+      },
       {
         "specId": "code-graph:graph-store",
         "file": "code-graph:test/helpers/in-memory-graph-store.ts",
         "symbol": "InMemoryGraphStore"
-      },
-      {
-        "specId": "code-graph:graph-store",
-        "file": "code-graph:test/helpers/in-memory-graph-store.ts",
-        "symbol": "searchSymbols"
-      },
-      {
-        "specId": "code-graph:graph-store",
-        "file": "code-graph:test/helpers/in-memory-graph-store.ts",
-        "symbol": "searchSpecs"
-      },
-      {
-        "specId": "code-graph:graph-store",
-        "file": "code-graph:test/helpers/in-memory-graph-store.ts",
-        "symbol": "searchDocuments"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:8582856c5cb16bbf0d0096bda70aee0e4bc9b5cb7fe608ad6bcd45162ac9b1ac",
-    "verify.md": "sha256:b8789fa1695a0c1a672455eaaeb09bb26bbc6848c40adc572644f11847686426"
+    "spec.md": "sha256:aae3f43e9847d831e10e9de18f977620285bd339dc2fd88544e72f4cae2b1e55",
+    "verify.md": "sha256:76c4972e607632308c17d207215e5fd2d3d9cf338754c963de683494c7cfc02b"
   },
-  "generatedBy": "agent",
-  "optimizedDescription": "Abstract durable graph persistence contract: atomic mutations, traversal/query APIs, search, stats, docs, backend-agnostic semantics.",
-  "optimizedContext": "# Graph Store\n## Rules\n- `GraphStore` abstract class in `domain/ports/`; ctor `storagePath`; concrete backend owns schema, layout, engine details.\n- Persist minimum semantics: `FileNode`, `SymbolNode`, `SpecNode`, `DocumentNode`, full file `content`, metadata `lastIndexedAt`, `lastIndexedRef`, graph fingerprint.\n- Persist relation families: `IMPORTS`, `DEFINES`, `CALLS`, `CONSTRUCTS`, `USES_TYPE`, `EXPORTS`, `DEPENDS_ON`, `COVERS_FILE`, `COVERS_SYMBOL`, `EXTENDS`, `IMPLEMENTS`, `OVERRIDES`.\n- `COVERS_FILE` links spec->file. `COVERS_SYMBOL` links spec->symbol and may carry `metadata.stale`.\n- Lifecycle explicit: `open()` and `close()`. Any query/mutation outside open lifecycle throws `StoreNotOpenError`.\n- `recreate()` performs destructive backend reset. Callers use this, never backend file deletion.\n- `upsertFile(file, symbols, relations)` atomically replaces file-local graph state. Failure preserves previous state.\n- `addRelations(relations)` additive only; used for cross-file relations.\n- `removeFile(filePath)` atomically removes file, owned symbols, all incident relations.\n- Query surface includes file/symbol/spec lookup, config-relative file lookup, callers/callees, imports, extends/implements/overrides, spec dependency/coverage traversal, `findSymbols(query)`.\n- Search surface includes `searchSymbols`, `searchSpecs`, `searchDocuments`, `rebuildFtsIndexes()`; results include snippet plus 1-based `startLine`/`endLine`.\n- Search ranking expands whitespace, `:`, `/`, `_`, `.`, `-`, CamelCase/PascalCase tokens; rank exact canonical identity first, then exact primary identity, prefix, suffix, substring, real component, then generic text. More identity-token coverage ranks higher.\n- `getStatistics()` returns file/symbol/spec counts, relation counts, languages, `lastIndexedAt`, `lastIndexedRef`, `graphFingerprint`.\n- Spec ops: `upsertSpec(spec, relations)`, `removeSpec(specId)`. Bulk ops: `clear()`, `getAllFiles()`, `getAllSpecs()`.\n## Constraints\n- Abstract port, not backend schema contract.\n- Atomic file/spec mutation semantics; no partial committed state.\n- Persisted file content exists for symbol snippets; no separate file search category implied.\n- `recreate()` owns destructive reset boundary.\n- No `@specd/core` dependency; store errors extend `CodeGraphError`."
+  "generatedBy": "core"
 }

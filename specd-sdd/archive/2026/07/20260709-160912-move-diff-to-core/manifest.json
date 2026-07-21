@@ -1,0 +1,709 @@
+{
+  "name": "move-diff-to-core",
+  "createdAt": "2026-07-09T16:09:12.409Z",
+  "description": "Move unified diff generation into core PreviewSpec so CLI, HTTP API, and MCP can reuse the same preview result without duplicating diff logic. This adds an internal DiffGenerator capability with a default core implementation, keeps diff generation opt-in for PreviewSpec callers, and simplifies the CLI to render diff data returned by core while preserving its existing presentation behavior.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": ["core:preview-spec", "cli:change-spec-preview", "core:diff-generator"],
+  "specDependsOn": {
+    "core:preview-spec": [
+      "core:delta-format",
+      "core:artifact-parser-port",
+      "core:change-layout",
+      "core:file-reader-port",
+      "core:composition-resolver",
+      "core:diff-generator"
+    ],
+    "cli:change-spec-preview": ["core:preview-spec"],
+    "core:diff-generator": []
+  },
+  "invalidationPolicy": "downstream",
+  "trackedImplementationFiles": [
+    {
+      "file": ".specd/metadata/cli/entrypoint/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/code-graph/indexer/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/actor-resolver-git/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/actor-resolver-hg/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/actor-resolver-svn/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/config/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/ports/diff-generator.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/preview-spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/package.json",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/package.json",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/composition-resolver.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/change/spec-preview.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/infrastructure/diff/diff-generator.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/preview-spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/diff-generator.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/change/spec-preview.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/ports/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/ports.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/helpers.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/preview-spec.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/preview-spec.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "pnpm-lock.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/composition/diff-generator.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/infrastructure/diff/diff-generator.spec.ts",
+      "state": "resolved"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "core:diff-generator",
+      "file": "packages/core/src/application/ports/diff-generator.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["DiffGeneratorInput", "DiffGenerator"]
+    },
+    {
+      "specId": "core:preview-spec",
+      "file": "packages/core/src/application/use-cases/preview-spec.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["PreviewSpecInput", "PreviewSpecFileEntry", "PreviewSpecResult", "PreviewSpec"]
+    },
+    {
+      "specId": "core:diff-generator",
+      "file": "packages/core/package.json",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:change-spec-preview",
+      "file": "packages/cli/package.json",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:preview-spec",
+      "file": "packages/core/src/composition/composition-resolver.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["CompositionResolver", "createCompositionResolver"]
+    },
+    {
+      "specId": "cli:change-spec-preview",
+      "file": "packages/cli/src/commands/change/spec-preview.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["registerChangeSpecPreview"]
+    },
+    {
+      "specId": "core:diff-generator",
+      "file": "packages/core/src/infrastructure/diff/diff-generator.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["DiffDiffGenerator"]
+    },
+    {
+      "specId": "core:preview-spec",
+      "file": "packages/core/src/composition/use-cases/preview-spec.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["PreviewSpecDeps", "resolvePreviewSpecDeps", "createPreviewSpec"]
+    },
+    {
+      "specId": "core:diff-generator",
+      "file": "packages/core/src/composition/diff-generator.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["createDefaultDiffGenerator"]
+    },
+    {
+      "specId": "cli:change-spec-preview",
+      "file": "packages/cli/test/commands/change/spec-preview.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:diff-generator",
+      "file": "packages/core/src/ports.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:diff-generator",
+      "file": "packages/core/src/application/ports/index.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:diff-generator",
+      "file": "packages/core/src/composition/index.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:diff-generator",
+      "file": "packages/core/test/composition/diff-generator.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:preview-spec",
+      "file": "packages/core/test/application/use-cases/helpers.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["makeStubPreviewSpec"]
+    },
+    {
+      "specId": "core:preview-spec",
+      "file": "packages/core/test/application/use-cases/preview-spec.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:preview-spec",
+      "file": "packages/core/test/composition/use-cases/preview-spec.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:diff-generator",
+      "file": "packages/core/test/infrastructure/diff/diff-generator.spec.ts",
+      "fileLinkExplicit": true
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:dc70f68bfe15bcf7ed3df35f3a0b9aca73f47414b7c0dd33505ec6319b4b4f68"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:preview-spec",
+          "filename": "deltas/core/preview-spec/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:a3bb642ae6551f175eca66ac97054f7f2f20fb382e2b35c925fac345a65eb047"
+        },
+        {
+          "key": "cli:change-spec-preview",
+          "filename": "deltas/cli/change-spec-preview/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:c3e16bd567aeb77a7bdd1808c1513be53ca30b89e381d7c7be0439221aff0522"
+        },
+        {
+          "key": "core:diff-generator",
+          "filename": "specs/core/diff-generator/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:cb3ecb8eee901ba5484d8139fb0de47e2e7a882a03c8088a3de656e9ee1cde2e"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:preview-spec",
+          "filename": "deltas/core/preview-spec/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:2391b0a9047b0e7e4b419523e0e8ab08da1fb7d05e084958c711df85463b5a0c"
+        },
+        {
+          "key": "cli:change-spec-preview",
+          "filename": "deltas/cli/change-spec-preview/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:6a5747d4ff39fd53f0191088e07e0650ec474c9cf83ab594710a0481836bf0e6"
+        },
+        {
+          "key": "core:diff-generator",
+          "filename": "specs/core/diff-generator/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:9be3ab1bda4f0ed652fbdf0366a9ab6c814daed97ef1154edd3924c7a2884a19"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:322ab58224134bf25e7abf642fb6ad67c80e6b2cedbf858186f354a3cf208ddb"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:72b1cfcc0770760ce0997acaddc7ca87222ebffaffae73cf9d4ad9b47685d517"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-07-09T16:09:12.409Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": ["core:preview-spec", "cli:change-spec-preview"],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-09T16:09:12.436Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "core:preview-spec"
+        },
+        {
+          "type": "specs",
+          "key": "cli:change-spec-preview"
+        },
+        {
+          "type": "verify",
+          "key": "core:preview-spec"
+        },
+        {
+          "type": "verify",
+          "key": "cli:change-spec-preview"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-09T16:10:13.764Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-09T16:28:56.899Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["core:preview-spec", "cli:change-spec-preview"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:preview-spec", "cli:change-spec-preview"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-15T11:50:24.442Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["core:preview-spec", "cli:change-spec-preview"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:preview-spec", "cli:change-spec-preview"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-15T11:50:24.510Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["core:preview-spec", "cli:change-spec-preview"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:preview-spec", "cli:change-spec-preview"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-15T11:50:24.511Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:diff-generator"
+        },
+        {
+          "type": "verify",
+          "key": "core:diff-generator"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-15T13:29:06.576Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["core:preview-spec", "cli:change-spec-preview", "core:diff-generator"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:preview-spec", "cli:change-spec-preview", "core:diff-generator"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-15T13:46:22.942Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-15T13:50:41.689Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-15T13:50:41.689Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-15T13:56:51.050Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-15T14:00:19.784Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-15T14:00:40.185Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-15T14:01:24.887Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-15T14:16:18.917Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-15T14:25:13.678Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-15T14:25:31.269Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "description-updated",
+      "at": "2026-07-15T14:38:00.164Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "description": "Move unified diff generation into core PreviewSpec so CLI, HTTP API, and MCP can reuse the same preview result without duplicating diff logic. This adds an internal DiffGenerator capability with a default core implementation, keeps diff generation opt-in for PreviewSpec callers, and simplifies the CLI to render diff data returned by core while preserving its existing presentation behavior."
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-15T14:38:03.257Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-07-15T14:38:03.315Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

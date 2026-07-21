@@ -1,0 +1,25 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [],
+  "implementation": [
+    {
+      "file": "core:src/infrastructure/diff/diff-generator.ts",
+      "symbols": ["DiffDiffGenerator"]
+    },
+    {
+      "file": "core:src/application/ports/diff-generator.ts",
+      "symbols": ["DiffGenerationError"]
+    },
+    {
+      "file": "core:src/composition/composition-resolver.ts",
+      "symbols": ["getDiffGenerator"]
+    },
+    {
+      "file": "core:src/composition/diff-generator.ts",
+      "symbols": ["createDefaultDiffGenerator"]
+    }
+  ]
+}

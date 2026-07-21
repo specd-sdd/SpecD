@@ -1,10 +1,9 @@
 import { Command, Option } from 'commander'
+import { isAbsolute, relative } from 'node:path'
 import {
   createCodeGraphProvider,
-  assertGraphIndexUnlocked,
   type FileImpactResult,
   GraphSpecNotFoundError as SpecNotFoundError,
-  normalizeFileSelectorPath,
 } from '@specd/sdk'
 import { cliError } from '../../handle-error.js'
 import { output, parseFormat } from '../../formatter.js'
@@ -14,6 +13,24 @@ import { warnGraphStale } from './warn-graph-staleness.js'
 
 /** Provider-supported graph impact traversal directions. */
 type ImpactDirection = 'upstream' | 'downstream' | 'both'
+
+/**
+ * Converts a CLI file selector into the config-relative form used in messages.
+ * @param input - Raw file selector supplied by the user.
+ * @param projectRoot - Optional project root for absolute selectors.
+ * @returns The normalized display path.
+ */
+function normalizeFileSelectorPath(input: string, projectRoot?: string): string {
+  const trimmed = input.trim()
+  const relativePath = isAbsolute(trimmed)
+    ? projectRoot === undefined
+      ? null
+      : relative(projectRoot, trimmed)
+    : trimmed
+  if (relativePath === null) return trimmed
+  const normalized = relativePath.replaceAll('\\', '/')
+  return normalized.startsWith('./') ? normalized.slice(2) : normalized
+}
 
 /** Shared impact payload shape used by text formatters in this command. */
 type FormattedImpactResult = {
@@ -231,13 +248,6 @@ JSON/TOON output schema:
             1,
           ),
         )
-        try {
-          assertGraphIndexUnlocked(config)
-        } catch (err: unknown) {
-          cliError(err instanceof Error ? err.message : 'The code graph is locked', opts.format, 3)
-          return
-        }
-
         await withProvider(config, opts.format, async (provider) => {
           await warnGraphStale(provider, config, kernel)
           if (opts.symbol) {
@@ -426,7 +436,7 @@ async function handleFilesImpact(
         directDependents: result.directDependents,
         indirectDependents: result.indirectDependents,
         transitiveDependents: result.transitiveDependents,
-        affectedFiles: result.affectedFiles,
+        affectedFiles: await Promise.all(result.affectedFiles.map((path) => toDisplayPath(path))),
         perFile: await Promise.all(
           perFile.map(async ({ file, result: r }) => ({
             file: file.canonicalPath,

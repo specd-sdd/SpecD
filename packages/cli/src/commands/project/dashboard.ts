@@ -2,39 +2,68 @@ import path from 'node:path'
 import { type Command } from 'commander'
 import chalk from 'chalk'
 import boxen from 'boxen'
-import { resolveCliContext } from '../../helpers/cli-context.js'
+import { openSpecdHost, buildProjectStatusSnapshot } from '@specd/sdk'
+import { buildCliKernelOptions } from '../../helpers/cli-context.js'
 import { handleError } from '../../handle-error.js'
 import { output, parseFormat } from '../../formatter.js'
 import { renderBanner } from '../../banner.js'
 import { CLI_VERSION, CODE_GRAPH_VERSION, CORE_VERSION, SDK_VERSION } from '../../version.js'
 
-/** Width of each stat column box. */
-const COL_WIDTH = 28
-
-/** Inner width of the project section box. */
-const PROJECT_BOX_WIDTH = 56
-
 /** Label for the root row, including trailing spaces to align the value column. */
-const ROOT_LABEL = 'root:    '
+const ROOT_LABEL = 'root:       '
 
 /**
- * Splits a long value string into chunks that fit within `maxWidth` characters,
- * with continuation lines prefixed by `indent`.
+ * Wraps a text string (such as comma-separated values or file paths) into lines
+ * where each line is at most `maxWidth` characters long, preferring to split
+ * at spaces/commas instead of mid-word.
  *
  * @param text - The string to wrap.
- * @param maxWidth - Maximum characters per line.
- * @param indent - Prefix to prepend to continuation lines.
- * @returns Array of line chunks (first line is the raw text segment; continuations are indented).
+ * @param maxWidth - Maximum character width per line.
+ * @returns Array of line segments without leading/trailing indentation.
  */
-function wrapValue(text: string, maxWidth: number, indent: string): string[] {
-  const chunks: string[] = []
-  let remaining = text
-  while (remaining.length > maxWidth) {
-    chunks.push(remaining.slice(0, maxWidth))
-    remaining = indent + remaining.slice(maxWidth)
+function wrapText(text: string, maxWidth: number): string[] {
+  if (text.length <= maxWidth) {
+    return [text]
   }
-  chunks.push(remaining)
-  return chunks
+
+  const words = text.split(' ')
+  const lines: string[] = []
+  let currentLine = ''
+
+  for (const word of words) {
+    if (currentLine.length === 0) {
+      if (word.length > maxWidth) {
+        let rem = word
+        while (rem.length > maxWidth) {
+          lines.push(rem.slice(0, maxWidth))
+          rem = rem.slice(maxWidth)
+        }
+        currentLine = rem
+      } else {
+        currentLine = word
+      }
+    } else if (currentLine.length + 1 + word.length <= maxWidth) {
+      currentLine += ' ' + word
+    } else {
+      lines.push(currentLine)
+      if (word.length > maxWidth) {
+        let rem = word
+        while (rem.length > maxWidth) {
+          lines.push(rem.slice(0, maxWidth))
+          rem = rem.slice(maxWidth)
+        }
+        currentLine = rem
+      } else {
+        currentLine = word
+      }
+    }
+  }
+
+  if (currentLine.length > 0) {
+    lines.push(currentLine)
+  }
+
+  return lines
 }
 
 /**
@@ -42,14 +71,23 @@ function wrapValue(text: string, maxWidth: number, indent: string): string[] {
  *
  * @param title - The box header label.
  * @param lines - Content lines to display inside the box.
- * @param width - Total inner width of the box (including padding).
+ * @param width - Total width of the box (including borders).
+ * @param minLines - Minimum number of content lines (pads with empty rows if needed).
  * @returns The rendered box as a multi-line string.
  */
-function innerBox(title: string, lines: string[], width: number): string {
+function innerBox(title: string, lines: string[], width: number, minLines = 0): string {
+  const innerWidth = width - 4
   const pad = (s: string, w: number): string => s + ' '.repeat(Math.max(0, w - stripAnsi(s).length))
-  const top = chalk.dim(`╭─ ${title} ${'─'.repeat(Math.max(0, width - title.length - 3))}╮`)
-  const rows = lines.map((l) => chalk.dim('│') + ' ' + pad(l, width - 1) + chalk.dim('│'))
-  const bot = chalk.dim('╰' + '─'.repeat(width) + '╯')
+  const paddedLines = [...lines]
+  while (paddedLines.length < minLines) {
+    paddedLines.push('')
+  }
+  const topBarLen = Math.max(0, width - title.length - 5)
+  const top = chalk.dim(`╭─ ${title} ${'─'.repeat(topBarLen)}╮`)
+  const rows = paddedLines.map(
+    (l) => chalk.dim('│') + ' ' + pad(l, innerWidth) + ' ' + chalk.dim('│'),
+  )
+  const bot = chalk.dim('╰' + '─'.repeat(width - 2) + '╯')
   return [top, ...rows, bot].join('\n')
 }
 
@@ -61,7 +99,7 @@ function innerBox(title: string, lines: string[], width: number): string {
  * @returns The string with all ANSI codes removed.
  */
 function stripAnsi(s: string): string {
-  return s.replace(/\x1b\[[0-9;]*m/g, '')
+  return s.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '')
 }
 
 /**
@@ -78,12 +116,14 @@ function sideBySide(left: string, right: string, gap = 2): string {
   const rs = right.split('\n')
   const height = Math.max(ls.length, rs.length)
   const leftWidth = Math.max(...ls.map((l) => stripAnsi(l).length))
+  const rightWidth = Math.max(...rs.map((r) => stripAnsi(r).length))
   const result: string[] = []
   for (let i = 0; i < height; i++) {
     const l = ls[i] ?? ''
     const r = rs[i] ?? ''
-    const padding = ' '.repeat(Math.max(0, leftWidth - stripAnsi(l).length))
-    result.push(l + padding + ' '.repeat(gap) + r)
+    const padL = ' '.repeat(Math.max(0, leftWidth - stripAnsi(l).length))
+    const padR = ' '.repeat(Math.max(0, rightWidth - stripAnsi(r).length))
+    result.push(l + padL + ' '.repeat(gap) + r + padR)
   }
   return result.join('\n')
 }
@@ -106,50 +146,64 @@ export function registerProjectDashboard(parent: Command): void {
       'after',
       `
 JSON/TOON output schema:
-  {
-    projectRoot: string
-    schemaRef: string
-    workspaces: string[]
-    specs: { total: number, byWorkspace: Record<string, number> }
-    changes: { active: number, drafts: number, discarded: number }
-  }
+  Delegates directly to specd project status --format <fmt>
 `,
     )
     .action(async (opts: { format: string; config?: string }) => {
       try {
         const fmt = parseFormat(opts.format)
-        const { config, configFilePath, kernel } = await resolveCliContext({
-          configPath: opts.config,
-        })
-
-        const [specs, activeChanges, drafts, discarded] = await Promise.all([
-          kernel.specs.list.execute({ includeSummary: false }),
-          kernel.changes.list.execute(),
-          kernel.changes.listDrafts.execute(),
-          kernel.changes.listDiscarded.execute(),
-        ])
 
         if (fmt !== 'text') {
-          const specsByWorkspace: Record<string, number> = {}
-          for (const s of specs) {
-            specsByWorkspace[s.workspace] = (specsByWorkspace[s.workspace] ?? 0) + 1
-          }
+          const host = await openSpecdHost({
+            ...(opts.config !== undefined ? { configPath: opts.config } : {}),
+            options: {
+              kernel: buildCliKernelOptions(),
+            },
+          })
+          const snapshot = await buildProjectStatusSnapshot(host, { includeGraph: true })
+          const summary = snapshot.summary
+          const graphHealth = snapshot.graphHealth
+          const totalSpecs = Object.values(summary.specsByWorkspace).reduce((acc, c) => acc + c, 0)
+
           output(
             {
-              projectRoot: config.projectRoot,
-              schemaRef: config.schemaRef,
-              workspaces: config.workspaces.map((w) => w.name),
-              specs: { total: specs.length, byWorkspace: specsByWorkspace },
-              changes: {
-                active: activeChanges.length,
-                drafts: drafts.length,
-                discarded: discarded.length,
+              projectRoot: host.config.projectRoot,
+              schemaRef: host.config.schemaRef,
+              workspaces: host.config.workspaces,
+              specs: {
+                total: totalSpecs,
+                byWorkspace: summary.specsByWorkspace,
               },
+              changes: {
+                active: summary.activeCount,
+                drafts: summary.draftCount,
+                discarded: summary.discardedCount,
+                archived: summary.archivedCount,
+              },
+              graph: graphHealth
+                ? {
+                    freshness: graphHealth.lastIndexedAt,
+                    stale: graphHealth.stale,
+                    fingerprintMismatch: graphHealth.fingerprintMismatch,
+                  }
+                : null,
+              approvals: snapshot.approvals,
+              llmOptimizedContext: snapshot.llmOptimizedContext,
             },
             fmt,
           )
           return
         }
+
+        const host = await openSpecdHost({
+          ...(opts.config !== undefined ? { configPath: opts.config } : {}),
+          options: {
+            kernel: buildCliKernelOptions(),
+          },
+        })
+        const config = host.config
+        const snapshot = await buildProjectStatusSnapshot(host, { includeGraph: true })
+        const { summary, graphHealth } = snapshot
 
         // ── Banner ────────────────────────────────────────────────────────────
         process.stdout.write(
@@ -162,59 +216,108 @@ JSON/TOON output schema:
         )
 
         // ── "Using config:" line ──────────────────────────────────────────────
-        const displayPath = configFilePath ?? '<unknown config>'
+        const displayPath = host.configFilePath ?? '<unknown config>'
         const relConfigPath = path.relative(process.cwd(), displayPath)
         process.stdout.write(`Using config: ${relConfigPath}\n\n`)
 
+        // ── Layout dimensions ───────────────────────────────────────────────
+        const wsEntries = Object.entries(summary.specsByWorkspace)
+        const maxWsLen = Math.max(12, ...wsEntries.map(([ws]) => ws.length))
+
+        // Total viewport width available from TTY (default 80 if undefined/piped)
+        const termCols = process.stdout.columns ?? 80
+
+        // Fit inner content to TTY width minus boxen decoration and terminal margins
+        const minContentWidth = Math.max(30, maxWsLen + 8) * 2 + 2
+        const PROJECT_BOX_WIDTH = Math.max(minContentWidth, termCols - 6)
+
+        // Divide side-by-side row width into left (Specs) and right (Changes) columns with a 2-space gap
+        const LEFT_COL_WIDTH = Math.floor((PROJECT_BOX_WIDTH - 2) / 2)
+        const RIGHT_COL_WIDTH = PROJECT_BOX_WIDTH - 2 - LEFT_COL_WIDTH
+
         // ── Project box ──────────────────────────────────────────────────────
         const wsNames = config.workspaces.map((w) => w.name).join(', ')
+        const wsLabel = 'workspaces: '
+        const wsIndent = ' '.repeat(wsLabel.length)
         const rootIndent = ' '.repeat(ROOT_LABEL.length)
-        const valueWidth = PROJECT_BOX_WIDTH - 1 - ROOT_LABEL.length
-        const rootChunks = wrapValue(config.projectRoot, valueWidth, rootIndent)
-        const rootFirstLine = `${chalk.dim('root:')}    ${chalk.white(rootChunks[0] ?? '')}`
-        const rootContinuations = rootChunks
-          .slice(1)
-          .map((chunk) => rootIndent + chalk.white(chunk))
+        const valueWidth = PROJECT_BOX_WIDTH - 4 - ROOT_LABEL.length
+        const wsValueWidth = PROJECT_BOX_WIDTH - 4 - wsLabel.length
+
+        const rootLines = wrapText(config.projectRoot, valueWidth)
+        const rootFirstLine = `${chalk.dim('root:')}       ${chalk.white(rootLines[0] ?? '')}`
+        const rootContinuations = rootLines.slice(1).map((line) => rootIndent + chalk.white(line))
+
+        const wsLines = wrapText(wsNames, wsValueWidth)
+        const wsFirstLine = `${chalk.dim('workspaces:')} ${chalk.white(wsLines[0] ?? '')}`
+        const wsContinuations = wsLines.slice(1).map((line) => wsIndent + chalk.white(line))
 
         const projectLines = [
           rootFirstLine,
           ...rootContinuations,
-          `${chalk.dim('schema:')}  ${chalk.cyan(config.schemaRef)}`,
-          `${chalk.dim('workspaces:')} ${chalk.white(wsNames)}`,
+          `${chalk.dim('schema:')}     ${chalk.cyan(config.schemaRef)}`,
+          wsFirstLine,
+          ...wsContinuations,
         ]
         const projectSection = innerBox('Project', projectLines, PROJECT_BOX_WIDTH)
 
-        // ── Specs box ────────────────────────────────────────────────────────
-        const specsByWorkspace: Record<string, number> = {}
-        for (const s of specs) {
-          specsByWorkspace[s.workspace] = (specsByWorkspace[s.workspace] ?? 0) + 1
-        }
+        // ── Specs & Changes side-by-side box content ─────────────────────────
+        const totalSpecs = Object.values(summary.specsByWorkspace).reduce((acc, c) => acc + c, 0)
+        const countColWidth = LEFT_COL_WIDTH - 6 - maxWsLen
         const specLines = [
-          `${chalk.bold.white(String(specs.length))} ${chalk.dim('total')}`,
-          ...Object.entries(specsByWorkspace).map(
-            ([ws, n]) => `  ${chalk.cyan(ws.padEnd(12))} ${chalk.white(String(n))}`,
+          `${chalk.bold.white(String(totalSpecs))} ${chalk.dim('total')}`,
+          ...wsEntries.map(
+            ([ws, n]) =>
+              `  ${chalk.cyan(ws.padEnd(maxWsLen))}${chalk.white(String(n).padStart(countColWidth))}`,
           ),
         ]
-        const specsSection = innerBox('Specs', specLines, COL_WIDTH)
 
-        // ── Changes box ──────────────────────────────────────────────────────
-        const byState: Record<string, number> = {}
-        for (const c of activeChanges) {
-          byState[c.state] = (byState[c.state] ?? 0) + 1
-        }
-        const stateLines = Object.entries(byState).map(
-          ([s, n]) => `  ${chalk.yellow(s.padEnd(14))} ${chalk.white(String(n))}`,
+        const changeStateLabels = [
+          ['active', summary.activeCount],
+          ['drafts', summary.draftCount],
+          ['discarded', summary.discardedCount],
+          ['archived', summary.archivedCount],
+        ] as const
+        const changeLabelWidth = 12
+        const changeCountWidth = RIGHT_COL_WIDTH - 6 - changeLabelWidth
+        const changeLines = changeStateLabels.map(
+          ([label, count]) =>
+            `  ${chalk.cyan(label.padEnd(changeLabelWidth))}${chalk.white(String(count).padStart(changeCountWidth))}`,
         )
-        const changeLines = [
-          `${chalk.bold.white(String(activeChanges.length))} ${chalk.dim('active')}   ${chalk.dim('drafts:')} ${chalk.white(String(drafts.length))}`,
-          ...stateLines,
-          `${chalk.dim('discarded:')} ${chalk.white(String(discarded.length))}`,
-        ]
-        const changesSection = innerBox('Changes', changeLines, COL_WIDTH)
+
+        // Equalize content lines so bottom borders align on the exact same row
+        const sideBySideMinLines = Math.max(specLines.length, changeLines.length)
+        const specsSection = innerBox('Specs', specLines, LEFT_COL_WIDTH, sideBySideMinLines)
+        const changesSection = innerBox('Changes', changeLines, RIGHT_COL_WIDTH, sideBySideMinLines)
+
+        // ── Graph box ────────────────────────────────────────────────────────
+        let graphSection = ''
+        if (graphHealth !== null) {
+          const freshness = graphHealth.lastIndexedAt
+            ? `${graphHealth.lastIndexedAt.slice(0, 10)} (${graphHealth.stale ? 'stale' : 'fresh'})`
+            : 'never indexed'
+          const totalRelations = Object.values(graphHealth.relationCounts ?? {}).reduce(
+            (a, b) => a + b,
+            0,
+          )
+          const langs =
+            graphHealth.languages && graphHealth.languages.length > 0
+              ? graphHealth.languages.join(', ')
+              : 'n/a'
+          const graphLines = [
+            `${chalk.dim('freshness:')} ${chalk.white(freshness)}`,
+            `${chalk.dim('docs:')} ${chalk.white(String(graphHealth.documentCount).padEnd(6))} ${chalk.dim('files:')} ${chalk.white(String(graphHealth.fileCount).padEnd(6))} ${chalk.dim('symbols:')} ${chalk.white(String(graphHealth.symbolCount).padEnd(6))} ${chalk.dim('relations:')} ${chalk.white(String(totalRelations))}`,
+            `${chalk.dim('languages:')} ${chalk.white(langs)}`,
+          ]
+          graphSection = innerBox('Graph', graphLines, PROJECT_BOX_WIDTH)
+        }
 
         // ── Assemble ─────────────────────────────────────────────────────────
-        const bottomRow = sideBySide(specsSection, changesSection)
-        const body = [projectSection, '', bottomRow].join('\n')
+        const middleRow = sideBySide(specsSection, changesSection)
+        const bodyLines = [projectSection, '', middleRow]
+        if (graphSection !== '') {
+          bodyLines.push('', graphSection)
+        }
+        const body = bodyLines.join('\n')
 
         const dashboard = boxen(body, {
           title: chalk.bold.white('SpecD') + chalk.dim(' project dashboard'),

@@ -1,0 +1,20 @@
+- op: modified
+  description: 'Align stats with its SDK-owned host bootstrap.'
+  selector:
+    type: section
+    matches: 'Scenario: Graph stats uses shared context module'
+  rename: 'Scenario: Graph stats owns SDK host bootstrap'
+  content: |
+    - **WHEN** `specd graph stats` executes
+    - **THEN** it uses `openSpecdHost` and SDK-managed provider lifecycle
+    - **AND** it does not use `resolveGraphCliContext` or a host-managed lock probe
+- op: modified
+  description: 'Replace obsolete stats lock probing with provider-owned availability.'
+  selector:
+    type: section
+    matches: 'Scenario: Stats uses assertGraphIndexUnlocked from SDK'
+  rename: 'Scenario: Provider availability replaces host lock probes'
+  content: |
+    - **WHEN** a graph command uses an opened provider while indexing is active
+    - **THEN** the provider lifecycle surfaces the availability error
+    - **AND** no handler performs a pre-open lock probe

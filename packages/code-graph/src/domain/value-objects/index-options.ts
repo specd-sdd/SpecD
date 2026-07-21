@@ -110,6 +110,11 @@ export interface IndexOptions {
    * Used to detect when a full re-index is required due to logic changes.
    */
   readonly codeGraphVersion?: string
+
+  /**
+   * Whether provider-owned indexing should recreate persisted backend state first.
+   */
+  readonly force?: boolean
 }
 
 /**

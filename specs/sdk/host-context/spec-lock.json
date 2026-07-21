@@ -3,11 +3,14 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": ["sdk:composition", "core:kernel", "core:composition"],
+  "dependsOn": ["sdk:composition", "core:kernel", "core:composition", "code-graph:composition"],
   "implementation": [
     {
       "file": "sdk:src/composition/host-context.ts",
-      "symbols": ["createSdkContext"]
+      "symbols": ["SdkContextOptions", "OpenSpecdHostInput", "createSdkContext", "openSpecdHost"]
+    },
+    {
+      "file": "sdk:test/composition/host-context.spec.ts"
     }
   ]
 }

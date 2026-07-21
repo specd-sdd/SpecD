@@ -6,8 +6,11 @@
   "dependsOn": ["cli:entrypoint", "sdk:host-context", "sdk:composition"],
   "implementation": [
     {
-      "file": "cli:src/load-config.ts",
-      "symbols": ["loadConfig"]
+      "file": "cli:src/helpers/cli-context.ts",
+      "symbols": ["resolveCliContext"]
+    },
+    {
+      "file": "cli:test/helpers/cli-context.spec.ts"
     }
   ]
 }

@@ -6,8 +6,23 @@
   "dependsOn": ["default:_global/architecture", "core:vcs-adapter"],
   "implementation": [
     {
+      "file": "core:src/public.ts"
+    },
+    {
+      "file": "core:test/barrel.spec.ts"
+    },
+    {
+      "file": "core:test/composition/vcs-adapter.spec.ts"
+    },
+    {
+      "file": "core:src/application/ports/index.ts"
+    },
+    {
+      "file": "core:src/ports.ts"
+    },
+    {
       "file": "core:src/application/ports/vcs-adapter.ts",
-      "symbols": ["VcsAdapter", "VcsIdentity"]
+      "symbols": ["VcsAdapter"]
     }
   ]
 }

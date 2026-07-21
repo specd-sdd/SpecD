@@ -1,6 +1,6 @@
 {
   "title": "Change Transition",
-  "description": "Changes must progress through a governed lifecycle so that validations, approval gates, requires enforcement, and hooks fire at the right time. `specd change transition <name> <step>` advances a change to the next lifecycle state, transparently routing through approval gates when enabled, enforcing workflow `requires`, and executing `run:` hooks at step boundaries by default.",
+  "description": "Changes must progress through a governed lifecycle so that validations, approval gates, requires enforcement, and hooks fire at the right time. `specd change transition <name> <step>` advances a change to the next lifecycle state, transparently routing through approval gates when enabled, enforcing workflow `requires`, and executing `run:` hooks at step boundaries by default.\n\nBecause transitions may trigger long-running hooks, the command must also keep hook execution observable while those hooks are in flight.",
   "dependsOn": [
     "cli:entrypoint",
     "core:change",
@@ -9,7 +9,7 @@
     "core:get-status"
   ],
   "context": [
-    "Changes must progress through a governed lifecycle so that validations, approval gates, requires enforcement, and hooks fire at the right time. `specd change transition <name> <step>` advances a change to the next lifecycle state, transparently routing through approval gates when enabled, enforcing workflow `requires`, and executing `run:` hooks at step boundaries by default."
+    "Changes must progress through a governed lifecycle so that validations, approval gates, requires enforcement, and hooks fire at the right time. `specd change transition <name> <step>` advances a change to the next lifecycle state, transparently routing through approval gates when enabled, enforcing workflow `requires`, and executing `run:` hooks at step boundaries by default.\n\nBecause transitions may trigger long-running hooks, the command must also keep hook execution observable while those hooks are in flight."
   ],
   "rules": [
     {
@@ -45,25 +45,37 @@
     {
       "requirement": "Progress output",
       "rules": [
-        "The CLI passes an `onProgress` callback to the use case that renders step-by-step feedback to stdout:\n\n- `requires-check` → `✓ artifactId [complete]` or `✗ artifactId [status]`\n- `hook-start` → spinner `⠋ phase › hookId: command`\n- `hook-done` → `✓ hookId (exit 0)` or `✗ hookId (exit N)`\n- `transitioned` → `✓ from → to`\n\nProgress output is only rendered in `text` format. JSON and toon formats include progress data in the structured output."
+        "The CLI passes an `onProgress` callback to the use case that renders step-by-step feedback in `text` format and preserves structured progress for machine-oriented formats.\n\nFor hook execution during a transition, progress output MUST allow the caller to observe:\n\n- hook start\n- the active hook ID and command\n- recent hook output while the hook is still running\n- liveness signals when the hook remains active without new output\n- hook completion\n\nIn `text` mode, the active hook MAY use a lightweight running label, but that label is only a visual aid and MUST NOT be the only signal that work is still progressing.\n\nProgress output for previously completed hooks MUST remain understandable instead of being fully overwritten by the currently running hook.\n\nIn `json` and `toon`, progress MUST be emitted on stdout as newline-delimited structured stream records. Hook lifecycle events use `stream: \"hook-progress\"`. Transition lifecycle events such as `requires-check` and `transitioned` use `stream: \"change-transition\"`."
+      ]
+    },
+    {
+      "requirement": "Transition hook observability",
+      "rules": [
+        "When transition hook execution exposes progress information, the command MUST surface that progress during the transition instead of appearing silent until the hook exits.\n\nThis applies even when the transition ultimately fails before the lifecycle state changes."
+      ]
+    },
+    {
+      "requirement": "Shared hook progress presentation",
+      "rules": [
+        "The command MUST use the same hook progress presentation model as `specd change run-hooks` for equivalent hook events.\n\nThe CLI implementation MUST centralize that presentation logic in a shared helper so the two commands do not drift in:\n\n- running-status labels\n- recent-output tail rendering\n- liveness signalling\n- failed-hook full-output rendering"
       ]
     },
     {
       "requirement": "Output on success",
       "rules": [
-        "On success, output depends on `--format`:\n\n- `text` (default): prints a single line to stdout:\n- `json` or `toon`: outputs the following to stdout (encoded in the respective format):\n\nwhere `<to>` is the effective target state after routing."
+        "On success, output depends on `--format`.\n\nIn `text` (default), the command prints a final human-readable confirmation to stdout after progress reporting completes.\n\nIn `json` and `toon`, the command MUST emit one terminal stdout stream record with:\n\n- `stream: \"change-transition\"`\n- `event.type: \"complete\"`\n- `event.result` containing `result`, `name`, `from`, and `to`\n\nThe final result MUST remain part of the same structured stream as the in-flight progress records rather than appearing as a standalone object outside the stream."
       ]
     },
     {
       "requirement": "Post-hook failure warning",
       "rules": [
-        "Since both hook phases (source.post and target.pre) are fail-fast, a hook failure causes the command to exit with code 1 and print an `error:` message to stderr. The previous `postHookFailures` warning (exit code 2) is removed — there are no post-transition hook failures to report."
+        "Since both hook phases (source.post and target.pre) are fail-fast, a hook failure causes the command to exit with code 2 and print an `error:` message to stderr. Richer progress reporting does not introduce a separate post-transition hook warning state.\n\nIf hook progress was rendered before the failure, the failure output MUST still leave the caller with enough visible context to understand which hook was active and what output preceded the error."
       ]
     },
     {
       "requirement": "Invalid transition error",
       "rules": [
-        "If the transition is not valid from the current state, the command exits with code 1 and prints an `error:` message to stderr.\n\nWhen the transition fails (e.g. `InvalidStateTransitionError`, `HookFailedError`), the command MUST render a **Repair Guide** to stdout:\n\n```\nerror: cannot transition to <step>\n! <CODE>: <message>\n\nrepair guide:\n  target:  <targetStep>\n  command: <command>\n  reason:  <reason>\n```\n\nThe repair guide uses the `nextAction` data from the `GetStatusResult` (which the command SHOULD fetch internally on failure to provide better diagnostics). The `! <CODE>` line uses the blocker codes identified in the `GetStatus` spec (e.g., `MISSING_ARTIFACT`, `ARTIFACT_DRIFT`).\n\nWhen `format` is `json` or `toon`, the output MUST include a `blockers` array and the `nextAction` object, mirroring the `change status` format.\n\nWhen the underlying `InvalidStateTransitionError` carries a structured reason explaining that the change is blocked on human approval or signoff, the command MUST surface that explanation in the stderr message rather than collapsing it to a generic invalid-transition message.\n\nWhen `--next` is invoked from a state where no transition-driven next action exists, the stderr message MUST explain why the command cannot advance automatically from that state."
+        "If the transition is not valid from the current state, the command exits with code 1 and prints an `error:` message to stderr.\n\nWhen the transition fails (e.g. `InvalidStateTransitionError`, `HookFailedError`), the command MUST render a **Repair Guide** in text mode:\n\n```\nerror: cannot transition to <step>\n! <CODE>: <message>\n\nrepair guide:\n  target:  <targetStep>\n  command: <command>\n  reason:  <reason>\n```\n\nThe repair guide uses the `nextAction` data from the `GetStatusResult`. The `! <CODE>` line uses the blocker codes identified in the `GetStatus` spec (e.g., `MISSING_ARTIFACT`, `ARTIFACT_DRIFT`).\n\nWhen `format` is `json` or `toon`, the command MUST keep failure reporting on stdout as part of the structured stream by emitting a terminal `stream: \"change-transition\"` record with `event.type: \"complete\"` and `event.result` containing `result: \"failure\"`, `name`, `from`, `to`, `blockers`, and `nextAction`.\n\nWhen the underlying `InvalidStateTransitionError` carries a structured reason explaining that the change is blocked on human approval or signoff, the command MUST surface that explanation in the stderr message rather than collapsing it to a generic invalid-transition message.\n\nWhen `--next` is invoked from a state where no transition-driven next action exists, the stderr message MUST explain why the command cannot advance automatically from that state."
       ]
     },
     {
@@ -81,7 +93,9 @@
   ],
   "constraints": [
     "The user specifies the logical target state; the CLI never exposes the routing logic in its help text",
-    "Repair-guide blockers and next-action data are projected from core lifecycle diagnostics (TransitionChange failure plus GetStatus), not recomputed in the CLI layer"
+    "Repair-guide blockers and next-action data are projected from core lifecycle diagnostics (TransitionChange failure plus GetStatus), not recomputed in the CLI layer",
+    "In text, progress is rendered to stderr and the final human-readable confirmation remains on stdout",
+    "In json and toon, machine-readable progress and the terminal complete record are emitted on stdout; stderr is reserved for non-structured diagnostics"
   ],
   "scenarios": [
     {
@@ -220,6 +234,28 @@
       ]
     },
     {
+      "requirement": "Output on success",
+      "name": "Structured success result is emitted as terminal complete record",
+      "given": ["specd change transition my-change designing --format json succeeds from drafting"],
+      "when": ["the command finishes"],
+      "then": [
+        "the final stdout record is stream: \"change-transition\"",
+        "AND its event type is complete",
+        "AND its result contains result: \"ok\", name: \"my-change\", from: \"drafting\", and to: \"designing\""
+      ]
+    },
+    {
+      "requirement": "Output on success",
+      "name": "Structured failure result is emitted as terminal complete record",
+      "given": ["a transition fails in json mode with lifecycle blockers"],
+      "when": ["the command finishes"],
+      "then": [
+        "the final stdout record is stream: \"change-transition\"",
+        "AND its event type is complete",
+        "AND its result contains result: \"failure\", blockers, and nextAction"
+      ]
+    },
+    {
       "requirement": "Invalid transition error",
       "name": "Illegal state transition",
       "given": ["the change is in drafting state"],
@@ -255,17 +291,6 @@
       "then": [
         "the command exits with code 1",
         "AND stderr contains an error: message naming the blocking artifact"
-      ]
-    },
-    {
-      "requirement": "Incomplete tasks error",
-      "name": "JSON output on successful transition",
-      "when": [
-        "specd change transition my-change designing --format json succeeds and the change was in drafting state"
-      ],
-      "then": [
-        "stdout is valid JSON with result equal to \"ok\", name equal to \"my-change\", from equal to \"drafting\", and to equal to \"designing\"",
-        "AND the process exits with code 0"
       ]
     },
     {
@@ -305,9 +330,64 @@
     },
     {
       "requirement": "Progress output",
-      "name": "Text mode renders progress feedback",
+      "name": "Text mode renders active hook status with recent output",
+      "given": ["a transition hook emits output while it is still running"],
       "when": ["specd change transition my-change designing is run in text mode"],
-      "then": ["lifecycle progress feedback may be rendered to stdout while the transition runs"]
+      "then": [
+        "the progress feedback shows the active hook and command",
+        "AND recent hook output remains visible while the hook is running"
+      ]
+    },
+    {
+      "requirement": "Progress output",
+      "name": "Text mode preserves completed hook history",
+      "given": ["multiple hooks execute during the transition"],
+      "when": ["progress is rendered in text mode"],
+      "then": [
+        "previously completed hooks remain understandable after later hooks start",
+        "AND the currently active hook does not fully overwrite the earlier hook history"
+      ]
+    },
+    {
+      "requirement": "Progress output",
+      "name": "Text mode shows liveness for quiet hook",
+      "given": ["a transition hook remains active without new output for a meaningful interval"],
+      "when": ["progress is rendered in text mode"],
+      "then": ["the output still signals that the hook remains active before completion"]
+    },
+    {
+      "requirement": "Progress output",
+      "name": "Structured formats emit progress on stdout",
+      "given": ["a transition emits hook and lifecycle progress events"],
+      "when": ["specd change transition my-change designing --format json is run"],
+      "then": [
+        "stdout emits newline-delimited structured records during the transition",
+        "AND hook lifecycle events use stream: \"hook-progress\"",
+        "AND transition lifecycle events use stream: \"change-transition\""
+      ]
+    },
+    {
+      "requirement": "Transition hook observability",
+      "name": "Transition exposes hook progress before hook-triggered failure",
+      "given": [
+        "a transition hook emits progress and then fails before the state transition completes"
+      ],
+      "when": ["specd change transition my-change <step> is run"],
+      "then": [
+        "hook progress is surfaced before the failure is reported",
+        "AND the caller can identify which hook was active when the failure occurred"
+      ]
+    },
+    {
+      "requirement": "Shared hook progress presentation",
+      "name": "Equivalent hook events render with the same presentation contract as run-hooks",
+      "given": [
+        "specd change transition and specd change run-hooks observe the same sequence of hook events"
+      ],
+      "when": ["both commands render hook progress in the same output format"],
+      "then": [
+        "running status, recent output, liveness, and failed-hook output follow the same presentation rules"
+      ]
     },
     {
       "requirement": "Post-hook failure warning",
@@ -315,7 +395,17 @@
       "given": ["a hook fails during transition execution"],
       "when": ["the command runs"],
       "then": [
-        "it exits with code 1 and prints an error: message instead of a separate post-hook warning state"
+        "it exits with code 2 and prints an error: message instead of a separate post-hook warning state"
+      ]
+    },
+    {
+      "requirement": "Post-hook failure warning",
+      "name": "Hook failure leaves visible execution context",
+      "given": ["progress was rendered for the active hook before failure"],
+      "when": ["the transition aborts on hook failure"],
+      "then": [
+        "the visible output still identifies the hook that failed",
+        "AND retains enough preceding hook context to understand the failure"
       ]
     },
     {
@@ -343,13 +433,51 @@
     "files": [
       {
         "specId": "cli:change-transition",
-        "file": "cli:src/commands/change/transition.ts"
+        "file": "cli:test/commands/change-transition.spec.ts"
+      },
+      {
+        "specId": "cli:change-transition",
+        "file": "cli:test/commands/_hook-progress-presenter.spec.ts"
+      },
+      {
+        "specId": "cli:change-transition",
+        "file": "cli:src/formatter.ts"
+      },
+      {
+        "specId": "cli:change-transition",
+        "file": "cli:test/commands/change.spec.ts"
+      },
+      {
+        "specId": "cli:change-transition",
+        "file": "cli:test/formatter.spec.ts"
+      }
+    ],
+    "symbols": [
+      {
+        "specId": "cli:change-transition",
+        "file": "cli:src/commands/change/_hook-progress-presenter.ts",
+        "symbol": "HookPresenterEvent"
+      },
+      {
+        "specId": "cli:change-transition",
+        "file": "cli:src/commands/change/_hook-progress-presenter.ts",
+        "symbol": "HookProgressPresenter"
+      },
+      {
+        "specId": "cli:change-transition",
+        "file": "cli:src/commands/change/_hook-progress-presenter.ts",
+        "symbol": "createHookProgressPresenter"
+      },
+      {
+        "specId": "cli:change-transition",
+        "file": "cli:src/commands/change/transition.ts",
+        "symbol": "registerChangeTransition"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:c9d2e3c42d652c5144ecc7a7b4c21115b9e4fe973b7dad2ec149bdfd9cc31788",
-    "verify.md": "sha256:ef528ae534729a665c9246940707b6887976b71222c76db0396464fe40b77b6d"
+    "spec.md": "sha256:688ddad94cee1d3e32960623b1ab1c0db18547d02cca0f9f2e8c37e31d48d17c",
+    "verify.md": "sha256:76671be8d2be1689e861733841c1b55e8d71826bfc763b755efa28a4fc4ac17d"
   },
   "generatedBy": "core"
 }

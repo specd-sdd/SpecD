@@ -147,12 +147,12 @@
 
 ### Requirement: Concurrent indexing guard
 
-#### Scenario: Impact analysis fails fast while the indexing lock is present
+#### Scenario: Impact analysis surfaces provider busy after open
 
-- **GIVEN** a `graph index` process currently holds the shared graph indexing lock
+- **GIVEN** the provider reports `GRAPH_BUSY` during impact analysis
 - **WHEN** `specd graph impact --file src/auth.ts` is run
-- **THEN** the command exits with code 3 before opening the provider
-- **AND** it prints a short retry-later message explaining that the graph is currently being indexed
+- **THEN** the command exits with code 3
+- **AND** it uses the infrastructure error path rather than a separate pre-open lock probe
 
 ### Requirement: Output format
 
@@ -225,6 +225,8 @@
 #### Scenario: Infrastructure error exits with code 3
 
 - **GIVEN** the provider cannot be opened
+- **OR** the provider reports `GRAPH_BUSY`
+- **OR** the provider reports `GRAPH_PROVIDER_STALE`
 - **WHEN** `specd graph impact --file core:src/auth.ts` is run
 - **THEN** stderr contains a `fatal:` prefixed error message
 - **AND** the process exits with code 3
