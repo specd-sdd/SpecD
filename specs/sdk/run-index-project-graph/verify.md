@@ -4,11 +4,29 @@
 
 ### Requirement: runIndexProjectGraph orchestration
 
-#### Scenario: Full workspace index
+#### Scenario: Full workspace index with transient provider and lifecycle hooks
 
-- **WHEN** `runIndexProjectGraph(ctx, { force: false })` is called without workspace filter
+- **GIVEN** optional `beforeOpen` and `afterClose` hooks provided in `input`
+- **WHEN** `runIndexProjectGraph(ctx, { force: false, beforeOpen, afterClose })` is called without explicit provider
 - **THEN** `listWorkspaces` is invoked
-- **AND** `IndexProjectGraph` runs inside `withOpenGraphProvider` for all workspaces
+- **AND** `withOpenGraphProvider` receives `beforeOpen` and `afterClose`
+- **AND** `IndexProjectGraph` runs for all workspaces
+- **AND** the transient provider is closed upon completion
+
+#### Scenario: Existing open provider bypasses withOpenGraphProvider
+
+- **GIVEN** an open `CodeGraphProvider` instance
+- **WHEN** `runIndexProjectGraph(ctx, { provider: openProvider })` is called
+- **THEN** `IndexProjectGraph` executes directly on `openProvider`
+- **AND** `openProvider.close()` is NOT called even if indexing succeeds or throws an error
+
+#### Scenario: Conflicting lifecycle hooks with existing provider throws error
+
+- **GIVEN** an open `CodeGraphProvider` instance
+- **AND** `input` includes `provider` and either `beforeOpen` or `afterClose`
+- **WHEN** `runIndexProjectGraph(ctx, input)` is called
+- **THEN** it throws `InvalidProviderLifecycleError`
+- **AND** the error is an instance of `SpecdError` with `code: 'INVALID_PROVIDER_LIFECYCLE'`
 
 #### Scenario: Subset workspace index
 

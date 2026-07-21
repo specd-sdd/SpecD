@@ -2,13 +2,23 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { type CodeGraphProvider } from '@specd/code-graph'
 import { type SdkHostContext } from '../../src/composition/host-context.js'
+import { InvalidProviderLifecycleError } from '../../src/domain/errors/invalid-provider-lifecycle-error.js'
 
-const getConfig = { execute: vi.fn() }
-const listWorkspaces = { execute: vi.fn() }
-const createIndexProjectGraph = vi.fn()
-const withOpenGraphProvider = vi.fn()
-const createVcsAdapter = vi.fn()
+const {
+  getConfig,
+  listWorkspaces,
+  createIndexProjectGraph,
+  withOpenGraphProvider,
+  createVcsAdapter,
+} = vi.hoisted(() => ({
+  getConfig: { execute: vi.fn() },
+  listWorkspaces: { execute: vi.fn() },
+  createIndexProjectGraph: vi.fn(),
+  withOpenGraphProvider: vi.fn(),
+  createVcsAdapter: vi.fn(),
+}))
 
 vi.mock('../../src/composition/with-open-graph-provider.js', () => ({
   withOpenGraphProvider,
@@ -113,5 +123,56 @@ describe('runIndexProjectGraph', () => {
       }),
     )
     expect(codeGraphPackageJson.version).not.toBe('0.0.0')
+  })
+
+  it('forwards beforeOpen and afterClose hooks to withOpenGraphProvider when provider is omitted', async () => {
+    const beforeOpen = vi.fn()
+    const afterClose = vi.fn()
+    await runIndexProjectGraph(ctx, { beforeOpen, afterClose })
+
+    expect(withOpenGraphProvider).toHaveBeenCalledWith(
+      ctx,
+      expect.any(Function),
+      expect.objectContaining({ beforeOpen, afterClose }),
+    )
+  })
+
+  it('bypasses withOpenGraphProvider and does not close provider when existing provider is supplied', async () => {
+    const closeSpy = vi.fn()
+    const mockProvider = { close: closeSpy } as unknown as CodeGraphProvider
+
+    const result = await runIndexProjectGraph(ctx, { provider: mockProvider })
+
+    expect(withOpenGraphProvider).not.toHaveBeenCalled()
+    expect(closeSpy).not.toHaveBeenCalled()
+    expect(result).toEqual({ filesIndexed: 3 })
+    const execute = createIndexProjectGraph.mock.results[0]?.value.execute as ReturnType<
+      typeof vi.fn
+    >
+    expect(execute).toHaveBeenCalledWith(
+      expect.objectContaining({
+        provider: mockProvider,
+      }),
+    )
+  })
+
+  it('throws InvalidProviderLifecycleError when provider is passed together with beforeOpen or afterClose', async () => {
+    const mockProvider = {} as CodeGraphProvider
+    const beforeOpen = vi.fn()
+    const afterClose = vi.fn()
+
+    await expect(runIndexProjectGraph(ctx, { provider: mockProvider, beforeOpen })).rejects.toThrow(
+      InvalidProviderLifecycleError,
+    )
+
+    await expect(runIndexProjectGraph(ctx, { provider: mockProvider, afterClose })).rejects.toThrow(
+      InvalidProviderLifecycleError,
+    )
+
+    try {
+      await runIndexProjectGraph(ctx, { provider: mockProvider, beforeOpen })
+    } catch (error: unknown) {
+      expect((error as InvalidProviderLifecycleError).code).toBe('INVALID_PROVIDER_LIFECYCLE')
+    }
   })
 })

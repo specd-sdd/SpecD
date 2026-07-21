@@ -10,10 +10,19 @@
 
 `runIndexProjectGraph(ctx: SdkHostContext, input: RunIndexProjectGraphInput): Promise<RunIndexProjectGraphResult>` SHALL:
 
-1. Resolve `SpecdConfig` via `ctx.kernel.project.getConfig.execute()`
-2. Call `ctx.kernel.project.listWorkspaces.execute()` for workspace targets
-3. Run inside `withOpenGraphProvider(ctx, async (provider) => { ... })`
-4. Invoke `createIndexProjectGraph()` from `@specd/code-graph` and call `indexProjectGraph.execute({ provider, projectRoot, workspaces, graphConfig, codeGraphVersion, force, vcsRef, onProgress })` with values prepared from config, workspace list, VCS ref, and `input`
+1. Validate input combinations:
+   - IF `input.provider` is provided AND (`input.beforeOpen` is provided OR `input.afterClose` is provided), throw `InvalidProviderLifecycleError` (a `SpecdError` with `code: 'INVALID_PROVIDER_LIFECYCLE'`)
+2. Resolve `SpecdConfig` via `ctx.kernel.project.getConfig.execute()`
+3. Call `ctx.kernel.project.listWorkspaces.execute()` for workspace targets
+4. Prepare `projectRoot`, `workspaces`, `graphConfig`, `codeGraphVersion`, `vcsRoot`, `vcsRef`, `force`, and `onProgress`
+5. If `input.provider` is provided:
+   - Expect `input.provider` to be an already open `CodeGraphProvider` instance
+   - Invoke `createIndexProjectGraph()` directly on `input.provider`
+   - MUST NOT close `input.provider` on completion or failure
+6. If `input.provider` is omitted:
+   - Run inside `withOpenGraphProvider(ctx, async (provider) => { ... }, { beforeOpen: input.beforeOpen, afterClose: input.afterClose })`
+   - Invoke `createIndexProjectGraph()` on the opened transient provider
+   - Close the transient provider upon completion
 
 `input.workspaces` MAY restrict indexing to a subset; when omitted, all configured workspaces MUST be indexed.
 

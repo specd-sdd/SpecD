@@ -1,0 +1,486 @@
+{
+  "name": "allow-existing-provider-in-run-index-project-graph",
+  "createdAt": "2026-07-21T14:21:46.240Z",
+  "description": "Allow passing an optional existing open CodeGraphProvider to runIndexProjectGraph to support long-lived hosts without closing resources",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": ["sdk:run-index-project-graph"],
+  "specDependsOn": {
+    "sdk:run-index-project-graph": [
+      "sdk:with-open-graph-provider",
+      "code-graph:index-project-graph",
+      "core:list-workspaces"
+    ]
+  },
+  "invalidationPolicy": "downstream",
+  "trackedImplementationFiles": [
+    {
+      "file": "EXPLORATION_SPECD_BRANCH_MERGE_SKILL.md",
+      "state": "ignored"
+    },
+    {
+      "file": "EXPLORATION_STORAGE_ABSTRACTION.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-changes-hooks.svg",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-changes-status.svg",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-changes-validate.svg",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-specs-lists.svg",
+      "state": "ignored"
+    },
+    {
+      "file": "specd.svg",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/sdk/src/domain/errors/invalid-provider-lifecycle-error.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/orchestration/run-index-project-graph.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/test/orchestration/run-index-project-graph.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/domain/errors/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "assets/specd-changes-hooks.svg",
+      "state": "ignored"
+    },
+    {
+      "file": "assets/specd-changes-status.svg",
+      "state": "ignored"
+    },
+    {
+      "file": "assets/specd-changes-validate.svg",
+      "state": "ignored"
+    },
+    {
+      "file": "assets/specd-specs-lists.svg",
+      "state": "ignored"
+    },
+    {
+      "file": "assets/specd.svg",
+      "state": "ignored"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "sdk:run-index-project-graph",
+      "file": "packages/sdk/src/domain/errors/invalid-provider-lifecycle-error.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["InvalidProviderLifecycleError"]
+    },
+    {
+      "specId": "sdk:run-index-project-graph",
+      "file": "packages/sdk/src/orchestration/run-index-project-graph.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["runIndexProjectGraph", "RunIndexProjectGraphInput"]
+    },
+    {
+      "specId": "sdk:run-index-project-graph",
+      "file": "packages/sdk/test/orchestration/run-index-project-graph.spec.ts",
+      "fileLinkExplicit": true
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:bf80ad3ae8063707595b7b4d2000b864027ae36c7510be8735d53eeb06173f00"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "sdk:run-index-project-graph",
+          "filename": "deltas/sdk/run-index-project-graph/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:0640465d72e5030d697576be1ea6d281e41bc0dcd9c4a026d06b7cf6eeb9d1c6"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "sdk:run-index-project-graph",
+          "filename": "deltas/sdk/run-index-project-graph/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:2e561dc588ed7ac8f9aadf1a8af9296de3e9b53cdbfca5ff08715101262b7a47"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:40e95ce74a644e3da43e73642841c02835147dd1ce1bc984d7edce74cfd4bb06"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:610ae404b1bd181ad570f47b097c3a1f26749ccd795d6b14508a6cece2dc7fe8"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-07-21T14:21:46.240Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": ["sdk:run-index-project-graph"],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-21T14:21:46.308Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "sdk:run-index-project-graph"
+        },
+        {
+          "type": "verify",
+          "key": "sdk:run-index-project-graph"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-21T14:25:06.815Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-21T14:40:41.543Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-21T14:48:11.096Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["sdk:run-index-project-graph"]
+        },
+        {
+          "type": "verify",
+          "files": ["sdk:run-index-project-graph"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-21T14:48:11.096Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-21T14:48:53.397Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-21T14:50:06.395Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["sdk:run-index-project-graph"]
+        },
+        {
+          "type": "verify",
+          "files": ["sdk:run-index-project-graph"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-21T14:50:06.395Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-21T14:50:45.865Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-21T14:53:04.418Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["sdk:run-index-project-graph"]
+        },
+        {
+          "type": "verify",
+          "files": ["sdk:run-index-project-graph"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-21T14:53:04.418Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-21T14:53:50.356Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-21T14:56:26.359Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-21T15:01:11.963Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-21T15:27:26.738Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-21T15:27:37.236Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-07-21T15:29:40.090Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Tracked implementation files remain open for change \"allow-existing-provider-in-run-index-project-graph\". Resolve or ignore them first.",
+      "commitStarted": false
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-21T15:29:50.821Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-07-21T15:29:50.852Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

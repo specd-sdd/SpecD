@@ -1,0 +1,23 @@
+- op: modified
+  description: 'Support optional existing open CodeGraphProvider, optional afterClose hook, and input validation guard in RunIndexProjectGraphInput'
+  selector:
+    type: section
+    matches: 'Requirement: runIndexProjectGraph orchestration'
+  content: |
+    `runIndexProjectGraph(ctx: SdkHostContext, input: RunIndexProjectGraphInput): Promise<RunIndexProjectGraphResult>` SHALL:
+
+    1. Validate input combinations:
+       - IF `input.provider` is provided AND (`input.beforeOpen` is provided OR `input.afterClose` is provided), throw `InvalidProviderLifecycleError` (a `SpecdError` with `code: 'INVALID_PROVIDER_LIFECYCLE'`)
+    2. Resolve `SpecdConfig` via `ctx.kernel.project.getConfig.execute()`
+    3. Call `ctx.kernel.project.listWorkspaces.execute()` for workspace targets
+    4. Prepare `projectRoot`, `workspaces`, `graphConfig`, `codeGraphVersion`, `vcsRoot`, `vcsRef`, `force`, and `onProgress`
+    5. If `input.provider` is provided:
+       - Expect `input.provider` to be an already open `CodeGraphProvider` instance
+       - Invoke `createIndexProjectGraph()` directly on `input.provider`
+       - MUST NOT close `input.provider` on completion or failure
+    6. If `input.provider` is omitted:
+       - Run inside `withOpenGraphProvider(ctx, async (provider) => { ... }, { beforeOpen: input.beforeOpen, afterClose: input.afterClose })`
+       - Invoke `createIndexProjectGraph()` on the opened transient provider
+       - Close the transient provider upon completion
+
+    `input.workspaces` MAY restrict indexing to a subset; when omitted, all configured workspaces MUST be indexed.
