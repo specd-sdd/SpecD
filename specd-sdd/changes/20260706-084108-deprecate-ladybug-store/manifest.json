@@ -2295,6 +2295,64 @@
           "files": ["tasks"]
         }
       ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-21T15:29:40.084Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'allow-existing-provider-in-run-index-project-graph' was archived with overlapping specs: sdk:run-index-project-graph",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["sdk:run-index-project-graph"]
+        },
+        {
+          "type": "verify",
+          "files": ["sdk:run-index-project-graph"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-21T15:29:50.768Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'allow-existing-provider-in-run-index-project-graph' was archived with overlapping specs: sdk:run-index-project-graph",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["sdk:run-index-project-graph"]
+        },
+        {
+          "type": "verify",
+          "files": ["sdk:run-index-project-graph"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
     }
   ]
 }

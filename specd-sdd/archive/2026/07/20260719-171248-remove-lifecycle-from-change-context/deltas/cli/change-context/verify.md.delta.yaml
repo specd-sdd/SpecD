@@ -1,0 +1,121 @@
+- op: removed
+  description: Remove verification for the removed lifecycle warning.
+  selector:
+    type: section
+    matches: 'Requirement: Step availability warning'
+- op: modified
+  description: Verify that CLI output omits lifecycle projections.
+  selector:
+    type: section
+    matches: 'Requirement: Output'
+  content: |
+    #### Scenario: Text output begins with fingerprint before context sections
+
+    - **GIVEN** the current context fingerprint is `sha256:abc123...`
+    - **WHEN** `specd change context my-change designing --format text` is called
+    - **THEN** the first rendered line is `Context Fingerprint: sha256:abc123...`
+
+    #### Scenario: Text output shows unchanged message when fingerprint matches
+
+    - **GIVEN** the current context fingerprint is `sha256:abc123...`
+    - **WHEN** `specd change context my-change designing --fingerprint sha256:abc123... --format text` is called
+    - **THEN** the output includes `Context unchanged since last call.`
+    - **AND** no spec content is printed
+
+    #### Scenario: Text output labels full-mode specs explicitly
+
+    - **GIVEN** `CompileContext` returns a full-mode spec entry
+    - **WHEN** `specd change context <name> <step> --format text` is called
+    - **THEN** the rendered block includes an explicit full-mode label
+
+    #### Scenario: Text output labels summary-mode specs explicitly
+
+    - **GIVEN** `CompileContext` returns a summary-mode spec entry
+    - **WHEN** `specd change context <name> <step> --format text` is called
+    - **THEN** the rendered block includes an explicit summary-mode label
+
+    #### Scenario: Text output labels list-mode specs explicitly
+
+    - **GIVEN** `CompileContext` returns a list-mode spec entry
+    - **WHEN** `specd change context <name> <step> --format text` is called
+    - **THEN** the rendered block includes an explicit list-mode label
+
+    #### Scenario: Text output omits lifecycle availability
+
+    - **GIVEN** the change has unavailable workflow steps
+    - **WHEN** `specd change context <name> <step> --format text` is called
+    - **THEN** stdout contains no available-step section, lifecycle state, or blocker list
+    - **AND** stderr contains no lifecycle-availability warning
+
+    #### Scenario: Structured output omits lifecycle fields
+
+    - **WHEN** `specd change context <name> <step> --format toon` is called
+    - **THEN** the result contains context fingerprint, context entries, specs, and context warnings
+    - **AND** it omits `stepAvailable`, `blockingArtifacts`, and `availableSteps`
+
+    #### Scenario: Non-full output instructs spec-preview usage
+
+    - **GIVEN** the output contains summary-mode or list-mode entries
+    - **WHEN** text output is rendered
+    - **THEN** it includes guidance to run `specd change spec-preview <change-name> <specId>` for merged full content
+
+    #### Scenario: JSON output includes list-mode entries
+
+    - **GIVEN** `CompileContext` returns `mode: "list"` entries
+    - **WHEN** `specd change context <name> <step> --format json` is called
+    - **THEN** JSON includes those entries with mode and source fields
+
+    #### Scenario: Section flags have no effect on list and summary entries
+
+    - **GIVEN** the result is rendered in list mode or summary mode
+    - **WHEN** `--rules` or `--constraints` are passed
+    - **THEN** output remains list/summary shaped without full content blocks
+
+    #### Scenario: include-change-specs false still allows reinjection
+
+    - **GIVEN** `--include-change-specs` is omitted
+    - **AND** a change spec matches include patterns or traversal
+    - **WHEN** the command is executed
+    - **THEN** that spec can still appear in emitted context entries
+
+    #### Scenario: Full mode defaults to Description + Rules + Constraints
+
+    - **GIVEN** a spec is rendered in `full` mode
+    - **WHEN** `specd change context` is run without section flags
+    - **THEN** output includes Description, Rules, and Constraints for that spec
+- op: modified
+  description: Remove CLI behaviour coverage for lifecycle blocker projection.
+  selector:
+    type: section
+    matches: 'Requirement: Behaviour'
+  content: |
+    #### Scenario: CLI does not build CompileContextConfig inline
+
+    - **WHEN** `specd change context` is run
+    - **THEN** the command does not construct a `CompileContextConfig` object from `SpecdConfig`
+    - **AND** it invokes `CompileContext.execute` with runtime overrides only
+
+    #### Scenario: CLI forwards traversal and fingerprint options to CompileContext
+
+    - **WHEN** `specd change context` is run with flags such as `--include-change-specs`, `--follow-deps`, `--depth`, or `--fingerprint`
+    - **THEN** the command forwards those options into the `CompileContext.execute` input
+
+    #### Scenario: --no-optimized suppresses preference for optimized context
+
+    - **GIVEN** `llmOptimizedContext: true` in configuration
+    - **WHEN** `specd change context my-change designing --no-optimized` is executed
+    - **THEN** the CLI passes `llmOptimizedContext: false` as a runtime override on `CompileContext.execute`
+
+    #### Scenario: --optimized forces preference for optimized context
+
+    - **GIVEN** `llmOptimizedContext: false` in configuration
+    - **WHEN** `specd change context my-change designing --optimized` is executed
+    - **THEN** the CLI passes `llmOptimizedContext: true` as a runtime override on `CompileContext.execute`
+
+    #### Scenario: Section flags forwarded without CLI llmOptimizedContext override
+
+    - **GIVEN** `llmOptimizedContext: true` in configuration
+    - **WHEN** `specd change context my-change designing --rules` is executed
+    - **THEN** the CLI forwards `sections: ['rules']` on `CompileContext.execute`
+    - **AND** the CLI does not pass `llmOptimizedContext` when it matches the yaml default
+    - **AND** optimization bypass behaviour is verified by `core:compile-context`

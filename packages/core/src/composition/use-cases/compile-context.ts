@@ -12,7 +12,6 @@ import { type ListWorkspaces } from '../../application/use-cases/list-workspaces
 import { type PreviewSpec } from '../../application/use-cases/preview-spec.js'
 import { type SpecdConfig } from '../../application/specd-config.js'
 import { type ExtractorTransformRegistry } from '../../domain/services/content-extraction.js'
-import { type LifecycleEngine } from '../../domain/services/lifecycle-engine.js'
 import {
   createCompositionResolver,
   type CompositionResolver,
@@ -34,7 +33,6 @@ export interface CompileContextDeps {
   readonly previewSpec: PreviewSpec
   readonly extractorTransforms: ExtractorTransformRegistry
   readonly workspaceRoutes: readonly SpecWorkspaceRoute[]
-  readonly lifecycle: LifecycleEngine
   readonly defaultConfig: CompileContextConfig
 }
 
@@ -60,7 +58,6 @@ export function resolveCompileContextDeps(resolver: CompositionResolver): Compil
     }),
     extractorTransforms: resolver.getExtractorTransforms(),
     workspaceRoutes: resolver.getSpecWorkspaceRoutes(),
-    lifecycle: resolver.getLifecycleEngine(),
     defaultConfig: resolver.getCompileContextConfig(),
   }
 }
@@ -123,7 +120,6 @@ function createCompileContextFromNormalized(
       previewSpec,
       extractorTransforms,
       workspaceRoutes,
-      lifecycle,
       defaultConfig,
     } = input.deps
     return new CompileContext(
@@ -136,7 +132,6 @@ function createCompileContextFromNormalized(
       previewSpec,
       extractorTransforms,
       workspaceRoutes,
-      lifecycle,
       defaultConfig,
     )
   }
@@ -164,7 +159,6 @@ function isCompileContextDeps(
     'previewSpec' in value &&
     'extractorTransforms' in value &&
     'workspaceRoutes' in value &&
-    'lifecycle' in value &&
     'defaultConfig' in value
   )
 }

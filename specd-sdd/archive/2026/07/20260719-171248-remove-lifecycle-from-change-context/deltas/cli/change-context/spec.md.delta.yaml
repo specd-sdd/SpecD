@@ -1,0 +1,52 @@
+- op: modified
+  description: Define change context as a context-only command.
+  selector:
+    type: section
+    matches: 'Purpose'
+  content: |
+    AI agents need a single command to retrieve relevant working context — spec content and project context entries — so they can operate on a change without manual assembly. `specd change context <name> <step>` compiles and prints the context block an agent receives when entering a lifecycle step for a named change. Lifecycle state and readiness are separate concerns retrieved through `specd change status`; artifact instructions and step hook instructions remain separate concerns retrieved via `specd change artifact-instruction` and `specd change hook-instruction` respectively.
+- op: modified
+  description: Remove lifecycle output and warnings from the CLI projection.
+  selector:
+    type: section
+    matches: 'Requirement: Output'
+  content: |
+    The CLI MUST assemble the final output from the structured `CompileContextResult` returned by the use case.
+
+    **In `text` mode** (default):
+
+    1. The first rendered line is `Context Fingerprint: <sha256...>`, before any project context or spec content.
+    2. Project context entries are rendered next, each preceded by its source label (for example `**Source: <path>**` for file entries and `**Source: instruction**` for instruction entries). Entries are separated by `---`.
+    3. Spec entries follow with explicit mode labels:
+       - **Full-mode specs** (`mode: 'full'`) are rendered under a `### Spec: <specId>` heading and MUST include an explicit mode label.
+       - **Summary-mode specs** (`mode: 'summary'`) are rendered under `## Available context specs` with spec ID, title, description, source, and an explicit summary label.
+       - **List-mode specs** (`mode: 'list'`) are rendered under `## Available context specs` with spec ID, source, and an explicit list label.
+       - Non-full sections include this instruction: `Use \`specd change spec-preview <change-name> <specId>\` to load the merged full content of any change spec you need.`
+       - Specs from `dependsOnTraversal` source MUST be visually distinguished from `includePattern` specs.
+
+    When `--fingerprint` is provided and matches the current fingerprint, text mode still begins with `Context Fingerprint: <sha256...>` and then outputs a brief unchanged message. The full context is not printed.
+
+    **In `json` or `toon` mode**, the output is the structured context-only result directly. List entries include `specId`, `source`, and `mode`. Summary entries additionally include `title` and `description`. Full entries additionally include `content`. The output MUST NOT include lifecycle state, requested-step availability, blocking artifacts, or per-step availability.
+- op: removed
+  description: Lifecycle readiness is reported by change status rather than change context.
+  selector:
+    type: section
+    matches: 'Requirement: Step availability warning'
+- op: modified
+  description: Remove lifecycle output constraints while retaining formatting rules.
+  selector:
+    type: section
+    matches: 'Constraints'
+  content: |
+    - In text mode, the first line is `Context Fingerprint: <sha256...>`, before project context entries.
+    - In text mode, project context entries appear before spec entries.
+    - Text output MUST label each rendered spec entry explicitly as list, summary, or full content without relying on title rewriting.
+    - Non-full specs in text output MUST include a note instructing the agent to use `specd change spec-preview <change-name> <specId>` for merged full content when applicable.
+    - Summary-mode and list-mode specs from `dependsOnTraversal` MUST be rendered under a separate sub-heading from `includePattern` specs.
+    - Section flags apply only to full-mode spec content.
+    - All warnings go to stderr; the assembled output goes to stdout.
+    - `dependsOn` traversal is opt-in via `--follow-deps`; without the flag, deps are not followed.
+    - `--include-change-specs` is opt-in; without the flag, `change.specIds` are not direct seeds.
+    - `--depth` without `--follow-deps` is a CLI usage error (exit code 1).
+    - The CLI MUST NOT derive or render lifecycle readiness; callers MUST use `change status` for lifecycle state and blockers.
+    - Optimization warnings for missing or stale optimized fields are suppressed whenever the effective `llmOptimizedContext` is `false`.

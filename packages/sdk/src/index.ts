@@ -19,6 +19,8 @@ export {
   type RunIndexProjectGraphResult,
 } from './orchestration/index.js'
 
+export { InvalidProviderLifecycleError } from './domain/errors/index.js'
+
 export * from './core-reexports.js'
 
 export {

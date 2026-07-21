@@ -23,15 +23,6 @@ export function formatCompiledContextMarkdown(result: CompileContextResult): str
     parts.push(formatSpecCatalogue(nonFullSpecs))
   }
 
-  if (result.availableSteps.length > 0) {
-    const stepLines = result.availableSteps.map((s) =>
-      s.available
-        ? `- ${s.step}: available`
-        : `- ${s.step}: unavailable — requires: [${s.blockingArtifacts.join(', ')}]`,
-    )
-    parts.push(`## Available steps\n\n${stepLines.join('\n')}`)
-  }
-
   return parts.join('\n\n---\n\n')
 }
 

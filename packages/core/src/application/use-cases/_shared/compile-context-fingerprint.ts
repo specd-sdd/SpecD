@@ -1,6 +1,5 @@
 import { createHash } from 'node:crypto'
 import type {
-  AvailableStep,
   ContextSpecEntry,
   ProjectContextEntry,
   ContextWarning,
@@ -16,11 +15,8 @@ export interface FingerprintInput {
   readonly followDeps: boolean
   readonly depth?: number
   readonly sections: readonly SpecSection[]
-  readonly stepAvailable: boolean
-  readonly blockingArtifacts: readonly string[]
   readonly projectContext: readonly ProjectContextEntry[]
   readonly specs: readonly ContextSpecEntry[]
-  readonly availableSteps: readonly AvailableStep[]
   readonly warnings: readonly ContextWarning[]
 }
 
@@ -38,8 +34,6 @@ export function compileContextFingerprint(input: FingerprintInput): string {
     followDeps: input.followDeps,
     ...(input.depth !== undefined ? { depth: input.depth } : {}),
     sections: [...input.sections],
-    stepAvailable: input.stepAvailable,
-    blockingArtifacts: [...input.blockingArtifacts],
     projectContext: input.projectContext.map((entry) =>
       entry.source === 'file'
         ? {
@@ -59,11 +53,6 @@ export function compileContextFingerprint(input: FingerprintInput): string {
       source: spec.source,
       mode: spec.mode,
       ...(spec.content !== undefined ? { content: spec.content } : {}),
-    })),
-    availableSteps: input.availableSteps.map((step) => ({
-      step: step.step,
-      available: step.available,
-      blockingArtifacts: [...step.blockingArtifacts],
     })),
     warnings: input.warnings.map((warning) => ({
       type: warning.type,

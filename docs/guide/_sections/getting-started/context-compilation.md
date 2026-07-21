@@ -28,4 +28,4 @@ Use that command to inspect merged full content for a specific spec in the curre
 
 Section flags (`--rules`, `--constraints`, `--scenarios`) only affect full-mode output. In `list` and `summary`, those flags are accepted but do not change the rendered shape.
 
-The output is a single ordered instruction block: project context, schema instructions for the active artifact, spec content, and lifecycle hooks — ready to inject directly into the agent.
+The output is a single ordered instruction block: project context, schema instructions for the active artifact, and spec content — ready to inject directly into the agent. Lifecycle state and readiness come from `change status`, not from `change context`.

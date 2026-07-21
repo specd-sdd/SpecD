@@ -1,0 +1,202 @@
+- op: modified
+  description: Remove lifecycle evaluation from the CompileContext constructor contract.
+  selector:
+    type: section
+    matches: 'Requirement: Ports and constructor'
+  content: |
+    `CompileContext` receives at construction time: `ChangeRepository`, `ListWorkspaces`, `SchemaProvider`, `FileReader`, `ArtifactParserRegistry`, `ContentHasher`, `PreviewSpec`, and a yaml-derived `CompileContextConfig` default snapshot.
+
+    ```typescript
+    class CompileContext {
+      constructor(
+        changes: ChangeRepository,
+        listWorkspaces: ListWorkspaces,
+        schemaProvider: SchemaProvider,
+        files: FileReader,
+        parsers: ArtifactParserRegistry,
+        hasher: ContentHasher,
+        previewSpec: PreviewSpec,
+        defaultConfig: CompileContextConfig,
+      )
+    }
+    ```
+
+    The `defaultConfig` value MUST be produced from the resolved `SpecdConfig` at kernel composition time (via the internal composition helper). It MUST include project-level `context`, `contextIncludeSpecs`, `contextExcludeSpecs`, per-workspace context patterns, `projectRoot`, and `configPath`. It MUST NOT include per-call runtime overrides such as `contextMode` or `llmOptimizedContext` unless those are the yaml defaults.
+
+    `SchemaProvider` is a lazy, caching port that returns the fully-resolved schema (with plugins and overrides applied). It replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple. All are injected at kernel composition time, not passed per invocation.
+
+    `PreviewSpec` is the use case `CompileContext` delegates to when it needs a materialized merged view of a spec with validated deltas applied. `ContentHasher` is used for metadata freshness checks and context fingerprint inputs.
+
+    `CompileContext` MUST NOT accept `LifecycleEngine` or `ImplementationDetector`, evaluate lifecycle availability, or invoke implementation autodetection.
+- op: modified
+  description: Limit section filtering to context entries rather than lifecycle projections.
+  selector:
+    type: section
+    matches: 'Requirement: Input'
+  content: |
+    `CompileContext.execute` receives:
+
+    - `name` — the change name to compile context for
+    - `step` — the lifecycle step being entered (e.g. `'designing'`, `'implementing'`, `'verifying'`, `'archiving'`); it identifies the requested context entry point but MUST NOT cause lifecycle readiness to be evaluated or returned
+    - `contextMode` (optional) — runtime override for display mode (`'list'`, `'summary'`, `'full'`, `'hybrid'`). When absent, the baked default from construction is used.
+    - `llmOptimizedContext` (optional) — runtime override for whether optimized context is preferred. When absent, the baked default from construction is used.
+    - `includeChangeSpecs` (optional, default `false`) — when `true`, directly seeds `change.specIds` into the collected set. When `false`, direct seeding is skipped; the same specs may still be included through include patterns, `change.specDependsOn`, or `dependsOn` traversal.
+    - `followDeps` (optional, default `false`) — when `true`, performs the `dependsOn` transitive traversal (step 5 of context spec collection) to discover additional specs. When `false` or absent, traversal is skipped and only specs collected in steps 1-4 are included.
+    - `depth` (optional) — only valid when `followDeps` is `true`; limits `dependsOn` traversal to N levels deep (1 = direct deps only, 2 = deps of deps, etc.). When absent and `followDeps` is `true`, traversal is unlimited.
+    - `sections` (optional) — when present, restricts the metadata-derived content rendered for each full-mode spec in the output to the listed sections (`'rules'`, `'constraints'`, `'scenarios'`). When absent, full-mode specs are rendered from their artifact files rather than from metadata sections. `sections` applies only to full-mode spec content — it does not affect list-mode specs, summary-mode specs, or project context entries.
+    - `fingerprint` (optional) — when provided, `CompileContext` compares this value against the fingerprint it calculates from the current context inputs. If they match, the result's `status` field is set to `'unchanged'` and the full context is not assembled. If omitted or the fingerprint does not match, `status` is `'changed'` and the full context is returned with the new fingerprint.
+
+    `CompileContext.execute` MUST NOT accept a `config` field. Yaml-derived configuration is read from the construction-time default snapshot only.
+- op: removed
+  description: Lifecycle readiness belongs to GetStatus, not compiled context.
+  selector:
+    type: section
+    matches: 'Requirement: Step availability'
+- op: modified
+  description: Restrict the structured result to context entries and warnings.
+  selector:
+    type: section
+    matches: 'Requirement: Structured result assembly'
+  content: |
+    `CompileContext` MUST assemble the result by producing two structured components rather than a single text string:
+
+    1. **Project context entries** (`projectContext: ProjectContextEntry[]`) — for each entry in `config.context` (in declaration order): resolve `instruction` values verbatim; resolve `file` values by reading the file at the given path relative to the `specd.yaml` directory. Missing files emit a warning and are skipped. Each entry is an object with:
+       - `source` (`'instruction' | 'file'`) — the type of context entry
+       - `path` (string, only for `file` entries) — the file path
+       - `content` (string) — the rendered text content
+    2. **Spec entries** (`specs: ContextSpecEntry[]`) — for each spec in the collected context set, produce an entry with: specs MUST appear in stable collection order: direct `change.specIds` seeds for the call (when `includeChangeSpecs: true`), then `change.specDependsOn` seeds, then include-pattern matches in declaration order, then `dependsOn` traversal discoveries.
+       - `specId` (string) — the fully-qualified spec ID (e.g. `core:compile-context`)
+       - `title` (string, summary/full modes) — the spec title from metadata or extracted from the artifact set
+       - `description` (string, summary/full modes) — the spec description from metadata (2–3 sentence summary)
+       - `source` (`'specIds' | 'specDependsOn' | 'includePattern' | 'dependsOnTraversal'`) — how this spec was collected. When a spec qualifies through multiple sources, the highest-priority source wins: `specIds` > `specDependsOn` > `dependsOnTraversal` > `includePattern`.
+       - `mode` (`'list' | 'summary' | 'full'`) — rendering shape for this entry according to `contextMode` and `includeChangeSpecs`
+       - `content` (string, present only when `mode` is `'full'`) — the rendered spec content.
+
+    Full-mode rendering follows these rules:
+
+    - When `sections` is absent, `CompileContext` renders all artifacts whose schema `scope` is `spec` for that spec. If a file named `spec.md` exists, it is rendered first. All remaining spec-scoped artifact files are rendered after it in alphabetical order by filename.
+    - The rendered full content concatenates those files in display order and labels each file with its filename so multi-file specs remain readable.
+    - For specs in `change.specIds`, `CompileContext` uses the merged artifact set returned by `PreviewSpec` when available, preserving the same ordering rule (`spec.md` first if present, then alphabetical). If merged preview files are unavailable, it falls back to the base spec artifact set.
+    - When `sections` is present, `CompileContext` does not render raw artifact files. Instead it renders only the selected metadata-derived sections. For specs in `change.specIds`, those selected sections are extracted from the merged preview artifact set when available so merged deltas affect `rules`, `constraints`, and `scenarios` output. For all other specs, the selected sections come from fresh metadata or fallback extraction against the base artifact set.
+- op: modified
+  description: Define the result as context-only.
+  selector:
+    type: section
+    matches: 'Requirement: Result shape'
+  content: |
+    `CompileContextResult` MUST include:
+
+    - `contextFingerprint` — the calculated fingerprint for the emitted logical context
+    - `status` — `'changed'` or `'unchanged'`
+    - `projectContext` — rendered project context entries
+    - `specs` — rendered context spec entries
+    - `warnings` — context-collection, metadata, or rendering warnings
+
+    It MUST NOT include lifecycle state, requested-step availability, blocking artifacts, or per-step availability. Consumers that need lifecycle information MUST use `GetStatus`.
+- op: modified
+  description: Fingerprints represent context-only output.
+  selector:
+    type: section
+    matches: 'Requirement: Context fingerprint'
+  content: |
+    `CompileContext` MUST calculate the fingerprint from the canonicalized emitted logical context: project context entries, spec entries, context diagnostics, and result-shaping inputs that change those emitted entries. It MUST NOT include lifecycle state, lifecycle availability, or lifecycle blockers. The requested step affects the fingerprint only when it changes emitted context, such as the effective section selection.
+
+    When `fingerprint` matches the current context fingerprint, the result's `status` MUST be `'unchanged'` and `projectContext` and `specs` MUST be empty arrays. Otherwise, the result's `status` MUST be `'changed'` and it MUST return the assembled context with the new fingerprint.
+- op: removed
+  description: Remove lifecycle-engine from CompileContext's declared spec dependencies.
+  selector:
+    type: list-item
+    matches: 'core:lifecycle-engine'
+    parent:
+      type: section
+      matches: 'Spec Dependencies'
+- op: modified
+  description: Purpose describes context-only compilation.
+  selector:
+    type: section
+    matches: Purpose
+  content: |
+    AI agents entering a lifecycle step need relevant spec content and project context to understand the codebase they're working with — assembling this from scattered sources manually would be error-prone and inconsistent. `CompileContext` automates this assembly: it collects context specs according to the project's include/exclude configuration, reads structured metadata via `SpecRepository.metadata()`, and combines project context entries and spec content into a single structured output. Lifecycle state and readiness are separate concerns retrieved through `GetStatus`. Artifact instructions and step hook instructions are separate concerns retrieved via `GetArtifactInstruction` and `GetHookInstructions` respectively.
+- op: modified
+  description: Factory composition no longer resolves LifecycleEngine.
+  selector:
+    type: section
+    matches: 'Requirement: Config-based factory delegates through resolveCompileContextDeps'
+  content: |
+    The config-based `createCompileContext(config, options?)` form MUST derive `CompileContextDeps` through `resolveCompileContextDeps(resolver)` and then delegate to canonical `createCompileContext(deps)`.
+
+    `resolveCompileContextDeps(resolver)` MUST resolve:
+
+    - `changes: ChangeRepository`
+    - `listWorkspaces: ListWorkspaces`
+    - `schemaProvider: SchemaProvider`
+    - `files: FileReader`
+    - `parsers: ArtifactParserRegistry`
+    - `hasher: ContentHasher`
+    - `previewSpec: PreviewSpec`
+    - `extractorTransforms: ExtractorTransformRegistry`
+    - `workspaceRoutes: readonly SpecWorkspaceRoute[]`
+    - `defaultConfig: CompileContextConfig`
+
+    It MUST NOT resolve `LifecycleEngine`.
+
+    The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+- op: modified
+  description: Remove available-steps constraint from section filtering.
+  selector:
+    type: section
+    matches: Constraints
+  content: |
+    - Project `context` entries always appear first in `projectContext`, before spec entries
+    - Missing `file` references in `context` emit a warning and are skipped — no error
+    - Steps 1-4 (include/exclude patterns) are applied before `dependsOn` traversal (step 5)
+    - Specs added via `dependsOn` traversal are never removed by exclude rules
+    - A spec always appears at most once in the `specs` array, classified by its highest-priority source
+    - `CompileContext` MUST NOT perform direct filesystem reads — all file access goes through `SpecRepository` (for spec files and metadata) or `FileReader` (for `config.context` file entries)
+    - The caller resolves the config and constructs all `SpecRepository` and `FileReader` instances before calling the constructor
+    - The active workspaces resolved via `ListWorkspaces` must contain one entry per workspace declared in `specd.yaml`; workspaces missing from the active list produce a warning, not an error
+    - Artifact instructions, rules, and delta context are NOT part of the result — they are retrieved via `GetArtifactInstruction`
+    - `instruction:` hook entries are NOT part of the result — they are retrieved via `GetHookInstructions`
+    - `dependsOn` traversal is opt-in via `followDeps: true`; when absent or `false`, step 5 is skipped entirely
+    - `depth` is only meaningful when `followDeps: true`; it limits traversal levels (1 = direct deps only)
+    - `sections` applies only to full-mode spec content rendering; summary-mode specs and project context entries are unaffected
+    - Cycle detection is mandatory — cycles in `dependsOn` must not cause infinite loops
+    - Fresh metadata (via `SpecRepository.metadata()`) is always preferred; the `metadataExtraction` fallback is only used when metadata is absent or stale
+    - `contextMode` supports `list`, `summary`, `full`, and `hybrid`; when omitted, `summary` is used
+    - In `hybrid`, only direct `change.specIds` entries included via `includeChangeSpecs: true` are full; other collected specs remain summaries
+    - `PreviewSpec` errors MUST NOT block context compilation — `CompileContext` falls back to base content on any preview failure
+- op: modified
+  description: Update example result comments to the context-only contract.
+  selector:
+    type: section
+    matches: Examples
+  content: |
+    ### Context compilation for any step
+
+    ```typescript
+    const result = await compileContext.execute({
+      name: 'add-auth-flow',
+      step: 'designing',
+      includeChangeSpecs: true,
+      config: {
+        context: [
+          { file: 'specd-bootstrap.md' },
+          { instruction: 'Always prefer editing existing files over creating new ones.' },
+        ],
+        contextIncludeSpecs: ['default:*'],
+        contextExcludeSpecs: [],
+        contextMode: 'hybrid',
+        workspaces: {
+          default: { contextIncludeSpecs: ['*'], contextExcludeSpecs: [] },
+        },
+      },
+    })
+    // result.contextFingerprint: 'sha256:...'
+    // result.status: 'changed'
+    // result.projectContext: [{ source: 'file', path: 'specd-bootstrap.md', content: '...' }, ...]
+    // result.specs: [
+    //   { specId: 'default:auth/login', title: '...', source: 'specIds', mode: 'full', content: '...' },
+    //   { specId: 'default:_global/architecture', title: '...', source: 'includePattern', mode: 'summary', description: '...' },
+    // ]
+    // result.warnings: []
+    ```

@@ -14,7 +14,8 @@
   ],
   "implementation": [
     {
-      "file": "cli:src/commands/change/context.ts"
+      "file": "cli:src/commands/change/context.ts",
+      "symbols": ["registerChangeContext"]
     },
     {
       "file": "cli:test/commands/change-context.spec.ts"

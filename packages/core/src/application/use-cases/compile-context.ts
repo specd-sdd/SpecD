@@ -12,7 +12,6 @@ import { SpecPath } from '../../domain/value-objects/spec-path.js'
 import { Schema } from '../../domain/value-objects/schema.js'
 import { inferFormat } from '../../domain/services/format-inference.js'
 import { parseSpecId } from '../../domain/services/parse-spec-id.js'
-import { LifecycleEngine } from '../../domain/services/lifecycle-engine.js'
 import { checkProjectMetadataFreshness } from './_shared/project-metadata-freshness.js'
 import { type ContentHasher } from '../ports/content-hasher.js'
 import { type PreviewSpec } from './preview-spec.js'
@@ -21,7 +20,6 @@ import { listMatchingSpecs, type ResolvedSpec } from './_shared/spec-pattern-mat
 import { traverseDependsOn, type DependsOnFallback } from './_shared/depends-on-traversal.js'
 import { compileContextFingerprint } from './_shared/compile-context-fingerprint.js'
 import { type SpecWorkspaceRoute } from './_shared/spec-reference-resolver.js'
-import { Logger } from '../logger.js'
 import { extractMetadataFromSpecArtifacts } from './_shared/extract-metadata-from-spec-artifacts.js'
 import { type ListWorkspaces, type ProjectWorkspace } from './list-workspaces.js'
 import { mergeCompileContextRuntimeOverrides } from './_shared/merge-compile-context-config.js'
@@ -169,38 +167,16 @@ export interface ContextSpecEntry {
   readonly content?: string
 }
 
-/** A workflow step with its availability status. */
-export interface AvailableStep {
-  /** The step name (e.g. `'designing'`, `'implementing'`). */
-  readonly step: string
-  /** Whether the step is currently available. */
-  readonly available: boolean
-  /** Whether structural requirements are satisfied for this step. */
-  readonly isReady?: boolean
-  /** Whether lifecycle protocol permits entering this step now. */
-  readonly isPermitted?: boolean
-  /** Artifact IDs blocking the step (empty if available). */
-  readonly blockingArtifacts: readonly string[]
-  /** Machine-readable blocker diagnostics for the step. */
-  readonly blockers?: readonly { readonly code: string; readonly message: string }[]
-}
-
 /** Result returned by a successful {@link CompileContext} execution. */
 export interface CompileContextResult {
   /** The calculated fingerprint for the current context state. */
   readonly contextFingerprint: string
   /** Whether the full context was returned (`'changed'`) or fingerprint matched (`'unchanged'`). */
   readonly status: 'changed' | 'unchanged'
-  /** Whether the requested step is currently available. */
-  readonly stepAvailable: boolean
-  /** Artifact IDs blocking the step; empty when `stepAvailable` is `true`. */
-  readonly blockingArtifacts: readonly string[]
   /** Rendered project context entries. */
   readonly projectContext: readonly ProjectContextEntry[]
   /** Spec entries with display mode, source, and content. */
   readonly specs: readonly ContextSpecEntry[]
-  /** All workflow steps with availability status. */
-  readonly availableSteps: readonly AvailableStep[]
   /** Stale metadata warnings and other advisory conditions. */
   readonly warnings: readonly ContextWarning[]
 }
@@ -208,9 +184,9 @@ export interface CompileContextResult {
 /**
  * Assembles the structured context an AI agent receives when entering a lifecycle step.
  *
- * Collects context specs via five-step include/exclude/dependsOn resolution,
- * evaluates step availability, and returns structured project context entries,
- * spec entries (with display-mode classification), and available steps. Artifact
+ * Collects context specs via five-step include/exclude/dependsOn resolution and
+ * returns structured project context entries and spec entries (with display-mode
+ * classification). Artifact
  * instructions and step hook instructions are separate concerns handled by
  * `GetArtifactInstruction` and `GetHookInstructions` respectively.
  */
@@ -224,7 +200,6 @@ export class CompileContext {
   private readonly _previewSpec: PreviewSpec
   private readonly _extractorTransforms: ExtractorTransformRegistry
   private readonly _workspaceRoutes: readonly SpecWorkspaceRoute[]
-  private readonly _lifecycle: LifecycleEngine
   private readonly _defaultConfig: CompileContextConfig
 
   /**
@@ -239,7 +214,6 @@ export class CompileContext {
    * @param previewSpec - Use case for merging deltas into spec content
    * @param extractorTransforms - Shared extractor transform registry
    * @param workspaceRoutes - Workspace routing metadata for cross-workspace resolution
-   * @param lifecycle - Shared lifecycle interpreter
    * @param defaultConfig - Yaml-derived context configuration baked at composition time
    */
   constructor(
@@ -252,7 +226,6 @@ export class CompileContext {
     previewSpec: PreviewSpec,
     extractorTransforms: ExtractorTransformRegistry = new Map(),
     workspaceRoutes: readonly SpecWorkspaceRoute[] = [],
-    lifecycle: LifecycleEngine = new LifecycleEngine(Logger.debug.bind(Logger)),
     defaultConfig: CompileContextConfig = {},
   ) {
     this._changes = changes
@@ -264,7 +237,6 @@ export class CompileContext {
     this._previewSpec = previewSpec
     this._extractorTransforms = extractorTransforms
     this._workspaceRoutes = workspaceRoutes
-    this._lifecycle = lifecycle
     this._defaultConfig = defaultConfig
   }
 
@@ -514,20 +486,6 @@ export class CompileContext {
     // --- Display mode classification ---
     const contextMode: 'list' | 'summary' | 'full' | 'hybrid' = config.contextMode ?? 'summary'
 
-    const lifecycle = this._lifecycle.evaluate(change, schema)
-    const requestedStepVerdict = lifecycle.availableSteps.find((step) => step.step === input.step)
-    const stepAvailable = requestedStepVerdict?.available ?? true
-    const blockingArtifacts = [...(requestedStepVerdict?.blockingArtifacts ?? [])]
-    Logger.debug('CompileContext projected lifecycle engine availability', {
-      change: change.name,
-      step: input.step,
-      stepAvailable,
-      blockingArtifacts,
-      engineAvailable: requestedStepVerdict?.available ?? null,
-      isReady: requestedStepVerdict?.isReady ?? null,
-      isPermitted: requestedStepVerdict?.isPermitted ?? null,
-    })
-
     // --- Part 1: Project context entries ---
     const projectContext: ProjectContextEntry[] = []
 
@@ -730,19 +688,6 @@ export class CompileContext {
       specs.push({ specId, title, description, source, mode, content })
     }
 
-    // --- Part 3: Available steps ---
-    const availableSteps: AvailableStep[] = lifecycle.availableSteps.map((step) => ({
-      step: step.step,
-      available: step.available,
-      isReady: step.isReady,
-      isPermitted: step.isPermitted,
-      blockingArtifacts: [...step.blockingArtifacts],
-      blockers: step.blockers.map((blocker) => ({
-        code: blocker.code,
-        message: blocker.message,
-      })),
-    }))
-
     // --- Calculate fingerprint (after all fields are ready) ---
     const fingerprintSections: readonly SpecSection[] =
       sectionsFilter !== undefined && specs.some((entry) => entry.mode === 'full')
@@ -755,11 +700,8 @@ export class CompileContext {
       followDeps: input.followDeps === true,
       ...(input.depth !== undefined ? { depth: input.depth } : {}),
       sections: fingerprintSections,
-      stepAvailable,
-      blockingArtifacts,
       projectContext,
       specs,
-      availableSteps,
       warnings,
     })
 
@@ -768,11 +710,8 @@ export class CompileContext {
       return {
         contextFingerprint: currentFingerprint,
         status: 'unchanged',
-        stepAvailable,
-        blockingArtifacts,
         projectContext: [],
         specs: [],
-        availableSteps,
         warnings,
       }
     }
@@ -780,11 +719,8 @@ export class CompileContext {
     return {
       contextFingerprint: currentFingerprint,
       status: 'changed',
-      stepAvailable,
-      blockingArtifacts,
       projectContext,
       specs,
-      availableSteps,
       warnings,
     }
   }

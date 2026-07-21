@@ -33,9 +33,6 @@ const mockResult = {
       content: '#### Rules\n\n##### Auth rule\n- Users must authenticate',
     },
   ],
-  availableSteps: [{ step: 'designing', available: true, blockingArtifacts: [] as string[] }],
-  stepAvailable: true,
-  blockingArtifacts: [] as string[],
   warnings: [] as { message: string }[],
 }
 
@@ -109,10 +106,11 @@ describe('change context', () => {
     const parsed = JSON.parse(stdout())
     expect(parsed.contextFingerprint).toBe('sha256:test-context')
     expect(parsed.status).toBe('changed')
-    expect(parsed.stepAvailable).toBe(true)
     expect(Array.isArray(parsed.projectContext)).toBe(true)
     expect(Array.isArray(parsed.specs)).toBe(true)
-    expect(Array.isArray(parsed.availableSteps)).toBe(true)
+    expect(parsed).not.toHaveProperty('stepAvailable')
+    expect(parsed).not.toHaveProperty('blockingArtifacts')
+    expect(parsed).not.toHaveProperty('availableSteps')
     expect(Array.isArray(parsed.warnings)).toBe(true)
     expect(parsed.specs[0].specId).toBe('default:auth/login')
     expect(parsed.specs[0].mode).toBe('full')
@@ -177,7 +175,6 @@ describe('change context', () => {
     expect(parsed.status).toBe('unchanged')
     expect(parsed.projectContext).toEqual([])
     expect(parsed.specs).toEqual([])
-    expect(parsed.availableSteps).toEqual(mockResult.availableSteps)
   })
 
   it('passes --follow-deps flag to use case', async () => {
@@ -259,21 +256,19 @@ describe('change context', () => {
     expect(call.sections).not.toContain('scenarios')
   })
 
-  it('warns to stderr when step not available', async () => {
+  it('does not warn to stderr for lifecycle unavailability', async () => {
     const { kernel, stderr } = setup()
     kernel.changes.compile.execute.mockResolvedValue({
       ...mockResult,
-      stepAvailable: false,
-      blockingArtifacts: ['proposal', 'spec'],
+      warnings: [{ message: 'spec auth/login has stale metadata' }],
     })
 
     const program = makeProgram()
     registerChangeContext(program.command('change'))
     await program.parseAsync(['node', 'specd', 'change', 'context', 'my-change', 'implementing'])
 
-    expect(stderr()).toContain('warning:')
-    expect(stderr()).toContain('proposal')
-    expect(stderr()).toContain('spec')
+    expect(stderr()).not.toContain('not yet available')
+    expect(stderr()).not.toContain('blocking artifacts')
   })
 
   it('warns to stderr for stale metadata', async () => {
@@ -404,7 +399,7 @@ describe('change context', () => {
     expect(stdout()).toContain('| default:infra/database | summary |')
   })
 
-  it('JSON output includes projectContext, specs, availableSteps with mode and source', async () => {
+  it('JSON output includes projectContext and specs with mode and source', async () => {
     const { stdout } = setup()
 
     const program = makeProgram()
@@ -423,7 +418,7 @@ describe('change context', () => {
     const parsed = JSON.parse(stdout())
     expect(parsed.projectContext).toBeDefined()
     expect(parsed.specs).toBeDefined()
-    expect(parsed.availableSteps).toBeDefined()
+    expect(parsed).not.toHaveProperty('availableSteps')
     expect(parsed.specs[0].mode).toBe('full')
     expect(parsed.specs[0].source).toBe('includePattern')
     expect(parsed.warnings).toEqual([])

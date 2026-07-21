@@ -1,0 +1,34 @@
+- op: modified
+  description: 'Add scenarios for existing open provider, conflicting lifecycle hooks error, and afterClose hook in runIndexProjectGraph orchestration requirement'
+  selector:
+    type: section
+    matches: 'Requirement: runIndexProjectGraph orchestration'
+  content: |
+    #### Scenario: Full workspace index with transient provider and lifecycle hooks
+
+    - **GIVEN** optional `beforeOpen` and `afterClose` hooks provided in `input`
+    - **WHEN** `runIndexProjectGraph(ctx, { force: false, beforeOpen, afterClose })` is called without explicit provider
+    - **THEN** `listWorkspaces` is invoked
+    - **AND** `withOpenGraphProvider` receives `beforeOpen` and `afterClose`
+    - **AND** `IndexProjectGraph` runs for all workspaces
+    - **AND** the transient provider is closed upon completion
+
+    #### Scenario: Existing open provider bypasses withOpenGraphProvider
+
+    - **GIVEN** an open `CodeGraphProvider` instance
+    - **WHEN** `runIndexProjectGraph(ctx, { provider: openProvider })` is called
+    - **THEN** `IndexProjectGraph` executes directly on `openProvider`
+    - **AND** `openProvider.close()` is NOT called even if indexing succeeds or throws an error
+
+    #### Scenario: Conflicting lifecycle hooks with existing provider throws error
+
+    - **GIVEN** an open `CodeGraphProvider` instance
+    - **AND** `input` includes `provider` and either `beforeOpen` or `afterClose`
+    - **WHEN** `runIndexProjectGraph(ctx, input)` is called
+    - **THEN** it throws `InvalidProviderLifecycleError`
+    - **AND** the error is an instance of `SpecdError` with `code: 'INVALID_PROVIDER_LIFECYCLE'`
+
+    #### Scenario: Subset workspace index
+
+    - **WHEN** `runIndexProjectGraph(ctx, { workspaces: ['core'] })` is called
+    - **THEN** only the specified workspaces are passed to `IndexProjectGraph`

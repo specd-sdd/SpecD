@@ -13,7 +13,7 @@
     {
       "requirement": "runIndexProjectGraph orchestration",
       "rules": [
-        "`runIndexProjectGraph(ctx: SdkHostContext, input: RunIndexProjectGraphInput): Promise<RunIndexProjectGraphResult>` SHALL:\n\n1. Resolve `SpecdConfig` via `ctx.kernel.project.getConfig.execute()`\n2. Call `ctx.kernel.project.listWorkspaces.execute()` for workspace targets\n3. Run inside `withOpenGraphProvider(ctx, async (provider) => { ... })`\n4. Invoke `createIndexProjectGraph()` from `@specd/code-graph` and call `indexProjectGraph.execute({ provider, projectRoot, workspaces, graphConfig, codeGraphVersion, force, vcsRef, onProgress })` with values prepared from config, workspace list, VCS ref, and `input`\n\n`input.workspaces` MAY restrict indexing to a subset; when omitted, all configured workspaces MUST be indexed."
+        "`runIndexProjectGraph(ctx: SdkHostContext, input: RunIndexProjectGraphInput): Promise<RunIndexProjectGraphResult>` SHALL:\n\n1. Validate input combinations:\n   - IF `input.provider` is provided AND (`input.beforeOpen` is provided OR `input.afterClose` is provided), throw `InvalidProviderLifecycleError` (a `SpecdError` with `code: 'INVALID_PROVIDER_LIFECYCLE'`)\n2. Resolve `SpecdConfig` via `ctx.kernel.project.getConfig.execute()`\n3. Call `ctx.kernel.project.listWorkspaces.execute()` for workspace targets\n4. Prepare `projectRoot`, `workspaces`, `graphConfig`, `codeGraphVersion`, `vcsRoot`, `vcsRef`, `force`, and `onProgress`\n5. If `input.provider` is provided:\n   - Expect `input.provider` to be an already open `CodeGraphProvider` instance\n   - Invoke `createIndexProjectGraph()` directly on `input.provider`\n   - MUST NOT close `input.provider` on completion or failure\n6. If `input.provider` is omitted:\n   - Run inside `withOpenGraphProvider(ctx, async (provider) => { ... }, { beforeOpen: input.beforeOpen, afterClose: input.afterClose })`\n   - Invoke `createIndexProjectGraph()` on the opened transient provider\n   - Close the transient provider upon completion\n\n`input.workspaces` MAY restrict indexing to a subset; when omitted, all configured workspaces MUST be indexed."
       ]
     },
     {
@@ -38,11 +38,39 @@
   "scenarios": [
     {
       "requirement": "runIndexProjectGraph orchestration",
-      "name": "Full workspace index",
-      "when": ["runIndexProjectGraph(ctx, { force: false }) is called without workspace filter"],
+      "name": "Full workspace index with transient provider and lifecycle hooks",
+      "given": ["optional beforeOpen and afterClose hooks provided in input"],
+      "when": [
+        "runIndexProjectGraph(ctx, { force: false, beforeOpen, afterClose }) is called without explicit provider"
+      ],
       "then": [
         "listWorkspaces is invoked",
-        "AND IndexProjectGraph runs inside withOpenGraphProvider for all workspaces"
+        "AND withOpenGraphProvider receives beforeOpen and afterClose",
+        "AND IndexProjectGraph runs for all workspaces",
+        "AND the transient provider is closed upon completion"
+      ]
+    },
+    {
+      "requirement": "runIndexProjectGraph orchestration",
+      "name": "Existing open provider bypasses withOpenGraphProvider",
+      "given": ["an open CodeGraphProvider instance"],
+      "when": ["runIndexProjectGraph(ctx, { provider: openProvider }) is called"],
+      "then": [
+        "IndexProjectGraph executes directly on openProvider",
+        "AND openProvider.close() is NOT called even if indexing succeeds or throws an error"
+      ]
+    },
+    {
+      "requirement": "runIndexProjectGraph orchestration",
+      "name": "Conflicting lifecycle hooks with existing provider throws error",
+      "given": [
+        "an open CodeGraphProvider instance",
+        "AND input includes provider and either beforeOpen or afterClose"
+      ],
+      "when": ["runIndexProjectGraph(ctx, input) is called"],
+      "then": [
+        "it throws InvalidProviderLifecycleError",
+        "AND the error is an instance of SpecdError with code: 'INVALID_PROVIDER_LIFECYCLE'"
       ]
     },
     {
@@ -72,27 +100,33 @@
     }
   ],
   "implementation": {
+    "files": [
+      {
+        "specId": "sdk:run-index-project-graph",
+        "file": "sdk:test/orchestration/run-index-project-graph.spec.ts"
+      }
+    ],
     "symbols": [
       {
         "specId": "sdk:run-index-project-graph",
-        "file": "sdk:src/orchestration/run-index-project-graph.ts",
-        "symbol": "RunIndexProjectGraphInput"
-      },
-      {
-        "specId": "sdk:run-index-project-graph",
-        "file": "sdk:src/orchestration/run-index-project-graph.ts",
-        "symbol": "RunIndexProjectGraphResult"
+        "file": "sdk:src/domain/errors/invalid-provider-lifecycle-error.ts",
+        "symbol": "InvalidProviderLifecycleError"
       },
       {
         "specId": "sdk:run-index-project-graph",
         "file": "sdk:src/orchestration/run-index-project-graph.ts",
         "symbol": "runIndexProjectGraph"
+      },
+      {
+        "specId": "sdk:run-index-project-graph",
+        "file": "sdk:src/orchestration/run-index-project-graph.ts",
+        "symbol": "RunIndexProjectGraphInput"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:d9763e6b3799d574eb4027fb12e7ce43448a918cb336fdd1dcf5878c5d9cf74a",
-    "verify.md": "sha256:269255d240474c343a76eae4162683a5071352f0a63084904ef700753c7048da"
+    "spec.md": "sha256:338ad2cf3a2924d56a76c4929f5189f2f19a73dd42f59a2c5bf73220d09f4ea0",
+    "verify.md": "sha256:845eb475dc5685ebc59c98732137f54826036a6a64ef8546dc3272a1eaaa6cfe"
   },
   "generatedBy": "core"
 }

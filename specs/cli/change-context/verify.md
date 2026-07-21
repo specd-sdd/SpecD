@@ -84,6 +84,19 @@
 - **WHEN** `specd change context <name> <step> --format text` is called
 - **THEN** the rendered block includes an explicit list-mode label
 
+#### Scenario: Text output omits lifecycle availability
+
+- **GIVEN** the change has unavailable workflow steps
+- **WHEN** `specd change context <name> <step> --format text` is called
+- **THEN** stdout contains no available-step section, lifecycle state, or blocker list
+- **AND** stderr contains no lifecycle-availability warning
+
+#### Scenario: Structured output omits lifecycle fields
+
+- **WHEN** `specd change context <name> <step> --format toon` is called
+- **THEN** the result contains context fingerprint, context entries, specs, and context warnings
+- **AND** it omits `stepAvailable`, `blockingArtifacts`, and `availableSteps`
+
 #### Scenario: Non-full output instructs spec-preview usage
 
 - **GIVEN** the output contains summary-mode or list-mode entries
@@ -111,19 +124,9 @@
 
 #### Scenario: Full mode defaults to Description + Rules + Constraints
 
-- **GIVEN** a spec is rendered in `full` mode (due to `--mode full` or being a change spec in `hybrid` mode)
+- **GIVEN** a spec is rendered in `full` mode
 - **WHEN** `specd change context` is run without section flags
 - **THEN** output includes Description, Rules, and Constraints for that spec
-
-### Requirement: Step availability warning
-
-#### Scenario: Step not yet available
-
-- **GIVEN** the step `implementing` has blocking artifacts
-- **WHEN** `specd change context my-change implementing` is run
-- **THEN** stderr contains a `warning:` line listing the blocking artifacts
-- **AND** stdout still contains the context output
-- **AND** the process exits with code 0
 
 ### Requirement: Context warnings
 
@@ -181,14 +184,7 @@
 - **WHEN** `specd change context my-change designing --rules` is executed
 - **THEN** the CLI forwards `sections: ['rules']` on `CompileContext.execute`
 - **AND** the CLI does not pass `llmOptimizedContext` when it matches the yaml default
-- **AND** optimization bypass behaviour is verified by `core:compile-context` (see "Optimization bypassed when only rules requested")
-
-#### Scenario: Blocking artifacts come from CompileContext output
-
-- **GIVEN** `CompileContext` returns `stepAvailable: false` and `blockingArtifacts: ['tasks']`
-- **WHEN** `specd change context my-change implementing` is run
-- **THEN** stderr names `tasks` as the blocking artifact
-- **AND** the CLI does not recompute a different blocking set locally
+- **AND** optimization bypass behaviour is verified by `core:compile-context`
 
 ### Requirement: Optimization warning signal
 

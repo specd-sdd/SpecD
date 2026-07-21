@@ -10,8 +10,15 @@
   ],
   "implementation": [
     {
+      "file": "sdk:src/domain/errors/invalid-provider-lifecycle-error.ts",
+      "symbols": ["InvalidProviderLifecycleError"]
+    },
+    {
       "file": "sdk:src/orchestration/run-index-project-graph.ts",
-      "symbols": ["RunIndexProjectGraphInput", "RunIndexProjectGraphResult", "runIndexProjectGraph"]
+      "symbols": ["runIndexProjectGraph", "RunIndexProjectGraphInput"]
+    },
+    {
+      "file": "sdk:test/orchestration/run-index-project-graph.spec.ts"
     }
   ]
 }
