@@ -1,0 +1,163 @@
+- op: removed
+  description: Remove verification for the removed lifecycle-readiness requirement.
+  selector:
+    type: section
+    matches: 'Requirement: Step availability'
+- op: modified
+  description: Verify that the public result is context-only.
+  selector:
+    type: section
+    matches: 'Requirement: Result shape'
+  content: |
+    #### Scenario: Result contains context entries and warnings without lifecycle projections
+
+    - **WHEN** `CompileContext.execute` returns a changed result
+    - **THEN** the payload includes `contextFingerprint`, `status`, `projectContext`, `specs`, and `warnings`
+    - **AND** it does not include `stepAvailable`, `blockingArtifacts`, or `availableSteps`
+
+    #### Scenario: Spec with validated delta returns merged content
+
+    - **GIVEN** a change with `specIds: ["core:config"]` and a validated delta for `spec.md`
+    - **AND** `PreviewSpec` returns a `files` entry with `filename: "spec.md"` and `merged: "merged content"`
+    - **WHEN** `CompileContext.execute` renders content for `core:config` in full mode
+    - **THEN** the `ContextSpecEntry.content` equals `"merged content"`
+
+    #### Scenario: Spec with no delta falls back to base content
+
+    - **GIVEN** a change with `specIds: ["core:config"]` and no delta files
+    - **AND** `PreviewSpec` returns an empty `files` array
+    - **WHEN** `CompileContext.execute` renders content for `core:config` in full mode
+    - **THEN** the `ContextSpecEntry.content` is rendered from metadata or extraction fallback as before
+
+    #### Scenario: PreviewSpec failure falls back gracefully
+
+    - **GIVEN** a change with `specIds: ["core:config"]` and a delta file
+    - **AND** `PreviewSpec` throws an error during execution
+    - **WHEN** `CompileContext.execute` renders content for `core:config`
+    - **THEN** the `ContextSpecEntry.content` is rendered from metadata or extraction fallback
+    - **AND** a warning is added to the result
+
+    #### Scenario: Preview only applies to specIds specs
+
+    - **GIVEN** a change with `specIds: ["core:config"]`
+    - **AND** the context includes `default:_global/architecture` via include pattern
+    - **WHEN** `CompileContext.execute` is called
+    - **THEN** `PreviewSpec` is NOT called for `default:_global/architecture`
+    - **AND** `default:_global/architecture` content is rendered from its base (metadata or fallback)
+
+    #### Scenario: Non-full specs are not previewed
+
+    - **GIVEN** `contextMode: "summary"` and a spec matched only via include pattern
+    - **WHEN** `CompileContext.execute` is called
+    - **THEN** `PreviewSpec` is NOT called for that spec
+- op: modified
+  description: Verify that fingerprints ignore lifecycle-only changes.
+  selector:
+    type: section
+    matches: 'Requirement: Context fingerprint'
+  content: |
+    #### Scenario: Fingerprint calculated from context-only result
+
+    - **GIVEN** a change with project context entries, collected specs, and context warnings
+    - **WHEN** `CompileContext.execute` is called without a fingerprint
+    - **THEN** a fingerprint is calculated from the canonicalized context-only result and included in the response
+
+    #### Scenario: Unchanged status returned when fingerprint matches
+
+    - **GIVEN** the current compiled context fingerprint is `sha256:abc123...`
+    - **WHEN** `CompileContext.execute` is called with `fingerprint: 'sha256:abc123...'`
+    - **THEN** the result `status` is `'unchanged'`
+    - **AND** `projectContext` and `specs` are empty arrays
+
+    #### Scenario: Lifecycle-only changes preserve the fingerprint
+
+    - **GIVEN** a compiled context with a recorded fingerprint
+    - **WHEN** the change lifecycle state, readiness, or blockers change without changing emitted project context, specs, warnings, or result-shaping inputs
+    - **THEN** the new context fingerprint equals the recorded fingerprint
+    - **AND** a request with that fingerprint returns `status: 'unchanged'`
+
+    #### Scenario: Fingerprint changes when emitted specs or warnings change
+
+    - **GIVEN** a compiled context with a recorded fingerprint
+    - **WHEN** `change.specDependsOn` changes the emitted specs or metadata freshness changes emitted warnings
+    - **THEN** the fingerprint changes
+
+    #### Scenario: Fingerprint changes when result-shaping flags change emitted context
+
+    - **GIVEN** a compiled context requested without dependency traversal or section filters
+    - **WHEN** `CompileContext.execute` is called again with flags that change emitted context, such as `followDeps`, `depth`, or `sections`
+    - **THEN** the fingerprint changes
+
+    #### Scenario: Format does not affect fingerprint
+
+    - **GIVEN** the fingerprint was calculated from a call whose compiled logical context matches the current context
+    - **WHEN** the same context is requested through `text`, `json`, or `toon`
+    - **THEN** the fingerprint remains unchanged
+- op: modified
+  description: Verify that construction no longer accepts lifecycle evaluation.
+  selector:
+    type: section
+    matches: 'Requirement: Ports and constructor'
+  content: |
+    #### Scenario: CompileContext is constructed without LifecycleEngine
+
+    - **WHEN** `CompileContext` is assembled from a resolved `SpecdConfig`
+    - **THEN** it receives its context repositories, parsers, hasher, preview use case, and default configuration snapshot
+    - **AND** it does not receive `LifecycleEngine`
+
+    #### Scenario: Construction preserves context dependencies
+
+    - **WHEN** `CompileContext` is assembled after lifecycle projections are removed
+    - **THEN** it retains the dependencies required to collect, render, and fingerprint context
+- op: modified
+  description: Remove per-step availability coverage from structured result verification.
+  selector:
+    type: section
+    matches: 'Requirement: Structured result assembly'
+  content: |
+    #### Scenario: Structured result contains only project and spec context components
+
+    - **WHEN** `CompileContext.execute` is called
+    - **THEN** the result contains project context entries, spec entries, and context warnings
+    - **AND** it does not contain a workflow-step availability collection
+
+    #### Scenario: List-mode structured entry omits summary and content fields
+
+    - **GIVEN** `contextMode: "list"`
+    - **WHEN** `CompileContext.execute` is called
+    - **THEN** each list entry includes `specId`, `source`, and `mode`
+    - **AND** list entries omit full content
+
+    #### Scenario: Summary-mode structured entry omits content
+
+    - **GIVEN** `contextMode: "summary"`
+    - **WHEN** `CompileContext.execute` is called
+    - **THEN** each summary entry omits full content
+
+    #### Scenario: Full-mode structured entry includes content
+
+    - **GIVEN** `contextMode: "full"`
+    - **WHEN** `CompileContext.execute` is called
+    - **THEN** each full entry includes content
+- op: modified
+  description: Factory composition no longer resolves LifecycleEngine.
+  selector:
+    type: section
+    matches: '^Scenario: createCompileContext config form derives CompileContextDeps through resolveCompileContextDeps$'
+  content: |
+    - **WHEN** `createCompileContext(config, options?)` is invoked
+    - **THEN** it creates a composition resolver for that composition session
+    - **AND** it derives `CompileContextDeps` through `resolveCompileContextDeps(resolver)`
+    - **AND** `resolveCompileContextDeps(resolver)` resolves:
+    - `changes: ChangeRepository`
+    - `listWorkspaces: ListWorkspaces`
+    - `schemaProvider: SchemaProvider`
+    - `files: FileReader`
+    - `parsers: ArtifactParserRegistry`
+    - `hasher: ContentHasher`
+    - `previewSpec: PreviewSpec`
+    - `extractorTransforms: ExtractorTransformRegistry`
+    - `workspaceRoutes: readonly SpecWorkspaceRoute[]`
+    - `defaultConfig: CompileContextConfig`
+    - **AND** it does not resolve `LifecycleEngine`
+    - **AND** the factory delegates to canonical `createCompileContext(deps)`

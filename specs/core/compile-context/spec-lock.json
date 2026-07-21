@@ -15,21 +15,28 @@
     "core:get-artifact-instruction",
     "core:get-hook-instructions",
     "core:preview-spec",
-    "core:lifecycle-engine",
     "core:refresh-implementation-tracking",
     "core:core/project-metadata",
     "core:composition-resolver"
   ],
   "implementation": [
     {
-      "file": "core:src/composition/use-cases/compile-context.ts"
+      "file": "core:src/application/use-cases/compile-context.ts",
+      "symbols": ["CompileContext", "CompileContextResult"]
     },
     {
-      "file": "core:src/application/use-cases/compile-context.ts",
-      "symbols": ["CompileContext"]
+      "file": "core:src/application/use-cases/_shared/compile-context-fingerprint.ts",
+      "symbols": ["compileContextFingerprint", "FingerprintInput"]
+    },
+    {
+      "file": "core:src/composition/use-cases/compile-context.ts",
+      "symbols": ["CompileContextDeps", "createCompileContext", "resolveCompileContextDeps"]
     },
     {
       "file": "core:test/application/use-cases/compile-context.spec.ts"
+    },
+    {
+      "file": "core:test/composition/use-cases/compile-context.spec.ts"
     }
   ]
 }

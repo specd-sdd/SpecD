@@ -1069,11 +1069,10 @@ In `'summary'` mode, specs from `specIds` and `specDependsOn` are rendered in fu
 
 ```typescript
 interface CompileContextResult {
-  stepAvailable: boolean
-  blockingArtifacts: readonly string[]
+  contextFingerprint: string
+  status: 'changed' | 'unchanged'
   projectContext: readonly ProjectContextEntry[]
   specs: readonly ContextSpecEntry[]
-  availableSteps: readonly AvailableStep[]
   warnings: readonly ContextWarning[]
 }
 
@@ -1091,13 +1090,11 @@ interface ContextSpecEntry {
   mode: 'full' | 'summary'
   content?: string // present only when mode is 'full'
 }
-
-interface AvailableStep {
-  step: string
-  available: boolean
-  blockingArtifacts: readonly string[]
-}
 ```
+
+Lifecycle state, requested-step readiness, blockers, and per-step availability are not part of the compiled context result. Use `GetStatus` / `change status` for lifecycle information.
+
+````
 
 **Throws:**
 
@@ -1123,7 +1120,7 @@ new GetProjectSummary(
   listArchived: ListArchived,
   listWorkspaces: ListWorkspaces,
 )
-```
+````
 
 **Input:** none — `execute()` accepts no parameters.
 

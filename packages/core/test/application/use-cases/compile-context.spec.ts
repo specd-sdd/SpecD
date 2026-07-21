@@ -32,7 +32,6 @@ import {
 import { type ExtractorTransformRegistry } from '../../../src/domain/services/content-extraction.js'
 import { type WorkflowStep } from '../../../src/domain/value-objects/workflow-step.js'
 import { createBuiltinExtractorTransforms } from '../../../src/composition/extractor-transforms/index.js'
-import { LifecycleEngine } from '../../../src/domain/services/lifecycle-engine.js'
 import {
   makeChangeRepository,
   makeListWorkspaces,
@@ -235,7 +234,6 @@ function createCompileContextForTest(
     previewSpec,
     extractorTransforms,
     workspaceRoutes,
-    new LifecycleEngine(() => undefined),
     defaultConfig,
   )
 }
@@ -283,20 +281,9 @@ function specsContain(result: CompileContextResult, text: string): boolean {
   )
 }
 
-/** Check if any available step entry contains the given text. */
-function availableStepsContain(result: CompileContextResult, text: string): boolean {
-  return result.availableSteps.some(
-    (s) => s.step.includes(text) || s.blockingArtifacts.some((a) => a.includes(text)),
-  )
-}
-
 /** Check across all structured fields for the given text. */
 function resultContains(result: CompileContextResult, text: string): boolean {
-  return (
-    projectContextContains(result, text) ||
-    specsContain(result, text) ||
-    availableStepsContain(result, text)
-  )
+  return projectContextContains(result, text) || specsContain(result, text)
 }
 
 /** Count how many spec entries have a specId containing the given text. */
@@ -1281,18 +1268,15 @@ describe('CompileContext', () => {
     })
   })
 
-  describe('Requirement: Step availability', () => {
-    it('returns stepAvailable: false and blockingArtifacts when required artifact not complete', async () => {
+  describe('Requirement: Result shape', () => {
+    it('omits lifecycle availability fields from the structured result', async () => {
       const workflowStep: WorkflowStep = {
         step: 'implementing',
         requires: ['tasks'],
         requiresTaskCompletion: [],
         hooks: { pre: [], post: [] },
       }
-      const change = makeChange('my-change', {
-        // tasks artifact is NOT set → effectiveStatus = 'missing'
-        artifacts: [],
-      })
+      const change = makeChange('my-change', { artifacts: [] })
       const schema = makeSchema({ workflow: [workflowStep] })
 
       const { sut } = makeSut({ change, schema })
@@ -1300,79 +1284,20 @@ describe('CompileContext', () => {
       const result = await sut.execute({
         name: 'my-change',
         step: 'implementing',
-
         config: noOp,
       })
 
-      expect(result.stepAvailable).toBe(false)
-      expect(result.blockingArtifacts).toContain('tasks')
+      expect(result).not.toHaveProperty('stepAvailable')
+      expect(result).not.toHaveProperty('blockingArtifacts')
+      expect(result).not.toHaveProperty('availableSteps')
+      expect(result.contextFingerprint).toMatch(/^sha256:/)
+      expect(result.status).toBe('changed')
+      expect(Array.isArray(result.projectContext)).toBe(true)
+      expect(Array.isArray(result.specs)).toBe(true)
+      expect(Array.isArray(result.warnings)).toBe(true)
     })
 
-    it('returns stepAvailable: true when all required artifacts are complete', async () => {
-      const workflowStep: WorkflowStep = {
-        step: 'implementing',
-        requires: ['tasks'],
-        requiresTaskCompletion: [],
-        hooks: { pre: [], post: [] },
-      }
-      const tasksArtifact = new ChangeArtifact({
-        type: 'tasks',
-        files: new Map([
-          [
-            'tasks',
-            new ArtifactFile({
-              key: 'tasks',
-              filename: 'tasks.md',
-              status: 'complete',
-              validatedHash: 'abc123',
-            }),
-          ],
-        ]),
-      })
-      const change = makeChange('my-change', { artifacts: [tasksArtifact] })
-      const schema = makeSchema({ workflow: [workflowStep] })
-      change.transition('ready', testActor)
-
-      const { sut } = makeSut({ change, schema })
-
-      const result = await sut.execute({
-        name: 'my-change',
-        step: 'implementing',
-
-        config: noOp,
-      })
-
-      expect(result.stepAvailable).toBe(true)
-      expect(result.blockingArtifacts).toHaveLength(0)
-    })
-
-    it('returns stepAvailable: false when the step is structurally ready but not permitted', async () => {
-      const workflowStep: WorkflowStep = {
-        step: 'implementing',
-        requires: [],
-        requiresTaskCompletion: [],
-        hooks: { pre: [], post: [] },
-      }
-      const change = makeChange('my-change')
-      const schema = makeSchema({ workflow: [workflowStep] })
-
-      const { sut } = makeSut({ change, schema })
-
-      const result = await sut.execute({
-        name: 'my-change',
-        step: 'implementing',
-
-        config: noOp,
-      })
-
-      expect(result.stepAvailable).toBe(false)
-      expect(result.availableSteps.find((step) => step.step === 'implementing')?.isReady).toBe(true)
-      expect(result.availableSteps.find((step) => step.step === 'implementing')?.isPermitted).toBe(
-        false,
-      )
-    })
-
-    it('does not throw when step is unavailable', async () => {
+    it('does not throw when the requested step would be unavailable in lifecycle terms', async () => {
       const workflowStep: WorkflowStep = {
         step: 'implementing',
         requires: ['tasks'],
@@ -1388,7 +1313,6 @@ describe('CompileContext', () => {
         sut.execute({
           name: 'my-change',
           step: 'implementing',
-
           config: noOp,
         }),
       ).resolves.toBeDefined()
@@ -1513,40 +1437,6 @@ describe('CompileContext', () => {
 
       expect(resultContains(result, 'Review delta specs')).toBe(false)
       expect(resultContains(result, 'pnpm test')).toBe(false)
-    })
-
-    it('lists all schema workflow steps with availability annotations', async () => {
-      const designStep: WorkflowStep = {
-        step: 'designing',
-        requires: [],
-        requiresTaskCompletion: [],
-        hooks: { pre: [], post: [] },
-      }
-      const implStep: WorkflowStep = {
-        step: 'implementing',
-        requires: ['tasks'],
-        requiresTaskCompletion: [],
-        hooks: { pre: [], post: [] },
-      }
-      const change = makeChange('my-change') // tasks artifact not complete
-      const schema = makeSchema({ workflow: [designStep, implStep] })
-
-      const { sut } = makeSut({ change, schema })
-
-      const result = await sut.execute({
-        name: 'my-change',
-        step: 'designing',
-
-        config: noOp,
-      })
-
-      const designingEntry = result.availableSteps.find((s) => s.step === 'designing')
-      expect(designingEntry).toBeDefined()
-      expect(designingEntry!.available).toBe(true)
-      const implEntry = result.availableSteps.find((s) => s.step === 'implementing')
-      expect(implEntry).toBeDefined()
-      expect(implEntry!.available).toBe(false)
-      expect(implEntry!.blockingArtifacts).toContain('tasks')
     })
 
     it('injects spec description from fresh metadata into spec content', async () => {
@@ -2106,8 +1996,7 @@ describe('CompileContext', () => {
         sections: ['constraints'],
       })
 
-      // Available steps are always included regardless of sections filter
-      expect(result.availableSteps.some((s) => s.step === 'designing')).toBe(true)
+      expect(result.specs.some((s) => s.specId.includes('auth/login'))).toBe(true)
     })
   })
 
@@ -2307,47 +2196,6 @@ describe('CompileContext', () => {
       expect(result.specs[1]?.source).toBe('specDependsOn')
       expect(result.specs[2]?.source).toBe('includePattern')
       expect(result.specs[3]?.source).toBe('dependsOnTraversal')
-    })
-  })
-
-  describe('Requirement: Step availability — skipped artifacts', () => {
-    it('treats a skipped optional artifact as satisfying the step requires', async () => {
-      const workflowStep: WorkflowStep = {
-        step: 'implementing',
-        requires: ['design'],
-        requiresTaskCompletion: [],
-        hooks: { pre: [], post: [] },
-      }
-      const designArtifact = new ChangeArtifact({
-        type: 'design',
-        optional: true,
-        files: new Map([
-          [
-            'design',
-            new ArtifactFile({
-              key: 'design',
-              filename: 'design.md',
-              status: 'skipped',
-              validatedHash: '__skipped__',
-            }),
-          ],
-        ]),
-      })
-      const change = makeChange('my-change', { artifacts: [designArtifact] })
-      const schema = makeSchema({ workflow: [workflowStep] })
-      change.transition('ready', testActor)
-
-      const { sut } = makeSut({ change, schema })
-
-      const result = await sut.execute({
-        name: 'my-change',
-        step: 'implementing',
-
-        config: noOp,
-      })
-
-      expect(result.stepAvailable).toBe(true)
-      expect(result.blockingArtifacts).toHaveLength(0)
     })
   })
 
@@ -3169,7 +3017,6 @@ describe('CompileContext', () => {
       expect(unchanged.status).toBe('unchanged')
       expect(unchanged.projectContext).toEqual([])
       expect(unchanged.specs).toEqual([])
-      expect(unchanged.availableSteps).toEqual(changed.availableSteps)
     })
 
     it('changes when specDependsOn changes the emitted specs', async () => {
@@ -3259,7 +3106,7 @@ describe('CompileContext', () => {
       expect(freshResult.contextFingerprint).not.toBe(staleResult.contextFingerprint)
     })
 
-    it('changes when step availability changes', async () => {
+    it('remains equal when only lifecycle state or blockers change', async () => {
       const loginSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
       const loginContent = '# Login\n'
       const metadata = freshMetadata(loginContent, { description: 'Login spec.' })
@@ -3319,9 +3166,7 @@ describe('CompileContext', () => {
         config: noOp,
       })
 
-      expect(incompleteResult.stepAvailable).toBe(false)
-      expect(completeResult.stepAvailable).toBe(true)
-      expect(incompleteResult.contextFingerprint).not.toBe(completeResult.contextFingerprint)
+      expect(incompleteResult.contextFingerprint).toBe(completeResult.contextFingerprint)
     })
 
     it('changes when result-shaping flags change the emitted context', async () => {

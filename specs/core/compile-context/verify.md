@@ -114,38 +114,6 @@
 - **WHEN** `CompileContext.execute` renders fallback content
 - **THEN** the fallback path fails explicitly instead of silently dropping the found value
 
-### Requirement: Step availability
-
-#### Scenario: Step availability is derived from LifecycleEngine
-
-- **GIVEN** a requested step that is blocked according to the engine
-- **WHEN** `CompileContext.execute` is called
-- **THEN** it calls `LifecycleEngine.evaluate`
-- **AND** `result.stepAvailable` matches the engine's verdict
-- **AND** `result.blockingArtifacts` is populated from the engine's blockers
-
-#### Scenario: Step unavailable when artifacts are ready but transition is not permitted
-
-- **GIVEN** the lifecycle engine reports `isReady: true`
-- **AND** the lifecycle engine reports `isPermitted: false`
-- **WHEN** `CompileContext.execute` is called for that step
-- **THEN** `result.stepAvailable` is `false`
-- **AND** `availableSteps` preserves the distinct `isReady` and `isPermitted` values
-
-#### Scenario: Step available when all required artifacts are complete
-
-- **GIVEN** `workflow.implementing.requires: ['tasks']`
-- **AND** the `tasks` artifact's effective status is `complete` according to the engine
-- **WHEN** `CompileContext.execute` is called with `step: 'implementing'`
-- **THEN** `result.stepAvailable` is `true`
-- **AND** `result.blockingArtifacts` is empty
-
-#### Scenario: Unavailability does not throw
-
-- **GIVEN** the requested step's required artifacts are not complete
-- **WHEN** `CompileContext.execute` is called
-- **THEN** the result is returned normally — no exception is thrown
-
 ### Requirement: Missing spec IDs emit a warning
 
 #### Scenario: Non-existent spec ID emits a warning
@@ -215,11 +183,11 @@
 
 ### Requirement: Context fingerprint
 
-#### Scenario: Fingerprint calculated from the compiled result
+#### Scenario: Fingerprint calculated from context-only result
 
-- **GIVEN** a change with project context entries, collected specs, available steps, and warnings
+- **GIVEN** a change with project context entries, collected specs, and context warnings
 - **WHEN** `CompileContext.execute` is called without a fingerprint
-- **THEN** a fingerprint is calculated from the canonicalized compiled context result and included in the response
+- **THEN** a fingerprint is calculated from the canonicalized context-only result and included in the response
 
 #### Scenario: Unchanged status returned when fingerprint matches
 
@@ -227,53 +195,39 @@
 - **WHEN** `CompileContext.execute` is called with `fingerprint: 'sha256:abc123...'`
 - **THEN** the result `status` is `'unchanged'`
 - **AND** `projectContext` and `specs` are empty arrays
-- **AND** the full context is not re-emitted
 
-#### Scenario: Changed status returned when fingerprint does not match
+#### Scenario: Lifecycle-only changes preserve the fingerprint
 
-- **GIVEN** the current compiled context fingerprint is `sha256:xyz789...`
-- **WHEN** `CompileContext.execute` is called with `fingerprint: 'sha256:abc123...'`
-- **THEN** the result `status` is `'changed'`
-- **AND** the full context is assembled and returned
-- **AND** `contextFingerprint` is `sha256:xyz789...`
+- **GIVEN** a compiled context with a recorded fingerprint
+- **WHEN** the change lifecycle state, readiness, or blockers change without changing emitted project context, specs, warnings, or result-shaping inputs
+- **THEN** the new context fingerprint equals the recorded fingerprint
+- **AND** a request with that fingerprint returns `status: 'unchanged'`
 
-#### Scenario: Fingerprint changes when specDependsOn changes emitted specs
+#### Scenario: Fingerprint changes when emitted specs or warnings change
 
-- **GIVEN** a change initially emits no seeded `specDependsOn` specs
-- **WHEN** `change.specDependsOn` is updated so the compiled `specs` array gains a new emitted entry
-- **THEN** the fingerprint changes because the compiled output changed
-
-#### Scenario: Fingerprint changes when warnings change
-
-- **GIVEN** a compiled context with fresh metadata emits no warnings
-- **WHEN** metadata becomes stale and the same context emits a warning
-- **THEN** the fingerprint changes because the emitted result changed
-
-#### Scenario: Fingerprint changes when step availability changes
-
-- **GIVEN** a compiled context where the requested step is available
-- **WHEN** a required artifact becomes incomplete and `stepAvailable` plus `blockingArtifacts` change
-- **THEN** the fingerprint changes because the emitted availability result changed
+- **GIVEN** a compiled context with a recorded fingerprint
+- **WHEN** `change.specDependsOn` changes the emitted specs or metadata freshness changes emitted warnings
+- **THEN** the fingerprint changes
 
 #### Scenario: Fingerprint changes when result-shaping flags change emitted context
 
 - **GIVEN** a compiled context requested without dependency traversal or section filters
-- **WHEN** `CompileContext.execute` is called again with flags that change the emitted result, such as `followDeps`, `depth`, or `sections`
-- **THEN** the fingerprint changes because the compiled logical output changed
+- **WHEN** `CompileContext.execute` is called again with flags that change emitted context, such as `followDeps`, `depth`, or `sections`
+- **THEN** the fingerprint changes
 
-#### Scenario: --format flag does not affect fingerprint
+#### Scenario: Format does not affect fingerprint
 
-- **GIVEN** the fingerprint was calculated from a call whose compiled logical output matches the current context
-- **WHEN** the same context is requested through a different presentation format such as `text` or `json`
+- **GIVEN** the fingerprint was calculated from a call whose compiled logical context matches the current context
+- **WHEN** the same context is requested through `text`, `json`, or `toon`
 - **THEN** the fingerprint remains unchanged
 
 ### Requirement: Structured result assembly
 
-#### Scenario: availableSteps includes all workflow steps
+#### Scenario: Structured result contains only project and spec context components
 
 - **WHEN** `CompileContext.execute` is called
-- **THEN** `availableSteps` includes all steps from the active schema workflow
-- **AND** each entry contains `available`, `isReady`, `isPermitted`, `blockingArtifacts`, and `blockers` from the engine
+- **THEN** the result contains project context entries, spec entries, and context warnings
+- **AND** it does not contain a workflow-step availability collection
 
 #### Scenario: List-mode structured entry omits summary and content fields
 
@@ -296,10 +250,16 @@
 
 ### Requirement: Ports and constructor
 
-#### Scenario: CompileContext is constructed with LifecycleEngine and default config
+#### Scenario: CompileContext is constructed without LifecycleEngine
 
 - **WHEN** `CompileContext` is assembled from a resolved `SpecdConfig`
-- **THEN** it receives `PreviewSpec`, `LifecycleEngine`, and a yaml-derived `CompileContextConfig` default snapshot alongside its existing repositories and utilities
+- **THEN** it receives its context repositories, parsers, hasher, preview use case, and default configuration snapshot
+- **AND** it does not receive `LifecycleEngine`
+
+#### Scenario: Construction preserves context dependencies
+
+- **WHEN** `CompileContext` is assembled after lifecycle projections are removed
+- **THEN** it retains the dependencies required to collect, render, and fingerprint context
 
 ### Requirement: Input
 
@@ -356,10 +316,11 @@
 
 ### Requirement: Result shape
 
-#### Scenario: Result contains fingerprint, availability, context entries, and warnings
+#### Scenario: Result contains context entries and warnings without lifecycle projections
 
 - **WHEN** `CompileContext.execute` returns a changed result
-- **THEN** the payload includes `contextFingerprint`, `stepAvailable`, `blockingArtifacts`, `projectContext`, `specs`, `availableSteps`, and `warnings`
+- **THEN** the payload includes `contextFingerprint`, `status`, `projectContext`, `specs`, and `warnings`
+- **AND** it does not include `stepAvailable`, `blockingArtifacts`, or `availableSteps`
 
 #### Scenario: Spec with validated delta returns merged content
 
@@ -395,7 +356,7 @@
 
 - **GIVEN** `contextMode: "summary"` and a spec matched only via include pattern
 - **WHEN** `CompileContext.execute` is called
-- **THEN** `PreviewSpec` is NOT called for that spec — non-full specs have no merged content to render
+- **THEN** `PreviewSpec` is NOT called for that spec
 
 ### Requirement: Prefer LLM-optimized context
 
@@ -463,6 +424,6 @@
 - `previewSpec: PreviewSpec`
 - `extractorTransforms: ExtractorTransformRegistry`
 - `workspaceRoutes: readonly SpecWorkspaceRoute[]`
-- `lifecycle: LifecycleEngine`
 - `defaultConfig: CompileContextConfig`
+- **AND** it does not resolve `LifecycleEngine`
 - **AND** the factory delegates to canonical `createCompileContext(deps)`

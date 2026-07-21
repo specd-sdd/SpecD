@@ -45,15 +45,13 @@ JSON/TOON output schema:
   {
     contextFingerprint: string
     status: 'changed' | 'unchanged'
-    stepAvailable: boolean
-    blockingArtifacts: string[]
     projectContext: ProjectContextEntry[]
     specs: ContextSpecEntry[]
-    availableSteps: AvailableStep[]
     warnings: ContextWarning[]
   }
 
 When status is 'unchanged', projectContext and specs are omitted from the structured output.
+Lifecycle state and readiness are available from change status, not from this command.
 `,
     )
     .action(
@@ -115,12 +113,6 @@ When status is 'unchanged', projectContext and specs are omitted from the struct
             ...(sectionFlags.length > 0 ? { sections: sectionFlags } : {}),
             ...(opts.fingerprint !== undefined ? { fingerprint: opts.fingerprint } : {}),
           })
-
-          if (!result.stepAvailable && result.blockingArtifacts.length > 0) {
-            process.stderr.write(
-              `warning: step '${step}' is not yet available; blocking artifacts: ${result.blockingArtifacts.join(', ')}\n`,
-            )
-          }
 
           const fmt = parseFormat(opts.format)
           const isOptimizedRequested =
@@ -214,16 +206,6 @@ When status is 'unchanged', projectContext and specs are omitted from the struct
               }
 
               parts.push(`## Available context specs\n\n${catalogueParts.join('\n')}`)
-            }
-
-            // Available steps
-            if (result.availableSteps.length > 0) {
-              const stepLines = result.availableSteps.map((s) =>
-                s.available
-                  ? `- ${s.step}: available`
-                  : `- ${s.step}: unavailable — requires: [${s.blockingArtifacts.join(', ')}]`,
-              )
-              parts.push(`## Available steps\n\n${stepLines.join('\n')}`)
             }
 
             output(parts.join('\n\n---\n\n'), 'text')

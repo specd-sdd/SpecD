@@ -1,8 +1,10 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { CompileContext } from '../../../src/application/use-cases/compile-context.js'
 import { type SpecdConfig } from '../../../src/application/specd-config.js'
+import { createCompositionResolver } from '../../../src/composition/composition-resolver.js'
 import {
   createCompileContext,
+  resolveCompileContextDeps,
   type CompileContextDeps,
 } from '../../../src/composition/use-cases/compile-context.js'
 import { InvalidCompositionFactoryArgumentsError } from '../../../src/domain/errors/invalid-composition-factory-arguments-error.js'
@@ -37,7 +39,6 @@ describe('createCompileContext', () => {
       previewSpec: {} as never,
       extractorTransforms: new Map(),
       workspaceRoutes: [],
-      lifecycle: {} as never,
       defaultConfig: {},
     }
 
@@ -55,12 +56,35 @@ describe('createCompileContext', () => {
       previewSpec: {} as never,
       extractorTransforms: new Map(),
       workspaceRoutes: [],
-      lifecycle: {} as never,
       defaultConfig: {},
     }
 
     expect(() =>
       createCompileContext(deps as unknown as SpecdConfig, { extraNodeModulesPaths: [] }),
     ).toThrow(InvalidCompositionFactoryArgumentsError)
+  })
+
+  it('does not resolve LifecycleEngine through resolveCompileContextDeps', async () => {
+    const setup = await setupCompositionFactoryConfig('specd-compile-context-deps')
+    fixture = setup.fixture
+    const resolver = createCompositionResolver(setup.config)
+    const getLifecycleEngine = vi.spyOn(resolver, 'getLifecycleEngine')
+
+    const deps = resolveCompileContextDeps(resolver)
+
+    expect(getLifecycleEngine).not.toHaveBeenCalled()
+    expect(deps).toMatchObject({
+      changes: expect.anything(),
+      listWorkspaces: expect.anything(),
+      schemaProvider: expect.anything(),
+      fileReader: expect.anything(),
+      parsers: expect.anything(),
+      contentHasher: expect.anything(),
+      previewSpec: expect.anything(),
+      extractorTransforms: expect.anything(),
+      workspaceRoutes: expect.anything(),
+      defaultConfig: expect.anything(),
+    })
+    expect(deps).not.toHaveProperty('lifecycle')
   })
 })

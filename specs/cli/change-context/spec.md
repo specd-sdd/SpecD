@@ -2,7 +2,7 @@
 
 ## Purpose
 
-AI agents need a single command to retrieve all relevant context — spec content, project context entries, and step availability — so they can operate on a change without manual assembly. `specd change context <name> <step>` compiles and prints the context block an agent receives when entering a lifecycle step for a named change. Artifact instructions and step hook instructions are separate concerns retrieved via `specd change artifact-instruction` and `specd change hook-instruction` respectively.
+AI agents need a single command to retrieve relevant working context — spec content and project context entries — so they can operate on a change without manual assembly. `specd change context <name> <step>` compiles and prints the context block an agent receives when entering a lifecycle step for a named change. Lifecycle state and readiness are separate concerns retrieved through `specd change status`; artifact instructions and step hook instructions remain separate concerns retrieved via `specd change artifact-instruction` and `specd change hook-instruction` respectively.
 
 ## Requirements
 
@@ -88,17 +88,10 @@ The CLI MUST assemble the final output from the structured `CompileContextResult
    - **List-mode specs** (`mode: 'list'`) are rendered under `## Available context specs` with spec ID, source, and an explicit list label.
    - Non-full sections include this instruction: `Use \`specd change spec-preview <change-name> <specId>\` to load the merged full content of any change spec you need.\`
    - Specs from `dependsOnTraversal` source MUST be visually distinguished from `includePattern` specs.
-4. Available steps are rendered last, each annotated with availability status.
 
 When `--fingerprint` is provided and matches the current fingerprint, text mode still begins with `Context Fingerprint: <sha256...>` and then outputs a brief unchanged message. The full context is not printed.
 
-**In `json` or `toon` mode**, the output is the structured result directly. List entries include `specId`, `source`, and `mode`. Summary entries additionally include `title` and `description`. Full entries additionally include `content`.
-
-### Requirement: Step availability warning
-
-If the requested step is not currently available (i.e. `stepAvailable: false`), the command prints a warning to stderr listing the blocking artifacts returned by `CompileContext` and still prints the context block to stdout. The process exits with code 0.
-
-The CLI must treat these fields as projections of core lifecycle interpretation; it MUST NOT re-evaluate workflow readiness independently.
+**In `json` or `toon` mode**, the output is the structured context-only result directly. List entries include `specId`, `source`, and `mode`. Summary entries additionally include `title` and `description`. Full entries additionally include `content`. The output MUST NOT include lifecycle state, requested-step availability, blocking artifacts, or per-step availability.
 
 ### Requirement: Context warnings
 
@@ -111,19 +104,18 @@ Any warnings from the `CompileContext` use case (for example stale metadata, mis
 
 ## Constraints
 
-- In text mode, the first line is `Context Fingerprint: <sha256...>`, before project context entries
-- In text mode, project context entries appear before spec entries, and available steps appear last
-- Text output MUST label each rendered spec entry explicitly as list, summary, or full content without relying on title rewriting
-- Non-full specs in text output MUST include a note instructing the agent to use `specd change spec-preview <change-name> <specId>` for merged full content when applicable
-- Summary-mode and list-mode specs from `dependsOnTraversal` MUST be rendered under a separate sub-heading from `includePattern` specs
-- Section flags apply only to full-mode spec content
-- All warnings go to stderr; the assembled output goes to stdout
-- `dependsOn` traversal is opt-in via `--follow-deps`; without the flag, deps are not followed
-- `--include-change-specs` is opt-in; without the flag, `change.specIds` are not direct seeds
-- `--depth` without `--follow-deps` is a CLI usage error (exit code 1)
-- `availableSteps`, `stepAvailable`, and `blockingArtifacts` are rendered from `CompileContext` output; the CLI must not re-derive lifecycle readiness locally
-- Section flags override `llmOptimizedContext` to `false` unless the combination of requested sections includes both rules and constraints
-- Optimization warnings for missing or stale optimized fields are suppressed whenever the effective `llmOptimizedContext` is `false`
+- In text mode, the first line is `Context Fingerprint: <sha256...>`, before project context entries.
+- In text mode, project context entries appear before spec entries.
+- Text output MUST label each rendered spec entry explicitly as list, summary, or full content without relying on title rewriting.
+- Non-full specs in text output MUST include a note instructing the agent to use `specd change spec-preview <change-name> <specId>` for merged full content when applicable.
+- Summary-mode and list-mode specs from `dependsOnTraversal` MUST be rendered under a separate sub-heading from `includePattern` specs.
+- Section flags apply only to full-mode spec content.
+- All warnings go to stderr; the assembled output goes to stdout.
+- `dependsOn` traversal is opt-in via `--follow-deps`; without the flag, deps are not followed.
+- `--include-change-specs` is opt-in; without the flag, `change.specIds` are not direct seeds.
+- `--depth` without `--follow-deps` is a CLI usage error (exit code 1).
+- The CLI MUST NOT derive or render lifecycle readiness; callers MUST use `change status` for lifecycle state and blockers.
+- Optimization warnings for missing or stale optimized fields are suppressed whenever the effective `llmOptimizedContext` is `false`.
 
 ## Examples
 

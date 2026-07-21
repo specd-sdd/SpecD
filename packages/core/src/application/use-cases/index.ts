@@ -124,7 +124,6 @@ export {
   type ContextSpecEntry,
   type ContextSpecSource,
   type ProjectContextEntry,
-  type AvailableStep,
   type SpecSection,
 } from './compile-context.js'
 export {
