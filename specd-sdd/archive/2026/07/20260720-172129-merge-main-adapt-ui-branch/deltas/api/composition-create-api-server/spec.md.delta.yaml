@@ -1,0 +1,41 @@
+- op: modified
+  description: Nest kernel log options and own long-lived graph provider
+  selector:
+    type: section
+    matches: 'Requirement: one kernel per process with per-request context'
+  content: |
+    The factory MUST call `createSdkContext` from `@specd/sdk` once per process and build
+    per-request context via `createApiContext`.
+
+    Process-scoped state (`ApiServerState`) MUST include the `SdkHostContext` fields
+    (`kernel`, `createGraphProvider`), resolved `SpecdConfig`, kernel actor resolver,
+    effective auth type, and a long-lived graph provider owned by the server.
+
+    When the API hosts a `LogRingBuffer` for Studio log readback, `createSdkContext` MUST
+    receive nested options `kernel: { logRing, logFormatter: createLogFormatter({ colorize: false }) }`.
+    Top-level `logRing` / `logFormatter` on `SdkContextOptions` MUST NOT be used.
+    `GET /v1/logs?prettier=true` MUST return plain text without ANSI escape sequences.
+
+    During bootstrap the server MUST create one provider via `createGraphProvider()`,
+    `await open()`, and retain it for graph routes while healthy. On
+    `GraphProviderStaleError` the server MUST close and reopen (or replace) that provider.
+    `ApiServer.close()` MUST close the long-lived provider.
+
+    Graph routes MUST NOT open/close a provider per HTTP request. After
+    `runIndexProjectGraph` completes, the server MUST replace/reopen the long-lived
+    provider before serving subsequent graph reads.
+
+- op: modified
+  description: Add composition long-lived dependency
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`default:_global/architecture`](../../default/_global/architecture/spec.md) — hexagonal delivery layout
+    - [`default:_global/conventions`](../../default/_global/conventions/spec.md) — naming and module conventions
+    - [`sdk:host-context`](../../sdk/host-context/spec.md) — `createSdkContext` bootstrap
+    - [`sdk:composition`](../../sdk/composition/spec.md) — SDK import policy for API host
+    - [`api:auth-adapter-registry`](../auth-adapter-registry/spec.md) — auth wiring
+    - [`api:middleware-auth`](../middleware-auth/spec.md) — middleware
+    - [`core:kernel`](../../core/kernel/spec.md) — kernel use cases invoked through SDK context
+    - [`code-graph:composition`](../../code-graph/composition/spec.md) — long-lived provider lifecycle for HTTP API hosts

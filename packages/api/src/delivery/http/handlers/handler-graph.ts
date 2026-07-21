@@ -42,9 +42,7 @@ export function registerGraphRoutes(app: FastifyInstance): void {
     apiHandler(async (ctx) => {
       const getGraphHealth = createGetGraphHealth()
       const workspaces = await ctx.kernel.project.listWorkspaces.execute()
-      const provider = ctx.createGraphProvider()
-      await provider.open()
-      try {
+      return ctx.withGraphProvider(async (provider) => {
         const health = await getGraphHealth.execute({
           config: ctx.config,
           provider,
@@ -52,9 +50,7 @@ export function registerGraphRoutes(app: FastifyInstance): void {
           workspaces: [...workspaces],
         })
         return toGraphStatusDto(health)
-      } finally {
-        await provider.close()
-      }
+      })
     }),
   )
 
@@ -68,10 +64,15 @@ export function registerGraphRoutes(app: FastifyInstance): void {
     },
     apiHandler(async (ctx, req) => {
       const body = (req.body ?? {}) as { force?: boolean }
-      const result = await runIndexProjectGraph(ctx, {
-        ...(body.force === true ? { force: true } : {}),
-      })
-      return toGraphIndexResultDto(result)
+      await ctx.releaseGraphProviderForIndex()
+      try {
+        const result = await runIndexProjectGraph(ctx, {
+          ...(body.force === true ? { force: true } : {}),
+        })
+        return toGraphIndexResultDto(result)
+      } finally {
+        await ctx.refreshGraphProvider()
+      }
     }),
   )
 
@@ -112,9 +113,7 @@ export function registerGraphRoutes(app: FastifyInstance): void {
         excludePaths?: string
         excludeWorkspaces?: string
       }
-      const provider = ctx.createGraphProvider()
-      await provider.open()
-      try {
+      return ctx.withGraphProvider(async (provider) => {
         const limit = query.limit !== undefined ? Number(query.limit) : 10
         const searchOpts = {
           query: query.q,
@@ -162,9 +161,7 @@ export function registerGraphRoutes(app: FastifyInstance): void {
             ? await provider.searchDocuments(searchOpts)
             : []
         return toGraphSearchResultDto(ctx.config, symbols, specs, documents)
-      } finally {
-        await provider.close()
-      }
+      })
     }),
   )
 
@@ -202,9 +199,7 @@ export function registerGraphRoutes(app: FastifyInstance): void {
             ? 'upstream'
             : (query.direction as 'upstream' | 'downstream' | 'both')
       const maxDepth = query.depth !== undefined ? Number(query.depth) : 3
-      const provider = ctx.createGraphProvider()
-      await provider.open()
-      try {
+      return ctx.withGraphProvider(async (provider) => {
         if (query.symbol !== undefined) {
           const impact = await provider.analyzeImpact(query.symbol, direction, maxDepth)
           return toGraphImpactDto(
@@ -258,9 +253,7 @@ export function registerGraphRoutes(app: FastifyInstance): void {
           )
         }
         throw new Error('Invalid graph impact request')
-      } finally {
-        await provider.close()
-      }
+      })
     }),
   )
 
@@ -281,9 +274,7 @@ export function registerGraphRoutes(app: FastifyInstance): void {
     },
     apiHandler(async (ctx, req) => {
       const query = req.query as { minRisk?: string; limit?: string }
-      const provider = ctx.createGraphProvider()
-      await provider.open()
-      try {
+      return ctx.withGraphProvider(async (provider) => {
         const result = await provider.getHotspots({
           ...(query.minRisk !== undefined
             ? { minRisk: query.minRisk as 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' }
@@ -291,9 +282,7 @@ export function registerGraphRoutes(app: FastifyInstance): void {
           ...(query.limit !== undefined ? { limit: Number(query.limit) } : {}),
         })
         return toGraphHotspotsDto(ctx.config, result)
-      } finally {
-        await provider.close()
-      }
+      })
     }),
   )
 
@@ -316,9 +305,7 @@ export function registerGraphRoutes(app: FastifyInstance): void {
       if (spec === null) {
         throw new SpecNotFoundError(specId)
       }
-      const provider = ctx.createGraphProvider()
-      await provider.open()
-      try {
+      return ctx.withGraphProvider(async (provider) => {
         const coveredFiles = await provider.getCoveredFiles(specId)
         const coveredSymbols = await provider.getCoveredSymbols(specId)
         return {
@@ -333,9 +320,7 @@ export function registerGraphRoutes(app: FastifyInstance): void {
             )
           ).filter((entry) => entry !== null),
         }
-      } finally {
-        await provider.close()
-      }
+      })
     }),
   )
 
@@ -353,9 +338,7 @@ export function registerGraphRoutes(app: FastifyInstance): void {
       if (change === null) {
         throw new ChangeNotFoundError(name)
       }
-      const provider = ctx.createGraphProvider()
-      await provider.open()
-      try {
+      return ctx.withGraphProvider(async (provider) => {
         const specs = await Promise.all(
           [...change.specIds].map(async (specId) => {
             const coveredFiles = (await provider.getCoveredFiles(specId)).map((r) =>
@@ -373,9 +356,7 @@ export function registerGraphRoutes(app: FastifyInstance): void {
           }),
         )
         return toChangeGraphViewDto(ctx.config, name, [...change.specIds], specs)
-      } finally {
-        await provider.close()
-      }
+      })
     }),
   )
 }

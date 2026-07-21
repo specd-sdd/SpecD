@@ -1,0 +1,11 @@
+- op: modified
+  description: Handler uses long-lived withGraphProvider for graph reads
+  selector:
+    type: section
+    matches: 'Scenario: Handler invokes createCodeGraphProvider → stats, index, search, impact, hotspots'
+  rename: 'Scenario: Handler uses long-lived provider for stats, search, impact, hotspots'
+  content: |
+    - **WHEN** graph status, search, impact, or hotspot routes run
+    - **THEN** the handler obtains an opened provider via `withGraphProvider()`
+    - **AND** index still goes through `runIndexProjectGraph`
+    - **AND** the handler does not call `createCodeGraphProvider` directly

@@ -53,11 +53,13 @@
 
 ### Requirement: graph IPC methods use the Electron graph runtime
 
-#### Scenario: Local graph IPC uses the Electron graph provider package
+#### Scenario: Local graph IPC uses long-lived sqlite-electron provider
 
 - **WHEN** the desktop main process serves graph status, search, impact, hotspot, or index IPC requests
-- **THEN** it creates the provider through `@specd/code-graph-electron`
-- **AND** graph execution stays inside the Electron local host runtime
+- **THEN** read paths reuse a long-lived open provider from the process-scoped SDK host
+- **AND** that host was created with `graphStoreId: 'sqlite-electron'` and the additive factory from `@specd/code-graph-sqlite-electron`
+- **AND** routine graph IPC does not call `withOpenGraphProvider` or `createCodeGraphProvider` directly
+- **AND** `@specd/code-graph-electron` is not imported for provider construction
 
 #### Scenario: Renderer graph calls stay on the shared data port
 

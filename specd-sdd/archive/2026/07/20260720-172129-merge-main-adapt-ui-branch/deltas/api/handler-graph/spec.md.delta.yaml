@@ -1,0 +1,29 @@
+- op: modified
+  description: Handlers reuse long-lived provider via healthy accessor; index via SDK
+  selector:
+    type: section
+    matches: 'Requirement: handler delegates to kernel without duplicating domain rules'
+  content: |
+    Business rules MUST live in core and code-graph use cases. This handler MUST invoke only:
+
+    - `apiContext.withGraphProvider()` (healthy long-lived opened provider) for stats, search, impact, and hotspots
+    - `runIndexProjectGraph` from `@specd/sdk` for `POST /v1/graph/index`, then rely on host refresh of the long-lived provider
+    - change-scoped graph view composed from change `specIds` via kernel use cases
+
+    The handler MUST NOT import `createCodeGraphProvider` from `@specd/code-graph` directly.
+    The handler MUST NOT open/close a provider per HTTP request and MUST NOT call
+    `withOpenGraphProvider` for routine graph routes.
+
+- op: modified
+  description: Add composition-graph-provider and composition deps
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`default:_global/architecture`](../../default/_global/architecture/spec.md) — hexagonal delivery layout
+    - [`default:_global/conventions`](../../default/_global/conventions/spec.md) — naming and module conventions
+    - [`sdk:composition`](../../sdk/composition/spec.md) — SDK import policy
+    - [`sdk:run-index-project-graph`](../../sdk/run-index-project-graph/spec.md) — index orchestration
+    - [`api:routes-graph`](../routes-graph/spec.md) — HTTP contract
+    - [`api:composition-graph-provider`](../composition-graph-provider/spec.md) — long-lived provider ownership
+    - [`code-graph:composition`](../../code-graph/composition/spec.md) — long-lived provider lifecycle

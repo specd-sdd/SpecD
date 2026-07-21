@@ -12,14 +12,10 @@ import { getSetting, setSetting, removeSetting } from './settings-store.js'
 import {
   type SymbolKind,
   buildProjectGraphConfig,
-  createCodeGraphProvider,
-  createIndexProjectGraph,
-  type IndexResult,
-} from '@specd/code-graph-electron'
-import {
   codeGraphVersion,
   createDefaultConfigLoader,
   createGetGraphHealth,
+  createIndexProjectGraph,
   createLogFormatter,
   createSdkContext,
   createVcsAdapter,
@@ -31,6 +27,7 @@ import {
   type Change,
   type ChangeEvent,
   type ChangeState,
+  type CodeGraphProvider,
   type CompileContextResult,
   type GetArtifactInstructionResult,
   type GetChangeArtifactResult,
@@ -38,6 +35,7 @@ import {
   type GetHookInstructionsResult,
   type GetImplementationReviewResult,
   type GetStatusResult,
+  type IndexResult,
   type Kernel,
   type ProjectWorkspace,
   type ReadOnlyChangeView,
@@ -47,6 +45,12 @@ import {
   type SpecSearchEntry,
   type ValidateChangeBatchResult,
 } from '@specd/sdk'
+import { createElectronSqliteGraphStoreFactory } from '@specd/code-graph-sqlite-electron'
+import {
+  openLongLivedGraphProvider,
+  withHealthyGraphProvider,
+  type LongLivedGraphHolder,
+} from './long-lived-graph.js'
 import {
   createIpcFailure,
   createIpcSuccess,
@@ -201,12 +205,13 @@ let sessionGeneration = 0
 let hostPromiseGeneration = 0
 let hostPromise: Promise<DesktopHostContext> | undefined
 let logRing: LogRingBuffer | undefined
-const openGraphProviders = new Set<ReturnType<typeof createCodeGraphProvider>>()
+let activeGraph: LongLivedGraphHolder | undefined
 
 interface DesktopHostContext {
   readonly kernel: Kernel
   readonly config: SpecdConfig
-  readonly createGraphProvider: () => ReturnType<typeof createCodeGraphProvider>
+  readonly createGraphProvider: () => CodeGraphProvider
+  readonly graph: LongLivedGraphHolder
 }
 
 /**
@@ -263,17 +268,30 @@ async function getHost(): Promise<DesktopHostContext> {
       })
       const config = await loader.load()
       logRing = new LogRingBuffer(1000)
-      const { kernel } = await createSdkContext(config, {
+      const { kernel, createGraphProvider } = await createSdkContext(config, {
         kernel: {
           logRing,
           logFormatter: createLogFormatter({ colorize: false }),
         },
+        graph: {
+          graphStoreId: 'sqlite-electron',
+          graphStoreFactories: {
+            'sqlite-electron': createElectronSqliteGraphStoreFactory(),
+          },
+        },
       })
-      Logger.info('Desktop kernel booted', { projectRoot: config.projectRoot })
+      const graph: LongLivedGraphHolder = {
+        provider: await openLongLivedGraphProvider(createGraphProvider),
+      }
+      activeGraph = graph
+      Logger.info('Desktop kernel and graph provider booted', {
+        projectRoot: config.projectRoot,
+      })
       return {
         kernel,
         config,
-        createGraphProvider: () => createCodeGraphProvider(config),
+        createGraphProvider,
+        graph,
       }
     })()
   }
@@ -294,25 +312,17 @@ async function getKernel(): Promise<Kernel> {
 }
 
 /**
- * Opens a graph provider for one operation and closes it afterwards.
+ * Runs a graph callback against the session long-lived provider.
  *
  * @param run - Callback to execute with the open provider.
  * @returns Callback result.
  */
 async function withGraphProvider<TResult>(
-  run: (provider: ReturnType<typeof createCodeGraphProvider>) => Promise<TResult>,
+  run: (provider: CodeGraphProvider) => Promise<TResult>,
 ): Promise<TResult> {
-  const config = await getConfig()
-  Logger.info('Opening graph provider', { projectRoot: config.projectRoot })
-  const provider = createCodeGraphProvider(config)
-  openGraphProviders.add(provider)
-  await provider.open()
-  try {
-    return await run(provider)
-  } finally {
-    openGraphProviders.delete(provider)
-    await provider.close().catch(() => undefined)
-  }
+  const host = await getHost()
+  Logger.info('Using long-lived graph provider', { projectRoot: host.config.projectRoot })
+  return withHealthyGraphProvider(host.createGraphProvider, host.graph, run)
 }
 
 /**
@@ -2236,8 +2246,9 @@ export function resetDesktopKernel(): void {
   sessionGeneration += 1
   hostPromise = undefined
   logRing = undefined
-  for (const provider of openGraphProviders) {
-    void provider.close().catch(() => undefined)
+  const graph = activeGraph
+  activeGraph = undefined
+  if (graph !== undefined) {
+    void graph.provider.close().catch(() => undefined)
   }
-  openGraphProviders.clear()
 }

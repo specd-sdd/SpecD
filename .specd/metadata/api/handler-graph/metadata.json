@@ -6,7 +6,9 @@
     "default:_global/conventions",
     "sdk:composition",
     "sdk:run-index-project-graph",
-    "api:routes-graph"
+    "api:routes-graph",
+    "code-graph:composition",
+    "api:composition-graph-provider"
   ],
   "context": [
     "HTTP handlers for **graph** in SpecD Studio. They validate requests, call graph operations through the SDK host context (`createGraphProvider`, `runIndexProjectGraph`) and kernel use cases from `@specd/sdk`, and map results through presenters. Business rules live in code-graph and core use cases — not in this delivery module."
@@ -21,7 +23,7 @@
     {
       "requirement": "handler delegates to kernel without duplicating domain rules",
       "rules": [
-        "Business rules MUST live in core and code-graph use cases. This handler MUST invoke only:\n\n- `apiContext.createGraphProvider()` for stats, search, impact, and hotspots\n- `runIndexProjectGraph` from `@specd/sdk` for `POST /v1/graph/index`\n- change-scoped graph view composed from change `specIds` via kernel use cases\n\nThe handler MUST NOT import `createCodeGraphProvider` from `@specd/code-graph` directly."
+        "Business rules MUST live in core and code-graph use cases. This handler MUST invoke only:\n\n- `apiContext.withGraphProvider()` (healthy long-lived opened provider) for stats, search, impact, and hotspots\n- `runIndexProjectGraph` from `@specd/sdk` for `POST /v1/graph/index`, then rely on host refresh of the long-lived provider\n- change-scoped graph view composed from change `specIds` via kernel use cases\n\nThe handler MUST NOT import `createCodeGraphProvider` from `@specd/code-graph` directly.\nThe handler MUST NOT open/close a provider per HTTP request and MUST NOT call\n`withOpenGraphProvider` for routine graph routes."
       ]
     },
     {
@@ -81,11 +83,12 @@
     },
     {
       "requirement": "handler delegates to kernel without duplicating domain rules",
-      "name": "Handler invokes createCodeGraphProvider → stats, index, search, impact, hotspots",
-      "when": ["a valid request for this handler is processed"],
+      "name": "Handler uses long-lived provider for stats, search, impact, hotspots",
+      "when": ["graph status, search, impact, or hotspot routes run"],
       "then": [
-        "createCodeGraphProvider → stats, index, search, impact, hotspots runs inside @specd/core",
-        "AND handler does not reimplement lifecycle or validation rules"
+        "the handler obtains an opened provider via withGraphProvider()",
+        "AND index still goes through runIndexProjectGraph",
+        "AND the handler does not call createCodeGraphProvider directly"
       ]
     },
     {
@@ -179,8 +182,8 @@
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:c5738a5306e10414d0c37020b3c6927b4c68e1748f28c3ef3c8ca2cad1c5abb6",
-    "verify.md": "sha256:ebeac47caf38462e62fbe23593a1a3bc1248a79791c84dc628663b48bc12a334"
+    "spec.md": "sha256:42e25696416b2ea5308bd3f1e2d6cc5aa9e9e053b92547cf4501f9855885a4a3",
+    "verify.md": "sha256:3c4a22983b02d58f7c8054f4eea5196ced77f8fa357882a50a70cb10fd85021e"
   },
   "generatedBy": "core"
 }

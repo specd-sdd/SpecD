@@ -8,7 +8,8 @@
     "api:middleware-auth",
     "core:kernel",
     "sdk:host-context",
-    "sdk:composition"
+    "sdk:composition",
+    "code-graph:composition"
   ],
   "context": [
     "SpecD Studio and `specd serve` need one factory that turns a discovered project into a listening HTTP server without reimplementing CLI workflow rules. `createApiServer` loads `api.auth` from `specd.yaml`, resolves the auth adapter once at startup, constructs a single process-scoped `Kernel`, registers all Studio routes under `/v1`, and can optionally mount the built `@specd/ui` bundle for embedded `specd ui serve`."
@@ -29,7 +30,7 @@
     {
       "requirement": "one kernel per process with per-request context",
       "rules": [
-        "The factory MUST call `createSdkContext` from `@specd/sdk` once per process with a `LogRingBuffer` (callback destination) and build per-request context via `createApiContext`.\n\nProcess-scoped state (`ApiServerState`) MUST include the `SdkHostContext` fields (`kernel`, `createGraphProvider`), resolved `SpecdConfig`, kernel actor resolver, and effective auth type.\n\nThe SDK context MUST receive `logFormatter: createLogFormatter({ colorize: false })` so Studio log readback (`GET /v1/logs?prettier=true`) returns plain text without ANSI escape sequences."
+        "The factory MUST call `createSdkContext` from `@specd/sdk` once per process and build\nper-request context via `createApiContext`.\n\nProcess-scoped state (`ApiServerState`) MUST include the `SdkHostContext` fields\n(`kernel`, `createGraphProvider`), resolved `SpecdConfig`, kernel actor resolver,\neffective auth type, and a long-lived graph provider owned by the server.\n\nWhen the API hosts a `LogRingBuffer` for Studio log readback, `createSdkContext` MUST\nreceive nested options `kernel: { logRing, logFormatter: createLogFormatter({ colorize: false }) }`.\nTop-level `logRing` / `logFormatter` on `SdkContextOptions` MUST NOT be used.\n`GET /v1/logs?prettier=true` MUST return plain text without ANSI escape sequences.\n\nDuring bootstrap the server MUST create one provider via `createGraphProvider()`,\n`await open()`, and retain it for graph routes while healthy. On\n`GraphProviderStaleError` the server MUST close and reopen (or replace) that provider.\n`ApiServer.close()` MUST close the long-lived provider.\n\nGraph routes MUST NOT open/close a provider per HTTP request. After\n`runIndexProjectGraph` completes, the server MUST replace/reopen the long-lived\nprovider before serving subsequent graph reads."
       ]
     },
     {
@@ -104,9 +105,27 @@
     },
     {
       "requirement": "one kernel per process with per-request context",
-      "name": "Log formatter disables ANSI for API readback",
-      "when": ["the API kernel boots"],
-      "then": ["createSdkContext receives logFormatter: createLogFormatter({ colorize: false })"]
+      "name": "Log formatter and ring nest under kernel options",
+      "when": ["the API kernel boots with a log ring for Studio readback"],
+      "then": [
+        "createSdkContext receives kernel: { logRing, logFormatter: createLogFormatter({ colorize: false }) }",
+        "AND top-level logRing / logFormatter are not passed on SdkContextOptions"
+      ]
+    },
+    {
+      "requirement": "one kernel per process with per-request context",
+      "name": "Server opens one long-lived graph provider",
+      "when": ["createApiServer finishes bootstrap"],
+      "then": [
+        "process state holds one opened graph provider from createGraphProvider()",
+        "AND that provider remains open across graph HTTP requests until stale replacement or close()"
+      ]
+    },
+    {
+      "requirement": "one kernel per process with per-request context",
+      "name": "Server close shuts down the long-lived provider",
+      "when": ["ApiServer.close() runs"],
+      "then": ["the long-lived graph provider is closed"]
     },
     {
       "requirement": "all API routes mount under /v1",
@@ -156,8 +175,8 @@
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:5d94bf8e80ac0110c5e74c3517611ee08341e7128506b5e748c0148f1d1da2ac",
-    "verify.md": "sha256:04f64d75a862f785cb8087f84764bda39eaf2df53702e12b0f8e6c69e362d169"
+    "spec.md": "sha256:87153ba122891a1a857543f67bfdde28180ad529a312cefe04c2f29a461e46f6",
+    "verify.md": "sha256:9529a34d57bd733a6845188d3484805eec0151a99d244c2b082a01c867f6eece"
   },
   "generatedBy": "core"
 }

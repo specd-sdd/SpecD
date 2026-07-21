@@ -22,9 +22,10 @@ describe('desktop graph runtime isolation', () => {
       readFileSync(path.join(repoRoot, 'packages/cli/package.json'), 'utf8'),
     ) as { dependencies: Record<string, string> }
 
-    expect(desktopPackage.dependencies['@specd/code-graph-electron']).toBe('workspace:*')
+    expect(desktopPackage.dependencies['@specd/code-graph-sqlite-electron']).toBe('workspace:*')
+    expect(desktopPackage.dependencies['@specd/code-graph-electron']).toBeUndefined()
     expect(desktopPackage.scripts['rebuild:graph-sqlite-electron']).toContain(
-      '@specd/code-graph-electron rebuild:vendored-sqlite-electron',
+      '@specd/code-graph-sqlite-electron rebuild:vendored-sqlite-electron',
     )
     expect(desktopPackage.scripts['rebuild:graph-electron']).toBe(
       'pnpm rebuild:graph-sqlite-electron',
@@ -37,6 +38,8 @@ describe('desktop graph runtime isolation', () => {
     expect(desktopPackage.dependencies['@specd/code-graph']).toBeUndefined()
     expect(apiPackage.dependencies['@specd/core']).toBeUndefined()
     expect(apiPackage.dependencies['@specd/code-graph']).toBeUndefined()
+    expect(apiPackage.dependencies['@specd/code-graph-sqlite-electron']).toBeUndefined()
+    expect(cliPackage.dependencies['@specd/code-graph-sqlite-electron']).toBeUndefined()
     expect(apiPackage.dependencies['@specd/code-graph-electron']).toBeUndefined()
     expect(cliPackage.dependencies['@specd/code-graph-electron']).toBeUndefined()
   })

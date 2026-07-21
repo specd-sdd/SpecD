@@ -1,0 +1,49 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["code-graph:composition", "code-graph:sqlite-graph-store"],
+  "implementation": [
+    {
+      "file": "code-graph-sqlite-electron:src/create-electron-sqlite-graph-store-factory.ts",
+      "symbols": ["createElectronSqliteGraphStoreFactory"]
+    },
+    {
+      "file": "code-graph-sqlite-electron:src/runtime/load-vendored-better-sqlite3.ts",
+      "symbols": [
+        "loadVendoredBetterSqlite3Module",
+        "vendoredSqlitePackageRoot",
+        "vendoredSqliteEntry",
+        "vendoredSqliteBinaryPath"
+      ]
+    },
+    {
+      "file": "code-graph-sqlite-electron:src/index.ts"
+    },
+    {
+      "file": "code-graph-sqlite-electron:package.json"
+    },
+    {
+      "file": "code-graph-sqlite-electron:scripts/sync-vendored-sqlite.mjs"
+    },
+    {
+      "file": "code-graph-sqlite-electron:scripts/rebuild-vendored-sqlite-electron.mjs"
+    },
+    {
+      "file": "code-graph-sqlite-electron:scripts/electron-build-metadata.mjs"
+    },
+    {
+      "file": "code-graph-sqlite-electron:tsup.config.ts"
+    },
+    {
+      "file": "code-graph-sqlite-electron:tsconfig.json"
+    },
+    {
+      "file": "code-graph-sqlite-electron:test/runtime/vendored-sqlite.spec.ts"
+    },
+    {
+      "file": "code-graph-sqlite-electron:.gitignore"
+    }
+  ]
+}

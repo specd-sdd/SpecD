@@ -1,0 +1,41 @@
+- op: modified
+  description: Graph IPC uses long-lived open provider with sqlite-electron backend
+  selector:
+    type: section
+    matches: 'Requirement: graph IPC methods use the Electron graph runtime'
+  content: |
+    Desktop-local graph IPC methods MUST reuse a long-lived, already-open
+    `CodeGraphProvider` owned by the process/project SDK host context — not open and
+    close a provider per IPC call, and not call `createCodeGraphProvider` directly.
+
+    The host context MUST be constructed with SDK `graph` options that select
+    `graphStoreId: 'sqlite-electron'` and register the additive factory from
+    `@specd/code-graph-sqlite-electron`.
+
+    On `GraphProviderStaleError`, the desktop host MUST `close()` and `open()` (or
+    replace) the long-lived provider before retrying the IPC operation. On project
+    switch or host teardown, the desktop host MUST `close()` the long-lived provider.
+
+    Desktop MUST NOT use `withOpenGraphProvider` for routine graph IPC. After
+    `runIndexProjectGraph` (short-lived internal provider), the host MUST replace/reopen
+    its long-lived provider before subsequent graph IPC.
+
+    The Electron main process MUST keep graph execution inside the desktop-local host
+    runtime. Renderer code MUST continue to call the shared `SpecdDataPort` surface and
+    MUST NOT import graph runtime packages directly.
+
+    Desktop-local graph IPC MUST NOT import `@specd/code-graph-electron` for provider
+    construction on this path.
+
+- op: modified
+  description: Spec dependencies for long-lived sqlite-electron IPC
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`sdk:host-context`](../../sdk/host-context/spec.md) — SDK bootstrap for IPC main process
+    - [`client:specd-data-port`](../../../../../../specs/client/specd-data-port/spec.md) — IPC data contract implemented by the desktop adapter
+    - [`client:ipc-message-envelope`](../../../../../../specs/client/ipc-message-envelope/spec.md) — IPC envelope types used by preload bridge
+    - [`client:dto-project-status`](../../client/dto-project-status/spec.md) — canonical status DTO and pure mapper shared with HTTP
+    - [`code-graph-sqlite-electron:sqlite-electron-store`](../../code-graph-sqlite-electron/sqlite-electron-store/spec.md) — Electron SQLite factory used by local graph IPC
+    - [`code-graph:composition`](../../code-graph/composition/spec.md) — long-lived provider lifecycle for Electron hosts

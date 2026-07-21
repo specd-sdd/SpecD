@@ -10,7 +10,8 @@
     "api:middleware-auth",
     "core:kernel",
     "sdk:host-context",
-    "sdk:composition"
+    "sdk:composition",
+    "code-graph:composition"
   ],
   "implementation": [
     {

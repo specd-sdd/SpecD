@@ -4,7 +4,9 @@
   "dependsOn": [
     "default:_global/architecture",
     "default:_global/conventions",
-    "sdk:run-index-project-graph"
+    "sdk:run-index-project-graph",
+    "sdk:host-context",
+    "code-graph:composition"
   ],
   "context": [
     "Graph routes must not construct `@specd/code-graph` providers ad hoc with divergent paths or freshness rules. This spec centralizes provider creation from `SpecdConfig` so index, search, impact, and linkage handlers share one implementation and expose stale-state signals to the UI."
@@ -13,7 +15,7 @@
     {
       "requirement": "provider is created from project configuration",
       "rules": [
-        "The factory MUST obtain graph providers from the `createGraphProvider` function on the process-scoped `SdkHostContext` (created by `createSdkContext`). Each provider MUST be bound to the resolved `SpecdConfig` (workspaces, code roots) for the served project."
+        "The API MUST obtain its process-scoped graph provider from the `createGraphProvider`\nfunction on the process-scoped `SdkHostContext` (created by `createSdkContext`).\nThe provider MUST be bound to the resolved `SpecdConfig` (workspaces, code roots) for\nthe served project.\n\nThe server MUST open that provider once under host control, reuse it while healthy,\nreopen or replace it on `GraphProviderStaleError`, and close it on server shutdown —\nmatching the long-lived host contract in `code-graph:composition`."
       ]
     },
     {
@@ -31,7 +33,13 @@
     {
       "requirement": "SDK graph provider factory",
       "rules": [
-        "Graph handlers and composition MUST obtain providers by calling `createGraphProvider` on the process-scoped `SdkHostContext`. They MUST NOT import `createCodeGraphProvider` from `@specd/code-graph` directly."
+        "Graph handlers and composition MUST obtain the opened provider through the\nprocess-scoped healthy long-lived accessor (`withGraphProvider` / equivalent host helper).\n`getGraphProvider` MAY return the held opened provider without stale recovery (peek).\nConstruction MUST still go through `SdkHostContext.createGraphProvider`.\nHandlers MUST NOT import `createCodeGraphProvider` from `@specd/code-graph` directly.\nHandlers MUST NOT call `withOpenGraphProvider` for routine graph HTTP routes."
+      ]
+    },
+    {
+      "requirement": "long-lived provider refresh after index and stale errors",
+      "rules": [
+        "After `runIndexProjectGraph` completes (which may open a short-lived provider\ninternally), the API host MUST replace or reopen its long-lived provider before\nsubsequent graph reads.\n\nWhen a graph operation on the long-lived provider throws `GraphProviderStaleError`,\nthe healthy accessor (`withGraphProvider`) MUST close and reopen (or replace) the\nprovider and MAY retry the operation once."
       ]
     }
   ],
@@ -48,7 +56,7 @@
       "requirement": "provider is created from project configuration",
       "name": "Provider binds to project graph paths",
       "given": ["specd.yaml declares workspaces"],
-      "when": ["API server bootstrap creates graph provider"],
+      "when": ["API server bootstrap creates and opens the long-lived graph provider"],
       "then": ["provider reads project root from config", "AND index paths match workspace layout"]
     },
     {
@@ -96,26 +104,55 @@
     },
     {
       "requirement": "SDK graph provider factory",
-      "name": "Graph handler uses SdkHostContext factory",
-      "given": ["an API request with apiContext attached"],
-      "when": ["a graph handler needs a provider"],
+      "name": "Graph handler uses long-lived withGraphProvider",
+      "when": ["a graph handler needs an opened provider"],
       "then": [
-        "it calls apiContext.createGraphProvider()",
-        "AND it does not import createCodeGraphProvider from @specd/code-graph directly"
+        "it calls apiContext.withGraphProvider() (or the process-scoped healthy equivalent)",
+        "AND it does not import createCodeGraphProvider from @specd/code-graph",
+        "AND it does not open/close a provider per HTTP request"
       ]
+    },
+    {
+      "requirement": "long-lived provider refresh after index and stale errors",
+      "name": "Stale provider is reopened",
+      "given": ["the long-lived provider throws GraphProviderStaleError"],
+      "when": ["the healthy accessor recovers"],
+      "then": ["it closes and reopens (or replaces) the process-scoped provider"]
+    },
+    {
+      "requirement": "long-lived provider refresh after index and stale errors",
+      "name": "Index completion refreshes the long-lived provider",
+      "when": ["runIndexProjectGraph completes"],
+      "then": ["the API replaces or reopens its long-lived provider before the next graph read"]
     }
   ],
   "implementation": {
-    "files": [
+    "symbols": [
       {
         "specId": "api:composition-graph-provider",
-        "file": "api:src/composition/graph-provider.ts"
+        "file": "api:src/composition/long-lived-graph.ts",
+        "symbol": "openLongLivedGraphProvider"
+      },
+      {
+        "specId": "api:composition-graph-provider",
+        "file": "api:src/composition/long-lived-graph.ts",
+        "symbol": "withHealthyGraphProvider"
+      },
+      {
+        "specId": "api:composition-graph-provider",
+        "file": "api:src/composition/long-lived-graph.ts",
+        "symbol": "refreshLongLivedGraphProvider"
+      },
+      {
+        "specId": "api:composition-graph-provider",
+        "file": "api:src/composition/long-lived-graph.ts",
+        "symbol": "closeLongLivedGraphProvider"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:bda620cbb8ac8243be30514d14348c83926b002aa6a3201f569e5c866a0a7f8c",
-    "verify.md": "sha256:147e55cda76fcf1ed34c14073b451d9bc4725d0d94204d11e85a2b26d1f0ae49"
+    "spec.md": "sha256:ae70ae1e87aa4036eb49f83adf0cb66f7505770f473f1cbbd6f3f64e7e8c562a",
+    "verify.md": "sha256:d85c7df3478fb212e06b228ff1a6788eb22a337ad4fec521a4d1842a51507054"
   },
   "generatedBy": "core"
 }

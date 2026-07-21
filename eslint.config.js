@@ -17,6 +17,7 @@ export default tseslint.config(
       'packages/schema-std/**',
       'packages/mcp/**',
       'packages/code-graph-electron/vendor/**',
+      'packages/code-graph-sqlite-electron/vendor/**',
       'dev/scripts/**',
       'packages/api/test/fixtures/**',
     ],

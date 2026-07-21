@@ -12,5 +12,5 @@ export default defineConfig({
   dts: false,
   sourcemap: false,
   splitting: false,
-  external: ['electron', '@specd/sdk', '@specd/client', '@specd/code-graph-electron'],
+  external: ['electron', '@specd/sdk', '@specd/client', '@specd/code-graph-sqlite-electron'],
 })

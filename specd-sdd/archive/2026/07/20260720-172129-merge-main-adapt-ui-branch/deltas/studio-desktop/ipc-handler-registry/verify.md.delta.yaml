@@ -1,0 +1,12 @@
+- op: modified
+  description: Graph IPC uses long-lived sqlite-electron provider
+  selector:
+    type: section
+    matches: 'Scenario: Local graph IPC uses the Electron graph provider package'
+  rename: 'Scenario: Local graph IPC uses long-lived sqlite-electron provider'
+  content: |
+    - **WHEN** the desktop main process serves graph status, search, impact, hotspot, or index IPC requests
+    - **THEN** read paths reuse a long-lived open provider from the process-scoped SDK host
+    - **AND** that host was created with `graphStoreId: 'sqlite-electron'` and the additive factory from `@specd/code-graph-sqlite-electron`
+    - **AND** routine graph IPC does not call `withOpenGraphProvider` or `createCodeGraphProvider` directly
+    - **AND** `@specd/code-graph-electron` is not imported for provider construction

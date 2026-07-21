@@ -37,8 +37,7 @@
 #### Scenario: Desktop package exposes Electron graph rebuild wiring
 
 - **WHEN** the desktop package scripts are inspected
-- **THEN** `rebuild:graph-sqlite-electron` rebuilds the locally generated vendored
-  Electron SQLite addon
+- **THEN** `rebuild:graph-sqlite-electron` rebuilds the locally generated vendored Electron SQLite addon owned by `@specd/code-graph-sqlite-electron`
 - **AND** `rebuild:graph-electron` aliases that rebuild
 - **AND** `prestart` executes the Electron SQLite rebuild before app startup
 
@@ -50,15 +49,18 @@
 - **AND** desktop local graph startup does not depend on vendored sqlite files being
   present in git
 
-#### Scenario: Desktop local host depends on the Electron graph package
+#### Scenario: Desktop local host depends on the sqlite-electron package
 
-- **WHEN** the desktop package dependencies are inspected
-- **THEN** `@specd/code-graph-electron` is present for desktop-local graph execution
+- **WHEN** the desktop package dependencies and local graph wiring are inspected
+- **THEN** `@specd/code-graph-sqlite-electron` is present for desktop-local graph execution
+- **AND** the project host selects `graphStoreId: 'sqlite-electron'` via SDK graph options
+- **AND** the host opens one long-lived provider and reuses it while healthy
+- **AND** `@specd/code-graph-electron` is not imported for that path
 
 #### Scenario: CLI and API keep the standard SDK-backed graph runtime
 
 - **WHEN** CLI and API package dependencies and bootstrap code are inspected
-- **THEN** they do not depend on `@specd/code-graph-electron`
+- **THEN** they do not depend on `@specd/code-graph-sqlite-electron` for default Node graph execution
 - **AND** they access the standard graph runtime through `@specd/sdk`
 
 ### Requirement: desktop main process launches as Electron
@@ -75,12 +77,13 @@
 
 - **WHEN** inspecting `apps/specd-studio-desktop/package.json` after build
 - **THEN** `main` is `dist/main/index.cjs`
-- **AND** `tsup` externalises `electron`, `@specd/code-graph-electron`, `@specd/sdk`, and `@specd/client`
+- **AND** `tsup` externalises `electron`, `@specd/code-graph-sqlite-electron`, `@specd/sdk`, and `@specd/client`
 
 ### Requirement: desktop kernel configures plain-text logs
 
 #### Scenario: Local desktop logs are formatted without colors
 
-- **WHEN** desktop local kernel is created
-- **THEN** logFormatter has colorize set to false
+- **WHEN** desktop local kernel is created via `createSdkContext`
+- **THEN** options nest `kernel.logFormatter` with `colorize: false`
 - **AND** log messages do not contain ANSI escape control codes
+- **AND** top-level `logFormatter` is not passed on `SdkContextOptions`

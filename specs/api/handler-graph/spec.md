@@ -14,11 +14,13 @@ The module MUST implement every method, path, query, and body declared in [`api:
 
 Business rules MUST live in core and code-graph use cases. This handler MUST invoke only:
 
-- `apiContext.createGraphProvider()` for stats, search, impact, and hotspots
-- `runIndexProjectGraph` from `@specd/sdk` for `POST /v1/graph/index`
+- `apiContext.withGraphProvider()` (healthy long-lived opened provider) for stats, search, impact, and hotspots
+- `runIndexProjectGraph` from `@specd/sdk` for `POST /v1/graph/index`, then rely on host refresh of the long-lived provider
 - change-scoped graph view composed from change `specIds` via kernel use cases
 
 The handler MUST NOT import `createCodeGraphProvider` from `@specd/code-graph` directly.
+The handler MUST NOT open/close a provider per HTTP request and MUST NOT call
+`withOpenGraphProvider` for routine graph routes.
 
 ### Requirement: successful responses use presenters and DTO wire shapes
 
@@ -52,3 +54,5 @@ Handler modules MUST import graph orchestration helpers and kernel types from `@
 - [`sdk:composition`](../../sdk/composition/spec.md) — SDK import policy
 - [`sdk:run-index-project-graph`](../../sdk/run-index-project-graph/spec.md) — index orchestration
 - [`api:routes-graph`](../routes-graph/spec.md) — HTTP contract
+- [`api:composition-graph-provider`](../composition-graph-provider/spec.md) — long-lived provider ownership
+- [`code-graph:composition`](../../code-graph/composition/spec.md) — long-lived provider lifecycle

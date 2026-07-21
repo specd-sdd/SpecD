@@ -250,6 +250,15 @@ workspaces:
     codeRoot: packages/code-graph-electron
     ownership: owned
 
+  code-graph-sqlite-electron:
+    specs:
+      adapter:
+        type: fs
+        config:
+          path: specs/code-graph-sqlite-electron
+    codeRoot: packages/code-graph-sqlite-electron
+    ownership: owned
+
   plugin-ui-studio:
     specs:
       adapter:

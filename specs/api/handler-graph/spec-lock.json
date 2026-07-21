@@ -8,7 +8,9 @@
     "default:_global/conventions",
     "sdk:composition",
     "sdk:run-index-project-graph",
-    "api:routes-graph"
+    "api:routes-graph",
+    "code-graph:composition",
+    "api:composition-graph-provider"
   ],
   "implementation": [
     {

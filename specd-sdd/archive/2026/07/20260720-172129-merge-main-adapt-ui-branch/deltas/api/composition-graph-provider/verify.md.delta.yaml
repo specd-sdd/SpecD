@@ -1,0 +1,45 @@
+- op: modified
+  description: Bootstrap opens long-lived provider from SDK factory
+  selector:
+    type: section
+    matches: 'Scenario: Provider binds to project graph paths'
+  content: |
+    - **GIVEN** specd.yaml declares workspaces
+    - **WHEN** API server bootstrap creates and opens the long-lived graph provider
+    - **THEN** provider reads project root from config
+    - **AND** index paths match workspace layout
+
+- op: modified
+  description: Handlers use withGraphProvider from long-lived host
+  selector:
+    type: section
+    matches: 'Scenario: Graph handler uses SdkHostContext factory'
+  rename: 'Scenario: Graph handler uses long-lived withGraphProvider'
+  content: |
+    - **WHEN** a graph handler needs an opened provider
+    - **THEN** it calls `apiContext.withGraphProvider()` (or the process-scoped healthy equivalent)
+    - **AND** it does not import `createCodeGraphProvider` from `@specd/code-graph`
+    - **AND** it does not open/close a provider per HTTP request
+
+- op: added
+  description: Stale reopen and post-index refresh scenarios
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: SDK graph provider factory'
+  content: |
+    ### Requirement: long-lived provider refresh after index and stale errors
+
+    #### Scenario: Stale provider is reopened
+
+    - **GIVEN** the long-lived provider throws `GraphProviderStaleError`
+    - **WHEN** the healthy accessor recovers
+    - **THEN** it closes and reopens (or replaces) the process-scoped provider
+
+    #### Scenario: Index completion refreshes the long-lived provider
+
+    - **WHEN** `runIndexProjectGraph` completes
+    - **THEN** the API replaces or reopens its long-lived provider before the next graph read

@@ -1,0 +1,54 @@
+- op: modified
+  description: Desktop local host depends on sqlite-electron with long-lived provider
+  selector:
+    type: section
+    matches: 'Scenario: Desktop local host depends on the Electron graph package'
+  rename: 'Scenario: Desktop local host depends on the sqlite-electron package'
+  content: |
+    - **WHEN** the desktop package dependencies and local graph wiring are inspected
+    - **THEN** `@specd/code-graph-sqlite-electron` is present for desktop-local graph execution
+    - **AND** the project host selects `graphStoreId: 'sqlite-electron'` via SDK graph options
+    - **AND** the host opens one long-lived provider and reuses it while healthy
+    - **AND** `@specd/code-graph-electron` is not imported for that path
+
+- op: modified
+  description: CLI/API must not depend on sqlite-electron package
+  selector:
+    type: section
+    matches: 'Scenario: CLI and API keep the standard SDK-backed graph runtime'
+  content: |
+    - **WHEN** CLI and API package dependencies and bootstrap code are inspected
+    - **THEN** they do not depend on `@specd/code-graph-sqlite-electron` for default Node graph execution
+    - **AND** they access the standard graph runtime through `@specd/sdk`
+
+- op: modified
+  description: Externalise sqlite-electron package in main bundle
+  selector:
+    type: section
+    matches: 'Scenario: main entry uses bundled CJS artifact'
+  content: |
+    - **WHEN** inspecting `apps/specd-studio-desktop/package.json` after build
+    - **THEN** `main` is `dist/main/index.cjs`
+    - **AND** `tsup` externalises `electron`, `@specd/code-graph-sqlite-electron`, `@specd/sdk`, and `@specd/client`
+
+- op: modified
+  description: Nested kernel logFormatter options
+  selector:
+    type: section
+    matches: 'Scenario: Local desktop logs are formatted without colors'
+  content: |
+    - **WHEN** desktop local kernel is created via `createSdkContext`
+    - **THEN** options nest `kernel.logFormatter` with `colorize: false`
+    - **AND** log messages do not contain ANSI escape control codes
+    - **AND** top-level `logFormatter` is not passed on `SdkContextOptions`
+
+- op: modified
+  description: Rebuild wiring still targets sqlite-electron package vendor
+  selector:
+    type: section
+    matches: 'Scenario: Desktop package exposes Electron graph rebuild wiring'
+  content: |
+    - **WHEN** the desktop package scripts are inspected
+    - **THEN** `rebuild:graph-sqlite-electron` rebuilds the locally generated vendored Electron SQLite addon owned by `@specd/code-graph-sqlite-electron`
+    - **AND** `rebuild:graph-electron` aliases that rebuild
+    - **AND** `prestart` executes the Electron SQLite rebuild before app startup

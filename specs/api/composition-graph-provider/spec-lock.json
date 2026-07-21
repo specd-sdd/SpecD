@@ -6,11 +6,19 @@
   "dependsOn": [
     "default:_global/architecture",
     "default:_global/conventions",
-    "sdk:run-index-project-graph"
+    "sdk:run-index-project-graph",
+    "sdk:host-context",
+    "code-graph:composition"
   ],
   "implementation": [
     {
-      "file": "api:src/composition/graph-provider.ts"
+      "file": "api:src/composition/long-lived-graph.ts",
+      "symbols": [
+        "openLongLivedGraphProvider",
+        "withHealthyGraphProvider",
+        "refreshLongLivedGraphProvider",
+        "closeLongLivedGraphProvider"
+      ]
     }
   ]
 }

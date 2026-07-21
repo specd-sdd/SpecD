@@ -1,0 +1,36 @@
+- op: modified
+  description: API context exposes peek and healthy long-lived graph accessors
+  selector:
+    type: section
+    matches: 'Requirement: context exposes kernel and actor'
+  content: |
+    `createApiContext(request)` MUST return `{ kernel, actor, createGraphProvider, getGraphProvider, withGraphProvider, config, authType, apiActor }` where:
+
+    - `kernel` and `createGraphProvider` come from the process-scoped `SdkHostContext` created by `createSdkContext`
+    - `getGraphProvider` returns the process-scoped long-lived opened `CodeGraphProvider` held by the server (peek; no stale reopen)
+    - `withGraphProvider` runs a callback against that same long-lived provider and MUST reopen/replace once on `GraphProviderStaleError` before retrying (healthy accessor)
+    - `actor` is the identity from `api:adapter-api-actor-resolver` wrapped for the request
+    - `config` is the resolved `SpecdConfig` for the served project
+
+    `ApiContext` and `ApiServerState` MUST extend `SdkHostContext` from `@specd/sdk`.
+
+- op: modified
+  description: Handlers use healthy long-lived accessor not per-request open
+  selector:
+    type: section
+    matches: 'Requirement: graph provider factory is per project config'
+  content: |
+    `createGraphProvider()` on the API context MUST delegate to the `createGraphProvider` factory from the process-scoped `SdkHostContext`. It MUST NOT construct `@specd/code-graph` providers independently of that factory.
+
+    Graph HTTP handlers MUST obtain the opened provider through `withGraphProvider()` (healthy long-lived accessor) rather than calling `createGraphProvider()` + `open()` + `close()` per request. `getGraphProvider()` MAY be used when a caller only needs the current held instance without stale recovery.
+
+- op: modified
+  description: Add composition long-lived dependency
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`default:_global/architecture`](../../default/_global/architecture/spec.md) — hexagonal delivery layout
+    - [`default:_global/conventions`](../../default/_global/conventions/spec.md) — naming and module conventions
+    - [`sdk:host-context`](../../sdk/host-context/spec.md) — `SdkHostContext` shape and bootstrap
+    - [`code-graph:composition`](../../code-graph/composition/spec.md) — long-lived provider lifecycle for HTTP API hosts

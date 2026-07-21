@@ -1,0 +1,31 @@
+- op: modified
+  description: Nested kernel options for logRing and logFormatter
+  selector:
+    type: section
+    matches: 'Scenario: Log formatter disables ANSI for API readback'
+  rename: 'Scenario: Log formatter and ring nest under kernel options'
+  content: |
+    - **WHEN** the API kernel boots with a log ring for Studio readback
+    - **THEN** `createSdkContext` receives `kernel: { logRing, logFormatter: createLogFormatter({ colorize: false }) }`
+    - **AND** top-level `logRing` / `logFormatter` are not passed on `SdkContextOptions`
+
+- op: added
+  description: Long-lived provider opened at bootstrap and closed on shutdown
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: one kernel per process with per-request context'
+    after:
+      type: section
+      matches: 'Scenario: Log formatter and ring nest under kernel options'
+  content: |
+    #### Scenario: Server opens one long-lived graph provider
+
+    - **WHEN** `createApiServer` finishes bootstrap
+    - **THEN** process state holds one opened graph provider from `createGraphProvider()`
+    - **AND** that provider remains open across graph HTTP requests until stale replacement or `close()`
+
+    #### Scenario: Server close shuts down the long-lived provider
+
+    - **WHEN** `ApiServer.close()` runs
+    - **THEN** the long-lived graph provider is closed

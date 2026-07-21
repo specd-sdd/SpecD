@@ -1,7 +1,12 @@
 {
   "title": "Composition Create Api Context",
   "description": "HTTP route handlers need a consistent way to reach the kernel, the request actor, and graph tooling without each handler wiring dependencies by hand. This composition builds a per-request API context that shares the process-scoped `Kernel` and resolved actor while exposing a factory for code-graph providers.",
-  "dependsOn": ["default:_global/architecture", "default:_global/conventions", "sdk:host-context"],
+  "dependsOn": [
+    "default:_global/architecture",
+    "default:_global/conventions",
+    "sdk:host-context",
+    "code-graph:composition"
+  ],
   "context": [
     "HTTP route handlers need a consistent way to reach the kernel, the request actor, and graph tooling without each handler wiring dependencies by hand. This composition builds a per-request API context that shares the process-scoped `Kernel` and resolved actor while exposing a factory for code-graph providers."
   ],
@@ -9,13 +14,13 @@
     {
       "requirement": "context exposes kernel and actor",
       "rules": [
-        "`createApiContext(request)` MUST return `{ kernel, actor, createGraphProvider, config, authType, apiActor }` where:\n\n- `kernel` and `createGraphProvider` come from the process-scoped `SdkHostContext` created by `createSdkContext`\n- `actor` is the identity from `api:adapter-api-actor-resolver` wrapped for the request\n- `config` is the resolved `SpecdConfig` for the served project\n\n`ApiContext` and `ApiServerState` MUST extend `SdkHostContext` from `@specd/sdk`."
+        "`createApiContext(request)` MUST return `{ kernel, actor, createGraphProvider, getGraphProvider, withGraphProvider, config, authType, apiActor }` where:\n\n- `kernel` and `createGraphProvider` come from the process-scoped `SdkHostContext` created by `createSdkContext`\n- `getGraphProvider` returns the process-scoped long-lived opened `CodeGraphProvider` held by the server (peek; no stale reopen)\n- `withGraphProvider` runs a callback against that same long-lived provider and MUST reopen/replace once on `GraphProviderStaleError` before retrying (healthy accessor)\n- `actor` is the identity from `api:adapter-api-actor-resolver` wrapped for the request\n- `config` is the resolved `SpecdConfig` for the served project\n\n`ApiContext` and `ApiServerState` MUST extend `SdkHostContext` from `@specd/sdk`."
       ]
     },
     {
       "requirement": "graph provider factory is per project config",
       "rules": [
-        "`createGraphProvider()` on the API context MUST delegate to the `createGraphProvider` factory from the process-scoped `SdkHostContext`. It MUST NOT construct `@specd/code-graph` providers independently of that factory."
+        "`createGraphProvider()` on the API context MUST delegate to the `createGraphProvider` factory from the process-scoped `SdkHostContext`. It MUST NOT construct `@specd/code-graph` providers independently of that factory.\n\nGraph HTTP handlers MUST obtain the opened provider through `withGraphProvider()` (healthy long-lived accessor) rather than calling `createGraphProvider()` + `open()` + `close()` per request. `getGraphProvider()` MAY be used when a caller only needs the current held instance without stale recovery."
       ]
     }
   ],
@@ -31,10 +36,11 @@
     {
       "requirement": "context exposes kernel and actor",
       "name": "ApiContext extends SdkHostContext",
-      "when": ["middleware attaches request.apiContext"],
+      "when": ["createApiContext builds a request context"],
       "then": [
         "the context exposes kernel and createGraphProvider from the process-scoped SDK host context",
-        "AND ApiContext includes request-scoped actor, config, and auth fields"
+        "AND the context exposes getGraphProvider for the process-scoped long-lived opened provider (peek)",
+        "AND the context exposes withGraphProvider as the healthy long-lived accessor (reopen once on stale)"
       ]
     },
     {
@@ -59,11 +65,11 @@
     },
     {
       "requirement": "graph provider factory is per project config",
-      "name": "Graph provider is created lazily per factory call",
-      "when": ["createGraphProvider() is invoked for a request that needs graph data"],
+      "name": "Graph handlers reuse the long-lived opened provider",
+      "when": ["a graph route needs an opened provider"],
       "then": [
-        "a code-graph provider is returned without mutating unrelated projects",
-        "AND failures surface as kernel or transport errors, not silent null providers"
+        "it calls withGraphProvider() (or equivalent healthy process accessor)",
+        "AND it does not open/close a new provider for that single request"
       ]
     }
   ],
@@ -87,8 +93,8 @@
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:96fa2f249a4569aef0ec02213029bf9ad1f080ed467f595c1d88944628bf1919",
-    "verify.md": "sha256:f99b3b313aeea1dfed125fd4b1a1a068b1a82d93b0dec306f80fe2d3eee299f3"
+    "spec.md": "sha256:22de5cf52b277483625fec7d0b98044d4cd2f8f8a10ea7050c56cad57738b8f5",
+    "verify.md": "sha256:4ebec7f1746ab66abede934565e15b2832bc5ce6b3fd2c0500ed60b86b807e70"
   },
   "generatedBy": "core"
 }

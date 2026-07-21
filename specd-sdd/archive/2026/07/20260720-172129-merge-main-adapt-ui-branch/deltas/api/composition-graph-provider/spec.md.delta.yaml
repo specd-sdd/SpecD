@@ -1,0 +1,59 @@
+- op: modified
+  description: Centralize long-lived provider ownership for API graph routes
+  selector:
+    type: section
+    matches: 'Requirement: provider is created from project configuration'
+  content: |
+    The API MUST obtain its process-scoped graph provider from the `createGraphProvider`
+    function on the process-scoped `SdkHostContext` (created by `createSdkContext`).
+    The provider MUST be bound to the resolved `SpecdConfig` (workspaces, code roots) for
+    the served project.
+
+    The server MUST open that provider once under host control, reuse it while healthy,
+    reopen or replace it on `GraphProviderStaleError`, and close it on server shutdown —
+    matching the long-lived host contract in `code-graph:composition`.
+
+- op: modified
+  description: Handlers use healthy long-lived accessor not per-request factory open
+  selector:
+    type: section
+    matches: 'Requirement: SDK graph provider factory'
+  content: |
+    Graph handlers and composition MUST obtain the opened provider through the
+    process-scoped healthy long-lived accessor (`withGraphProvider` / equivalent host helper).
+    `getGraphProvider` MAY return the held opened provider without stale recovery (peek).
+    Construction MUST still go through `SdkHostContext.createGraphProvider`.
+    Handlers MUST NOT import `createCodeGraphProvider` from `@specd/code-graph` directly.
+    Handlers MUST NOT call `withOpenGraphProvider` for routine graph HTTP routes.
+
+- op: added
+  description: Reopen long-lived provider after index and on stale
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: SDK graph provider factory'
+  content: |
+    ### Requirement: long-lived provider refresh after index and stale errors
+
+    After `runIndexProjectGraph` completes (which may open a short-lived provider
+    internally), the API host MUST replace or reopen its long-lived provider before
+    subsequent graph reads.
+
+    When a graph operation on the long-lived provider throws `GraphProviderStaleError`,
+    the healthy accessor (`withGraphProvider`) MUST close and reopen (or replace) the
+    provider and MAY retry the operation once.
+
+- op: modified
+  description: Add host-context and composition dependencies
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`default:_global/architecture`](../../default/_global/architecture/spec.md) — hexagonal delivery layout
+    - [`default:_global/conventions`](../../default/_global/conventions/spec.md) — naming and module conventions
+    - [`sdk:run-index-project-graph`](../../sdk/run-index-project-graph/spec.md) — project-level graph indexing orchestration
+    - [`sdk:host-context`](../../sdk/host-context/spec.md) — process-scoped `createGraphProvider`
+    - [`code-graph:composition`](../../code-graph/composition/spec.md) — long-lived provider lifecycle for HTTP API hosts

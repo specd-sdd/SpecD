@@ -11,7 +11,7 @@
     "build:ui": "pnpm --filter @specd/ui build",
     "build": "pnpm rebuild:graph-sqlite-electron && pnpm build:ui && pnpm build:main && pnpm build:preload && pnpm build:renderer",
     "dev:renderer": "vite dev -c vite.renderer.config.ts",
-    "rebuild:graph-sqlite-electron": "pnpm --filter @specd/code-graph-electron rebuild:vendored-sqlite-electron",
+    "rebuild:graph-sqlite-electron": "pnpm --filter @specd/code-graph-sqlite-electron rebuild:vendored-sqlite-electron",
     "rebuild:graph-electron": "pnpm rebuild:graph-sqlite-electron",
     "prestart": "pnpm rebuild:graph-sqlite-electron",
     "start": "env ELECTRON_RUN_AS_NODE= electron .",
@@ -20,7 +20,7 @@
     "lint": "eslint ."
   },
   "dependencies": {
-    "@specd/code-graph-electron": "workspace:*",
+    "@specd/code-graph-sqlite-electron": "workspace:*",
     "@specd/client": "workspace:*",
     "@specd/sdk": "workspace:*",
     "@specd/ui": "workspace:*",

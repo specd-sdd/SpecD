@@ -24,11 +24,12 @@
 
 ### Requirement: handler delegates to kernel without duplicating domain rules
 
-#### Scenario: Handler invokes createCodeGraphProvider → stats, index, search, impact, hotspots
+#### Scenario: Handler uses long-lived provider for stats, search, impact, hotspots
 
-- **WHEN** a valid request for this handler is processed
-- **THEN** `createCodeGraphProvider` → stats, index, search, impact, hotspots runs inside @specd/core
-- **AND** handler does not reimplement lifecycle or validation rules
+- **WHEN** graph status, search, impact, or hotspot routes run
+- **THEN** the handler obtains an opened provider via `withGraphProvider()`
+- **AND** index still goes through `runIndexProjectGraph`
+- **AND** the handler does not call `createCodeGraphProvider` directly
 
 #### Scenario: Handler invokes change-scoped graph view composed from change specIds
 

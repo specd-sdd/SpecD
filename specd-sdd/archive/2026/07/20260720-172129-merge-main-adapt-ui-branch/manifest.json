@@ -1,0 +1,1077 @@
+{
+  "name": "merge-main-adapt-ui-branch",
+  "createdAt": "2026-07-20T17:21:29.568Z",
+  "updatedAt": "2026-07-21T17:45:23.978Z",
+  "description": "Adapts feat/user-interface to main’s graph/SDK composition seams after merge. Introduces @specd/code-graph-sqlite-electron (sqlite-electron backend) for Electron-native SQLite graph storage, wires Studio desktop and the HTTP API to long-lived graph providers with stale reopen, and leaves @specd/code-graph-electron unused on this path.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "code-graph-sqlite-electron:sqlite-electron-store",
+    "studio-desktop:main-kernel-lifecycle",
+    "studio-desktop:ipc-handler-registry",
+    "api:composition-create-api-server",
+    "api:composition-graph-provider",
+    "api:composition-create-api-context",
+    "api:handler-graph"
+  ],
+  "specDependsOn": {
+    "code-graph-sqlite-electron:sqlite-electron-store": [
+      "code-graph:composition",
+      "code-graph:sqlite-graph-store"
+    ],
+    "studio-desktop:main-kernel-lifecycle": [
+      "client:specd-data-port",
+      "sdk:host-context",
+      "code-graph-sqlite-electron:sqlite-electron-store",
+      "code-graph:composition"
+    ],
+    "studio-desktop:ipc-handler-registry": [
+      "client:specd-data-port",
+      "client:ipc-message-envelope",
+      "sdk:host-context",
+      "client:dto-project-status",
+      "code-graph-sqlite-electron:sqlite-electron-store",
+      "code-graph:composition"
+    ],
+    "api:composition-create-api-server": [
+      "default:_global/architecture",
+      "default:_global/conventions",
+      "api:auth-adapter-registry",
+      "api:middleware-auth",
+      "core:kernel",
+      "sdk:host-context",
+      "sdk:composition",
+      "code-graph:composition"
+    ],
+    "api:composition-graph-provider": [
+      "default:_global/architecture",
+      "default:_global/conventions",
+      "sdk:run-index-project-graph",
+      "sdk:host-context",
+      "code-graph:composition"
+    ],
+    "api:composition-create-api-context": [
+      "default:_global/architecture",
+      "default:_global/conventions",
+      "sdk:host-context",
+      "code-graph:composition"
+    ],
+    "api:handler-graph": [
+      "default:_global/architecture",
+      "default:_global/conventions",
+      "sdk:composition",
+      "sdk:run-index-project-graph",
+      "api:routes-graph",
+      "code-graph:composition",
+      "api:composition-graph-provider"
+    ]
+  },
+  "invalidationPolicy": "downstream",
+  "trackedImplementationFiles": [
+    {
+      "file": "pnpm-lock.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specd.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-sqlite-electron/package.json",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph-sqlite-electron/src/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph-sqlite-electron/tsconfig.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/code-graph-sqlite-electron/.gitkeep",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/schema-std/.gitkeep",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/specd/.gitkeep",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-sqlite-electron/src/create-electron-sqlite-graph-store-factory.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph-sqlite-electron/src/runtime/load-vendored-better-sqlite3.ts",
+      "state": "resolved"
+    },
+    {
+      "file": ".gitignore",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-sqlite-electron/scripts/sync-vendored-sqlite.mjs",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph-sqlite-electron/scripts/rebuild-vendored-sqlite-electron.mjs",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph-sqlite-electron/scripts/electron-build-metadata.mjs",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph-sqlite-electron/tsup.config.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "apps/specd-studio-desktop/src/main/ipc-handlers.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "apps/specd-studio-desktop/src/main/long-lived-graph.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "apps/specd-studio-desktop/package.json",
+      "state": "resolved"
+    },
+    {
+      "file": "apps/specd-studio-desktop/tsup.main.config.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/api/src/composition/create-api-server.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/api/src/composition/create-api-context.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/api/src/composition/long-lived-graph.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/api/src/delivery/http/handlers/handler-graph.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph-sqlite-electron/test/runtime/vendored-sqlite.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "eslint.config.js",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph-sqlite-electron/.gitignore",
+      "state": "resolved"
+    },
+    {
+      "file": "apps/specd-studio-desktop/test/desktop-graph-runtime.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "apps/specd-studio-desktop/test/ipc-graph-provider.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "apps/specd-studio-desktop/test/desktop-host-lifecycle.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/client/connection-profiles.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/studio/packages.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/adr/0024-sqlite-electron-graph-store-package.md",
+      "state": "ignored"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "code-graph-sqlite-electron:sqlite-electron-store",
+      "file": "packages/code-graph-sqlite-electron/src/create-electron-sqlite-graph-store-factory.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["createElectronSqliteGraphStoreFactory"]
+    },
+    {
+      "specId": "code-graph-sqlite-electron:sqlite-electron-store",
+      "file": "packages/code-graph-sqlite-electron/src/runtime/load-vendored-better-sqlite3.ts",
+      "fileLinkExplicit": false,
+      "symbols": [
+        "loadVendoredBetterSqlite3Module",
+        "vendoredSqlitePackageRoot",
+        "vendoredSqliteEntry",
+        "vendoredSqliteBinaryPath"
+      ]
+    },
+    {
+      "specId": "code-graph-sqlite-electron:sqlite-electron-store",
+      "file": "packages/code-graph-sqlite-electron/src/index.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph-sqlite-electron:sqlite-electron-store",
+      "file": "packages/code-graph-sqlite-electron/package.json",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph-sqlite-electron:sqlite-electron-store",
+      "file": "packages/code-graph-sqlite-electron/scripts/sync-vendored-sqlite.mjs",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph-sqlite-electron:sqlite-electron-store",
+      "file": "packages/code-graph-sqlite-electron/scripts/rebuild-vendored-sqlite-electron.mjs",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph-sqlite-electron:sqlite-electron-store",
+      "file": "packages/code-graph-sqlite-electron/scripts/electron-build-metadata.mjs",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph-sqlite-electron:sqlite-electron-store",
+      "file": "packages/code-graph-sqlite-electron/tsup.config.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "studio-desktop:main-kernel-lifecycle",
+      "file": "apps/specd-studio-desktop/src/main/ipc-handlers.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["getHost", "withGraphProvider", "resetDesktopKernel"]
+    },
+    {
+      "specId": "studio-desktop:main-kernel-lifecycle",
+      "file": "apps/specd-studio-desktop/src/main/long-lived-graph.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["openLongLivedGraphProvider", "withHealthyGraphProvider"]
+    },
+    {
+      "specId": "studio-desktop:main-kernel-lifecycle",
+      "file": "apps/specd-studio-desktop/package.json",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "studio-desktop:main-kernel-lifecycle",
+      "file": "apps/specd-studio-desktop/tsup.main.config.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "studio-desktop:ipc-handler-registry",
+      "file": "apps/specd-studio-desktop/src/main/ipc-handlers.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["withGraphProvider", "getHost"]
+    },
+    {
+      "specId": "api:composition-create-api-server",
+      "file": "packages/api/src/composition/create-api-server.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["createApiServer"]
+    },
+    {
+      "specId": "api:composition-create-api-context",
+      "file": "packages/api/src/composition/create-api-context.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["createApiContext", "ApiContext", "ApiServerState"]
+    },
+    {
+      "specId": "api:composition-graph-provider",
+      "file": "packages/api/src/composition/long-lived-graph.ts",
+      "fileLinkExplicit": false,
+      "symbols": [
+        "openLongLivedGraphProvider",
+        "withHealthyGraphProvider",
+        "refreshLongLivedGraphProvider",
+        "closeLongLivedGraphProvider"
+      ]
+    },
+    {
+      "specId": "api:handler-graph",
+      "file": "packages/api/src/delivery/http/handlers/handler-graph.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["registerGraphRoutes"]
+    },
+    {
+      "specId": "studio-desktop:main-kernel-lifecycle",
+      "file": "apps/specd-studio-desktop/test/desktop-graph-runtime.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "studio-desktop:ipc-handler-registry",
+      "file": "apps/specd-studio-desktop/test/ipc-graph-provider.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "studio-desktop:main-kernel-lifecycle",
+      "file": "apps/specd-studio-desktop/test/desktop-host-lifecycle.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "studio-desktop:ipc-handler-registry",
+      "file": "apps/specd-studio-desktop/test/desktop-host-lifecycle.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph-sqlite-electron:sqlite-electron-store",
+      "file": "packages/code-graph-sqlite-electron/tsconfig.json",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph-sqlite-electron:sqlite-electron-store",
+      "file": "packages/code-graph-sqlite-electron/test/runtime/vendored-sqlite.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph-sqlite-electron:sqlite-electron-store",
+      "file": "packages/code-graph-sqlite-electron/.gitignore",
+      "fileLinkExplicit": true
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:aebfe536c6a19715acd163c79e6e5906eb06b88b445dbcab6d693547e5b81a25"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "code-graph-sqlite-electron:sqlite-electron-store",
+          "filename": "specs/code-graph-sqlite-electron/sqlite-electron-store/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:ecdb1b9be8ba3554b7ce6370d677e6aaf9004cfd28792b8f2c641fe17edded7b"
+        },
+        {
+          "key": "studio-desktop:main-kernel-lifecycle",
+          "filename": "deltas/studio-desktop/main-kernel-lifecycle/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:3a6bc05d901200d6429b66ca1aa2c728018af673f9943bc93dbc201e128d505d"
+        },
+        {
+          "key": "studio-desktop:ipc-handler-registry",
+          "filename": "deltas/studio-desktop/ipc-handler-registry/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:85e544ddbc8cb79d66c93ad7c3279e65c02d014e50bba6dc29899acb511acefd"
+        },
+        {
+          "key": "api:composition-create-api-server",
+          "filename": "deltas/api/composition-create-api-server/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:7e9c9539e4ca2e222913134914df1c77153f327e9acf4e05a6e050dad1871779"
+        },
+        {
+          "key": "api:composition-graph-provider",
+          "filename": "deltas/api/composition-graph-provider/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:8e0b99f532696eb64c255cf34c30ae8336ef6b99f030ef5535f8d92d52708c59"
+        },
+        {
+          "key": "api:composition-create-api-context",
+          "filename": "deltas/api/composition-create-api-context/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:4218df6868b766a7180f623d57d459448b0a71abde56df4cdb2ba8b42eae9410"
+        },
+        {
+          "key": "api:handler-graph",
+          "filename": "deltas/api/handler-graph/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:d48e14c442ad3571286ea3fd34609c87d79e96f48d9508a7f81aa6aaba754971"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "code-graph-sqlite-electron:sqlite-electron-store",
+          "filename": "specs/code-graph-sqlite-electron/sqlite-electron-store/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:7d7d2cc21680e988ea3ae30c1de7c346ca9c2f65c62818f4bbb5e05b741dfb65"
+        },
+        {
+          "key": "studio-desktop:main-kernel-lifecycle",
+          "filename": "deltas/studio-desktop/main-kernel-lifecycle/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:e226e2f59778de519090aa1f151fab5d6fa9e5138d8d261a2c1e429b2b431cab"
+        },
+        {
+          "key": "studio-desktop:ipc-handler-registry",
+          "filename": "deltas/studio-desktop/ipc-handler-registry/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:d166409a8a9dd6f976122755838b899f69a5bd758672b0c21f95f6ab0586cd15"
+        },
+        {
+          "key": "api:composition-create-api-server",
+          "filename": "deltas/api/composition-create-api-server/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:6dcac8c95e75ad5221a613051fedefe76921cc4cdb63517331a96f62b838b893"
+        },
+        {
+          "key": "api:composition-graph-provider",
+          "filename": "deltas/api/composition-graph-provider/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:0d0b44ec121a2f52e6344602fe5cfa2182ff3784be048d72de8b2f1474f62eef"
+        },
+        {
+          "key": "api:composition-create-api-context",
+          "filename": "deltas/api/composition-create-api-context/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:f08987ab7d5a7d42a05e9d4ccf7b14e11a860da44e14ec3f9c2b713f84c10b4b"
+        },
+        {
+          "key": "api:handler-graph",
+          "filename": "deltas/api/handler-graph/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:7891a7a69424df11b6b52d1c5bf90f333fc448004fc5b591acfabccd2e2865ab"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:35c4a223fe23ef19b198eda28b7556c525185bc1c2984cde044e1636a31bf541"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:e40ff258b54d91aa71bfcf26b8e342a17e54712287c0b06b157ed4747c0f7160"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-07-20T17:21:29.568Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": [],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-20T17:21:29.579Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-20T17:24:52.496Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-21T06:00:30.760Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": []
+        },
+        {
+          "type": "verify",
+          "files": []
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-21T06:00:30.764Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "code-graph-sqlite-electron:sqlite-electron-store"
+        },
+        {
+          "type": "specs",
+          "key": "studio-desktop:main-kernel-lifecycle"
+        },
+        {
+          "type": "specs",
+          "key": "studio-desktop:ipc-handler-registry"
+        },
+        {
+          "type": "specs",
+          "key": "api:composition-create-api-server"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph-sqlite-electron:sqlite-electron-store"
+        },
+        {
+          "type": "verify",
+          "key": "studio-desktop:main-kernel-lifecycle"
+        },
+        {
+          "type": "verify",
+          "key": "studio-desktop:ipc-handler-registry"
+        },
+        {
+          "type": "verify",
+          "key": "api:composition-create-api-server"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-21T06:05:08.566Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [api:composition-create-api-server, studio-desktop:ipc-handler-registry]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["api:composition-create-api-server", "studio-desktop:ipc-handler-registry"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-21T13:20:33.779Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]; specs [studio-desktop:ipc-handler-registry]; verify [studio-desktop:ipc-handler-registry]; design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["studio-desktop:ipc-handler-registry"]
+        },
+        {
+          "type": "verify",
+          "files": ["studio-desktop:ipc-handler-registry"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-21T13:27:08.492Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph-sqlite-electron:sqlite-electron-store",
+            "studio-desktop:main-kernel-lifecycle",
+            "studio-desktop:ipc-handler-registry",
+            "api:composition-create-api-server"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph-sqlite-electron:sqlite-electron-store",
+            "studio-desktop:main-kernel-lifecycle",
+            "studio-desktop:ipc-handler-registry",
+            "api:composition-create-api-server"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-21T13:27:08.500Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "api:composition-graph-provider"
+        },
+        {
+          "type": "specs",
+          "key": "api:composition-create-api-context"
+        },
+        {
+          "type": "specs",
+          "key": "api:handler-graph"
+        },
+        {
+          "type": "verify",
+          "key": "api:composition-graph-provider"
+        },
+        {
+          "type": "verify",
+          "key": "api:composition-create-api-context"
+        },
+        {
+          "type": "verify",
+          "key": "api:handler-graph"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-21T13:46:29.537Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-21T13:47:59.559Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-21T14:57:33.344Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-21T15:36:27.921Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph-sqlite-electron:sqlite-electron-store",
+            "studio-desktop:main-kernel-lifecycle",
+            "studio-desktop:ipc-handler-registry",
+            "api:composition-create-api-server",
+            "api:composition-graph-provider",
+            "api:composition-create-api-context",
+            "api:handler-graph"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph-sqlite-electron:sqlite-electron-store",
+            "studio-desktop:main-kernel-lifecycle",
+            "studio-desktop:ipc-handler-registry",
+            "api:composition-create-api-server",
+            "api:composition-graph-provider",
+            "api:composition-create-api-context",
+            "api:handler-graph"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-21T15:36:27.921Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-21T15:41:00.141Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-21T15:41:13.085Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-21T15:55:32.022Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-21T16:00:53.084Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-21T16:22:53.512Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-21T16:23:04.422Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "description-updated",
+      "at": "2026-07-21T17:22:45.204Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "description": "Adapts feat/user-interface to main’s graph/SDK composition seams after merge. Introduces @specd/code-graph-sqlite-electron (sqlite-electron backend) for Electron-native SQLite graph storage, wires Studio desktop and the HTTP API to long-lived graph providers with stale reopen, and leaves @specd/code-graph-electron unused on this path."
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-21T17:26:02.989Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [code-graph-sqlite-electron:sqlite-electron-store]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph-sqlite-electron:sqlite-electron-store"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph-sqlite-electron:sqlite-electron-store",
+            "studio-desktop:main-kernel-lifecycle",
+            "studio-desktop:ipc-handler-registry",
+            "api:composition-create-api-server",
+            "api:composition-graph-provider",
+            "api:composition-create-api-context",
+            "api:handler-graph"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-21T17:26:02.989Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "archivable",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-21T17:26:41.182Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-21T17:26:49.451Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-21T17:26:50.346Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-21T17:26:59.242Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-21T17:27:14.381Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-07-21T17:27:14.917Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Tracked implementation files remain open for change \"merge-main-adapt-ui-branch\". Resolve or ignore them first.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-07-21T17:27:31.273Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Implementation link \"code-graph-sqlite-electron:sqlite-electron-store\" points outside workspace \"code-graph-sqlite-electron\" codeRoot.",
+      "commitStarted": false
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-21T17:45:23.978Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-07-21T17:45:24.181Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

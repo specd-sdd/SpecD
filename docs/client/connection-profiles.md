@@ -42,7 +42,7 @@ Used when the SPA and API share one origin (bundle plugin via `specd ui serve` +
 
 Reserved for `apps/specd-studio-desktop` where the main process runs kernel use cases and the renderer speaks IPC (`createIpcRequest` / `createIpcSuccess` in `ipc/envelope.ts`).
 
-For graph features, the desktop main process composes against `@specd/code-graph-electron`, an internal-only workspace package that keeps Electron's native sqlite rebuild flow separate from the standard `@specd/code-graph` package used by CLI and API.
+For graph features, the desktop main process uses `@specd/code-graph` via SDK `graph` options (`graphStoreId: 'sqlite-electron'`) and injects the factory from `@specd/code-graph-sqlite-electron`, an internal-only workspace package that keeps Electron's native sqlite rebuild flow separate from the Node `sqlite` backend used by CLI and API.
 
 ## Connect panel
 

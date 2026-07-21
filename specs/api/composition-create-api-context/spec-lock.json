@@ -3,7 +3,12 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": ["default:_global/architecture", "default:_global/conventions", "sdk:host-context"],
+  "dependsOn": [
+    "default:_global/architecture",
+    "default:_global/conventions",
+    "sdk:host-context",
+    "code-graph:composition"
+  ],
   "implementation": [
     {
       "file": "api:src/composition/create-api-context.ts",

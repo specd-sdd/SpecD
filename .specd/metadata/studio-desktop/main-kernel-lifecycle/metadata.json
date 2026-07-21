@@ -1,7 +1,12 @@
 {
   "title": "Main Kernel Lifecycle",
   "description": "Electron desktop host concern — **Main Kernel Lifecycle**. Local mode bootstraps an SDK host context (`createSdkContext`) in the main process and exposes IPC-backed ports; remote mode reuses the HTTP client stack. The main process owns one SDK host context per locally opened project.",
-  "dependsOn": ["client:specd-data-port", "sdk:host-context"],
+  "dependsOn": [
+    "client:specd-data-port",
+    "sdk:host-context",
+    "code-graph-sqlite-electron:sqlite-electron-store",
+    "code-graph:composition"
+  ],
   "context": [
     "Electron desktop host concern — **Main Kernel Lifecycle**. Local mode bootstraps an SDK host context (`createSdkContext`) in the main process and exposes IPC-backed ports; remote mode reuses the HTTP client stack. The main process owns one SDK host context per locally opened project."
   ],
@@ -21,7 +26,7 @@
     {
       "requirement": "desktop startup prepares the Electron SQLite graph runtime",
       "rules": [
-        "The desktop host MUST prepare its Electron-native SQLite graph runtime before the\napp starts local graph work.\n\nThe desktop package MUST:\n\n- depend on `@specd/code-graph-electron` for desktop-local graph execution\n- expose `rebuild:graph-sqlite-electron` for rebuilding the locally generated\n  vendored Electron SQLite addon\n- expose `rebuild:graph-electron` as an alias of that rebuild\n- run the Electron SQLite rebuild from `prestart`\n\nDesktop startup MUST NOT assume that the vendored sqlite tree or its Electron-targeted\nnative addon are present in git. The first successful desktop start on a fresh clone\nMAY require a local native rebuild when the generated addon is missing or stale for\nthe current Electron version, platform, or architecture.\n\nThis wiring isolates the native SQLite runtime required by the Electron desktop\nhost without retargeting CLI or API away from the standard non-Electron graph\nruntime exposed through `@specd/sdk` and backed by `@specd/code-graph`."
+        "The desktop host MUST prepare its Electron-native SQLite graph runtime before the\napp starts local graph work.\n\nThe desktop package MUST:\n\n- depend on `@specd/code-graph-sqlite-electron` for the Electron-vendored SQLite\n  graph-store factory used by desktop-local graph execution\n- expose `rebuild:graph-sqlite-electron` for rebuilding the locally generated\n  vendored Electron SQLite addon owned by `@specd/code-graph-sqlite-electron`\n- expose `rebuild:graph-electron` as an alias of that rebuild\n- run the Electron SQLite rebuild from `prestart`\n\nDesktop startup MUST NOT assume that the vendored sqlite tree or its Electron-targeted\nnative addon are present in git. The first successful desktop start on a fresh clone\nMAY require a local native rebuild when the generated addon is missing or stale for\nthe current Electron version, platform, or architecture.\n\nDesktop-local graph MUST follow the long-lived host model from `code-graph:composition`:\nconstruct the process/project SDK host with `graphStoreId: 'sqlite-electron'` and the\nadditive factory from `@specd/code-graph-sqlite-electron`, create one provider via\n`createGraphProvider()`, `await open()`, reuse it while healthy, reopen on\n`GraphProviderStaleError`, and `close()` on project switch or host teardown.\n\nDesktop MUST NOT import `@specd/code-graph-electron` for this path. The existing\n`@specd/code-graph-electron` package MAY remain in the monorepo unused.\n\nDesktop MUST NOT use `withOpenGraphProvider` for routine local graph IPC (that helper\nis the short-lived CLI/one-shot path). Index orchestration MAY still call\n`runIndexProjectGraph` (which opens a short-lived provider internally); after index\ncompletes the desktop host MUST replace/reopen its long-lived provider.\n\nThis wiring isolates the native SQLite runtime required by the Electron desktop\nhost without retargeting CLI or API away from the standard non-Electron graph\nruntime exposed through `@specd/sdk` and backed by `@specd/code-graph`."
       ]
     },
     {
@@ -33,13 +38,13 @@
     {
       "requirement": "main process entry is bundled for pnpm and Electron",
       "rules": [
-        "The Electron main entry MUST be built as a bundled CommonJS artifact at `dist/main/index.cjs`.\n\nThe bundle MUST externalise `electron`, `@specd/code-graph-electron`, `@specd/sdk`, and\n`@specd/client`, relying on workspace `exports.require` surfaces for correct pnpm\nresolution under the Electron main process.\n\n`package.json` `main` MUST reference `dist/main/index.cjs`."
+        "The Electron main entry MUST be built as a bundled CommonJS artifact at `dist/main/index.cjs`.\n\nThe bundle MUST externalise `electron`, `@specd/code-graph-sqlite-electron`, `@specd/sdk`, and\n`@specd/client`, relying on workspace `exports.require` surfaces for correct pnpm\nresolution under the Electron main process.\n\n`package.json` `main` MUST reference `dist/main/index.cjs`."
       ]
     },
     {
       "requirement": "desktop kernel configures plain-text logs",
       "rules": [
-        "`createSdkContext` for the desktop main process MUST receive `logFormatter: createLogFormatter({ colorize: false })` so that log readback through local IPC returns plain text without ANSI escape sequences."
+        "`createSdkContext` for the desktop main process MUST receive nested kernel options\n`kernel: { logFormatter: createLogFormatter({ colorize: false }) }` (and any\n`logRing` when used) so that log readback through local IPC returns plain text\nwithout ANSI escape sequences. Top-level `logFormatter` / `logRing` on\n`SdkContextOptions` MUST NOT be used."
       ]
     }
   ],
@@ -78,7 +83,7 @@
       "name": "Desktop package exposes Electron graph rebuild wiring",
       "when": ["the desktop package scripts are inspected"],
       "then": [
-        "rebuild:graph-sqlite-electron rebuilds the locally generated vendored",
+        "rebuild:graph-sqlite-electron rebuilds the locally generated vendored Electron SQLite addon owned by @specd/code-graph-sqlite-electron",
         "AND rebuild:graph-electron aliases that rebuild",
         "AND prestart executes the Electron SQLite rebuild before app startup"
       ]
@@ -95,16 +100,21 @@
     },
     {
       "requirement": "desktop startup prepares the Electron SQLite graph runtime",
-      "name": "Desktop local host depends on the Electron graph package",
-      "when": ["the desktop package dependencies are inspected"],
-      "then": ["@specd/code-graph-electron is present for desktop-local graph execution"]
+      "name": "Desktop local host depends on the sqlite-electron package",
+      "when": ["the desktop package dependencies and local graph wiring are inspected"],
+      "then": [
+        "@specd/code-graph-sqlite-electron is present for desktop-local graph execution",
+        "AND the project host selects graphStoreId: 'sqlite-electron' via SDK graph options",
+        "AND the host opens one long-lived provider and reuses it while healthy",
+        "AND @specd/code-graph-electron is not imported for that path"
+      ]
     },
     {
       "requirement": "desktop startup prepares the Electron SQLite graph runtime",
       "name": "CLI and API keep the standard SDK-backed graph runtime",
       "when": ["CLI and API package dependencies and bootstrap code are inspected"],
       "then": [
-        "they do not depend on @specd/code-graph-electron",
+        "they do not depend on @specd/code-graph-sqlite-electron for default Node graph execution",
         "AND they access the standard graph runtime through @specd/sdk"
       ]
     },
@@ -123,31 +133,70 @@
       "when": ["inspecting apps/specd-studio-desktop/package.json after build"],
       "then": [
         "main is dist/main/index.cjs",
-        "AND tsup externalises electron, @specd/code-graph-electron, @specd/sdk, and @specd/client"
+        "AND tsup externalises electron, @specd/code-graph-sqlite-electron, @specd/sdk, and @specd/client"
       ]
     },
     {
       "requirement": "desktop kernel configures plain-text logs",
       "name": "Local desktop logs are formatted without colors",
-      "when": ["desktop local kernel is created"],
+      "when": ["desktop local kernel is created via createSdkContext"],
       "then": [
-        "logFormatter has colorize set to false",
-        "AND log messages do not contain ANSI escape control codes"
+        "options nest kernel.logFormatter with colorize: false",
+        "AND log messages do not contain ANSI escape control codes",
+        "AND top-level logFormatter is not passed on SdkContextOptions"
       ]
     }
   ],
   "implementation": {
+    "files": [
+      {
+        "specId": "studio-desktop:main-kernel-lifecycle",
+        "file": "studio-desktop:package.json"
+      },
+      {
+        "specId": "studio-desktop:main-kernel-lifecycle",
+        "file": "studio-desktop:tsup.main.config.ts"
+      },
+      {
+        "specId": "studio-desktop:main-kernel-lifecycle",
+        "file": "studio-desktop:test/desktop-graph-runtime.spec.ts"
+      },
+      {
+        "specId": "studio-desktop:main-kernel-lifecycle",
+        "file": "studio-desktop:test/desktop-host-lifecycle.spec.ts"
+      }
+    ],
     "symbols": [
       {
         "specId": "studio-desktop:main-kernel-lifecycle",
         "file": "studio-desktop:src/main/ipc-handlers.ts",
-        "symbol": "onSessionChangeMain"
+        "symbol": "getHost"
+      },
+      {
+        "specId": "studio-desktop:main-kernel-lifecycle",
+        "file": "studio-desktop:src/main/ipc-handlers.ts",
+        "symbol": "withGraphProvider"
+      },
+      {
+        "specId": "studio-desktop:main-kernel-lifecycle",
+        "file": "studio-desktop:src/main/ipc-handlers.ts",
+        "symbol": "resetDesktopKernel"
+      },
+      {
+        "specId": "studio-desktop:main-kernel-lifecycle",
+        "file": "studio-desktop:src/main/long-lived-graph.ts",
+        "symbol": "openLongLivedGraphProvider"
+      },
+      {
+        "specId": "studio-desktop:main-kernel-lifecycle",
+        "file": "studio-desktop:src/main/long-lived-graph.ts",
+        "symbol": "withHealthyGraphProvider"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:c65c59dd414c8f44bc2896392e4d44fb899d464216c8a0f67edf6ddac7916988",
-    "verify.md": "sha256:52ed189f51e4e522d1cf83ddd636e3c1a37af7e7b0b122add82eb023e2dc163f"
+    "spec.md": "sha256:e9ca27951434cfadafdb20c852e492786cf6e0555c8081a0769f3aa5ed5e9fdd",
+    "verify.md": "sha256:f1bf739f0738e7ad691c26a1735d2760a5efbfb0d586ad80d1a79060e5bdffd6"
   },
   "generatedBy": "core"
 }

@@ -15,7 +15,9 @@ describe('desktop host lifecycle and status parity', () => {
       'if (hostPromise === undefined || hostPromiseGeneration !== gen)',
     )
     expect(ipcHandlersSource).toContain('const loader = await createDefaultConfigLoader({')
-    expect(ipcHandlersSource).toContain('const { kernel } = await createSdkContext(config, {')
+    expect(ipcHandlersSource).toContain(
+      'const { kernel, createGraphProvider } = await createSdkContext(config, {',
+    )
     expect(ipcHandlersSource).toContain('if (gen !== sessionGeneration) {')
     expect(ipcHandlersSource).toContain('throw new SessionSupersededError()')
   })
@@ -28,13 +30,15 @@ describe('desktop host lifecycle and status parity', () => {
     expect(ipcHandlersSource).not.toContain('toSdkHostContext')
   })
 
-  it('tears down tracked graph providers on reset and per-operation completion', () => {
-    expect(ipcHandlersSource).toContain('openGraphProviders.add(provider)')
-    expect(ipcHandlersSource).toContain('openGraphProviders.delete(provider)')
-    expect(ipcHandlersSource).toContain('await provider.close().catch(() => undefined)')
-    expect(ipcHandlersSource).toContain('for (const provider of openGraphProviders) {')
+  it('tears down the long-lived graph provider on reset', () => {
+    expect(ipcHandlersSource).toContain('let activeGraph: LongLivedGraphHolder | undefined')
+    expect(ipcHandlersSource).toContain('activeGraph = graph')
+    expect(ipcHandlersSource).toContain('export function resetDesktopKernel(): void')
+    expect(ipcHandlersSource).toContain('const graph = activeGraph')
+    expect(ipcHandlersSource).toContain('activeGraph = undefined')
+    expect(ipcHandlersSource).toContain('void graph.provider.close().catch(() => undefined)')
     expect(ipcHandlersSource).toContain('hostPromise = undefined')
     expect(ipcHandlersSource).toContain('logRing = undefined')
-    expect(ipcHandlersSource).toContain('openGraphProviders.clear()')
+    expect(ipcHandlersSource).not.toContain('openGraphProviders')
   })
 })

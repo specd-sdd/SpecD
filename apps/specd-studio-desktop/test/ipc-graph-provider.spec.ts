@@ -7,10 +7,12 @@ const testDir = path.dirname(fileURLToPath(import.meta.url))
 const desktopRoot = path.resolve(testDir, '..')
 
 describe('desktop graph provider wiring', () => {
-  it('imports the Electron graph package for local graph operations', () => {
+  it('imports the sqlite-electron factory for local graph operations', () => {
     const source = readFileSync(path.join(desktopRoot, 'src/main/ipc-handlers.ts'), 'utf8')
 
-    expect(source).toContain("from '@specd/code-graph-electron'")
+    expect(source).toContain("from '@specd/code-graph-sqlite-electron'")
+    expect(source).toContain("graphStoreId: 'sqlite-electron'")
+    expect(source).not.toContain("from '@specd/code-graph-electron'")
     expect(source).not.toContain('../../../../packages/code-graph/dist/index.js')
   })
 })

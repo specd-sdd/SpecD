@@ -1,0 +1,8 @@
+releases:
+  code-graph-sqlite-electron:sqlite-electron-store: minor
+  studio-desktop:main-kernel-lifecycle: minor
+  studio-desktop:ipc-handler-registry: minor
+  api:composition-create-api-server: minor
+  api:composition-graph-provider: minor
+  api:composition-create-api-context: minor
+  api:handler-graph: minor

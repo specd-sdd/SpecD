@@ -52,10 +52,22 @@
 - **THEN** it awaits `createSdkContext` from `@specd/sdk` exactly once per process
 - **AND** `createApiContext` builds per-request context from the resulting `ApiServerState`
 
-#### Scenario: Log formatter disables ANSI for API readback
+#### Scenario: Log formatter and ring nest under kernel options
 
-- **WHEN** the API kernel boots
-- **THEN** `createSdkContext` receives `logFormatter: createLogFormatter({ colorize: false })`
+- **WHEN** the API kernel boots with a log ring for Studio readback
+- **THEN** `createSdkContext` receives `kernel: { logRing, logFormatter: createLogFormatter({ colorize: false }) }`
+- **AND** top-level `logRing` / `logFormatter` are not passed on `SdkContextOptions`
+
+#### Scenario: Server opens one long-lived graph provider
+
+- **WHEN** `createApiServer` finishes bootstrap
+- **THEN** process state holds one opened graph provider from `createGraphProvider()`
+- **AND** that provider remains open across graph HTTP requests until stale replacement or `close()`
+
+#### Scenario: Server close shuts down the long-lived provider
+
+- **WHEN** `ApiServer.close()` runs
+- **THEN** the long-lived graph provider is closed
 
 ### Requirement: all API routes mount under /v1
 

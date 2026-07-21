@@ -1,0 +1,227 @@
+{
+  "title": "SQLite Electron Store",
+  "description": "Electron desktop needs a SQLite-backed code-graph store whose native module is rebuilt for Electron’s ABI, without forking `@specd/code-graph` composition or overwriting `@specd/code-graph-electron`. This spec defines the `@specd/code-graph-sqlite-electron` package contract: an additive `sqlite-electron` graph-store factory that injects an Electron-vendored `better-sqlite3` module through `createSqliteGraphStoreFactory({ loadDatabaseModule })`.",
+  "dependsOn": ["code-graph:composition", "code-graph:sqlite-graph-store"],
+  "context": [
+    "Electron desktop needs a SQLite-backed code-graph store whose native module is rebuilt for Electron’s ABI, without forking `@specd/code-graph` composition or overwriting `@specd/code-graph-electron`. This spec defines the `@specd/code-graph-sqlite-electron` package contract: an additive `sqlite-electron` graph-store factory that injects an Electron-vendored `better-sqlite3` module through `createSqliteGraphStoreFactory({ loadDatabaseModule })`."
+  ],
+  "rules": [
+    {
+      "requirement": "Dedicated Electron SQLite store package",
+      "rules": [
+        "The system SHALL provide a dedicated workspace package named `@specd/code-graph-sqlite-electron` for Electron-targeted SQLite graph-store construction.\n\nThe package MUST exist as a separate workspace from `@specd/code-graph` and `@specd/code-graph-electron`. It MUST NOT re-export `createCodeGraphProvider` or any full code-graph composition surface."
+      ]
+    },
+    {
+      "requirement": "sqlite-electron GraphStoreFactory",
+      "rules": [
+        "The package SHALL export a factory constructor that returns a `GraphStoreFactory` suitable for additive registration on `CodeGraphCompositionOptions.graphStoreFactories` under the backend id `sqlite-electron`.\n\nThe factory MUST be built with `createSqliteGraphStoreFactory` from `@specd/code-graph`, supplying a `loadDatabaseModule` that resolves the package’s Electron-vendored `better-sqlite3` entry.\n\nThe factory MUST NOT overwrite or collide with the built-in `sqlite` backend id."
+      ]
+    },
+    {
+      "requirement": "Deferred native module load",
+      "rules": [
+        "`loadDatabaseModule` MUST defer loading the vendored native module until `SQLiteGraphStore.open()`, matching the injectable-loader contract of `code-graph:sqlite-graph-store`.\n\nFactory construction and `createCodeGraphProvider(...)` MUST remain synchronous with respect to native addon loading."
+      ]
+    },
+    {
+      "requirement": "Locally generated vendored sqlite tree",
+      "rules": [
+        "The package SHALL treat `vendor/better-sqlite3/` as a locally generated runtime artifact rather than a git-tracked package tree.\n\nThe package MUST:\n\n- ignore `packages/code-graph-sqlite-electron/vendor/` from version control\n- populate the vendored tree through an owned sync script before build or rebuild workflows need it\n- preserve a physically separate module root from both Node CLI `better-sqlite3` and `@specd/code-graph-electron` vendor paths"
+      ]
+    },
+    {
+      "requirement": "Platform-aware Electron rebuild cache",
+      "rules": [
+        "The Electron-specific sqlite rebuild flow owned by this package SHALL use rebuild cache metadata that is portable across machines.\n\nRebuild cache metadata MUST record at least:\n\n- the target Electron version used by `studio-desktop`\n- the host `platform`\n- the host `arch`\n\nThe rebuild flow MUST skip recompilation when the vendored `build/Release/better_sqlite3.node` already exists and the cache metadata matches the current Electron version, platform, and architecture."
+      ]
+    },
+    {
+      "requirement": "Shared SQLite graph semantics",
+      "rules": [
+        "Graph behaviour observed through a provider that selects `graphStoreId: 'sqlite-electron'` MUST match `SQLiteGraphStore` semantics from `code-graph:sqlite-graph-store` for indexing, search, traversal, impact, hotspots, and stats.\n\nDifferences MUST be limited to native-module resolution and packaging for Electron."
+      ]
+    },
+    {
+      "requirement": "Host wiring via SDK graph options",
+      "rules": [
+        "Desktop hosts that need Electron SQLite MUST construct providers through `@specd/sdk` / `createCodeGraphProvider` with:\n\n- `graphStoreId: 'sqlite-electron'`\n- `graphStoreFactories: { 'sqlite-electron': <factory from this package> }`\n\nHosts MUST NOT import `@specd/code-graph-electron` for this path."
+      ]
+    },
+    {
+      "requirement": "Internal-only distribution role",
+      "rules": [
+        "`@specd/code-graph-sqlite-electron` SHALL be an internal workspace package for desktop packaging. It MUST NOT be designed as a separately published public npm package by default."
+      ]
+    }
+  ],
+  "constraints": [
+    "MUST NOT re-export or fork @specd/code-graph composition",
+    "MUST NOT modify or replace @specd/code-graph-electron in this change",
+    "Builtin backend id sqlite remains reserved for CLI/API Node runtimes",
+    "Ladybug Electron adapters are out of scope"
+  ],
+  "scenarios": [
+    {
+      "requirement": "Dedicated Electron SQLite store package",
+      "name": "Package is a separate workspace from composition forks",
+      "when": ["workspace and package metadata are inspected"],
+      "then": [
+        "@specd/code-graph-sqlite-electron exists as its own workspace package",
+        "AND it does not re-export createCodeGraphProvider or a full code-graph composition surface",
+        "AND it is distinct from @specd/code-graph-electron"
+      ]
+    },
+    {
+      "requirement": "sqlite-electron GraphStoreFactory",
+      "name": "Factory registers under sqlite-electron without colliding with sqlite",
+      "when": ["the package factory is registered via graphStoreFactories with id sqlite-electron"],
+      "then": [
+        "createCodeGraphProvider(config, { graphStoreId: 'sqlite-electron', graphStoreFactories }) constructs a provider successfully",
+        "AND the built-in sqlite backend id remains available and unmodified"
+      ]
+    },
+    {
+      "requirement": "sqlite-electron GraphStoreFactory",
+      "name": "Factory uses createSqliteGraphStoreFactory with vendored loader",
+      "when": ["the exported Electron SQLite factory is inspected"],
+      "then": [
+        "it is produced by createSqliteGraphStoreFactory from @specd/code-graph",
+        "AND its loadDatabaseModule resolves the package’s Electron-vendored better-sqlite3 entry"
+      ]
+    },
+    {
+      "requirement": "Deferred native module load",
+      "name": "Native addon is not loaded during provider construction",
+      "given": ["an Electron SQLite factory registered as sqlite-electron"],
+      "when": ["createCodeGraphProvider(...) returns a provider without calling open()"],
+      "then": [
+        "the vendored native module has not been loaded yet",
+        "AND loading occurs during open()"
+      ]
+    },
+    {
+      "requirement": "Locally generated vendored sqlite tree",
+      "name": "Vendor directory is ignored by git",
+      "when": ["repository ignore rules are inspected"],
+      "then": ["packages/code-graph-sqlite-electron/vendor/ is excluded from version control"]
+    },
+    {
+      "requirement": "Locally generated vendored sqlite tree",
+      "name": "Sync populates the vendored tree on demand",
+      "given": ["a fresh workspace without a local vendored sqlite tree under the new package"],
+      "when": ["the package sync workflow runs"],
+      "then": ["vendor/better-sqlite3/ is created under @specd/code-graph-sqlite-electron"]
+    },
+    {
+      "requirement": "Platform-aware Electron rebuild cache",
+      "name": "Matching cache metadata skips rebuild",
+      "given": [
+        "a vendored better_sqlite3.node exists with matching Electron version, platform, and arch metadata"
+      ],
+      "when": ["the Electron sqlite rebuild workflow runs"],
+      "then": ["it skips recompilation"]
+    },
+    {
+      "requirement": "Shared SQLite graph semantics",
+      "name": "Electron backend preserves SQLite graph behaviour",
+      "given": [
+        "equivalent graph operations through sqlite and sqlite-electron backends on compatible inputs"
+      ],
+      "when": ["indexing and search are exercised"],
+      "then": [
+        "observable graph semantics match",
+        "AND differences are limited to native-module resolution"
+      ]
+    },
+    {
+      "requirement": "Host wiring via SDK graph options",
+      "name": "Desktop selects sqlite-electron through SDK options",
+      "when": ["desktop local composition is inspected"],
+      "then": [
+        "providers are created with graphStoreId: 'sqlite-electron' and the additive factory from this package",
+        "AND @specd/code-graph-electron is not imported on that path"
+      ]
+    },
+    {
+      "requirement": "Internal-only distribution role",
+      "name": "Package is marked for internal workspace usage",
+      "when": ["package metadata is reviewed"],
+      "then": [
+        "it is private / internal workspace usage rather than a public standalone npm product by default"
+      ]
+    }
+  ],
+  "implementation": {
+    "files": [
+      {
+        "specId": "code-graph-sqlite-electron:sqlite-electron-store",
+        "file": "code-graph-sqlite-electron:src/index.ts"
+      },
+      {
+        "specId": "code-graph-sqlite-electron:sqlite-electron-store",
+        "file": "code-graph-sqlite-electron:package.json"
+      },
+      {
+        "specId": "code-graph-sqlite-electron:sqlite-electron-store",
+        "file": "code-graph-sqlite-electron:scripts/sync-vendored-sqlite.mjs"
+      },
+      {
+        "specId": "code-graph-sqlite-electron:sqlite-electron-store",
+        "file": "code-graph-sqlite-electron:scripts/rebuild-vendored-sqlite-electron.mjs"
+      },
+      {
+        "specId": "code-graph-sqlite-electron:sqlite-electron-store",
+        "file": "code-graph-sqlite-electron:scripts/electron-build-metadata.mjs"
+      },
+      {
+        "specId": "code-graph-sqlite-electron:sqlite-electron-store",
+        "file": "code-graph-sqlite-electron:tsup.config.ts"
+      },
+      {
+        "specId": "code-graph-sqlite-electron:sqlite-electron-store",
+        "file": "code-graph-sqlite-electron:tsconfig.json"
+      },
+      {
+        "specId": "code-graph-sqlite-electron:sqlite-electron-store",
+        "file": "code-graph-sqlite-electron:test/runtime/vendored-sqlite.spec.ts"
+      },
+      {
+        "specId": "code-graph-sqlite-electron:sqlite-electron-store",
+        "file": "code-graph-sqlite-electron:.gitignore"
+      }
+    ],
+    "symbols": [
+      {
+        "specId": "code-graph-sqlite-electron:sqlite-electron-store",
+        "file": "code-graph-sqlite-electron:src/create-electron-sqlite-graph-store-factory.ts",
+        "symbol": "createElectronSqliteGraphStoreFactory"
+      },
+      {
+        "specId": "code-graph-sqlite-electron:sqlite-electron-store",
+        "file": "code-graph-sqlite-electron:src/runtime/load-vendored-better-sqlite3.ts",
+        "symbol": "loadVendoredBetterSqlite3Module"
+      },
+      {
+        "specId": "code-graph-sqlite-electron:sqlite-electron-store",
+        "file": "code-graph-sqlite-electron:src/runtime/load-vendored-better-sqlite3.ts",
+        "symbol": "vendoredSqlitePackageRoot"
+      },
+      {
+        "specId": "code-graph-sqlite-electron:sqlite-electron-store",
+        "file": "code-graph-sqlite-electron:src/runtime/load-vendored-better-sqlite3.ts",
+        "symbol": "vendoredSqliteEntry"
+      },
+      {
+        "specId": "code-graph-sqlite-electron:sqlite-electron-store",
+        "file": "code-graph-sqlite-electron:src/runtime/load-vendored-better-sqlite3.ts",
+        "symbol": "vendoredSqliteBinaryPath"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:ecdb1b9be8ba3554b7ce6370d677e6aaf9004cfd28792b8f2c641fe17edded7b",
+    "verify.md": "sha256:7d7d2cc21680e988ea3ae30c1de7c346ca9c2f65c62818f4bbb5e05b741dfb65"
+  },
+  "generatedBy": "core"
+}

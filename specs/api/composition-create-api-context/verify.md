@@ -6,9 +6,10 @@
 
 #### Scenario: ApiContext extends SdkHostContext
 
-- **WHEN** middleware attaches `request.apiContext`
+- **WHEN** `createApiContext` builds a request context
 - **THEN** the context exposes `kernel` and `createGraphProvider` from the process-scoped SDK host context
-- **AND** `ApiContext` includes request-scoped `actor`, `config`, and auth fields
+- **AND** the context exposes `getGraphProvider` for the process-scoped long-lived opened provider (peek)
+- **AND** the context exposes `withGraphProvider` as the healthy long-lived accessor (reopen once on stale)
 
 ### Requirement: graph provider factory is per project config
 
@@ -26,8 +27,8 @@
 - **THEN** each factory closes over its own `SpecdConfig`
 - **AND** graph queries do not read the other project index
 
-#### Scenario: Graph provider is created lazily per factory call
+#### Scenario: Graph handlers reuse the long-lived opened provider
 
-- **WHEN** `createGraphProvider()` is invoked for a request that needs graph data
-- **THEN** a code-graph provider is returned without mutating unrelated projects
-- **AND** failures surface as kernel or transport errors, not silent null providers
+- **WHEN** a graph route needs an opened provider
+- **THEN** it calls `withGraphProvider()` (or equivalent healthy process accessor)
+- **AND** it does not open/close a new provider for that single request

@@ -3,11 +3,32 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": ["client:specd-data-port", "sdk:host-context"],
+  "dependsOn": [
+    "client:specd-data-port",
+    "sdk:host-context",
+    "code-graph-sqlite-electron:sqlite-electron-store",
+    "code-graph:composition"
+  ],
   "implementation": [
     {
       "file": "studio-desktop:src/main/ipc-handlers.ts",
-      "symbols": ["onSessionChangeMain"]
+      "symbols": ["getHost", "withGraphProvider", "resetDesktopKernel"]
+    },
+    {
+      "file": "studio-desktop:src/main/long-lived-graph.ts",
+      "symbols": ["openLongLivedGraphProvider", "withHealthyGraphProvider"]
+    },
+    {
+      "file": "studio-desktop:package.json"
+    },
+    {
+      "file": "studio-desktop:tsup.main.config.ts"
+    },
+    {
+      "file": "studio-desktop:test/desktop-graph-runtime.spec.ts"
+    },
+    {
+      "file": "studio-desktop:test/desktop-host-lifecycle.spec.ts"
     }
   ]
 }

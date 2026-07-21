@@ -1,0 +1,37 @@
+{
+  "name": "@specd/code-graph-sqlite-electron",
+  "version": "0.0.0",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "files": [
+    "dist/",
+    "vendor/"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "sync:vendor-sqlite": "node ./scripts/sync-vendored-sqlite.mjs",
+    "rebuild:vendored-sqlite-electron": "node ./scripts/rebuild-vendored-sqlite-electron.mjs",
+    "rebuild:electron": "pnpm rebuild:vendored-sqlite-electron",
+    "build": "pnpm sync:vendor-sqlite && tsup --config tsup.config.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "pnpm build && vitest run --passWithNoTests",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@specd/code-graph": "workspace:*",
+    "better-sqlite3": "^12.8.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "tsup": "^8.4.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  }
+}

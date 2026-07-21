@@ -8,9 +8,11 @@ HTTP route handlers need a consistent way to reach the kernel, the request actor
 
 ### Requirement: context exposes kernel and actor
 
-`createApiContext(request)` MUST return `{ kernel, actor, createGraphProvider, config, authType, apiActor }` where:
+`createApiContext(request)` MUST return `{ kernel, actor, createGraphProvider, getGraphProvider, withGraphProvider, config, authType, apiActor }` where:
 
 - `kernel` and `createGraphProvider` come from the process-scoped `SdkHostContext` created by `createSdkContext`
+- `getGraphProvider` returns the process-scoped long-lived opened `CodeGraphProvider` held by the server (peek; no stale reopen)
+- `withGraphProvider` runs a callback against that same long-lived provider and MUST reopen/replace once on `GraphProviderStaleError` before retrying (healthy accessor)
 - `actor` is the identity from `api:adapter-api-actor-resolver` wrapped for the request
 - `config` is the resolved `SpecdConfig` for the served project
 
@@ -19,6 +21,8 @@ HTTP route handlers need a consistent way to reach the kernel, the request actor
 ### Requirement: graph provider factory is per project config
 
 `createGraphProvider()` on the API context MUST delegate to the `createGraphProvider` factory from the process-scoped `SdkHostContext`. It MUST NOT construct `@specd/code-graph` providers independently of that factory.
+
+Graph HTTP handlers MUST obtain the opened provider through `withGraphProvider()` (healthy long-lived accessor) rather than calling `createGraphProvider()` + `open()` + `close()` per request. `getGraphProvider()` MAY be used when a caller only needs the current held instance without stale recovery.
 
 ## Constraints
 
@@ -34,3 +38,4 @@ HTTP route handlers need a consistent way to reach the kernel, the request actor
 - [`default:_global/architecture`](../../default/_global/architecture/spec.md) — hexagonal delivery layout
 - [`default:_global/conventions`](../../default/_global/conventions/spec.md) — naming and module conventions
 - [`sdk:host-context`](../../sdk/host-context/spec.md) — `SdkHostContext` shape and bootstrap
+- [`code-graph:composition`](../../code-graph/composition/spec.md) — long-lived provider lifecycle for HTTP API hosts

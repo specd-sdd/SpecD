@@ -19,6 +19,7 @@ import { registerV1Routes } from '../delivery/http/register-routes.js'
 import { registerApiOpenApiSchemas } from '../delivery/http/openapi-schemas.js'
 import { toProblemJson } from '../delivery/http/problem-json.js'
 import { resolveKernelActor, type ApiServerState } from './create-api-context.js'
+import { openLongLivedGraphProvider } from './long-lived-graph.js'
 
 /** Options for {@link createApiServer}. */
 export interface CreateApiServerOptions {
@@ -90,7 +91,11 @@ export async function createApiServer(options: CreateApiServerOptions): Promise<
     config,
     kernelActor,
     authType: auth.type,
+    graph: {
+      provider: await openLongLivedGraphProvider(sdkHost.createGraphProvider),
+    },
   }
+  Logger.info('API graph provider opened', { projectRoot: config.projectRoot })
 
   const app = Fastify({
     logger: false,
@@ -221,6 +226,7 @@ export async function createApiServer(options: CreateApiServerOptions): Promise<
       return address
     },
     async close() {
+      await state.graph.provider.close().catch(() => undefined)
       await app.close()
     },
   }
