@@ -57,10 +57,21 @@ specd changes list [options]
 
 List all active changes as a table with columns: `NAME`, `STATE`, `SPECS`, `SCHEMA`.
 
-| Option                      | Description       |
-| --------------------------- | ----------------- |
-| `--format text\|json\|toon` | Output format.    |
-| `--config <path>`           | Config file path. |
+| Option                      | Description                                                |
+| --------------------------- | ---------------------------------------------------------- |
+| `--limit <n>`               | Maximum entries to return (default **100**).               |
+| `--page <p>`                | 1-based page number (mutually exclusive with `--after-*`). |
+| `--after-key <key>`         | Exclusive keyset cursor sort key.                          |
+| `--after-id <id>`           | Tiebreak id when used with `--after-key`.                  |
+| `--description`             | Include change description as a dim sub-row per entry.     |
+| `--format text\|json\|toon` | Output format. JSON/TOON return `{ items, meta }`.         |
+| `--config <path>`           | Config file path.                                          |
+
+When the returned page is incomplete, text mode appends a truncation hint:
+
+```
+showing <count> of <total> (use --limit/--page)
+```
 
 ### change status
 
@@ -607,12 +618,20 @@ Manage shelved changes. Drafts are changes that have been paused without being d
 specd drafts list [options]
 ```
 
-List all drafted changes as a table with columns: `NAME`, `STATE`, `DATE`, `BY`, `REASON`.
+List all drafted changes as a table with columns: `NAME`, `STATE`, `DATE`, `BY`, and optionally `REASON`.
 
-| Option                      | Description       |
-| --------------------------- | ----------------- |
-| `--format text\|json\|toon` | Output format.    |
-| `--config <path>`           | Config file path. |
+| Option                      | Description                                                |
+| --------------------------- | ---------------------------------------------------------- |
+| `--limit <n>`               | Maximum entries to return (default **100**).               |
+| `--page <p>`                | 1-based page number (mutually exclusive with `--after-*`). |
+| `--after-key <key>`         | Exclusive keyset cursor sort key.                          |
+| `--after-id <id>`           | Tiebreak id when used with `--after-key`.                  |
+| `--description`             | Include change description as a dim sub-row per entry.     |
+| `--reason`                  | Include draft reason column / JSON field (opt-in).         |
+| `--format text\|json\|toon` | Output format. JSON/TOON return `{ items, meta }`.         |
+| `--config <path>`           | Config file path.                                          |
+
+Truncated text output includes `showing <count> of <total> (use --limit/--page)`.
 
 ### drafts show
 
@@ -652,12 +671,21 @@ View permanently discarded changes. Discarded changes cannot be recovered.
 specd discarded list [options]
 ```
 
-List all discarded changes as a table with columns: `NAME`, `DATE`, `BY`, `REASON`, `SUPERSEDED`.
+List all discarded changes as a table with columns: `NAME`, `DATE`, `BY`, and optionally `REASON` and `SUPERSEDED`.
 
-| Option                      | Description       |
-| --------------------------- | ----------------- |
-| `--format text\|json\|toon` | Output format.    |
-| `--config <path>`           | Config file path. |
+| Option                      | Description                                                |
+| --------------------------- | ---------------------------------------------------------- |
+| `--limit <n>`               | Maximum entries to return (default **100**).               |
+| `--page <p>`                | 1-based page number (mutually exclusive with `--after-*`). |
+| `--after-key <key>`         | Exclusive keyset cursor sort key.                          |
+| `--after-id <id>`           | Tiebreak id when used with `--after-key`.                  |
+| `--description`             | Include change description as a dim sub-row per entry.     |
+| `--reason`                  | Include discard reason column / JSON field (opt-in).       |
+| `--superseded-by`           | Include superseded-by target column / JSON field.          |
+| `--format text\|json\|toon` | Output format. JSON/TOON return `{ items, meta }`.         |
+| `--config <path>`           | Config file path.                                          |
+
+Truncated text output includes `showing <count> of <total> (use --limit/--page)`.
 
 ### discarded show
 
@@ -684,12 +712,19 @@ View archived changes. Archived changes are the permanent record of completed wo
 specd archives list [options]
 ```
 
-List all archived changes as a table with columns: `NAME`, `WORKSPACE`, `DATE`, `BY`.
+List archived changes as a table with columns: `NAME`, `DATE`, and optionally `BY`.
 
-| Option                      | Description       |
-| --------------------------- | ----------------- |
-| `--format text\|json\|toon` | Output format.    |
-| `--config <path>`           | Config file path. |
+| Option                      | Description                                                            |
+| --------------------------- | ---------------------------------------------------------------------- |
+| `--limit <n>`               | Maximum entries to return (default **100**).                           |
+| `--page <p>`                | 1-based page number (mutually exclusive with `--after-*`).             |
+| `--after-key <key>`         | Exclusive keyset cursor for pagination (replaces legacy `--start-at`). |
+| `--after-id <id>`           | Tiebreak id when used with `--after-key`.                              |
+| `--archived-by`             | Include `archivedBy` column / JSON field (opt-in).                     |
+| `--format text\|json\|toon` | Output format. JSON/TOON return `{ items, meta }`.                     |
+| `--config <path>`           | Config file path.                                                      |
+
+Truncated text output includes `showing <count> of <total> (use --limit/--page)`.
 
 ### archive show
 
@@ -716,15 +751,20 @@ Browse and manage specs. These commands operate on spec files in the spec reposi
 specd specs list [options]
 ```
 
-List all specs known to the project.
+List all specs known to the project, grouped by workspace.
 
 | Option                       | Description                                                                                                                                |
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `--summary`                  | Show a one-line summary per spec instead of the full table.                                                                                |
+| `--limit <n>`                | Maximum entries per workspace (default **100**).                                                                                           |
+| `--page <p>`                 | 1-based page number (mutually exclusive with `--after-key`).                                                                               |
+| `--after-key <key>`          | Exclusive keyset cursor sort key (`--after-id` is not supported for spec lists).                                                           |
+| `--summary`                  | Include a short description (`SUMMARY` column) for each spec.                                                                              |
 | `--metadata-status [filter]` | Filter by metadata freshness. Valid values: `fresh`, `stale`, `missing`, `invalid`. Omitting the value shows all with their status column. |
 | `--workspace <name>`         | Filter by workspace name. Repeatable: `--workspace alpha --workspace beta`.                                                                |
-| `--format text\|json\|toon`  | Output format.                                                                                                                             |
+| `--format text\|json\|toon`  | Output format. JSON/TOON return `{ workspaces: [{ name, specs, meta }] }`.                                                                 |
 | `--config <path>`            | Config file path.                                                                                                                          |
+
+Per-workspace truncated text output includes `showing <count> of <total> (use --limit/--page)`.
 
 ### spec search
 
@@ -938,6 +978,32 @@ Generate metadata for a spec (or all specs) from the schema rules and artifact c
 specd specs generate-metadata --all --status stale --write
 specd specs generate-metadata --all --status missing --write
 ```
+
+---
+
+## storage
+
+Commands for maintaining derived filesystem list indexes. List indexes are stored under `{configPath}/tmp/fs-cache/` (for example `changes/`, `drafts/`, `discarded/`, `specs/<workspace>/`, and `archive/`). The `{configPath}/tmp/` directory is gitignored via `tmp/.gitignore` (`*` with `!.gitignore`).
+
+### storage reindex
+
+```
+specd storage reindex [options]
+```
+
+Rebuild filesystem list indexes by delegating to repository `reindex()` methods. The CLI does not read or write cache files directly.
+
+| Option                      | Description                                                                      |
+| --------------------------- | -------------------------------------------------------------------------------- |
+| `--changes`                 | Rebuild active, draft, and discarded change indexes.                             |
+| `--specs`                   | Rebuild spec indexes for every configured workspace.                             |
+| `--archive`                 | Rebuild the archive list index.                                                  |
+| `--format text\|json\|toon` | Output format. JSON/TOON return `{ reindexed: { changes?, specs?, archive? } }`. |
+| `--config <path>`           | Config file path.                                                                |
+
+When no resource flags are given, all indexes are rebuilt. Flags are combinable — for example `--changes --specs` rebuilds change and spec indexes but not archive.
+
+Text output lists each rebuilt target on its own line (`reindexed changes`, `reindexed specs (<workspace>)`, `reindexed archive`).
 
 ---
 

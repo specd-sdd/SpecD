@@ -1,0 +1,53 @@
+- op: added
+  description: FsSpecIndexCache owns per-workspace spec list index under fs-cache.
+  position:
+    parent:
+      type: section
+      matches: Requirements
+    after:
+      type: section
+      matches: 'Requirement: Storage factory registration'
+  content: |
+    ### Requirement: FsSpecIndexCache helper
+
+    `FsSpecRepository` MUST delegate `list`, `count`, `reindex`, and cache invalidation to an `FsSpecIndexCache` instance under `{configPath}/tmp/fs-cache/specs/<workspace>/`.
+
+    The repository MUST NOT read or write `.specd-index.jsonl` or `.specd-index-meta.json` directly.
+
+    Canonical sort: capability path lexicographic ascending.
+
+    The helper uses the same `mutate`/lock, atomic publish, and freshness rules as change index helpers, with `sourceFiles` (per-file mtimes) instead of `sourceMtime`.
+
+- op: added
+  description: Index materializes full SpecListEntry payload at index time.
+  position:
+    parent:
+      type: section
+      matches: Requirements
+    after:
+      type: section
+      matches: 'Requirement: FsSpecIndexCache helper'
+  content: |
+    ### Requirement: SpecListEntry materialization in index
+
+    When building or refreshing index rows, `FsSpecIndexCache` MUST materialize the full CLI-usable `SpecListEntry` payload:
+
+    - **Always:** `workspace`, `path`, `title` — title resolution order: (1) non-empty trimmed metadata `title`; (2) last segment of `path`.
+    - **Stored for projection:** `summary` and `metadataStatus` using the same resolution rules as [`core:spec-repository-port`](../spec-repository-port/spec.md) / [`core:list-specs`](../list-specs/spec.md).
+
+    Errors while resolving title, summary, or status for an individual spec MUST be swallowed; the entry still appears with title fallback.
+
+    Port `includeSummary` / `includeMetadataStatus` flags MUST project cached fields only — no extra file reads at list time.
+
+    Spec create/delete/publish and content/metadata/lock changes that affect cached fields MUST refresh via upsert or bucket invalidation according to helper rules.
+
+- op: modified
+  description: Fs spec repository depends on storage fs-cache and spec list entry contract.
+  selector:
+    type: section
+    matches: Spec Dependencies
+  content: |
+    - [`default:_global/architecture`](../../_global/architecture/spec.md) — composition and infrastructure rules
+    - [`core:composition`](../composition/spec.md) — public factories and storage factory interfaces
+    - [`core:storage`](../storage/spec.md) — fs-cache layout and index wire shapes
+    - [`core:spec-repository-port`](../spec-repository-port/spec.md) — `SpecListEntry` and list/count/reindex port contract

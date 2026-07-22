@@ -48,7 +48,7 @@
   "implementation": [
     {
       "file": "core:src/composition/kernel.ts",
-      "symbols": ["KernelOptions", "createKernel"]
+      "symbols": ["createKernel"]
     }
   ]
 }

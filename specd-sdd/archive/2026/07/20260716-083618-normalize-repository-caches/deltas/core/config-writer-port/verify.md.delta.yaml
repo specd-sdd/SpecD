@@ -1,0 +1,24 @@
+- op: modified
+  description: initProject creates configPath tmp gitignore.
+  selector:
+    type: section
+    matches: 'Requirement: InitProject behaviour'
+  content: |
+    #### Scenario: Fresh project is initialised
+
+    - **GIVEN** a directory with no existing `specd.yaml`
+    - **WHEN** `initProject` is called with valid options
+    - **THEN** a `specd.yaml` is created with the schema reference and default workspace config (omitting the `storage` block by default)
+    - **AND** the workspace specs directory and standard storage directories under `.specd/` are created
+    - **AND** both `specd.local.yaml` and `specd.local.*.yaml` are appended to `.gitignore`
+
+    #### Scenario: initProject creates tmp gitignore for fs-cache and locks
+
+    - **GIVEN** a directory with no existing `specd.yaml`
+    - **WHEN** `initProject` completes successfully
+    - **THEN** `{configPath}/tmp/.gitignore` exists with contents ignoring `*` and un-ignoring `!.gitignore`
+
+    #### Scenario: Result contains expected metadata
+
+    - **WHEN** `initProject` completes successfully
+    - **THEN** the returned `InitProjectResult` contains the absolute `configPath`, the `schemaRef` as written, and the created `workspaces` list

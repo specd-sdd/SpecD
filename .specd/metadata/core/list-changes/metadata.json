@@ -1,7 +1,13 @@
 {
   "title": "ListChanges",
   "description": "Delivery mechanisms need a way to show the current working set at a glance, filtering out shelved and discarded items automatically. The `ListChanges` use case retrieves all active changes — those that have not been drafted or discarded — from the default workspace, sorted by creation order.",
-  "dependsOn": ["core:change", "core:kernel", "core:composition-resolver"],
+  "dependsOn": [
+    "core:change",
+    "core:kernel",
+    "core:composition-resolver",
+    "core:change-list-entry",
+    "core:change-repository-port"
+  ],
   "context": [
     "Delivery mechanisms need a way to show the current working set at a glance, filtering out shelved and discarded items automatically. The `ListChanges` use case retrieves all active changes — those that have not been drafted or discarded — from the default workspace, sorted by creation order."
   ],
@@ -9,25 +15,25 @@
     {
       "requirement": "Returns all active changes",
       "rules": [
-        "`ListChanges.execute()` MUST return all changes that are neither drafted nor discarded. The result MUST be sorted by creation order, oldest first."
+        "`ListChanges.execute(options?)` MUST return `ListResult<ActiveChangeListEntry>` for all active (non-drafted, non-discarded) changes.\n\nIt MUST forward `ListOptions` and `includeDescription` to `ChangeRepository.list()` without re-sorting, re-filtering, or re-paginating. Canonical order (`createdAt` ascending) is owned by the repository index helper.\n\nDefault `limit` is **100** when callers omit options."
       ]
     },
     {
       "requirement": "Returns Change entities without content",
       "rules": [
-        "The returned `Change[]` MUST contain artifact state (status, validated hashes) but MUST NOT include artifact file content. Content is loaded on demand through separate use cases."
+        "The returned `ActiveChangeListEntry` items MUST NOT include artifact file content, history, validated hashes, artifact state maps, or other detail fields reserved for `get(name)`.\n\nOptional `description` appears only when `includeDescription` is set on the forwarded options and the repository projected it from the cached entry."
       ]
     },
     {
       "requirement": "Constructor accepts a ChangeRepository",
       "rules": [
-        "`ListChanges` MUST accept a `ChangeRepository` as its sole constructor argument. It MUST delegate to `ChangeRepository.list()` to retrieve changes."
+        "`ListChanges` MUST accept a `ChangeRepository` as its sole constructor argument. It MUST delegate to `ChangeRepository.list(options)` and return the resulting `ListResult<ActiveChangeListEntry>` unchanged.\n\nThe use case MUST NOT re-sort, filter, or paginate after the repository returns."
       ]
     },
     {
       "requirement": "Returns an empty array when no active changes exist",
       "rules": [
-        "When the repository contains no active changes (all are drafted, discarded, or none exist), `execute()` MUST return an empty array. It MUST NOT throw."
+        "When the repository contains no active changes, `execute()` MUST return `{ items: [], meta: { total: 0, count: 0, limit: <resolved limit> } }`. It MUST NOT throw."
       ]
     },
     {
@@ -51,13 +57,28 @@
       "then": ["it requires a ChangeRepository in its constructor"]
     },
     {
-      "requirement": "Returns all active changes",
-      "name": "Multiple active changes exist",
+      "requirement": "Constructor accepts a ChangeRepository",
+      "name": "Execute forwards options and returns repository result unchanged",
       "given": [
-        "the repository contains three active changes created in order: alpha, beta, gamma"
+        "ChangeRepository.list(options) returns a specific ListResult<ActiveChangeListEntry>"
       ],
-      "when": ["execute() is called"],
-      "then": ["the result contains all three changes in creation order: alpha, beta, gamma"]
+      "when": ["execute(options) is called"],
+      "then": [
+        "the result is identical to the repository output",
+        "AND the use case does not re-sort, filter, or paginate after delegation"
+      ]
+    },
+    {
+      "requirement": "Returns all active changes",
+      "name": "Multiple active changes returned in canonical order",
+      "given": [
+        "the repository contains three active changes where alpha has the oldest createdAt"
+      ],
+      "when": ["execute() is called without options"],
+      "then": [
+        "the result is ListResult<ActiveChangeListEntry> with default limit: 100",
+        "AND items appear in createdAt ascending order: alpha, then the others"
+      ]
     },
     {
       "requirement": "Returns all active changes",
@@ -66,30 +87,47 @@
         "the repository contains active change alpha, drafted change beta, and discarded change gamma"
       ],
       "when": ["execute() is called"],
-      "then": ["the result contains only alpha"]
+      "then": ["items contains only alpha", "AND meta.total counts active changes only"]
+    },
+    {
+      "requirement": "Returns all active changes",
+      "name": "Pagination limit truncates items but preserves total",
+      "given": ["five active changes exist"],
+      "when": ["execute({ limit: 2 }) is called"],
+      "then": ["items.length is 2", "AND meta.total is 5", "AND meta.count is 2"]
     },
     {
       "requirement": "Returns Change entities without content",
-      "name": "Changes have artifact state but no content",
-      "when": ["execute() returns a list of changes"],
+      "name": "Entries omit artifact content and history",
+      "when": ["execute() returns a non-empty result"],
       "then": [
-        "each Change has its artifact map populated with status and validated hashes",
-        "AND no artifact file content is loaded"
+        "each item is an ActiveChangeListEntry",
+        "AND items do not include artifact file content, history, validated hashes, or artifact state maps"
       ]
+    },
+    {
+      "requirement": "Returns Change entities without content",
+      "name": "Description appears only when includeDescription is set",
+      "given": ["cached list entries include a stored description"],
+      "when": [
+        "execute({ includeDescription: true }) is called",
+        "execute() is called without includeDescription"
+      ],
+      "then": ["returned items may include description", "returned items omit description"]
     },
     {
       "requirement": "Returns an empty array when no active changes exist",
       "name": "Repository is empty",
       "given": ["the repository contains no changes at all"],
       "when": ["execute() is called"],
-      "then": ["the result is an empty array"]
+      "then": ["the result is { items: [], meta: { total: 0, count: 0, limit: 100 } }"]
     },
     {
       "requirement": "Returns an empty array when no active changes exist",
       "name": "All changes are drafted or discarded",
       "given": ["the repository contains only drafted and discarded changes"],
       "when": ["execute() is called"],
-      "then": ["the result is an empty array"]
+      "then": ["the result is { items: [], meta: { total: 0, count: 0, limit: 100 } }"]
     },
     {
       "requirement": "Config-based factory preserves complete change repository bootstrap",
@@ -113,17 +151,10 @@
       ]
     }
   ],
-  "implementation": {
-    "files": [
-      {
-        "specId": "core:list-changes",
-        "file": "core:src/composition/use-cases/list-changes.ts"
-      }
-    ]
-  },
+  "implementation": {},
   "contentHashes": {
-    "spec.md": "sha256:4069c7a2c64ac5554cfc122ffbc6ecbdb9fc7fc1b8ec3624b43987e79ebf92b0",
-    "verify.md": "sha256:b03d83935bbde89225e3b9366c1224c6a5534a538b679db2ec97a7c3fa7c496a"
+    "spec.md": "sha256:ef5017f3724a01dabd342c8a82b147a5953e6d01ba7ca004fea07245195d258d",
+    "verify.md": "sha256:246646766ded8270f7a4caf275b88ce48f492e863490742f37c10e1a1d1709e3"
   },
   "generatedBy": "core"
 }

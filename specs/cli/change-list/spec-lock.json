@@ -1,0 +1,18 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "cli:entrypoint",
+    "core:list-changes",
+    "core:change-list-entry",
+    "cli:command-resource-naming"
+  ],
+  "implementation": [
+    {
+      "file": "cli:src/commands/change/list.ts",
+      "symbols": ["registerChangeList"]
+    }
+  ]
+}

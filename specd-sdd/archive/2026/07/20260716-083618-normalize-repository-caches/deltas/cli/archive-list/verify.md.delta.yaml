@@ -1,0 +1,114 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Command signature'
+  content: |
+    #### Scenario: Default limit is 100
+
+    - **GIVEN** the archive contains more than 100 changes
+    - **WHEN** `specd archive list --format json` is run without `--limit`
+    - **THEN** `meta.limit` is 100
+
+    #### Scenario: --page and keyset cursors are mutually exclusive
+
+    - **WHEN** `specd archive list --page 2 --after-key 2024-01-01T00:00:00.000Z` is run
+    - **THEN** the command exits with a CLI usage error before invoking the use case
+
+    #### Scenario: --after-id requires --after-key
+
+    - **WHEN** `specd archive list --after-id archived-change` is run without `--after-key`
+    - **THEN** the command exits with a CLI usage error before invoking the use case
+
+- op: modified
+  description: Delegates after-key pagination to ListArchived
+  selector:
+    type: section
+    matches: 'Scenario: Pagination flags are accepted'
+  content: |
+    - **WHEN** `specd archive list --limit 10 --after-key 2024-01-01T00:00:00.000Z --after-id archived-change` is run
+    - **THEN** `ListArchived.execute` is called with `limit` 10 and keyset cursor `{ key, id }`
+
+- op: modified
+  description: Standardized truncation hint and opt-in BY column
+  selector:
+    type: section
+    matches: 'Scenario: Normal text output'
+  content: |
+    - **GIVEN** the archive contains 125 changes and default pagination
+    - **WHEN** `specd archive list` is run
+    - **THEN** stdout contains a table with `NAME` and `DATE` columns
+    - **AND** stdout contains `showing 100 of 125 (use --limit/--page)`
+
+    #### Scenario: BY column appears only with --archived-by
+
+    - **GIVEN** an archived change with `archivedBy` recorded
+    - **WHEN** `specd archive list --archived-by` is run
+    - **THEN** stdout includes a `BY` column header
+    - **AND** the actor appears in the row
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Output format — text'
+  content: |
+    #### Scenario: CLI preserves use-case row order
+
+    - **GIVEN** `ListArchived.execute` returns entries ordered by `archivedAt` descending
+    - **WHEN** `specd archive list` is run
+    - **THEN** stdout rows appear in the same order as the returned `items`
+
+- op: modified
+  description: JSON envelope without artifacts field
+  selector:
+    type: section
+    matches: 'Scenario: JSON format output with metadata'
+  content: |
+    - **GIVEN** the archive contains 125 changes and `limit` is 100
+    - **WHEN** `specd archive list --format json` is run
+    - **THEN** stdout is a JSON object with `items` array and `meta` object
+    - **AND** `meta.total` is 125
+    - **AND** `meta.count` is 100
+    - **AND** `meta.limit` is 100
+    - **AND** `meta.page` is 1
+    - **AND** list entries do not include an `artifacts` field
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: Requirements
+    after:
+      type: section
+      matches: 'Requirement: Command signature'
+  content: |
+    ### Requirement: List options forwarding
+
+    #### Scenario: --archived-by sets includeArchivedBy
+
+    - **WHEN** `specd archive list --archived-by --format json` is run
+    - **THEN** `ListArchived.execute` is called with `includeArchivedBy: true`
+
+    #### Scenario: archivedBy omitted without include flag
+
+    - **GIVEN** an archived entry includes `archivedBy`
+    - **WHEN** `specd archive list --format json` is run without `--archived-by`
+    - **THEN** stdout `items[0]` does not contain `archivedBy`
+
+    #### Scenario: CLI does not re-sort or paginate after the use case returns
+
+    - **GIVEN** `ListArchived.execute` returns items in repository canonical order
+    - **WHEN** `specd archive list --format json` is run
+    - **THEN** stdout `items` appear in the same order as returned by the use case
+
+- op: modified
+  description: Empty JSON uses paginated envelope
+  selector:
+    type: section
+    matches: 'Scenario: No archived changes — JSON'
+  content: |
+    - **GIVEN** the archive directory is empty
+    - **WHEN** `specd archive list --format json` is run
+    - **THEN** stdout is `{"items":[],"meta":{"total":0,"count":0,"limit":100}}`
+    - **AND** the process exits with code 0

@@ -26,13 +26,19 @@ import {
   type ResolveFromPathResult,
   type SpecSearchResult,
   type SpecSearchMatch,
+  type SpecListEntry,
+  type SpecListOptions,
 } from '../../application/ports/spec-repository.js'
+import { type ListResult } from '../../application/ports/repository.js'
 import { Logger } from '../../application/logger.js'
 import { isEnoent } from './is-enoent.js'
 import { normalizeRelativePath, resolveConfinedPath } from './path-confinement.js'
 import { writeFileAtomic } from './write-atomic.js'
 import { sha256 } from './hash.js'
 import { checkMetadataFreshness } from '../../application/use-cases/_shared/metadata-freshness.js'
+import { FsSpecIndexCache, type SpecIndexSource } from './fs-spec-index-cache.js'
+import { type SourceFileStamp } from './fs-index-cache-base.js'
+import { ensureTmpGitignore } from './ensure-tmp-gitignore.js'
 
 const SPEC_LOCK_FILENAME = 'spec-lock.json'
 
@@ -72,6 +78,8 @@ export class FsSpecRepository extends SpecRepository {
   private readonly _specsPath: string
   private readonly _metadataPath: string
   private readonly _prefixSegments: readonly string[]
+  private readonly _indexCache: FsSpecIndexCache
+  private _tmpGitignoreEnsured = false
 
   /**
    * Creates a new `FsSpecRepository` instance.
@@ -133,6 +141,76 @@ export class FsSpecRepository extends SpecRepository {
     this._metadataPath = parsedConfig.metadataPath
     this._prefixSegments =
       context.prefix !== undefined ? context.prefix.split('/').filter((s) => s.length > 0) : []
+
+    const source: SpecIndexSource = {
+      walk: () => this._listAllSpecs(),
+      metadata: (spec) => this.metadata(spec),
+      artifact: (spec, filename) => this.artifact(spec, filename),
+      sourceFileStamps: (spec) => this._computeSourceFileStamps(spec),
+    }
+    this._indexCache = new FsSpecIndexCache({
+      bucketDir: path.join(context.configPath, 'tmp', 'fs-cache', 'specs', context.workspace),
+      workspace: context.workspace,
+      source,
+    })
+  }
+
+  /**
+   * Idempotently ensures `{configPath}/tmp/.gitignore` exists before this
+   * repository writes anything under `tmp/fs-cache`.
+   */
+  private async _ensureGitignore(): Promise<void> {
+    if (this._tmpGitignoreEnsured) return
+    await ensureTmpGitignore(this.configPath())
+    this._tmpGitignoreEnsured = true
+  }
+
+  /**
+   * Walks the entire specs tree, returning every leaf spec directory.
+   *
+   * Used by {@link FsSpecIndexCache} to rebuild this workspace's index.
+   *
+   * @returns All specs under `specsPath`
+   */
+  private async _listAllSpecs(): Promise<Spec[]> {
+    const specs: Spec[] = []
+    await this._walk(this._specsPath, this._specsPath, specs)
+    return specs
+  }
+
+  /**
+   * Computes current mtimes for every file that spec-list materialization
+   * depends on (artifact files, `metadata.json`, `spec-lock.json`).
+   *
+   * Missing files are omitted rather than erroring — a file that disappears
+   * changes the stamp set length, which the freshness check already treats
+   * as a mismatch.
+   *
+   * @param spec - The spec whose source files should be stamped
+   * @returns Current mtime stamps, one per existing dependency file
+   */
+  private async _computeSourceFileStamps(spec: Spec): Promise<readonly SourceFileStamp[]> {
+    const candidates: Array<{ filename: string; absPath: string }> = [
+      ...spec.filenames.map((filename) => ({
+        filename,
+        absPath: path.join(this._specDir(spec.name), filename),
+      })),
+      { filename: 'metadata.json', absPath: this._metadataFilePath(spec.name) },
+      { filename: SPEC_LOCK_FILENAME, absPath: this._specLockFilePath(spec.name) },
+    ]
+
+    const stamps: SourceFileStamp[] = []
+    await Promise.all(
+      candidates.map(async ({ filename, absPath }) => {
+        try {
+          const stat = await fs.stat(absPath)
+          stamps.push({ filename, mtime: stat.mtime.toISOString() })
+        } catch (err) {
+          if (!isEnoent(err)) throw err
+        }
+      }),
+    )
+    return stamps
   }
 
   /** Canonical specs root path for this workspace repository. */
@@ -169,45 +247,30 @@ export class FsSpecRepository extends SpecRepository {
   /**
    * Lists all specs under `specsPath`, optionally filtered by a path prefix.
    *
-   * Specs are discovered by recursively walking the specs root directory and
-   * identifying leaf directories (directories that contain at least one file).
-   * The result order follows the filesystem traversal order.
+   * Delegates to this workspace's fs-cache index; include flags are
+   * projected from the full materialized payload without extra I/O.
    *
    * @param prefix - Optional path prefix to filter results
-   * @returns All matching specs with their artifact filenames
+   * @param options - Pagination and include projection options
+   * @returns Paginated matching specs in canonical path order
    */
-  override async list(prefix?: SpecPath): Promise<Spec[]> {
-    let basePath: string
-    if (prefix !== undefined) {
-      // Strip the logical prefix segments from the filter before computing the fs path
-      if (this._prefixSegments.length > 0) {
-        const filterSegments = prefix.toString().split('/')
-        const stripped = filterSegments.slice(this._prefixSegments.length)
-        basePath = stripped.length > 0 ? path.join(this._specsPath, ...stripped) : this._specsPath
-      } else {
-        basePath = path.join(this._specsPath, prefix.toFsPath(path.sep))
-      }
-    } else {
-      basePath = this._specsPath
+  override async list(
+    prefix?: SpecPath,
+    options?: SpecListOptions,
+  ): Promise<ListResult<SpecListEntry>> {
+    await this._ensureGitignore()
+    const filter =
+      prefix !== undefined
+        ? (entry: SpecListEntry) => {
+            const prefixStr = prefix.toString()
+            return entry.path === prefixStr || entry.path.startsWith(`${prefixStr}/`)
+          }
+        : undefined
+    const result = await this._indexCache.list(options, filter)
+    return {
+      items: result.items.map((entry) => this._projectSpecInclude(entry, options)),
+      meta: result.meta,
     }
-
-    Logger.debug(`[FsSpecRepository] list() called with basePath=${basePath}`)
-    const start = performance.now()
-    // LBYL optimization: Checking existence asynchronously avoids queuing a full recursive directory walk
-    // for a non-existent specs directory.
-    if (!(await pathExists(basePath))) {
-      Logger.debug(
-        `[FsSpecRepository] list() basePath does not exist, returning [] immediately (took ${Math.round(performance.now() - start)}ms)`,
-      )
-      return []
-    }
-
-    const specs: Spec[] = []
-    await this._walk(basePath, this._specsPath, specs)
-    Logger.debug(
-      `[FsSpecRepository] list() finished in ${Math.round(performance.now() - start)}ms, returned ${specs.length} specs`,
-    )
-    return specs
   }
 
   /**
@@ -216,23 +279,24 @@ export class FsSpecRepository extends SpecRepository {
    * @returns The total spec count
    */
   override async count(): Promise<number> {
-    Logger.debug(
-      `[FsSpecRepository] count() called for workspace=${this.workspace()} with specsPath=${this._specsPath}`,
-    )
-    const start = performance.now()
-    // LBYL optimization: Checking existence asynchronously avoids queuing a full recursive directory walk
-    // for a non-existent specs directory.
-    if (!(await pathExists(this._specsPath))) {
-      Logger.debug(
-        `[FsSpecRepository] count() specsPath does not exist, returning 0 immediately (took ${Math.round(performance.now() - start)}ms)`,
-      )
-      return 0
+    await this._ensureGitignore()
+    return this._indexCache.count()
+  }
+
+  /**
+   * Projects a fully-materialized entry down to the fields requested by `options`.
+   *
+   * @param entry - Full stored/materialized entry
+   * @param options - Include projection options
+   * @returns The projected entry
+   */
+  private _projectSpecInclude(entry: SpecListEntry, options?: SpecListOptions): SpecListEntry {
+    const { summary, metadataStatus, ...rest } = entry
+    return {
+      ...rest,
+      ...(options?.includeSummary && summary !== undefined ? { summary } : {}),
+      ...(options?.includeMetadataStatus && metadataStatus !== undefined ? { metadataStatus } : {}),
     }
-    const result = await this._countSpecs(this._specsPath)
-    Logger.debug(
-      `[FsSpecRepository] count() finished in ${Math.round(performance.now() - start)}ms, returned ${result}`,
-    )
-    return result
   }
 
   /**
@@ -314,6 +378,7 @@ export class FsSpecRepository extends SpecRepository {
     }
 
     await writeFileAtomic(filePath, artifact.content)
+    await this._indexCache.refresh(spec)
   }
 
   /**
@@ -404,6 +469,8 @@ export class FsSpecRepository extends SpecRepository {
       if (error instanceof SpecPublicationError) throw error
       throw new SpecPublicationError(specId, stagingDir, errorMessage(error))
     }
+
+    await this._indexCache.refresh(spec)
   }
 
   /**
@@ -421,6 +488,7 @@ export class FsSpecRepository extends SpecRepository {
       if (isEnoent(err)) return
       throw err
     }
+    await this._indexCache.remove(spec.name.toFsPath('/'))
   }
 
   /**
@@ -505,6 +573,7 @@ export class FsSpecRepository extends SpecRepository {
     }
 
     await writeFileAtomic(filePath, content)
+    await this._indexCache.refresh(spec)
   }
 
   /**
@@ -697,6 +766,7 @@ export class FsSpecRepository extends SpecRepository {
     const { originalHash, ...persisted } = content
     void originalHash
     await writeFileAtomic(filePath, JSON.stringify(persisted, null, 2) + '\n')
+    await this._indexCache.refresh(spec)
   }
 
   /**
@@ -792,6 +862,20 @@ export class FsSpecRepository extends SpecRepository {
     return { specPath, specId }
   }
 
+  /** @inheritdoc */
+  override async reindex(): Promise<void> {
+    await this._ensureGitignore()
+    await this._indexCache.reindex()
+  }
+
+  /**
+   * Marks this workspace's fs-cache index invalidated so the next
+   * `list`/`count` rebuilds from disk.
+   */
+  override async invalidateCache(): Promise<void> {
+    await this._indexCache.invalidate()
+  }
+
   /**
    * Searches spec artifact content for the given query string.
    *
@@ -808,10 +892,12 @@ export class FsSpecRepository extends SpecRepository {
   override async search(query: string, options?: { limit?: number }): Promise<SpecSearchResult[]> {
     const limit = options?.limit
     const lowerQuery = query.toLowerCase()
-    const specs = await this.list()
+    const listed = await this.list(undefined, { limit: Number.MAX_SAFE_INTEGER })
     const results: SpecSearchResult[] = []
 
-    for (const spec of specs) {
+    for (const entry of listed.items) {
+      const spec = await this.get(SpecPath.parse(entry.path))
+      if (spec === null) continue
       let score = 0
       const matches: SpecSearchMatch[] = []
 
@@ -1022,57 +1108,6 @@ export class FsSpecRepository extends SpecRepository {
     for (const subdir of subdirs) {
       await this._walk(path.join(dir, subdir), root, results)
     }
-  }
-
-  /**
-   * Recursively counts leaf spec directories.
-   *
-   * @param dir - Absolute path to the directory to count
-   * @returns Total number of leaf spec directories found
-   */
-  private async _countSpecs(dir: string): Promise<number> {
-    Logger.debug(`[FsSpecRepository] _countSpecs walking dir: ${dir}`)
-    let entries: string[]
-    try {
-      entries = await fs.readdir(dir)
-    } catch (err) {
-      if (isEnoent(err)) {
-        Logger.debug(`[FsSpecRepository] _countSpecs dir does not exist (ENOENT): ${dir}`)
-        return 0
-      }
-      Logger.debug(`[FsSpecRepository] _countSpecs dir readdir failed for ${dir}: ${String(err)}`)
-      throw err
-    }
-
-    const subdirs: string[] = []
-    let hasFile = false
-
-    const stats = await Promise.all(
-      entries.map(async (entry) => {
-        try {
-          const stat = await fs.lstat(path.join(dir, entry))
-          return { entry, isDir: stat.isDirectory(), isFile: stat.isFile() }
-        } catch {
-          return { entry, isDir: false, isFile: false }
-        }
-      }),
-    )
-
-    for (const { entry, isDir, isFile } of stats) {
-      if (isDir) subdirs.push(entry)
-      else if (isFile && entry !== SPEC_LOCK_FILENAME) hasFile = true
-    }
-
-    let count = hasFile ? 1 : 0
-    const subdirCounts = await Promise.all(
-      subdirs.map((entry) => this._countSpecs(path.join(dir, entry))),
-    )
-
-    for (const subCount of subdirCounts) {
-      count += subCount
-    }
-
-    return count
   }
 }
 

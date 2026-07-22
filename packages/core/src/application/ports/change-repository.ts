@@ -3,11 +3,40 @@ import {
   type DiscardedChangeView,
   type DraftedChangeView,
 } from '../../domain/read-only-change-view.js'
+import {
+  type ActiveChangeListEntry,
+  type DiscardedChangeListEntry,
+  type DraftedChangeListEntry,
+} from '../../domain/change-list-entry.js'
 import { type SpecArtifact } from '../../domain/value-objects/spec-artifact.js'
 import { type ArtifactConflictError } from '../../domain/errors/artifact-conflict-error.js'
-import { Repository, type RepositoryConfig } from './repository.js'
+import {
+  Repository,
+  type RepositoryConfig,
+  type ListOptions,
+  type ListResult,
+} from './repository.js'
 
 export { type RepositoryConfig as ChangeRepositoryConfig }
+export type { ListOptions, ListResult }
+
+/** Options for listing active changes. */
+export interface ActiveChangeListOptions extends ListOptions {
+  readonly includeDescription?: boolean
+}
+
+/** Options for listing drafted changes. */
+export interface DraftedChangeListOptions extends ListOptions {
+  readonly includeDescription?: boolean
+  readonly includeReason?: boolean
+}
+
+/** Options for listing discarded changes. */
+export interface DiscardedChangeListOptions extends ListOptions {
+  readonly includeDescription?: boolean
+  readonly includeReason?: boolean
+  readonly includeSupersededBy?: boolean
+}
 
 /**
  * Port for reading and writing changes.
@@ -97,27 +126,76 @@ export abstract class ChangeRepository extends Repository {
   abstract mutateDraft<T>(name: string, fn: (change: Change) => Promise<T> | T): Promise<T>
 
   /**
-   * Lists all active (non-drafted, non-discarded) changes, sorted by creation order.
+   * Lists active (non-drafted, non-discarded) changes in canonical order (`createdAt` asc).
    *
-   * Returns {@link Change} objects with artifact state but without content.
+   * Returns lightweight {@link ActiveChangeListEntry} rows — no artifact content,
+   * history, or derived artifact state maps.
    *
-   * @returns All active changes in this workspace, oldest first
+   * @param options - Pagination and include projection options
+   * @returns Paginated active change list entries, oldest first
    */
-  abstract list(): Promise<Change[]>
+  abstract list(options?: ActiveChangeListOptions): Promise<ListResult<ActiveChangeListEntry>>
 
   /**
-   * Lists all drafted changes in this workspace, sorted by creation order.
+   * Lists drafted changes in canonical order (`draftedAt` desc).
    *
-   * @returns All drafted changes as {@link DraftedChangeView}, oldest first
+   * @param options - Pagination and include projection options
+   * @returns Paginated drafted change list entries, newest first
    */
-  abstract listDrafts(): Promise<DraftedChangeView[]>
+  abstract listDrafts(
+    options?: DraftedChangeListOptions,
+  ): Promise<ListResult<DraftedChangeListEntry>>
 
   /**
-   * Lists all discarded changes in this workspace, sorted by creation order.
+   * Lists discarded changes in canonical order (`discardedAt` desc).
    *
-   * @returns All discarded changes as {@link DiscardedChangeView}, oldest first
+   * @param options - Pagination and include projection options
+   * @returns Paginated discarded change list entries, newest first
    */
-  abstract listDiscarded(): Promise<DiscardedChangeView[]>
+  abstract listDiscarded(
+    options?: DiscardedChangeListOptions,
+  ): Promise<ListResult<DiscardedChangeListEntry>>
+
+  /**
+   * Returns the total number of active changes.
+   *
+   * @returns Total active change count (same source as `list().meta.total`)
+   */
+  abstract count(): Promise<number>
+
+  /**
+   * Returns the total number of drafted changes.
+   *
+   * @returns Total drafted change count (same source as `listDrafts().meta.total`)
+   */
+  abstract countDrafts(): Promise<number>
+
+  /**
+   * Returns the total number of discarded changes.
+   *
+   * @returns Total discarded change count (same source as `listDiscarded().meta.total`)
+   */
+  abstract countDiscarded(): Promise<number>
+
+  /**
+   * Rebuilds active, drafted, and discarded list indexes.
+   */
+  abstract reindex(): Promise<void>
+
+  /**
+   * Rebuilds the active-changes list index only.
+   */
+  abstract reindexActive(): Promise<void>
+
+  /**
+   * Rebuilds the drafts list index only.
+   */
+  abstract reindexDrafts(): Promise<void>
+
+  /**
+   * Rebuilds the discarded list index only.
+   */
+  abstract reindexDiscarded(): Promise<void>
 
   /**
    * Persists the change manifest — state, artifact statuses, validated

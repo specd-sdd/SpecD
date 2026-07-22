@@ -654,15 +654,12 @@ describe('RunStepHooks', () => {
       expect(capturedVars).toEqual({
         change: {
           name: 'my-change',
-          workspace: 'default',
           path: '/test/changes/my-change',
         },
       })
     })
 
-    it('uses first workspace or "default" fallback', async () => {
-      // makeChange produces a change with no workspaces array on the entity,
-      // so workspace falls back to 'default'. Verify that path.
+    it('does not inject a singular workspace into template variables', async () => {
       const change = makeChange('my-change')
       const hook: HookEntry = { id: 'lint', type: 'run', command: 'pnpm lint' }
 
@@ -682,8 +679,15 @@ describe('RunStepHooks', () => {
 
       await uc.execute({ name: 'my-change', step: 'implementing', phase: 'pre' })
 
-      // The change created by makeChange has no workspaces, so it falls back to 'default'
-      expect((capturedVars as { change: { workspace: string } }).change.workspace).toBe('default')
+      expect(capturedVars).toEqual({
+        change: {
+          name: 'my-change',
+          path: '/test/changes/my-change',
+        },
+      })
+      expect((capturedVars as { change: Record<string, unknown> }).change).not.toHaveProperty(
+        'workspace',
+      )
     })
   })
 
@@ -801,10 +805,12 @@ describe('RunStepHooks', () => {
         change: {
           name: 'my-change',
           archivedName: archived.archivedName,
-          workspace: 'core',
           path: `/test/archive/${archived.archivedName}`,
         },
       })
+      expect((capturedVars as { change: Record<string, unknown> }).change).not.toHaveProperty(
+        'workspace',
+      )
     })
   })
 })

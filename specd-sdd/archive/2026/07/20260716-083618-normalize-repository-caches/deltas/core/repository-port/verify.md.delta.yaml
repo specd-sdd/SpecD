@@ -1,0 +1,54 @@
+- op: added
+  description: Verify shared list pagination types and defaults.
+  position:
+    parent:
+      type: section
+      matches: Requirements
+    after:
+      type: section
+      matches: 'Requirement: ReadOnlyWorkspaceError'
+  content: |
+    ### Requirement: Shared list pagination types
+
+    #### Scenario: Default limit is 100
+
+    - **WHEN** a listable repository `list()` method is called without `limit`
+    - **THEN** `meta.limit` is 100
+    - **AND** at most 100 items are returned unless fewer exist
+
+    #### Scenario: Page and after are mutually exclusive
+
+    - **WHEN** list options include both `page` and `after`
+    - **THEN** the repository rejects the request or normalizes to one pagination mode without applying both
+
+    #### Scenario: After cursor returns the next page in canonical order
+
+    - **GIVEN** a bucket with at least three entries in canonical sort order
+    - **WHEN** `list({ limit: 1, after: { key: <first-key>, id: <first-id> } })` is called for a change bucket
+    - **THEN** the first returned item is strictly after that cursor position
+    - **AND** `meta.after` reflects the last returned position when more items remain
+
+- op: added
+  description: Verify generic cache invalidation hook on Repository base.
+  position:
+    parent:
+      type: section
+      matches: Requirements
+    after:
+      type: section
+      matches: 'Requirement: Shared list pagination types'
+  content: |
+    ### Requirement: invalidateCache resets adapter caches
+
+    #### Scenario: Base implementation is a no-op
+
+    - **GIVEN** a concrete repository subclass that does not override cache invalidation
+    - **WHEN** `invalidateCache()` is called
+    - **THEN** it resolves without throwing
+    - **AND** it performs no adapter-specific side effects beyond the default no-op
+
+    #### Scenario: Filesystem subclass may mark caches invalidated
+
+    - **GIVEN** a filesystem-backed repository that overrides `invalidateCache()`
+    - **WHEN** `invalidateCache()` is called after external storage changes
+    - **THEN** subsequent list or count operations observe invalidated index state and rebuild as required

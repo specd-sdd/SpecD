@@ -10,6 +10,7 @@ import {
 } from '../../application/ports/config-writer.js'
 import { AlreadyInitialisedError } from '../../application/errors/already-initialised-error.js'
 import { ConfigValidationError } from '../../domain/errors/config-validation-error.js'
+import { ensureTmpGitignore } from './ensure-tmp-gitignore.js'
 import { isEnoent } from './is-enoent.js'
 import { writeFileAtomic } from './write-atomic.js'
 
@@ -64,6 +65,7 @@ export class FsConfigWriter implements ConfigWriter {
 
     // Create storage directories
     const storageBase = path.join(options.projectRoot, '.specd')
+    await ensureTmpGitignore(storageBase)
     await fs.mkdir(path.join(storageBase, 'changes'), { recursive: true })
     await fs.mkdir(path.join(storageBase, 'drafts'), { recursive: true })
     await fs.mkdir(path.join(storageBase, 'discarded'), { recursive: true })

@@ -8,21 +8,29 @@ Discarded changes remain in storage for audit purposes, and teams need to review
 
 ### Requirement: Returns all discarded changes
 
-`ListDiscarded.execute()` MUST return all changes that are in the discarded lifecycle state. The result MUST be sorted by creation order, oldest first.
+`ListDiscarded.execute(options?)` MUST return `ListResult<DiscardedChangeListEntry>` for all discarded changes.
+
+It MUST forward `ListOptions`, `includeDescription`, `includeReason`, and `includeSupersededBy` to `ChangeRepository.listDiscarded()` without re-sorting, re-filtering, or re-paginating. Canonical order (`discardedAt` descending) is owned by the repository index helper.
+
+Default `limit` is **100** when callers omit options.
 
 ### Requirement: Returns DiscardedChangeView without content
 
-`ListDiscarded.execute()` MUST return `DiscardedChangeView[]`. Each view MUST expose artifact state (status, validated hashes), shared inspection fields, and discard metadata (`discardReason`, `discardedAt`, `discardedBy`, optional `supersededBy`) but MUST NOT include artifact file content.
+`ListDiscarded.execute()` MUST return `DiscardedChangeListEntry` items — not `DiscardedChangeView`, not mutable `Change` instances.
 
-Callers MUST NOT receive a `Change` aggregate from this use case.
+Entries MUST NOT include artifact file content, history, or derived artifact state maps. Detail belongs on `getDiscarded(name)`.
+
+Optional `description`, `reason`, and `supersededBy` appear only when the matching include flags are set and the repository projected them from the cached entry.
 
 ### Requirement: Constructor accepts a ChangeRepository
 
-`ListDiscarded` MUST accept a `ChangeRepository` as its sole constructor argument. It MUST delegate to `ChangeRepository.listDiscarded()` and return the resulting `DiscardedChangeView[]` without wrapping in mutable `Change` instances.
+`ListDiscarded` MUST accept a `ChangeRepository` as its sole constructor argument. It MUST delegate to `ChangeRepository.listDiscarded(options)` and return the resulting `ListResult<DiscardedChangeListEntry>` unchanged.
+
+The use case MUST NOT re-sort, filter, or paginate after the repository returns.
 
 ### Requirement: Returns an empty array when no discarded changes exist
 
-When the repository contains no discarded changes, `execute()` MUST return an empty array. It MUST NOT throw.
+When the repository contains no discarded changes, `execute()` MUST return `{ items: [], meta: { total: 0, count: 0, limit: <resolved limit> } }`. It MUST NOT throw.
 
 ### Requirement: Config-based factory preserves complete change repository bootstrap
 
@@ -43,7 +51,8 @@ The helper is the only use-case-specific composition entry for config-based boot
 ## Spec Dependencies
 
 - [`core:change`](../change/spec.md)
+- [`core:change-list-entry`](../change-list-entry/spec.md) — `DiscardedChangeListEntry` row shape
+- [`core:change-repository-port`](../change-repository-port/spec.md) — paginated list/count contract
 - [`core:kernel`](../kernel/spec.md)
-- [`core:discarded-change-view`](../discarded-change-view/spec.md)
-- [`core:change-repository-port`](../change-repository-port/spec.md)
+- [`core:discarded-change-view`](../discarded-change-view/spec.md) — detail read model for `getDiscarded`
 - [`core:composition-resolver`](../composition-resolver/spec.md)

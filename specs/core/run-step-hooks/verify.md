@@ -71,6 +71,13 @@
 - **WHEN** `execute` is called
 - **THEN** `ChangeNotFoundError` is thrown
 
+#### Scenario: Neither lookup path derives a workspace value
+
+- **GIVEN** either the active-change lookup path or the archive-fallback lookup path resolves a change
+- **WHEN** `RunStepHooks` proceeds to build template variables
+- **THEN** the lookup step itself does not read, compute, or cache any workspace value
+- **AND** workspace derivation for the `change` namespace is governed entirely by Requirement: HookVariables construction
+
 ### Requirement: Schema name guard
 
 #### Scenario: Schema mismatch throws SchemaMismatchError
@@ -152,21 +159,30 @@
 
 ### Requirement: HookVariables construction
 
-#### Scenario: Archived post-phase includes archivedName in change namespace
+#### Scenario: Archived post-phase includes archivedName but no workspace
 
 - **GIVEN** the active change is not found in `ChangeRepository`
 - **AND** the request is `step: "archiving"` with `phase: "post"`
 - **AND** the archived change exists with archived name `20260418-103000-add-auth`
 - **WHEN** `RunStepHooks.execute` builds `TemplateVariables` for hook execution
-- **THEN** the `change` namespace includes `name`, `workspace`, `path`, and `archivedName`
+- **THEN** the `change` namespace includes `name`, `path`, and `archivedName`
 - **AND** `change.archivedName` equals `20260418-103000-add-auth`
+- **AND** the `change` namespace has no `workspace` key
 
-#### Scenario: Active change path may omit archivedName
+#### Scenario: Active change path may omit archivedName and never has workspace
 
 - **GIVEN** the change is loaded from `ChangeRepository`
 - **WHEN** `RunStepHooks.execute` builds `TemplateVariables`
-- **THEN** the `change` namespace includes `name`, `workspace`, and `path`
+- **THEN** the `change` namespace includes `name` and `path`
 - **AND** `change.archivedName` may be absent
+- **AND** the `change` namespace has no `workspace` key
+
+#### Scenario: HookVariables construction never derives a singular workspace
+
+- **GIVEN** a change touching multiple workspaces via `specIds`
+- **WHEN** `RunStepHooks.execute` builds `TemplateVariables`
+- **THEN** the `change` namespace is not populated with `change.workspaces[0] ?? 'default'` or `specIds[0]?.split(':')[0]`
+- **AND** no `change.workspace` key is present in the resulting namespace
 
 ### Requirement: Pre-phase execution (fail-fast)
 

@@ -166,12 +166,14 @@ async function executeBatch(
   const filterAll = statusFilter.has('all')
 
   // List all specs with metadata status
-  const entries = await kernel.specs.list.execute({ includeMetadataStatus: true })
+  const listed = await kernel.specs.list.execute({ includeMetadataStatus: true })
 
   // Filter by status
   const matching = filterAll
-    ? entries
-    : entries.filter((e) => e.metadataStatus !== undefined && statusFilter.has(e.metadataStatus))
+    ? listed.items
+    : listed.items.filter(
+        (e) => e.metadataStatus !== undefined && statusFilter.has(e.metadataStatus),
+      )
 
   if (matching.length === 0) {
     const fmt = parseFormat(opts.format)

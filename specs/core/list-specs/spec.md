@@ -8,53 +8,47 @@ Agents and CLI users need a single query to discover what specs exist across all
 
 ### Requirement: Enumerate specs across all workspaces
 
-`ListSpecs.execute()` SHALL obtain the orchestrated project structure via the `ListWorkspaces` use case (or the corresponding kernel capability). It SHALL iterate through the resulting `ProjectWorkspace` entities to enumerate all specs across all configured workspaces.
+`ListSpecs.execute(options?)` SHALL obtain the orchestrated project structure via the `ListWorkspaces` use case (or the corresponding kernel capability). It SHALL iterate through the resulting `ProjectWorkspace` entities and call `SpecRepository.list(options)` on each workspace's `specRepo`.
 
-The returned `SpecListEntry[]` MUST preserve the workspace order and spec repository order. Workspace filtering SHALL be performed by matching workspace names against the orchestrated list.
+It MUST forward the same `ListOptions`, `includeSummary`, and `includeMetadataStatus` to every workspace repository call. It MUST NOT re-sort, re-filter, or re-paginate per-workspace results after the repository returns.
+
+The merged result MUST preserve workspace declaration order from `ListWorkspaces`, with each workspace's items in the repository's canonical path order. Cross-workspace pagination is out of scope for v1 — callers paginate within a single workspace via the port or filter workspaces explicitly.
+
+Workspace filtering SHALL be performed by matching workspace names against the orchestrated list before invoking `list()`.
 
 ### Requirement: Always resolve a title for each entry
 
-Every `SpecListEntry` MUST include a `title` field. The title resolution order SHALL be:
-
-1. The `title` field from the spec's metadata (via `SpecRepository.metadata()`), when metadata exists, parses successfully, and `title` is a non-empty string after trimming.
-2. Fallback: the last segment of the spec's capability path (e.g. `auth/login` yields `login`).
+Every returned `SpecListEntry` MUST include a `title` field supplied by `SpecRepository.list()`. The use case MUST NOT perform additional metadata or file reads to resolve titles when the repository already returned them.
 
 ### Requirement: Optional summary resolution
 
-When `options.includeSummary` is `true`, the use case SHALL resolve a `summary` field for each entry. Summary resolution order:
+When `options.includeSummary` is `true`, the use case MUST forward the flag to `SpecRepository.list()` and project `summary` onto merged results only when the repository included it in the cached entry.
 
-1. The `description` field from the spec's metadata (via `SpecRepository.metadata()`), when present and non-empty after trimming.
-2. Extraction from `spec.md` content via `extractSpecSummary`, when the spec has a `spec.md` file and the extraction succeeds.
-3. If neither source yields a value, `summary` MUST be omitted from the entry (not set to an empty string or `null`).
+The use case MUST NOT re-resolve summary via `SpecRepository.metadata()`, `spec.md` reads, or `extractSpecSummary` when the repository already returned a summary for that entry.
 
-When `options.includeSummary` is `false` or omitted, the `summary` field MUST NOT appear on any entry.
+When `includeSummary` is `false` or omitted, `summary` MUST NOT appear on any entry.
 
 ### Requirement: Optional metadata freshness status
 
-When `options.includeMetadataStatus` is `true`, the use case SHALL resolve a `metadataStatus` field for each entry. The status values SHALL be:
+When `options.includeMetadataStatus` is `true`, the use case MUST forward the flag to `SpecRepository.list()` and project `metadataStatus` only when the repository included it in the cached entry.
 
-- `'missing'` — no metadata exists for the spec (via `SpecRepository.metadata()` returning `null`).
-- `'invalid'` — metadata exists but fails structural validation against `strictSpecMetadataSchema`.
-- `'stale'` — metadata exists and is structurally valid, but content hashes are absent or do not match current file contents.
-- `'fresh'` — metadata exists, is structurally valid, and all content hashes match current files.
+The use case MUST NOT re-compute metadata freshness via `SpecRepository.metadata()`, content hashing, or schema validation when the repository already returned `metadataStatus`.
 
-When `options.includeMetadataStatus` is `false` or omitted, the `metadataStatus` field MUST NOT appear on any entry.
+When `includeMetadataStatus` is `false` or omitted, `metadataStatus` MUST NOT appear on any entry.
 
 ### Requirement: Silent error handling for metadata and summary reads
 
-Errors encountered while reading metadata (via `SpecRepository.metadata()`) or `spec.md` for title/summary/status resolution MUST be silently caught. The spec entry MUST still appear in the results with the title fallback applied. The use case SHALL NOT propagate I/O errors from individual spec resolution to the caller.
+Per-spec title/summary/status resolution errors are handled at index materialization time in `FsSpecIndexCache`. `ListSpecs` MUST NOT perform supplementary I/O that could throw for individual specs.
+
+The use case SHALL NOT propagate I/O errors from optional field projection to the caller when merging repository list results.
 
 ### Requirement: SpecListEntry shape
 
-Each entry MUST include the following required fields:
+Each entry MUST include required fields `workspace`, `path`, and `title` as returned by `SpecRepository.list()`.
 
-- `workspace` — the workspace name the spec belongs to.
-- `path` — the spec's capability path rendered with `/` separators.
-- `title` — the resolved title string.
+Optional fields (`summary`, `metadataStatus`) MUST only be present when explicitly requested via include flags **and** projected from the repository result.
 
-Optional fields (`summary`, `metadataStatus`) MUST only be present when explicitly requested and successfully resolved.
-
-When workspace filtering is active, the result array contains entries only from the filtered workspaces. Callers that need all configured workspace names (including those with no matching specs) MUST consult the config directly.
+When workspace filtering is active, the result array contains entries only from the filtered workspaces.
 
 ### Requirement: Config-based factory delegates through resolveListSpecsDeps
 
@@ -63,8 +57,8 @@ The config-based `createListSpecs(config, options?)` form MUST derive `ListSpecs
 `resolveListSpecsDeps(resolver)` MUST resolve:
 
 - `listWorkspaces: ListWorkspaces`
-- `hasher: ContentHasher`
-- `yaml: YamlSerializer`
+
+It MUST NOT resolve `hasher: ContentHasher` or `yaml: YamlSerializer` — `ListSpecs` orchestrates workspace repositories and forwards list options; title/summary/metadata-status enrichment happens inside `SpecRepository.list()`'s index materialization, not in this use case, so it has no dependency on content hashing or YAML serialization.
 
 The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
 
@@ -72,13 +66,14 @@ The helper is the only use-case-specific composition entry for config-based boot
 
 - The use case MUST NOT modify the repositories.
 - It SHALL depend on `ListWorkspaces` for consistent project traversal.
-- Title and description values MUST be trimmed before use.
+- It MUST NOT re-resolve title, summary, or metadata status with extra I/O when the repository already returned those fields.
+- Include flags are forwarded to repositories for projection-only filtering of cached payloads.
 
 ## Spec Dependencies
 
 - [`core:spec-metadata`](../spec-metadata/spec.md)
-- [`core:content-extraction`](../content-extraction/spec.md)
 - [`core:storage`](../storage/spec.md)
 - [`core:workspace`](../workspace/spec.md)
 - [`core:list-workspaces`](../list-workspaces/spec.md)
+- [`core:spec-repository-port`](../spec-repository-port/spec.md) — `SpecListEntry` and paginated list contract
 - [`core:composition-resolver`](../composition-resolver/spec.md)

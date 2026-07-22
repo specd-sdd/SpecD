@@ -1,7 +1,13 @@
 {
   "title": "ListDrafts",
   "description": "Users who draft changes need visibility into what is parked so they can decide what to resume. The `ListDrafts` use case retrieves all drafted changes from the default workspace — those temporarily set aside that can be restored to active status later.",
-  "dependsOn": ["core:change", "core:kernel", "core:composition-resolver"],
+  "dependsOn": [
+    "core:change",
+    "core:kernel",
+    "core:composition-resolver",
+    "core:change-list-entry",
+    "core:change-repository-port"
+  ],
   "context": [
     "Users who draft changes need visibility into what is parked so they can decide what to resume. The `ListDrafts` use case retrieves all drafted changes from the default workspace — those temporarily set aside that can be restored to active status later."
   ],
@@ -9,25 +15,25 @@
     {
       "requirement": "Returns all drafted changes",
       "rules": [
-        "`ListDrafts.execute()` MUST return all changes that are in the drafted lifecycle state. The result MUST be sorted by creation order, oldest first."
+        "`ListDrafts.execute(options?)` MUST return `ListResult<DraftedChangeListEntry>` for all drafted changes.\n\nIt MUST forward `ListOptions`, `includeDescription`, and `includeReason` to `ChangeRepository.listDrafts()` without re-sorting, re-filtering, or re-paginating. Canonical order (`draftedAt` descending) is owned by the repository index helper.\n\nDefault `limit` is **100** when callers omit options."
       ]
     },
     {
       "requirement": "Returns DraftedChangeView without content",
       "rules": [
-        "`ListDrafts.execute()` MUST return `DraftedChangeView[]`. Each view MUST expose artifact state (status, validated hashes) and any fields required for listing (including `history` for the latest `drafted` event) but MUST NOT include artifact file content.\n\nCallers MUST NOT receive a `Change` aggregate from this use case."
+        "`ListDrafts.execute()` MUST return `DraftedChangeListEntry` items — not `DraftedChangeView`, not mutable `Change` instances.\n\nEntries MUST NOT include artifact file content, history, or derived artifact state maps. Detail belongs on `getDraft(name)`.\n\nOptional `description` and `reason` appear only when the matching include flags are set and the repository projected them from the cached entry."
       ]
     },
     {
       "requirement": "Constructor accepts a ChangeRepository",
       "rules": [
-        "`ListDrafts` MUST accept a `ChangeRepository` as its sole constructor argument. It MUST delegate to `ChangeRepository.listDrafts()` and return the resulting `DraftedChangeView[]` without wrapping in mutable `Change` instances."
+        "`ListDrafts` MUST accept a `ChangeRepository` as its sole constructor argument. It MUST delegate to `ChangeRepository.listDrafts(options)` and return the resulting `ListResult<DraftedChangeListEntry>` unchanged.\n\nThe use case MUST NOT re-sort, filter, or paginate after the repository returns."
       ]
     },
     {
       "requirement": "Returns an empty array when no drafted changes exist",
       "rules": [
-        "When the repository contains no drafted changes, `execute()` MUST return an empty array. It MUST NOT throw."
+        "When the repository contains no drafted changes, `execute()` MUST return `{ items: [], meta: { total: 0, count: 0, limit: <resolved limit> } }`. It MUST NOT throw."
       ]
     },
     {
@@ -51,13 +57,26 @@
       "then": ["it requires a ChangeRepository in its constructor"]
     },
     {
-      "requirement": "Returns all drafted changes",
-      "name": "Multiple drafted changes exist",
+      "requirement": "Constructor accepts a ChangeRepository",
+      "name": "Execute forwards options and returns repository result unchanged",
       "given": [
-        "the repository contains three drafted changes created in order: alpha, beta, gamma"
+        "ChangeRepository.listDrafts(options) returns a specific ListResult<DraftedChangeListEntry>"
       ],
-      "when": ["execute() is called"],
-      "then": ["the result contains all three changes in creation order: alpha, beta, gamma"]
+      "when": ["execute(options) is called"],
+      "then": [
+        "the result is identical to the repository output",
+        "AND the use case does not re-sort, filter, or paginate after delegation"
+      ]
+    },
+    {
+      "requirement": "Returns all drafted changes",
+      "name": "Multiple drafted changes returned in canonical order",
+      "given": ["the repository contains three drafted changes with distinct draftedAt timestamps"],
+      "when": ["execute() is called without options"],
+      "then": [
+        "the result is ListResult<DraftedChangeListEntry> with default limit: 100",
+        "AND items appear in draftedAt descending order (newest first)"
+      ]
     },
     {
       "requirement": "Returns all drafted changes",
@@ -66,54 +85,58 @@
         "the repository contains drafted change alpha, active change beta, and discarded change gamma"
       ],
       "when": ["execute() is called"],
-      "then": ["the result contains only alpha"]
+      "then": ["items contains only alpha"]
+    },
+    {
+      "requirement": "Returns all drafted changes",
+      "name": "Pagination limit truncates items but preserves total",
+      "given": ["four drafted changes exist"],
+      "when": ["execute({ limit: 1, page: 2 }) is called"],
+      "then": ["items.length is 1", "AND meta.total is 4"]
     },
     {
       "requirement": "Returns DraftedChangeView without content",
-      "name": "Views have artifact state but no content",
-      "when": ["execute() returns a list"],
+      "name": "Entries are DraftedChangeListEntry without detail fields",
+      "when": ["execute() returns a non-empty result"],
       "then": [
-        "each entry satisfies DraftedChangeView with isDrafted === true",
-        "AND artifact statuses are populated",
-        "AND no artifact file content is loaded"
+        "each item is a DraftedChangeListEntry with draftedAt and draftedBy",
+        "AND items do not include artifact file content, history, or artifact state maps",
+        "AND entries are not mutable Change instances"
       ]
     },
     {
       "requirement": "Returns DraftedChangeView without content",
-      "name": "Views are not Change instances",
-      "when": ["execute() returns a non-empty list"],
-      "then": ["entries do not expose transition or other Change mutators"]
+      "name": "Optional description and reason require include flags",
+      "given": ["cached draft rows include stored description and reason"],
+      "when": [
+        "execute({ includeDescription: true, includeReason: true }) is called",
+        "execute() is called without those flags"
+      ],
+      "then": [
+        "returned items may include description and reason",
+        "returned items omit description and reason"
+      ]
     },
     {
       "requirement": "Returns DraftedChangeView without content",
-      "name": "Empty drafts directory returns empty list",
+      "name": "Empty drafts directory returns empty ListResult",
       "given": ["no directories exist under drafts/"],
       "when": ["ListDrafts.execute() is called"],
-      "then": ["it returns an empty array"]
-    },
-    {
-      "requirement": "Returns DraftedChangeView without content",
-      "name": "Active changes are excluded",
-      "given": [
-        "parked-feature exists only under changes/",
-        "AND old-work exists only under drafts/"
-      ],
-      "when": ["ListDrafts.execute() is called"],
-      "then": ["the result contains old-work only", "AND no entry has name === 'parked-feature'"]
+      "then": ["the result is { items: [], meta: { total: 0, count: 0, limit: 100 } }"]
     },
     {
       "requirement": "Returns an empty array when no drafted changes exist",
       "name": "Repository is empty",
       "given": ["the repository contains no changes at all"],
       "when": ["execute() is called"],
-      "then": ["the result is an empty array"]
+      "then": ["the result is { items: [], meta: { total: 0, count: 0, limit: 100 } }"]
     },
     {
       "requirement": "Returns an empty array when no drafted changes exist",
       "name": "All changes are active or discarded",
       "given": ["the repository contains only active and discarded changes"],
       "when": ["execute() is called"],
-      "then": ["the result is an empty array"]
+      "then": ["the result is { items: [], meta: { total: 0, count: 0, limit: 100 } }"]
     },
     {
       "requirement": "Config-based factory preserves complete change repository bootstrap",
@@ -137,17 +160,10 @@
       ]
     }
   ],
-  "implementation": {
-    "files": [
-      {
-        "specId": "core:list-drafts",
-        "file": "core:src/composition/use-cases/list-drafts.ts"
-      }
-    ]
-  },
+  "implementation": {},
   "contentHashes": {
-    "spec.md": "sha256:bdabe4c14affe1291d8ff07d6d74573407a917474e00229619fa984a8cb7325b",
-    "verify.md": "sha256:a186e69a3008b3660ed1a46c3aed46477527d1b4a20ce8f4bbf10edbf7d8f715"
+    "spec.md": "sha256:8de8d132bdc9e31eeedbdfd3fc5277969866b52ee4be6c16d9d8cbd1f0f63d24",
+    "verify.md": "sha256:02c225aa8821eebf8216c3637220ce37de9d4edf28fc350cad3c1f840b921eb9"
   },
   "generatedBy": "core"
 }

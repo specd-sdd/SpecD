@@ -1,5 +1,6 @@
-import { type Change } from '../../domain/entities/change.js'
-import { type ChangeRepository } from '../ports/change-repository.js'
+import { type ActiveChangeListEntry } from '../../domain/change-list-entry.js'
+import { type ActiveChangeListOptions, type ChangeRepository } from '../ports/change-repository.js'
+import { type ListResult } from '../ports/repository.js'
 
 /**
  * Lists all active (non-drafted, non-discarded) changes in the default workspace.
@@ -19,9 +20,10 @@ export class ListChanges {
   /**
    * Executes the use case.
    *
-   * @returns All active changes, oldest first
+   * @param options - Pagination and include projection options
+   * @returns Paginated active change list entries, oldest first
    */
-  async execute(): Promise<Change[]> {
-    return this._changes.list()
+  async execute(options?: ActiveChangeListOptions): Promise<ListResult<ActiveChangeListEntry>> {
+    return this._changes.list(options)
   }
 }

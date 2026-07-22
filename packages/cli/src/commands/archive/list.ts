@@ -1,5 +1,11 @@
 import { type Command } from 'commander'
+import { type ArchiveListEntry } from '@specd/sdk'
 import { resolveCliContext } from '../../helpers/cli-context.js'
+import {
+  addListPaginationOptions,
+  formatTruncationHint,
+  parseListPaginationFlags,
+} from '../../helpers/list-pagination.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
 import { colWidth, renderTable } from '../../helpers/table.js'
@@ -10,15 +16,17 @@ import { colWidth, renderTable } from '../../helpers/table.js'
  * @param parent - The parent Commander command to attach the subcommand to.
  */
 export function registerArchiveList(parent: Command): void {
-  parent
+  const cmd = parent
     .command('list')
     .allowExcessArguments(false)
     .description('List archived changes with optional pagination.')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
-    .option('--limit <n>', 'maximum number of entries to return', (v) => parseInt(v, 10))
-    .option('--page <p>', '1-based page number', (v) => parseInt(v, 10))
-    .option('--start-at <name>', 'name of the change to start after')
+    .option('--archived-by', 'include archivedBy on each entry')
+
+  addListPaginationOptions(cmd)
+
+  cmd
     .addHelpText(
       'after',
       `
@@ -28,16 +36,17 @@ JSON/TOON output schema:
       name: string
       archivedName: string
       archivedAt: string
-      archivedBy?: { name: string, email: string }
-      artifacts: string[]
       specIds: string[]
+      schemaName: string
+      schemaVersion: number
+      archivedBy?: { name: string, email: string }
     }>,
     meta: {
       total: number
       count: number
       limit: number
       page?: number
-      startAt?: string
+      after?: { key: string, id?: string }
     }
   }
 `,
@@ -46,60 +55,69 @@ JSON/TOON output schema:
       async (opts: {
         format: string
         config?: string
+        archivedBy?: boolean
         limit?: number
         page?: number
-        startAt?: string
+        afterKey?: string
+        afterId?: string
       }) => {
         try {
           const { kernel } = await resolveCliContext({ configPath: opts.config })
+          const pagination = parseListPaginationFlags(opts)
           const result = await kernel.changes.listArchived.execute({
-            limit: opts.limit,
-            page: opts.page,
-            startAt: opts.startAt,
+            ...pagination,
+            ...(opts.archivedBy === true ? { includeArchivedBy: true } : {}),
           })
 
-          const changes = [...result.items].sort(
-            (a, b) => b.archivedAt.getTime() - a.archivedAt.getTime(),
-          )
           const fmt = parseFormat(opts.format)
 
           if (fmt === 'text') {
-            if (changes.length === 0) {
+            if (result.items.length === 0) {
               output('no archived changes', 'text')
             } else {
-              const dates = changes.map((c) => c.archivedAt.toISOString().slice(0, 10))
-              const byCol = changes.map((c) => (c.archivedBy ? `by ${c.archivedBy.name}` : ''))
+              const includeBy = opts.archivedBy === true
+              const dates = result.items.map((c) => c.archivedAt.toISOString().slice(0, 10))
+              const byCol = result.items.map((c) =>
+                includeBy && c.archivedBy ? c.archivedBy.name : '',
+              )
+              const columns = [
+                {
+                  header: 'NAME',
+                  width: colWidth(
+                    'NAME',
+                    result.items.map((c) => c.name),
+                  ),
+                },
+                { header: 'DATE', width: colWidth('DATE', dates) },
+              ]
+              if (includeBy) {
+                columns.push({ header: 'BY', width: colWidth('BY', byCol) })
+              }
               const table = renderTable(
                 null,
-                [
-                  {
-                    header: 'NAME',
-                    width: colWidth(
-                      'NAME',
-                      changes.map((c) => c.name),
-                    ),
-                  },
-                  { header: 'DATE', width: colWidth('DATE', dates) },
-                  { header: 'BY', width: colWidth('BY', byCol) },
-                ],
-                changes.map((c, i) => [c.name, dates[i]!, byCol[i]!]),
+                columns,
+                result.items.map((c, i) => {
+                  const row = [c.name, dates[i]!]
+                  if (includeBy) row.push(byCol[i]!)
+                  return row
+                }),
               )
-
-              const summary = `\nShowing ${result.meta.count} archived changes of ${result.meta.total}. Increase limit or specify another page.`
-              output(table + summary, 'text')
+              const hint = formatTruncationHint(result.meta)
+              output(table + (hint !== null ? `\n${hint}` : ''), 'text')
             }
           } else {
             output(
               {
-                items: result.items.map((c) => ({
+                items: result.items.map((c: ArchiveListEntry) => ({
                   name: c.name,
                   archivedName: c.archivedName,
                   archivedAt: c.archivedAt.toISOString(),
-                  ...(c.archivedBy
+                  specIds: [...c.specIds],
+                  schemaName: c.schemaName,
+                  schemaVersion: c.schemaVersion,
+                  ...(opts.archivedBy === true && c.archivedBy
                     ? { archivedBy: { name: c.archivedBy.name, email: c.archivedBy.email } }
                     : {}),
-                  artifacts: [...(c.artifacts ?? [])],
-                  specIds: [...(c.specIds ?? [])],
                 })),
                 meta: result.meta,
               },

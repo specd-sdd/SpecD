@@ -44,7 +44,7 @@
     {
       "requirement": "Delegation to ConfigWriter",
       "rules": [
-        "The CLI passes the resolved project root, schema reference, workspace id, workspace specs path, and force flag to `createConfigWriter().initProject(...)`. All file creation — `specd.yaml`, storage directories, `.gitignore` entry — is handled by the `ConfigWriter` port. The CLI never touches `specd.yaml` directly and MUST NOT call `createInitProject`, `InitProject.execute`, or `kernel.project.init`."
+        "The CLI passes the resolved project root, schema reference, workspace id, workspace specs path, and force flag to `createConfigWriter().initProject(...)`. All file creation — `specd.yaml`, storage directories, root `.gitignore` entries, and `{configPath}/tmp/.gitignore` — is handled by the `ConfigWriter` port. The CLI never touches `specd.yaml` or tmp cache paths directly and MUST NOT call `createInitProject`, `InitProject.execute`, or `kernel.project.init`.\n\nThe `{configPath}/tmp/.gitignore` file MUST be created idempotently during `initProject` with normative contents:\n\n```gitignore\n*\n!.gitignore\n```\n\nThis keeps all tmp artifacts (including `fs-cache/`) out of version control while allowing the ignore rule file itself to remain tracked."
       ]
     },
     {
@@ -173,6 +173,23 @@
       ]
     },
     {
+      "requirement": "Delegation to ConfigWriter",
+      "name": "tmp gitignore created idempotently",
+      "given": ["a clean project root with resolved config path .specd"],
+      "when": ["specd project init --workspace default completes successfully"],
+      "then": [
+        ".specd/tmp/.gitignore exists",
+        "AND its contents are * on the first line and !.gitignore on the second line"
+      ]
+    },
+    {
+      "requirement": "Delegation to ConfigWriter",
+      "name": "tmp gitignore preserved on re-init with --force",
+      "given": [".specd/tmp/.gitignore already exists with the normative contents"],
+      "when": ["specd project init --force --workspace default completes successfully"],
+      "then": [".specd/tmp/.gitignore still contains * and !.gitignore"]
+    },
+    {
       "requirement": "Skills installation after init",
       "name": "Plugins are installed for selected plugins after init",
       "when": ["specd project init --plugin @specd/plugin-agent-claude is run"],
@@ -203,24 +220,10 @@
       ]
     }
   ],
-  "implementation": {
-    "files": [
-      {
-        "specId": "cli:project-init",
-        "file": "cli:test/commands/project-init.spec.ts"
-      }
-    ],
-    "symbols": [
-      {
-        "specId": "cli:project-init",
-        "file": "cli:src/commands/project/init.ts",
-        "symbol": "registerProjectInit"
-      }
-    ]
-  },
+  "implementation": {},
   "contentHashes": {
-    "spec.md": "sha256:d3b2fa439b9d3ca4faa239dcaa2bce6a8209f86b70dffb7e74b8ad920767ec4b",
-    "verify.md": "sha256:fad0372688d8e26406f2f63428caaca3327fe8fd4ec6896e30216bd99fa1964c"
+    "spec.md": "sha256:0250d81532651f95fcb81b4ce8b1cf34a357228a43f240ac95cf3d3a552b8507",
+    "verify.md": "sha256:e8475ca733201087dd694572c915a873b6ade9f8415020bc9e2ecb9445f1365b"
   },
   "generatedBy": "core"
 }

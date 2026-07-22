@@ -7,7 +7,7 @@
  * ```typescript
  * {
  *   project: { root: '/Users/dev/my-project' },
- *   change: { name: 'add-auth', workspace: 'default', path: '...' },
+ *   change: { name: 'add-auth', path: '/Users/dev/my-project/changes/add-auth' },
  * }
  * ```
  */

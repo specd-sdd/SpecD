@@ -65,6 +65,12 @@
       "rules": [
         "Documentation under `docs/` SHALL be updated when the public composition surface of `@specd/core` changes.\n\nWhen composition factories change their public contract shape, the documentation MUST describe at least:\n\n- the canonical `createX(deps)` form\n- the convenience `createX(config, options?)` form\n- the role split between standalone factories, `createKernel(...)`, and `createKernelBuilder()`\n- the shared `CompositionResolver` path used for config-based bootstrap"
       ]
+    },
+    {
+      "requirement": "Documentation stays aligned with removed/renamed template variables and list/summary contracts",
+      "rules": [
+        "When a change removes or renames a public template variable token (for example `{{change.workspace}}`), or changes the shape of a listing/summary use case's inputs, outputs, or dependency-resolution contract, that change MUST update every in-repo doc under `docs/` that documents the old token or shape, in the same change — not as separate follow-up work.\n\nThis includes, when applicable to the change:\n\n- `docs/config/config-reference.md` — archive pattern variable tables and other config examples\n- `docs/guide/workspaces.md` — workspace/template variable guidance\n- `docs/guide/workflow.md` — hook and template variable examples\n- `docs/guide/schemas.md` and `docs/schemas/schema-format.md` — schema-authoring examples that reference template variables\n- `docs/adr/0013-workspaces-not-scopes.md` — ADR prose that mandates or illustrates the removed/renamed token\n- `docs/core/use-cases.md` — constructor signatures, return shapes, and ordering claims for use cases whose public contract changed\n- `docs/cli/cli-reference.md` — CLI flag tables and examples for commands whose output contract changed\n\nA doc file not listed above but found to document the same stale token or shape is equally in scope — this list is illustrative, not exhaustive."
+      ]
     }
   ],
   "constraints": [
@@ -77,7 +83,8 @@
     "No documentation outside docs/ except README.md, AGENTS.md, CLAUDE.md",
     "A spec's ## ADRs section lists only the ADRs that produced that spec — they are historical provenance, not dependencies",
     "A spec may only depend on other specs (## Spec Dependencies), never on ADRs directly",
-    "If an ADR's decision needs to be enforced as a constraint, it must first be captured in a spec; that spec is then what other specs depend on"
+    "If an ADR's decision needs to be enforced as a constraint, it must first be captured in a spec; that spec is then what other specs depend on",
+    "Removing or renaming a template variable token, or changing a listing/summary use case's public contract, is a documentation-affecting change under docs/config/, docs/guide/, docs/schemas/, docs/adr/, docs/core/, and docs/cli/ as applicable — not just under docs/core/"
   ],
   "scenarios": [
     {
@@ -216,45 +223,80 @@
       "then": [
         "the corresponding documentation in docs/ is updated to reflect the new factory and kernel composition model"
       ]
+    },
+    {
+      "requirement": "Documentation stays aligned with removed/renamed template variables and list/summary contracts",
+      "name": "Removed template variable token requires doc updates in the same change",
+      "given": [
+        "a change removes the {{change.workspace}} template variable token from core:template-variables",
+        "AND docs/config/config-reference.md, docs/guide/workspaces.md, docs/guide/workflow.md, and docs/adr/0013-workspaces-not-scopes.md all document or illustrate that token"
+      ],
+      "when": ["the change is reviewed for documentation alignment"],
+      "then": [
+        "every one of those files is updated in the same change to drop or replace the stale token references",
+        "AND none of them is left documenting {{change.workspace}} as a supported token"
+      ]
+    },
+    {
+      "requirement": "Documentation stays aligned with removed/renamed template variables and list/summary contracts",
+      "name": "Changed listing/summary use case contract requires doc updates in the same change",
+      "given": [
+        "a change alters a listing or summary use case's return shape or dependency-resolution contract (for example GetProjectSummary or ListSpecs)",
+        "AND docs/core/use-cases.md documents the old shape or dependency list"
+      ],
+      "when": ["the change is reviewed for documentation alignment"],
+      "then": ["docs/core/use-cases.md is updated in the same change to reflect the new contract"]
+    },
+    {
+      "requirement": "Documentation stays aligned with removed/renamed template variables and list/summary contracts",
+      "name": "CLI output contract change requires cli-reference update in the same change",
+      "given": [
+        "a change alters a CLI command's flags, JSON/toon output shape, or pagination behavior",
+        "AND docs/cli/cli-reference.md documents the old flags or output shape for that command"
+      ],
+      "when": ["the change is reviewed for documentation alignment"],
+      "then": ["docs/cli/cli-reference.md is updated in the same change"]
+    },
+    {
+      "requirement": "Documentation stays aligned with removed/renamed template variables and list/summary contracts",
+      "name": "Illustrative doc list is not exhaustive",
+      "given": [
+        "a doc file not among docs/config/config-reference.md, docs/guide/workspaces.md, docs/guide/workflow.md, docs/guide/schemas.md, docs/schemas/schema-format.md, docs/adr/0013-workspaces-not-scopes.md, docs/core/use-cases.md, docs/cli/cli-reference.md",
+        "AND that file documents the same removed/renamed token or stale contract shape"
+      ],
+      "when": ["the change is reviewed for documentation alignment"],
+      "then": ["that file is equally in scope and must be updated in the same change"]
+    },
+    {
+      "requirement": "Documentation stays aligned with removed/renamed template variables and list/summary contracts",
+      "name": "Follow-up-only documentation fix is rejected",
+      "given": [
+        "a change removes a public template variable token or changes a listing/summary use case's public contract",
+        "AND the author proposes updating the affected docs/ files as separate follow-up work"
+      ],
+      "when": ["the change is reviewed for documentation alignment"],
+      "then": ["the review rejects deferring those doc updates — they MUST land in the same change"]
     }
   ],
   "implementation": {
     "files": [
       {
         "specId": "default:_global/docs",
-        "file": "default:docs/adr/0015-use-case-level-composition.md"
-      },
-      {
-        "specId": "default:_global/docs",
-        "file": "default:docs/adr/0018-graduated-composition-levels.md"
-      },
-      {
-        "specId": "default:_global/docs",
-        "file": "default:docs/core/examples/implementing-a-port.md"
-      },
-      {
-        "specId": "default:_global/docs",
-        "file": "default:docs/core/overview.md"
-      },
-      {
-        "specId": "default:_global/docs",
-        "file": "default:docs/core/ports.md"
-      },
-      {
-        "specId": "default:_global/docs",
-        "file": "default:docs/core/services.md"
-      },
-      {
-        "specId": "default:_global/docs",
         "file": "default:docs/config/config-reference.md"
+      },
+      {
+        "specId": "default:_global/docs",
+        "file": "default:docs/guide/workspaces.md"
+      },
+      {
+        "specId": "default:_global/docs",
+        "file": "default:docs/core/use-cases.md"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:e2ba74ea3502e15cd209586f7f2dc7cc08aeaaf1f4c1fe907071f8cc2158f632",
-    "verify.md": "sha256:776dd528ebac1a35f8c030ffc75234e87cacf12d756e757abd0648a7c011e2c5"
+    "spec.md": "sha256:c6750667aa9ba97ab9ebcd25157cc3f70ccd4d8d3a9d7340045ea5581c916020",
+    "verify.md": "sha256:4d8ad4dc2a992c1d5a0217a292d300b61f2b92adda0d8efa185e137b1731bc83"
   },
-  "generatedBy": "agent",
-  "optimizedDescription": "Docs contract for `docs/`, ADRs, SDK-first host guidance, command references, and composition-surface alignment.",
-  "optimizedContext": "# Documentation Conventions\n\n## Rules\n- Project documentation lives under `docs/`. Exceptions only: root `README.md` and agent instruction files `AGENTS.md` / `CLAUDE.md`.\n- Expected docs tree: `docs/adr/`, `docs/cli/`, `docs/mcp/`, `docs/core/`, `docs/schemas/`.\n- Every significant architectural/design decision needs ADR. Significant = multi-package impact, future constraint, or real non-obvious alternative choice.\n- ADRs MUST follow MADR format, plus `### Spec` inside `## More Information` linking relevant specs. `### Confirmation` inside `## Decision Outcome` is always required. `## Decision Drivers`, `## Considered Options`, `## Pros and Cons of the Options`, and `## More Information` body are optional only when no value.\n- ADR frontmatter MUST include status/date. ADR filenames are sequential `NNNN-kebab-case-title.md` starting `0001`. Numbers never reused.\n- Every `specd` command needs matching `docs/cli/` reference covering purpose, flags, examples, exit codes. If command output/caching/machine-consumed behavior changes, docs update same change.\n- Every MCP tool/resource exposed by `@specd/mcp` needs matching `docs/mcp/` entry with input schema, output schema, examples.\n- `docs/core/` documents `@specd/core` semantics/contracts, not host integration path.\n- Host integrators MUST start at `docs/sdk/` and import from `@specd/sdk` only. `docs/core/index.md` and `docs/code-graph/index.md` MUST call this out prominently.\n- Core examples using `@specd/core` imports MUST be labeled plugin/core-only audience, never host-default guidance.\n- `docs/sdk/` is only Docusaurus integrator entry point. It documents `@specd/sdk` `.`, `./ports`, `./extensions`, host bootstrap (`openSpecdHost`, `createSdkContext`), `createKernel`, standalone `createX` / `create*Repository` assembly, and rule against mixed `@specd/core` + `@specd/code-graph` host deps.\n- All functions, methods, classes, type aliases, interfaces require JSDoc. JSDoc includes description, `@param` for each param, `@returns` when applicable, `@throws` per thrown error type.\n- When public composition surface changes, docs MUST describe canonical `createX(deps)`, convenience `createX(config, options?)`, role split among standalone factories / `createKernel(...)` / `createKernelBuilder()`, and shared `CompositionResolver` path.\n\n## Constraints\n- All docs files are Markdown.\n- Specs may link ADRs only in historical provenance `## ADRs`; spec dependencies are spec-to-spec only.\n- ADR-derived constraints must be captured in specs before other specs depend on them."
+  "generatedBy": "core"
 }

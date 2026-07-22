@@ -1,0 +1,47 @@
+- op: added
+  description: Verify docs stay aligned when template variable tokens are removed/renamed or list/summary contracts change.
+  position:
+    parent:
+      type: section
+      matches: Requirements
+    after:
+      type: section
+      matches: 'Requirement: Public composition-surface documentation stays aligned'
+  content: |
+    ### Requirement: Documentation stays aligned with removed/renamed template variables and list/summary contracts
+
+    #### Scenario: Removed template variable token requires doc updates in the same change
+
+    - **GIVEN** a change removes the `{{change.workspace}}` template variable token from `core:template-variables`
+    - **AND** `docs/config/config-reference.md`, `docs/guide/workspaces.md`, `docs/guide/workflow.md`, and `docs/adr/0013-workspaces-not-scopes.md` all document or illustrate that token
+    - **WHEN** the change is reviewed for documentation alignment
+    - **THEN** every one of those files is updated in the same change to drop or replace the stale token references
+    - **AND** none of them is left documenting `{{change.workspace}}` as a supported token
+
+    #### Scenario: Changed listing/summary use case contract requires doc updates in the same change
+
+    - **GIVEN** a change alters a listing or summary use case's return shape or dependency-resolution contract (for example `GetProjectSummary` or `ListSpecs`)
+    - **AND** `docs/core/use-cases.md` documents the old shape or dependency list
+    - **WHEN** the change is reviewed for documentation alignment
+    - **THEN** `docs/core/use-cases.md` is updated in the same change to reflect the new contract
+
+    #### Scenario: CLI output contract change requires cli-reference update in the same change
+
+    - **GIVEN** a change alters a CLI command's flags, JSON/toon output shape, or pagination behavior
+    - **AND** `docs/cli/cli-reference.md` documents the old flags or output shape for that command
+    - **WHEN** the change is reviewed for documentation alignment
+    - **THEN** `docs/cli/cli-reference.md` is updated in the same change
+
+    #### Scenario: Illustrative doc list is not exhaustive
+
+    - **GIVEN** a doc file not among `docs/config/config-reference.md`, `docs/guide/workspaces.md`, `docs/guide/workflow.md`, `docs/guide/schemas.md`, `docs/schemas/schema-format.md`, `docs/adr/0013-workspaces-not-scopes.md`, `docs/core/use-cases.md`, `docs/cli/cli-reference.md`
+    - **AND** that file documents the same removed/renamed token or stale contract shape
+    - **WHEN** the change is reviewed for documentation alignment
+    - **THEN** that file is equally in scope and must be updated in the same change
+
+    #### Scenario: Follow-up-only documentation fix is rejected
+
+    - **GIVEN** a change removes a public template variable token or changes a listing/summary use case's public contract
+    - **AND** the author proposes updating the affected `docs/` files as separate follow-up work
+    - **WHEN** the change is reviewed for documentation alignment
+    - **THEN** the review rejects deferring those doc updates — they MUST land in the same change

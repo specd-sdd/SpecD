@@ -457,7 +457,7 @@ archive:
     pattern: '{{year}}/{{change.archivedName}}'
 ```
 
-This organises archived changes into yearly subdirectories. Available variables: `{{change.archivedName}}`, `{{change.name}}`, `{{change.workspace}}`, `{{year}}`, `{{date}}`.
+This organises archived changes into yearly subdirectories. Available variables: `{{change.archivedName}}`, `{{change.name}}`, `{{year}}`, `{{date}}`.
 
 ---
 

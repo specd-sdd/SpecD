@@ -1,0 +1,212 @@
+{
+  "title": "Storage Reindex",
+  "description": "Filesystem list indexes under `{configPath}/tmp/fs-cache/` can become stale after manual edits, external sync, or cache invalidation. Operators and agents need a single CLI entry point to force a full rebuild of those indexes without knowing cache file layout or JSONL wire shapes. `specd storage reindex` invokes repository port `reindex*` methods only — the CLI never reads or writes cache files directly.",
+  "dependsOn": [
+    "cli:entrypoint",
+    "core:change-repository-port",
+    "core:spec-repository-port",
+    "core:archive-repository-port",
+    "core:storage",
+    "core:composition"
+  ],
+  "context": [
+    "Filesystem list indexes under `{configPath}/tmp/fs-cache/` can become stale after manual edits, external sync, or cache invalidation. Operators and agents need a single CLI entry point to force a full rebuild of those indexes without knowing cache file layout or JSONL wire shapes. `specd storage reindex` invokes repository port `reindex*` methods only — the CLI never reads or writes cache files directly."
+  ],
+  "rules": [
+    {
+      "requirement": "Command signature",
+      "rules": [
+        "```\nspecd storage reindex [--changes] [--specs] [--archive] [--format text|json|toon]\n```\n\n- `--changes` — optional; rebuild change list indexes (active, drafts, and discarded) via `ChangeRepository.reindex()`\n- `--specs` — optional; rebuild spec list indexes for every configured workspace via each workspace `SpecRepository.reindex()`\n- `--archive` — optional; rebuild the archive list index via `ArchiveRepository.reindex()`\n- `--format text|json|toon` — optional; output format, defaults to `text`\n\nWhen **no** resource flag is set, the command MUST rebuild **all** FS list indexes: `ChangeRepository.reindex()`, `SpecRepository.reindex()` for every configured workspace, and `ArchiveRepository.reindex()`.\n\nWhen one or more resource flags are set, the command MUST rebuild only the selected targets. Flags are combinable (for example `--changes --specs` rebuilds change and spec indexes but not archive)."
+      ]
+    },
+    {
+      "requirement": "Port delegation",
+      "rules": [
+        "The command MUST obtain repository instances through the normal composition/kernel wiring used by other storage commands.\n\nThe command MUST invoke only these port surfaces:\n\n- `ChangeRepository.reindex()` when `--changes` is selected or when rebuilding all\n- `SpecRepository.reindex()` for each configured workspace when `--specs` is selected or when rebuilding all\n- `ArchiveRepository.reindex()` when `--archive` is selected or when rebuilding all\n\nThe CLI MUST NOT:\n\n- read or write files under `{configPath}/tmp/fs-cache/` directly\n- parse or emit JSONL index wire shapes\n- call per-bucket change methods (`reindexActive`, `reindexDrafts`, `reindexDiscarded`) in v1 — those remain port-only for programmatic use"
+      ]
+    },
+    {
+      "requirement": "Output format",
+      "rules": [
+        "In `text` mode (default), after all selected reindex operations complete successfully, the command prints one summary line per rebuilt target to stdout:\n\n```\nreindexed changes\nreindexed specs (default)\nreindexed specs (billing)\nreindexed archive\n```\n\nWorkspace lines use the configured workspace name. When rebuilding all with no flags, every applicable line MUST appear.\n\nIn `json` or `toon` mode, stdout is an object listing what was rebuilt:\n\n```json\n{\n  \"reindexed\": {\n    \"changes\": true,\n    \"specs\": [\"default\", \"billing\"],\n    \"archive\": true\n  }\n}\n```\n\nOmitted keys reflect targets that were not rebuilt. An empty `specs` array means no workspace spec indexes were rebuilt."
+      ]
+    },
+    {
+      "requirement": "Error cases",
+      "rules": [
+        "If any selected `reindex()` call throws or rejects, the command exits with code 3 and prints an `error:` message to stderr. Partial rebuilds completed before the failure are not rolled back; stderr SHOULD indicate which target failed when the underlying error permits.\n\nIf the project has no configured workspaces and `--specs` is selected (or all targets are rebuilt), spec reindex is a no-op and produces no spec workspace lines."
+      ]
+    }
+  ],
+  "constraints": [
+    "Reindex is a write-side maintenance operation; it does not list or count entries",
+    "The command requires a valid specd.yaml and uses standard config discovery from [cli:entrypoint](../entrypoint/spec.md)",
+    "Errors always go to stderr as plain text regardless of --format",
+    "--format only affects stdout"
+  ],
+  "scenarios": [
+    {
+      "requirement": "Command signature",
+      "name": "No flags rebuilds all indexes",
+      "given": ["a project with configured workspaces default and billing"],
+      "when": ["specd storage reindex is run"],
+      "then": [
+        "ChangeRepository.reindex(), SpecRepository.reindex() for each workspace, and ArchiveRepository.reindex() are invoked",
+        "AND the process exits with code 0"
+      ]
+    },
+    {
+      "requirement": "Command signature",
+      "name": "--changes rebuilds change indexes only",
+      "when": ["specd storage reindex --changes is run"],
+      "then": [
+        "only ChangeRepository.reindex() is invoked",
+        "AND no spec or archive reindex methods are invoked"
+      ]
+    },
+    {
+      "requirement": "Command signature",
+      "name": "--specs rebuilds spec indexes only",
+      "given": ["configured workspaces default and billing"],
+      "when": ["specd storage reindex --specs is run"],
+      "then": [
+        "SpecRepository.reindex() is invoked for each configured workspace",
+        "AND change and archive reindex methods are not invoked"
+      ]
+    },
+    {
+      "requirement": "Command signature",
+      "name": "--archive rebuilds archive index only",
+      "when": ["specd storage reindex --archive is run"],
+      "then": [
+        "only ArchiveRepository.reindex() is invoked",
+        "AND change and spec reindex methods are not invoked"
+      ]
+    },
+    {
+      "requirement": "Command signature",
+      "name": "Combined resource flags rebuild selected targets",
+      "when": ["specd storage reindex --changes --specs is run"],
+      "then": [
+        "ChangeRepository.reindex() and each workspace SpecRepository.reindex() are invoked",
+        "AND ArchiveRepository.reindex() is not invoked"
+      ]
+    },
+    {
+      "requirement": "Port delegation",
+      "name": "Repositories obtained through normal composition wiring",
+      "when": ["specd storage reindex runs"],
+      "then": [
+        "repository instances are obtained through the same composition/kernel wiring used by other storage commands"
+      ]
+    },
+    {
+      "requirement": "Port delegation",
+      "name": "CLI does not touch fs-cache files directly",
+      "when": ["specd storage reindex runs"],
+      "then": [
+        "the command does not read or write files under {configPath}/tmp/fs-cache/",
+        "AND it does not parse or emit JSONL index wire shapes"
+      ]
+    },
+    {
+      "requirement": "Port delegation",
+      "name": "Per-bucket change reindex methods are not called",
+      "when": ["specd storage reindex --changes runs"],
+      "then": [
+        "the command invokes ChangeRepository.reindex() only",
+        "AND it does not call reindexActive, reindexDrafts, or reindexDiscarded"
+      ]
+    },
+    {
+      "requirement": "Output format",
+      "name": "Text output lists every rebuilt target when rebuilding all",
+      "given": ["workspaces default and billing"],
+      "when": ["specd storage reindex completes successfully"],
+      "then": [
+        "stdout contains reindexed changes",
+        "AND stdout contains reindexed specs (default)",
+        "AND stdout contains reindexed specs (billing)",
+        "AND stdout contains reindexed archive"
+      ]
+    },
+    {
+      "requirement": "Output format",
+      "name": "Text output lists only selected targets",
+      "when": ["specd storage reindex --changes --archive completes successfully"],
+      "then": [
+        "stdout contains reindexed changes and reindexed archive",
+        "AND stdout does not contain any reindexed specs line"
+      ]
+    },
+    {
+      "requirement": "Output format",
+      "name": "JSON output reflects rebuilt targets",
+      "given": ["workspaces default and billing"],
+      "when": ["specd storage reindex --format json completes successfully"],
+      "then": [
+        "stdout is valid JSON with reindexed.changes equal to true",
+        "AND reindexed.specs equals [\"default\", \"billing\"]",
+        "AND reindexed.archive equal to true"
+      ]
+    },
+    {
+      "requirement": "Output format",
+      "name": "JSON output omits targets not rebuilt",
+      "when": ["specd storage reindex --changes --format json completes successfully"],
+      "then": [
+        "stdout is valid JSON with reindexed.changes equal to true",
+        "AND reindexed does not contain specs or archive keys"
+      ]
+    },
+    {
+      "requirement": "Output format",
+      "name": "TOON output matches JSON data model",
+      "when": ["specd storage reindex --changes --format toon completes successfully"],
+      "then": [
+        "stdout encodes the same reindexed object shape as JSON mode in Token-Oriented Object Notation (toon)"
+      ]
+    },
+    {
+      "requirement": "Error cases",
+      "name": "Reindex failure exits code 3",
+      "given": ["ArchiveRepository.reindex() throws an error"],
+      "when": ["specd storage reindex --archive is run"],
+      "then": ["the process exits with code 3", "AND stderr contains an error: message"]
+    },
+    {
+      "requirement": "Error cases",
+      "name": "Errors go to stderr regardless of format",
+      "given": ["a selected reindex() call fails"],
+      "when": ["specd storage reindex --format json is run"],
+      "then": [
+        "stderr contains a plain-text error: message",
+        "AND stdout does not contain the error payload"
+      ]
+    },
+    {
+      "requirement": "Error cases",
+      "name": "Spec reindex is no-op with no configured workspaces",
+      "given": ["the project has no configured workspaces"],
+      "when": ["specd storage reindex --specs completes successfully"],
+      "then": [
+        "stdout contains no reindexed specs workspace lines",
+        "AND JSON output has reindexed.specs as an empty array or omits workspace entries"
+      ]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "cli:storage-reindex",
+        "file": "cli:src/commands/storage/reindex.ts",
+        "symbol": "registerStorageReindex"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:cabb6447623d677f22cbb33848e1e7c8bdb9fc3b48925cde52ab0231d269efe7",
+    "verify.md": "sha256:8225957f0661ba2a0e30f8ea11323e3b437b14b69606a7c5e1d01da402339c16"
+  },
+  "generatedBy": "core"
+}

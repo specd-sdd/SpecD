@@ -1555,6 +1555,354 @@
           "files": ["tasks"]
         }
       ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-22T16:54:13.971Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'normalize-repository-caches' was archived with overlapping specs: core:change",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:change"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:change"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-22T16:54:23.660Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'normalize-repository-caches' was archived with overlapping specs: core:change",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:change"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:change"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-22T16:54:28.289Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'normalize-repository-caches' was archived with overlapping specs: core:change",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:change"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:change"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-22T16:54:55.783Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'normalize-repository-caches' was archived with overlapping specs: core:change",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:change"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:change"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-22T16:55:04.798Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'normalize-repository-caches' was archived with overlapping specs: core:change",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:change"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:change"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-22T16:55:16.008Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'normalize-repository-caches' was archived with overlapping specs: core:change",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:change"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:change"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-22T16:55:22.073Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'normalize-repository-caches' was archived with overlapping specs: core:change",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:change"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:change"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-22T16:55:27.243Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'normalize-repository-caches' was archived with overlapping specs: core:change",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:change"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:change"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-22T16:55:31.809Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'normalize-repository-caches' was archived with overlapping specs: core:change",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:change"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:change"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-22T16:55:36.675Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'normalize-repository-caches' was archived with overlapping specs: core:change",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:change"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:change"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-22T16:55:40.418Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'normalize-repository-caches' was archived with overlapping specs: core:change",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:change"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:change"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-22T16:55:44.001Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'normalize-repository-caches' was archived with overlapping specs: core:change",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:change"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:change"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
     }
   ]
 }

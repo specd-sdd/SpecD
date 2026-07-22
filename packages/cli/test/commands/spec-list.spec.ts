@@ -1,5 +1,13 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { makeMockConfig, makeMockKernel, makeProgram, captureStdout } from './helpers.js'
+import {
+  makeMockConfig,
+  makeMockKernel,
+  makeListSpecsResult,
+  makeProgram,
+  captureStdout,
+  mockProcessExit,
+  DEFAULT_LIST_LIMIT,
+} from './helpers.js'
 
 function makeMultiWorkspaceConfig() {
   return makeMockConfig({
@@ -83,7 +91,7 @@ const entries = [
 describe('spec list --metadata-status', () => {
   it('shows STATUS column in text mode', async () => {
     const { kernel, stdout } = setup()
-    kernel.specs.list.execute.mockResolvedValue(entries)
+    kernel.specs.list.execute.mockResolvedValue(makeListSpecsResult(entries))
 
     const program = makeProgram()
     registerSpecList(program.command('spec'))
@@ -98,7 +106,7 @@ describe('spec list --metadata-status', () => {
 
   it('passes includeMetadataStatus true to use case when --metadata-status is present', async () => {
     const { kernel } = setup()
-    kernel.specs.list.execute.mockResolvedValue([])
+    kernel.specs.list.execute.mockResolvedValue(makeListSpecsResult([]))
 
     const program = makeProgram()
     registerSpecList(program.command('spec'))
@@ -112,7 +120,7 @@ describe('spec list --metadata-status', () => {
 
   it('does not pass includeMetadataStatus when --metadata-status is absent', async () => {
     const { kernel } = setup()
-    kernel.specs.list.execute.mockResolvedValue([])
+    kernel.specs.list.execute.mockResolvedValue(makeListSpecsResult([]))
 
     const program = makeProgram()
     registerSpecList(program.command('spec'))
@@ -126,7 +134,7 @@ describe('spec list --metadata-status', () => {
 
   it('filters by single status value', async () => {
     const { kernel, stdout } = setup()
-    kernel.specs.list.execute.mockResolvedValue(entries)
+    kernel.specs.list.execute.mockResolvedValue(makeListSpecsResult(entries))
 
     const program = makeProgram()
     registerSpecList(program.command('spec'))
@@ -141,7 +149,7 @@ describe('spec list --metadata-status', () => {
 
   it('filters by comma-separated status values', async () => {
     const { kernel, stdout } = setup()
-    kernel.specs.list.execute.mockResolvedValue(entries)
+    kernel.specs.list.execute.mockResolvedValue(makeListSpecsResult(entries))
 
     const program = makeProgram()
     registerSpecList(program.command('spec'))
@@ -162,7 +170,7 @@ describe('spec list --metadata-status', () => {
 
   it('includes status in JSON output', async () => {
     const { kernel, stdout } = setup()
-    kernel.specs.list.execute.mockResolvedValue(entries)
+    kernel.specs.list.execute.mockResolvedValue(makeListSpecsResult(entries))
 
     const program = makeProgram()
     registerSpecList(program.command('spec'))
@@ -186,7 +194,7 @@ describe('spec list --metadata-status', () => {
   it('omits status from JSON when --metadata-status is not passed', async () => {
     const { kernel, stdout } = setup()
     const noStatusEntries = entries.map(({ metadataStatus: _, ...rest }) => rest)
-    kernel.specs.list.execute.mockResolvedValue(noStatusEntries)
+    kernel.specs.list.execute.mockResolvedValue(makeListSpecsResult(noStatusEntries))
 
     const program = makeProgram()
     registerSpecList(program.command('spec'))
@@ -200,7 +208,7 @@ describe('spec list --metadata-status', () => {
   it('does not show STATUS column when --metadata-status is absent', async () => {
     const { kernel, stdout } = setup()
     const noStatusEntries = entries.map(({ metadataStatus: _, ...rest }) => rest)
-    kernel.specs.list.execute.mockResolvedValue(noStatusEntries)
+    kernel.specs.list.execute.mockResolvedValue(makeListSpecsResult(noStatusEntries))
 
     const program = makeProgram()
     registerSpecList(program.command('spec'))
@@ -212,14 +220,16 @@ describe('spec list --metadata-status', () => {
 
   it('uses optimizedDescription when available in summary mode', async () => {
     const { kernel, stdout } = setup()
-    kernel.specs.list.execute.mockResolvedValue([
-      {
-        workspace: 'default',
-        path: 'auth/login',
-        title: 'Login',
-        summary: 'Terse login summary',
-      },
-    ])
+    kernel.specs.list.execute.mockResolvedValue(
+      makeListSpecsResult([
+        {
+          workspace: 'default',
+          path: 'auth/login',
+          title: 'Login',
+          summary: 'Terse login summary',
+        },
+      ]),
+    )
 
     const program = makeProgram()
     registerSpecList(program.command('spec'))
@@ -254,7 +264,7 @@ describe('spec list --workspace', () => {
       configFilePath: null,
       kernel: kernel,
     })
-    kernel.specs.list.execute.mockResolvedValue([])
+    kernel.specs.list.execute.mockResolvedValue(makeListSpecsResult([]))
 
     const program = makeProgram()
     registerSpecList(program.command('spec'))
@@ -291,7 +301,7 @@ describe('spec list --workspace', () => {
       configFilePath: null,
       kernel: kernel,
     })
-    kernel.specs.list.execute.mockResolvedValue([])
+    kernel.specs.list.execute.mockResolvedValue(makeListSpecsResult([]))
 
     const program = makeProgram()
     registerSpecList(program.command('spec'))
@@ -337,7 +347,7 @@ describe('spec list --workspace', () => {
       configFilePath: null,
       kernel: kernel,
     })
-    kernel.specs.list.execute.mockResolvedValue([multiEntries[0]!])
+    kernel.specs.list.execute.mockResolvedValue(makeListSpecsResult([multiEntries[0]!]))
 
     const stdout = captureStdout()
     const program = makeProgram()
@@ -374,7 +384,7 @@ describe('spec list --workspace', () => {
       configFilePath: null,
       kernel: kernel,
     })
-    kernel.specs.list.execute.mockResolvedValue([multiEntries[0]!])
+    kernel.specs.list.execute.mockResolvedValue(makeListSpecsResult([multiEntries[0]!]))
 
     const stdout = captureStdout()
     const program = makeProgram()
@@ -397,7 +407,7 @@ describe('spec list --workspace', () => {
 
   it('omits workspaces property when no --workspace is provided', async () => {
     const { kernel } = setup()
-    kernel.specs.list.execute.mockResolvedValue([])
+    kernel.specs.list.execute.mockResolvedValue(makeListSpecsResult([]))
 
     const program = makeProgram()
     registerSpecList(program.command('spec'))
@@ -407,5 +417,78 @@ describe('spec list --workspace', () => {
       includeSummary: false,
       includeMetadataStatus: false,
     })
+  })
+})
+
+describe('spec list pagination', () => {
+  it('forwards --limit and --page to ListSpecs', async () => {
+    const { kernel } = setup()
+    kernel.specs.list.execute.mockResolvedValue(makeListSpecsResult([]))
+
+    const program = makeProgram()
+    registerSpecList(program.command('spec'))
+    await program.parseAsync(['node', 'specd', 'spec', 'list', '--limit', '50', '--page', '3'])
+
+    expect(kernel.specs.list.execute).toHaveBeenCalledWith({
+      limit: 50,
+      page: 3,
+      includeSummary: false,
+      includeMetadataStatus: false,
+    })
+  })
+
+  it('forwards --after-key without --after-id', async () => {
+    const { kernel } = setup()
+    kernel.specs.list.execute.mockResolvedValue(makeListSpecsResult([]))
+
+    const program = makeProgram()
+    registerSpecList(program.command('spec'))
+    await program.parseAsync(['node', 'specd', 'spec', 'list', '--after-key', 'auth/login'])
+
+    expect(kernel.specs.list.execute).toHaveBeenCalledWith({
+      after: { key: 'auth/login' },
+      includeSummary: false,
+      includeMetadataStatus: false,
+    })
+  })
+
+  it('rejects --after-id for spec list', async () => {
+    const program = makeProgram()
+    registerSpecList(program.command('spec'))
+    const cmd = program.commands
+      .find((c) => c.name() === 'spec')!
+      .commands.find((c) => c.name() === 'list')!
+    const optionNames = cmd.options.map((o) => o.long?.replace(/^--/, '') ?? o.short)
+    expect(optionNames).not.toContain('after-id')
+  })
+
+  it('prints per-workspace truncation hint', async () => {
+    const { kernel, stdout } = setup()
+    kernel.specs.list.execute.mockResolvedValue(
+      makeListSpecsResult([{ workspace: 'default', path: 'auth/login', title: 'Login' }], {
+        total: 500,
+        count: 1,
+      }),
+    )
+
+    const program = makeProgram()
+    registerSpecList(program.command('spec'))
+    await program.parseAsync(['node', 'specd', 'spec', 'list'])
+
+    expect(stdout()).toContain('showing 1 of 500 (use --limit/--page)')
+  })
+
+  it('JSON workspaces include meta with default limit', async () => {
+    const { kernel, stdout } = setup()
+    kernel.specs.list.execute.mockResolvedValue(
+      makeListSpecsResult([{ workspace: 'default', path: 'auth/login', title: 'Login' }]),
+    )
+
+    const program = makeProgram()
+    registerSpecList(program.command('spec'))
+    await program.parseAsync(['node', 'specd', 'spec', 'list', '--format', 'json'])
+
+    const json = JSON.parse(stdout())
+    expect(json.workspaces[0].meta.limit).toBe(DEFAULT_LIST_LIMIT)
   })
 })

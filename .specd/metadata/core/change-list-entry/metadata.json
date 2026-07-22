@@ -1,0 +1,168 @@
+{
+  "title": "Change List Entry",
+  "description": "Listing active, drafted, and discarded changes is a hot path for CLI and agents. Returning full `Change` aggregates or rich read-only views from every list call forces expensive manifest rehydration and history projection. `ChangeListEntry` types define the lightweight row shapes returned by `ChangeRepository.list*`: a shared base plus bucket-specific extras. Detail fields — history, artifact file maps, hashes, approvals — remain on `get`, `getDraft`, `getDiscarded`, and related detail operations.",
+  "dependsOn": ["core:change", "core:repository-port"],
+  "context": [
+    "Listing active, drafted, and discarded changes is a hot path for CLI and agents. Returning full `Change` aggregates or rich read-only views from every list call forces expensive manifest rehydration and history projection. `ChangeListEntry` types define the lightweight row shapes returned by `ChangeRepository.list*`: a shared base plus bucket-specific extras. Detail fields — history, artifact file maps, hashes, approvals — remain on `get`, `getDraft`, `getDiscarded`, and related detail operations."
+  ],
+  "rules": [
+    {
+      "requirement": "Shared change list entry base",
+      "rules": [
+        "All three change list entry types share a common required base. Every entry MUST include:\n\n- `name` (string) — change slug (lookup key)\n- `createdAt` (Date) — creation timestamp recorded at change creation\n- `state` (string) — current lifecycle state\n- `specIds` (string\\[]) — spec IDs associated with the change\n- `schemaName` (string) and `schemaVersion` (number) — governing schema identity\n\n`state` MUST be derived from change history when projecting a list entry. It is not necessarily a plain manifest snapshot field."
+      ]
+    },
+    {
+      "requirement": "ActiveChangeListEntry",
+      "rules": [
+        "`ActiveChangeListEntry` extends the shared base with no additional required fields beyond the base.\n\nWhen `includeDescription` is set on the list options, the entry MAY include:\n\n- `description` (string) — change description when present\n\nWhen `includeDescription` is not set, `description` MUST NOT appear on the entry."
+      ]
+    },
+    {
+      "requirement": "DraftedChangeListEntry",
+      "rules": [
+        "`DraftedChangeListEntry` extends the shared base with these additional **required** fields:\n\n- `draftedAt` (Date) — timestamp when the change was drafted\n- `draftedBy` (`ActorIdentity`) — actor who drafted the change\n\nThese fields MUST be derived from change history when projecting the entry.\n\nWhen `includeDescription` is set, the entry MAY include `description` (string).\n\nWhen `includeReason` is set, the entry MAY include `reason` (string) — draft reason when recorded in history.\n\nWhen the corresponding include flag is not set, the optional field MUST NOT appear on the entry."
+      ]
+    },
+    {
+      "requirement": "DiscardedChangeListEntry",
+      "rules": [
+        "`DiscardedChangeListEntry` extends the shared base with these additional **required** fields:\n\n- `discardedAt` (Date) — timestamp when the change was discarded\n- `discardedBy` (`ActorIdentity`) — actor who discarded the change\n\nThese fields MUST be derived from change history when projecting the entry.\n\nWhen `includeDescription` is set, the entry MAY include `description` (string).\n\nWhen `includeReason` is set, the entry MAY include `reason` (string) — discard reason when recorded in history.\n\nWhen `includeSupersededBy` is set, the entry MAY include `supersededBy` (string) — name of the superseding change when recorded in history.\n\nWhen the corresponding include flag is not set, the optional field MUST NOT appear on the entry."
+      ]
+    },
+    {
+      "requirement": "Three distinct entry types",
+      "rules": [
+        "`ActiveChangeListEntry`, `DraftedChangeListEntry`, and `DiscardedChangeListEntry` are three separate types sharing a common base. They MUST NOT be modeled as a single discriminated union type at the port layer."
+      ]
+    },
+    {
+      "requirement": "List entries exclude detail fields",
+      "rules": [
+        "Change list entry types MUST NOT include history events, artifact file maps, validated hashes, approval records, artifact content, or other fields reserved for detail operations (`get`, `getDraft`, `getDiscarded`, `status`, `artifact`)."
+      ]
+    }
+  ],
+  "constraints": [
+    "Change list entries are read-only data shapes with no mutating operations.",
+    "Optional fields appear only when the matching include* flag is set on the list call; implementations MUST NOT perform extra get or file reads to satisfy a flag — the index stores the full CLI-usable payload and flags are response projection only.",
+    "History-derived fields (state, draft/discard timestamps, actors, reasons, superseded-by) are projected when building an entry, not read as opaque manifest snapshots."
+  ],
+  "scenarios": [
+    {
+      "requirement": "Shared change list entry base",
+      "name": "Entry includes required base fields",
+      "given": ["an active change projected into a list entry"],
+      "when": ["the entry is returned from ChangeRepository.list()"],
+      "then": ["it includes name, createdAt, state, specIds, schemaName, and schemaVersion"]
+    },
+    {
+      "requirement": "Shared change list entry base",
+      "name": "State is derived from history",
+      "given": [
+        "a change whose lifecycle state is determined by the latest history event rather than a plain manifest snapshot field"
+      ],
+      "when": ["the change is projected into a list entry"],
+      "then": ["state reflects the history-derived lifecycle state"]
+    },
+    {
+      "requirement": "ActiveChangeListEntry",
+      "name": "Description omitted without includeDescription",
+      "given": ["an active change with a description in its cached list payload"],
+      "when": ["list() is called without includeDescription"],
+      "then": ["returned ActiveChangeListEntry items do not include a description property"]
+    },
+    {
+      "requirement": "ActiveChangeListEntry",
+      "name": "Description projected when includeDescription is set",
+      "given": ["an active change with a description in its cached list payload"],
+      "when": ["list({ includeDescription: true }) is called"],
+      "then": ["the matching entry includes description"]
+    },
+    {
+      "requirement": "DraftedChangeListEntry",
+      "name": "Entry includes required draft fields",
+      "given": ["a drafted change with drafted history metadata"],
+      "when": ["it is projected into a DraftedChangeListEntry"],
+      "then": ["the entry includes draftedAt and draftedBy derived from history"]
+    },
+    {
+      "requirement": "DraftedChangeListEntry",
+      "name": "Optional draft fields respect include flags",
+      "given": ["a drafted change whose cached entry payload includes description and reason"],
+      "when": ["listDrafts({ includeDescription: true, includeReason: false }) is called"],
+      "then": ["returned items include description", "AND returned items do not include reason"]
+    },
+    {
+      "requirement": "DiscardedChangeListEntry",
+      "name": "Entry includes required discard fields",
+      "given": ["a discarded change with discarded history metadata"],
+      "when": ["it is projected into a DiscardedChangeListEntry"],
+      "then": ["the entry includes discardedAt and discardedBy derived from history"]
+    },
+    {
+      "requirement": "DiscardedChangeListEntry",
+      "name": "SupersededBy projected only when requested",
+      "given": ["a discarded change whose cached entry payload includes supersededBy"],
+      "when": [
+        "listDiscarded({ includeSupersededBy: true }) is called",
+        "listDiscarded() is called without includeSupersededBy"
+      ],
+      "then": [
+        "the matching entry includes supersededBy",
+        "the matching entry does not include supersededBy"
+      ]
+    },
+    {
+      "requirement": "Three distinct entry types",
+      "name": "Port exposes three separate list entry types",
+      "when": ["the change repository port list methods are typed"],
+      "then": [
+        "list() returns ActiveChangeListEntry",
+        "AND listDrafts() returns DraftedChangeListEntry",
+        "AND listDiscarded() returns DiscardedChangeListEntry",
+        "AND they are not modeled as a single discriminated union type"
+      ]
+    },
+    {
+      "requirement": "List entries exclude detail fields",
+      "name": "List entry omits detail-only fields",
+      "given": [
+        "a change with history events, artifact file maps, validated hashes, and approval records"
+      ],
+      "when": ["it is projected into any change list entry type"],
+      "then": [
+        "the entry does not include history, artifact file maps, validated hashes, approval records, or artifact content"
+      ]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "core:change-list-entry",
+        "file": "core:src/domain/change-list-entry.ts",
+        "symbol": "ChangeListEntryBase"
+      },
+      {
+        "specId": "core:change-list-entry",
+        "file": "core:src/domain/change-list-entry.ts",
+        "symbol": "ActiveChangeListEntry"
+      },
+      {
+        "specId": "core:change-list-entry",
+        "file": "core:src/domain/change-list-entry.ts",
+        "symbol": "DraftedChangeListEntry"
+      },
+      {
+        "specId": "core:change-list-entry",
+        "file": "core:src/domain/change-list-entry.ts",
+        "symbol": "DiscardedChangeListEntry"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:e26b9cdbdda8520873b8af1384e1fd13686f07b560652865479a1bed4553d863",
+    "verify.md": "sha256:e8a4d4726f2da8198f6179a8a1ab898f6d2a85bea9fdd9d230330da68e29cf65"
+  },
+  "generatedBy": "core"
+}

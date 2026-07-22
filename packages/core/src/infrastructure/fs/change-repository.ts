@@ -28,7 +28,26 @@ import { SchemaMismatchError } from '../../application/errors/schema-mismatch-er
 import {
   ChangeRepository,
   type ChangeRepositoryConfig as BaseChangeRepositoryConfig,
+  type ActiveChangeListOptions,
+  type DiscardedChangeListOptions,
+  type DraftedChangeListOptions,
 } from '../../application/ports/change-repository.js'
+import { type ListResult } from '../../application/ports/repository.js'
+import {
+  toActiveChangeListEntry,
+  toDiscardedChangeListEntry,
+  toDraftedChangeListEntry,
+  projectActiveInclude,
+  projectDraftedInclude,
+  projectDiscardedInclude,
+} from './change-list-projection.js'
+import {
+  type ActiveChangeListEntry,
+  type DraftedChangeListEntry,
+  type DiscardedChangeListEntry,
+} from '../../domain/change-list-entry.js'
+import { FsChangeIndexCache, type ChangeBucketKind } from './fs-change-index-cache.js'
+import { ensureTmpGitignore } from './ensure-tmp-gitignore.js'
 import { parseSpecId } from '../../domain/services/parse-spec-id.js'
 import { expectedArtifactFilename } from '../../domain/services/artifact-filename.js'
 import { type PreHashCleanup } from '../../domain/value-objects/validation-rule.js'
@@ -112,6 +131,10 @@ export class FsChangeRepository extends ChangeRepository {
   private readonly _activeMutationInProgress = new Set<string>()
   /** Change names currently inside `mutateDraft` — allow save/saveArtifact for that name. */
   private readonly _draftMutationInProgress = new Set<string>()
+  private readonly _activeIndex: FsChangeIndexCache<ActiveChangeListEntry>
+  private readonly _draftsIndex: FsChangeIndexCache<DraftedChangeListEntry>
+  private readonly _discardedIndex: FsChangeIndexCache<DiscardedChangeListEntry>
+  private _tmpGitignoreEnsured = false
 
   /**
    * Creates a new `FsChangeRepository` instance.
@@ -173,6 +196,107 @@ export class FsChangeRepository extends ChangeRepository {
     this._resolveSpecExists = context.resolveSpecExists
     this._artifactTypes = context.artifactTypes ?? []
     this._artifactTypesResolved = context.artifactTypes !== undefined
+
+    const fsCacheRoot = path.join(context.configPath, 'tmp', 'fs-cache')
+    this._activeIndex = new FsChangeIndexCache<ActiveChangeListEntry>({
+      bucketDir: path.join(fsCacheRoot, 'changes'),
+      sourceDir: this._changesPath,
+      kind: 'active',
+    })
+    this._draftsIndex = new FsChangeIndexCache<DraftedChangeListEntry>({
+      bucketDir: path.join(fsCacheRoot, 'drafts'),
+      sourceDir: this._draftsPath,
+      kind: 'drafted',
+    })
+    this._discardedIndex = new FsChangeIndexCache<DiscardedChangeListEntry>({
+      bucketDir: path.join(fsCacheRoot, 'discarded'),
+      sourceDir: this._discardedPath,
+      kind: 'discarded',
+    })
+  }
+
+  /**
+   * Idempotently ensures `{configPath}/tmp/.gitignore` exists before this
+   * repository writes anything under `tmp/fs-cache` or `tmp/change-locks`.
+   */
+  private async _ensureGitignore(): Promise<void> {
+    if (this._tmpGitignoreEnsured) return
+    await ensureTmpGitignore(this.configPath())
+    this._tmpGitignoreEnsured = true
+  }
+
+  /**
+   * Resolves which lifecycle bucket a change directory belongs to based on
+   * its parent storage root.
+   *
+   * @param dir - Absolute path to a change directory
+   * @returns The lifecycle bucket kind, or `null` if `dir` is not under any known root
+   */
+  private _bucketKindForDir(dir: string): ChangeBucketKind | null {
+    if (dir === this._changesPath || dir.startsWith(this._changesPath + path.sep)) return 'active'
+    if (dir === this._draftsPath || dir.startsWith(this._draftsPath + path.sep)) return 'drafted'
+    if (dir === this._discardedPath || dir.startsWith(this._discardedPath + path.sep))
+      return 'discarded'
+    return null
+  }
+
+  /**
+   * Removes a change's row from the index for the given bucket.
+   *
+   * @param kind - The lifecycle bucket to remove from
+   * @param name - The change name to remove
+   * @returns A promise that resolves when the row has been removed
+   */
+  private async _removeFromBucketIndex(kind: ChangeBucketKind, name: string): Promise<void> {
+    if (kind === 'active') return this._activeIndex.remove(name)
+    if (kind === 'drafted') return this._draftsIndex.remove(name)
+    return this._discardedIndex.remove(name)
+  }
+
+  /**
+   * Projects `change` for `targetBucket` and upserts it into the
+   * corresponding index, removing it from `previousBucket`'s index first
+   * when the change moved between buckets.
+   *
+   * @param change - The change that was just persisted
+   * @param targetDir - Absolute directory the change was persisted into
+   * @param targetBucket - The lifecycle bucket the change now belongs to
+   * @param previousBucket - The lifecycle bucket the change previously belonged to, or `null` if new
+   */
+  private async _syncChangeIndex(
+    change: Change,
+    targetDir: string,
+    targetBucket: ChangeBucketKind,
+    previousBucket: ChangeBucketKind | null,
+  ): Promise<void> {
+    if (previousBucket !== null && previousBucket !== targetBucket) {
+      await this._removeFromBucketIndex(previousBucket, change.name)
+    }
+
+    const stat = await fs.stat(path.join(targetDir, 'manifest.json'))
+    const mtimeIso = stat.mtime.toISOString()
+
+    if (targetBucket === 'active') {
+      await this._activeIndex.upsert(
+        toActiveChangeListEntry(change, { includeDescription: true }),
+        mtimeIso,
+      )
+      return
+    }
+    if (targetBucket === 'drafted') {
+      const entry = toDraftedChangeListEntry(change, {
+        includeDescription: true,
+        includeReason: true,
+      })
+      if (entry !== null) await this._draftsIndex.upsert(entry, mtimeIso)
+      return
+    }
+    const entry = toDiscardedChangeListEntry(change, {
+      includeDescription: true,
+      includeReason: true,
+      includeSupersededBy: true,
+    })
+    if (entry !== null) await this._discardedIndex.upsert(entry, mtimeIso)
   }
 
   /**
@@ -381,85 +505,110 @@ export class FsChangeRepository extends ChangeRepository {
   /**
    * Lists all active (non-drafted, non-discarded) changes, oldest first.
    *
-   * @returns All active changes in this workspace, sorted by creation order
+   * Delegates to the `changes/` bucket's fs-cache index; include flags are
+   * projected from the full stored payload without extra I/O.
+   *
+   * @param options - Pagination and include projection options
+   * @returns Paginated active change list entries
    */
-  override async list(): Promise<Change[]> {
-    let entries: string[]
-    try {
-      entries = await fs.readdir(this._changesPath)
-    } catch (err) {
-      if (isEnoent(err)) return []
-      throw err
+  override async list(
+    options?: ActiveChangeListOptions,
+  ): Promise<ListResult<ActiveChangeListEntry>> {
+    await this._ensureGitignore()
+    const result = await this._activeIndex.list(options)
+    return {
+      items: result.items.map((entry) => projectActiveInclude(entry, options)),
+      meta: result.meta,
     }
-
-    const dirs = await filterDirectories(this._changesPath, entries)
-    dirs.sort()
-
-    const changes: Change[] = []
-    for (const dirName of dirs) {
-      const match = dirName.match(/^\d{8}-\d{6}-(.+)$/)
-      if (match === null) continue
-      const name = match[1]!
-      const change = await this.get(name)
-      if (change !== null) {
-        changes.push(change)
-      }
-    }
-    return changes
   }
 
   /**
-   * Lists all drafted (shelved) changes, oldest first.
+   * Lists all drafted (shelved) changes, newest first.
    *
-   * @returns All drafted changes in this workspace, sorted by creation order
+   * @param options - Pagination and include projection options
+   * @returns Paginated drafted change list entries
    */
-  override async listDrafts(): Promise<DraftedChangeView[]> {
-    let entries: string[]
-    try {
-      entries = await fs.readdir(this._draftsPath)
-    } catch (err) {
-      if (isEnoent(err)) return []
-      throw err
+  override async listDrafts(
+    options?: DraftedChangeListOptions,
+  ): Promise<ListResult<DraftedChangeListEntry>> {
+    await this._ensureGitignore()
+    const result = await this._draftsIndex.list(options)
+    return {
+      items: result.items.map((entry) => projectDraftedInclude(entry, options)),
+      meta: result.meta,
     }
-
-    const dirs = await filterDirectories(this._draftsPath, entries)
-    dirs.sort()
-
-    const views: DraftedChangeView[] = []
-    for (const dirName of dirs) {
-      const dir = path.join(this._draftsPath, dirName)
-      const manifest = await this._loadManifest(dir)
-      const { change } = await this._manifestToChange(manifest, dir)
-      views.push(toDraftedChangeView(change))
-    }
-    return views
   }
 
   /**
-   * Lists all discarded changes, oldest first.
+   * Lists all discarded changes, newest first.
    *
-   * @returns All discarded changes in this workspace, sorted by creation order
+   * @param options - Pagination and include projection options
+   * @returns Paginated discarded change list entries
    */
-  override async listDiscarded(): Promise<DiscardedChangeView[]> {
-    let entries: string[]
-    try {
-      entries = await fs.readdir(this._discardedPath)
-    } catch (err) {
-      if (isEnoent(err)) return []
-      throw err
+  override async listDiscarded(
+    options?: DiscardedChangeListOptions,
+  ): Promise<ListResult<DiscardedChangeListEntry>> {
+    await this._ensureGitignore()
+    const result = await this._discardedIndex.list(options)
+    return {
+      items: result.items.map((entry) => projectDiscardedInclude(entry, options)),
+      meta: result.meta,
     }
+  }
 
-    const dirs = await filterDirectories(this._discardedPath, entries)
-    dirs.sort()
+  /** @inheritdoc */
+  override async count(): Promise<number> {
+    await this._ensureGitignore()
+    return this._activeIndex.count()
+  }
 
-    const views: DiscardedChangeView[] = []
-    for (const dirName of dirs) {
-      const dir = path.join(this._discardedPath, dirName)
-      const manifest = await this._loadManifest(dir)
-      const { change } = await this._manifestToChange(manifest, dir)
-      views.push(toDiscardedChangeView(change))
-    }
-    return views
+  /** @inheritdoc */
+  override async countDrafts(): Promise<number> {
+    await this._ensureGitignore()
+    return this._draftsIndex.count()
+  }
+
+  /** @inheritdoc */
+  override async countDiscarded(): Promise<number> {
+    await this._ensureGitignore()
+    return this._discardedIndex.count()
+  }
+
+  /** @inheritdoc */
+  override async reindex(): Promise<void> {
+    await this.reindexActive()
+    await this.reindexDrafts()
+    await this.reindexDiscarded()
+  }
+
+  /** @inheritdoc */
+  override async reindexActive(): Promise<void> {
+    await this._ensureGitignore()
+    await this._activeIndex.reindex()
+  }
+
+  /** @inheritdoc */
+  override async reindexDrafts(): Promise<void> {
+    await this._ensureGitignore()
+    await this._draftsIndex.reindex()
+  }
+
+  /** @inheritdoc */
+  override async reindexDiscarded(): Promise<void> {
+    await this._ensureGitignore()
+    await this._discardedIndex.reindex()
+  }
+
+  /**
+   * Marks all three bucket indexes invalidated so the next `list`/`count`
+   * rebuilds from disk.
+   */
+  override async invalidateCache(): Promise<void> {
+    await Promise.all([
+      this._activeIndex.invalidate(),
+      this._draftsIndex.invalidate(),
+      this._discardedIndex.invalidate(),
+    ])
   }
 
   /**
@@ -489,6 +638,7 @@ export class FsChangeRepository extends ChangeRepository {
 
     // Determine current location (if any)
     const currentDir = await this._resolveDir(change.name)
+    const previousBucket = currentDir !== null ? this._bucketKindForDir(currentDir) : null
 
     if (currentDir === null) {
       // First save: ensure parent exists, then atomically create change dir.
@@ -507,6 +657,11 @@ export class FsChangeRepository extends ChangeRepository {
     }
 
     await this._writeManifestAtomic(targetDir, manifest)
+    await this._ensureGitignore()
+    const targetBucket = this._bucketKindForDir(targetDir)
+    if (targetBucket !== null) {
+      await this._syncChangeIndex(change, targetDir, targetBucket, previousBucket)
+    }
   }
 
   /**
@@ -517,7 +672,11 @@ export class FsChangeRepository extends ChangeRepository {
   override async delete(change: Change): Promise<void> {
     const dir = await this._resolveDir(change.name)
     if (dir === null) return
+    const bucket = this._bucketKindForDir(dir)
     await fs.rm(dir, { recursive: true })
+    if (bucket !== null) {
+      await this._removeFromBucketIndex(bucket, change.name)
+    }
   }
 
   /**
@@ -1825,29 +1984,6 @@ function isDiscardedChange(change: Change): boolean {
  */
 function isEexist(err: unknown): boolean {
   return typeof err === 'object' && err !== null && (err as NodeJS.ErrnoException).code === 'EEXIST'
-}
-
-// ---- Directory filtering ----
-
-/**
- * Filters a list of directory entry names to include only subdirectories.
- *
- * @param basePath - Absolute path to the parent directory
- * @param entries - Entry names to filter
- * @returns The names of entries that are directories
- */
-async function filterDirectories(basePath: string, entries: string[]): Promise<string[]> {
-  const checks = await Promise.all(
-    entries.map(async (entry) => {
-      try {
-        const stat = await fs.lstat(path.join(basePath, entry))
-        return { entry, isDir: stat.isDirectory() }
-      } catch {
-        return { entry, isDir: false }
-      }
-    }),
-  )
-  return checks.filter((c) => c.isDir).map((c) => c.entry)
 }
 
 /**

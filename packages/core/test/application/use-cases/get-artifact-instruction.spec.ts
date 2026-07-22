@@ -113,7 +113,7 @@ describe('GetArtifactInstruction', () => {
       expect(result.template).toBeNull()
     })
 
-    it('expands change.workspace in template', async () => {
+    it('does not expand change.workspace in template', async () => {
       const artifactType = makeArtifactType('spec', {
         template: 'workspace={{change.workspace}}',
       })
@@ -123,7 +123,7 @@ describe('GetArtifactInstruction', () => {
 
       const result = await sut.execute({ name: 'my-change', artifactId: 'spec' })
 
-      expect(result.template).toBe('workspace=default')
+      expect(result.template).toBe('workspace={{change.workspace}}')
     })
   })
 

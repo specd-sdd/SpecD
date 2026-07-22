@@ -6,7 +6,8 @@
     "core:kernel",
     "core:discarded-change-view",
     "core:change-repository-port",
-    "core:composition-resolver"
+    "core:composition-resolver",
+    "core:change-list-entry"
   ],
   "context": [
     "Discarded changes remain in storage for audit purposes, and teams need to review them — for example, to confirm a superseded change was properly replaced. The `ListDiscarded` use case retrieves all discarded changes from the default workspace, providing visibility into abandoned work that has not been permanently deleted."
@@ -15,25 +16,25 @@
     {
       "requirement": "Returns all discarded changes",
       "rules": [
-        "`ListDiscarded.execute()` MUST return all changes that are in the discarded lifecycle state. The result MUST be sorted by creation order, oldest first."
+        "`ListDiscarded.execute(options?)` MUST return `ListResult<DiscardedChangeListEntry>` for all discarded changes.\n\nIt MUST forward `ListOptions`, `includeDescription`, `includeReason`, and `includeSupersededBy` to `ChangeRepository.listDiscarded()` without re-sorting, re-filtering, or re-paginating. Canonical order (`discardedAt` descending) is owned by the repository index helper.\n\nDefault `limit` is **100** when callers omit options."
       ]
     },
     {
       "requirement": "Returns DiscardedChangeView without content",
       "rules": [
-        "`ListDiscarded.execute()` MUST return `DiscardedChangeView[]`. Each view MUST expose artifact state (status, validated hashes), shared inspection fields, and discard metadata (`discardReason`, `discardedAt`, `discardedBy`, optional `supersededBy`) but MUST NOT include artifact file content.\n\nCallers MUST NOT receive a `Change` aggregate from this use case."
+        "`ListDiscarded.execute()` MUST return `DiscardedChangeListEntry` items — not `DiscardedChangeView`, not mutable `Change` instances.\n\nEntries MUST NOT include artifact file content, history, or derived artifact state maps. Detail belongs on `getDiscarded(name)`.\n\nOptional `description`, `reason`, and `supersededBy` appear only when the matching include flags are set and the repository projected them from the cached entry."
       ]
     },
     {
       "requirement": "Constructor accepts a ChangeRepository",
       "rules": [
-        "`ListDiscarded` MUST accept a `ChangeRepository` as its sole constructor argument. It MUST delegate to `ChangeRepository.listDiscarded()` and return the resulting `DiscardedChangeView[]` without wrapping in mutable `Change` instances."
+        "`ListDiscarded` MUST accept a `ChangeRepository` as its sole constructor argument. It MUST delegate to `ChangeRepository.listDiscarded(options)` and return the resulting `ListResult<DiscardedChangeListEntry>` unchanged.\n\nThe use case MUST NOT re-sort, filter, or paginate after the repository returns."
       ]
     },
     {
       "requirement": "Returns an empty array when no discarded changes exist",
       "rules": [
-        "When the repository contains no discarded changes, `execute()` MUST return an empty array. It MUST NOT throw."
+        "When the repository contains no discarded changes, `execute()` MUST return `{ items: [], meta: { total: 0, count: 0, limit: <resolved limit> } }`. It MUST NOT throw."
       ]
     },
     {
@@ -57,13 +58,28 @@
       "then": ["it requires a ChangeRepository in its constructor"]
     },
     {
-      "requirement": "Returns all discarded changes",
-      "name": "Multiple discarded changes exist",
+      "requirement": "Constructor accepts a ChangeRepository",
+      "name": "Execute forwards options and returns repository result unchanged",
       "given": [
-        "the repository contains three discarded changes created in order: alpha, beta, gamma"
+        "ChangeRepository.listDiscarded(options) returns a specific ListResult<DiscardedChangeListEntry>"
       ],
-      "when": ["execute() is called"],
-      "then": ["the result contains all three changes in creation order: alpha, beta, gamma"]
+      "when": ["execute(options) is called"],
+      "then": [
+        "the result is identical to the repository output",
+        "AND the use case does not re-sort, filter, or paginate after delegation"
+      ]
+    },
+    {
+      "requirement": "Returns all discarded changes",
+      "name": "Multiple discarded changes returned in canonical order",
+      "given": [
+        "the repository contains three discarded changes with distinct discardedAt timestamps"
+      ],
+      "when": ["execute() is called without options"],
+      "then": [
+        "the result is ListResult<DiscardedChangeListEntry> with default limit: 100",
+        "AND items appear in discardedAt descending order (newest first)"
+      ]
     },
     {
       "requirement": "Returns all discarded changes",
@@ -72,54 +88,58 @@
         "the repository contains discarded change alpha, active change beta, and drafted change gamma"
       ],
       "when": ["execute() is called"],
-      "then": ["the result contains only alpha"]
+      "then": ["items contains only alpha"]
+    },
+    {
+      "requirement": "Returns all discarded changes",
+      "name": "Keyset after cursor returns next page",
+      "given": ["discarded changes alpha and beta where alpha is newer"],
+      "when": ["execute({ limit: 1, after: { key: alpha.discardedAt, id: 'alpha' } }) is called"],
+      "then": ["items contains only beta"]
     },
     {
       "requirement": "Returns DiscardedChangeView without content",
-      "name": "Views have artifact state but no content",
-      "when": ["execute() returns a list"],
+      "name": "Entries are DiscardedChangeListEntry without detail fields",
+      "when": ["execute() returns a non-empty result"],
       "then": [
-        "each entry satisfies DiscardedChangeView with discardReason from the terminal discarded event",
-        "AND artifact statuses are populated",
-        "AND no artifact file content is loaded"
+        "each item is a DiscardedChangeListEntry with discardedAt and discardedBy",
+        "AND items do not include artifact file content, history, or artifact state maps",
+        "AND entries are not mutable Change instances"
       ]
     },
     {
       "requirement": "Returns DiscardedChangeView without content",
-      "name": "Views are not Change instances",
-      "when": ["execute() returns a non-empty list"],
-      "then": ["entries do not expose transition or other Change mutators"]
+      "name": "Optional description, reason, and supersededBy require include flags",
+      "given": ["cached discarded rows include stored description, reason, and supersededBy"],
+      "when": [
+        "execute({ includeDescription: true, includeReason: true, includeSupersededBy: true }) is called",
+        "execute() is called without those flags"
+      ],
+      "then": [
+        "returned items may include description, reason, and supersededBy",
+        "returned items omit those optional fields"
+      ]
     },
     {
       "requirement": "Returns DiscardedChangeView without content",
-      "name": "Empty discarded directory returns empty list",
+      "name": "Empty discarded directory returns empty ListResult",
       "given": ["no directories exist under discarded/"],
       "when": ["ListDiscarded.execute() is called"],
-      "then": ["it returns an empty array"]
-    },
-    {
-      "requirement": "Returns DiscardedChangeView without content",
-      "name": "Drafted and active changes are excluded",
-      "given": [
-        "old-experiment exists only under discarded/",
-        "AND parked-feature exists only under drafts/"
-      ],
-      "when": ["ListDiscarded.execute() is called"],
-      "then": ["the result contains old-experiment only"]
+      "then": ["the result is { items: [], meta: { total: 0, count: 0, limit: 100 } }"]
     },
     {
       "requirement": "Returns an empty array when no discarded changes exist",
       "name": "Repository is empty",
       "given": ["the repository contains no changes at all"],
       "when": ["execute() is called"],
-      "then": ["the result is an empty array"]
+      "then": ["the result is { items: [], meta: { total: 0, count: 0, limit: 100 } }"]
     },
     {
       "requirement": "Returns an empty array when no discarded changes exist",
       "name": "All changes are active or drafted",
       "given": ["the repository contains only active and drafted changes"],
       "when": ["execute() is called"],
-      "then": ["the result is an empty array"]
+      "then": ["the result is { items: [], meta: { total: 0, count: 0, limit: 100 } }"]
     },
     {
       "requirement": "Config-based factory preserves complete change repository bootstrap",
@@ -143,17 +163,10 @@
       ]
     }
   ],
-  "implementation": {
-    "files": [
-      {
-        "specId": "core:list-discarded",
-        "file": "core:src/composition/use-cases/list-discarded.ts"
-      }
-    ]
-  },
+  "implementation": {},
   "contentHashes": {
-    "spec.md": "sha256:ee21239f19f95a0b47edb8306e5025095cb84f7ffe07a3d044d2cba8370d447d",
-    "verify.md": "sha256:1383d7d64aa32084f01d2dd8d61d9fb64298eb1b5381b3809e54d1558cfb51ce"
+    "spec.md": "sha256:a7f3266d8484113b93f134d331a9bba19ffa61cd523188189d43e1b995fbb76a",
+    "verify.md": "sha256:901607c22e37cab24b300670f6dc9f0cd2525c64ce447a28bec08fcd70c9ba51"
   },
   "generatedBy": "core"
 }

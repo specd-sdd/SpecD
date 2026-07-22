@@ -20,7 +20,47 @@ Each `SpecRepository` instance is bound to exactly one workspace. All operations
 
 ### Requirement: list returns spec metadata with optional prefix filter
 
-`list(prefix?)` MUST return all `Spec` metadata in this workspace. When a `SpecPath` prefix is provided, only specs whose path starts with that prefix MUST be returned (e.g. prefix `auth` returns `auth/login`, `auth/oauth`, etc.). The returned `Spec` objects MUST be lightweight — no artifact content is loaded.
+`list(prefix?, options?)` MUST return `ListResult<SpecListEntry>` for all specs in this workspace.
+
+When a `SpecPath` prefix is provided, only specs whose capability path starts with that prefix MUST be included (e.g. prefix `auth` returns `auth/login`, `auth/oauth`, etc.).
+
+`SpecListOptions` extends `ListOptions` with:
+
+- `includeSummary?: boolean` — when `true`, projected entries MAY include `summary`; when `false` or omitted, `summary` MUST NOT appear
+- `includeMetadataStatus?: boolean` — when `true`, projected entries MAY include `metadataStatus`; when `false` or omitted, `metadataStatus` MUST NOT appear
+
+Sort order MUST be canonical: capability path ascending (lexicographic).
+
+`list()` MUST NOT return lightweight `Spec` metadata alone. Each item MUST be a port-level `SpecListEntry` with resolved `title` and optional projected fields.
+
+`meta.total` and `count()` MUST read from the same index source.
+
+### Requirement: SpecListEntry port shape
+
+`SpecListEntry` is a port-level contract. Each entry MUST include these **required** fields:
+
+- `workspace` (string) — workspace name bound to the repository instance
+- `path` (string) — capability path with `/` separators
+- `title` (string) — resolved when indexing in this fixed order (first hit wins):
+  1. non-empty trimmed `title` from spec metadata when present and valid
+  2. else the last segment of `path`
+
+When `includeSummary` is set, the entry MAY include `summary` resolved in this fixed order (first hit wins; omit the field if none):
+
+1. non-empty trimmed `optimizedDescription` from spec metadata
+2. non-empty trimmed `description` from spec metadata
+3. extract from `spec.md` via the existing core pure helper: (a) first non-empty paragraph after `# H1`; (b) first paragraph of first `## Overview` / `## Summary` / `## Purpose` section
+
+When `includeMetadataStatus` is set, the entry MAY include `metadataStatus`: `'missing' | 'invalid' | 'stale' | 'fresh'` with these semantics:
+
+- `'missing'` — no metadata exists
+- `'invalid'` — metadata exists but fails structural validation
+- `'stale'` — metadata exists and is structurally valid, but content hashes are absent, mismatch, or hashing encountered I/O errors
+- `'fresh'` — metadata exists, is structurally valid, and all content hashes match current files
+
+Errors while resolving title, summary, or status for an individual spec MUST be swallowed; the entry still appears with the title fallback.
+
+`include*` flags are response projection only. The filesystem index MUST materialize the full CLI-usable payload; implementations MUST NOT perform extra I/O when a flag is set.
 
 ### Requirement: artifact loads a single artifact file
 
@@ -126,11 +166,15 @@ This method is the port-level search primitive — it performs a content scan wi
 
 ### Requirement: Abstract class with abstract methods
 
-`SpecRepository` MUST be defined as an `abstract class`, not an `interface`. All storage operations (`get`, `list`, `count`, `artifact`, `save`, `delete`, `resolveFromPath`, `metadata`, `saveMetadata`, persisted spec semantic read/write operations, stable spec hash lookup, `search`) MUST be declared as `abstract` methods. This follows the architecture spec requirement that ports with shared construction are abstract classes.
+`SpecRepository` MUST be defined as an `abstract class`, not an `interface`. All storage operations (`get`, `list`, `count`, `reindex`, `artifact`, `save`, `delete`, `resolveFromPath`, `metadata`, `saveMetadata`, persisted spec semantic read/write operations, stable spec hash lookup, `search`) MUST be declared as `abstract` methods. This follows the architecture spec requirement that ports with shared construction are abstract classes.
 
 ### Requirement: Spec counting
 
-The repository MUST provide a `count()` method that returns the total number of specs managed by the repository. This allows consumers (such as progress reporters) to discover the size of the workspace efficiently without loading the metadata for every spec via `list()`.
+The repository MUST provide a `count()` method that returns the total number of specs in this workspace. The value MUST match `list().meta.total` and MUST be served from the same index source. `count()` MUST NOT load metadata for every spec via repeated `list()` materialization.
+
+### Requirement: Spec list reindex
+
+`SpecRepository` MUST expose `reindex()` which forces a full rebuild of the workspace spec list index under `{configPath}/tmp/fs-cache/specs/<workspace>/`. Implementations MUST NOT require callers to know JSONL layout.
 
 ### Requirement: Filesystem-backed specs capability
 
@@ -150,7 +194,8 @@ When `specsPath` is exposed:
 ## Constraints
 
 - Each instance is bound to a single workspace; workspace is immutable after construction
-- `get` and `list` return lightweight `Spec` metadata — artifact content is never loaded by these methods
+- `get` returns lightweight `Spec` metadata — artifact content is never loaded by `get`
+- `list` returns paginated `SpecListEntry` rows with default `limit` **100**; artifact content is never loaded by `list`
 - `search` loads artifact content as needed to perform matching — it is more expensive than `list`
 - `save` creates the spec directory if it does not already exist
 - `ArtifactConflictError` is the sole error type for concurrent modification detection on `save`, `saveMetadata`, and semantic `update` operations
@@ -167,13 +212,14 @@ When `specsPath` is exposed:
 
 ## Spec Dependencies
 
-- [`core:repository-port`](../repository-port/spec.md) — shared abstract-port conventions
+- [`core:repository-port`](../repository-port/spec.md) — shared abstract-port conventions and list pagination types
 - [`default:_global/architecture`](../../../_global/architecture/spec.md) — port and adapter boundary rules
 - [`core:change`](../change/spec.md) — change identity and archived implementation semantics
 - [`core:storage`](../storage/spec.md) — repository rooting and filesystem ownership
 - [`core:workspace`](../workspace/spec.md) — workspace identity and ownership semantics
 - [`core:spec-id-format`](../spec-id-format/spec.md) — canonical spec identity parsing
-- [`core:spec-metadata`](../spec-metadata/spec.md) — metadata interactions exposed through the repository
+- [`core:spec-metadata`](../spec-metadata/spec.md) — metadata interactions exposed through the repository and title/summary resolution
+- [`core:content-extraction`](../content-extraction/spec.md) — summary extraction helper used when indexing entries
 - [`core:search-specs`](../search-specs/spec.md) — repository-backed search semantics
 - [`default:_global/logging`](../../../_global/logging/spec.md) — logging expectations for adapters
 - [`core:spec-lock`](../spec-lock/spec.md) — persisted spec state and sidecar semantics hidden behind repository methods

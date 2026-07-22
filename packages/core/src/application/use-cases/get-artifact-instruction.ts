@@ -119,10 +119,8 @@ export class GetArtifactInstruction {
       throw new ArtifactNotFoundError(resolvedId, change.name)
     }
 
-    // Build contextual variables for template expansion
-    const workspace = change.workspaces[0] ?? 'default'
     const contextVars = {
-      change: { name: change.name, workspace, path: this._changes.changePath(change) },
+      change: { name: change.name, path: this._changes.changePath(change) },
     }
 
     // rules.pre

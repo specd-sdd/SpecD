@@ -20,30 +20,23 @@ The `ArchiveRepository` instance is scoped to the default workspace and is injec
 
 ### Requirement: No input
 
-`ListArchived.execute()` accepts no parameters. It always operates on the full set of archived changes in the repository.
+`ListArchived.execute(options?)` accepts optional list options (`limit`, `page`, `after`, `includeArchivedBy`) and forwards them to `ArchiveRepository.list(options)`.
+
+Default `limit` is **100** when callers omit options. `page` and `after` are mutually exclusive per shared `ListOptions`.
 
 ### Requirement: Output
 
-`ListArchived.execute()` MUST return a `Promise` resolving to a result object containing the entries and metadata:
+`ListArchived.execute(options?)` MUST return `Promise<ListResult<ArchiveListEntry>>` (alias `ListArchivedResult`).
 
-```typescript
-interface ListArchivedResult {
-  items: ArchivedChangeIndexEntry[]
-  meta: {
-    total: number
-    count: number
-    limit: number
-    page?: number
-    startAt?: string
-  }
-}
-```
+Items are ordered in the repository's canonical sort (`archivedAt` descending — newest first). `meta.total` reflects the full archive count; `meta.count` reflects the returned page size.
 
-The `items` array contains the archived changes, ordered oldest first (chronological order by `archivedAt`) unless the repository implementation provides a different default order.
+Keyset pagination uses `after: { key: archivedAt ISO-8601, id: change name }` — not legacy `startAt`.
 
 ### Requirement: Delegation to ArchiveRepository
 
-`ListArchived` MUST delegate entirely to `ArchiveRepository.list()`. It SHALL NOT apply additional filtering, sorting, or transformation to the repository result. The ordering guarantee (oldest first) is the responsibility of the `ArchiveRepository` port.
+`ListArchived` MUST delegate entirely to `ArchiveRepository.list(options)` and return the result unchanged. It SHALL NOT apply additional filtering, sorting, pagination, or transformation.
+
+Canonical sort order is owned by the archive index helper; the use case MUST NOT re-sort.
 
 ### Requirement: No side effects
 
@@ -61,9 +54,10 @@ The helper is the only use-case-specific composition entry for config-based boot
 
 ## Constraints
 
-- `ListArchived` has no error cases of its own -- any errors originate from the `ArchiveRepository` infrastructure
-- The use case does not accept workspace selection -- it operates on the single `ArchiveRepository` injected at construction time
-- The returned `ArchivedChangeIndexEntry` instances are immutable read-only records
+- `ListArchived` has no error cases of its own — any errors originate from the `ArchiveRepository` infrastructure
+- The use case does not accept workspace selection — it operates on the single `ArchiveRepository` injected at construction time
+- The returned `ArchiveListEntry` instances are immutable read-only records
+- Optional `archivedBy` appears only when `includeArchivedBy` is set on forwarded options
 
 ## Spec Dependencies
 
@@ -71,5 +65,6 @@ The helper is the only use-case-specific composition entry for config-based boot
 - [`core:storage`](../storage/spec.md)
 - [`core:kernel`](../kernel/spec.md)
 - [`default:_global/architecture`](../../_global/architecture/spec.md)
-- [`core:archived-change-index-entry`](../archived-change-index-entry/spec.md)
+- [`core:archived-change-index-entry`](../archived-change-index-entry/spec.md) — `ArchiveListEntry` row shape
+- [`core:archive-repository-port`](../archive-repository-port/spec.md) — paginated list/count contract
 - [`core:composition-resolver`](../composition-resolver/spec.md)

@@ -64,9 +64,11 @@ This relay MUST NOT change fail-fast or fail-soft semantics.
 
 ### Requirement: Change lookup
 
-`RunStepHooks` loads the change by name via `ChangeRepository`. If no change exists with the given name **and** the requested step is `'archiving'` with phase `'post'`, it MUST fall back to `ArchiveRepository.get(name)`. If the change is found in the archive, it MUST be used for template variable construction (using `ArchivedChange.name`, `ArchivedChange.workspace`, and `ArchiveRepository.archivePath(archivedChange)` for the `change.path` variable). If the change is not found in the archive either, it MUST throw `ChangeNotFoundError`.
+`RunStepHooks` loads the change by name via `ChangeRepository`. If no change exists with the given name **and** the requested step is `'archiving'` with phase `'post'`, it MUST fall back to `ArchiveRepository.get(name)`. If the change is found in the archive, it MUST be used for template variable construction (using `ArchivedChange.name` and `ArchiveRepository.archivePath(archivedChange)` for the `change.path` variable). If the change is not found in the archive either, it MUST throw `ChangeNotFoundError`.
 
 For all other step/phase combinations, if `ChangeRepository.get(name)` returns null, `RunStepHooks` MUST throw `ChangeNotFoundError` immediately — the archive fallback does not apply.
+
+Neither lookup path reads or derives a workspace value for template variables — see Requirement: HookVariables construction.
 
 ### Requirement: Schema name guard
 
@@ -107,11 +109,12 @@ When `only` is provided, `RunStepHooks` MUST filter the collected hook list to t
 `RunStepHooks` MUST build the contextual `TemplateVariables` from the resolved change and the appropriate repository path:
 
 - `change.name` — the change name (from `Change.name` or `ArchivedChange.name`)
-- `change.workspace` — the primary workspace (from `Change.workspaces[0]` or `ArchivedChange.workspace`)
 - `change.path` — the absolute path to the change directory (via `ChangeRepository.changePath()` for active changes, or `ArchiveRepository.archivePath()` for archived changes)
 - `change.archivedName` — the archived directory basename (`YYYYMMDD-HHmmss-<name>`) when the archived fallback path is used (archiving post phase)
 
 For active changes (non-archived lookup path), `change.archivedName` may be absent.
+
+`RunStepHooks` MUST NOT build a `change.workspace` variable or otherwise inject a singular/primary workspace value (for example via `change.workspaces[0] ?? 'default'` or `specIds[0]?.split(':')[0]`) into the `change` namespace — per [`core:template-variables`](../template-variables/spec.md), `change.workspace` is not a supported token, and a change has no single primary workspace.
 
 Built-in variables (e.g. `project.root`) are already present in the `TemplateExpander` — the use case only builds the contextual `change` namespace.
 

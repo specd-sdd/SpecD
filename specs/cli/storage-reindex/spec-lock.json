@@ -1,0 +1,20 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "cli:entrypoint",
+    "core:change-repository-port",
+    "core:spec-repository-port",
+    "core:archive-repository-port",
+    "core:storage",
+    "core:composition"
+  ],
+  "implementation": [
+    {
+      "file": "cli:src/commands/storage/reindex.ts",
+      "symbols": ["registerStorageReindex"]
+    }
+  ]
+}

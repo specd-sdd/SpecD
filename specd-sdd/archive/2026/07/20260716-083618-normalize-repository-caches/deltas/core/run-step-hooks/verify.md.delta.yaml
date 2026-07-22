@@ -1,0 +1,66 @@
+- op: modified
+  description: Change lookup never reads or derives a workspace value for template variables.
+  selector:
+    type: section
+    matches: 'Requirement: Change lookup'
+  content: |
+    #### Scenario: Change not found throws ChangeNotFoundError (non-archiving)
+
+    - **GIVEN** `ChangeRepository.get(name)` returns `null`
+    - **AND** the requested step is NOT `'archiving'` with phase `'post'`
+    - **WHEN** `execute` is called
+    - **THEN** `ChangeNotFoundError` is thrown immediately
+
+    #### Scenario: Archiving post-phase falls back to archive
+
+    - **GIVEN** `ChangeRepository.get(name)` returns `null`
+    - **AND** the requested step is `'archiving'` with phase `'post'`
+    - **WHEN** `execute` is called
+    - **THEN** it falls back to `ArchiveRepository.get(name)`
+    - **AND** if found, uses the archived change for template variables
+
+    #### Scenario: Change not found in archive throws error
+
+    - **GIVEN** `ChangeRepository.get(name)` returns `null`
+    - **AND** the requested step is `'archiving'` with phase `'post'`
+    - **AND** `ArchiveRepository.get(name)` also returns `null`
+    - **WHEN** `execute` is called
+    - **THEN** `ChangeNotFoundError` is thrown
+
+    #### Scenario: Neither lookup path derives a workspace value
+
+    - **GIVEN** either the active-change lookup path or the archive-fallback lookup path resolves a change
+    - **WHEN** `RunStepHooks` proceeds to build template variables
+    - **THEN** the lookup step itself does not read, compute, or cache any workspace value
+    - **AND** workspace derivation for the `change` namespace is governed entirely by Requirement: HookVariables construction
+
+- op: modified
+  description: HookVariables construction drops the singular workspace token from the change namespace.
+  selector:
+    type: section
+    matches: 'Requirement: HookVariables construction'
+  content: |
+    #### Scenario: Archived post-phase includes archivedName but no workspace
+
+    - **GIVEN** the active change is not found in `ChangeRepository`
+    - **AND** the request is `step: "archiving"` with `phase: "post"`
+    - **AND** the archived change exists with archived name `20260418-103000-add-auth`
+    - **WHEN** `RunStepHooks.execute` builds `TemplateVariables` for hook execution
+    - **THEN** the `change` namespace includes `name`, `path`, and `archivedName`
+    - **AND** `change.archivedName` equals `20260418-103000-add-auth`
+    - **AND** the `change` namespace has no `workspace` key
+
+    #### Scenario: Active change path may omit archivedName and never has workspace
+
+    - **GIVEN** the change is loaded from `ChangeRepository`
+    - **WHEN** `RunStepHooks.execute` builds `TemplateVariables`
+    - **THEN** the `change` namespace includes `name` and `path`
+    - **AND** `change.archivedName` may be absent
+    - **AND** the `change` namespace has no `workspace` key
+
+    #### Scenario: HookVariables construction never derives a singular workspace
+
+    - **GIVEN** a change touching multiple workspaces via `specIds`
+    - **WHEN** `RunStepHooks.execute` builds `TemplateVariables`
+    - **THEN** the `change` namespace is not populated with `change.workspaces[0] ?? 'default'` or `specIds[0]?.split(':')[0]`
+    - **AND** no `change.workspace` key is present in the resulting namespace

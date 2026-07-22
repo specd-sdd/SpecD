@@ -109,15 +109,75 @@ The `SYSTEM_ACTOR` constant (`{ name: 'specd', email: 'system@getspecd.dev' }`) 
 
 ### Requirement: list returns active changes in creation order
 
-`list()` MUST return all active (non-drafted, non-discarded) changes sorted by creation order, oldest first. Each returned `Change` MUST include artifact state (derived statuses) but MUST NOT include artifact content. Content is loaded on demand via `artifact()`.
+`list(options?)` MUST return `ListResult<ActiveChangeListEntry>` for all active (non-drafted, non-discarded) changes.
+
+`ActiveChangeListOptions` extends `ListOptions` with:
+
+- `includeDescription?: boolean` — when `true`, projected entries MAY include `description`; when `false` or omitted, `description` MUST NOT appear.
+
+Sort order MUST be canonical: `createdAt` ascending (oldest → newest). The sort key aligns with the timestamped directory name, but pagination and cursors use `createdAt`.
+
+`list()` MUST NOT return full `Change` aggregates, artifact content, history, or derived artifact state maps. Those belong on `get(name)`.
+
+`meta.total` and `count()` MUST read from the same index source.
 
 ### Requirement: listDrafts returns drafted changes in creation order
 
-`listDrafts()` MUST return all drafted changes sorted by creation order, oldest first. Each entry MUST be a `DraftedChangeView` with artifact state (derived statuses) but MUST NOT include artifact content. The repository MUST NOT return mutable `Change` instances to callers.
+`listDrafts(options?)` MUST return `ListResult<DraftedChangeListEntry>` for all drafted changes.
+
+`DraftedChangeListOptions` extends `ListOptions` with:
+
+- `includeDescription?: boolean` — projected `description` when `true`
+- `includeReason?: boolean` — projected `reason` when `true`
+
+Sort order MUST be canonical: `draftedAt` descending (newest → oldest).
+
+`listDrafts()` MUST NOT return `DraftedChangeView`, mutable `Change` instances, artifact content, or history. Detail belongs on `getDraft(name)`.
+
+`meta.total` and `countDrafts()` MUST read from the same index source.
 
 ### Requirement: listDiscarded returns discarded changes in creation order
 
-`listDiscarded()` MUST return all discarded changes sorted by creation order, oldest first. Each entry MUST be a `DiscardedChangeView` built via the shared inspection facade. The repository MUST NOT return mutable `Change` instances to callers.
+`listDiscarded(options?)` MUST return `ListResult<DiscardedChangeListEntry>` for all discarded changes.
+
+`DiscardedChangeListOptions` extends `ListOptions` with:
+
+- `includeDescription?: boolean` — projected `description` when `true`
+- `includeReason?: boolean` — projected `reason` when `true`
+- `includeSupersededBy?: boolean` — projected `supersededBy` when `true`
+
+Sort order MUST be canonical: `discardedAt` descending (newest → oldest).
+
+`listDiscarded()` MUST NOT return `DiscardedChangeView`, mutable `Change` instances, artifact content, or history. Detail belongs on `getDiscarded(name)`.
+
+`meta.total` and `countDiscarded()` MUST read from the same index source.
+
+### Requirement: Change list counts
+
+`ChangeRepository` MUST expose:
+
+- `count()` — returns the total number of active changes (same value as `list().meta.total`)
+- `countDrafts()` — returns the total number of drafted changes (same value as `listDrafts().meta.total`)
+- `countDiscarded()` — returns the total number of discarded changes (same value as `listDiscarded().meta.total`)
+
+Each method MUST be efficient and MUST NOT materialize full change aggregates. Filesystem implementations MUST delegate to the corresponding index helper's `count()`.
+
+### Requirement: Change list reindex
+
+`ChangeRepository` MUST expose:
+
+- `reindex()` — rebuilds active, drafted, and discarded list indexes
+- `reindexActive()` — rebuilds the active-changes index only
+- `reindexDrafts()` — rebuilds the drafts index only
+- `reindexDiscarded()` — rebuilds the discarded index only
+
+Each method MUST force a full rebuild of the relevant filesystem index cache bucket under `{configPath}/tmp/fs-cache/`. Implementations MUST NOT require callers to know JSONL layout.
+
+### Requirement: Change list include projection
+
+For each change list method, `include*` flags control **response projection only**. The filesystem index helper MUST store the full CLI-usable entry payload (including optional fields). When an include flag is set, the corresponding optional field MUST appear on returned items if present in the cached entry. When an include flag is not set, that field MUST NOT appear on returned items.
+
+Implementations and use cases MUST NOT perform extra `get` / manifest reads to satisfy an include flag.
 
 ### Requirement: save persists the change manifest only
 
@@ -196,7 +256,7 @@ along with the directory itself.
 
 ### Requirement: Abstract class with abstract methods
 
-`ChangeRepository` MUST be defined as an `abstract class`, not an `interface`. All storage operations (`get`, `getDraft`, `getDiscarded`, `mutate`, `mutateDraft`, `list`, `listDrafts`, `listDiscarded`, `save`, `delete`, `artifact`, `saveArtifact`, `artifactExists`, `deltaExists`, `changePath`, `draftChangePath`, `scaffold`, `unscaffold`) MUST be declared as `abstract` methods. This follows the architecture spec requirement that ports with shared construction are abstract classes.
+`ChangeRepository` MUST be defined as an `abstract class`, not an `interface`. All storage operations (`get`, `getDraft`, `getDiscarded`, `mutate`, `mutateDraft`, `list`, `listDrafts`, `listDiscarded`, `count`, `countDrafts`, `countDiscarded`, `reindex`, `reindexActive`, `reindexDrafts`, `reindexDiscarded`, `save`, `delete`, `artifact`, `saveArtifact`, `artifactExists`, `deltaExists`, `changePath`, `draftChangePath`, `scaffold`, `unscaffold`) MUST be declared as `abstract` methods. This follows the architecture spec requirement that ports with shared construction are abstract classes.
 
 ### Requirement: artifact only loads tracked change artifact files
 
@@ -220,7 +280,9 @@ These logs MUST follow the project's global logging conventions.
 
 - Changes are stored globally, not per-workspace — the inherited workspace context is unused
 - `get()` in `FsChangeRepository` may auto-invalidate and persist the change under the mutation lock before returning, if artifact drift is detected and the change is beyond `designing` or has active approvals
-- All list methods return `Change` objects with derived artifact state but without artifact content
+- `list`, `listDrafts`, and `listDiscarded` return lightweight list entries with no artifact content, history, or derived artifact state maps
+- `get`, `getDraft`, and `getDiscarded` remain the detail surfaces for full manifest-backed inspection
+- Default list `limit` is **100**; callers needing more MUST pass a higher limit or paginate with `page` or `after`
 - `save()` writes the manifest only; `saveArtifact()` writes file content only — these are separate operations
 - `ArtifactConflictError` is the sole error type for concurrent modification detection
 - The `force` option on `saveArtifact()` bypasses conflict detection entirely
@@ -229,7 +291,8 @@ These logs MUST follow the project's global logging conventions.
 
 ## Spec Dependencies
 
-- [`core:repository-port`](../repository-port/spec.md) — shared repository base contract
+- [`core:repository-port`](../repository-port/spec.md) — shared repository base contract and list pagination types
+- [`core:change-list-entry`](../change-list-entry/spec.md) — `ActiveChangeListEntry`, `DraftedChangeListEntry`, and `DiscardedChangeListEntry`
 - [`default:_global/architecture`](../../_global/architecture/spec.md) — application ports and ownership boundaries
 - [`core:change`](../change/spec.md) — change entity state, invalidation, and artifact semantics
 - [`core:read-only-change-view`](../read-only-change-view/spec.md) — shared read-only facade

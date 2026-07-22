@@ -32,6 +32,8 @@ When `specIds` is updated via `updateSpecIds()`, any `specDependsOn` entry whose
 
 `CompileContext` derives the active workspaces from `specIds` via the `workspaces` getter. It resolves `dependsOn` entries directly from `change.specIds` by reading each spec's `.specd-metadata.yaml`, then follows links transitively. This resolution happens dynamically on every execution, not as a snapshot. See [`core:spec-metadata`](../spec-metadata/spec.md) for the `.specd-metadata.yaml` format.
 
+`workspaces` represents the **plural set of workspaces touched** by this change's `specIds` — it is not, and MUST NOT be treated as, a primary or singular workspace identity for the change. A change has no "home" workspace. Consumers building template variables (see [`core:template-variables`](../template-variables/spec.md)) or archive path patterns (see [`core:storage`](../storage/spec.md)) MUST NOT derive a singular value from `workspaces[0]` (or any other index) to stand in for "the change's workspace" — that concept does not exist. `workspaces` remains valid for uses that genuinely need the touched set, such as compile-context resolution and display of which workspaces a change spans.
+
 ### Requirement: Lifecycle
 
 A Change progresses through the following states. Two approval gates are configurable in `specd.yaml` (`approvals.spec` and `approvals.signoff`, both default `false`); the dashed paths are only active when the corresponding gate is enabled:
@@ -403,6 +405,7 @@ When a file is canonically `missing`, `missing` remains the canonical state even
 - name and createdAt are set at creation and never changed
 - workspaces is a computed getter derived from specIds via parseSpecId() — it is not a declared or persisted field
 - specIds may be empty (empty specIds results in empty workspaces)
+- workspaces is the plural set of touched workspaces; it MUST NOT be used to derive a singular "primary workspace" for template variables or archive path patterns
 - Current lifecycle state is derived from history (last transitioned event); no state snapshot is stored
 - Any modification to the spec list or any artifact content appends an invalidated event followed by a transitioned event back to designing — this may be triggered by use cases or automatically by FsChangeRepository.get() using SYSTEM_ACTOR
 - A designing → designing transition MUST NOT trigger approval invalidation or artifact downgrade — re-entering the same step is not a backward transition

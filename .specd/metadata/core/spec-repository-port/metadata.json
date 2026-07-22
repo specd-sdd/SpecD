@@ -9,6 +9,7 @@
     "core:workspace",
     "core:spec-id-format",
     "core:spec-metadata",
+    "core:content-extraction",
     "core:search-specs",
     "default:_global/logging",
     "core:spec-lock"
@@ -38,7 +39,13 @@
     {
       "requirement": "list returns spec metadata with optional prefix filter",
       "rules": [
-        "`list(prefix?)` MUST return all `Spec` metadata in this workspace. When a `SpecPath` prefix is provided, only specs whose path starts with that prefix MUST be returned (e.g. prefix `auth` returns `auth/login`, `auth/oauth`, etc.). The returned `Spec` objects MUST be lightweight — no artifact content is loaded."
+        "`list(prefix?, options?)` MUST return `ListResult<SpecListEntry>` for all specs in this workspace.\n\nWhen a `SpecPath` prefix is provided, only specs whose capability path starts with that prefix MUST be included (e.g. prefix `auth` returns `auth/login`, `auth/oauth`, etc.).\n\n`SpecListOptions` extends `ListOptions` with:\n\n- `includeSummary?: boolean` — when `true`, projected entries MAY include `summary`; when `false` or omitted, `summary` MUST NOT appear\n- `includeMetadataStatus?: boolean` — when `true`, projected entries MAY include `metadataStatus`; when `false` or omitted, `metadataStatus` MUST NOT appear\n\nSort order MUST be canonical: capability path ascending (lexicographic).\n\n`list()` MUST NOT return lightweight `Spec` metadata alone. Each item MUST be a port-level `SpecListEntry` with resolved `title` and optional projected fields.\n\n`meta.total` and `count()` MUST read from the same index source."
+      ]
+    },
+    {
+      "requirement": "SpecListEntry port shape",
+      "rules": [
+        "`SpecListEntry` is a port-level contract. Each entry MUST include these **required** fields:\n\n- `workspace` (string) — workspace name bound to the repository instance\n- `path` (string) — capability path with `/` separators\n- `title` (string) — resolved when indexing in this fixed order (first hit wins):\n  1. non-empty trimmed `title` from spec metadata when present and valid\n  2. else the last segment of `path`\n\nWhen `includeSummary` is set, the entry MAY include `summary` resolved in this fixed order (first hit wins; omit the field if none):\n\n1. non-empty trimmed `optimizedDescription` from spec metadata\n2. non-empty trimmed `description` from spec metadata\n3. extract from `spec.md` via the existing core pure helper: (a) first non-empty paragraph after `# H1`; (b) first paragraph of first `## Overview` / `## Summary` / `## Purpose` section\n\nWhen `includeMetadataStatus` is set, the entry MAY include `metadataStatus`: `'missing' | 'invalid' | 'stale' | 'fresh'` with these semantics:\n\n- `'missing'` — no metadata exists\n- `'invalid'` — metadata exists but fails structural validation\n- `'stale'` — metadata exists and is structurally valid, but content hashes are absent, mismatch, or hashing encountered I/O errors\n- `'fresh'` — metadata exists, is structurally valid, and all content hashes match current files\n\nErrors while resolving title, summary, or status for an individual spec MUST be swallowed; the entry still appears with the title fallback.\n\n`include*` flags are response projection only. The filesystem index MUST materialize the full CLI-usable payload; implementations MUST NOT perform extra I/O when a flag is set."
       ]
     },
     {
@@ -108,13 +115,19 @@
     {
       "requirement": "Abstract class with abstract methods",
       "rules": [
-        "`SpecRepository` MUST be defined as an `abstract class`, not an `interface`. All storage operations (`get`, `list`, `count`, `artifact`, `save`, `delete`, `resolveFromPath`, `metadata`, `saveMetadata`, persisted spec semantic read/write operations, stable spec hash lookup, `search`) MUST be declared as `abstract` methods. This follows the architecture spec requirement that ports with shared construction are abstract classes."
+        "`SpecRepository` MUST be defined as an `abstract class`, not an `interface`. All storage operations (`get`, `list`, `count`, `reindex`, `artifact`, `save`, `delete`, `resolveFromPath`, `metadata`, `saveMetadata`, persisted spec semantic read/write operations, stable spec hash lookup, `search`) MUST be declared as `abstract` methods. This follows the architecture spec requirement that ports with shared construction are abstract classes."
       ]
     },
     {
       "requirement": "Spec counting",
       "rules": [
-        "The repository MUST provide a `count()` method that returns the total number of specs managed by the repository. This allows consumers (such as progress reporters) to discover the size of the workspace efficiently without loading the metadata for every spec via `list()`."
+        "The repository MUST provide a `count()` method that returns the total number of specs in this workspace. The value MUST match `list().meta.total` and MUST be served from the same index source. `count()` MUST NOT load metadata for every spec via repeated `list()` materialization."
+      ]
+    },
+    {
+      "requirement": "Spec list reindex",
+      "rules": [
+        "`SpecRepository` MUST expose `reindex()` which forces a full rebuild of the workspace spec list index under `{configPath}/tmp/fs-cache/specs/<workspace>/`. Implementations MUST NOT require callers to know JSONL layout."
       ]
     },
     {
@@ -126,7 +139,8 @@
   ],
   "constraints": [
     "Each instance is bound to a single workspace; workspace is immutable after construction",
-    "get and list return lightweight Spec metadata — artifact content is never loaded by these methods",
+    "get returns lightweight Spec metadata — artifact content is never loaded by get",
+    "list returns paginated SpecListEntry rows with default limit 100; artifact content is never loaded by list",
     "search loads artifact content as needed to perform matching — it is more expensive than list",
     "save creates the spec directory if it does not already exist",
     "ArtifactConflictError is the sole error type for concurrent modification detection on save, saveMetadata, and semantic update operations",
@@ -155,10 +169,22 @@
     },
     {
       "requirement": "Spec counting",
-      "name": "Count returns total spec size",
-      "given": ["a workspace with a known number of specs"],
-      "when": ["SpecRepository.count() is called"],
-      "then": ["it returns an integer equal to the number of specs in the workspace"]
+      "name": "Count matches list meta.total from index source",
+      "given": ["a workspace with a known number of specs indexed for listing"],
+      "when": ["count() and list().meta.total are queried"],
+      "then": [
+        "both return the same total",
+        "AND count() does not load metadata for every spec via repeated full list materialization"
+      ]
+    },
+    {
+      "requirement": "Spec list reindex",
+      "name": "reindex rebuilds workspace spec list cache",
+      "given": ["a filesystem-backed SpecRepository for workspace core"],
+      "when": ["reindex() is called"],
+      "then": [
+        "the spec list index under {configPath}/tmp/fs-cache/specs/core/ is fully rebuilt from disk"
+      ]
     },
     {
       "requirement": "saveMetadata persists metadata with conflict detection",
@@ -193,7 +219,7 @@
       "when": ["SpecRepository is examined"],
       "then": [
         "it is declared as abstract class",
-        "AND get, list, artifact, save, delete, resolveFromPath, metadata, saveMetadata, and search are declared as abstract methods",
+        "AND get, list, count, reindex, artifact, save, delete, resolveFromPath, metadata, saveMetadata, and search are declared as abstract methods",
         "AND a concrete implementation can extend it and implement these methods"
       ]
     },
@@ -223,10 +249,13 @@
     },
     {
       "requirement": "list returns spec metadata with optional prefix filter",
-      "name": "List all specs",
+      "name": "List all specs as SpecListEntry rows",
       "given": ["a workspace with specs auth/login, auth/oauth, and billing/invoices"],
       "when": ["list() is called without a prefix"],
-      "then": ["all three specs are returned"]
+      "then": [
+        "the result is ListResult<SpecListEntry> containing all three entries ordered by capability path ascending",
+        "AND each item includes resolved workspace, path, and title"
+      ]
     },
     {
       "requirement": "list returns spec metadata with optional prefix filter",
@@ -239,7 +268,39 @@
       "requirement": "list returns spec metadata with optional prefix filter",
       "name": "Empty workspace",
       "when": ["list() is called on an empty workspace"],
-      "then": ["an empty array is returned"]
+      "then": ["{ items: [], meta: { total: 0, count: 0, limit: 100 } } is returned"]
+    },
+    {
+      "requirement": "SpecListEntry port shape",
+      "name": "Title falls back to path segment",
+      "given": ["a spec with no valid metadata title"],
+      "when": ["the repository projects a SpecListEntry"],
+      "then": ["title equals the last segment of path"]
+    },
+    {
+      "requirement": "SpecListEntry port shape",
+      "name": "Summary and metadataStatus respect include flags",
+      "given": ["a cached spec list entry payload with resolvable summary and metadata status"],
+      "when": [
+        "list(undefined, { includeSummary: true, includeMetadataStatus: true }) is called",
+        "the same call omits both include flags"
+      ],
+      "then": [
+        "returned items include projected summary and metadataStatus",
+        "returned items omit summary and metadataStatus"
+      ]
+    },
+    {
+      "requirement": "SpecListEntry port shape",
+      "name": "Resolution errors still return an entry with title fallback",
+      "given": [
+        "a spec whose summary or status resolution encounters an I/O error during indexing"
+      ],
+      "when": ["list() is called"],
+      "then": [
+        "the spec still appears with a title fallback",
+        "AND the list call does not fail because of that individual spec"
+      ]
     },
     {
       "requirement": "artifact loads a single artifact file",
@@ -498,18 +559,13 @@
     "symbols": [
       {
         "specId": "core:spec-repository-port",
-        "file": "core:src/infrastructure/fs/spec-repository.ts",
-        "symbol": "FsSpecRepository"
+        "file": "core:src/application/ports/spec-repository.ts",
+        "symbol": "SpecListEntry"
       },
       {
         "specId": "core:spec-repository-port",
-        "file": "core:src/infrastructure/fs/spec-repository.ts",
-        "symbol": "filterFiles"
-      },
-      {
-        "specId": "core:spec-repository-port",
-        "file": "core:src/infrastructure/fs/spec-repository.ts",
-        "symbol": "allowedSpecArtifactFilenames"
+        "file": "core:src/application/ports/spec-repository.ts",
+        "symbol": "SpecListOptions"
       },
       {
         "specId": "core:spec-repository-port",
@@ -519,10 +575,8 @@
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:55a2cbb033be721dc0d8ea488600808dd19d5fb5cb17821b05584a48c314c7ea",
-    "verify.md": "sha256:b8bdbfa0e74f4887c613cf31f141818c41b1a054b66de04e9347d0a73858512c"
+    "spec.md": "sha256:ab21dc21e6595066f103a6de2ba3f1cefd2ead58278875666807e73eac716c7b",
+    "verify.md": "sha256:4112072e5c7df84f885572f8a3934a8b671f26157123877bf2ab503da7f589f1"
   },
-  "generatedBy": "agent",
-  "optimizedDescription": "`SpecRepository` defines per-workspace spec storage, semantic metadata reads, guarded writes, and stable spec identity without leaking sidecars.",
-  "optimizedContext": "# SpecRepository\n\n## Rules\n- Port is `abstract class` extending `Repository`; constructor fixes immutable `workspace()`, `ownership()`, and `isExternal()` for one workspace instance.\n- `get`, `list`, and `count` operate only inside bound workspace and return lightweight spec metadata, not artifact content.\n- `artifact(spec, filename)` and `save(spec, artifact, options?)` operate only on schema-valid artifact filenames for that spec; sidecars like `spec-lock.json` stay outside generic artifact surface.\n- Artifact read/write must enforce strict spec-directory confinement and reject unsupported filenames or path escapes.\n- `save`, `saveMetadata`, and semantic persisted-write operations must throw `ReadOnlyWorkspaceError` before any I/O when ownership is `readOnly`.\n- `metadata(spec)` returns parsed metadata or `null`, plus `originalHash` and freshness; `saveMetadata` writes metadata with optimistic concurrency semantics.\n- Repository must expose semantic persisted-state operations like `readPersistedSchema(spec)`, `readPersistedDependsOn(spec)`, and stable `specHash()`; use cases must not inspect raw sidecar files.\n- `resolveFromPath(inputPath, from?)` maps storage paths back to `{ specPath, specId }` or cross-workspace result; relative inputs need `from`.\n- `search(query, options?)` searches spec artifact content with relevance scores; `specsPath` exists only for filesystem-backed adapters.\n\n## Constraints\n- Each instance is single-workspace scoped.\n- `ArtifactConflictError` is sole optimistic-concurrency failure type for artifact, metadata, and semantic persisted writes.\n- Read operations remain available on read-only workspaces.\n- Metadata and semantic persisted state are parsed views, not raw adapter files.\n- `specHash()` must be stable and deterministic for unchanged spec state.\n"
+  "generatedBy": "core"
 }

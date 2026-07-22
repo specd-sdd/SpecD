@@ -114,9 +114,10 @@ Schema hooks always precede project hooks within the same phase. Within each lev
 Before executing a `run:` hook command, `HookRunner` expands `{{key.path}}` template variables using a `HookVariables` object. The variables available are:
 
 - `{{change.name}}` — the change name
-- `{{change.workspace}}` — the primary workspace name
 - `{{change.path}}` — the absolute path to the change directory
 - `{{project.root}}` — the absolute path to the project root
+
+`{{change.workspace}}` MUST NOT be a supported token. A change has no single primary workspace — workspaces touched by the change are derived from `specIds` and MUST NOT be injected into `HookVariables` as a singular workspace field. See [`core:template-variables`](../template-variables/spec.md) and [`core:change`](../change/spec.md).
 
 Unknown variable paths are left unexpanded (the original `{{key.path}}` token is preserved). All substituted values are shell-escaped to prevent injection attacks.
 

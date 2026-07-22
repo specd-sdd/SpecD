@@ -46,38 +46,34 @@ When a change is not in `archivable` state and `options.force` is not `true`, `a
 
 ### Requirement: list returns all archived changes in chronological order
 
-`list(options?)` MUST return archived changes in this workspace sorted chronologically (oldest first).
+`list(options?)` MUST return archived changes in this workspace sorted by canonical order: `archivedAt` descending (newest → oldest).
 
-```typescript
-interface ArchiveListOptions {
-  limit?: number
-  page?: number
-  startAt?: string
-}
-```
+`ArchiveListOptions` extends `ListOptions` with:
 
-- `limit`: maximum number of entries to return. Defaults to 100 if not provided.
-- `page`: 1-based page index. Mutually exclusive with `startAt`.
-- `startAt`: name of the change to start after (exclusive keyset cursor). Mutually exclusive with `page`.
+- `includeArchivedBy?: boolean` — when `true`, projected entries MAY include `archivedBy`; when `false` or omitted, `archivedBy` MUST NOT appear
+
+Pagination uses shared `ListOptions` / `ListResult` from [`core:repository-port`](../repository-port/spec.md). The former `startAt` cursor is replaced by `after: { key, id? }` where `after.key` is `archivedAt` ISO-8601 and `after.id` is the change `name` tiebreak.
+
+Default `limit` is **100** when omitted.
 
 ### Requirement: list returns index entries
 
-`list(options?)` MUST return a result object containing the entries and metadata:
+`list(options?)` MUST return `ListResult<ArchiveListEntry>`:
 
 ```typescript
 interface ArchiveListResult {
-  items: ArchivedChangeIndexEntry[]
-  meta: {
-    total: number
-    count: number
-    limit: number
-    page?: number
-    startAt?: string
-  }
+  items: ArchiveListEntry[]
+  meta: ListMeta
 }
 ```
 
-The implementation MUST satisfy this requirement without reading `manifest.json` files for every entry.
+The implementation MUST satisfy this requirement without reading `manifest.json` for every entry. `includeArchivedBy` controls projection of `archivedBy` only; implementations MUST NOT perform extra reads to satisfy the flag.
+
+`meta.total` and `count()` MUST read from the same index source.
+
+### Requirement: Archive list count
+
+`ArchiveRepository` MUST expose `count()` returning the total number of archived changes in this workspace. The value MUST match `list().meta.total` and MUST be served from the same fs-cache index source. `count()` MUST NOT scan every archive manifest.
 
 ### Requirement: get returns an archived change or null
 
@@ -89,19 +85,21 @@ When an entry is found (either from the index or recovery), the implementation M
 
 ### Requirement: fs implementation maintains archive runtime ignore rules
 
-When the filesystem implementation creates or maintains runtime archive artifacts, it MUST also maintain archive-local ignore rules for those artifacts.
+When the filesystem implementation creates or maintains runtime archive artifacts, it MUST maintain archive-local ignore rules for staging artifacts.
 
-`FsArchiveRepository` MUST ensure that the archive root `.gitignore` contains entries for `.specd-index.jsonl` and `.staging`.
+`FsArchiveRepository` MUST ensure that the archive root `.gitignore` contains an entry for `.staging`.
+
+List index files live under `{configPath}/tmp/fs-cache/archive/` and are governed by `{configPath}/tmp/.gitignore`, not the archive root `.gitignore`. On rebuild/migration, obsolete root-local `.specd-index.jsonl` / `.specd-index-meta.json` gitignore entries MAY be removed while keeping `.staging`.
 
 This guarantee MUST be provided by runtime archive behavior, not only by project initialization.
 
-The guarantee MUST cover archive creation, `reindex()`, and runtime index recovery or append paths that recreate or maintain `.specd-index.jsonl`.
-
 ### Requirement: archivePath returns the absolute path for an archived change
 
-`archivePath(entry)` MUST accept either a full `ArchivedChange` or an `ArchivedChangeIndexEntry` and return the absolute filesystem path to the archived directory.
+`archivePath(entry)` MUST accept either a full `ArchivedChange` or an `ArchiveListEntry` and return the absolute filesystem path to the archived directory. The accepted parameter type MUST NOT require a `workspaces` field on the entry — `ArchiveListEntry` has no `workspaces` field (see [`core:archived-change-index-entry`](../archived-change-index-entry/spec.md)), so `archivePath` MUST be resolvable from `name`, `archivedName`, and `archivedAt` alone.
 
 This mirrors `ChangeRepository.changePath(change)` for active changes. The path MUST be resolved from the archive pattern and root directory configured at construction time — the caller does not need to know the archive directory structure.
+
+Archive patterns MUST NOT support a `{{change.workspace}}` token: a change has no single primary workspace, and `archivePath` MUST NOT derive or require one from `workspaces[0]` or `specIds[0]`. See [`core:storage`](../storage/spec.md) for the normative supported-variable catalog.
 
 This method is used by `RunStepHooks` and `GetHookInstructions` to build the `change.path` template variable when operating on archived changes.
 
@@ -119,20 +117,26 @@ These paths are used by implementation discovery to avoid tracking specd's own m
 
 ### Requirement: reindex rebuilds the archive index
 
-`reindex()` MUST rebuild `index.jsonl` by scanning the archive directory for all manifest files, sorting entries by `archivedAt` in chronological order, and writing a clean index. The resulting file MUST be in chronological order (oldest first) so that git diffs show only added or removed lines — never reorderings.
+`reindex()` MUST rebuild the archive list index under `{configPath}/tmp/fs-cache/archive/` by scanning archive directories for manifest files, projecting `ArchiveListEntry` rows, sorting by `archivedAt` descending, and writing a clean fs-cache index via atomic publish.
+
+On first rebuild or migration, implementations MUST delete legacy `.specd-index.jsonl` and `.specd-index-meta.json` from the archive root if present (ignore ENOENT). Normal `list` / `count` cache hits MUST NOT scan or delete root-local legacy files.
+
+Implementations MUST NOT write or maintain a root-local archive list index as part of normal list/count operation.
 
 ### Requirement: Archive index metadata persistence
 
-The repository implementation SHALL maintain a metadata file `.specd-index-meta.json` at the archive root.
+Filesystem implementations MUST maintain `.specd-index-meta.json` alongside `.specd-index.jsonl` under `{configPath}/tmp/fs-cache/archive/`.
 
-- The file MUST contain the `totalCount` of archived changes.
-- `archive()` MUST update this count on success.
-- `reindex()` MUST recalculate the `totalCount` and refresh the metadata file.
-- `list()` SHOULD use this metadata file to provide the `total` count in its result.
+- The meta file MUST contain `totalCount`, `generatedAt`, and `isInvalidated` per the shared fs-cache index helper contract.
+- `archive()` MUST upsert the archive list entry and update `totalCount` through the helper.
+- `reindex()` MUST recalculate `totalCount` and refresh the meta file.
+- `list()` and `count()` MUST use this meta file (after freshness checks) for `meta.total` and `count()` respectively.
+
+Root-local archive index metadata files are obsolete and MUST NOT be updated after migration.
 
 ### Requirement: Abstract class with abstract methods
 
-`ArchiveRepository` MUST be defined as an `abstract class`, not an `interface`. All storage operations (`archive`, `list`, `get`, `reindex`) MUST be declared as `abstract` methods. This follows the architecture spec requirement that ports with shared construction are abstract classes.
+`ArchiveRepository` MUST be defined as an `abstract class`, not an `interface`. All storage operations (`archive`, `list`, `count`, `get`, `reindex`) MUST be declared as `abstract` methods. This follows the architecture spec requirement that ports with shared construction are abstract classes.
 
 ### Requirement: Append-only archive semantics
 
@@ -141,20 +145,21 @@ Once a change is archived, the resulting `ArchivedChange` record and its directo
 ## Constraints
 
 - The archive is append-only — archived changes are never modified after creation
-- `index.jsonl` entries MUST use forward slashes as path separators regardless of host OS
-- `index.jsonl` MUST be kept in chronological order (oldest first, newest last) so git diffs only show lines added at the bottom or removed — never reorderings
-- `archive()` appends exactly one line to `index.jsonl` (O(1) append)
-- `get()` searches from the end of `index.jsonl` for most-recent-first lookup; falls back to filesystem scan if not found
+- Archive list indexes live under `{configPath}/tmp/fs-cache/archive/`, not at the archive root
+- Canonical archive list sort is `archivedAt` descending (newest → oldest)
+- Default list `limit` is **100**
+- `archive()` upserts the archive list entry through the fs-cache helper
+- `get()` loads full detail from the archived directory `manifest.json`; list/count use index entries only
 - The `force` option on `archive()` bypasses the state check entirely
 - `ArchivedChange` is immutable once created — no setters, no mutation methods
 
 ## Spec Dependencies
 
-- [`core:repository-port`](../repository-port/spec.md) — `Repository` base class, `RepositoryConfig`, shared accessors
+- [`core:repository-port`](../repository-port/spec.md) — `Repository` base class, shared list pagination types, and `invalidateCache()`
 - [`default:_global/architecture`](../../_global/architecture/spec.md) — ports as abstract classes, application layer uses ports only
 - [`core:change`](../change/spec.md) — Change entity, `archivable` state, `ActorIdentity`, lifecycle transitions
-- [`core:storage`](../storage/spec.md) — archive pattern configuration, archive index format, directory naming
+- [`core:storage`](../storage/spec.md) — archive pattern configuration, fs-cache layout, directory naming
 - [`core:archive-change`](../archive-change/spec.md) — ArchiveChange use case that delegates to this port
 - [`default:_global/logging`](../../_global/logging/spec.md) — debug logging requirements for archive staging, path resolution, and failure diagnostics
-- `core:archived-change-index-entry` — index row type returned by `list()` and accepted by `archivePath()`
+- [`core:archived-change-index-entry`](../archived-change-index-entry/spec.md) — `ArchiveListEntry` row type returned by `list()` and accepted by `archivePath()`
 - [`core:read-only-change-view`](../read-only-change-view/spec.md) — shared read-only surface for manifest-backed archive reads

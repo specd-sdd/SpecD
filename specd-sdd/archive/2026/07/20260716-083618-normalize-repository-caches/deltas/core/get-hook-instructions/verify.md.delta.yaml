@@ -1,0 +1,55 @@
+- op: modified
+  description: Change lookup never builds a change.workspace template variable.
+  selector:
+    type: section
+    matches: 'Requirement: Change lookup'
+  content: |
+    #### Scenario: Change loaded from ChangeRepository by name
+
+    - **GIVEN** a change named `my-change` exists in `ChangeRepository`
+    - **WHEN** `GetHookInstructions.execute` is called with `name: "my-change"`
+    - **THEN** `ChangeRepository.get("my-change")` is called
+
+    #### Scenario: ChangeNotFoundError thrown when change not found
+
+    - **GIVEN** `ChangeRepository.get("nonexistent")` returns `null`
+    - **AND** the step is not `archiving` post phase
+    - **WHEN** `GetHookInstructions.execute` is called with `name: "nonexistent"`
+    - **THEN** `ChangeNotFoundError` is thrown
+
+    #### Scenario: Post-archiving fallback — change found in archive
+
+    - **GIVEN** a change named `my-change` does not exist in `ChangeRepository`
+    - **AND** `ArchiveRepository.get("my-change")` returns an `ArchivedChange`
+    - **WHEN** `GetHookInstructions.execute` is called with `name: "my-change"`, `step: "archiving"`, `phase: "post"`
+    - **THEN** the use case proceeds normally using the archived change
+    - **AND** `change.path` template variable resolves to `ArchiveRepository.archivePath(archivedChange)`
+
+    #### Scenario: Post-archiving fallback — change not in either repository
+
+    - **GIVEN** a change named `nonexistent` does not exist in `ChangeRepository`
+    - **AND** `ArchiveRepository.get("nonexistent")` returns `null`
+    - **WHEN** `GetHookInstructions.execute` is called with `name: "nonexistent"`, `step: "archiving"`, `phase: "post"`
+    - **THEN** `ChangeNotFoundError` is thrown
+
+    #### Scenario: Active change takes precedence over archived
+
+    - **GIVEN** a change named `my-change` exists in both `ChangeRepository` and `ArchiveRepository`
+    - **WHEN** `GetHookInstructions.execute` is called with `name: "my-change"`, `step: "archiving"`, `phase: "post"`
+    - **THEN** the active change from `ChangeRepository` is used
+    - **AND** `ArchiveRepository.get()` is not called
+
+    #### Scenario: Non-archiving step does not fall back to archive
+
+    - **GIVEN** a change named `my-change` does not exist in `ChangeRepository`
+    - **AND** `ArchiveRepository.get("my-change")` would return an `ArchivedChange`
+    - **WHEN** `GetHookInstructions.execute` is called with `name: "my-change"`, `step: "implementing"`, `phase: "post"`
+    - **THEN** `ChangeNotFoundError` is thrown immediately
+    - **AND** `ArchiveRepository.get()` is not called
+
+    #### Scenario: No workspace value is read or injected on either lookup path
+
+    - **GIVEN** either the active-change lookup or the archive-fallback lookup resolves a change
+    - **WHEN** `GetHookInstructions.execute` builds `TemplateVariables` for `TemplateExpander.expand()`
+    - **THEN** the resulting `change` namespace has no `workspace` key
+    - **AND** it is not derived via `change.workspaces[0] ?? 'default'` or `specIds[0]?.split(':')[0]`

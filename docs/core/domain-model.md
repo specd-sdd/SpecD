@@ -391,6 +391,6 @@ p.toFsPath('/') // 'auth/oauth' (POSIX)
 p.toFsPath('\\') // 'auth\\oauth' (Windows)
 ```
 
-You typically receive `SpecPath` values from `Spec.name` or `ArchivedChange.workspace` and pass them to `SpecRepository` methods. You rarely need to construct them yourself unless building a custom adapter.
+You typically receive `SpecPath` values from `Spec.name` or from workspaces derived via `Change.workspaces` / `ArchivedChange.workspaces` (from `specIds`) and pass them to `SpecRepository` methods. You rarely need to construct them yourself unless building a custom adapter.
 
 Note that `SpecPath` is distinct from spec IDs. A spec ID is the full `workspace:capability-path` string (e.g. `'default:auth/oauth'`), while a `SpecPath` is the capability path portion only (e.g. `'auth/oauth'`).

@@ -313,7 +313,6 @@ The `storage.archive.adapter.config.pattern` field controls the directory name g
 | ------------------------- | ------------------------------------------------------------------------ |
 | `{{change.archivedName}}` | Full archived directory name — e.g. `2024-01-15-add-auth-flow` (default) |
 | `{{change.name}}`         | The change's slug name — e.g. `add-auth-flow`                            |
-| `{{change.workspace}}`    | The primary workspace of the change                                      |
 | `{{year}}`                | Four-digit year at archive time — e.g. `2024`                            |
 | `{{date}}`                | ISO date at archive time — e.g. `2024-01-15`                             |
 
@@ -321,11 +320,11 @@ The `storage.archive.adapter.config.pattern` field controls the directory name g
 # organise archives by year
 pattern: '{{year}}/{{change.archivedName}}'
 
-# organise by workspace, then name
-pattern: '{{change.workspace}}/{{change.archivedName}}'
+# organise by change slug, then archived directory name
+pattern: '{{change.name}}/{{change.archivedName}}'
 ```
 
-Unknown variables are left as-is and a warning is emitted.
+`{{change.workspace}}` is not supported — a change has no single primary workspace. Use `{{change.name}}` or `{{change.archivedName}}` instead.
 
 ## context
 

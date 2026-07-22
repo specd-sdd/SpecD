@@ -7,7 +7,8 @@
     "core:kernel",
     "default:_global/architecture",
     "core:archived-change-index-entry",
-    "core:composition-resolver"
+    "core:composition-resolver",
+    "core:archive-repository-port"
   ],
   "context": [
     "Teams need to browse the history of completed spec work — for audits, onboarding, or tracing when a particular spec was last modified. `ListArchived` retrieves all archived changes in the default workspace as a read-only query with no side effects, no input parameters, and no lifecycle hooks."
@@ -22,19 +23,19 @@
     {
       "requirement": "No input",
       "rules": [
-        "`ListArchived.execute()` accepts no parameters. It always operates on the full set of archived changes in the repository."
+        "`ListArchived.execute(options?)` accepts optional list options (`limit`, `page`, `after`, `includeArchivedBy`) and forwards them to `ArchiveRepository.list(options)`.\n\nDefault `limit` is **100** when callers omit options. `page` and `after` are mutually exclusive per shared `ListOptions`."
       ]
     },
     {
       "requirement": "Output",
       "rules": [
-        "`ListArchived.execute()` MUST return a `Promise` resolving to a result object containing the entries and metadata:\n\n```typescript\ninterface ListArchivedResult {\n  items: ArchivedChangeIndexEntry[]\n  meta: {\n    total: number\n    count: number\n    limit: number\n    page?: number\n    startAt?: string\n  }\n}\n```\n\nThe `items` array contains the archived changes, ordered oldest first (chronological order by `archivedAt`) unless the repository implementation provides a different default order."
+        "`ListArchived.execute(options?)` MUST return `Promise<ListResult<ArchiveListEntry>>` (alias `ListArchivedResult`).\n\nItems are ordered in the repository's canonical sort (`archivedAt` descending — newest first). `meta.total` reflects the full archive count; `meta.count` reflects the returned page size.\n\nKeyset pagination uses `after: { key: archivedAt ISO-8601, id: change name }` — not legacy `startAt`."
       ]
     },
     {
       "requirement": "Delegation to ArchiveRepository",
       "rules": [
-        "`ListArchived` MUST delegate entirely to `ArchiveRepository.list()`. It SHALL NOT apply additional filtering, sorting, or transformation to the repository result. The ordering guarantee (oldest first) is the responsibility of the `ArchiveRepository` port."
+        "`ListArchived` MUST delegate entirely to `ArchiveRepository.list(options)` and return the result unchanged. It SHALL NOT apply additional filtering, sorting, pagination, or transformation.\n\nCanonical sort order is owned by the archive index helper; the use case MUST NOT re-sort."
       ]
     },
     {
@@ -51,9 +52,10 @@
     }
   ],
   "constraints": [
-    "ListArchived has no error cases of its own -- any errors originate from the ArchiveRepository infrastructure",
-    "The use case does not accept workspace selection -- it operates on the single ArchiveRepository injected at construction time",
-    "The returned ArchivedChangeIndexEntry instances are immutable read-only records"
+    "ListArchived has no error cases of its own — any errors originate from the ArchiveRepository infrastructure",
+    "The use case does not accept workspace selection — it operates on the single ArchiveRepository injected at construction time",
+    "The returned ArchiveListEntry instances are immutable read-only records",
+    "Optional archivedBy appears only when includeArchivedBy is set on forwarded options"
   ],
   "scenarios": [
     {
@@ -64,33 +66,77 @@
     },
     {
       "requirement": "No input",
-      "name": "Execute called with no arguments",
-      "when": ["listArchived.execute({ limit: 10, page: 2 }) is called"],
-      "then": ["it delegates to archiveRepository.list({ limit: 10, page: 2 })"]
+      "name": "Execute forwards list options to repository",
+      "when": ["listArchived.execute({ limit: 10, page: 2, includeArchivedBy: true }) is called"],
+      "then": [
+        "it delegates to archiveRepository.list({ limit: 10, page: 2, includeArchivedBy: true })"
+      ]
+    },
+    {
+      "requirement": "No input",
+      "name": "Default limit is 100 when options omitted",
+      "when": ["listArchived.execute() is called with no arguments"],
+      "then": ["it delegates to archiveRepository.list() with default limit: 100"]
+    },
+    {
+      "requirement": "No input",
+      "name": "page and after are mutually exclusive",
+      "when": ["options include both page and after"],
+      "then": ["validation rejects the request before repository delegation"]
     },
     {
       "requirement": "Output",
-      "name": "Archive contains multiple changes",
+      "name": "Archive contains multiple changes ordered newest first",
       "given": [
-        "the archive repository contains three archived changes with distinct archivedAt timestamps as index entries"
+        "the archive repository contains three archived changes with distinct archivedAt timestamps"
       ],
       "when": ["listArchived.execute() is called"],
       "then": [
-        "the result is an array of three ArchivedChangeIndexEntry records ordered oldest first"
+        "the result is ListResult<ArchiveListEntry> with three items ordered by archivedAt descending (newest first)",
+        "AND meta.total equals the full archive count"
       ]
     },
     {
       "requirement": "Output",
       "name": "Archive is empty",
       "when": ["listArchived.execute() is called and the archive repository contains no entries"],
-      "then": ["the result is an empty array"]
+      "then": ["the result is { items: [], meta: { total: 0, count: 0, limit: 100 } }"]
+    },
+    {
+      "requirement": "Output",
+      "name": "Keyset after cursor replaces legacy startAt",
+      "given": ["archived changes alpha and beta where alpha is newer"],
+      "when": [
+        "listArchived.execute({ limit: 1, after: { key: alpha.archivedAt, id: 'alpha' } }) is called"
+      ],
+      "then": ["items contains only beta", "AND no startAt option is accepted"]
+    },
+    {
+      "requirement": "Output",
+      "name": "archivedBy appears only when includeArchivedBy is set",
+      "given": ["cached archive rows include stored archivedBy"],
+      "when": [
+        "listArchived.execute({ includeArchivedBy: true }) is called",
+        "listArchived.execute() is called without the flag"
+      ],
+      "then": ["returned items may include archivedBy", "returned items omit archivedBy"]
     },
     {
       "requirement": "Delegation to ArchiveRepository",
       "name": "Result matches repository output exactly",
-      "given": ["ArchiveRepository.list(options) returns a specific ArchiveListResult"],
+      "given": ["ArchiveRepository.list(options) returns a specific ListResult<ArchiveListEntry>"],
       "when": ["listArchived.execute(options) is called"],
-      "then": ["the result is identical to the object returned by the repository"]
+      "then": [
+        "the result is identical to the object returned by the repository",
+        "AND the use case does not re-sort, filter, or paginate after delegation"
+      ]
+    },
+    {
+      "requirement": "Delegation to ArchiveRepository",
+      "name": "No additional transformation after delegation",
+      "given": ["the archive repository returns items in archivedAt descending order"],
+      "when": ["listArchived.execute(options) is called"],
+      "then": ["the returned item order and meta fields match the repository output exactly"]
     },
     {
       "requirement": "No side effects",
@@ -111,17 +157,10 @@
       ]
     }
   ],
-  "implementation": {
-    "files": [
-      {
-        "specId": "core:list-archived",
-        "file": "core:src/composition/use-cases/list-archived.ts"
-      }
-    ]
-  },
+  "implementation": {},
   "contentHashes": {
-    "spec.md": "sha256:7c230c78aed72bedb82d6b5b36eb5bd56813d9cc1a5014a27c7a5a3de07685bc",
-    "verify.md": "sha256:223489d4adcc958077d65603bf101ddc4db27e97e5db852301c6f1867937a63b"
+    "spec.md": "sha256:7a8c4d52fb5170b529dd28d2d2473841893f1997a6801734e5e1ed8f14bc5636",
+    "verify.md": "sha256:75f33b3d5fdd1efcc16378b9968a0d4f0dad18dbb50a4b379eb8cb9799845198"
   },
   "generatedBy": "core"
 }

@@ -13,6 +13,13 @@ export {
   toArchivedChangeView,
 } from './read-only-change-view.js'
 export {
+  type ArchiveListEntry,
   type ArchivedChangeIndexEntry,
   workspacesFromSpecIds,
 } from './archived-change-index-entry.js'
+export {
+  type ChangeListEntryBase,
+  type ActiveChangeListEntry,
+  type DraftedChangeListEntry,
+  type DiscardedChangeListEntry,
+} from './change-list-entry.js'

@@ -29,7 +29,7 @@
     {
       "requirement": "Change lookup",
       "rules": [
-        "`GetHookInstructions` loads the change by name via `ChangeRepository`. If no change exists with the given name **and** the requested step is `'archiving'` with phase `'post'`, it MUST fall back to `ArchiveRepository.get(name)`. If the change is found in the archive, it MUST be used for template variable construction (using `ArchivedChange.name`, `ArchivedChange.workspace`, and `ArchiveRepository.archivePath(archivedChange)` for the `change.path` variable). If the change is not found in the archive either, it MUST throw `ChangeNotFoundError`.\n\nFor all other step/phase combinations, if `ChangeRepository.get(name)` returns null, `GetHookInstructions` MUST throw `ChangeNotFoundError` immediately — the archive fallback does not apply."
+        "`GetHookInstructions` loads the change by name via `ChangeRepository`. If no change exists with the given name **and** the requested step is `'archiving'` with phase `'post'`, it MUST fall back to `ArchiveRepository.get(name)`. If the change is found in the archive, it MUST be used for template variable construction (using `ArchivedChange.name` and `ArchiveRepository.archivePath(archivedChange)` for the `change.path` variable). If the change is not found in the archive either, it MUST throw `ChangeNotFoundError`.\n\nFor all other step/phase combinations, if `ChangeRepository.get(name)` returns null, `GetHookInstructions` MUST throw `ChangeNotFoundError` immediately — the archive fallback does not apply.\n\nNeither lookup path reads or derives a workspace value: `GetHookInstructions` MUST NOT build a `change.workspace` variable or inject any singular/primary workspace value (for example via `change.workspaces[0] ?? 'default'` or `specIds[0]?.split(':')[0]`) into the `change` namespace passed to `TemplateExpander.expand()`. Per [`core:template-variables`](../template-variables/spec.md), `change.workspace` is not a supported token."
       ]
     },
     {
@@ -240,6 +240,18 @@
       ]
     },
     {
+      "requirement": "Change lookup",
+      "name": "No workspace value is read or injected on either lookup path",
+      "given": ["either the active-change lookup or the archive-fallback lookup resolves a change"],
+      "when": [
+        "GetHookInstructions.execute builds TemplateVariables for TemplateExpander.expand()"
+      ],
+      "then": [
+        "the resulting change namespace has no workspace key",
+        "AND it is not derived via change.workspaces[0] ?? 'default' or specIds[0]?.split(':')[0]"
+      ]
+    },
+    {
       "requirement": "Config-based factory delegates through resolveGetHookInstructionsDeps",
       "name": "createGetHookInstructions config form derives GetHookInstructionsDeps through resolveGetHookInstructionsDeps",
       "when": ["createGetHookInstructions(config, options?) is invoked"],
@@ -252,16 +264,17 @@
     }
   ],
   "implementation": {
-    "files": [
+    "symbols": [
       {
         "specId": "core:get-hook-instructions",
-        "file": "core:src/composition/use-cases/get-hook-instructions.ts"
+        "file": "core:src/application/use-cases/get-hook-instructions.ts",
+        "symbol": "GetHookInstructions"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:a5f59de8d77a400c309345e1bd0fdd434d0f453a68d5d99c93995736ca3f53d5",
-    "verify.md": "sha256:385d1badb3ac9e4e2b1ad91b4fe5519fc4ff4e36c6fbdbb7023f218751425fc0"
+    "spec.md": "sha256:53f1845c5689fead4a65a832f9b2da1e42fd5fb0883b850a09ffa40a4f8324b8",
+    "verify.md": "sha256:34f86afddb90f4fcdb374ea203d68fd3431d65c78c7278086a72920226d8fbd9"
   },
   "generatedBy": "core"
 }

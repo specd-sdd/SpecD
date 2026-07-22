@@ -7,6 +7,12 @@
   "implementation": [
     {
       "file": "cli:src/index.ts"
+    },
+    {
+      "file": "cli:src/helpers/list-pagination.ts"
+    },
+    {
+      "file": "cli:src/commands/change/validate.ts"
     }
   ]
 }

@@ -46,7 +46,7 @@ Use **`workspaces`** as the canonical term for the config section and domain con
 - Repository ports expose `workspace()` (not `scope()`).
 - `RepositoryConfig` uses `workspace` (not `scope`).
 - Schema references use `#workspace:name` syntax (not `#scope:name`).
-- Template variables use `{{change.workspace}}` (not `{{change.scope}}`).
+- Archive patterns reject `{{change.scope}}` and `{{change.workspace}}` at configuration time.
 
 `ValidationRule.scope` retains its name — it refers to a section within a spec file, which is a different concept unrelated to workspaces.
 

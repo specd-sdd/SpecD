@@ -1,9 +1,96 @@
 import { type Command } from 'commander'
-import { type DraftedEvent } from '@specd/sdk'
+import { type DraftedChangeListEntry } from '@specd/sdk'
 import { resolveCliContext } from '../../helpers/cli-context.js'
+import {
+  addListPaginationOptions,
+  formatTruncationHint,
+  parseListPaginationFlags,
+} from '../../helpers/list-pagination.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
 import { colWidth, renderTable } from '../../helpers/table.js'
+import chalk from 'chalk'
+
+/**
+ * Renders drafted change list entries as a text table.
+ *
+ * @param entries - Draft list entries
+ * @param includeReason - Whether to show the reason column
+ * @returns Multi-line table string
+ */
+function renderDraftList(
+  entries: readonly DraftedChangeListEntry[],
+  includeReason: boolean,
+): string {
+  const rows = entries.map((entry) => ({
+    name: entry.name,
+    state: entry.state,
+    date: entry.draftedAt.toISOString().slice(0, 10),
+    by: entry.draftedBy.name,
+    reason: entry.reason ?? '',
+    description: entry.description,
+  }))
+
+  const columns: Array<{ header: string; width: number; overflow?: 'wrap' }> = [
+    {
+      header: 'NAME',
+      width: colWidth(
+        'NAME',
+        rows.map((r) => r.name),
+      ),
+    },
+    {
+      header: 'STATE',
+      width: colWidth(
+        'STATE',
+        rows.map((r) => r.state),
+      ),
+    },
+    {
+      header: 'DATE',
+      width: colWidth(
+        'DATE',
+        rows.map((r) => r.date),
+      ),
+    },
+    {
+      header: 'BY',
+      width: colWidth(
+        'BY',
+        rows.map((r) => r.by),
+      ),
+    },
+  ]
+  if (includeReason) {
+    columns.push({
+      header: 'REASON',
+      width: Math.min(
+        60,
+        colWidth(
+          'REASON',
+          rows.map((r) => r.reason),
+        ),
+      ),
+      overflow: 'wrap',
+    })
+  }
+
+  const table = renderTable(
+    null,
+    columns,
+    rows.map((r) => {
+      const row = [r.name, r.state, r.date, r.by]
+      if (includeReason) row.push(r.reason)
+      return row
+    }),
+  )
+
+  const descriptionLines = rows
+    .filter((r) => r.description !== undefined)
+    .map((r) => `    ${chalk.dim(r.description!)}`)
+
+  return [table, ...descriptionLines].filter((line) => line.length > 0).join('\n')
+}
 
 /**
  * Registers the `drafts list` subcommand on the given parent command.
@@ -11,7 +98,7 @@ import { colWidth, renderTable } from '../../helpers/table.js'
  * @param parent - The parent Commander command to attach the subcommand to.
  */
 export function registerDraftsList(parent: Command): void {
-  parent
+  const cmd = parent
     .command('list')
     .allowExcessArguments(false)
     .description(
@@ -19,111 +106,81 @@ export function registerDraftsList(parent: Command): void {
     )
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
+    .option('--description', 'include change description on each entry')
+    .option('--reason', 'include draft reason on each entry')
+
+  addListPaginationOptions(cmd)
+
+  cmd
     .addHelpText(
       'after',
       `
 JSON/TOON output schema:
-  Array<{
-    name: string
-    state: string
-    draftedAt: string | null
-    draftedBy?: { name: string, email: string }
-    reason?: string
-  }>
+  {
+    items: Array<{ name, state, createdAt, specIds, schemaName, schemaVersion, draftedAt, draftedBy?, description?, reason? }>,
+    meta: { total, count, limit, page?, after? }
+  }
 `,
     )
-    .action(async (opts: { format: string; config?: string }) => {
-      try {
-        const { kernel } = await resolveCliContext({ configPath: opts.config })
-        const changes = await kernel.changes.listDrafts.execute()
-        const fmt = parseFormat(opts.format)
+    .action(
+      async (opts: {
+        format: string
+        config?: string
+        description?: boolean
+        reason?: boolean
+        limit?: number
+        page?: number
+        afterKey?: string
+        afterId?: string
+      }) => {
+        try {
+          const { kernel } = await resolveCliContext({ configPath: opts.config })
+          const pagination = parseListPaginationFlags(opts)
+          const result = await kernel.changes.listDrafts.execute({
+            ...pagination,
+            ...(opts.description === true ? { includeDescription: true } : {}),
+            ...(opts.reason === true ? { includeReason: true } : {}),
+          })
+          const fmt = parseFormat(opts.format)
 
-        if (fmt === 'text') {
-          if (changes.length === 0) {
-            output('no drafts', 'text')
+          if (fmt === 'text') {
+            if (result.items.length === 0) {
+              output('no drafts', 'text')
+            } else {
+              const hint = formatTruncationHint(result.meta)
+              output(
+                renderDraftList(result.items, opts.reason === true) +
+                  (hint !== null ? `\n${hint}` : ''),
+                'text',
+              )
+            }
           } else {
-            const rows = changes.map((c) => {
-              const evt = c.history
-                .slice()
-                .reverse()
-                .find((e): e is DraftedEvent => e.type === 'drafted')
-              return {
-                name: c.name,
-                state: c.state,
-                date: evt?.at.toISOString().slice(0, 10) ?? '',
-                by: evt?.by.name ?? '',
-                reason: evt?.reason ?? '',
-              }
-            })
             output(
-              renderTable(
-                null,
-                [
-                  {
-                    header: 'NAME',
-                    width: colWidth(
-                      'NAME',
-                      rows.map((r) => r.name),
-                    ),
-                  },
-                  {
-                    header: 'STATE',
-                    width: colWidth(
-                      'STATE',
-                      rows.map((r) => r.state),
-                    ),
-                  },
-                  {
-                    header: 'DATE',
-                    width: colWidth(
-                      'DATE',
-                      rows.map((r) => r.date),
-                    ),
-                  },
-                  {
-                    header: 'BY',
-                    width: colWidth(
-                      'BY',
-                      rows.map((r) => r.by),
-                    ),
-                  },
-                  {
-                    header: 'REASON',
-                    width: Math.min(
-                      60,
-                      colWidth(
-                        'REASON',
-                        rows.map((r) => r.reason),
-                      ),
-                    ),
-                    overflow: 'wrap',
-                  },
-                ],
-                rows.map((r) => [r.name, r.state, r.date, r.by, r.reason]),
-              ),
-              'text',
+              {
+                items: result.items.map((entry) => ({
+                  name: entry.name,
+                  state: entry.state,
+                  createdAt: entry.createdAt.toISOString(),
+                  specIds: [...entry.specIds],
+                  schemaName: entry.schemaName,
+                  schemaVersion: entry.schemaVersion,
+                  draftedAt: entry.draftedAt.toISOString(),
+                  draftedBy: { name: entry.draftedBy.name, email: entry.draftedBy.email },
+                  ...(opts.description === true && entry.description !== undefined
+                    ? { description: entry.description }
+                    : {}),
+                  ...(opts.reason === true && entry.reason !== undefined
+                    ? { reason: entry.reason }
+                    : {}),
+                })),
+                meta: result.meta,
+              },
+              fmt,
             )
           }
-        } else {
-          output(
-            changes.map((c) => {
-              const evt = c.history
-                .slice()
-                .reverse()
-                .find((e): e is DraftedEvent => e.type === 'drafted')
-              return {
-                name: c.name,
-                state: c.state,
-                draftedAt: evt?.at.toISOString() ?? null,
-                ...(evt ? { draftedBy: { name: evt.by.name, email: evt.by.email } } : {}),
-                ...(evt?.reason !== undefined ? { reason: evt.reason } : {}),
-              }
-            }),
-            fmt,
-          )
+        } catch (err) {
+          handleError(err, opts.format)
         }
-      } catch (err) {
-        handleError(err, opts.format)
-      }
-    })
+      },
+    )
 }

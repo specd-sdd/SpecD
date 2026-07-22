@@ -1,8 +1,6 @@
 import { GetProjectSummary } from '../../application/use-cases/get-project-summary.js'
-import { type ListArchived } from '../../application/use-cases/list-archived.js'
-import { type ListChanges } from '../../application/use-cases/list-changes.js'
-import { type ListDiscarded } from '../../application/use-cases/list-discarded.js'
-import { type ListDrafts } from '../../application/use-cases/list-drafts.js'
+import { type ChangeRepository } from '../../application/ports/change-repository.js'
+import { type ArchiveRepository } from '../../application/ports/archive-repository.js'
 import { type ListWorkspaces } from '../../application/use-cases/list-workspaces.js'
 import { type SpecdConfig } from '../../application/specd-config.js'
 import {
@@ -11,19 +9,13 @@ import {
   type CompositionResolutionOptions,
 } from '../composition-resolver.js'
 import { normalizeCompositionFactoryArgs, type FactoryInput } from '../normalize-factory-args.js'
-import { createListArchived } from './list-archived.js'
-import { createListChanges } from './list-changes.js'
-import { createListDiscarded } from './list-discarded.js'
-import { createListDrafts } from './list-drafts.js'
 
 /**
  * Explicit dependencies for {@link createGetProjectSummary}.
  */
 export interface GetProjectSummaryDeps {
-  readonly listChanges: ListChanges
-  readonly listDrafts: ListDrafts
-  readonly listDiscarded: ListDiscarded
-  readonly listArchived: ListArchived
+  readonly changes: ChangeRepository
+  readonly archive: ArchiveRepository
   readonly listWorkspaces: ListWorkspaces
 }
 
@@ -35,10 +27,8 @@ export interface GetProjectSummaryDeps {
  */
 export function resolveGetProjectSummaryDeps(resolver: CompositionResolver): GetProjectSummaryDeps {
   return {
-    listChanges: createListChanges({ changes: resolver.getChangeRepository() }),
-    listDrafts: createListDrafts({ changes: resolver.getChangeRepository() }),
-    listDiscarded: createListDiscarded({ changes: resolver.getChangeRepository() }),
-    listArchived: createListArchived({ archive: resolver.getArchiveRepository() }),
+    changes: resolver.getChangeRepository(),
+    archive: resolver.getArchiveRepository(),
     listWorkspaces: resolver.getListWorkspaces(),
   }
 }
@@ -91,14 +81,8 @@ function createGetProjectSummaryFromNormalized(
   input: FactoryInput<GetProjectSummaryDeps, CompositionResolutionOptions>,
 ): GetProjectSummary {
   if (input.kind === 'deps') {
-    const { listChanges, listDrafts, listDiscarded, listArchived, listWorkspaces } = input.deps
-    return new GetProjectSummary(
-      listChanges,
-      listDrafts,
-      listDiscarded,
-      listArchived,
-      listWorkspaces,
-    )
+    const { changes, archive, listWorkspaces } = input.deps
+    return new GetProjectSummary(changes, archive, listWorkspaces)
   }
 
   const resolver = createCompositionResolver(input.config, input.options)
@@ -114,11 +98,5 @@ function createGetProjectSummaryFromNormalized(
 function isGetProjectSummaryDeps(
   value: GetProjectSummaryDeps | SpecdConfig,
 ): value is GetProjectSummaryDeps {
-  return (
-    'listChanges' in value &&
-    'listDrafts' in value &&
-    'listDiscarded' in value &&
-    'listArchived' in value &&
-    'listWorkspaces' in value
-  )
+  return 'changes' in value && 'archive' in value && 'listWorkspaces' in value
 }

@@ -54,13 +54,19 @@
     {
       "requirement": "list returns all archived changes in chronological order",
       "rules": [
-        "`list(options?)` MUST return archived changes in this workspace sorted chronologically (oldest first).\n\n```typescript\ninterface ArchiveListOptions {\n  limit?: number\n  page?: number\n  startAt?: string\n}\n```\n\n- `limit`: maximum number of entries to return. Defaults to 100 if not provided.\n- `page`: 1-based page index. Mutually exclusive with `startAt`.\n- `startAt`: name of the change to start after (exclusive keyset cursor). Mutually exclusive with `page`."
+        "`list(options?)` MUST return archived changes in this workspace sorted by canonical order: `archivedAt` descending (newest → oldest).\n\n`ArchiveListOptions` extends `ListOptions` with:\n\n- `includeArchivedBy?: boolean` — when `true`, projected entries MAY include `archivedBy`; when `false` or omitted, `archivedBy` MUST NOT appear\n\nPagination uses shared `ListOptions` / `ListResult` from [`core:repository-port`](../repository-port/spec.md). The former `startAt` cursor is replaced by `after: { key, id? }` where `after.key` is `archivedAt` ISO-8601 and `after.id` is the change `name` tiebreak.\n\nDefault `limit` is **100** when omitted."
       ]
     },
     {
       "requirement": "list returns index entries",
       "rules": [
-        "`list(options?)` MUST return a result object containing the entries and metadata:\n\n```typescript\ninterface ArchiveListResult {\n  items: ArchivedChangeIndexEntry[]\n  meta: {\n    total: number\n    count: number\n    limit: number\n    page?: number\n    startAt?: string\n  }\n}\n```\n\nThe implementation MUST satisfy this requirement without reading `manifest.json` files for every entry."
+        "`list(options?)` MUST return `ListResult<ArchiveListEntry>`:\n\n```typescript\ninterface ArchiveListResult {\n  items: ArchiveListEntry[]\n  meta: ListMeta\n}\n```\n\nThe implementation MUST satisfy this requirement without reading `manifest.json` for every entry. `includeArchivedBy` controls projection of `archivedBy` only; implementations MUST NOT perform extra reads to satisfy the flag.\n\n`meta.total` and `count()` MUST read from the same index source."
+      ]
+    },
+    {
+      "requirement": "Archive list count",
+      "rules": [
+        "`ArchiveRepository` MUST expose `count()` returning the total number of archived changes in this workspace. The value MUST match `list().meta.total` and MUST be served from the same fs-cache index source. `count()` MUST NOT scan every archive manifest."
       ]
     },
     {
@@ -72,13 +78,13 @@
     {
       "requirement": "fs implementation maintains archive runtime ignore rules",
       "rules": [
-        "When the filesystem implementation creates or maintains runtime archive artifacts, it MUST also maintain archive-local ignore rules for those artifacts.\n\n`FsArchiveRepository` MUST ensure that the archive root `.gitignore` contains entries for `.specd-index.jsonl` and `.staging`.\n\nThis guarantee MUST be provided by runtime archive behavior, not only by project initialization.\n\nThe guarantee MUST cover archive creation, `reindex()`, and runtime index recovery or append paths that recreate or maintain `.specd-index.jsonl`."
+        "When the filesystem implementation creates or maintains runtime archive artifacts, it MUST maintain archive-local ignore rules for staging artifacts.\n\n`FsArchiveRepository` MUST ensure that the archive root `.gitignore` contains an entry for `.staging`.\n\nList index files live under `{configPath}/tmp/fs-cache/archive/` and are governed by `{configPath}/tmp/.gitignore`, not the archive root `.gitignore`. On rebuild/migration, obsolete root-local `.specd-index.jsonl` / `.specd-index-meta.json` gitignore entries MAY be removed while keeping `.staging`.\n\nThis guarantee MUST be provided by runtime archive behavior, not only by project initialization."
       ]
     },
     {
       "requirement": "archivePath returns the absolute path for an archived change",
       "rules": [
-        "`archivePath(entry)` MUST accept either a full `ArchivedChange` or an `ArchivedChangeIndexEntry` and return the absolute filesystem path to the archived directory.\n\nThis mirrors `ChangeRepository.changePath(change)` for active changes. The path MUST be resolved from the archive pattern and root directory configured at construction time — the caller does not need to know the archive directory structure.\n\nThis method is used by `RunStepHooks` and `GetHookInstructions` to build the `change.path` template variable when operating on archived changes."
+        "`archivePath(entry)` MUST accept either a full `ArchivedChange` or an `ArchiveListEntry` and return the absolute filesystem path to the archived directory. The accepted parameter type MUST NOT require a `workspaces` field on the entry — `ArchiveListEntry` has no `workspaces` field (see [`core:archived-change-index-entry`](../archived-change-index-entry/spec.md)), so `archivePath` MUST be resolvable from `name`, `archivedName`, and `archivedAt` alone.\n\nThis mirrors `ChangeRepository.changePath(change)` for active changes. The path MUST be resolved from the archive pattern and root directory configured at construction time — the caller does not need to know the archive directory structure.\n\nArchive patterns MUST NOT support a `{{change.workspace}}` token: a change has no single primary workspace, and `archivePath` MUST NOT derive or require one from `workspaces[0]` or `specIds[0]`. See [`core:storage`](../storage/spec.md) for the normative supported-variable catalog.\n\nThis method is used by `RunStepHooks` and `GetHookInstructions` to build the `change.path` template variable when operating on archived changes."
       ]
     },
     {
@@ -90,19 +96,19 @@
     {
       "requirement": "reindex rebuilds the archive index",
       "rules": [
-        "`reindex()` MUST rebuild `index.jsonl` by scanning the archive directory for all manifest files, sorting entries by `archivedAt` in chronological order, and writing a clean index. The resulting file MUST be in chronological order (oldest first) so that git diffs show only added or removed lines — never reorderings."
+        "`reindex()` MUST rebuild the archive list index under `{configPath}/tmp/fs-cache/archive/` by scanning archive directories for manifest files, projecting `ArchiveListEntry` rows, sorting by `archivedAt` descending, and writing a clean fs-cache index via atomic publish.\n\nOn first rebuild or migration, implementations MUST delete legacy `.specd-index.jsonl` and `.specd-index-meta.json` from the archive root if present (ignore ENOENT). Normal `list` / `count` cache hits MUST NOT scan or delete root-local legacy files.\n\nImplementations MUST NOT write or maintain a root-local archive list index as part of normal list/count operation."
       ]
     },
     {
       "requirement": "Archive index metadata persistence",
       "rules": [
-        "The repository implementation SHALL maintain a metadata file `.specd-index-meta.json` at the archive root.\n\n- The file MUST contain the `totalCount` of archived changes.\n- `archive()` MUST update this count on success.\n- `reindex()` MUST recalculate the `totalCount` and refresh the metadata file.\n- `list()` SHOULD use this metadata file to provide the `total` count in its result."
+        "Filesystem implementations MUST maintain `.specd-index-meta.json` alongside `.specd-index.jsonl` under `{configPath}/tmp/fs-cache/archive/`.\n\n- The meta file MUST contain `totalCount`, `generatedAt`, and `isInvalidated` per the shared fs-cache index helper contract.\n- `archive()` MUST upsert the archive list entry and update `totalCount` through the helper.\n- `reindex()` MUST recalculate `totalCount` and refresh the meta file.\n- `list()` and `count()` MUST use this meta file (after freshness checks) for `meta.total` and `count()` respectively.\n\nRoot-local archive index metadata files are obsolete and MUST NOT be updated after migration."
       ]
     },
     {
       "requirement": "Abstract class with abstract methods",
       "rules": [
-        "`ArchiveRepository` MUST be defined as an `abstract class`, not an `interface`. All storage operations (`archive`, `list`, `get`, `reindex`) MUST be declared as `abstract` methods. This follows the architecture spec requirement that ports with shared construction are abstract classes."
+        "`ArchiveRepository` MUST be defined as an `abstract class`, not an `interface`. All storage operations (`archive`, `list`, `count`, `get`, `reindex`) MUST be declared as `abstract` methods. This follows the architecture spec requirement that ports with shared construction are abstract classes."
       ]
     },
     {
@@ -114,10 +120,11 @@
   ],
   "constraints": [
     "The archive is append-only — archived changes are never modified after creation",
-    "index.jsonl entries MUST use forward slashes as path separators regardless of host OS",
-    "index.jsonl MUST be kept in chronological order (oldest first, newest last) so git diffs only show lines added at the bottom or removed — never reorderings",
-    "archive() appends exactly one line to index.jsonl (O(1) append)",
-    "get() searches from the end of index.jsonl for most-recent-first lookup; falls back to filesystem scan if not found",
+    "Archive list indexes live under {configPath}/tmp/fs-cache/archive/, not at the archive root",
+    "Canonical archive list sort is archivedAt descending (newest → oldest)",
+    "Default list limit is 100",
+    "archive() upserts the archive list entry through the fs-cache helper",
+    "get() loads full detail from the archived directory manifest.json; list/count use index entries only",
     "The force option on archive() bypasses the state check entirely",
     "ArchivedChange is immutable once created — no setters, no mutation methods"
   ],
@@ -218,21 +225,20 @@
     },
     {
       "requirement": "list returns all archived changes in chronological order",
-      "name": "Multiple archived changes",
-      "given": ["the archive has 250 changes"],
+      "name": "List with limit and page",
+      "given": ["the archive has 250 archived changes indexed in fs-cache"],
       "when": ["list({ limit: 100, page: 2 }) is called"],
       "then": [
-        "it returns 100 changes (entries 101 to 200)",
+        "it returns 100 ArchiveListEntry rows (entries 101 to 200 in canonical order)",
         "AND meta.total is 250",
-        "AND meta.page is 2"
+        "AND meta.page is 2",
+        "AND items are ordered by archivedAt descending (newest first)"
       ]
     },
     {
       "requirement": "list returns all archived changes in chronological order",
       "name": "Duplicate entries in index",
-      "given": [
-        "index.jsonl contains duplicate entries for the same change name (from manual recovery)"
-      ],
+      "given": ["the fs-cache archive index contains duplicate entries for the same change name"],
       "when": ["list() is called"],
       "then": ["only the last entry per name is included in the result"]
     },
@@ -240,7 +246,7 @@
       "requirement": "list returns all archived changes in chronological order",
       "name": "No archived changes",
       "when": ["list() is called and no changes have been archived"],
-      "then": ["an empty array is returned"]
+      "then": ["{ items: [], meta: { total: 0, count: 0, limit: 100 } } is returned"]
     },
     {
       "requirement": "list returns index entries",
@@ -248,9 +254,38 @@
       "given": ["the archive contains archived changes"],
       "when": ["list() is called"],
       "then": [
-        "the result is an object with items (array) and meta (object)",
-        "AND meta.total reflects the count from .specd-index-meta.json"
+        "the result is ListResult<ArchiveListEntry> with items and meta",
+        "AND meta.total reflects the count from {configPath}/tmp/fs-cache/archive/.specd-index-meta.json"
       ]
+    },
+    {
+      "requirement": "list returns index entries",
+      "name": "archivedBy appears only when includeArchivedBy is set",
+      "given": ["cached archive list entries that include archivedBy"],
+      "when": [
+        "list({ includeArchivedBy: true }) is called",
+        "list() is called without includeArchivedBy"
+      ],
+      "then": [
+        "returned items may include projected archivedBy",
+        "returned items do not include archivedBy"
+      ]
+    },
+    {
+      "requirement": "list returns index entries",
+      "name": "List does not read every manifest",
+      "given": ["an archive with many indexed entries"],
+      "when": ["list() is called"],
+      "then": [
+        "the repository satisfies the listing from index entries without reading every archive manifest.json"
+      ]
+    },
+    {
+      "requirement": "Archive list count",
+      "name": "Count matches list meta.total from fs-cache index",
+      "given": ["an archive with a known number of indexed entries"],
+      "when": ["count() and list().meta.total are queried"],
+      "then": ["both return the same total", "AND count() does not scan every archive manifest"]
     },
     {
       "requirement": "get returns an archived change or null",
@@ -283,45 +318,39 @@
     },
     {
       "requirement": "fs implementation maintains archive runtime ignore rules",
-      "name": "Archive creation ensures runtime ignore rules",
+      "name": "Archive creation ensures staging ignore rule",
       "given": ["the archive root .gitignore is missing or incomplete"],
       "when": ["FsArchiveRepository.archive(change) commits a successful archive"],
-      "then": ["the archive root .gitignore contains entries for .specd-index.jsonl and .staging"]
+      "then": ["the archive root .gitignore contains an entry for .staging"]
     },
     {
       "requirement": "fs implementation maintains archive runtime ignore rules",
-      "name": "Runtime index recovery restores ignore rules",
-      "given": ["runtime lookup recovers or appends an archive index entry"],
-      "when": [
-        "FsArchiveRepository maintains .specd-index.jsonl through recovery or append behavior"
-      ],
-      "then": ["the archive root .gitignore contains entries for .specd-index.jsonl and .staging"]
-    },
-    {
-      "requirement": "fs implementation maintains archive runtime ignore rules",
-      "name": "Reindex restores ignore rules",
+      "name": "Reindex does not require root-local index gitignore entries",
       "given": ["the archive root .gitignore is missing or incomplete"],
-      "when": ["FsArchiveRepository.reindex() rebuilds the archive index"],
-      "then": ["the archive root .gitignore contains entries for .specd-index.jsonl and .staging"]
+      "when": ["FsArchiveRepository.reindex() rebuilds the fs-cache archive index"],
+      "then": [
+        "the archive root .gitignore contains an entry for .staging",
+        "AND list index files remain governed by {configPath}/tmp/.gitignore, not the archive root .gitignore"
+      ]
     },
     {
       "requirement": "archivePath returns the absolute path for an archived change",
-      "name": "Path resolved from archive pattern",
+      "name": "Path resolved from archive pattern for ArchivedChange",
       "given": [
         "an archive pattern {{year}}/{{change.archivedName}} and archive root /project/.specd/archive",
         "AND an ArchivedChange with archivedName: \"20260322-120000-my-change\""
       ],
       "when": ["archivePath(archivedChange) is called"],
-      "then": [
-        "it returns the absolute path to the archived change directory (e.g. /project/.specd/archive/20260322-120000-my-change)"
-      ]
+      "then": ["it returns the absolute path to the archived change directory"]
     },
     {
       "requirement": "archivePath returns the absolute path for an archived change",
-      "name": "Path is consistent with archive() result",
-      "given": ["an ArchivedChange returned by archive(change)"],
-      "when": ["archivePath(archivedChange) is called with the same ArchivedChange"],
-      "then": ["the returned path matches the archiveDirPath that was returned by archive()"]
+      "name": "Path resolved from ArchiveListEntry",
+      "given": ["an ArchiveListEntry for the same archived change"],
+      "when": ["archivePath(entry) is called"],
+      "then": [
+        "it returns the same absolute archived directory path as for the full ArchivedChange"
+      ]
     },
     {
       "requirement": "internalPaths returns absolute storage paths",
@@ -339,12 +368,22 @@
     },
     {
       "requirement": "reindex rebuilds the archive index",
-      "name": "Corrupted index is rebuilt",
-      "given": ["an index.jsonl with missing or extra entries"],
+      "name": "Corrupted fs-cache index is rebuilt newest first",
+      "given": ["a corrupted or stale index under {configPath}/tmp/fs-cache/archive/"],
       "when": ["reindex() is called"],
       "then": [
-        "index.jsonl is rewritten with all archive entries sorted by archivedAt (oldest first)",
+        "the fs-cache index is rewritten with all archive entries sorted by archivedAt descending",
         "AND each entry corresponds to a manifest file found in the archive directory"
+      ]
+    },
+    {
+      "requirement": "reindex rebuilds the archive index",
+      "name": "Migration deletes legacy root-local index files",
+      "given": ["legacy .specd-index.jsonl and .specd-index-meta.json exist at the archive root"],
+      "when": ["reindex() or the first full fs-cache rebuild runs"],
+      "then": [
+        "those legacy root-local index files are deleted (ENOENT ignored)",
+        "AND normal cache-hit list() / count() calls do not scan or delete root-local legacy files"
       ]
     },
     {
@@ -365,19 +404,26 @@
       "name": "ArchiveRepository declares abstract methods",
       "when": ["ArchiveRepository is declared"],
       "then": [
-        "it is an abstract class with abstract methods for archive, list, get, and archivePath",
+        "it is an abstract class with abstract methods for archive, list, count, get, and reindex",
         "AND concrete implementations must implement all abstract methods"
       ]
     },
     {
       "requirement": "Archive index metadata persistence",
-      "name": "reindex rebuilds metadata file",
+      "name": "reindex rebuilds fs-cache metadata file",
       "given": [
         "the archive has 150 directories with manifests",
-        "AND .specd-index-meta.json is missing or incorrect"
+        "AND {configPath}/tmp/fs-cache/archive/.specd-index-meta.json is missing or incorrect"
       ],
       "when": ["reindex() is called"],
-      "then": [".specd-index-meta.json is created/updated with totalCount: 150"]
+      "then": ["the fs-cache meta file is created or updated with totalCount: 150"]
+    },
+    {
+      "requirement": "Archive index metadata persistence",
+      "name": "list and count share fs-cache meta total",
+      "given": ["a populated fs-cache archive index with totalCount recorded in meta"],
+      "when": ["list().meta.total and count() are queried after freshness checks"],
+      "then": ["both return the same total from the fs-cache meta file"]
     }
   ],
   "implementation": {
@@ -389,16 +435,19 @@
       },
       {
         "specId": "core:archive-repository-port",
-        "file": "core:src/infrastructure/fs/archive-repository.ts",
-        "symbol": "FsArchiveRepository"
+        "file": "core:src/application/ports/archive-repository.ts",
+        "symbol": "ArchiveListOptions"
+      },
+      {
+        "specId": "core:archive-repository-port",
+        "file": "core:src/application/ports/archive-repository.ts",
+        "symbol": "ArchivePathEntry"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:b147f8de3fd94c35774ae7af8a25edfbec6a2c26a00dbf6b1a9a160d08b0676c",
-    "verify.md": "sha256:01684eb5a59ffd5d6d9f9660e1c06f24a2a592ba96630613edb96c1f2136e169"
+    "spec.md": "sha256:0aefa4a95d7717a74f3906b946054a5e4883318da56d5a30aa669bd8f8a2951e",
+    "verify.md": "sha256:e8042ecba858d2858614a5aa297d460227a56d936cd5fb4d54cdb657700d1d33"
   },
-  "generatedBy": "agent",
-  "optimizedDescription": "Archiving completed changes must decoupled active-change storage so archive can enforce own append-only semantics indexing strategy independently.",
-  "optimizedContext": "# ArchiveRepository Port\n\n## Rules\n- Inheritance from Repository base: ArchiveRepository MUST extend Repository. workspace(), ownership(), isExternal() accessors MUST reflect values provided construction time MUST NOT change during lifetime instance.\n- archive moves a change to the archive: archive(change, options?) MUST move change directory active changes location archive, create ArchivedChange record, persist manifest, append entry index. jsonl. method MUST return object containing ArchivedChange archiveDirPath. implementation MUST verify change archivable state before proceeding. state check intentionally redundant ArchiveChange use case — exists safety guard prevent accidental archival if repository called directly. When options. force true, state check MUST skipped, allowing archival any state (e. g. recovery administrative operations). When options. actor provided, ActorIdentity MUST recorded archived change manifest archivedBy. destination path MUST computed archive pa…\n- archive persists through a staged commit: archive(change, options?) MUST treat archive persistence staged commit rather than sequence partially visible permanent writes. When archive storage needs materialize multiple durable effects, repository MUST prepare destination state so failure before commit does not leave partially committed archive result visible successful archive.\n- Archive path confinement: Archive path resolution derived archive patterns, stored index entries, recovered manifest locations MUST remain confined configured archive root. Implementations MUST reject any derived path would escape archive root reinterpret archive metadata unchecked arbitrary filesystem path.\n- Archive repository debug logging: Implementations SHOULD emit debug-level logs archive path resolution, staged commit start, staged commit completion, confinement-related archive failures. logs MUST follow project's global logging conventions.\n- archive rejects non-archivable state: When change not archivable state options. force not true, archive() MUST throw InvalidStateTransitionError. change directory MUST NOT moved no index entry MUST written.\n- list returns all archived changes in chronological order: list(options?) MUST return archived changes workspace sorted chronologically (oldest first). - limit: maximum number entries return. Defaults 100 if not provided. - page: 1-based page index. Mutually exclusive startAt. - startAt: name change start after (exclusive keyset cursor). Mutually exclusive page.\n- list returns index entries: list(options?) MUST return result object containing entries metadata: implementation MUST satisfy requirement reading manifest. json files every entry.\n- get returns an archived change or null: get(name) MUST accept change name string return full ArchivedChange name, null if not found. implementation MUST search index. jsonl end (most recent entries first) efficient lookup. If entry not found index, implementation MUST fall back filesystem scan (e. g. glob **/*-<name>) append recovered entry index. jsonl future lookups. When entry found (either index recovery), implementation MUST read archived directory's manifest. json construct returned ArchivedChange manifest so callers can inspect archived change full read-only detail.\n- fs implementation maintains archive runtime ignore rules: When filesystem implementation creates maintains runtime archive artifacts, MUST also maintain archive-local ignore rules artifacts. FsArchiveRepository MUST ensure archive root. gitignore contains entries. specd-index. jsonl. staging. guarantee MUST provided runtime archive behavior, not only project initialization. guarantee MUST cover archive creation, reindex(), runtime index recovery append paths recreate maintain. specd-index. jsonl.\n- archivePath returns the absolute path for an archived change: archivePath(entry) MUST accept either full ArchivedChange ArchivedChangeIndexEntry return absolute filesystem path archived directory. mirrors ChangeRepository. changePath(change) active changes. path MUST resolved archive pattern root directory configured construction time — caller does not need know archive directory structure. method used RunStepHooks GetHookInstructions build change. path template variable when operating archived changes.\n- internalPaths returns absolute storage paths: internalPaths() MUST return array absolute filesystem paths internal specd management directories owned repository, undefined when concept does not apply. Returning undefined signals internal-path exclusion not applicable (e. g. remote backends do not manage local filesystem directories). Implementations MUST NOT return empty array signal inapplicability; empty array means \"no paths exclude\". FsArchiveRepository, MUST include: - absolute path archive root directory paths used implementation discovery avoid tracking specd's own metadata.\n- reindex rebuilds the archive index: reindex() MUST rebuild index. jsonl scanning archive directory all manifest files, sorting entries archivedAt chronological order, writing clean index. resulting file MUST chronological order (oldest first) so git diffs show only added removed lines — never reorderings.\n- Archive index metadata persistence: repository implementation SHALL maintain metadata file. specd-index-meta. json archive root. - file MUST contain totalCount archived changes. - archive() MUST update count success. - reindex() MUST recalculate totalCount refresh metadata file. - list() SHOULD use metadata file provide total count result.\n- Abstract class with abstract methods: ArchiveRepository MUST defined abstract class, not interface. All storage operations (archive, list, get, reindex) MUST declared abstract methods. follows architecture spec requirement ports shared construction abstract classes.\n- Append-only archive semantics: Once change archived, resulting ArchivedChange record directory contents MUST NOT mutated. archive append-only. No method ArchiveRepository permits modification existing archived entry."
+  "generatedBy": "core"
 }

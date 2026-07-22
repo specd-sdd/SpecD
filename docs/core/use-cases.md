@@ -708,27 +708,33 @@ Does not throw for validation failures — errors are returned in the result's `
 
 Lists all specs across all configured workspaces, resolving title and optionally a short summary or metadata freshness status per spec.
 
-**Constructor:** `new ListSpecs(specRepos: ReadonlyMap<string, SpecRepository>, hasher: ContentHasher, yaml: YamlSerializer)`
+**Constructor:** `new ListSpecs(listWorkspaces: ListWorkspaces)`
 
 **Input (options object):**
 
-| Option                  | Type      | Description                                                   |
-| ----------------------- | --------- | ------------------------------------------------------------- |
-| `includeSummary`        | `boolean` | Resolve a short description per spec. Default: `false`.       |
-| `includeMetadataStatus` | `boolean` | Resolve metadata freshness status per spec. Default: `false`. |
+| Option                  | Type                | Description                                                   |
+| ----------------------- | ------------------- | ------------------------------------------------------------- |
+| `limit`                 | `number`            | Page size (default `100`).                                    |
+| `page`                  | `number`            | 1-based page (mutually exclusive with `after`).               |
+| `after`                 | `ListCursor`        | Keyset cursor for pagination.                                 |
+| `workspaces`            | `readonly string[]` | When set, list only these workspaces.                         |
+| `includeSummary`        | `boolean`           | Resolve a short description per spec. Default: `false`.       |
+| `includeMetadataStatus` | `boolean`           | Resolve metadata freshness status per spec. Default: `false`. |
 
-**Returns:** `Promise<SpecListEntry[]>`
+**Returns:** `Promise<ListSpecsResult>` — aggregate `items`/`meta` plus `byWorkspace` slices per repository.
 
 ```typescript
+interface ListSpecsResult extends ListResult<SpecListEntry> {
+  readonly byWorkspace: readonly ListSpecsWorkspaceSlice[]
+}
+
 interface SpecListEntry {
   workspace: string
   path: string
-  title: string // from metadata title, or last path segment as fallback
-  summary?: string // present only when includeSummary is true
-  metadataStatus?: SpecMetadataStatus // present only when includeMetadataStatus is true
+  title: string
+  summary?: string
+  metadataStatus?: SpecMetadataStatus
 }
-
-type SpecMetadataStatus = 'fresh' | 'stale' | 'invalid' | 'missing'
 ```
 
 ---
@@ -1114,13 +1120,11 @@ Returns consolidated project-level counts (active/draft/discarded/archived chang
 
 ```typescript
 new GetProjectSummary(
-  listChanges: ListChanges,
-  listDrafts: ListDrafts,
-  listDiscarded: ListDiscarded,
-  listArchived: ListArchived,
+  changes: ChangeRepository,
+  archive: ArchiveRepository,
   listWorkspaces: ListWorkspaces,
 )
-````
+```
 
 **Input:** none — `execute()` accepts no parameters.
 
@@ -1137,9 +1141,9 @@ interface GetProjectSummaryResult {
 }
 ```
 
-Change counts derive from `ListChanges`, `ListDrafts`, and `ListDiscarded` result lengths. `archivedCount` uses `ListArchived.execute().meta.total` (not `items.length`, because archive listing may paginate). Spec counts call `SpecRepository.count()` on each workspace from `ListWorkspaces`.
+Change counts use `ChangeRepository.count()` / `countDrafts()` / `countDiscarded()` and `ArchiveRepository.count()` — no full list materialization. Spec counts call `SpecRepository.count()` on each workspace from `ListWorkspaces`.
 
-**Composition factory:** `createGetProjectSummary(config: SpecdConfig)` wires the five list use cases from a resolved project configuration.
+**Composition factory:** `createGetProjectSummary(config: SpecdConfig)` wires `changes`, `archive`, and `listWorkspaces` from a resolved project configuration.
 
 **Kernel:** `kernel.project.getProjectSummary`
 
@@ -1460,3 +1464,4 @@ interface UpdateImplementationTrackingResult {
 | `ChangeNotFoundError`             | No change with the given name exists.                              |
 | `ImplementationFileNotFoundError` | A file-required action targets a file that does not exist on disk. |
 | `ImplementationLinksExistError`   | `ignore` targets a file that still has live implementation links.  |
+````

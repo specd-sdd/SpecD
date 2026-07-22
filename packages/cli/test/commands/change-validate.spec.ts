@@ -657,9 +657,10 @@ describe('change validate', () => {
 
   it('allows --artifact without specPath for change-scoped artifacts', async () => {
     const { kernel, stdout } = setup()
-    kernel.changes.list.execute.mockResolvedValue([
-      { name: 'feat', specIds: ['default:auth/login'] },
-    ])
+    kernel.changes.list.execute.mockResolvedValue({
+      items: [{ name: 'feat', specIds: ['default:auth/login'] }],
+      meta: { total: 1, count: 1, limit: 100 },
+    })
     kernel.specs.getActiveSchema.execute.mockResolvedValue({
       raw: false,
       schema: {
@@ -693,9 +694,10 @@ describe('change validate', () => {
 
   it('requires specPath for scope:spec artifacts even with --artifact', async () => {
     const { kernel, stderr } = setup()
-    kernel.changes.list.execute.mockResolvedValue([
-      { name: 'feat', specIds: ['default:auth/login'] },
-    ])
+    kernel.changes.list.execute.mockResolvedValue({
+      items: [{ name: 'feat', specIds: ['default:auth/login'] }],
+      meta: { total: 1, count: 1, limit: 100 },
+    })
     kernel.specs.getActiveSchema.execute.mockResolvedValue({
       raw: false,
       schema: {

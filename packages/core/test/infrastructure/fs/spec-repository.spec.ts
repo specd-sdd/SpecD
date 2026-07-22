@@ -17,10 +17,16 @@ interface RepoContext {
   repo: FsSpecRepository
   specsPath: string
   tmpDir: string
+  configPath: string
+}
+
+function specCacheDir(configPath: string, workspace: string): string {
+  return path.join(configPath, 'tmp', 'fs-cache', 'specs', workspace)
 }
 
 async function setupRepo(): Promise<RepoContext> {
   const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'specd-spec-test-'))
+  const configPath = tmpDir
   const specsPath = path.join(tmpDir, 'specs')
   const metadataPath = path.join(tmpDir, '.specd', 'metadata')
   await Promise.all([
@@ -32,12 +38,12 @@ async function setupRepo(): Promise<RepoContext> {
     workspace: 'default',
     ownership: 'owned',
     isExternal: false,
-    configPath: '/test',
+    configPath,
     specsPath,
     metadataPath,
   })
 
-  return { repo, specsPath, tmpDir }
+  return { repo, specsPath, tmpDir, configPath }
 }
 
 async function cleanupRepo(ctx: RepoContext): Promise<void> {
@@ -152,7 +158,7 @@ describe('FsSpecRepository', () => {
   describe('list', () => {
     it('returns empty array when specsPath is empty', async () => {
       const results = await ctx.repo.list()
-      expect(results).toHaveLength(0)
+      expect(results.items).toHaveLength(0)
     })
 
     it('discovers a single spec', async () => {
@@ -160,8 +166,8 @@ describe('FsSpecRepository', () => {
 
       const results = await ctx.repo.list()
 
-      expect(results).toHaveLength(1)
-      expect(results[0]!.name.toString()).toBe('auth/login')
+      expect(results.items).toHaveLength(1)
+      expect(results.items[0]!.path).toBe('auth/login')
     })
 
     it('discovers multiple specs at different depths', async () => {
@@ -171,7 +177,7 @@ describe('FsSpecRepository', () => {
 
       const results = await ctx.repo.list()
 
-      const names = results.map((s) => s.name.toString()).sort()
+      const names = results.items.map((s) => s.path).sort()
       expect(names).toEqual(['auth/login', 'billing/invoices', 'billing/payments'])
     })
 
@@ -181,7 +187,7 @@ describe('FsSpecRepository', () => {
 
       const results = await ctx.repo.list()
 
-      const names = results.map((s) => s.name.toString())
+      const names = results.items.map((s) => s.path)
       expect(names).not.toContain('auth')
       expect(names).toContain('auth/login')
     })
@@ -193,7 +199,7 @@ describe('FsSpecRepository', () => {
 
       const results = await ctx.repo.list(SpecPath.parse('auth'))
 
-      const names = results.map((s) => s.name.toString()).sort()
+      const names = results.items.map((s) => s.path).sort()
       expect(names).toEqual(['auth/login', 'auth/oauth'])
     })
 
@@ -202,7 +208,7 @@ describe('FsSpecRepository', () => {
 
       const results = await ctx.repo.list(SpecPath.parse('billing'))
 
-      expect(results).toHaveLength(0)
+      expect(results.items).toHaveLength(0)
     })
 
     it('includes filenames in discovered specs', async () => {
@@ -210,9 +216,10 @@ describe('FsSpecRepository', () => {
       await writeSpecFile(ctx, 'auth/login', 'verify.md', 'content')
 
       const results = await ctx.repo.list()
+      const spec = await ctx.repo.get(SpecPath.parse(results.items[0]!.path))
 
-      expect(results[0]!.filenames).toContain('spec.md')
-      expect(results[0]!.filenames).toContain('verify.md')
+      expect(spec!.filenames).toContain('spec.md')
+      expect(spec!.filenames).toContain('verify.md')
     })
 
     it('does not surface spec-lock.json in list() filenames', async () => {
@@ -225,9 +232,10 @@ describe('FsSpecRepository', () => {
       )
 
       const results = await ctx.repo.list()
+      const spec = await ctx.repo.get(SpecPath.parse(results.items[0]!.path))
 
-      expect(results).toHaveLength(1)
-      expect(results[0]!.filenames).toEqual(['spec.md'])
+      expect(results.items).toHaveLength(1)
+      expect(spec!.filenames).toEqual(['spec.md'])
     })
   })
 
@@ -499,13 +507,13 @@ describe('FsSpecRepository', () => {
         workspace: 'default',
         ownership: 'owned',
         isExternal: false,
-        configPath: '/test',
+        configPath: tmpDir,
         specsPath,
         metadataPath: metaDir,
         prefix: '_global',
       })
 
-      prefixCtx = { repo, specsPath, tmpDir }
+      prefixCtx = { repo, specsPath, tmpDir, configPath: tmpDir }
     })
 
     afterEach(async () => {
@@ -518,7 +526,7 @@ describe('FsSpecRepository', () => {
 
       const results = await prefixCtx.repo.list()
 
-      const names = results.map((s) => s.name.toString()).sort()
+      const names = results.items.map((s) => s.path).sort()
       expect(names).toEqual(['_global/architecture', '_global/conventions'])
     })
 
@@ -572,7 +580,7 @@ describe('FsSpecRepository', () => {
 
       const results = await ctx.repo.list()
 
-      expect(results[0]!.name.toString()).toBe('auth/login')
+      expect(results.items[0]!.path).toBe('auth/login')
     })
 
     it('multi-segment prefix works correctly', async () => {
@@ -588,18 +596,18 @@ describe('FsSpecRepository', () => {
         workspace: 'shared',
         ownership: 'readOnly',
         isExternal: false,
-        configPath: '/test',
+        configPath: tmpDir,
         specsPath,
         metadataPath: metaDir,
         prefix: 'team_1/shared',
       })
 
-      const multiCtx: RepoContext = { repo, specsPath, tmpDir }
+      const multiCtx: RepoContext = { repo, specsPath, tmpDir, configPath: tmpDir }
       try {
         await writeSpecFile(multiCtx, 'auth/login', 'spec.md', '# Login')
 
         const results = await repo.list()
-        expect(results[0]!.name.toString()).toBe('team_1/shared/auth/login')
+        expect(results.items[0]!.path).toBe('team_1/shared/auth/login')
 
         const spec = await repo.get(SpecPath.parse('team_1/shared/auth/login'))
         expect(spec).not.toBeNull()
@@ -667,7 +675,7 @@ describe('FsSpecRepository', () => {
         workspace: 'core',
         ownership: 'owned',
         isExternal: false,
-        configPath: '/test',
+        configPath: tmpDir,
         specsPath,
         metadataPath: metaDir,
         prefix: 'core',
@@ -740,7 +748,7 @@ describe('FsSpecRepository', () => {
         workspace: 'core',
         ownership: 'owned',
         isExternal: false,
-        configPath: '/test',
+        configPath: tmpDir,
         specsPath,
         metadataPath: metaDir,
         prefix: 'core',
@@ -824,12 +832,12 @@ describe('FsSpecRepository', () => {
         workspace: 'platform',
         ownership: 'readOnly',
         isExternal: false,
-        configPath: '/test',
+        configPath: tmpDir,
         specsPath,
         metadataPath: path.join(tmpDir, '.specd', 'metadata'),
       })
 
-      roCtx = { repo, specsPath, tmpDir }
+      roCtx = { repo, specsPath, tmpDir, configPath: tmpDir }
 
       // Pre-populate a spec for read tests
       await writeSpecFile(roCtx, 'auth/tokens', 'spec.md', '# Tokens spec')
@@ -876,7 +884,7 @@ describe('FsSpecRepository', () => {
 
     it('list() still works on readOnly workspace', async () => {
       const result = await roCtx.repo.list()
-      expect(result.length).toBeGreaterThan(0)
+      expect(result.items.length).toBeGreaterThan(0)
     })
 
     it('artifact() still works on readOnly workspace', async () => {
@@ -905,7 +913,7 @@ describe('FsSpecRepository', () => {
         workspace: 'skills',
         ownership: 'owned',
         isExternal: false,
-        configPath: '/test',
+        configPath: tmpDir,
         specsPath,
         metadataPath: metaDir,
       })
@@ -950,7 +958,7 @@ describe('FsSpecRepository', () => {
         workspace: 'core',
         ownership: 'owned',
         isExternal: false,
-        configPath: '/test',
+        configPath: tmpDir,
         specsPath,
         metadataPath: metaDir,
         prefix: 'core',
@@ -1184,6 +1192,37 @@ describe('FsSpecRepository', () => {
       const match = results[0]!.matches[0]!
       expect(match.line).toBe(3)
       expect(match.snippet).toContain('OAuth2')
+    })
+  })
+
+  describe('fs-cache index', () => {
+    it('creates index under configPath/tmp/fs-cache/specs/<workspace> on list', async () => {
+      await writeSpecFile(ctx, 'auth/login', 'spec.md', '# Login')
+
+      await ctx.repo.list()
+
+      const indexPath = path.join(specCacheDir(ctx.configPath, 'default'), '.specd-index.jsonl')
+      await expect(fs.access(indexPath)).resolves.toBeUndefined()
+    })
+
+    it('upserts index entry on save', async () => {
+      const spec = makeSpec(ctx, 'auth/login', [])
+      const artifact = new SpecArtifact('spec.md', '# Login')
+
+      await ctx.repo.save(spec, artifact)
+
+      expect(await ctx.repo.count()).toBe(1)
+    })
+
+    it('invalidateCache triggers rebuild on next list', async () => {
+      await writeSpecFile(ctx, 'auth/login', 'spec.md', '# Login')
+      await ctx.repo.list()
+
+      await ctx.repo.invalidateCache()
+
+      const result = await ctx.repo.list()
+      expect(result.items).toHaveLength(1)
+      expect(result.items[0]!.path).toBe('auth/login')
     })
   })
 })

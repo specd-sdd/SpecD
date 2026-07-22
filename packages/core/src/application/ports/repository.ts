@@ -1,4 +1,48 @@
 /**
+ * Exclusive keyset cursor for paginated repository lists.
+ *
+ * `key` is the sort-key value in canonical order (ISO timestamp for time-sorted
+ * buckets; capability path for specs). `id` is an optional tiebreak (change
+ * `name` for change/archive buckets; omit for specs).
+ */
+export interface ListCursor {
+  readonly key: string
+  readonly id?: string
+}
+
+/**
+ * Shared pagination options for listable repository ports.
+ *
+ * - `limit` defaults to **100** when omitted.
+ * - `page` is 1-based and mutually exclusive with `after`.
+ * - `after` continues strictly after the cursor position in canonical sort order.
+ */
+export interface ListOptions {
+  readonly limit?: number
+  readonly page?: number
+  readonly after?: ListCursor
+}
+
+/**
+ * Metadata returned with every paginated list result.
+ */
+export interface ListMeta {
+  readonly total: number
+  readonly count: number
+  readonly limit: number
+  readonly page?: number
+  readonly after?: ListCursor
+}
+
+/**
+ * Uniform paginated list envelope used by listable repository ports.
+ */
+export interface ListResult<T> {
+  readonly items: readonly T[]
+  readonly meta: ListMeta
+}
+
+/**
  * Construction properties shared by all repository implementations.
  */
 export interface RepositoryConfig {
@@ -87,5 +131,16 @@ export abstract class Repository {
    */
   configPath(): string {
     return this._configPath
+  }
+
+  /**
+   * Resets whatever this adapter caches.
+   *
+   * Default is a no-op. Filesystem adapters override to invalidate list-index
+   * helpers. Callers that know the on-disk tree changed outside the repository
+   * MAY invoke this without knowing adapter-specific cache details.
+   */
+  async invalidateCache(): Promise<void> {
+    // default no-op
   }
 }

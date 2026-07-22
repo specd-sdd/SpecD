@@ -1,7 +1,12 @@
 import { type Command } from 'commander'
 import chalk from 'chalk'
-import { type Change } from '@specd/sdk'
+import { type ActiveChangeListEntry } from '@specd/sdk'
 import { resolveCliContext } from '../../helpers/cli-context.js'
+import {
+  addListPaginationOptions,
+  formatTruncationHint,
+  parseListPaginationFlags,
+} from '../../helpers/list-pagination.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
 import { colWidth, pad } from '../../helpers/table.js'
@@ -10,17 +15,10 @@ import { colWidth, pad } from '../../helpers/table.js'
  * Renders the change list as an aligned text table with an inverse-video
  * header row.
  *
- * Header row (inverse-video): `NAME  STATE  SPECS  SCHEMA`
- * Each data row: `  <name>  <state>  <specIds>  <schema>@<version>`
- * Optional description row (indented, dim): `    <description>`
- *
- * Column widths are fixed at render time, computed from the widest value
- * across all rows for each column (global, not per-group).
- *
- * @param changes - Changes to render
+ * @param changes - Change list entries to render
  * @returns Multi-line string
  */
-function renderChangeList(changes: Change[]): string {
+function renderChangeList(changes: readonly ActiveChangeListEntry[]): string {
   const rows = changes.map((c) => ({
     name: c.name,
     state: c.state,
@@ -83,51 +81,81 @@ function renderChangeList(changes: Change[]): string {
  * @param parent - The parent Commander command to attach the subcommand to.
  */
 export function registerChangeList(parent: Command): void {
-  parent
+  const cmd = parent
     .command('list')
     .allowExcessArguments(false)
     .description('List all active changes with their current lifecycle state and associated specs.')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
+    .option('--description', 'include change description on each entry')
+
+  addListPaginationOptions(cmd)
+
+  cmd
     .addHelpText(
       'after',
       `
 JSON/TOON output schema:
-  Array<{
-    name: string
-    state: string
-    specIds: string[]
-    schema: { name: string, version: number }
-    description?: string
-  }>
+  {
+    items: Array<{
+      name: string
+      state: string
+      specIds: string[]
+      schemaName: string
+      schemaVersion: number
+      createdAt: string
+      description?: string
+    }>,
+    meta: { total: number, count: number, limit: number, page?: number, after?: object }
+  }
 `,
     )
-    .action(async (opts: { format: string; config?: string }) => {
-      try {
-        const { kernel } = await resolveCliContext({ configPath: opts.config })
-        const changes = await kernel.changes.list.execute()
-        const fmt = parseFormat(opts.format)
+    .action(
+      async (opts: {
+        format: string
+        config?: string
+        description?: boolean
+        limit?: number
+        page?: number
+        afterKey?: string
+        afterId?: string
+      }) => {
+        try {
+          const { kernel } = await resolveCliContext({ configPath: opts.config })
+          const pagination = parseListPaginationFlags(opts)
+          const result = await kernel.changes.list.execute({
+            ...pagination,
+            ...(opts.description === true ? { includeDescription: true } : {}),
+          })
+          const fmt = parseFormat(opts.format)
 
-        if (fmt === 'text') {
-          if (changes.length === 0) {
-            output('no changes', 'text')
+          if (fmt === 'text') {
+            if (result.items.length === 0) {
+              output('no changes', 'text')
+            } else {
+              const hint = formatTruncationHint(result.meta)
+              output(renderChangeList(result.items) + (hint !== null ? `\n${hint}` : ''), 'text')
+            }
           } else {
-            output(renderChangeList(changes), 'text')
+            output(
+              {
+                items: result.items.map((c) => ({
+                  name: c.name,
+                  state: c.state,
+                  specIds: [...c.specIds],
+                  schemaName: c.schemaName,
+                  schemaVersion: c.schemaVersion,
+                  createdAt: c.createdAt.toISOString(),
+                  ...(c.description !== undefined ? { description: c.description } : {}),
+                })),
+                meta: result.meta,
+              },
+              fmt,
+            )
           }
-        } else {
-          output(
-            changes.map((c) => ({
-              name: c.name,
-              state: c.state,
-              specIds: [...c.specIds],
-              schema: { name: c.schemaName, version: c.schemaVersion },
-              ...(c.description !== undefined ? { description: c.description } : {}),
-            })),
-            fmt,
-          )
+        } catch (err) {
+          handleError(err, opts.format)
         }
-      } catch (err) {
-        handleError(err, opts.format)
-      }
-    })
+      },
+    )
 }

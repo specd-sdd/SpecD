@@ -62,7 +62,16 @@ The target directory is the **git root** when inside a git repository, or the **
 
 ### Requirement: Delegation to ConfigWriter
 
-The CLI passes the resolved project root, schema reference, workspace id, workspace specs path, and force flag to `createConfigWriter().initProject(...)`. All file creation — `specd.yaml`, storage directories, `.gitignore` entry — is handled by the `ConfigWriter` port. The CLI never touches `specd.yaml` directly and MUST NOT call `createInitProject`, `InitProject.execute`, or `kernel.project.init`.
+The CLI passes the resolved project root, schema reference, workspace id, workspace specs path, and force flag to `createConfigWriter().initProject(...)`. All file creation — `specd.yaml`, storage directories, root `.gitignore` entries, and `{configPath}/tmp/.gitignore` — is handled by the `ConfigWriter` port. The CLI never touches `specd.yaml` or tmp cache paths directly and MUST NOT call `createInitProject`, `InitProject.execute`, or `kernel.project.init`.
+
+The `{configPath}/tmp/.gitignore` file MUST be created idempotently during `initProject` with normative contents:
+
+```gitignore
+*
+!.gitignore
+```
+
+This keeps all tmp artifacts (including `fs-cache/`) out of version control while allowing the ignore rule file itself to remain tracked.
 
 ### Requirement: Skills installation after init
 

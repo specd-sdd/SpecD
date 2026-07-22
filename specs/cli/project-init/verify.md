@@ -94,6 +94,19 @@
 - **THEN** it calls `createConfigWriter().initProject(...)`
 - **AND** it does not call `createInitProject`, `InitProject.execute`, or `kernel.project.init`
 
+#### Scenario: tmp gitignore created idempotently
+
+- **GIVEN** a clean project root with resolved config path `.specd`
+- **WHEN** `specd project init --workspace default` completes successfully
+- **THEN** `.specd/tmp/.gitignore` exists
+- **AND** its contents are `*` on the first line and `!.gitignore` on the second line
+
+#### Scenario: tmp gitignore preserved on re-init with --force
+
+- **GIVEN** `.specd/tmp/.gitignore` already exists with the normative contents
+- **WHEN** `specd project init --force --workspace default` completes successfully
+- **THEN** `.specd/tmp/.gitignore` still contains `*` and `!.gitignore`
+
 ### Requirement: Skills installation after init
 
 #### Scenario: Plugins are installed for selected plugins after init

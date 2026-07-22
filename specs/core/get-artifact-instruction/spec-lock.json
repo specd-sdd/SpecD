@@ -14,7 +14,8 @@
   ],
   "implementation": [
     {
-      "file": "core:src/composition/use-cases/get-artifact-instruction.ts"
+      "file": "core:src/application/use-cases/get-artifact-instruction.ts",
+      "symbols": ["GetArtifactInstruction"]
     }
   ]
 }

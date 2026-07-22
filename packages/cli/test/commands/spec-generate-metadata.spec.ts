@@ -2,6 +2,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest'
 import {
   makeMockConfig,
   makeMockKernel,
+  makeListSpecsResult,
   makeProgram,
   mockProcessExit,
   captureStdout,
@@ -300,11 +301,13 @@ describe('spec generate-metadata', () => {
 
   it('--all --write processes stale and missing specs by default', async () => {
     const { kernel, stdout } = setup()
-    vi.mocked(kernel.specs.list.execute).mockResolvedValue([
-      { workspace: 'default', path: '_global/arch', title: 'arch', metadataStatus: 'stale' },
-      { workspace: 'default', path: '_global/docs', title: 'docs', metadataStatus: 'missing' },
-      { workspace: 'default', path: '_global/test', title: 'test', metadataStatus: 'fresh' },
-    ])
+    vi.mocked(kernel.specs.list.execute).mockResolvedValue(
+      makeListSpecsResult([
+        { workspace: 'default', path: '_global/arch', title: 'arch', metadataStatus: 'stale' },
+        { workspace: 'default', path: '_global/docs', title: 'docs', metadataStatus: 'missing' },
+        { workspace: 'default', path: '_global/test', title: 'test', metadataStatus: 'fresh' },
+      ]),
+    )
     vi.mocked(kernel.specs.generateMetadata.execute).mockResolvedValue({
       metadata: { title: 'T', generatedBy: 'core' },
       hasExtraction: true,
@@ -326,10 +329,12 @@ describe('spec generate-metadata', () => {
 
   it('--all --write --status all processes every spec', async () => {
     const { kernel, stdout } = setup()
-    vi.mocked(kernel.specs.list.execute).mockResolvedValue([
-      { workspace: 'default', path: '_global/arch', title: 'arch', metadataStatus: 'stale' },
-      { workspace: 'default', path: '_global/test', title: 'test', metadataStatus: 'fresh' },
-    ])
+    vi.mocked(kernel.specs.list.execute).mockResolvedValue(
+      makeListSpecsResult([
+        { workspace: 'default', path: '_global/arch', title: 'arch', metadataStatus: 'stale' },
+        { workspace: 'default', path: '_global/test', title: 'test', metadataStatus: 'fresh' },
+      ]),
+    )
     vi.mocked(kernel.specs.generateMetadata.execute).mockResolvedValue({
       metadata: { title: 'T', generatedBy: 'core' },
       hasExtraction: true,
@@ -355,10 +360,12 @@ describe('spec generate-metadata', () => {
 
   it('--all continues on individual failure and exits 1', async () => {
     const { kernel, stdout } = setup()
-    vi.mocked(kernel.specs.list.execute).mockResolvedValue([
-      { workspace: 'default', path: '_global/arch', title: 'arch', metadataStatus: 'stale' },
-      { workspace: 'default', path: '_global/docs', title: 'docs', metadataStatus: 'stale' },
-    ])
+    vi.mocked(kernel.specs.list.execute).mockResolvedValue(
+      makeListSpecsResult([
+        { workspace: 'default', path: '_global/arch', title: 'arch', metadataStatus: 'stale' },
+        { workspace: 'default', path: '_global/docs', title: 'docs', metadataStatus: 'stale' },
+      ]),
+    )
     vi.mocked(kernel.specs.generateMetadata.execute).mockResolvedValue({
       metadata: { title: 'T', generatedBy: 'core' },
       hasExtraction: true,
@@ -382,9 +389,11 @@ describe('spec generate-metadata', () => {
 
   it('--all JSON output has batch result structure', async () => {
     const { kernel, stdout } = setup()
-    vi.mocked(kernel.specs.list.execute).mockResolvedValue([
-      { workspace: 'default', path: '_global/arch', title: 'arch', metadataStatus: 'stale' },
-    ])
+    vi.mocked(kernel.specs.list.execute).mockResolvedValue(
+      makeListSpecsResult([
+        { workspace: 'default', path: '_global/arch', title: 'arch', metadataStatus: 'stale' },
+      ]),
+    )
     vi.mocked(kernel.specs.generateMetadata.execute).mockResolvedValue({
       metadata: { title: 'T', generatedBy: 'core' },
       hasExtraction: true,
@@ -414,9 +423,11 @@ describe('spec generate-metadata', () => {
 
   it('--all reports no matches when filter excludes everything', async () => {
     const { kernel, stdout } = setup()
-    vi.mocked(kernel.specs.list.execute).mockResolvedValue([
-      { workspace: 'default', path: '_global/arch', title: 'arch', metadataStatus: 'fresh' },
-    ])
+    vi.mocked(kernel.specs.list.execute).mockResolvedValue(
+      makeListSpecsResult([
+        { workspace: 'default', path: '_global/arch', title: 'arch', metadataStatus: 'fresh' },
+      ]),
+    )
 
     const program = makeProgram()
     registerSpecGenerateMetadata(program.command('spec'))

@@ -47,7 +47,7 @@
     {
       "requirement": "Instruction resolution",
       "rules": [
-        "`GetArtifactInstruction` MUST resolve each instruction component independently:\n\n- **`rulesPre`** — if the artifact declares `rules.pre`, collect all entries' `text` in declaration order. These are composition rules added by extending schemas or plugins to augment the base instruction.\n- **`instruction`** — the artifact's `instruction` field from the schema. `null` if not declared.\n- **`template`** — if the artifact declares a `template` path, read the file content from the schema directory via `SchemaRegistry` and return the resolved string. `null` if the artifact has no template. Template variable expansion (via `TemplateExpander`) MUST be applied to the template content using the same contextual variables as `instruction`.\n- **`delta`** — if the artifact has `delta: true`, resolve three sub-components:\n  - **`formatInstructions`** — call `parsers.get(artifact.format).deltaInstructions()` for the technical delta format guidance.\n  - **`domainInstructions`** — the artifact's `deltaInstruction` field. `null` if not declared.\n  - **`availableOutlines`** — for each spec ID in `change.specIds`, if the corresponding artifact file exists in `SpecRepository`, include that `specId` in `availableOutlines`. `availableOutlines` is strictly `string[]` of spec IDs. The use case MUST NOT embed full outline trees in this payload. Full outline content is retrieved on demand via `GetSpecOutline` (CLI: `specd specs outline <specPath> --artifact <artifactId>`).\n- **`rulesPost`** — if the artifact declares `rules.post`, collect all entries' `text` in declaration order.\n\nWhen `delta` is `false`, the `delta` field in the result is `null`."
+        "`GetArtifactInstruction` MUST build contextual `TemplateVariables` for expansion from only `change.name` and `change.path` (via `ChangeRepository.changePath()`). It MUST NOT build a `change.workspace` variable or inject any singular/primary workspace value (for example via `change.workspaces[0] ?? 'default'`) into the `change` namespace — per [`core:template-variables`](../template-variables/spec.md), `change.workspace` is not a supported token, and a change has no single primary workspace.\n\n`GetArtifactInstruction` MUST resolve each instruction component independently:\n\n- **`rulesPre`** — if the artifact declares `rules.pre`, collect all entries' `text` in declaration order. These are composition rules added by extending schemas or plugins to augment the base instruction.\n- **`instruction`** — the artifact's `instruction` field from the schema. `null` if not declared.\n- **`template`** — if the artifact declares a `template` path, read the file content from the schema directory via `SchemaRegistry` and return the resolved string. `null` if the artifact has no template. Template variable expansion (via `TemplateExpander`) MUST be applied to the template content using the same contextual variables as `instruction`.\n- **`delta`** — if the artifact has `delta: true`, resolve three sub-components:\n  - **`formatInstructions`** — call `parsers.get(artifact.format).deltaInstructions()` for the technical delta format guidance.\n  - **`domainInstructions`** — the artifact's `deltaInstruction` field. `null` if not declared.\n  - **`availableOutlines`** — for each spec ID in `change.specIds`, if the corresponding artifact file exists in `SpecRepository`, include that `specId` in `availableOutlines`. `availableOutlines` is strictly `string[]` of spec IDs. The use case MUST NOT embed full outline trees in this payload. Full outline content is retrieved on demand via `GetSpecOutline` (CLI: `specd specs outline <specPath> --artifact <artifactId>`).\n- **`rulesPost`** — if the artifact declares `rules.post`, collect all entries' `text` in declaration order.\n\nWhen `delta` is `false`, the `delta` field in the result is `null`."
       ]
     },
     {
@@ -138,6 +138,21 @@
       ]
     },
     {
+      "requirement": "Instruction resolution",
+      "name": "Contextual variables built for expansion have no workspace key",
+      "given": [
+        "a change touching multiple workspaces via specIds",
+        "AND an artifact with a template path"
+      ],
+      "when": [
+        "GetArtifactInstruction.execute builds TemplateVariables for template/instruction expansion"
+      ],
+      "then": [
+        "the change namespace contains only name and path",
+        "AND it is not populated with change.workspaces[0] ?? 'default' or any other singular-workspace derivation"
+      ]
+    },
+    {
       "requirement": "Result shape",
       "name": "Rules-only artifact has null instruction",
       "given": [
@@ -205,16 +220,17 @@
     }
   ],
   "implementation": {
-    "files": [
+    "symbols": [
       {
         "specId": "core:get-artifact-instruction",
-        "file": "core:src/composition/use-cases/get-artifact-instruction.ts"
+        "file": "core:src/application/use-cases/get-artifact-instruction.ts",
+        "symbol": "GetArtifactInstruction"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:15068b507daf402a6591753840e1f5c75503392384e8f37571f1789a4260a947",
-    "verify.md": "sha256:fc63185fab482993f2c6ea2d963ce9455162fd4cbb775b086447034ac5b6e257"
+    "spec.md": "sha256:2896763c4007388bdb429a4662438b6e54cfbd16000ce372a50a1297d9e6fb3f",
+    "verify.md": "sha256:e631dae8eeed9fbc3f7a2435316cb2f1732b9bb714ad15ac252619202006471f"
   },
   "generatedBy": "core"
 }

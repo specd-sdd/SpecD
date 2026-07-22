@@ -1,77 +1,69 @@
 {
   "title": "ArchivedChangeIndexEntry",
-  "description": "Listing archived changes must remain fast even when the archive contains many entries. `ArchivedChangeIndexEntry` defines the lightweight, index-backed record returned by archive listing APIs without requiring a `manifest.json` read per archived change.",
-  "dependsOn": ["core:change", "core:storage"],
+  "description": "Listing archived changes must remain fast even when the archive contains many entries. `ArchiveListEntry` (formerly `ArchivedChangeIndexEntry`) defines the lightweight, index-backed record returned by archive listing APIs without requiring a `manifest.json` read per archived change.",
+  "dependsOn": ["core:change", "core:storage", "core:repository-port"],
   "context": [
-    "Listing archived changes must remain fast even when the archive contains many entries. `ArchivedChangeIndexEntry` defines the lightweight, index-backed record returned by archive listing APIs without requiring a `manifest.json` read per archived change."
+    "Listing archived changes must remain fast even when the archive contains many entries. `ArchiveListEntry` (formerly `ArchivedChangeIndexEntry`) defines the lightweight, index-backed record returned by archive listing APIs without requiring a `manifest.json` read per archived change."
   ],
   "rules": [
     {
       "requirement": "Index entry fields",
       "rules": [
-        "An `ArchivedChangeIndexEntry` MUST include the following fields:\n\n- `name` (string) — original change name (lookup key)\n- `archivedName` (string) — archive directory name\n- `archivedAt` (Date) — archive timestamp\n- `archivedBy` (ActorIdentity, optional) — actor identity when recorded\n- `artifacts` (string\\[]) — artifact type IDs present at archive time\n- `specIds` (string\\[]) — spec IDs associated with the change at archive time\n- `schemaName` (string) and `schemaVersion` (number) — governing schema identity"
+        "An `ArchiveListEntry` MUST include the following **required** fields:\n\n- `name` (string) — original change name (lookup key)\n- `archivedName` (string) — archive directory name\n- `archivedAt` (Date) — archive timestamp\n- `specIds` (string\\[]) — spec IDs associated with the change at archive time\n- `schemaName` (string) and `schemaVersion` (number) — governing schema identity\n\nWhen `includeArchivedBy` is set on archive list options, the entry MAY include:\n\n- `archivedBy` (`ActorIdentity`) — actor identity when recorded at archive time\n\nWhen `includeArchivedBy` is not set, `archivedBy` MUST NOT appear on the entry.\n\n`ArchiveListEntry` MUST NOT include `artifacts`. Artifact detail belongs on `get(name)`.\n\n`ArchiveListEntry` MUST NOT include a `workspaces` field. Callers that need workspace prefixes MUST derive them from `specIds` (prefix before `:`). The former derived `workspaces` field and `workspacesFromSpecIds` helper used only for archive listing MUST be removed when no longer referenced.\n\nThe public type name `ArchiveListEntry` replaces `ArchivedChangeIndexEntry`. Implementations MAY retain the old name as a deprecated alias during migration, but new code MUST use `ArchiveListEntry`."
       ]
     },
     {
       "requirement": "No manifest-only data",
       "rules": [
-        "`ArchivedChangeIndexEntry` MUST NOT require access to `manifest.json`-only fields that are not reliably present in `index.jsonl` entries (for example detailed artifact state maps or full change history)."
-      ]
-    },
-    {
-      "requirement": "Derived workspaces",
-      "rules": [
-        "`ArchivedChangeIndexEntry` SHOULD provide `workspaces` derived from `specIds` (workspace prefixes before `:`) for display and filtering."
+        "`ArchiveListEntry` MUST NOT require access to `manifest.json`-only fields that are not reliably present in the list index (for example detailed artifact state maps, full change history, or artifact type lists). Artifact inventories are detail fields loaded via `get(name)`."
       ]
     }
   ],
   "constraints": [
-    "ArchivedChangeIndexEntry is a read-only data model with no mutating operations.",
-    "It is intentionally incomplete; full archived change inspection is provided by ArchivedChange loaded from the archive manifest."
+    "ArchiveListEntry is a read-only data model with no mutating operations.",
+    "It is intentionally incomplete; full archived change inspection is provided by ArchivedChange loaded from the archive manifest via get(name).",
+    "Optional archivedBy appears only when includeArchivedBy is set on the list call; the index stores the full payload and the flag is projection-only."
   ],
   "scenarios": [
     {
       "requirement": "Index entry fields",
-      "name": "Index entry contains required fields",
-      "given": ["an archive index entry loaded from index.jsonl"],
-      "when": ["it is represented as an ArchivedChangeIndexEntry"],
+      "name": "ArchiveListEntry contains required fields",
+      "given": ["an archive list entry loaded from the fs-cache index"],
+      "when": ["it is represented as an ArchiveListEntry"],
       "then": [
         "it contains name, archivedName, archivedAt, specIds, schemaName, and schemaVersion",
-        "AND it may contain archivedBy when recorded",
-        "AND it contains artifacts as an array of artifact type IDs"
+        "AND it does not contain artifacts",
+        "AND it does not contain workspaces"
+      ]
+    },
+    {
+      "requirement": "Index entry fields",
+      "name": "archivedBy appears only when includeArchivedBy is set",
+      "given": ["an archive list entry whose cached payload includes archivedBy"],
+      "when": [
+        "the entry is projected with includeArchivedBy: true",
+        "the entry is projected without includeArchivedBy"
+      ],
+      "then": [
+        "archivedBy may appear on the returned entry",
+        "archivedBy is not present on the returned entry"
       ]
     },
     {
       "requirement": "No manifest-only data",
-      "name": "Index entry is sufficient for listing without manifest reads",
-      "given": ["an archive with many entries"],
-      "when": ["an archive listing is produced from ArchivedChangeIndexEntry values"],
-      "then": ["the listing does not require loading manifest.json for every entry"]
-    },
-    {
-      "requirement": "Derived workspaces",
-      "name": "Workspaces are derived from specIds",
-      "given": [
-        "an ArchivedChangeIndexEntry with specIds containing core:change and cli:archive-show"
-      ],
-      "when": ["workspaces is derived"],
-      "then": ["it contains core and cli"]
+      "name": "ArchiveListEntry is sufficient for listing without manifest reads",
+      "given": ["an archive with many indexed entries"],
+      "when": ["an archive listing is produced from ArchiveListEntry values"],
+      "then": [
+        "the listing does not require loading manifest.json for every entry",
+        "AND artifact inventories are not present on list rows"
+      ]
     }
   ],
-  "implementation": {
-    "symbols": [
-      {
-        "specId": "core:archived-change-index-entry",
-        "file": "core:src/domain/archived-change-index-entry.ts",
-        "symbol": "ArchivedChangeIndexEntry"
-      }
-    ]
-  },
+  "implementation": {},
   "contentHashes": {
-    "spec.md": "sha256:183aaed774bbebc2563645f2a481056464e6af42a65baf5340e474b473e644ef",
-    "verify.md": "sha256:82e91c31ac52aa38809fb4c410464e5979f1da105c3ca4aebcfeff7a9e44c48b"
+    "spec.md": "sha256:6069476a4256c04c9689e844e9884f9f78d2e7352470912dff515de8f1037749",
+    "verify.md": "sha256:6d124738c199123f1d5e0f899ce00f235f3dafbbd73194aea6200fcf7d205458"
   },
-  "generatedBy": "agent",
-  "optimizedDescription": "Lightweight archive listing record: name, path, derived workspaces, no manifest-only data load.",
-  "optimizedContext": "# ArchivedChangeIndexEntry\n\n## Rules\n- Index entry fields: `ArchivedChangeIndexEntry` MUST include following fields: `name` (string) — original change name (lookup key) `archivedName` (string) — archive directory name `archivedAt` (Date) — archive timestamp `archivedBy` (ActorIdentity, optional) — actor identity when recorded `artifacts` (string\\[]) — artifact type IDs present at archive time `specIds` (string\\[]) — spec IDs associated with change at archive time `schemaName` (string) and `schemaVersion` (number) — governing schema identity\n- No manifest-only data: `ArchivedChangeIndexEntry` MUST NOT require access to `manifest.json`-only fields are not reliably present in `index.jsonl` entries (for example detailed artifact state maps or full change history).\n- Derived workspaces: `ArchivedChangeIndexEntry` SHOULD provide `workspaces` derived from `specIds` (workspace prefixes before `:`) for display and filtering.\n\n## Constraints\n- ArchivedChangeIndexEntry is read-only data model with no mutating operations.\n- It is intentionally incomplete; full archived change inspection is provided by ArchivedChange loaded from archive manifest.\n"
+  "generatedBy": "core"
 }

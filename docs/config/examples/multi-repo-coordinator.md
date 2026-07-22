@@ -90,7 +90,7 @@ schemaOverrides:
 
 **Schema overrides** — `schemaOverrides` applies inline changes to the active schema without forking it. `workflow` is a schema-level concept and is not a valid top-level field in `specd.yaml`; use `schemaOverrides` to add project-specific hook entries to schema-defined steps. The `append` operation adds a post-archive hook entry to the `archiving` step; the `id` field is required so the entry can be targeted by future overrides.
 
-**Post-archive hook** — after each change is archived, SpecD runs `git -C {{change.path}} checkout -b specd/{{change.name}}`. `{{change.path}}` resolves to the absolute path of the change directory at runtime. The supported template variables in `run:` hooks are `{{change.name}}`, `{{change.workspace}}`, `{{change.path}}`, and `{{project.root}}`.
+**Post-archive hook** — after each change is archived, SpecD runs `git -C {{change.path}} checkout -b specd/{{change.name}}`. `{{change.path}}` resolves to the absolute path of the change directory at runtime. The supported template variables in `run:` hooks are `{{change.name}}`, `{{change.path}}`, and `{{project.root}}`.
 
 **Context** — with no `contextIncludeSpecs` declared at the project or workspace level, the defaults apply: each workspace includes all its own specs when it is active in the current change. A change that touches both `auth` and `payments` specs activates both workspaces and loads all specs from each.
 

@@ -322,7 +322,7 @@ JSON/TOON output schema:
               // scope: change artifact - specPath is optional
               // Use first spec in change as placeholder, or let ValidateArtifacts handle it
               const change = await kernel.changes.list.execute()
-              const targetChange = change.find((c) => c.name === name)
+              const targetChange = change.items.find((c) => c.name === name)
               if (targetChange !== undefined && targetChange.specIds.length > 0) {
                 finalSpecPath = targetChange.specIds[0]
               }

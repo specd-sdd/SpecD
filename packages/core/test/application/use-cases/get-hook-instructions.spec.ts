@@ -158,4 +158,41 @@ describe('GetHookInstructions — archive fallback', () => {
       }),
     ).rejects.toThrow(HookNotFoundError)
   })
+
+  it('does not inject a singular workspace into instruction context', async () => {
+    const change = makeChange('my-change')
+    const schema = makeSchema({
+      workflow: [
+        {
+          step: 'implementing',
+          requires: [],
+          requiresTaskCompletion: [],
+          hooks: {
+            pre: [
+              {
+                id: 'pre-instr',
+                type: 'instruction',
+                text: 'vars={{change.name}}',
+              },
+            ],
+            post: [],
+          },
+        },
+      ],
+    })
+
+    const uc = makeUseCase({
+      changes: makeChangeRepository([change]),
+      schema,
+    })
+
+    const result = await uc.execute({
+      name: 'my-change',
+      step: 'implementing',
+      phase: 'pre',
+    })
+
+    expect(result.instructions[0]!.text).toBe('vars=my-change')
+    expect(result.instructions[0]!.text).not.toContain('workspace')
+  })
 })

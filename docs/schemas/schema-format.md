@@ -717,12 +717,11 @@ Explicit external hooks are part of the workflow model, not ad hoc shell escapes
 
 ### Template variables in `run:` hooks
 
-| Variable               | Value                                                  |
-| ---------------------- | ------------------------------------------------------ |
-| `{{change.name}}`      | The change's slug name                                 |
-| `{{change.workspace}}` | The primary workspace of the change                    |
-| `{{change.path}}`      | Absolute path to the change directory                  |
-| `{{project.root}}`     | Absolute path to the directory containing `specd.yaml` |
+| Variable           | Value                                                  |
+| ------------------ | ------------------------------------------------------ |
+| `{{change.name}}`  | The change's slug name                                 |
+| `{{change.path}}`  | Absolute path to the change directory                  |
+| `{{project.root}}` | Absolute path to the directory containing `specd.yaml` |
 
 ### Relationship with schemaOverrides hooks
 

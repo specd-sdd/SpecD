@@ -3,11 +3,11 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": ["default:_global/architecture", "core:composition"],
-  "implementation": [
-    {
-      "file": "core:src/infrastructure/fs/spec-repository.ts",
-      "symbols": ["FsSpecRepository"]
-    }
-  ]
+  "dependsOn": [
+    "default:_global/architecture",
+    "core:composition",
+    "core:storage",
+    "core:spec-repository-port"
+  ],
+  "implementation": []
 }

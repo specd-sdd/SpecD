@@ -10,6 +10,8 @@ import {
   makeMockConfig,
   makeMockChange,
   makeMockKernel,
+  makeActiveChangeListEntry,
+  makeListResult,
   makeProgram,
   mockProcessExit,
   captureStdout,
@@ -67,7 +69,7 @@ afterEach(() => vi.restoreAllMocks())
 describe('change list', () => {
   it('prints "no active changes" when empty', async () => {
     const { kernel, stdout } = setup()
-    kernel.changes.list.execute.mockResolvedValue([])
+    kernel.changes.list.execute.mockResolvedValue(makeListResult([]))
 
     const program = makeProgram()
     registerChangeList(program.command('change'))
@@ -78,10 +80,12 @@ describe('change list', () => {
 
   it('lists changes in text format', async () => {
     const { kernel, stdout } = setup()
-    kernel.changes.list.execute.mockResolvedValue([
-      makeMockChange({ name: 'feat-a', state: 'designing' }),
-      makeMockChange({ name: 'feat-b', state: 'ready' }),
-    ])
+    kernel.changes.list.execute.mockResolvedValue(
+      makeListResult([
+        makeActiveChangeListEntry({ name: 'feat-a', state: 'designing' }),
+        makeActiveChangeListEntry({ name: 'feat-b', state: 'ready' }),
+      ]),
+    )
 
     const program = makeProgram()
     registerChangeList(program.command('change'))
@@ -96,42 +100,44 @@ describe('change list', () => {
 
   it('outputs valid JSON in json format', async () => {
     const { kernel, stdout } = setup()
-    kernel.changes.list.execute.mockResolvedValue([
-      makeMockChange({ name: 'feat-a', state: 'designing' }),
-    ])
+    kernel.changes.list.execute.mockResolvedValue(
+      makeListResult([makeActiveChangeListEntry({ name: 'feat-a', state: 'designing' })]),
+    )
 
     const program = makeProgram()
     registerChangeList(program.command('change'))
     await program.parseAsync(['node', 'specd', 'change', 'list', '--format', 'json'])
 
     const parsed = JSON.parse(stdout())
-    expect(Array.isArray(parsed)).toBe(true)
-    expect(parsed[0].name).toBe('feat-a')
-    expect(parsed[0].state).toBe('designing')
+    expect(parsed.items).toHaveLength(1)
+    expect(parsed.items[0].name).toBe('feat-a')
+    expect(parsed.items[0].state).toBe('designing')
   })
 
-  it('returns empty JSON array when no changes', async () => {
+  it('returns empty JSON items when no changes', async () => {
     const { kernel, stdout } = setup()
-    kernel.changes.list.execute.mockResolvedValue([])
+    kernel.changes.list.execute.mockResolvedValue(makeListResult([]))
 
     const program = makeProgram()
     registerChangeList(program.command('change'))
     await program.parseAsync(['node', 'specd', 'change', 'list', '--format', 'json'])
 
-    expect(JSON.parse(stdout())).toEqual([])
+    expect(JSON.parse(stdout()).items).toEqual([])
   })
 
   it('text rows contain specIds and schema', async () => {
     const { kernel, stdout } = setup()
-    kernel.changes.list.execute.mockResolvedValue([
-      makeMockChange({
-        name: 'add-login',
-        state: 'designing',
-        specIds: ['auth/login'],
-        schemaName: 'std',
-        schemaVersion: 1,
-      }),
-    ])
+    kernel.changes.list.execute.mockResolvedValue(
+      makeListResult([
+        makeActiveChangeListEntry({
+          name: 'add-login',
+          state: 'designing',
+          specIds: ['auth/login'],
+          schemaName: 'std',
+          schemaVersion: 1,
+        }),
+      ]),
+    )
 
     const program = makeProgram()
     registerChangeList(program.command('change'))
@@ -144,25 +150,28 @@ describe('change list', () => {
     expect(out).toContain('std@1')
   })
 
-  it('JSON output includes specIds and schema object with name and version', async () => {
+  it('JSON output includes specIds and schema fields', async () => {
     const { kernel, stdout } = setup()
-    kernel.changes.list.execute.mockResolvedValue([
-      makeMockChange({
-        name: 'add-login',
-        state: 'designing',
-        specIds: ['auth/login'],
-        schemaName: 'std',
-        schemaVersion: 1,
-      }),
-    ])
+    kernel.changes.list.execute.mockResolvedValue(
+      makeListResult([
+        makeActiveChangeListEntry({
+          name: 'add-login',
+          state: 'designing',
+          specIds: ['auth/login'],
+          schemaName: 'std',
+          schemaVersion: 1,
+        }),
+      ]),
+    )
 
     const program = makeProgram()
     registerChangeList(program.command('change'))
     await program.parseAsync(['node', 'specd', 'change', 'list', '--format', 'json'])
 
     const parsed = JSON.parse(stdout())
-    expect(parsed[0].specIds).toContain('auth/login')
-    expect(parsed[0].schema).toEqual({ name: 'std', version: 1 })
+    expect(parsed.items[0].specIds).toContain('auth/login')
+    expect(parsed.items[0].schemaName).toBe('std')
+    expect(parsed.items[0].schemaVersion).toBe(1)
   })
 })
 

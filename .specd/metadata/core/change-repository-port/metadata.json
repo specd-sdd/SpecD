@@ -11,7 +11,8 @@
     "core:drafted-change-read-only-error",
     "core:storage",
     "core:change-manifest",
-    "default:_global/logging"
+    "default:_global/logging",
+    "core:change-list-entry"
   ],
   "context": [
     "Without an abstraction over change storage, use cases would couple directly to filesystem layout and I/O, making them untestable and locked to a single storage strategy. `ChangeRepository` is the application-layer port for reading and writing changes, extending the shared `Repository` base class for interface consistency while operating globally — changes live in a single `changes/` directory, not per-workspace. This spec defines the contract that all implementations must satisfy."
@@ -62,19 +63,37 @@
     {
       "requirement": "list returns active changes in creation order",
       "rules": [
-        "`list()` MUST return all active (non-drafted, non-discarded) changes sorted by creation order, oldest first. Each returned `Change` MUST include artifact state (derived statuses) but MUST NOT include artifact content. Content is loaded on demand via `artifact()`."
+        "`list(options?)` MUST return `ListResult<ActiveChangeListEntry>` for all active (non-drafted, non-discarded) changes.\n\n`ActiveChangeListOptions` extends `ListOptions` with:\n\n- `includeDescription?: boolean` — when `true`, projected entries MAY include `description`; when `false` or omitted, `description` MUST NOT appear.\n\nSort order MUST be canonical: `createdAt` ascending (oldest → newest). The sort key aligns with the timestamped directory name, but pagination and cursors use `createdAt`.\n\n`list()` MUST NOT return full `Change` aggregates, artifact content, history, or derived artifact state maps. Those belong on `get(name)`.\n\n`meta.total` and `count()` MUST read from the same index source."
       ]
     },
     {
       "requirement": "listDrafts returns drafted changes in creation order",
       "rules": [
-        "`listDrafts()` MUST return all drafted changes sorted by creation order, oldest first. Each entry MUST be a `DraftedChangeView` with artifact state (derived statuses) but MUST NOT include artifact content. The repository MUST NOT return mutable `Change` instances to callers."
+        "`listDrafts(options?)` MUST return `ListResult<DraftedChangeListEntry>` for all drafted changes.\n\n`DraftedChangeListOptions` extends `ListOptions` with:\n\n- `includeDescription?: boolean` — projected `description` when `true`\n- `includeReason?: boolean` — projected `reason` when `true`\n\nSort order MUST be canonical: `draftedAt` descending (newest → oldest).\n\n`listDrafts()` MUST NOT return `DraftedChangeView`, mutable `Change` instances, artifact content, or history. Detail belongs on `getDraft(name)`.\n\n`meta.total` and `countDrafts()` MUST read from the same index source."
       ]
     },
     {
       "requirement": "listDiscarded returns discarded changes in creation order",
       "rules": [
-        "`listDiscarded()` MUST return all discarded changes sorted by creation order, oldest first. Each entry MUST be a `DiscardedChangeView` built via the shared inspection facade. The repository MUST NOT return mutable `Change` instances to callers."
+        "`listDiscarded(options?)` MUST return `ListResult<DiscardedChangeListEntry>` for all discarded changes.\n\n`DiscardedChangeListOptions` extends `ListOptions` with:\n\n- `includeDescription?: boolean` — projected `description` when `true`\n- `includeReason?: boolean` — projected `reason` when `true`\n- `includeSupersededBy?: boolean` — projected `supersededBy` when `true`\n\nSort order MUST be canonical: `discardedAt` descending (newest → oldest).\n\n`listDiscarded()` MUST NOT return `DiscardedChangeView`, mutable `Change` instances, artifact content, or history. Detail belongs on `getDiscarded(name)`.\n\n`meta.total` and `countDiscarded()` MUST read from the same index source."
+      ]
+    },
+    {
+      "requirement": "Change list counts",
+      "rules": [
+        "`ChangeRepository` MUST expose:\n\n- `count()` — returns the total number of active changes (same value as `list().meta.total`)\n- `countDrafts()` — returns the total number of drafted changes (same value as `listDrafts().meta.total`)\n- `countDiscarded()` — returns the total number of discarded changes (same value as `listDiscarded().meta.total`)\n\nEach method MUST be efficient and MUST NOT materialize full change aggregates. Filesystem implementations MUST delegate to the corresponding index helper's `count()`."
+      ]
+    },
+    {
+      "requirement": "Change list reindex",
+      "rules": [
+        "`ChangeRepository` MUST expose:\n\n- `reindex()` — rebuilds active, drafted, and discarded list indexes\n- `reindexActive()` — rebuilds the active-changes index only\n- `reindexDrafts()` — rebuilds the drafts index only\n- `reindexDiscarded()` — rebuilds the discarded index only\n\nEach method MUST force a full rebuild of the relevant filesystem index cache bucket under `{configPath}/tmp/fs-cache/`. Implementations MUST NOT require callers to know JSONL layout."
+      ]
+    },
+    {
+      "requirement": "Change list include projection",
+      "rules": [
+        "For each change list method, `include*` flags control **response projection only**. The filesystem index helper MUST store the full CLI-usable entry payload (including optional fields). When an include flag is set, the corresponding optional field MUST appear on returned items if present in the cached entry. When an include flag is not set, that field MUST NOT appear on returned items.\n\nImplementations and use cases MUST NOT perform extra `get` / manifest reads to satisfy an include flag."
       ]
     },
     {
@@ -146,7 +165,7 @@
     {
       "requirement": "Abstract class with abstract methods",
       "rules": [
-        "`ChangeRepository` MUST be defined as an `abstract class`, not an `interface`. All storage operations (`get`, `getDraft`, `getDiscarded`, `mutate`, `mutateDraft`, `list`, `listDrafts`, `listDiscarded`, `save`, `delete`, `artifact`, `saveArtifact`, `artifactExists`, `deltaExists`, `changePath`, `draftChangePath`, `scaffold`, `unscaffold`) MUST be declared as `abstract` methods. This follows the architecture spec requirement that ports with shared construction are abstract classes."
+        "`ChangeRepository` MUST be defined as an `abstract class`, not an `interface`. All storage operations (`get`, `getDraft`, `getDiscarded`, `mutate`, `mutateDraft`, `list`, `listDrafts`, `listDiscarded`, `count`, `countDrafts`, `countDiscarded`, `reindex`, `reindexActive`, `reindexDrafts`, `reindexDiscarded`, `save`, `delete`, `artifact`, `saveArtifact`, `artifactExists`, `deltaExists`, `changePath`, `draftChangePath`, `scaffold`, `unscaffold`) MUST be declared as `abstract` methods. This follows the architecture spec requirement that ports with shared construction are abstract classes."
       ]
     },
     {
@@ -171,7 +190,9 @@
   "constraints": [
     "Changes are stored globally, not per-workspace — the inherited workspace context is unused",
     "get() in FsChangeRepository may auto-invalidate and persist the change under the mutation lock before returning, if artifact drift is detected and the change is beyond designing or has active approvals",
-    "All list methods return Change objects with derived artifact state but without artifact content",
+    "list, listDrafts, and listDiscarded return lightweight list entries with no artifact content, history, or derived artifact state maps",
+    "get, getDraft, and getDiscarded remain the detail surfaces for full manifest-backed inspection",
+    "Default list limit is 100; callers needing more MUST pass a higher limit or paginate with page or after",
     "save() writes the manifest only; saveArtifact() writes file content only — these are separate operations",
     "ArtifactConflictError is the sole error type for concurrent modification detection",
     "The force option on saveArtifact() bypasses conflict detection entirely",
@@ -428,27 +449,121 @@
         "three changes exist: one active (created first), one drafted, one active (created last)"
       ],
       "when": ["list() is called"],
-      "then": ["only the two active changes are returned, ordered oldest first"]
+      "then": [
+        "the result is ListResult<ActiveChangeListEntry>",
+        "AND only the two active changes are returned in createdAt ascending order"
+      ]
     },
     {
       "requirement": "list returns active changes in creation order",
       "name": "No active changes",
       "when": ["list() is called and no active changes exist"],
-      "then": ["an empty array is returned"]
+      "then": ["{ items: [], meta: { total: 0, count: 0, limit: 100 } } is returned"]
+    },
+    {
+      "requirement": "list returns active changes in creation order",
+      "name": "List entries exclude full Change detail",
+      "given": ["an active change with history and artifact state maps"],
+      "when": ["list() is called"],
+      "then": [
+        "returned items are ActiveChangeListEntry rows without history, artifact content, or derived artifact state maps"
+      ]
     },
     {
       "requirement": "listDrafts returns drafted changes in creation order",
-      "name": "Only drafted changes returned",
-      "given": ["two drafted changes and one active change exist"],
+      "name": "Only drafted changes returned newest first",
+      "given": ["two drafted changes drafted at different times and one active change exist"],
       "when": ["listDrafts() is called"],
-      "then": ["only the two drafted changes are returned, ordered oldest first"]
+      "then": [
+        "the result is ListResult<DraftedChangeListEntry>",
+        "AND only the two drafted changes are returned in draftedAt descending order"
+      ]
+    },
+    {
+      "requirement": "listDrafts returns drafted changes in creation order",
+      "name": "List drafts excludes DraftedChangeView",
+      "given": ["a drafted change with artifact statuses on disk"],
+      "when": ["listDrafts() is called"],
+      "then": [
+        "returned items are list entries without artifact content or history",
+        "AND no returned item is a DraftedChangeView or mutable Change"
+      ]
     },
     {
       "requirement": "listDiscarded returns discarded changes in creation order",
-      "name": "Only discarded changes returned",
+      "name": "Only discarded changes returned newest first",
       "given": ["one discarded change and two active changes exist"],
       "when": ["listDiscarded() is called"],
-      "then": ["only the discarded change is returned"]
+      "then": [
+        "the result is ListResult<DiscardedChangeListEntry>",
+        "AND only the discarded change is returned"
+      ]
+    },
+    {
+      "requirement": "listDiscarded returns discarded changes in creation order",
+      "name": "List discarded excludes DiscardedChangeView",
+      "given": ["a discarded change with discard history metadata"],
+      "when": ["listDiscarded() is called"],
+      "then": [
+        "returned items are list entries without artifact content or history",
+        "AND no returned item is a DiscardedChangeView or mutable Change"
+      ]
+    },
+    {
+      "requirement": "Change list counts",
+      "name": "Active count matches list meta.total",
+      "given": ["a repository with known active, drafted, and discarded changes"],
+      "when": ["count() and list().meta.total are queried"],
+      "then": [
+        "both return the same active change total",
+        "AND count() does not materialize full Change aggregates"
+      ]
+    },
+    {
+      "requirement": "Change list counts",
+      "name": "Draft and discarded counts match their list totals",
+      "given": ["a repository with known drafted and discarded changes"],
+      "when": [
+        "countDrafts() and listDrafts().meta.total are queried",
+        "countDiscarded() and listDiscarded().meta.total are queried"
+      ],
+      "then": ["both return the same drafted total", "both return the same discarded total"]
+    },
+    {
+      "requirement": "Change list reindex",
+      "name": "reindex rebuilds all change list buckets",
+      "given": ["filesystem-backed change list indexes under {configPath}/tmp/fs-cache/"],
+      "when": ["reindex() is called"],
+      "then": ["active, drafted, and discarded list indexes are fully rebuilt from disk"]
+    },
+    {
+      "requirement": "Change list reindex",
+      "name": "Per-bucket reindex methods rebuild one bucket",
+      "when": [
+        "reindexActive() is called",
+        "reindexDrafts() is called",
+        "reindexDiscarded() is called"
+      ],
+      "then": [
+        "only the active-changes index is rebuilt",
+        "only the drafts index is rebuilt",
+        "only the discarded index is rebuilt"
+      ]
+    },
+    {
+      "requirement": "Change list include projection",
+      "name": "Include flags project cached optional fields only",
+      "given": [
+        "a cached list entry payload that already contains optional description and reason"
+      ],
+      "when": [
+        "list({ includeDescription: true }) is called",
+        "the same list call omits includeDescription"
+      ],
+      "then": [
+        "returned items include projected description without extra manifest reads",
+        "returned items omit description"
+      ]
     },
     {
       "requirement": "save persists the change manifest only",
@@ -722,41 +837,29 @@
     "symbols": [
       {
         "specId": "core:change-repository-port",
-        "file": "core:src/infrastructure/fs/change-repository.ts",
-        "symbol": "FsChangeRepository"
+        "file": "core:src/application/ports/change-repository.ts",
+        "symbol": "ChangeRepository"
       },
       {
         "specId": "core:change-repository-port",
-        "file": "core:src/infrastructure/fs/change-repository.ts",
-        "symbol": "_getInternal"
+        "file": "core:src/application/ports/change-repository.ts",
+        "symbol": "ActiveChangeListOptions"
       },
       {
         "specId": "core:change-repository-port",
-        "file": "core:src/infrastructure/fs/change-repository.ts",
-        "symbol": "_manifestToChange"
+        "file": "core:src/application/ports/change-repository.ts",
+        "symbol": "DraftedChangeListOptions"
       },
       {
         "specId": "core:change-repository-port",
-        "file": "core:src/infrastructure/fs/change-repository.ts",
-        "symbol": "get"
-      },
-      {
-        "specId": "core:change-repository-port",
-        "file": "core:src/infrastructure/fs/change-repository.ts",
-        "symbol": "mutate"
-      },
-      {
-        "specId": "core:change-repository-port",
-        "file": "core:src/infrastructure/fs/change-repository.ts",
-        "symbol": "list"
+        "file": "core:src/application/ports/change-repository.ts",
+        "symbol": "DiscardedChangeListOptions"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:39f67e52defc9714c5f9bbdfc3eb6f27b1befec90a3bdb7ae4b0d403ce131018",
-    "verify.md": "sha256:446daeb1c7500c43eb6503def5bbb0378b268a789245a8b2b3cc5681c6e2133d"
+    "spec.md": "sha256:0c316531330f164c5738bf3ece9e101b714f2e564e5b663a084a6939201b31a9",
+    "verify.md": "sha256:29ac2b4b4915be014dc3de4bf7c6c6940ab858ac5efe9fc630d4005571da0a30"
   },
-  "generatedBy": "agent",
-  "optimizedDescription": "abstraction over change storage, use cases would couple directly filesystem layout I/O, making untestable locked single storage strategy.",
-  "optimizedContext": "# ChangeRepository Port\n\n## Rules\n- Inheritance from Repository base: ChangeRepository MUST extend Repository. inherited workspace(), ownership(), isExternal() accessors MUST present but carry default values — no use case relies ChangeRepository. exist solely satisfy shared base contract.\n- get returns a Change or null: get(name) MUST resolve change name only under active storage (changes/). MUST NOT search drafts/ discarded/. When change given name exists only drafted, get(name) MUST return null. When change exists active storage, get(name) MUST return Change artifact file states loaded persisted manifest. If artifact file entry omits state, repository defaults missing value missing while loading. validatedHash still loaded artifact data, but hash comparison not sole source truth steady-state status. repository MAY detect drift persist updated file artifact states before returning (see Requirement: Auto-invalidation get when artifact files drift). get() snapshot read active changes. MAY auto-invalidate pe…\n- getDraft returns a DraftedChangeView or null: getDraft(name) MUST resolve change name only under drafted storage (drafts/). MUST NOT search changes/ discarded/. When drafted change exists, getDraft(name) MUST return DraftedChangeView constructed persisted manifest. view MUST satisfy core: drafted-change-view. When no drafted change exists given name, getDraft(name) MUST return null. getDraft() MUST NOT auto-invalidate persist manifest updates. Drift detection drafted changes out scope active working set until change restored.\n- getDiscarded returns a DiscardedChangeView or null: getDiscarded(name) MUST resolve change name only under discarded storage (discarded/). MUST NOT search changes/ drafts/. When discarded change exists, getDiscarded(name) MUST return DiscardedChangeView built via toDiscardedChangeView shared inspection facade (core: read-only-change-view). When no discarded change exists given name, getDiscarded(name) MUST return null. getDiscarded() MUST NOT auto-invalidate persist manifest updates.\n- mutate serializes persisted change updates: mutate(name, fn) MUST provide serialized read-modify-write semantics one existing active persisted change. Resolution MUST use same rules get(name) — only changes/. If name exists only under drafts/, mutate() MUST throw ChangeNotFoundError. given active change name, repository MUST: 1. Acquire exclusive mutation access scoped persisted change 2. Reload freshest persisted Change state active storage after exclusive access acquired, ensuring load operation does not trigger nested write locks deadlocks. filesystem-backed implementations, reload operation MUST performed using internal read helper (e. g. _getInternal(. . . , { skipWrite: true })) bypass nested locks auto-invalidation writes, def…\n- mutateDraft serializes drafted change updates: mutateDraft(name, fn) MUST provide serialized read-modify-write semantics one existing drafted persisted change. Resolution MUST use same rules getDraft(name) — only drafts/. If name exists only under active storage, mutateDraft() MUST throw ChangeNotFoundError. callback MUST receive fresh mutable Change isDrafted === true before any transforming operation callback. Only RestoreChange DiscardChange repository internals) MAY call mutateDraft production code. success, repository MUST persist manifest perform any required directory move (drafts/ ↔ changes/ drafts/ → discarded/). If fn throws, mutateDraft() MUST NOT persist partial updates, matching mutate failure semantics.\n- Auto-invalidation on get when artifact files drift: FsChangeRepository implementation get() MUST detect artifact file drift auto-invalidate change when appropriate, provided repository fully initialized resolved artifact types. After loading change, repository compares current cleaned file hash against each file's stored validatedHash files were previously validated. If repository not initialized artifact types, drift detection bypassed. support clean delegation avoid deadlocks, core loading, status mapping, lock-based drift invalidation/sync checks MUST encapsulated single internal read path (e. g. , private helper like _getInternal) shared get() mutate(). file drifted when: - validatedHash SHA-256 value recorded prior validation, - current…\n- list returns active changes in creation order: list() MUST return all active (non-drafted, non-discarded) changes sorted creation order, oldest first. Each returned Change MUST include artifact state (derived statuses) but MUST NOT include artifact content. Content loaded demand via artifact().\n- listDrafts returns drafted changes in creation order: listDrafts() MUST return all drafted changes sorted creation order, oldest first. Each entry MUST DraftedChangeView artifact state (derived statuses) but MUST NOT include artifact content. repository MUST NOT return mutable Change instances callers.\n- listDiscarded returns discarded changes in creation order: listDiscarded() MUST return all discarded changes sorted creation order, oldest first. Each entry MUST DiscardedChangeView built via shared inspection facade. repository MUST NOT return mutable Change instances callers.\n- save persists the change manifest only: save(change) MUST persist change manifest — state, artifact statuses, validated hashes, history events, approvals. MUST NOT write artifact file content. Artifact content written exclusively via saveArtifact(). write MUST atomic (e. g. temp file + rename) prevent partial reads. If change. isDrafted === true, save(change) MUST throw DraftedChangeReadOnlyError unless call originates serialized mutateDraft window change name. save() low-level persistence operation. Atomic manifest writing prevents partial-file corruption, but save() alone does not serialize caller's earlier snapshot read. Use cases mutate existing active persisted change need concurrency safety MUST perform mutation through mut…\n- delete removes the entire change directory: delete(change) MUST remove entire change directory all contents filesystem.\n- artifact loads content with originalHash: artifact(change, filename) MUST load content single artifact file within change return SpecArtifact. returned artifact's originalHash MUST set sha256 hash content read disk, enabling conflict detection subsequent saves. If file does not exist, method MUST return null.\n- saveArtifact with optimistic concurrency: saveArtifact(change, artifact, options?) MUST write artifact file within change directory. If change. isDrafted === true, saveArtifact MUST throw DraftedChangeReadOnlyError before any filesystem write. If artifact. originalHash set, implementation MUST compare against current hash file disk before writing. If hashes differ, save MUST rejected throwing ArtifactConflictError — prevents silently overwriting concurrent modifications. When options. force true, conflict check MUST skipped file MUST overwritten unconditionally. After successful write, corresponding ChangeArtifact status change manifest MUST reset in-progress; caller responsible calling save(change) persist state change.\n- artifactExists checks file presence without loading: artifactExists(change, filename) MUST return true if artifact file exists within change directory, false otherwise. MUST NOT load file content.\n- deltaExists checks delta file presence: deltaExists(change, specId, filename) MUST return true if specified delta file exists given change spec ID, false otherwise. Delta files located within subdirectory change directory identified spec ID.\n- changePath returns the absolute path to a change directory: changePath(change) MUST accept Change return absolute filesystem path change's directory. used use cases need change path template variable construction (e. g. change. path TemplateVariables). implementation resolves path internal storage layout.\n- draftChangePath returns the drafted directory path: draftChangePath(view) MUST accept DraftedChangeView internal drafted Change during mutateDraft) return absolute filesystem path under drafts/ template variables CLI display. changePath(change) MUST continue resolve paths under changes/ active changes only.\n- internalPaths returns absolute storage paths: internalPaths() MUST return array absolute filesystem paths internal specd management directories owned repository, undefined when concept does not apply. Returning undefined signals internal-path exclusion not applicable (e. g. remote backends do not manage local filesystem directories). Implementations MUST NOT return empty array signal inapplicability; empty array means \"no paths exclude\". FsChangeRepository, MUST include: - absolute path changes/ - absolute path drafts/ - absolute path discarded/ paths used implementation discovery avoid tracking specd's own metadata.\n- scaffold creates artifact directories: scaffold(change, specExists) MUST create directory structure needed change's artifacts. scope: spec artifacts, creates specs/<ws>/<capPath>/ deltas/<ws>/<capPath>/ directories under change directory. scope: change artifacts, root directory already exists. specExists callback async function returns whether spec already exists repository, used determine whether create spec-scoped delta-scoped directories.\n- unscaffold removes spec directories: unscaffold(change, specIds) MUST remove scaffolded directories given spec IDs change directory. each spec ID, MUST remove: - specs/<workspace>/<capability-path>/ — new-spec artifact directories - deltas/<workspace>/<capability-path>/ — delta artifact directories operation MUST idempotent — if directory does not exist, MUST silently skipped. If directory contains files, all files subdirectories MUST removed along directory itself.\n- Abstract class with abstract methods: ChangeRepository MUST defined abstract class, not interface. All storage operations (get, getDraft, getDiscarded, mutate, mutateDraft, list, listDrafts, listDiscarded, save, delete, artifact, saveArtifact, artifactExists, deltaExists, changePath, draftChangePath, scaffold, unscaffold) MUST declared abstract methods. follows architecture spec requirement ports shared construction abstract classes.\n- artifact only loads tracked change artifact files: artifact(change, filename) MUST accept only filenames correspond tracked artifact files declared change's artifact file list. If filename does not match tracked artifact file change, repository MUST reject read rather than treating change directory general-purpose file container.\n- Change artifact path confinement: artifact(change, filename), artifactExists(change, filename), any related change-artifact file lookup MUST enforce strict confinement change directory. repository MUST reject any path would escape change directory address arbitrary file outside tracked artifact set, including path traversal forms alternate relative-path encodings.\n- Change artifact resolution debug logging: Implementations SHOULD emit debug-level logs when resolving tracked change artifact files, rejecting untracked filenames, rejecting path-confinement violation. logs MUST follow project's global logging conventions."
+  "generatedBy": "core"
 }

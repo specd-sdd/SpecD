@@ -13,10 +13,10 @@
 
 #### Scenario: Multiple tokens in one string
 
-- **GIVEN** a template `"{{change.name}} in {{change.workspace}}"`
-- **AND** variables `{ change: { name: "add-auth", workspace: "default" } }`
+- **GIVEN** a template `"{{change.name}} at {{change.path}}"`
+- **AND** variables `{ change: { name: "add-auth", path: "/project/changes/add-auth" } }`
 - **WHEN** `expand()` is called
-- **THEN** the result is `"add-auth in default"`
+- **THEN** the result is `"add-auth at /project/changes/add-auth"`
 
 ### Requirement: Built-in namespace
 
@@ -48,6 +48,12 @@
 - **AND** variables `{ change: { complex: { nested: 'value' } } }`
 - **WHEN** `expand()` is called
 - **THEN** the token is preserved unchanged because object values are not expanded
+
+#### Scenario: Example variable map has no workspace key
+
+- **GIVEN** the normative example variable map `{ project: { root: '/Users/dev/my-project' }, change: { name: 'add-auth', path: '/Users/dev/my-project/changes/add-auth', archivedName: '20260418-103000-add-auth' } }`
+- **WHEN** the shape is checked against `TemplateVariables`
+- **THEN** the `change` namespace contains no `workspace` key
 
 ### Requirement: Expansion semantics
 
@@ -156,9 +162,10 @@
 
 #### Scenario: Change namespace populated from change entity
 
-- **GIVEN** a change named `add-auth` in workspace `default` at path `/project/changes/add-auth`
+- **GIVEN** a change named `add-auth` at path `/project/changes/add-auth`
 - **WHEN** the use case builds the variable map
-- **THEN** the map contains `{ change: { name: "add-auth", workspace: "default", path: "/project/changes/add-auth" } }`
+- **THEN** the map contains `{ change: { name: "add-auth", path: "/project/changes/add-auth" } }`
+- **AND** the map does not contain a `change.workspace` key
 
 #### Scenario: Archived context includes change.archivedName
 
@@ -172,3 +179,17 @@
 - **GIVEN** an active (non-archived) runtime context
 - **WHEN** the use case builds the variable map
 - **THEN** `change.archivedName` may be absent without invalidating expansion
+
+#### Scenario: change.workspace is never injected regardless of workspace count
+
+- **GIVEN** a change with `specIds: ['default:auth/login', 'billing:invoices']` touching two workspaces
+- **WHEN** any use case builds the `change` namespace for template expansion
+- **THEN** the resulting namespace has no `workspace` key
+- **AND** the namespace is not populated via `change.workspaces[0]`, `specIds[0]?.split(':')[0]`, or any other singular-workspace derivation
+
+#### Scenario: {{change.workspace}} token is left unexpanded
+
+- **GIVEN** a template `"{{change.workspace}}"`
+- **AND** a `change` namespace built by any consuming use case
+- **WHEN** `expand()` is called
+- **THEN** the token is left unexpanded because `change.workspace` is never a key in the built namespace

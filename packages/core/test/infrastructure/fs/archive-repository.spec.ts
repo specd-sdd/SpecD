@@ -11,8 +11,6 @@ import { changeDirName } from '../../../src/infrastructure/fs/dir-name.js'
 
 const actor: ActorIdentity = { name: 'Alice', email: 'alice@example.com' }
 
-// ---- Setup / teardown helpers ----
-
 interface RepoContext {
   changes: FsChangeRepository
   archive: FsArchiveRepository
@@ -20,6 +18,15 @@ interface RepoContext {
   changesPath: string
   draftsPath: string
   archivePath: string
+  configPath: string
+}
+
+function archiveCacheDir(configPath: string): string {
+  return path.join(configPath, 'tmp', 'fs-cache', 'archive')
+}
+
+function archiveIndexPath(configPath: string): string {
+  return path.join(archiveCacheDir(configPath), '.specd-index.jsonl')
 }
 
 async function setupRepo(pattern?: string): Promise<RepoContext> {
@@ -54,7 +61,7 @@ async function setupRepo(pattern?: string): Promise<RepoContext> {
     ...(pattern !== undefined ? { pattern } : {}),
   })
 
-  return { changes, archive, tmpDir, changesPath, draftsPath, archivePath }
+  return { changes, archive, tmpDir, changesPath, draftsPath, archivePath, configPath: tmpDir }
 }
 
 async function cleanupRepo(ctx: RepoContext): Promise<void> {
@@ -69,11 +76,6 @@ async function readArchiveGitignoreEntries(archivePath: string): Promise<string[
     .filter((line) => line.length > 0)
 }
 
-/**
- * Creates a `Change` in `archivable` state and saves it via `FsChangeRepository`.
- *
- * Transitions: drafting → designing → ready → implementing → verifying → done → archivable
- */
 async function makeArchivableChange(
   ctx: RepoContext,
   name: string,
@@ -105,8 +107,6 @@ async function makeArchivableChange(
   return change
 }
 
-// ---- Tests ----
-
 describe('FsArchiveRepository', () => {
   let ctx: RepoContext
 
@@ -117,8 +117,6 @@ describe('FsArchiveRepository', () => {
   afterEach(async () => {
     await cleanupRepo(ctx)
   })
-
-  // ---- constructor ----
 
   describe('constructor', () => {
     it('throws when pattern contains {{change.scope}}', () => {
@@ -136,9 +134,23 @@ describe('FsArchiveRepository', () => {
           }),
       ).toThrow()
     })
-  })
 
-  // ---- archive ----
+    it('throws when pattern contains {{change.workspace}}', () => {
+      expect(
+        () =>
+          new FsArchiveRepository({
+            workspace: 'default',
+            ownership: 'owned',
+            isExternal: false,
+            configPath: '/test',
+            changesPath: ctx.changesPath,
+            draftsPath: ctx.draftsPath,
+            archivePath: ctx.archivePath,
+            pattern: '{{change.workspace}}/{{change.archivedName}}',
+          }),
+      ).toThrow()
+    })
+  })
 
   describe('archive', () => {
     it('moves the change directory from changes/ to archive/', async () => {
@@ -147,11 +159,9 @@ describe('FsArchiveRepository', () => {
 
       await ctx.archive.archive(change)
 
-      // Source directory is gone
       const changesEntries = await fs.readdir(ctx.changesPath)
       expect(changesEntries).toHaveLength(0)
 
-      // Destination directory exists under archive
       const archiveEntries = await fs.readdir(ctx.archivePath)
       expect(archiveEntries).toContain(expectedDirName)
     })
@@ -182,29 +192,30 @@ describe('FsArchiveRepository', () => {
       expect(typeof manifest['archivedAt']).toBe('string')
     })
 
-    it('appends an entry to .specd-index.jsonl', async () => {
+    it('appends an entry to fs-cache archive index', async () => {
       const change = await makeArchivableChange(ctx, 'add-auth')
 
       await ctx.archive.archive(change)
 
-      const indexContent = await fs.readFile(
-        path.join(ctx.archivePath, '.specd-index.jsonl'),
-        'utf8',
-      )
+      const indexContent = await fs.readFile(archiveIndexPath(ctx.configPath), 'utf8')
       const lines = indexContent.trim().split('\n')
       expect(lines).toHaveLength(1)
-      const entry = JSON.parse(lines[0]!) as Record<string, unknown>
-      expect(entry['name']).toBe('add-auth')
-      expect(typeof entry['path']).toBe('string')
+      const wire = JSON.parse(lines[0]!) as { entry: Record<string, unknown> }
+      expect(wire.entry['name']).toBe('add-auth')
+      expect(typeof wire.entry['path']).toBe('string')
+      expect(wire.entry['artifacts']).toBeUndefined()
+      expect(wire.entry['workspaces']).toBeUndefined()
     })
 
-    it('ensures archive runtime ignore entries after archive()', async () => {
+    it('ensures tmp gitignore and archive runtime ignore entries after archive()', async () => {
       const change = await makeArchivableChange(ctx, 'add-auth')
 
       await ctx.archive.archive(change)
 
+      const tmpGitignore = await fs.readFile(path.join(ctx.configPath, 'tmp', '.gitignore'), 'utf8')
+      expect(tmpGitignore).toBe('*\n!.gitignore\n')
+
       const entries = await readArchiveGitignoreEntries(ctx.archivePath)
-      expect(entries).toContain('.specd-index.jsonl')
       expect(entries).toContain('.staging')
     })
 
@@ -261,9 +272,6 @@ describe('FsArchiveRepository', () => {
         return loaded
       })
 
-      // Restore to archivable state (already archivable, just drafted)
-      // Actually we need to check: can an archivable change also be drafted?
-      // The isDrafted flag is orthogonal to state. Let's just archive directly.
       const { archivedChange } = await ctx.archive.archive(change)
 
       expect(archivedChange.name).toBe('drafted-change')
@@ -279,7 +287,6 @@ describe('FsArchiveRepository', () => {
 
         await localCtx.archive.archive(change)
 
-        // Year directory should exist (derived from archivedAt, which is ~now)
         const expectedYear = beforeArchive.getUTCFullYear().toString()
         const yearDir = path.join(localCtx.archivePath, expectedYear)
         const yearEntries = await fs.readdir(yearDir)
@@ -297,20 +304,15 @@ describe('FsArchiveRepository', () => {
 
         await localCtx.archive.archive(change)
 
-        const indexContent = await fs.readFile(
-          path.join(localCtx.archivePath, '.specd-index.jsonl'),
-          'utf8',
-        )
-        const entry = JSON.parse(indexContent.trim()) as Record<string, unknown>
-        expect(entry['path']).toContain('/')
-        expect(entry['path']).not.toContain('\\')
+        const indexContent = await fs.readFile(archiveIndexPath(localCtx.configPath), 'utf8')
+        const wire = JSON.parse(indexContent.trim()) as { entry: Record<string, unknown> }
+        expect(wire.entry['path']).toContain('/')
+        expect(wire.entry['path']).not.toContain('\\')
       } finally {
         await cleanupRepo(localCtx)
       }
     })
   })
-
-  // ---- archivePath ----
 
   describe('archivePath', () => {
     it('returns the correct absolute path for an archived change', async () => {
@@ -335,9 +337,20 @@ describe('FsArchiveRepository', () => {
         await cleanupRepo(localCtx)
       }
     })
-  })
 
-  // ---- list ----
+    it('accepts a path entry without workspaces', async () => {
+      const change = await makeArchivableChange(ctx, 'no-workspaces-field')
+      const { archivedChange, archiveDirPath } = await ctx.archive.archive(change)
+
+      const result = ctx.archive.archivePath({
+        name: archivedChange.name,
+        archivedName: archivedChange.archivedName,
+        archivedAt: archivedChange.archivedAt,
+      })
+
+      expect(result).toBe(archiveDirPath)
+    })
+  })
 
   describe('list', () => {
     it('returns empty result when archive is empty', async () => {
@@ -346,7 +359,7 @@ describe('FsArchiveRepository', () => {
       expect(result.meta.total).toBe(0)
     })
 
-    it('returns archived changes in order after archiving', async () => {
+    it('returns archived changes newest first', async () => {
       const older = await makeArchivableChange(
         ctx,
         'older-change',
@@ -363,18 +376,17 @@ describe('FsArchiveRepository', () => {
       const result = await ctx.archive.list()
 
       expect(result.items).toHaveLength(2)
-      expect(result.items[0]!.name).toBe('older-change')
-      expect(result.items[1]!.name).toBe('newer-change')
+      expect(result.items[0]!.name).toBe('newer-change')
+      expect(result.items[1]!.name).toBe('older-change')
       expect(result.meta.total).toBe(2)
+      expect(result.items[0]).not.toHaveProperty('path')
     })
 
     it('deduplicates by name — last entry wins', async () => {
-      // Manually write two index entries for the same change (simulates manual recovery)
       const change = await makeArchivableChange(ctx, 'dedup-change')
       await ctx.archive.archive(change)
 
-      // Append a duplicate entry pointing to same path
-      const indexPath = path.join(ctx.archivePath, '.specd-index.jsonl')
+      const indexPath = archiveIndexPath(ctx.configPath)
       const existing = await fs.readFile(indexPath, 'utf8')
       await fs.appendFile(indexPath, existing.trim() + '\n', 'utf8')
 
@@ -384,21 +396,16 @@ describe('FsArchiveRepository', () => {
     })
 
     it('auto-rebuilds index when new manifests appear on disk', async () => {
-      // Archive one change — this creates the index
       const first = await makeArchivableChange(ctx, 'first-change')
       await ctx.archive.archive(first)
 
-      // Simulate another developer archiving: create manifest on disk without updating the index
       const second = await makeArchivableChange(ctx, 'second-change')
-      const secondArchived = await ctx.archive.archive(second)
+      await ctx.archive.archive(second)
 
-      // Remove the second entry from the index (simulate stale index after git pull)
-      const indexPath = path.join(ctx.archivePath, '.specd-index.jsonl')
+      const indexPath = archiveIndexPath(ctx.configPath)
       const lines = (await fs.readFile(indexPath, 'utf8')).trim().split('\n')
-      // Keep only the first line
       await fs.writeFile(indexPath, lines[0]! + '\n', 'utf8')
 
-      // list() should detect staleness and rebuild
       const result = await ctx.archive.list()
       expect(result.items).toHaveLength(2)
       const names = result.items.map((r) => r.name)
@@ -406,8 +413,6 @@ describe('FsArchiveRepository', () => {
       expect(names).toContain('second-change')
     })
   })
-
-  // ---- get ----
 
   describe('get', () => {
     it('returns null when change is not in archive', async () => {
@@ -429,8 +434,7 @@ describe('FsArchiveRepository', () => {
       const change = await makeArchivableChange(ctx, 'multi-entry')
       await ctx.archive.archive(change)
 
-      // Duplicate index entry — both point to same path, last should win
-      const indexPath = path.join(ctx.archivePath, '.specd-index.jsonl')
+      const indexPath = archiveIndexPath(ctx.configPath)
       const line = (await fs.readFile(indexPath, 'utf8')).trim()
       await fs.appendFile(indexPath, line + '\n', 'utf8')
 
@@ -440,12 +444,10 @@ describe('FsArchiveRepository', () => {
     })
 
     it('falls back to directory scan when not in index', async () => {
-      // Archive directly without adding to index
       const change = await makeArchivableChange(ctx, 'missing-from-index')
       const archivedName = changeDirName('missing-from-index', change.createdAt)
       const archiveDir = path.join(ctx.archivePath, archivedName)
 
-      // Move directory manually, write minimal manifest with archivedAt
       const changesEntries = await fs.readdir(ctx.changesPath)
       const sourceDir = path.join(ctx.changesPath, changesEntries[0]!)
       await fs.rename(sourceDir, archiveDir)
@@ -459,7 +461,7 @@ describe('FsArchiveRepository', () => {
       expect(result!.name).toBe('missing-from-index')
     })
 
-    it('appends recovered entry to index after fallback', async () => {
+    it('appends recovered entry to fs-cache index after fallback', async () => {
       const change = await makeArchivableChange(ctx, 'recovered')
       const archivedName = changeDirName('recovered', change.createdAt)
       const archiveDir = path.join(ctx.archivePath, archivedName)
@@ -474,13 +476,9 @@ describe('FsArchiveRepository', () => {
 
       await ctx.archive.get('recovered')
 
-      // Index should now exist with a recovered entry
-      const indexContent = await fs.readFile(
-        path.join(ctx.archivePath, '.specd-index.jsonl'),
-        'utf8',
-      )
-      const entry = JSON.parse(indexContent.trim()) as Record<string, unknown>
-      expect(entry['name']).toBe('recovered')
+      const indexContent = await fs.readFile(archiveIndexPath(ctx.configPath), 'utf8')
+      const wire = JSON.parse(indexContent.trim()) as { entry: Record<string, unknown> }
+      expect(wire.entry['name']).toBe('recovered')
     })
 
     it('ensures archive runtime ignore entries during recovery append path', async () => {
@@ -503,13 +501,10 @@ describe('FsArchiveRepository', () => {
       await ctx.archive.get('recovered-ignore')
 
       const entries = await readArchiveGitignoreEntries(ctx.archivePath)
-      expect(entries).toContain('.specd-index.jsonl')
       expect(entries).toContain('.staging')
       expect(entries.filter((entry) => entry === '.staging')).toHaveLength(1)
     })
   })
-
-  // ---- reindex ----
 
   describe('reindex', () => {
     it('creates a clean index from existing archive directories', async () => {
@@ -526,56 +521,83 @@ describe('FsArchiveRepository', () => {
       await ctx.archive.archive(older)
       await ctx.archive.archive(newer)
 
-      // Corrupt the index
-      await fs.writeFile(path.join(ctx.archivePath, '.specd-index.jsonl'), '', 'utf8')
+      await fs.writeFile(archiveIndexPath(ctx.configPath), '', 'utf8')
 
       await ctx.archive.reindex()
 
       const result = await ctx.archive.list()
       expect(result.items).toHaveLength(2)
-      expect(result.items[0]!.name).toBe('old-change')
-      expect(result.items[1]!.name).toBe('new-change')
+      expect(result.items[0]!.name).toBe('new-change')
+      expect(result.items[1]!.name).toBe('old-change')
     })
 
     it('creates an empty index file when archive is empty', async () => {
       await ctx.archive.reindex()
 
-      const indexContent = await fs.readFile(
-        path.join(ctx.archivePath, '.specd-index.jsonl'),
-        'utf8',
-      )
+      const indexContent = await fs.readFile(archiveIndexPath(ctx.configPath), 'utf8')
       expect(indexContent).toBe('')
     })
 
-    it('sorts entries chronologically by archivedAt', async () => {
-      // Archive in order: older first, newer second — archivedAt timestamps follow archive order
+    it('sorts entries chronologically by archivedAt in the index file', async () => {
       const older = await makeArchivableChange(ctx, 'older', new Date('2024-01-01T10:00:00.000Z'))
       const newer = await makeArchivableChange(ctx, 'newer', new Date('2024-03-01T10:00:00.000Z'))
       await ctx.archive.archive(older)
       await ctx.archive.archive(newer)
 
-      // Corrupt the index to force reindex to rebuild from manifests
-      await fs.writeFile(path.join(ctx.archivePath, '.specd-index.jsonl'), '', 'utf8')
+      await fs.writeFile(archiveIndexPath(ctx.configPath), '', 'utf8')
       await ctx.archive.reindex()
 
-      const lines = (await fs.readFile(path.join(ctx.archivePath, '.specd-index.jsonl'), 'utf8'))
+      const lines = (await fs.readFile(archiveIndexPath(ctx.configPath), 'utf8'))
         .trim()
         .split('\n')
-        .map((l) => JSON.parse(l) as Record<string, unknown>)
+        .map((l) => JSON.parse(l) as { entry: Record<string, unknown> })
 
-      // After reindex, order is by archivedAt — older was archived first so it comes first
-      expect(lines[0]!['name']).toBe('older')
-      expect(lines[1]!['name']).toBe('newer')
+      expect(lines[0]!.entry['name']).toBe('older')
+      expect(lines[1]!.entry['name']).toBe('newer')
+    })
+
+    it('deletes legacy archive-root index files on reindex', async () => {
+      const change = await makeArchivableChange(ctx, 'legacy-cleanup')
+      await ctx.archive.archive(change)
+
+      await fs.writeFile(
+        path.join(ctx.archivePath, '.specd-index.jsonl'),
+        '{"legacy":true}\n',
+        'utf8',
+      )
+      await fs.writeFile(
+        path.join(ctx.archivePath, '.specd-index-meta.json'),
+        '{"totalCount":1}\n',
+        'utf8',
+      )
+
+      await ctx.archive.reindex()
+
+      await expect(fs.access(path.join(ctx.archivePath, '.specd-index.jsonl'))).rejects.toThrow()
+      await expect(
+        fs.access(path.join(ctx.archivePath, '.specd-index-meta.json')),
+      ).rejects.toThrow()
     })
 
     it('ensures archive runtime ignore entries during reindex()', async () => {
-      await fs.writeFile(path.join(ctx.archivePath, '.gitignore'), '.specd-index.jsonl\n', 'utf8')
+      await fs.writeFile(path.join(ctx.archivePath, '.gitignore'), '.staging\n', 'utf8')
 
       await ctx.archive.reindex()
 
       const entries = await readArchiveGitignoreEntries(ctx.archivePath)
-      expect(entries).toContain('.specd-index.jsonl')
       expect(entries).toContain('.staging')
+    })
+
+    it('invalidateCache triggers rebuild on next list', async () => {
+      const change = await makeArchivableChange(ctx, 'invalidate-me')
+      await ctx.archive.archive(change)
+      await ctx.archive.list()
+
+      await ctx.archive.invalidateCache()
+
+      const result = await ctx.archive.list()
+      expect(result.items).toHaveLength(1)
+      expect(result.items[0]!.name).toBe('invalidate-me')
     })
   })
 })

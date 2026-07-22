@@ -54,13 +54,76 @@ The constructor MUST accept a `message` string. Callers construct the message wi
 
 `ReadOnlyWorkspaceError` is a domain error because ownership is a domain concept — it represents a violated invariant, not an I/O failure or a user input error.
 
+### Requirement: Shared list pagination types
+
+`Repository` and listable repository ports MUST use these shared types for paginated listing:
+
+```typescript
+interface ListCursor {
+  /** Sort-key value in canonical order (ISO timestamp for time-sorted buckets; capability path for specs). */
+  key: string
+  /** Tiebreak id when keys collide (change `name` for change/archive buckets; omit for specs). */
+  id?: string
+}
+
+interface ListOptions {
+  limit?: number
+  page?: number
+  /** Exclusive keyset cursor: continue after this position in canonical sort order. Mutually exclusive with `page`. */
+  after?: ListCursor
+}
+
+interface ListMeta {
+  total: number
+  count: number
+  limit: number
+  page?: number
+  after?: ListCursor
+}
+
+interface ListResult<T> {
+  items: T[]
+  meta: ListMeta
+}
+```
+
+- `limit` defaults to **100** when omitted on every listable port.
+- `page` is 1-based and MUST be mutually exclusive with `after`.
+- `after` is an exclusive keyset cursor: return the next `limit` items strictly after `{ key, id? }` in the bucket's canonical sort order.
+- Pagination applies over canonical sort order owned by the index helper; use cases and CLI MUST NOT re-sort list results.
+
+`ListMeta.after` (normative): when a `list()` call returns a page and more items remain beyond it in canonical order, `meta.after` MUST be the cursor `{ key, id? }` of the **last item actually returned** in that page — computed via the bucket's cursor extraction, never echoed from the request's `options.after`. When the returned page reaches the end of the bucket (no more items remain), `meta.after` MUST be omitted entirely. Callers page forward by feeding the previous response's `meta.after` into the next request's `options.after`; an implementation that echoes the input cursor back as `meta.after` violates this requirement because it yields the same page indefinitely.
+
+Keyset cursor semantics by bucket:
+
+| Bucket         | `after.key`            | `after.id`    |
+| -------------- | ---------------------- | ------------- |
+| Active changes | `createdAt` ISO-8601   | change `name` |
+| Drafts         | `draftedAt` ISO-8601   | change `name` |
+| Discarded      | `discardedAt` ISO-8601 | change `name` |
+| Archive        | `archivedAt` ISO-8601  | change `name` |
+| Specs          | capability path        | omit          |
+
+### Requirement: invalidateCache resets adapter caches
+
+`Repository` MUST expose:
+
+```typescript
+async invalidateCache(): Promise<void> {
+  // default no-op
+}
+```
+
+Semantics: reset whatever this adapter caches — not filesystem-specific and not list-only by name. The base implementation MUST be a no-op. Subclasses MAY override to mark index helpers or other adapter caches invalidated. Callers that know storage changed outside normal repository write paths MAY invoke `invalidateCache()` without knowing adapter internals.
+
 ## Constraints
 
-- Repository defines no storage operations — it is purely a construction and accessor base
-- All three accessors are explicit methods, not property signatures (per architecture spec)
+- Repository defines no storage operations — it is purely a construction, accessor, and shared listing-type base
+- All four accessors are explicit methods, not property signatures (per architecture spec)
 - Backing fields are private to Repository — subclasses cannot access them directly
 - RepositoryConfig is a plain interface, not a class
 - ReadOnlyWorkspaceError extends DomainError and is exported from the repository-port module
+- Shared list types (`ListOptions`, `ListMeta`, `ListResult`, `ListCursor`) are exported from the repository-port module for use by listable ports
 
 ## Spec Dependencies
 

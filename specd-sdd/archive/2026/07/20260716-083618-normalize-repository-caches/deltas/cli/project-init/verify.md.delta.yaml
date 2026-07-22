@@ -1,0 +1,18 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Delegation to ConfigWriter'
+  content: |
+    #### Scenario: tmp gitignore created idempotently
+
+    - **GIVEN** a clean project root with resolved config path `.specd`
+    - **WHEN** `specd project init --workspace default` completes successfully
+    - **THEN** `.specd/tmp/.gitignore` exists
+    - **AND** its contents are `*` on the first line and `!.gitignore` on the second line
+
+    #### Scenario: tmp gitignore preserved on re-init with --force
+
+    - **GIVEN** `.specd/tmp/.gitignore` already exists with the normative contents
+    - **WHEN** `specd project init --force --workspace default` completes successfully
+    - **THEN** `.specd/tmp/.gitignore` still contains `*` and `!.gitignore`

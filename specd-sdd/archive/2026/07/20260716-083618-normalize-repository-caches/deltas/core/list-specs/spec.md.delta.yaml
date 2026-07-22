@@ -1,0 +1,109 @@
+- op: modified
+  description: Orchestrate workspace spec repos with forwarded list options.
+  selector:
+    type: section
+    matches: 'Requirement: Enumerate specs across all workspaces'
+  content: |
+    `ListSpecs.execute(options?)` SHALL obtain the orchestrated project structure via the `ListWorkspaces` use case (or the corresponding kernel capability). It SHALL iterate through the resulting `ProjectWorkspace` entities and call `SpecRepository.list(options)` on each workspace's `specRepo`.
+
+    It MUST forward the same `ListOptions`, `includeSummary`, and `includeMetadataStatus` to every workspace repository call. It MUST NOT re-sort, re-filter, or re-paginate per-workspace results after the repository returns.
+
+    The merged result MUST preserve workspace declaration order from `ListWorkspaces`, with each workspace's items in the repository's canonical path order. Cross-workspace pagination is out of scope for v1 — callers paginate within a single workspace via the port or filter workspaces explicitly.
+
+    Workspace filtering SHALL be performed by matching workspace names against the orchestrated list before invoking `list()`.
+
+- op: modified
+  description: Title is materialized by the repository index, not re-resolved here.
+  selector:
+    type: section
+    matches: 'Requirement: Always resolve a title for each entry'
+  content: |
+    Every returned `SpecListEntry` MUST include a `title` field supplied by `SpecRepository.list()`. The use case MUST NOT perform additional metadata or file reads to resolve titles when the repository already returned them.
+
+- op: modified
+  description: Summary projection comes from repository cache when requested.
+  selector:
+    type: section
+    matches: 'Requirement: Optional summary resolution'
+  content: |
+    When `options.includeSummary` is `true`, the use case MUST forward the flag to `SpecRepository.list()` and project `summary` onto merged results only when the repository included it in the cached entry.
+
+    The use case MUST NOT re-resolve summary via `SpecRepository.metadata()`, `spec.md` reads, or `extractSpecSummary` when the repository already returned a summary for that entry.
+
+    When `includeSummary` is `false` or omitted, `summary` MUST NOT appear on any entry.
+
+- op: modified
+  description: Metadata status projection comes from repository cache when requested.
+  selector:
+    type: section
+    matches: 'Requirement: Optional metadata freshness status'
+  content: |
+    When `options.includeMetadataStatus` is `true`, the use case MUST forward the flag to `SpecRepository.list()` and project `metadataStatus` only when the repository included it in the cached entry.
+
+    The use case MUST NOT re-compute metadata freshness via `SpecRepository.metadata()`, content hashing, or schema validation when the repository already returned `metadataStatus`.
+
+    When `includeMetadataStatus` is `false` or omitted, `metadataStatus` MUST NOT appear on any entry.
+
+- op: modified
+  description: Repository swallows per-spec resolution errors at index time.
+  selector:
+    type: section
+    matches: 'Requirement: Silent error handling for metadata and summary reads'
+  content: |
+    Per-spec title/summary/status resolution errors are handled at index materialization time in `FsSpecIndexCache`. `ListSpecs` MUST NOT perform supplementary I/O that could throw for individual specs.
+
+    The use case SHALL NOT propagate I/O errors from optional field projection to the caller when merging repository list results.
+
+- op: modified
+  description: SpecListEntry is a port-level shape returned by repositories.
+  selector:
+    type: section
+    matches: 'Requirement: SpecListEntry shape'
+  content: |
+    Each entry MUST include required fields `workspace`, `path`, and `title` as returned by `SpecRepository.list()`.
+
+    Optional fields (`summary`, `metadataStatus`) MUST only be present when explicitly requested via include flags **and** projected from the repository result.
+
+    When workspace filtering is active, the result array contains entries only from the filtered workspaces.
+
+- op: modified
+  description: resolveListSpecsDeps resolves only listWorkspaces.
+  selector:
+    type: section
+    matches: 'Requirement: Config-based factory delegates through resolveListSpecsDeps'
+  content: |
+    ### Requirement: Config-based factory delegates through resolveListSpecsDeps
+
+    The config-based `createListSpecs(config, options?)` form MUST derive `ListSpecsDeps` through `resolveListSpecsDeps(resolver)` and then delegate to canonical `createListSpecs(deps)`.
+
+    `resolveListSpecsDeps(resolver)` MUST resolve:
+
+    - `listWorkspaces: ListWorkspaces`
+
+    It MUST NOT resolve `hasher: ContentHasher` or `yaml: YamlSerializer` — `ListSpecs` orchestrates workspace repositories and forwards list options; title/summary/metadata-status enrichment happens inside `SpecRepository.list()`'s index materialization, not in this use case, so it has no dependency on content hashing or YAML serialization.
+
+    The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+
+- op: modified
+  description: Trim deps no longer needed for list-time enrichment.
+  selector:
+    type: section
+    matches: Spec Dependencies
+  content: |
+    - [`core:spec-metadata`](../spec-metadata/spec.md)
+    - [`core:storage`](../storage/spec.md)
+    - [`core:workspace`](../workspace/spec.md)
+    - [`core:list-workspaces`](../list-workspaces/spec.md)
+    - [`core:spec-repository-port`](../spec-repository-port/spec.md) — `SpecListEntry` and paginated list contract
+    - [`core:composition-resolver`](../composition-resolver/spec.md)
+
+- op: modified
+  description: ListSpecs orchestrates repositories; enrichment is index-backed.
+  selector:
+    type: section
+    matches: Constraints
+  content: |
+    - The use case MUST NOT modify the repositories.
+    - It SHALL depend on `ListWorkspaces` for consistent project traversal.
+    - It MUST NOT re-resolve title, summary, or metadata status with extra I/O when the repository already returned those fields.
+    - Include flags are forwarded to repositories for projection-only filtering of cached payloads.

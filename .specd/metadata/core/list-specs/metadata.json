@@ -3,10 +3,10 @@
   "description": "Agents and CLI users need a single query to discover what specs exist across all workspaces without loading full spec content. The `ListSpecs` use case enumerates all specs across all configured workspaces, returning a title for each entry and optionally a short summary and metadata freshness status. It supports optional workspace filtering so callers can restrict results to one or more named workspaces. It is the primary query for discovery UIs and CLI listing commands.",
   "dependsOn": [
     "core:spec-metadata",
-    "core:content-extraction",
     "core:storage",
     "core:workspace",
     "core:list-workspaces",
+    "core:spec-repository-port",
     "core:composition-resolver"
   ],
   "context": [
@@ -16,50 +16,51 @@
     {
       "requirement": "Enumerate specs across all workspaces",
       "rules": [
-        "`ListSpecs.execute()` SHALL obtain the orchestrated project structure via the `ListWorkspaces` use case (or the corresponding kernel capability). It SHALL iterate through the resulting `ProjectWorkspace` entities to enumerate all specs across all configured workspaces.\n\nThe returned `SpecListEntry[]` MUST preserve the workspace order and spec repository order. Workspace filtering SHALL be performed by matching workspace names against the orchestrated list."
+        "`ListSpecs.execute(options?)` SHALL obtain the orchestrated project structure via the `ListWorkspaces` use case (or the corresponding kernel capability). It SHALL iterate through the resulting `ProjectWorkspace` entities and call `SpecRepository.list(options)` on each workspace's `specRepo`.\n\nIt MUST forward the same `ListOptions`, `includeSummary`, and `includeMetadataStatus` to every workspace repository call. It MUST NOT re-sort, re-filter, or re-paginate per-workspace results after the repository returns.\n\nThe merged result MUST preserve workspace declaration order from `ListWorkspaces`, with each workspace's items in the repository's canonical path order. Cross-workspace pagination is out of scope for v1 — callers paginate within a single workspace via the port or filter workspaces explicitly.\n\nWorkspace filtering SHALL be performed by matching workspace names against the orchestrated list before invoking `list()`."
       ]
     },
     {
       "requirement": "Always resolve a title for each entry",
       "rules": [
-        "Every `SpecListEntry` MUST include a `title` field. The title resolution order SHALL be:\n\n1. The `title` field from the spec's metadata (via `SpecRepository.metadata()`), when metadata exists, parses successfully, and `title` is a non-empty string after trimming.\n2. Fallback: the last segment of the spec's capability path (e.g. `auth/login` yields `login`)."
+        "Every returned `SpecListEntry` MUST include a `title` field supplied by `SpecRepository.list()`. The use case MUST NOT perform additional metadata or file reads to resolve titles when the repository already returned them."
       ]
     },
     {
       "requirement": "Optional summary resolution",
       "rules": [
-        "When `options.includeSummary` is `true`, the use case SHALL resolve a `summary` field for each entry. Summary resolution order:\n\n1. The `description` field from the spec's metadata (via `SpecRepository.metadata()`), when present and non-empty after trimming.\n2. Extraction from `spec.md` content via `extractSpecSummary`, when the spec has a `spec.md` file and the extraction succeeds.\n3. If neither source yields a value, `summary` MUST be omitted from the entry (not set to an empty string or `null`).\n\nWhen `options.includeSummary` is `false` or omitted, the `summary` field MUST NOT appear on any entry."
+        "When `options.includeSummary` is `true`, the use case MUST forward the flag to `SpecRepository.list()` and project `summary` onto merged results only when the repository included it in the cached entry.\n\nThe use case MUST NOT re-resolve summary via `SpecRepository.metadata()`, `spec.md` reads, or `extractSpecSummary` when the repository already returned a summary for that entry.\n\nWhen `includeSummary` is `false` or omitted, `summary` MUST NOT appear on any entry."
       ]
     },
     {
       "requirement": "Optional metadata freshness status",
       "rules": [
-        "When `options.includeMetadataStatus` is `true`, the use case SHALL resolve a `metadataStatus` field for each entry. The status values SHALL be:\n\n- `'missing'` — no metadata exists for the spec (via `SpecRepository.metadata()` returning `null`).\n- `'invalid'` — metadata exists but fails structural validation against `strictSpecMetadataSchema`.\n- `'stale'` — metadata exists and is structurally valid, but content hashes are absent or do not match current file contents.\n- `'fresh'` — metadata exists, is structurally valid, and all content hashes match current files.\n\nWhen `options.includeMetadataStatus` is `false` or omitted, the `metadataStatus` field MUST NOT appear on any entry."
+        "When `options.includeMetadataStatus` is `true`, the use case MUST forward the flag to `SpecRepository.list()` and project `metadataStatus` only when the repository included it in the cached entry.\n\nThe use case MUST NOT re-compute metadata freshness via `SpecRepository.metadata()`, content hashing, or schema validation when the repository already returned `metadataStatus`.\n\nWhen `includeMetadataStatus` is `false` or omitted, `metadataStatus` MUST NOT appear on any entry."
       ]
     },
     {
       "requirement": "Silent error handling for metadata and summary reads",
       "rules": [
-        "Errors encountered while reading metadata (via `SpecRepository.metadata()`) or `spec.md` for title/summary/status resolution MUST be silently caught. The spec entry MUST still appear in the results with the title fallback applied. The use case SHALL NOT propagate I/O errors from individual spec resolution to the caller."
+        "Per-spec title/summary/status resolution errors are handled at index materialization time in `FsSpecIndexCache`. `ListSpecs` MUST NOT perform supplementary I/O that could throw for individual specs.\n\nThe use case SHALL NOT propagate I/O errors from optional field projection to the caller when merging repository list results."
       ]
     },
     {
       "requirement": "SpecListEntry shape",
       "rules": [
-        "Each entry MUST include the following required fields:\n\n- `workspace` — the workspace name the spec belongs to.\n- `path` — the spec's capability path rendered with `/` separators.\n- `title` — the resolved title string.\n\nOptional fields (`summary`, `metadataStatus`) MUST only be present when explicitly requested and successfully resolved.\n\nWhen workspace filtering is active, the result array contains entries only from the filtered workspaces. Callers that need all configured workspace names (including those with no matching specs) MUST consult the config directly."
+        "Each entry MUST include required fields `workspace`, `path`, and `title` as returned by `SpecRepository.list()`.\n\nOptional fields (`summary`, `metadataStatus`) MUST only be present when explicitly requested via include flags **and** projected from the repository result.\n\nWhen workspace filtering is active, the result array contains entries only from the filtered workspaces."
       ]
     },
     {
       "requirement": "Config-based factory delegates through resolveListSpecsDeps",
       "rules": [
-        "The config-based `createListSpecs(config, options?)` form MUST derive `ListSpecsDeps` through `resolveListSpecsDeps(resolver)` and then delegate to canonical `createListSpecs(deps)`.\n\n`resolveListSpecsDeps(resolver)` MUST resolve:\n\n- `listWorkspaces: ListWorkspaces`\n- `hasher: ContentHasher`\n- `yaml: YamlSerializer`\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
+        "The config-based `createListSpecs(config, options?)` form MUST derive `ListSpecsDeps` through `resolveListSpecsDeps(resolver)` and then delegate to canonical `createListSpecs(deps)`.\n\n`resolveListSpecsDeps(resolver)` MUST resolve:\n\n- `listWorkspaces: ListWorkspaces`\n\nIt MUST NOT resolve `hasher: ContentHasher` or `yaml: YamlSerializer` — `ListSpecs` orchestrates workspace repositories and forwards list options; title/summary/metadata-status enrichment happens inside `SpecRepository.list()`'s index materialization, not in this use case, so it has no dependency on content hashing or YAML serialization.\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
       ]
     }
   ],
   "constraints": [
     "The use case MUST NOT modify the repositories.",
     "It SHALL depend on ListWorkspaces for consistent project traversal.",
-    "Title and description values MUST be trimmed before use."
+    "It MUST NOT re-resolve title, summary, or metadata status with extra I/O when the repository already returned those fields.",
+    "Include flags are forwarded to repositories for projection-only filtering of cached payloads."
   ],
   "scenarios": [
     {
@@ -67,7 +68,10 @@
       "name": "Multiple workspaces returned in declaration order",
       "given": ["two workspaces alpha and beta configured in that order, each containing specs"],
       "when": ["execute() is called with no options"],
-      "then": ["all entries from alpha appear before all entries from beta"]
+      "then": [
+        "all entries from alpha appear before all entries from beta",
+        "AND each workspace's items remain in repository canonical path order"
+      ]
     },
     {
       "requirement": "Enumerate specs across all workspaces",
@@ -85,106 +89,74 @@
     },
     {
       "requirement": "Enumerate specs across all workspaces",
-      "name": "Unknown workspace name in filter silently ignored",
-      "given": ["no workspace named nonexistent is configured"],
-      "when": ["execute({ workspaces: [\"nonexistent\"] }) is called"],
-      "then": ["the result array is empty and no error is thrown"]
-    },
-    {
-      "requirement": "Enumerate specs across all workspaces",
-      "name": "Empty workspaces array includes all",
-      "given": ["specs exist in workspaces alpha and beta"],
-      "when": ["execute({ workspaces: [] }) is called"],
-      "then": ["entries from both workspaces are returned"]
-    },
-    {
-      "requirement": "Enumerate specs across all workspaces",
-      "name": "ListSpecs uses orchestrated project structure",
-      "when": ["ListSpecs.execute() is called"],
+      "name": "ListSpecs forwards include flags to each repository",
+      "when": [
+        "execute({ includeSummary: true, includeMetadataStatus: true, limit: 50 }) is called"
+      ],
       "then": [
-        "it obtains the list of workspaces via the ListWorkspaces orchestrator",
-        "AND it enumerates all specs through the provided repository instances"
+        "each workspace SpecRepository.list() receives the same forwarded options",
+        "AND the use case does not re-sort or re-paginate per-workspace results"
       ]
     },
     {
       "requirement": "Always resolve a title for each entry",
-      "name": "Title from metadata",
-      "given": ["a spec with metadata containing title: \"OAuth Login\""],
+      "name": "Title supplied by repository list",
+      "given": ["SpecRepository.list() returns entries with resolved titles"],
       "when": ["execute() is called"],
-      "then": ["the entry's title is \"OAuth Login\""]
+      "then": [
+        "each entry's title matches the repository-provided value",
+        "AND the use case does not perform additional metadata or file reads to resolve titles"
+      ]
     },
     {
       "requirement": "Always resolve a title for each entry",
-      "name": "Title fallback to path segment",
-      "given": ["a spec at path auth/login with no metadata"],
+      "name": "Title fallback comes from repository index materialization",
+      "given": ["a spec at path auth/login indexed without metadata title"],
       "when": ["execute() is called"],
-      "then": ["the entry's title is \"login\""]
+      "then": [
+        "the entry's title is \"login\" as returned by SpecRepository.list()",
+        "AND ListSpecs does not read metadata or spec files to derive the title"
+      ]
     },
     {
       "requirement": "Always resolve a title for each entry",
-      "name": "Empty metadata title triggers fallback",
-      "given": ["a spec at path auth/login with metadata containing title: \"  \""],
+      "name": "Empty metadata title fallback comes from repository",
+      "given": ["a spec indexed with empty trimmed metadata title and path auth/login"],
       "when": ["execute() is called"],
-      "then": ["the entry's title is \"login\" (fallback applied)"]
+      "then": ["the entry's title is \"login\" from the repository result"]
     },
     {
       "requirement": "Optional summary resolution",
-      "name": "Summary from metadata description",
-      "given": ["a spec with metadata containing description: \"Handles OAuth flows\""],
-      "when": ["execute({ includeSummary: true }) is called"],
-      "then": ["the entry's summary is \"Handles OAuth flows\""]
-    },
-    {
-      "requirement": "Optional summary resolution",
-      "name": "Summary extracted from spec.md when no description in metadata",
+      "name": "Summary forwarded from repository when requested",
       "given": [
-        "a spec with no description in metadata but a spec.md with an extractable overview"
+        "SpecRepository.list({ includeSummary: true }) returns entries with cached summary"
       ],
       "when": ["execute({ includeSummary: true }) is called"],
-      "then": ["the entry's summary is the extracted overview text"]
+      "then": ["merged entries include the repository-provided summary"]
     },
     {
       "requirement": "Optional summary resolution",
-      "name": "Summary omitted when no source available",
-      "given": ["a spec with no metadata description and no spec.md"],
-      "when": ["execute({ includeSummary: true }) is called"],
-      "then": ["the entry has no summary property"]
-    },
-    {
-      "requirement": "Optional summary resolution",
-      "name": "Summary not present when not requested",
+      "name": "Summary omitted when not requested",
       "when": ["execute() is called without includeSummary"],
       "then": ["no entry has a summary property"]
     },
     {
-      "requirement": "Optional metadata freshness status",
-      "name": "Status is missing when no metadata",
-      "given": ["a spec with no metadata"],
-      "when": ["execute({ includeMetadataStatus: true }) is called"],
-      "then": ["the entry's metadataStatus is 'missing'"]
+      "requirement": "Optional summary resolution",
+      "name": "Use case does not re-resolve summary with extra I/O",
+      "given": ["the repository already returned a cached summary for a spec entry"],
+      "when": ["execute({ includeSummary: true }) is called"],
+      "then": [
+        "the use case does not call metadata(), read spec.md, or invoke summary extraction helpers for that entry"
+      ]
     },
     {
       "requirement": "Optional metadata freshness status",
-      "name": "Status is invalid when metadata fails structural validation",
-      "given": ["a spec with metadata that fails strictSpecMetadataSchema parsing"],
-      "when": ["execute({ includeMetadataStatus: true }) is called"],
-      "then": ["the entry's metadataStatus is 'invalid'"]
-    },
-    {
-      "requirement": "Optional metadata freshness status",
-      "name": "Status is stale when hashes do not match",
+      "name": "metadataStatus forwarded from repository when requested",
       "given": [
-        "a spec with valid metadata whose contentHashes do not match current file contents"
+        "SpecRepository.list({ includeMetadataStatus: true }) returns entries with cached metadataStatus"
       ],
       "when": ["execute({ includeMetadataStatus: true }) is called"],
-      "then": ["the entry's metadataStatus is 'stale'"]
-    },
-    {
-      "requirement": "Optional metadata freshness status",
-      "name": "Status is fresh when all hashes match",
-      "given": ["a spec with valid metadata whose contentHashes all match current file contents"],
-      "when": ["execute({ includeMetadataStatus: true }) is called"],
-      "then": ["the entry's metadataStatus is 'fresh'"]
+      "then": ["merged entries include the repository-provided metadataStatus"]
     },
     {
       "requirement": "Optional metadata freshness status",
@@ -193,32 +165,53 @@
       "then": ["no entry has a metadataStatus property"]
     },
     {
-      "requirement": "Silent error handling for metadata and summary reads",
-      "name": "Metadata read error does not propagate",
-      "given": ["repo.metadata(spec) throws an I/O error"],
-      "when": ["execute() is called"],
+      "requirement": "Optional metadata freshness status",
+      "name": "Use case does not re-compute freshness with extra I/O",
+      "given": ["the repository already returned metadataStatus for a spec entry"],
+      "when": ["execute({ includeMetadataStatus: true }) is called"],
       "then": [
-        "the entry still appears with the path-segment fallback title and no error is thrown"
+        "the use case does not call metadata(), content hashing, or schema validation for that entry"
       ]
     },
     {
       "requirement": "Silent error handling for metadata and summary reads",
-      "name": "spec.md read error does not propagate",
-      "given": ["repo.artifact(spec, 'spec.md') throws an I/O error during summary resolution"],
-      "when": ["execute({ includeSummary: true }) is called"],
-      "then": ["the entry still appears without a summary and no error is thrown"]
-    },
-    {
-      "requirement": "SpecListEntry shape",
-      "name": "Entry contains required fields",
+      "name": "Repository swallows per-spec resolution errors at index time",
+      "given": ["a spec whose title/summary/status resolution fails during index materialization"],
       "when": ["execute() is called"],
-      "then": ["each entry contains workspace (string), path (string), and title (string)"]
+      "then": [
+        "the entry still appears with repository-provided fallback fields",
+        "AND no error is thrown to the caller"
+      ]
+    },
+    {
+      "requirement": "Silent error handling for metadata and summary reads",
+      "name": "ListSpecs does not perform supplementary I/O for optional fields",
+      "when": ["execute({ includeSummary: true, includeMetadataStatus: true }) is called"],
+      "then": [
+        "the use case merges repository list results without additional per-spec file reads beyond repository delegation"
+      ]
     },
     {
       "requirement": "SpecListEntry shape",
-      "name": "Entry may contain optional fields when requested",
+      "name": "Entry contains required fields from repository",
+      "when": ["execute() is called"],
+      "then": [
+        "each entry contains workspace, path, and title as returned by SpecRepository.list()"
+      ]
+    },
+    {
+      "requirement": "SpecListEntry shape",
+      "name": "Optional fields appear only when requested and projected",
       "when": ["execute({ includeSummary: true, includeMetadataStatus: true }) is called"],
-      "then": ["entries may contain summary and metadataStatus in addition to required fields"]
+      "then": [
+        "entries may contain summary and metadataStatus only when the repository projected them"
+      ]
+    },
+    {
+      "requirement": "SpecListEntry shape",
+      "name": "Workspace filter limits merged results",
+      "when": ["execute({ workspaces: [\"alpha\"] }) is called"],
+      "then": ["the result array contains entries only from workspace alpha"]
     },
     {
       "requirement": "Config-based factory delegates through resolveListSpecsDeps",
@@ -233,16 +226,22 @@
     }
   ],
   "implementation": {
-    "files": [
+    "symbols": [
       {
         "specId": "core:list-specs",
-        "file": "core:src/composition/use-cases/list-specs.ts"
+        "file": "core:src/application/use-cases/list-specs.ts",
+        "symbol": "ListSpecs"
+      },
+      {
+        "specId": "core:list-specs",
+        "file": "core:src/composition/use-cases/list-specs.ts",
+        "symbol": "resolveListSpecsDeps"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:afa098eb930f285fedee46e38fd406c86cc6b3a3d7743290bd2e3aeb778ab9fc",
-    "verify.md": "sha256:37be6dce0e445478030d84a5fb189db3454e9db26e38038422082871f296eb25"
+    "spec.md": "sha256:865b6d4149d9557a020f46abd3de08b8f71b8068445e416d5e84228373ad1bb7",
+    "verify.md": "sha256:c64426c605e7089ad1887538b9378e63821b56109544885dd94e73a4968579a4"
   },
   "generatedBy": "core"
 }

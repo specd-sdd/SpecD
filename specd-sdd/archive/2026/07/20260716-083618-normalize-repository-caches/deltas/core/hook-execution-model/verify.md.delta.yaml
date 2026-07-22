@@ -1,0 +1,31 @@
+- op: modified
+  description: Verify HookRunner's variable catalog drops the singular {{change.workspace}} token.
+  selector:
+    type: section
+    matches: 'Requirement: Template variable expansion'
+  content: |
+    #### Scenario: HookRunner expands template variables in run commands
+
+    - **GIVEN** a `run:` hook with command `"echo {{change.name}}"`
+    - **WHEN** the hook is executed via `HookRunner`
+    - **THEN** `{{change.name}}` is substituted with the change name value
+
+    #### Scenario: Unknown template variables left unexpanded
+
+    - **GIVEN** a `run:` hook with command `"echo {{unknown.variable}}"`
+    - **WHEN** the hook is executed
+    - **THEN** the literal `{{unknown.variable}}` token is preserved in the command
+
+    #### Scenario: {{change.workspace}} is not a supported token
+
+    - **GIVEN** a `run:` hook with command `"echo {{change.workspace}}"`
+    - **WHEN** the hook is executed via `HookRunner`
+    - **THEN** `{{change.workspace}}` is left unexpanded, the same as any other unknown token
+    - **AND** `HookVariables` passed to `HookRunner` never contains a `workspace` key under `change`
+
+    #### Scenario: Multi-workspace change never yields a singular workspace variable
+
+    - **GIVEN** a change whose `specIds` touch both `default` and `billing` workspaces
+    - **WHEN** `{{key.path}}` template variables are expanded for a `run:` hook on that change
+    - **THEN** the `change` namespace has no `workspace` key
+    - **AND** no hook command can resolve `{{change.workspace}}` to either touched workspace name

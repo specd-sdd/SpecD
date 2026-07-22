@@ -75,7 +75,7 @@ describe('@specd/core kernel-equivalent public coverage', () => {
 
     for (const namespace of ['changes', 'specs', 'project'] as const) {
       for (const key of extractNamespaceKeys(namespace)) {
-        if (key === 'repo' || key === 'repos') continue
+        if (key === 'repo' || key === 'repos' || key === 'archiveRepo') continue
         const mount = `${namespace}.${key}`
         const exportName = KERNEL_ASSEMBLY_EXPORTS[mount]
         const value = exportName ? (corePublic as Record<string, unknown>)[exportName] : undefined

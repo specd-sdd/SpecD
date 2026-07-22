@@ -43,7 +43,7 @@
     {
       "requirement": "Change lookup",
       "rules": [
-        "`RunStepHooks` loads the change by name via `ChangeRepository`. If no change exists with the given name **and** the requested step is `'archiving'` with phase `'post'`, it MUST fall back to `ArchiveRepository.get(name)`. If the change is found in the archive, it MUST be used for template variable construction (using `ArchivedChange.name`, `ArchivedChange.workspace`, and `ArchiveRepository.archivePath(archivedChange)` for the `change.path` variable). If the change is not found in the archive either, it MUST throw `ChangeNotFoundError`.\n\nFor all other step/phase combinations, if `ChangeRepository.get(name)` returns null, `RunStepHooks` MUST throw `ChangeNotFoundError` immediately — the archive fallback does not apply."
+        "`RunStepHooks` loads the change by name via `ChangeRepository`. If no change exists with the given name **and** the requested step is `'archiving'` with phase `'post'`, it MUST fall back to `ArchiveRepository.get(name)`. If the change is found in the archive, it MUST be used for template variable construction (using `ArchivedChange.name` and `ArchiveRepository.archivePath(archivedChange)` for the `change.path` variable). If the change is not found in the archive either, it MUST throw `ChangeNotFoundError`.\n\nFor all other step/phase combinations, if `ChangeRepository.get(name)` returns null, `RunStepHooks` MUST throw `ChangeNotFoundError` immediately — the archive fallback does not apply.\n\nNeither lookup path reads or derives a workspace value for template variables — see Requirement: HookVariables construction."
       ]
     },
     {
@@ -79,7 +79,7 @@
     {
       "requirement": "HookVariables construction",
       "rules": [
-        "`RunStepHooks` MUST build the contextual `TemplateVariables` from the resolved change and the appropriate repository path:\n\n- `change.name` — the change name (from `Change.name` or `ArchivedChange.name`)\n- `change.workspace` — the primary workspace (from `Change.workspaces[0]` or `ArchivedChange.workspace`)\n- `change.path` — the absolute path to the change directory (via `ChangeRepository.changePath()` for active changes, or `ArchiveRepository.archivePath()` for archived changes)\n- `change.archivedName` — the archived directory basename (`YYYYMMDD-HHmmss-<name>`) when the archived fallback path is used (archiving post phase)\n\nFor active changes (non-archived lookup path), `change.archivedName` may be absent.\n\nBuilt-in variables (e.g. `project.root`) are already present in the `TemplateExpander` — the use case only builds the contextual `change` namespace."
+        "`RunStepHooks` MUST build the contextual `TemplateVariables` from the resolved change and the appropriate repository path:\n\n- `change.name` — the change name (from `Change.name` or `ArchivedChange.name`)\n- `change.path` — the absolute path to the change directory (via `ChangeRepository.changePath()` for active changes, or `ArchiveRepository.archivePath()` for archived changes)\n- `change.archivedName` — the archived directory basename (`YYYYMMDD-HHmmss-<name>`) when the archived fallback path is used (archiving post phase)\n\nFor active changes (non-archived lookup path), `change.archivedName` may be absent.\n\n`RunStepHooks` MUST NOT build a `change.workspace` variable or otherwise inject a singular/primary workspace value (for example via `change.workspaces[0] ?? 'default'` or `specIds[0]?.split(':')[0]`) into the `change` namespace — per [`core:template-variables`](../template-variables/spec.md), `change.workspace` is not a supported token, and a change has no single primary workspace.\n\nBuilt-in variables (e.g. `project.root`) are already present in the `TemplateExpander` — the use case only builds the contextual `change` namespace."
       ]
     },
     {
@@ -210,6 +210,18 @@
       "then": ["ChangeNotFoundError is thrown"]
     },
     {
+      "requirement": "Change lookup",
+      "name": "Neither lookup path derives a workspace value",
+      "given": [
+        "either the active-change lookup path or the archive-fallback lookup path resolves a change"
+      ],
+      "when": ["RunStepHooks proceeds to build template variables"],
+      "then": [
+        "the lookup step itself does not read, compute, or cache any workspace value",
+        "AND workspace derivation for the change namespace is governed entirely by Requirement: HookVariables construction"
+      ]
+    },
+    {
       "requirement": "Schema name guard",
       "name": "Schema mismatch throws SchemaMismatchError",
       "given": [
@@ -305,7 +317,7 @@
     },
     {
       "requirement": "HookVariables construction",
-      "name": "Archived post-phase includes archivedName in change namespace",
+      "name": "Archived post-phase includes archivedName but no workspace",
       "given": [
         "the active change is not found in ChangeRepository",
         "AND the request is step: \"archiving\" with phase: \"post\"",
@@ -313,18 +325,30 @@
       ],
       "when": ["RunStepHooks.execute builds TemplateVariables for hook execution"],
       "then": [
-        "the change namespace includes name, workspace, path, and archivedName",
-        "AND change.archivedName equals 20260418-103000-add-auth"
+        "the change namespace includes name, path, and archivedName",
+        "AND change.archivedName equals 20260418-103000-add-auth",
+        "AND the change namespace has no workspace key"
       ]
     },
     {
       "requirement": "HookVariables construction",
-      "name": "Active change path may omit archivedName",
+      "name": "Active change path may omit archivedName and never has workspace",
       "given": ["the change is loaded from ChangeRepository"],
       "when": ["RunStepHooks.execute builds TemplateVariables"],
       "then": [
-        "the change namespace includes name, workspace, and path",
-        "AND change.archivedName may be absent"
+        "the change namespace includes name and path",
+        "AND change.archivedName may be absent",
+        "AND the change namespace has no workspace key"
+      ]
+    },
+    {
+      "requirement": "HookVariables construction",
+      "name": "HookVariables construction never derives a singular workspace",
+      "given": ["a change touching multiple workspaces via specIds"],
+      "when": ["RunStepHooks.execute builds TemplateVariables"],
+      "then": [
+        "the change namespace is not populated with change.workspaces[0] ?? 'default' or specIds[0]?.split(':')[0]",
+        "AND no change.workspace key is present in the resulting namespace"
       ]
     },
     {
@@ -421,18 +445,7 @@
     }
   ],
   "implementation": {
-    "files": [
-      {
-        "specId": "core:run-step-hooks",
-        "file": "core:test/application/use-cases/run-step-hooks.spec.ts"
-      }
-    ],
     "symbols": [
-      {
-        "specId": "core:run-step-hooks",
-        "file": "core:src/application/use-cases/run-step-hooks.ts",
-        "symbol": "HookProgressEvent"
-      },
       {
         "specId": "core:run-step-hooks",
         "file": "core:src/application/use-cases/run-step-hooks.ts",
@@ -441,8 +454,8 @@
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:83171315608ad989da7271a4dfeac4e083a5617199e864307b1bd77104878696",
-    "verify.md": "sha256:d9cfc31026721911de4282f211d3256d44565dc4d950e09b2bc47027cd3cf6e9"
+    "spec.md": "sha256:ceeb6daa92fdd385eea0f202eeb1a6e7e99c8a576dcc76c8aa88de52623e2418",
+    "verify.md": "sha256:7d39615c83693b9b82391183d1d270eae98bf1075be1ed24ef25c556e23faf50"
   },
   "generatedBy": "core"
 }

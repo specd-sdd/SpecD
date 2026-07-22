@@ -1,0 +1,87 @@
+- op: modified
+  description: Return paginated DiscardedChangeListEntry ListResult.
+  selector:
+    type: section
+    matches: 'Requirement: Returns all discarded changes'
+  content: |
+    #### Scenario: Multiple discarded changes returned in canonical order
+
+    - **GIVEN** the repository contains three discarded changes with distinct `discardedAt` timestamps
+    - **WHEN** `execute()` is called without options
+    - **THEN** the result is `ListResult<DiscardedChangeListEntry>` with default `limit: 100`
+    - **AND** items appear in `discardedAt` descending order (newest first)
+
+    #### Scenario: Active and drafted changes are excluded
+
+    - **GIVEN** the repository contains discarded change `alpha`, active change `beta`, and drafted change `gamma`
+    - **WHEN** `execute()` is called
+    - **THEN** `items` contains only `alpha`
+
+    #### Scenario: Keyset after cursor returns next page
+
+    - **GIVEN** discarded changes `alpha` and `beta` where `alpha` is newer
+    - **WHEN** `execute({ limit: 1, after: { key: alpha.discardedAt, id: 'alpha' } })` is called
+    - **THEN** `items` contains only `beta`
+
+- op: modified
+  description: List entries replace DiscardedChangeView for listing.
+  selector:
+    type: section
+    matches: 'Requirement: Returns DiscardedChangeView without content'
+  content: |
+    #### Scenario: Entries are DiscardedChangeListEntry without detail fields
+
+    - **WHEN** `execute()` returns a non-empty result
+    - **THEN** each item is a `DiscardedChangeListEntry` with `discardedAt` and `discardedBy`
+    - **AND** items do not include artifact file content, history, or artifact state maps
+    - **AND** entries are not mutable `Change` instances
+
+    #### Scenario: Optional description, reason, and supersededBy require include flags
+
+    - **GIVEN** cached discarded rows include stored description, reason, and supersededBy
+    - **WHEN** `execute({ includeDescription: true, includeReason: true, includeSupersededBy: true })` is called
+    - **THEN** returned items may include `description`, `reason`, and `supersededBy`
+    - **WHEN** `execute()` is called without those flags
+    - **THEN** returned items omit those optional fields
+
+    #### Scenario: Empty discarded directory returns empty ListResult
+
+    - **GIVEN** no directories exist under `discarded/`
+    - **WHEN** `ListDiscarded.execute()` is called
+    - **THEN** the result is `{ items: [], meta: { total: 0, count: 0, limit: 100 } }`
+
+- op: modified
+  description: Empty result uses ListResult envelope.
+  selector:
+    type: section
+    matches: 'Requirement: Returns an empty array when no discarded changes exist'
+  content: |
+    #### Scenario: Repository is empty
+
+    - **GIVEN** the repository contains no changes at all
+    - **WHEN** `execute()` is called
+    - **THEN** the result is `{ items: [], meta: { total: 0, count: 0, limit: 100 } }`
+
+    #### Scenario: All changes are active or drafted
+
+    - **GIVEN** the repository contains only active and drafted changes
+    - **WHEN** `execute()` is called
+    - **THEN** the result is `{ items: [], meta: { total: 0, count: 0, limit: 100 } }`
+
+- op: modified
+  description: Delegate list options without re-sorting.
+  selector:
+    type: section
+    matches: 'Requirement: Constructor accepts a ChangeRepository'
+  content: |
+    #### Scenario: Constructor accepts ChangeRepository
+
+    - **WHEN** `ListDiscarded` is instantiated
+    - **THEN** it requires a `ChangeRepository` in its constructor
+
+    #### Scenario: Execute forwards options and returns repository result unchanged
+
+    - **GIVEN** `ChangeRepository.listDiscarded(options)` returns a specific `ListResult<DiscardedChangeListEntry>`
+    - **WHEN** `execute(options)` is called
+    - **THEN** the result is identical to the repository output
+    - **AND** the use case does not re-sort, filter, or paginate after delegation

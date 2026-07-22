@@ -20,6 +20,12 @@
 - **AND** the workspace specs directory and standard storage directories under `.specd/` are created
 - **AND** both `specd.local.yaml` and `specd.local.*.yaml` are appended to `.gitignore`
 
+#### Scenario: initProject creates tmp gitignore for fs-cache and locks
+
+- **GIVEN** a directory with no existing `specd.yaml`
+- **WHEN** `initProject` completes successfully
+- **THEN** `{configPath}/tmp/.gitignore` exists with contents ignoring `*` and un-ignoring `!.gitignore`
+
 #### Scenario: Result contains expected metadata
 
 - **WHEN** `initProject` completes successfully

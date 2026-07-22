@@ -1,0 +1,129 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Command signature'
+  content: |
+    #### Scenario: Default limit is 100
+
+    - **GIVEN** more than 100 discarded changes exist
+    - **WHEN** `specd discarded list --format json` is run without `--limit`
+    - **THEN** `meta.limit` is 100
+
+    #### Scenario: --page and keyset cursors are mutually exclusive
+
+    - **WHEN** `specd discarded list --page 2 --after-key 2024-01-01T00:00:00.000Z` is run
+    - **THEN** the command exits with a CLI usage error before invoking the use case
+
+- op: modified
+  description: ListDiscarded invoked with list options
+  selector:
+    type: section
+    matches: 'Scenario: Invokes ListDiscarded'
+  content: |
+    - **WHEN** `specd discarded list --limit 10` runs
+    - **THEN** `ListDiscarded.execute` is called with list options derived from CLI flags
+
+- op: removed
+  selector:
+    type: section
+    matches: 'Scenario: Text output includes discard reason per row'
+
+- op: modified
+  description: Opt-in reason and superseded-by columns
+  selector:
+    type: section
+    matches: 'Scenario: Discarded changes listed with correct fields'
+  content: |
+    - **GIVEN** `discarded/` contains two changes: `old-experiment` (discarded `2024-01-10`, actor `alice`, reason `"no longer needed"`, no supersededBy) and `bad-idea` (discarded `2024-01-08`, actor `bob`, reason `"duplicate effort"`, supersededBy `['new-approach']`)
+    - **WHEN** `specd discarded list --reason --superseded-by` is run
+    - **THEN** stdout contains one row for each change showing name, date, actor, and reason
+    - **AND** the row for `bad-idea` includes `→ new-approach`
+    - **AND** the row for `old-experiment` does not include a `→` segment
+    - **AND** the process exits with code 0
+
+- op: removed
+  selector:
+    type: section
+    matches: 'Scenario: Rows sorted by discard date descending'
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Output format — text'
+  content: |
+    #### Scenario: Reason and superseded-by hidden without include flags
+
+    - **GIVEN** a discarded change with reason `"duplicate effort"` and supersededBy `['new-approach']`
+    - **WHEN** `specd discarded list` is run without `--reason` or `--superseded-by`
+    - **THEN** stdout does not include the reason text or `→ new-approach`
+
+    #### Scenario: Truncation hint when results are partial
+
+    - **GIVEN** 125 discarded changes and default pagination
+    - **WHEN** `specd discarded list` is run
+    - **THEN** stdout contains `showing 100 of 125 (use --limit/--page)`
+
+    #### Scenario: CLI preserves use-case row order
+
+    - **GIVEN** `ListDiscarded.execute` returns entries ordered by `discardedAt` descending
+    - **WHEN** `specd discarded list` is run
+    - **THEN** stdout rows appear in the same order as the returned `items`
+
+- op: modified
+  description: JSON paginated envelope without include flags
+  selector:
+    type: section
+    matches: '^Scenario: JSON format output$'
+  content: |
+    - **GIVEN** `discarded/` contains one change named `old-experiment` discarded at `2024-01-10T09:00:00.000Z`, actor `alice`, reason `"no longer needed"`, no supersededBy
+    - **WHEN** `specd discarded list --format json` is run
+    - **THEN** stdout is valid JSON with `items` and `meta`
+    - **AND** the object for `old-experiment` contains `name`, `discardedAt`, and `discardedBy`
+    - **AND** the object does not contain `reason`, `description`, or `supersededBy`
+    - **AND** the process exits with code 0
+
+- op: modified
+  description: supersededBy included only with --superseded-by when non-empty
+  selector:
+    type: section
+    matches: '^Scenario: JSON format output — supersededBy present$'
+  content: |
+    - **GIVEN** `discarded/` contains one change named `bad-idea` with `supersededBy` set to `['new-approach']`
+    - **WHEN** `specd discarded list --format json --superseded-by` is run
+    - **THEN** the JSON object for `bad-idea` contains a `supersededBy` array with `"new-approach"`
+    - **AND** the process exits with code 0
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: Requirements
+    after:
+      type: section
+      matches: 'Requirement: Uses ListDiscarded read model'
+  content: |
+    ### Requirement: List options forwarding
+
+    #### Scenario: Include flags forwarded only when set
+
+    - **WHEN** `specd discarded list --description --reason --superseded-by --format json` is run
+    - **THEN** `ListDiscarded.execute` is called with `includeDescription: true`, `includeReason: true`, and `includeSupersededBy: true`
+
+    #### Scenario: CLI does not re-sort after the use case returns
+
+    - **GIVEN** `ListDiscarded.execute` returns items in repository canonical order
+    - **WHEN** `specd discarded list --format json` is run
+    - **THEN** stdout `items` appear in the same order as returned by the use case
+
+- op: modified
+  description: Empty JSON uses paginated envelope
+  selector:
+    type: section
+    matches: 'Scenario: No discarded changes — JSON'
+  content: |
+    - **GIVEN** `discarded/` is empty
+    - **WHEN** `specd discarded list --format json` is run
+    - **THEN** stdout is `{"items":[],"meta":{"total":0,"count":0,"limit":100}}`
+    - **AND** the process exits with code 0

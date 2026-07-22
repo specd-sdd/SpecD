@@ -18,8 +18,9 @@ import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
 import {
   ArchiveRepository,
   type ArchiveListOptions,
-  type ArchiveListResult,
 } from '../../../src/application/ports/archive-repository.js'
+import { type ListResult } from '../../../src/application/ports/repository.js'
+import { type ArchiveListEntry } from '../../../src/domain/archived-change-index-entry.js'
 import { SpecPublicationError } from '../../../src/domain/errors/spec-publication-error.js'
 import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
 import { ArtifactFile } from '../../../src/domain/value-objects/artifact-file.js'
@@ -83,7 +84,7 @@ class StubArchiveRepository extends ArchiveRepository {
     return { archivedChange, archiveDirPath: `/archive/${archivedName}` }
   }
 
-  override async list(options?: ArchiveListOptions): Promise<ArchiveListResult> {
+  override async list(options?: ArchiveListOptions): Promise<ListResult<ArchiveListEntry>> {
     return {
       items: [],
       meta: {
@@ -92,6 +93,10 @@ class StubArchiveRepository extends ArchiveRepository {
         limit: options?.limit ?? 100,
       },
     }
+  }
+
+  override async count(): Promise<number> {
+    return 0
   }
 
   override async get(): Promise<ArchivedChange | null> {

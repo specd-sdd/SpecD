@@ -14,6 +14,17 @@
 - **WHEN** `specd spec list --format json` is run
 - **THEN** it behaves as an alias of `specd specs list --format json`
 
+#### Scenario: Default limit is 100 per workspace query
+
+- **GIVEN** workspace `default` contains more than 100 specs
+- **WHEN** `specd spec list --workspace default --format json` is run without `--limit`
+- **THEN** `workspaces[0].meta.limit` is 100
+
+#### Scenario: --page and --after-key are mutually exclusive
+
+- **WHEN** `specd spec list --page 2 --after-key default:auth/login` is run
+- **THEN** the command exits with a CLI usage error before invoking the use case
+
 ### Requirement: Workspace filtering
 
 #### Scenario: Workspaces grouped using orchestrated list
@@ -28,6 +39,30 @@
 - **WHEN** `specd spec list --workspace default` is run
 - **THEN** only workspace `default` group is rendered
 - **AND** workspace `billing` does not appear
+
+### Requirement: List options forwarding
+
+#### Scenario: Pagination flags forwarded to ListSpecs
+
+- **WHEN** `specd spec list --limit 25 --page 2 --format json` is run
+- **THEN** `ListSpecs.execute` is called with `limit` 25 and `page` 2
+
+#### Scenario: Keyset cursor uses path only
+
+- **WHEN** `specd spec list --after-key default:auth/login --format json` is run
+- **THEN** `ListSpecs.execute` is called with `after.key` equal to `default:auth/login`
+- **AND** no `after.id` field is set
+
+#### Scenario: Include flags forwarded only when present
+
+- **WHEN** `specd spec list --summary --metadata-status --format json` is run
+- **THEN** `ListSpecs.execute` is called with `includeSummary: true` and `includeMetadataStatus: true`
+
+#### Scenario: CLI does not re-sort or paginate after the use case returns
+
+- **GIVEN** `ListSpecs.execute` returns specs in capability path ascending order for a workspace
+- **WHEN** `specd spec list --workspace default` is run
+- **THEN** stdout rows appear in the same order as returned by the use case
 
 ### Requirement: Title resolution
 
@@ -148,17 +183,13 @@
 - **THEN** stdout shows `default` followed by rows containing `default:auth/login  Login` and `default:auth/register  Register`
 - **AND** the process exits with code 0
 
-#### Scenario: Specs in lexicographic order within workspace
-
-- **GIVEN** the `default` workspace contains specs `z/spec`, `a/spec`, and `m/spec`
-- **WHEN** `specd spec list` is run
-- **THEN** the specs are listed in alphabetical order: `default:a/spec`, `default:m/spec`, `default:z/spec`
-
 #### Scenario: JSON output without --summary
 
 - **GIVEN** workspace `default` has spec `auth/login` with title `Login`
 - **WHEN** `specd spec list --format json` is run
-- **THEN** stdout is valid JSON with `workspaces[0].specs[0]` having `path` equal to `"default:auth/login"` and `title` but no `summary` key
+- **THEN** stdout is valid JSON with `workspaces[0].specs[0]` having `path` equal to `"default:auth/login"` and `title`
+- **AND** `workspaces[0].meta` contains `total`, `count`, `limit`, and `page`
+- **AND** `workspaces[0].specs[0]` has no `summary` key
 
 #### Scenario: JSON output with --summary and available summary
 
@@ -171,6 +202,18 @@
 - **GIVEN** workspace `default` has spec `auth/register` with no extractable summary
 - **WHEN** `specd spec list --summary --format json` is run
 - **THEN** the entry for `default:auth/register` has `path` and `title` but no `summary` key
+
+#### Scenario: Truncation hint per workspace group when partial
+
+- **GIVEN** workspace `default` has 125 specs and default pagination
+- **WHEN** `specd spec list --workspace default` is run
+- **THEN** stdout contains `showing 100 of 125 (use --limit/--page)` after the `default` group table
+
+#### Scenario: CLI preserves repository order within workspace
+
+- **GIVEN** `ListSpecs.execute` returns `default:a/spec` before `default:m/spec`
+- **WHEN** `specd spec list --workspace default` is run
+- **THEN** `default:a/spec` appears before `default:m/spec` in stdout
 
 ### Requirement: Empty output
 

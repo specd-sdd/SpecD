@@ -46,6 +46,8 @@ After resolving the schema, `GetArtifactInstruction` MUST compare `schema.name()
 
 ### Requirement: Instruction resolution
 
+`GetArtifactInstruction` MUST build contextual `TemplateVariables` for expansion from only `change.name` and `change.path` (via `ChangeRepository.changePath()`). It MUST NOT build a `change.workspace` variable or inject any singular/primary workspace value (for example via `change.workspaces[0] ?? 'default'`) into the `change` namespace — per [`core:template-variables`](../template-variables/spec.md), `change.workspace` is not a supported token, and a change has no single primary workspace.
+
 `GetArtifactInstruction` MUST resolve each instruction component independently:
 
 - **`rulesPre`** — if the artifact declares `rules.pre`, collect all entries' `text` in declaration order. These are composition rules added by extending schemas or plugins to augment the base instruction.

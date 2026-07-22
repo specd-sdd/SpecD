@@ -4,26 +4,27 @@
 
 ### Requirement: Index entry fields
 
-#### Scenario: Index entry contains required fields
+#### Scenario: ArchiveListEntry contains required fields
 
-- **GIVEN** an archive index entry loaded from `index.jsonl`
-- **WHEN** it is represented as an `ArchivedChangeIndexEntry`
+- **GIVEN** an archive list entry loaded from the fs-cache index
+- **WHEN** it is represented as an `ArchiveListEntry`
 - **THEN** it contains `name`, `archivedName`, `archivedAt`, `specIds`, `schemaName`, and `schemaVersion`
-- **AND** it may contain `archivedBy` when recorded
-- **AND** it contains `artifacts` as an array of artifact type IDs
+- **AND** it does not contain `artifacts`
+- **AND** it does not contain `workspaces`
+
+#### Scenario: archivedBy appears only when includeArchivedBy is set
+
+- **GIVEN** an archive list entry whose cached payload includes `archivedBy`
+- **WHEN** the entry is projected with `includeArchivedBy: true`
+- **THEN** `archivedBy` may appear on the returned entry
+- **WHEN** the entry is projected without `includeArchivedBy`
+- **THEN** `archivedBy` is not present on the returned entry
 
 ### Requirement: No manifest-only data
 
-#### Scenario: Index entry is sufficient for listing without manifest reads
+#### Scenario: ArchiveListEntry is sufficient for listing without manifest reads
 
-- **GIVEN** an archive with many entries
-- **WHEN** an archive listing is produced from `ArchivedChangeIndexEntry` values
+- **GIVEN** an archive with many indexed entries
+- **WHEN** an archive listing is produced from `ArchiveListEntry` values
 - **THEN** the listing does not require loading `manifest.json` for every entry
-
-### Requirement: Derived workspaces
-
-#### Scenario: Workspaces are derived from specIds
-
-- **GIVEN** an `ArchivedChangeIndexEntry` with `specIds` containing `core:change` and `cli:archive-show`
-- **WHEN** `workspaces` is derived
-- **THEN** it contains `core` and `cli`
+- **AND** artifact inventories are not present on list rows

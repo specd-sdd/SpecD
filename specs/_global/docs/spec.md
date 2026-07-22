@@ -186,6 +186,22 @@ When composition factories change their public contract shape, the documentation
 - the role split between standalone factories, `createKernel(...)`, and `createKernelBuilder()`
 - the shared `CompositionResolver` path used for config-based bootstrap
 
+### Requirement: Documentation stays aligned with removed/renamed template variables and list/summary contracts
+
+When a change removes or renames a public template variable token (for example `{{change.workspace}}`), or changes the shape of a listing/summary use case's inputs, outputs, or dependency-resolution contract, that change MUST update every in-repo doc under `docs/` that documents the old token or shape, in the same change — not as separate follow-up work.
+
+This includes, when applicable to the change:
+
+- `docs/config/config-reference.md` — archive pattern variable tables and other config examples
+- `docs/guide/workspaces.md` — workspace/template variable guidance
+- `docs/guide/workflow.md` — hook and template variable examples
+- `docs/guide/schemas.md` and `docs/schemas/schema-format.md` — schema-authoring examples that reference template variables
+- `docs/adr/0013-workspaces-not-scopes.md` — ADR prose that mandates or illustrates the removed/renamed token
+- `docs/core/use-cases.md` — constructor signatures, return shapes, and ordering claims for use cases whose public contract changed
+- `docs/cli/cli-reference.md` — CLI flag tables and examples for commands whose output contract changed
+
+A doc file not listed above but found to document the same stale token or shape is equally in scope — this list is illustrative, not exhaustive.
+
 ## Constraints
 
 - All documentation files use Markdown
@@ -198,6 +214,7 @@ When composition factories change their public contract shape, the documentation
 - A spec's `## ADRs` section lists only the ADRs that _produced_ that spec — they are historical provenance, not dependencies
 - A spec may only depend on other specs (`## Spec Dependencies`), never on ADRs directly
 - If an ADR's decision needs to be enforced as a constraint, it must first be captured in a spec; that spec is then what other specs depend on
+- Removing or renaming a template variable token, or changing a listing/summary use case's public contract, is a documentation-affecting change under `docs/config/`, `docs/guide/`, `docs/schemas/`, `docs/adr/`, `docs/core/`, and `docs/cli/` as applicable — not just under `docs/core/`
 
 ## Spec Dependencies
 

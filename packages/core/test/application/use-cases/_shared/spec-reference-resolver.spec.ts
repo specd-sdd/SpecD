@@ -35,9 +35,11 @@ class FakeSpecRepository extends SpecRepository {
     return new Spec(this.workspace(), SpecPath.parse(key), [])
   }
 
-  override async list(_prefix?: SpecPath): Promise<Spec[]> {
-    return []
+  override async list(_prefix?: SpecPath) {
+    return { items: [], meta: { total: 0, count: 0, limit: 100 } }
   }
+
+  override async reindex(): Promise<void> {}
 
   override async count(): Promise<number> {
     return this._knownSpecs.size

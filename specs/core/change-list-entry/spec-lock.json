@@ -1,0 +1,18 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["core:change", "core:repository-port"],
+  "implementation": [
+    {
+      "file": "core:src/domain/change-list-entry.ts",
+      "symbols": [
+        "ChangeListEntryBase",
+        "ActiveChangeListEntry",
+        "DraftedChangeListEntry",
+        "DiscardedChangeListEntry"
+      ]
+    }
+  ]
+}

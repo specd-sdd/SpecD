@@ -55,6 +55,14 @@
 - **THEN** `delta.availableOutlines` does not include `"default:new/spec"`
 - **AND** no error or warning is produced
 
+#### Scenario: Contextual variables built for expansion have no workspace key
+
+- **GIVEN** a change touching multiple workspaces via `specIds`
+- **AND** an artifact with a `template` path
+- **WHEN** `GetArtifactInstruction.execute` builds `TemplateVariables` for template/instruction expansion
+- **THEN** the `change` namespace contains only `name` and `path`
+- **AND** it is not populated with `change.workspaces[0] ?? 'default'` or any other singular-workspace derivation
+
 ### Requirement: Result shape
 
 #### Scenario: Rules-only artifact has null instruction

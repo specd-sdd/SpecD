@@ -13,54 +13,73 @@
 
 ### Requirement: Orchestrates existing list use cases
 
-#### Scenario: Active count matches ListChanges length
+#### Scenario: Active count uses ChangeRepository.count()
 
-- **GIVEN** `ListChanges.execute()` returns three active changes
+- **GIVEN** `ChangeRepository.count()` returns `3`
 - **WHEN** `GetProjectSummary.execute()` is called
 - **THEN** `activeCount` is `3`
+- **AND** `ListChanges.execute()` is not invoked solely to measure length
 
-#### Scenario: Draft count matches ListDrafts length
+#### Scenario: Draft count uses ChangeRepository.countDrafts()
 
-- **GIVEN** `ListDrafts.execute()` returns two drafts
+- **GIVEN** `ChangeRepository.countDrafts()` returns `2`
 - **WHEN** `GetProjectSummary.execute()` is called
 - **THEN** `draftCount` is `2`
 
-#### Scenario: Discarded count matches ListDiscarded length
+#### Scenario: Discarded count uses ChangeRepository.countDiscarded()
 
-- **GIVEN** `ListDiscarded.execute()` returns one discarded change
+- **GIVEN** `ChangeRepository.countDiscarded()` returns `1`
 - **WHEN** `GetProjectSummary.execute()` is called
 - **THEN** `discardedCount` is `1`
 
-#### Scenario: Archived count uses ArchiveListResult meta total
+#### Scenario: Archived count uses meta.total not items.length
 
-- **GIVEN** `ListArchived.execute()` returns `{ items: [...], meta: { total: 5, count: 5, limit: 100 } }`
+- **GIVEN** `ListArchived.execute()` or `ArchiveRepository.count()` yields `{ items: [...], meta: { total: 5, count: 1, limit: 1 } }`
 - **WHEN** `GetProjectSummary.execute()` is called
 - **THEN** `archivedCount` is `5`
-- **AND** `archivedCount` is not derived from `items.length` when pagination limits returned items
+- **AND** `archivedCount` is not derived from `items.length`
 
 ### Requirement: Orchestrates workspace spec counting
 
-#### Scenario: Spec counts keyed by workspace name
+#### Scenario: Spec counts keyed by workspace name from count()
 
-- **GIVEN** `ListWorkspaces.execute()` returns workspaces `default` (3 specs) and `core` (10 specs)
+- **GIVEN** `ListWorkspaces.execute()` returns workspaces `default` and `core`
+- **AND** their `SpecRepository.count()` results are `3` and `10`
 - **WHEN** `GetProjectSummary.execute()` is called
 - **THEN** `specsByWorkspace` is `{ default: 3, core: 10 }`
 - **AND** `workspaceCount` is `2`
+- **AND** `ListSpecs.execute()` is not invoked solely to count specs
+
+#### Scenario: Workspace count matches ListWorkspaces length
+
+- **GIVEN** `ListWorkspaces.execute()` returns three configured workspaces
+- **WHEN** `GetProjectSummary.execute()` is called
+- **THEN** `workspaceCount` is `3`
 
 ### Requirement: Parallelizes independent queries
 
-#### Scenario: Independent list operations run concurrently
+#### Scenario: Independent count operations run concurrently
 
 - **WHEN** `GetProjectSummary.execute()` runs
-- **THEN** list use case calls and per-workspace `count()` operations are not serialized behind unrelated awaits
+- **THEN** change-bucket `count()` calls and per-workspace spec `count()` operations are not serialized behind unrelated awaits
+
+#### Scenario: Summary does not materialize list entries during counting
+
+- **WHEN** `GetProjectSummary.execute()` runs
+- **THEN** it does not invoke list use cases solely to measure returned array lengths
 
 ### Requirement: Constructor accepts orchestration dependencies
 
-#### Scenario: Constructor requires injected list use cases
+#### Scenario: Constructor requires count-capable dependencies
 
 - **WHEN** `GetProjectSummary` is instantiated
-- **THEN** it requires `ListChanges`, `ListDrafts`, `ListDiscarded`, `ListArchived`, and `ListWorkspaces` as constructor dependencies
+- **THEN** it receives dependencies sufficient to call `ChangeRepository.count()`, `countDrafts()`, `countDiscarded()`, archive `count()` or `ListArchived` for `meta.total`, and `ListWorkspaces` for per-workspace `SpecRepository.count()`
 - **AND** it does not construct repositories or read configuration directly
+
+#### Scenario: Constructor does not require list use cases for counting
+
+- **WHEN** `GetProjectSummary` is instantiated for count-only summary assembly
+- **THEN** it is wired to repository count surfaces rather than `ListChanges.execute()` / `ListDrafts.execute()` / `ListDiscarded.execute()` / `ListSpecs.execute()` for measurement
 
 ### Requirement: Factory wires from SpecdConfig
 

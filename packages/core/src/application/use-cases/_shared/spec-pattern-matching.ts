@@ -94,16 +94,16 @@ async function listByPattern(
   warnings: ContextWarning[],
 ): Promise<string[]> {
   if (pathPat === '*') {
-    const specs = await repo.list()
-    return specs.map((s) => s.name.toString())
+    const listed = await repo.list(undefined, { limit: Number.MAX_SAFE_INTEGER })
+    return listed.items.map((s) => s.path)
   }
 
   if (pathPat.endsWith('/*')) {
     const prefix = pathPat.slice(0, -2)
     try {
       const prefixPath = SpecPath.parse(prefix)
-      const specs = await repo.list(prefixPath)
-      return specs.map((s) => s.name.toString())
+      const listed = await repo.list(prefixPath, { limit: Number.MAX_SAFE_INTEGER })
+      return listed.items.map((s) => s.path)
     } catch {
       warnings.push({
         type: 'missing-spec',

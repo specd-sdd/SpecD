@@ -171,12 +171,11 @@ Steps can have `pre` and `post` hooks. Hooks are either instructions injected in
 
 Shell hooks support template variables:
 
-| Variable               | Value                                                  |
-| ---------------------- | ------------------------------------------------------ |
-| `{{change.name}}`      | The change's slug name                                 |
-| `{{change.workspace}}` | The primary workspace of the change                    |
-| `{{change.path}}`      | Absolute path to the change directory                  |
-| `{{project.root}}`     | Absolute path to the directory containing `specd.yaml` |
+| Variable           | Value                                                  |
+| ------------------ | ------------------------------------------------------ |
+| `{{change.name}}`  | The change's slug name                                 |
+| `{{change.path}}`  | Absolute path to the change directory                  |
+| `{{project.root}}` | Absolute path to the directory containing `specd.yaml` |
 
 ## Customising your schema
 

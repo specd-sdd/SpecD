@@ -1,0 +1,15 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "core:hook-runner-port",
+    "core:hook-execution-model",
+    "core:get-hook-instructions",
+    "core:get-artifact-instruction",
+    "core:run-step-hooks",
+    "core:archive-change"
+  ],
+  "implementation": []
+}

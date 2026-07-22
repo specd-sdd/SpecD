@@ -129,6 +129,13 @@
 - **THEN** `ChangeNotFoundError` is thrown immediately
 - **AND** `ArchiveRepository.get()` is not called
 
+#### Scenario: No workspace value is read or injected on either lookup path
+
+- **GIVEN** either the active-change lookup or the archive-fallback lookup resolves a change
+- **WHEN** `GetHookInstructions.execute` builds `TemplateVariables` for `TemplateExpander.expand()`
+- **THEN** the resulting `change` namespace has no `workspace` key
+- **AND** it is not derived via `change.workspaces[0] ?? 'default'` or `specIds[0]?.split(':')[0]`
+
 ### Requirement: Config-based factory delegates through resolveGetHookInstructionsDeps
 
 #### Scenario: createGetHookInstructions config form derives GetHookInstructionsDeps through resolveGetHookInstructionsDeps

@@ -1,0 +1,43 @@
+- op: added
+  description: Require in-repo docs to stay aligned when template variables or list/summary contracts change.
+  position:
+    parent:
+      type: section
+      matches: Requirements
+    after:
+      type: section
+      matches: 'Requirement: Public composition-surface documentation stays aligned'
+  content: |
+    ### Requirement: Documentation stays aligned with removed/renamed template variables and list/summary contracts
+
+    When a change removes or renames a public template variable token (for example `{{change.workspace}}`), or changes the shape of a listing/summary use case's inputs, outputs, or dependency-resolution contract, that change MUST update every in-repo doc under `docs/` that documents the old token or shape, in the same change — not as separate follow-up work.
+
+    This includes, when applicable to the change:
+
+    - `docs/config/config-reference.md` — archive pattern variable tables and other config examples
+    - `docs/guide/workspaces.md` — workspace/template variable guidance
+    - `docs/guide/workflow.md` — hook and template variable examples
+    - `docs/guide/schemas.md` and `docs/schemas/schema-format.md` — schema-authoring examples that reference template variables
+    - `docs/adr/0013-workspaces-not-scopes.md` — ADR prose that mandates or illustrates the removed/renamed token
+    - `docs/core/use-cases.md` — constructor signatures, return shapes, and ordering claims for use cases whose public contract changed
+    - `docs/cli/cli-reference.md` — CLI flag tables and examples for commands whose output contract changed
+
+    A doc file not listed above but found to document the same stale token or shape is equally in scope — this list is illustrative, not exhaustive.
+
+- op: modified
+  description: Reinforce composition-surface doc alignment includes CLI/ADR/guide areas for removed template tokens.
+  selector:
+    type: section
+    matches: Constraints
+  content: |
+    - All documentation files use Markdown
+    - ADR filenames must match the pattern `NNNN-kebab-case-title.md`
+    - ADR numbers are sequential and never reused
+    - Every significant architectural decision must have an ADR
+    - Every ADR must include a `### Spec` sub-section inside `## More Information` linking to the spec(s) that capture its constraints
+    - Specs that have associated ADRs include a `## ADRs` section linking to them — omitted if none exist
+    - No documentation outside `docs/` except `README.md`, `AGENTS.md`, `CLAUDE.md`
+    - A spec's `## ADRs` section lists only the ADRs that _produced_ that spec — they are historical provenance, not dependencies
+    - A spec may only depend on other specs (`## Spec Dependencies`), never on ADRs directly
+    - If an ADR's decision needs to be enforced as a constraint, it must first be captured in a spec; that spec is then what other specs depend on
+    - Removing or renaming a template variable token, or changing a listing/summary use case's public contract, is a documentation-affecting change under `docs/config/`, `docs/guide/`, `docs/schemas/`, `docs/adr/`, `docs/core/`, and `docs/cli/` as applicable — not just under `docs/core/`

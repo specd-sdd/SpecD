@@ -6,8 +6,10 @@ import { GetProjectSummary } from '../../../src/application/use-cases/get-projec
 import { InvalidCompositionFactoryArgumentsError } from '../../../src/domain/errors/invalid-composition-factory-arguments-error.js'
 import {
   createGetProjectSummary,
+  resolveGetProjectSummaryDeps,
   type GetProjectSummaryDeps,
 } from '../../../src/composition/use-cases/get-project-summary.js'
+import { createCompositionResolver } from '../../../src/composition/composition-resolver.js'
 import { type SpecdConfig } from '../../../src/application/specd-config.js'
 
 let tmpDir: string | undefined
@@ -96,16 +98,16 @@ describe('createGetProjectSummary', () => {
   })
 
   it('accepts explicit deps without config bootstrap', () => {
-    const listChanges = { execute: async () => [] } as never
-    const listDrafts = { execute: async () => [] } as never
-    const listDiscarded = { execute: async () => [] } as never
-    const listArchived = { execute: async () => ({ meta: { total: 0 } }) } as never
+    const changes = {
+      count: async () => 0,
+      countDrafts: async () => 0,
+      countDiscarded: async () => 0,
+    } as never
+    const archive = { count: async () => 0 } as never
     const listWorkspaces = { execute: async () => [] } as never
     const deps: GetProjectSummaryDeps = {
-      listChanges,
-      listDrafts,
-      listDiscarded,
-      listArchived,
+      changes,
+      archive,
       listWorkspaces,
     }
 
@@ -113,21 +115,29 @@ describe('createGetProjectSummary', () => {
   })
 
   it('rejects deps plus composition options', () => {
-    const listChanges = { execute: async () => [] } as never
-    const listDrafts = { execute: async () => [] } as never
-    const listDiscarded = { execute: async () => [] } as never
-    const listArchived = { execute: async () => ({ meta: { total: 0 } }) } as never
+    const changes = {
+      count: async () => 0,
+      countDrafts: async () => 0,
+      countDiscarded: async () => 0,
+    } as never
+    const archive = { count: async () => 0 } as never
     const listWorkspaces = { execute: async () => [] } as never
     const deps: GetProjectSummaryDeps = {
-      listChanges,
-      listDrafts,
-      listDiscarded,
-      listArchived,
+      changes,
+      archive,
       listWorkspaces,
     }
 
     expect(() =>
       createGetProjectSummary(deps as unknown as SpecdConfig, { extraNodeModulesPaths: [] }),
     ).toThrow(InvalidCompositionFactoryArgumentsError)
+  })
+
+  it('resolveGetProjectSummaryDeps returns only count-capable deps', async () => {
+    const config = await makeConfig()
+    const resolver = createCompositionResolver(config)
+    const deps = resolveGetProjectSummaryDeps(resolver)
+
+    expect(Object.keys(deps).sort()).toEqual(['archive', 'changes', 'listWorkspaces'])
   })
 })

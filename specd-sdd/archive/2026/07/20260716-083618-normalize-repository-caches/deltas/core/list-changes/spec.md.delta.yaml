@@ -1,0 +1,51 @@
+- op: modified
+  description: Return paginated ActiveChangeListEntry rows, not full Change aggregates.
+  selector:
+    type: section
+    matches: 'Requirement: Returns all active changes'
+  content: |
+    `ListChanges.execute(options?)` MUST return `ListResult<ActiveChangeListEntry>` for all active (non-drafted, non-discarded) changes.
+
+    It MUST forward `ListOptions` and `includeDescription` to `ChangeRepository.list()` without re-sorting, re-filtering, or re-paginating. Canonical order (`createdAt` ascending) is owned by the repository index helper.
+
+    Default `limit` is **100** when callers omit options.
+
+- op: modified
+  description: List entries are lightweight rows without artifact content or history.
+  selector:
+    type: section
+    matches: 'Requirement: Returns Change entities without content'
+  content: |
+    The returned `ActiveChangeListEntry` items MUST NOT include artifact file content, history, validated hashes, artifact state maps, or other detail fields reserved for `get(name)`.
+
+    Optional `description` appears only when `includeDescription` is set on the forwarded options and the repository projected it from the cached entry.
+
+- op: modified
+  description: Empty result is a zero-item ListResult envelope.
+  selector:
+    type: section
+    matches: 'Requirement: Returns an empty array when no active changes exist'
+  content: |
+    When the repository contains no active changes, `execute()` MUST return `{ items: [], meta: { total: 0, count: 0, limit: <resolved limit> } }`. It MUST NOT throw.
+
+- op: modified
+  description: Delegate list options to ChangeRepository.list without re-sorting.
+  selector:
+    type: section
+    matches: 'Requirement: Constructor accepts a ChangeRepository'
+  content: |
+    `ListChanges` MUST accept a `ChangeRepository` as its sole constructor argument. It MUST delegate to `ChangeRepository.list(options)` and return the resulting `ListResult<ActiveChangeListEntry>` unchanged.
+
+    The use case MUST NOT re-sort, filter, or paginate after the repository returns.
+
+- op: modified
+  description: Add change-list-entry dependency.
+  selector:
+    type: section
+    matches: Spec Dependencies
+  content: |
+    - [`core:change`](../change/spec.md)
+    - [`core:change-list-entry`](../change-list-entry/spec.md) — `ActiveChangeListEntry` row shape
+    - [`core:change-repository-port`](../change-repository-port/spec.md) — paginated list/count contract
+    - [`core:kernel`](../kernel/spec.md)
+    - [`core:composition-resolver`](../composition-resolver/spec.md)

@@ -14,7 +14,12 @@
   ],
   "implementation": [
     {
-      "file": "core:src/composition/use-cases/get-project-summary.ts"
+      "file": "core:src/application/use-cases/get-project-summary.ts",
+      "symbols": ["GetProjectSummary"]
+    },
+    {
+      "file": "core:src/composition/use-cases/get-project-summary.ts",
+      "symbols": ["resolveGetProjectSummaryDeps"]
     }
   ]
 }

@@ -38,7 +38,12 @@ export { Logger } from '@specd/core'
 export { TemplateExpander } from '@specd/core'
 export type { SchemaRawResult } from '@specd/core'
 export type { LogDestination, LogEntry, LogFormat, LogLevel, LoggerPort } from '@specd/core'
-export type { ChangeRepository, SpecRepository, SchemaRegistry } from '@specd/core'
+export type {
+  ChangeRepository,
+  SpecRepository,
+  SchemaRegistry,
+  ArchiveRepository,
+} from '@specd/core'
 
 // Use-case types and helpers
 export {
@@ -56,6 +61,8 @@ export {
   type UpdateSpecDepsInput,
   type UpdateSpecDepsResult,
   type ListSpecs,
+  type ListSpecsResult,
+  type ListSpecsWorkspaceSlice,
   type SpecListEntry,
   type SpecMetadataStatus,
   type SearchSpecs,
@@ -445,7 +452,18 @@ export {
   toDiscardedChangeView,
   toArchivedChangeView,
 } from '@specd/core'
-export { type ArchivedChangeIndexEntry, workspacesFromSpecIds } from '@specd/core'
+export {
+  type ArchiveListEntry,
+  type ArchivedChangeIndexEntry,
+  workspacesFromSpecIds,
+} from '@specd/core'
+export {
+  type ActiveChangeListEntry,
+  type DraftedChangeListEntry,
+  type DiscardedChangeListEntry,
+  type ChangeListEntryBase,
+} from '@specd/core'
+export { type ListMeta, type ListResult, type ListOptions, type ListCursor } from '@specd/core'
 
 // Domain services
 export { applyPreHashCleanup } from '@specd/core'

@@ -1,0 +1,141 @@
+- op: modified
+  description: Archive list uses shared pagination and canonical newest-first sort.
+  selector:
+    type: section
+    matches: 'Requirement: list returns all archived changes in chronological order'
+  content: |
+    `list(options?)` MUST return archived changes in this workspace sorted by canonical order: `archivedAt` descending (newest → oldest).
+
+    `ArchiveListOptions` extends `ListOptions` with:
+
+    - `includeArchivedBy?: boolean` — when `true`, projected entries MAY include `archivedBy`; when `false` or omitted, `archivedBy` MUST NOT appear
+
+    Pagination uses shared `ListOptions` / `ListResult` from [`core:repository-port`](../repository-port/spec.md). The former `startAt` cursor is replaced by `after: { key, id? }` where `after.key` is `archivedAt` ISO-8601 and `after.id` is the change `name` tiebreak.
+
+    Default `limit` is **100** when omitted.
+
+- op: modified
+  description: List returns ArchiveListEntry inside ListResult envelope.
+  selector:
+    type: section
+    matches: 'Requirement: list returns index entries'
+  content: |
+    `list(options?)` MUST return `ListResult<ArchiveListEntry>`:
+
+    ```typescript
+    interface ArchiveListResult {
+      items: ArchiveListEntry[]
+      meta: ListMeta
+    }
+    ```
+
+    The implementation MUST satisfy this requirement without reading `manifest.json` for every entry. `includeArchivedBy` controls projection of `archivedBy` only; implementations MUST NOT perform extra reads to satisfy the flag.
+
+    `meta.total` and `count()` MUST read from the same index source.
+
+- op: added
+  description: Expose archive list count aligned with meta.total.
+  position:
+    parent:
+      type: section
+      matches: Requirements
+    after:
+      type: section
+      matches: 'Requirement: list returns index entries'
+  content: |
+    ### Requirement: Archive list count
+
+    `ArchiveRepository` MUST expose `count()` returning the total number of archived changes in this workspace. The value MUST match `list().meta.total` and MUST be served from the same fs-cache index source. `count()` MUST NOT scan every archive manifest.
+
+- op: modified
+  description: archivePath accepts ArchiveListEntry as well as ArchivedChange.
+  selector:
+    type: section
+    matches: 'Requirement: archivePath returns the absolute path for an archived change'
+  content: |
+    `archivePath(entry)` MUST accept either a full `ArchivedChange` or an `ArchiveListEntry` and return the absolute filesystem path to the archived directory. The accepted parameter type MUST NOT require a `workspaces` field on the entry — `ArchiveListEntry` has no `workspaces` field (see [`core:archived-change-index-entry`](../archived-change-index-entry/spec.md)), so `archivePath` MUST be resolvable from `name`, `archivedName`, and `archivedAt` alone.
+
+    This mirrors `ChangeRepository.changePath(change)` for active changes. The path MUST be resolved from the archive pattern and root directory configured at construction time — the caller does not need to know the archive directory structure.
+
+    Archive patterns MUST NOT support a `{{change.workspace}}` token: a change has no single primary workspace, and `archivePath` MUST NOT derive or require one from `workspaces[0]` or `specIds[0]`. See [`core:storage`](../storage/spec.md) for the normative supported-variable catalog.
+
+    This method is used by `RunStepHooks` and `GetHookInstructions` to build the `change.path` template variable when operating on archived changes.
+
+- op: modified
+  description: Reindex rebuilds fs-cache archive index, not archive-root index files.
+  selector:
+    type: section
+    matches: 'Requirement: reindex rebuilds the archive index'
+  content: |
+    `reindex()` MUST rebuild the archive list index under `{configPath}/tmp/fs-cache/archive/` by scanning archive directories for manifest files, projecting `ArchiveListEntry` rows, sorting by `archivedAt` descending, and writing a clean fs-cache index via atomic publish.
+
+    On first rebuild or migration, implementations MUST delete legacy `.specd-index.jsonl` and `.specd-index-meta.json` from the archive root if present (ignore ENOENT). Normal `list` / `count` cache hits MUST NOT scan or delete root-local legacy files.
+
+    Implementations MUST NOT write or maintain a root-local archive list index as part of normal list/count operation.
+
+- op: modified
+  description: Index metadata lives in fs-cache; count alignment with list meta.total.
+  selector:
+    type: section
+    matches: 'Requirement: Archive index metadata persistence'
+  content: |
+    Filesystem implementations MUST maintain `.specd-index-meta.json` alongside `.specd-index.jsonl` under `{configPath}/tmp/fs-cache/archive/`.
+
+    - The meta file MUST contain `totalCount`, `generatedAt`, and `isInvalidated` per the shared fs-cache index helper contract.
+    - `archive()` MUST upsert the archive list entry and update `totalCount` through the helper.
+    - `reindex()` MUST recalculate `totalCount` and refresh the meta file.
+    - `list()` and `count()` MUST use this meta file (after freshness checks) for `meta.total` and `count()` respectively.
+
+    Root-local archive index metadata files are obsolete and MUST NOT be updated after migration.
+
+- op: modified
+  description: Runtime ignore rules no longer cover root-local list index files.
+  selector:
+    type: section
+    matches: 'Requirement: fs implementation maintains archive runtime ignore rules'
+  content: |
+    When the filesystem implementation creates or maintains runtime archive artifacts, it MUST maintain archive-local ignore rules for staging artifacts.
+
+    `FsArchiveRepository` MUST ensure that the archive root `.gitignore` contains an entry for `.staging`.
+
+    List index files live under `{configPath}/tmp/fs-cache/archive/` and are governed by `{configPath}/tmp/.gitignore`, not the archive root `.gitignore`. On rebuild/migration, obsolete root-local `.specd-index.jsonl` / `.specd-index-meta.json` gitignore entries MAY be removed while keeping `.staging`.
+
+    This guarantee MUST be provided by runtime archive behavior, not only by project initialization.
+
+- op: modified
+  description: Declare count and shared list types on abstract port.
+  selector:
+    type: section
+    matches: 'Requirement: Abstract class with abstract methods'
+  content: |
+    `ArchiveRepository` MUST be defined as an `abstract class`, not an `interface`. All storage operations (`archive`, `list`, `count`, `get`, `reindex`) MUST be declared as `abstract` methods. This follows the architecture spec requirement that ports with shared construction are abstract classes.
+
+- op: modified
+  description: Archive list index lives in fs-cache; sort newest-first.
+  selector:
+    type: section
+    matches: Constraints
+  content: |
+    - The archive is append-only — archived changes are never modified after creation
+    - Archive list indexes live under `{configPath}/tmp/fs-cache/archive/`, not at the archive root
+    - Canonical archive list sort is `archivedAt` descending (newest → oldest)
+    - Default list `limit` is **100**
+    - `archive()` upserts the archive list entry through the fs-cache helper
+    - `get()` loads full detail from the archived directory `manifest.json`; list/count use index entries only
+    - The `force` option on `archive()` bypasses the state check entirely
+    - `ArchivedChange` is immutable once created — no setters, no mutation methods
+
+- op: modified
+  description: Reference ArchiveListEntry and repository-port list types.
+  selector:
+    type: section
+    matches: Spec Dependencies
+  content: |
+    - [`core:repository-port`](../repository-port/spec.md) — `Repository` base class, shared list pagination types, and `invalidateCache()`
+    - [`default:_global/architecture`](../../_global/architecture/spec.md) — ports as abstract classes, application layer uses ports only
+    - [`core:change`](../change/spec.md) — Change entity, `archivable` state, `ActorIdentity`, lifecycle transitions
+    - [`core:storage`](../storage/spec.md) — archive pattern configuration, fs-cache layout, directory naming
+    - [`core:archive-change`](../archive-change/spec.md) — ArchiveChange use case that delegates to this port
+    - [`default:_global/logging`](../../_global/logging/spec.md) — debug logging requirements for archive staging, path resolution, and failure diagnostics
+    - [`core:archived-change-index-entry`](../archived-change-index-entry/spec.md) — `ArchiveListEntry` row type returned by `list()` and accepted by `archivePath()`
+    - [`core:read-only-change-view`](../read-only-change-view/spec.md) — shared read-only surface for manifest-backed archive reads

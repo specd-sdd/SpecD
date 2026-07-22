@@ -1,43 +1,27 @@
 import { type Change, type ActorIdentity } from '../../domain/entities/change.js'
 import { type ArchivedChange } from '../../domain/entities/archived-change.js'
-import { type ArchivedChangeIndexEntry } from '../../domain/archived-change-index-entry.js'
-import { Repository, type RepositoryConfig } from './repository.js'
+import { type ArchiveListEntry } from '../../domain/archived-change-index-entry.js'
+import {
+  Repository,
+  type RepositoryConfig,
+  type ListOptions,
+  type ListResult,
+} from './repository.js'
 
 export { type RepositoryConfig as ArchiveRepositoryConfig }
+export type { ListOptions, ListResult }
 
 /** Minimum shape accepted by {@link ArchiveRepository.archivePath}. */
-export type ArchivePathEntry = Pick<
-  ArchivedChangeIndexEntry,
-  'name' | 'archivedName' | 'archivedAt' | 'workspaces'
->
-
-/** Options for listing archived changes. */
-export interface ArchiveListOptions {
-  /** Maximum number of entries to return. Defaults to 100. */
-  readonly limit?: number | undefined
-  /** 1-based page index. Mutually exclusive with `startAt`. */
-  readonly page?: number | undefined
-  /** Name of the change to start after (exclusive). Mutually exclusive with `page`. */
-  readonly startAt?: string | undefined
+export type ArchivePathEntry = {
+  readonly name: string
+  readonly archivedName: string
+  readonly archivedAt: Date
 }
 
-/** Result of listing archived changes. */
-export interface ArchiveListResult {
-  /** The list of archived change index entries. */
-  readonly items: readonly ArchivedChangeIndexEntry[]
-  /** Metadata about the listing. */
-  readonly meta: {
-    /** Total number of archived changes in the repository. */
-    readonly total: number
-    /** Number of entries returned in this result. */
-    readonly count: number
-    /** The limit applied to the query. */
-    readonly limit: number
-    /** The page index if page-based pagination was used. */
-    readonly page?: number
-    /** The startAt cursor if keyset pagination was used. */
-    readonly startAt?: string
-  }
+/** Options for listing archived changes. */
+export interface ArchiveListOptions extends ListOptions {
+  /** When `true`, projected entries MAY include `archivedBy`. */
+  readonly includeArchivedBy?: boolean
 }
 
 /**
@@ -45,8 +29,8 @@ export interface ArchiveListResult {
  *
  * Extends {@link Repository} — `workspace()`, `ownership()`, and `isExternal()`
  * are set at construction time. The archive is append-only: once a change is
- * archived it is never mutated. An `index.jsonl` file at the archive root
- * provides O(1) appends and fast lookup without scanning the filesystem.
+ * archived it is never mutated. An fs-cache index provides O(1) appends and
+ * fast lookup without scanning the filesystem.
  *
  * Implementations receive both the changes path and the archive path in their
  * configuration so they can physically move the change directory during `archive()`.
@@ -63,7 +47,7 @@ export abstract class ArchiveRepository extends Repository {
 
   /**
    * Moves the change directory to the archive, creates the `ArchivedChange`
-   * record, persists its manifest, and appends an entry to `index.jsonl`.
+   * record, persists its manifest, and appends an entry to the fs-cache index.
    *
    * As a safety guard, the repository verifies that the change is in
    * `archivable` state before proceeding. This check is intentionally
@@ -91,22 +75,29 @@ export abstract class ArchiveRepository extends Repository {
   ): Promise<{ archivedChange: ArchivedChange; archiveDirPath: string }>
 
   /**
-   * Lists archived changes in this workspace in chronological order (oldest first).
+   * Lists archived changes in canonical order (`archivedAt` descending).
    *
-   * Streams `index.jsonl` from the start, deduplicating by name so that the
-   * last entry wins in case of duplicates introduced by manual recovery.
+   * Streams the fs-cache index, deduplicating by name so that the last entry
+   * wins in case of duplicates introduced by manual recovery.
    *
-   * @param options - Pagination and filtering options
-   * @returns Paginated index-backed archive result, oldest first
+   * @param options - Pagination and include projection options
+   * @returns Paginated index-backed archive result, newest first
    */
-  abstract list(options?: ArchiveListOptions): Promise<ArchiveListResult>
+  abstract list(options?: ArchiveListOptions): Promise<ListResult<ArchiveListEntry>>
+
+  /**
+   * Returns the total number of archived changes in this workspace.
+   *
+   * @returns Total archived change count (same source as `list().meta.total`)
+   */
+  abstract count(): Promise<number>
 
   /**
    * Returns the archived change with the given name, or `null` if not found.
    *
-   * Searches `index.jsonl` from the end (most recent entries first). If not
+   * Searches the fs-cache index from the end (most recent entries first). If not
    * found in the index, falls back to a glob scan of the archive directory and
-   * appends the recovered entry to `index.jsonl` for future lookups.
+   * appends the recovered entry to the index for future lookups.
    *
    * @param name - The change name to look up (e.g. `"add-oauth-login"`)
    * @returns Full manifest-backed archived detail, or `null` if not found
@@ -114,12 +105,10 @@ export abstract class ArchiveRepository extends Repository {
   abstract get(name: string): Promise<ArchivedChange | null>
 
   /**
-   * Rebuilds `index.jsonl` by scanning the archive directory for all
-   * `manifest.json` files, sorting by `archivedAt`, and writing a clean
-   * index in chronological order.
+   * Rebuilds the archive fs-cache index by scanning the archive directory for all
+   * `manifest.json` files, sorting by `archivedAt`, and writing a clean index.
    *
-   * Use this to recover from a corrupted or missing index. The resulting
-   * git diff shows only missing or spurious lines — no reorderings.
+   * Use this to recover from a corrupted or missing index.
    */
   abstract reindex(): Promise<void>
 
@@ -128,7 +117,7 @@ export abstract class ArchiveRepository extends Repository {
    *
    * Mirrors {@link ChangeRepository.changePath} for active changes.
    *
-   * @param entry - Full archived detail or index row with path resolution fields
+   * @param entry - Full archived detail or path row with path resolution fields
    * @returns The absolute path to the archived change's directory
    */
   abstract archivePath(entry: ArchivePathEntry): string

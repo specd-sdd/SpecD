@@ -1,7 +1,13 @@
 {
   "title": "FsArchiveRepository",
   "description": "`FsArchiveRepository` is the filesystem-backed implementation of the `ArchiveRepository` port. It manages archived changes, validating configuration options strictly against its Zod schema while receiving runtime dependencies (like paths of active changes and drafts) via its `context: ArchiveRepositoryConfig` parameter.",
-  "dependsOn": ["default:_global/architecture", "core:composition"],
+  "dependsOn": [
+    "default:_global/architecture",
+    "core:composition",
+    "core:storage",
+    "core:archived-change-index-entry",
+    "core:archive-repository-port"
+  ],
   "context": [
     "`FsArchiveRepository` is the filesystem-backed implementation of the `ArchiveRepository` port. It manages archived changes, validating configuration options strictly against its Zod schema while receiving runtime dependencies (like paths of active changes and drafts) via its `context: ArchiveRepositoryConfig` parameter."
   ],
@@ -16,6 +22,24 @@
       "requirement": "Storage factory registration",
       "rules": [
         "`FsArchiveRepository` SHALL expose a creator function `createFsArchiveStorageFactory()` that returns an `ArchiveStorageFactory` instance.\n\nThis factory SHALL construct and return `FsArchiveRepository` instances when `create(context, config)` is called, forwarding the parameters without merging."
+      ]
+    },
+    {
+      "requirement": "Archive list index in fs-cache",
+      "rules": [
+        "`FsArchiveRepository` MUST maintain its archive list index under `{configPath}/tmp/fs-cache/archive/` via an `FsChangeIndexCache`-style index helper (same wire shapes and `mutate`/freshness rules as change buckets).\n\n`list()`, `count()`, and `reindex()` MUST delegate to that helper. The repository MUST NOT read or write root-local `.specd-index.jsonl` or `.specd-index-meta.json` during normal operation.\n\nCanonical sort: `archivedAt` descending (newest → oldest).\n\nOn first use or `reindex()`, the helper MUST rebuild from archived manifests under the archive storage root. This is a migrate-and-forget cutover — no dual-read of legacy root index files."
+      ]
+    },
+    {
+      "requirement": "Legacy archive root index orphan cleanup",
+      "rules": [
+        "When `reindex()` or the first full rebuild materializes `fs-cache/archive/`, `FsArchiveRepository` MUST delete legacy `.specd-index.jsonl` and `.specd-index-meta.json` from the archive root if present (ignore ENOENT).\n\nIt MAY remove obsolete index-only lines from the archive-root `.gitignore` while keeping `.staging`.\n\nNormal `list()` / `count()` cache hits MUST NOT scan or delete root-local legacy files.\n\nAfter `archive(change)`, the helper MUST upsert/append the archive list entry and invalidate or update the source change bucket index as required by the change repository."
+      ]
+    },
+    {
+      "requirement": "Archive pattern expansion has no workspace token",
+      "rules": [
+        "`FsArchiveRepository` MUST expand archive path patterns using only `{{year}}`, `{{month}}`, `{{day}}`, `{{date}}`, `{{change.name}}`, and `{{change.archivedName}}`. Pattern expansion MUST NOT accept or substitute a workspace value — `archive()` and `archivePath()` MUST resolve the relative archive directory from `name`, `archivedName`, and `archivedAt` alone, without reading `workspaces[0]`, `specIds[0]`, or any other derived workspace value.\n\nIf the configured pattern contains the literal token `{{change.workspace}}`, the constructor MUST throw `UnsupportedPatternError` (the same error type already thrown for `{{change.scope}}`), with a reason explaining that a change has no single primary workspace. Implementations MUST NOT silently leave the token unexpanded and MUST NOT fall back to `'default'`."
       ]
     }
   ],
@@ -59,6 +83,91 @@
       "given": ["a ArchiveStorageFactory created by createFsArchiveStorageFactory()"],
       "when": ["create is invoked with valid repository context and filesystem options"],
       "then": ["it returns an instance of FsArchiveRepository configured with those options"]
+    },
+    {
+      "requirement": "Archive list index in fs-cache",
+      "name": "list delegates to fs-cache archive helper",
+      "given": ["archived changes exist on disk"],
+      "when": ["FsArchiveRepository.list() is called"],
+      "then": [
+        "results are served from {configPath}/tmp/fs-cache/archive/",
+        "AND items are ArchiveListEntry rows ordered by archivedAt descending"
+      ]
+    },
+    {
+      "requirement": "Archive list index in fs-cache",
+      "name": "count reads totalCount from fs-cache meta",
+      "given": ["the fs-cache archive index reports totalCount: 4"],
+      "when": ["FsArchiveRepository.count() is called with a fresh index"],
+      "then": ["the returned count is 4"]
+    },
+    {
+      "requirement": "Archive list index in fs-cache",
+      "name": "reindex rebuilds fs-cache archive index only",
+      "when": ["FsArchiveRepository.reindex() is invoked"],
+      "then": [
+        "{configPath}/tmp/fs-cache/archive/ is rebuilt from archived manifests",
+        "AND no root-local archive index is written during normal operation"
+      ]
+    },
+    {
+      "requirement": "Archive list index in fs-cache",
+      "name": "archive upserts archive row and updates source bucket",
+      "when": ["archive(change) completes successfully"],
+      "then": [
+        "an ArchiveListEntry is upserted in the fs-cache archive index",
+        "AND the source active change bucket index is updated or invalidated as required"
+      ]
+    },
+    {
+      "requirement": "Legacy archive root index orphan cleanup",
+      "name": "Rebuild deletes legacy root index files",
+      "given": [
+        "legacy .specd-index.jsonl and .specd-index-meta.json exist at the archive storage root"
+      ],
+      "when": ["reindex() or the first full rebuild materializes fs-cache/archive/"],
+      "then": ["both legacy root files are deleted (ENOENT ignored)"]
+    },
+    {
+      "requirement": "Legacy archive root index orphan cleanup",
+      "name": "Normal list hits do not scan archive root for legacy files",
+      "given": ["a fresh fs-cache archive index is served on list()"],
+      "when": ["list() or count() completes from cache"],
+      "then": ["legacy root index files are not scanned or deleted during that read path"]
+    },
+    {
+      "requirement": "Archive pattern expansion has no workspace token",
+      "name": "Configured pattern with {{change.workspace}} is rejected at construction",
+      "given": [
+        "storage.archive.pattern is configured as {{year}}/{{change.workspace}}/{{change.archivedName}}"
+      ],
+      "when": ["FsArchiveRepository is constructed with that pattern"],
+      "then": [
+        "the constructor throws UnsupportedPatternError",
+        "AND the error reason explains that a change has no single primary workspace"
+      ]
+    },
+    {
+      "requirement": "Archive pattern expansion has no workspace token",
+      "name": "Path resolution never derives a workspace value",
+      "given": [
+        "a supported archive pattern {{year}}/{{change.archivedName}}",
+        "AND a change touching multiple workspaces via specIds"
+      ],
+      "when": ["archive(change) or archivePath(entry) resolves the destination path"],
+      "then": [
+        "the resolved path is computed from name, archivedName, and archivedAt alone",
+        "AND the implementation does not read workspaces[0], specIds[0], or any other derived workspace value"
+      ]
+    },
+    {
+      "requirement": "Archive pattern expansion has no workspace token",
+      "name": "{{change.scope}} and {{change.workspace}} are rejected the same way",
+      "given": [
+        "two otherwise-identical archive pattern configurations, one containing {{change.scope}} and one containing {{change.workspace}}"
+      ],
+      "when": ["FsArchiveRepository is constructed with each pattern in turn"],
+      "then": ["both constructions throw UnsupportedPatternError"]
     }
   ],
   "implementation": {
@@ -67,12 +176,17 @@
         "specId": "core:fs-archive-repository",
         "file": "core:src/infrastructure/fs/archive-repository.ts",
         "symbol": "FsArchiveRepository"
+      },
+      {
+        "specId": "core:fs-archive-repository",
+        "file": "core:src/infrastructure/fs/archive-repository.ts",
+        "symbol": "_expandPattern"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:2880009814d405e47b2c6d8aa4b48fcf78917162c84927d0a443f0bc1b7e03ae",
-    "verify.md": "sha256:06b20e1e3e34a993c2f5e48c3ef2b9b5c3153ff139fa5ffffb94c4d8339d8e9c"
+    "spec.md": "sha256:bbfb53e41665e883deeae1c52d68479e14f83cd72ac0ac69256bbf82a21a38e2",
+    "verify.md": "sha256:046fb5db71dd1b211d9f47b9da089d66e0ba153fee809e10d56ecd2ce9ff4f87"
   },
   "generatedBy": "core"
 }

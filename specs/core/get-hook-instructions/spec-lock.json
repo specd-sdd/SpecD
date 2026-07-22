@@ -14,7 +14,8 @@
   ],
   "implementation": [
     {
-      "file": "core:src/composition/use-cases/get-hook-instructions.ts"
+      "file": "core:src/application/use-cases/get-hook-instructions.ts",
+      "symbols": ["GetHookInstructions"]
     }
   ]
 }

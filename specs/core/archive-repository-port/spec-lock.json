@@ -16,11 +16,7 @@
   "implementation": [
     {
       "file": "core:src/application/ports/archive-repository.ts",
-      "symbols": ["ArchiveRepository"]
-    },
-    {
-      "file": "core:src/infrastructure/fs/archive-repository.ts",
-      "symbols": ["FsArchiveRepository"]
+      "symbols": ["ArchiveRepository", "ArchiveListOptions", "ArchivePathEntry"]
     }
   ]
 }

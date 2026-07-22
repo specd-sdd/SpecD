@@ -31,11 +31,12 @@ The `change` namespace is present when a change is active:
 | Variable              | Type   | Description                                                                         |
 | --------------------- | ------ | ----------------------------------------------------------------------------------- |
 | `change.name`         | string | The change's kebab-case name                                                        |
-| `change.workspace`    | string | The primary workspace name (first entry in `change.workspaces`)                     |
 | `change.path`         | string | Absolute path to the change directory                                               |
 | `change.archivedName` | string | Archived directory basename (`YYYYMMDD-HHmmss-<name>`) when the runtime is archived |
 
 `change.archivedName` is optional in mixed contexts: it is present for archived-change runtime flows (for example archiving post hooks) and may be absent for active-change runtime flows.
+
+`change.workspace` MUST NOT be a supported token. A change has no single primary workspace — it only has workspaces touched via `specIds` (see [`core:change`](../change/spec.md)). Consumers that build the `change` namespace MUST NOT inject a workspace key (not `change.workspace`, not any `[0] ?? 'default'` derivation) into the variable map. Callers needing workspace context for a change use `specIds`-derived workspace sets directly, outside the template variable system.
 
 Future use cases may introduce additional namespaces (e.g. `spec`, `schema`). The expansion engine does not restrict which namespaces can exist — it traverses whatever object it receives.
 
@@ -54,14 +55,13 @@ Example:
   project: { root: '/Users/dev/my-project' },
   change: {
     name: 'add-auth',
-    workspace: 'default',
     path: '/Users/dev/my-project/changes/add-auth',
     archivedName: '20260418-103000-add-auth',
   },
 }
 ```
 
-`archivedName` is context-dependent and may be omitted when no archived-change context exists.
+`archivedName` is context-dependent and may be omitted when no archived-change context exists. The `change` namespace MUST NOT include a `workspace` key.
 
 This replaces the current typed `HookVariables` interface with a generic structure that supports arbitrary namespaces without code changes.
 

@@ -1,5 +1,3 @@
-import { type ContentHasher } from '../../application/ports/content-hasher.js'
-import { type YamlSerializer } from '../../application/ports/yaml-serializer.js'
 import { ListSpecs } from '../../application/use-cases/list-specs.js'
 import { type ListWorkspaces } from '../../application/use-cases/list-workspaces.js'
 import { type SpecdConfig } from '../../application/specd-config.js'
@@ -16,10 +14,6 @@ import { normalizeCompositionFactoryArgs, type FactoryInput } from '../normalize
 export interface ListSpecsDeps {
   /** Workspace enumeration use case. */
   readonly listWorkspaces: ListWorkspaces
-  /** Content hasher used for metadata freshness checks. */
-  readonly hasher: ContentHasher
-  /** YAML serializer used for metadata parsing. */
-  readonly yaml: YamlSerializer
 }
 
 /**
@@ -31,8 +25,6 @@ export interface ListSpecsDeps {
 export function resolveListSpecsDeps(resolver: CompositionResolver): ListSpecsDeps {
   return {
     listWorkspaces: resolver.getListWorkspaces(),
-    hasher: resolver.getContentHasher(),
-    yaml: resolver.getYamlSerializer(),
   }
 }
 
@@ -84,7 +76,7 @@ function createListSpecsFromNormalized(
   input: FactoryInput<ListSpecsDeps, CompositionResolutionOptions>,
 ): ListSpecs {
   if (input.kind === 'deps') {
-    return new ListSpecs(input.deps.listWorkspaces, input.deps.hasher, input.deps.yaml)
+    return new ListSpecs(input.deps.listWorkspaces)
   }
   const resolver = createCompositionResolver(input.config, input.options)
   return createListSpecs(resolveListSpecsDeps(resolver))
@@ -97,5 +89,5 @@ function createListSpecsFromNormalized(
  * @returns `true` when the input is explicit deps
  */
 function isListSpecsDeps(value: ListSpecsDeps | SpecdConfig): value is ListSpecsDeps {
-  return 'listWorkspaces' in value && 'hasher' in value && 'yaml' in value
+  return 'listWorkspaces' in value
 }

@@ -1,0 +1,13 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [],
+  "implementation": [
+    {
+      "file": "core:src/domain/archived-change-index-entry.ts",
+      "symbols": ["ArchiveListEntry", "workspacesFromSpecIds"]
+    }
+  ]
+}

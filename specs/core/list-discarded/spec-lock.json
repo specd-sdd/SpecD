@@ -8,11 +8,8 @@
     "core:kernel",
     "core:discarded-change-view",
     "core:change-repository-port",
-    "core:composition-resolver"
+    "core:composition-resolver",
+    "core:change-list-entry"
   ],
-  "implementation": [
-    {
-      "file": "core:src/composition/use-cases/list-discarded.ts"
-    }
-  ]
+  "implementation": []
 }

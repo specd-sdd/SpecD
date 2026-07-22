@@ -10,12 +10,23 @@
 - **THEN** the command proceeds without positional arguments
 - **AND** output format defaults to text
 
+#### Scenario: Default limit is 100
+
+- **GIVEN** more than 100 discarded changes exist
+- **WHEN** `specd discarded list --format json` is run without `--limit`
+- **THEN** `meta.limit` is 100
+
+#### Scenario: --page and keyset cursors are mutually exclusive
+
+- **WHEN** `specd discarded list --page 2 --after-key 2024-01-01T00:00:00.000Z` is run
+- **THEN** the command exits with a CLI usage error before invoking the use case
+
 ### Requirement: Uses ListDiscarded read model
 
 #### Scenario: Invokes ListDiscarded
 
-- **WHEN** `specd discarded list` runs
-- **THEN** `ListDiscarded.execute` is called
+- **WHEN** `specd discarded list --limit 10` runs
+- **THEN** `ListDiscarded.execute` is called with list options derived from CLI flags
 
 #### Scenario: Does not invoke GetStatus per row
 
@@ -23,11 +34,18 @@
 - **WHEN** `specd discarded list` runs
 - **THEN** `GetStatus` is not invoked for each listed name
 
-#### Scenario: Text output includes discard reason per row
+### Requirement: List options forwarding
 
-- **GIVEN** `ListDiscarded` returns a view with `discardReason: 'superseded'`
-- **WHEN** `specd discarded list` runs in text mode
-- **THEN** stdout includes that reason for the listed change
+#### Scenario: Include flags forwarded only when set
+
+- **WHEN** `specd discarded list --description --reason --superseded-by --format json` is run
+- **THEN** `ListDiscarded.execute` is called with `includeDescription: true`, `includeReason: true`, and `includeSupersededBy: true`
+
+#### Scenario: CLI does not re-sort after the use case returns
+
+- **GIVEN** `ListDiscarded.execute` returns items in repository canonical order
+- **WHEN** `specd discarded list --format json` is run
+- **THEN** stdout `items` appear in the same order as returned by the use case
 
 ### Requirement: Output format — toon
 
@@ -42,17 +60,29 @@
 #### Scenario: Discarded changes listed with correct fields
 
 - **GIVEN** `discarded/` contains two changes: `old-experiment` (discarded `2024-01-10`, actor `alice`, reason `"no longer needed"`, no supersededBy) and `bad-idea` (discarded `2024-01-08`, actor `bob`, reason `"duplicate effort"`, supersededBy `['new-approach']`)
-- **WHEN** `specd discarded list` is run
+- **WHEN** `specd discarded list --reason --superseded-by` is run
 - **THEN** stdout contains one row for each change showing name, date, actor, and reason
 - **AND** the row for `bad-idea` includes `→ new-approach`
 - **AND** the row for `old-experiment` does not include a `→` segment
 - **AND** the process exits with code 0
 
-#### Scenario: Rows sorted by discard date descending
+#### Scenario: Reason and superseded-by hidden without include flags
 
-- **GIVEN** `discarded/` contains change `older-discard` discarded before `newer-discard`
+- **GIVEN** a discarded change with reason `"duplicate effort"` and supersededBy `['new-approach']`
+- **WHEN** `specd discarded list` is run without `--reason` or `--superseded-by`
+- **THEN** stdout does not include the reason text or `→ new-approach`
+
+#### Scenario: Truncation hint when results are partial
+
+- **GIVEN** 125 discarded changes and default pagination
 - **WHEN** `specd discarded list` is run
-- **THEN** `newer-discard` appears before `older-discard` in the output
+- **THEN** stdout contains `showing 100 of 125 (use --limit/--page)`
+
+#### Scenario: CLI preserves use-case row order
+
+- **GIVEN** `ListDiscarded.execute` returns entries ordered by `discardedAt` descending
+- **WHEN** `specd discarded list` is run
+- **THEN** stdout rows appear in the same order as the returned `items`
 
 ### Requirement: Output format — JSON
 
@@ -60,14 +90,15 @@
 
 - **GIVEN** `discarded/` contains one change named `old-experiment` discarded at `2024-01-10T09:00:00.000Z`, actor `alice`, reason `"no longer needed"`, no supersededBy
 - **WHEN** `specd discarded list --format json` is run
-- **THEN** stdout is a JSON array with one object containing `name`, `discardedAt`, `discardedBy`, and `reason` fields
-- **AND** the object does not contain a `supersededBy` field
+- **THEN** stdout is valid JSON with `items` and `meta`
+- **AND** the object for `old-experiment` contains `name`, `discardedAt`, and `discardedBy`
+- **AND** the object does not contain `reason`, `description`, or `supersededBy`
 - **AND** the process exits with code 0
 
 #### Scenario: JSON format output — supersededBy present
 
 - **GIVEN** `discarded/` contains one change named `bad-idea` with `supersededBy` set to `['new-approach']`
-- **WHEN** `specd discarded list --format json` is run
+- **WHEN** `specd discarded list --format json --superseded-by` is run
 - **THEN** the JSON object for `bad-idea` contains a `supersededBy` array with `"new-approach"`
 - **AND** the process exits with code 0
 
@@ -84,7 +115,7 @@
 
 - **GIVEN** `discarded/` is empty
 - **WHEN** `specd discarded list --format json` is run
-- **THEN** stdout is `[]`
+- **THEN** stdout is `{"items":[],"meta":{"total":0,"count":0,"limit":100}}`
 - **AND** the process exits with code 0
 
 ### Requirement: Error cases

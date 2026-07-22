@@ -4,7 +4,7 @@
   "dependsOn": [
     "cli:entrypoint",
     "core:list-drafts",
-    "core:drafted-change-view",
+    "core:change-list-entry",
     "cli:command-resource-naming"
   ],
   "context": [
@@ -14,37 +14,43 @@
     {
       "requirement": "Command signature",
       "rules": [
-        "```\nspecd drafts list [--format text|json|toon]\n```\n\nAlias:\n\n```\nspecd draft list [--format text|json|toon]\n```\n\nNo positional arguments. The `--format` flag controls output encoding; defaults to `text`."
+        "```\nspecd drafts list [--format text|json|toon] [--limit <n>] [--page <p>] [--after-key <iso>] [--after-id <name>] [--description] [--reason]\n```\n\nAlias:\n\n```\nspecd draft list [--format text|json|toon] [--limit <n>] [--page <p>] [--after-key <iso>] [--after-id <name>] [--description] [--reason]\n```\n\n- `--format text|json|toon` — optional; output encoding, defaults to `text`\n- `--limit <n>` — optional; maximum number of entries to return; defaults to `100`\n- `--page <p>` — optional; 1-based page number (uses `--limit`, defaulting to `100` when omitted)\n- `--after-key <iso>` — optional; exclusive keyset cursor — ISO-8601 `draftedAt` of the last seen row\n- `--after-id <name>` — optional; tiebreak change `name` when `--after-key` collides; MUST accompany `--after-key`\n- `--description` — optional; include `description` (`includeDescription`)\n- `--reason` — optional; include draft `reason` (`includeReason`)\n\n`--page` is mutually exclusive with `--after-key` / `--after-id`.\n\nNo positional arguments."
       ]
     },
     {
       "requirement": "Uses ListDrafts read model",
       "rules": [
-        "The command MUST invoke `ListDrafts.execute()` and treat each entry as a `DraftedChangeView`.\n\nThe command MUST read `history` from each view to extract the latest `drafted` event for `draftedAt`, `draftedBy`, and `reason`.\n\nThe command MUST NOT assume entries are mutable `Change` instances."
+        "The command MUST invoke `ListDrafts.execute()` with list options derived from the flags and treat each entry as a `DraftedChangeListEntry`.\n\nThe command MUST read `draftedAt`, `draftedBy`, and optional `reason` / `description` from the list entry returned by the use case — not by scanning raw `Change` history in the command.\n\nThe command MUST NOT assume entries are mutable `Change` instances or full drafted views."
+      ]
+    },
+    {
+      "requirement": "List options forwarding",
+      "rules": [
+        "The command MUST map CLI flags to list options:\n\n- `--limit`, `--page`, `--after-key`, `--after-id` → `limit`, `page`, and `after: { key, id? }`\n- `--description` → `includeDescription: true`\n- `--reason` → `includeReason: true`\n\nWhen include flags are omitted, the CLI MUST NOT set them. The command MUST NOT re-sort or paginate after the use case returns."
       ]
     },
     {
       "requirement": "Output format — text",
       "rules": [
-        "The command prints a human-readable table to stdout. Changes are sorted by `createdAt` ascending (oldest first).\n\nThe output has an inverse-video column header row `NAME  STATE  DATE  BY  REASON` above the data rows. Column widths are fixed at render time, computed from the widest value across all rows for each column (global, not per-group). The REASON column uses wrap overflow when its content exceeds the column width."
+        "The command prints a human-readable table to stdout. Rows appear in canonical order (`draftedAt` descending — most recently drafted first) as returned by the use case; the CLI MUST NOT re-sort.\n\nThe output has an inverse-video column header row. Base columns are always `NAME  STATE  DATE  BY`. When `--reason` is set, `REASON` is appended. Column widths are fixed at render time, computed from the widest value across all rows for each column (global, not per-group). The REASON column uses wrap overflow when its content exceeds the column width.\n\nWhen `--description` is set and an entry includes a description, a dim indented description line is printed below the main row (same convention as active change list).\n\nWhen `meta.count < meta.total`, the command MUST print a trailing hint line:\n\n```\nshowing <count> of <total> (use --limit/--page)\n```"
       ]
     },
     {
       "requirement": "Output format — JSON",
       "rules": [
-        "When `--format json` is passed, the command writes a JSON array to stdout:\n\n```json\n[\n  {\n    \"name\": \"...\",\n    \"state\": \"...\",\n    \"draftedAt\": \"...\",\n    \"draftedBy\": { \"name\": \"...\", \"email\": \"...\" },\n    \"reason\": \"...\"\n  }\n]\n```\n\nOne object per drafted change, sorted by `createdAt` ascending. `reason` is omitted when not provided. `draftedBy` is omitted when not recorded."
+        "When `--format json` is passed, the command writes a paginated envelope to stdout:\n\n```json\n{\n  \"items\": [\n    {\n      \"name\": \"...\",\n      \"state\": \"...\",\n      \"createdAt\": \"...\",\n      \"specIds\": [\"...\"],\n      \"schemaName\": \"...\",\n      \"schemaVersion\": 1,\n      \"draftedAt\": \"...\",\n      \"draftedBy\": { \"name\": \"...\", \"email\": \"...\" },\n      \"description\": \"...\",\n      \"reason\": \"...\"\n    }\n  ],\n  \"meta\": {\n    \"total\": 125,\n    \"count\": 100,\n    \"limit\": 100,\n    \"page\": 1\n  }\n}\n```\n\nOptional fields (`description`, `reason`, `draftedBy`) appear only when present on the entry and when the matching include flag was set (`--description`, `--reason`). Entries are in canonical order as returned by the use case."
       ]
     },
     {
       "requirement": "Output format — toon",
       "rules": [
-        "When `--format toon` is passed, the command writes the same data model as JSON encoded in Token-Oriented Object Notation (toon) to stdout."
+        "When `--format toon` is passed, the command writes the same `{ items, meta }` data model as JSON encoded in Token-Oriented Object Notation (toon) to stdout."
       ]
     },
     {
       "requirement": "Empty drafts",
       "rules": [
-        "If there are no changes in `drafts/`, the command prints `no drafts` to stdout in text mode, or `[]` in JSON/toon mode, and exits with code 0."
+        "If there are no changes in `drafts/`, the command prints `no drafts` to stdout in text mode, or `{\"items\":[],\"meta\":{\"total\":0,\"count\":0,\"limit\":100}}` in JSON/toon mode, and exits with code 0."
       ]
     },
     {
@@ -69,10 +75,23 @@
       ]
     },
     {
+      "requirement": "Command signature",
+      "name": "Default limit is 100",
+      "given": ["more than 100 drafted changes exist"],
+      "when": ["specd drafts list --format json is run without --limit"],
+      "then": ["meta.limit is 100"]
+    },
+    {
+      "requirement": "Command signature",
+      "name": "--page and keyset cursors are mutually exclusive",
+      "when": ["specd drafts list --page 2 --after-key 2024-01-01T00:00:00.000Z is run"],
+      "then": ["the command exits with a CLI usage error before invoking the use case"]
+    },
+    {
       "requirement": "Uses ListDrafts read model",
       "name": "Invokes ListDrafts",
-      "when": ["specd drafts list runs"],
-      "then": ["ListDrafts.execute is called"]
+      "when": ["specd drafts list --limit 10 runs"],
+      "then": ["ListDrafts.execute is called with list options derived from CLI flags"]
     },
     {
       "requirement": "Uses ListDrafts read model",
@@ -84,12 +103,26 @@
     {
       "requirement": "Uses ListDrafts read model",
       "name": "JSON output serializes view fields",
-      "given": ["ListDrafts returns views with name and isDrafted === true"],
-      "when": ["specd drafts list --format json runs"],
+      "given": ["ListDrafts returns a paginated result with one drafted entry"],
+      "when": ["specd drafts list --format json is run without include flags"],
       "then": [
-        "stdout is a JSON array whose objects include name",
-        "AND entries do not include mutable Change internals"
+        "stdout is valid JSON with items and meta",
+        "AND items[0] includes name, state, createdAt, specIds, schemaName, schemaVersion, and draftedAt",
+        "AND items[0] does not include reason, description, or draftedBy"
       ]
+    },
+    {
+      "requirement": "List options forwarding",
+      "name": "Include flags forwarded only when set",
+      "when": ["specd drafts list --description --reason --format json is run"],
+      "then": ["ListDrafts.execute is called with includeDescription: true and includeReason: true"]
+    },
+    {
+      "requirement": "List options forwarding",
+      "name": "CLI does not paginate after the use case returns",
+      "given": ["ListDrafts.execute returns 10 items with meta.count 10 and meta.total 50"],
+      "when": ["specd drafts list --format json is run"],
+      "then": ["stdout items length is 10", "AND stdout meta.total is 50"]
     },
     {
       "requirement": "Output format — toon",
@@ -104,22 +137,12 @@
       "given": [
         "drafts/ contains two changes: old-experiment (state drafting, drafted 2024-01-05, actor alice, reason \"parked for later\") and shelved-work (state designing, drafted 2024-01-03, actor bob, no reason)"
       ],
-      "when": ["specd drafts list is run"],
+      "when": ["specd drafts list --reason --description is run"],
       "then": [
-        "stdout contains one row for each change showing name, bracketed state, date, and actor",
+        "stdout contains one row for each change showing name, state, date, actor, and reason",
         "AND the row for old-experiment includes \"parked for later\"",
-        "AND the row for shelved-work does not include a quoted reason",
         "AND the process exits with code 0"
       ]
-    },
-    {
-      "requirement": "Output format — text",
-      "name": "Rows sorted by createdAt ascending",
-      "given": [
-        "drafts/ contains change b-change created before a-change (alphabetically later but older)"
-      ],
-      "when": ["specd drafts list is run"],
-      "then": ["b-change appears before a-change in the output"]
     },
     {
       "requirement": "Output format — text",
@@ -131,15 +154,39 @@
       ]
     },
     {
+      "requirement": "Output format — text",
+      "name": "REASON column appears only with --reason",
+      "given": ["a drafted change with reason \"parked for later\""],
+      "when": ["specd drafts list is run without --reason"],
+      "then": [
+        "stdout does not include a REASON column header",
+        "AND the reason text is not shown in the table row"
+      ]
+    },
+    {
+      "requirement": "Output format — text",
+      "name": "Truncation hint when results are partial",
+      "given": ["125 drafted changes and default pagination"],
+      "when": ["specd drafts list is run"],
+      "then": ["stdout contains showing 100 of 125 (use --limit/--page)"]
+    },
+    {
+      "requirement": "Output format — text",
+      "name": "CLI preserves use-case row order",
+      "given": ["ListDrafts.execute returns entries ordered by draftedAt descending"],
+      "when": ["specd drafts list is run"],
+      "then": ["stdout rows appear in the same order as the returned items"]
+    },
+    {
       "requirement": "Output format — JSON",
       "name": "JSON format output",
       "given": [
         "drafts/ contains one change named old-experiment in state drafting, drafted at 2024-01-05T10:00:00.000Z, actor alice, reason \"parked for later\""
       ],
-      "when": ["specd drafts list --format json is run"],
+      "when": ["specd drafts list --format json --reason --description is run"],
       "then": [
-        "stdout is a JSON array with one object containing name, state, draftedAt, draftedBy, and reason fields",
-        "AND the object does not contain specIds or schema fields",
+        "stdout is valid JSON with items and meta",
+        "AND items[0] contains name, state, draftedAt, draftedBy, and reason",
         "AND the process exits with code 0"
       ]
     },
@@ -147,11 +194,11 @@
       "requirement": "Output format — JSON",
       "name": "JSON format output — no reason or actor",
       "given": [
-        "drafts/ contains one change named shelved-work with no reason and no draftedBy recorded"
+        "drafts/ contains one change named shelved-work with reason and draftedBy available on the entry"
       ],
-      "when": ["specd drafts list --format json is run"],
+      "when": ["specd drafts list --format json is run without --reason or --description"],
       "then": [
-        "the JSON object for shelved-work does not contain reason or draftedBy fields",
+        "the JSON object for shelved-work does not contain reason, description, or draftedBy",
         "AND the process exits with code 0"
       ]
     },
@@ -167,7 +214,10 @@
       "name": "No drafted changes — JSON",
       "given": ["drafts/ is empty"],
       "when": ["specd drafts list --format json is run"],
-      "then": ["stdout is []", "AND the process exits with code 0"]
+      "then": [
+        "stdout is {\"items\":[],\"meta\":{\"total\":0,\"count\":0,\"limit\":100}}",
+        "AND the process exits with code 0"
+      ]
     },
     {
       "requirement": "Error cases",
@@ -178,16 +228,17 @@
     }
   ],
   "implementation": {
-    "files": [
+    "symbols": [
       {
         "specId": "cli:drafts-list",
-        "file": "cli:src/commands/drafts/list.ts"
+        "file": "cli:src/commands/drafts/list.ts",
+        "symbol": "registerDraftsList"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:35ed882e1876bf3fdc1fc5365200d4b64dd9a62a7f41cb142cc3670a13673c53",
-    "verify.md": "sha256:74d36fcc8b6eab9a8ef9ead571d7c7eedf480ddc5ccc2c09f2568ae5f63be5b5"
+    "spec.md": "sha256:31cb3f10b2b31b0e52034116b5dc00546b24c86a499691e3d51133c2e2e34655",
+    "verify.md": "sha256:0a432c05ed83e7a65a92ecd14d917e062cae10b0a5612f29c78ee02c91a4cd7b"
   },
   "generatedBy": "core"
 }

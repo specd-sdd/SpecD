@@ -1,3 +1,4 @@
+import { type Change } from '../../domain/entities/change.js'
 import { type ChangeRepository } from '../ports/change-repository.js'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
 import { detectSpecOverlap } from '../../domain/services/detect-spec-overlap.js'
@@ -36,7 +37,12 @@ export class DetectOverlap {
    * @throws ChangeNotFoundError when `input.name` is provided but not found
    */
   async execute(input?: DetectOverlapInput): Promise<OverlapReport> {
-    const changes = await this._changes.list()
+    const listed = await this._changes.list({ limit: Number.MAX_SAFE_INTEGER })
+    const changes: Change[] = []
+    for (const entry of listed.items) {
+      const change = await this._changes.get(entry.name)
+      if (change !== null) changes.push(change)
+    }
     const report = detectSpecOverlap(changes)
 
     const name = input?.name

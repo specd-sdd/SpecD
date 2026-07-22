@@ -1,0 +1,127 @@
+- op: added
+  description: Explicitly exclude the singular workspace token from archive patterns.
+  position:
+    parent:
+      type: section
+      matches: Requirements
+    after:
+      type: section
+      matches: 'Requirement: Scope excluded from archive pattern'
+  content: |
+    ### Requirement: Workspace excluded from archive pattern
+
+    `{{change.workspace}}` MUST NOT be a supported archive pattern variable. A change has no single primary workspace — only workspaces touched via `specIds` (see [`core:change`](../change/spec.md)). The normative supported-variable catalog for `storage.archive.pattern` is `{{year}}`, `{{month}}`, `{{day}}`, `{{change.name}}`, `{{change.archivedName}}`; it MUST NOT include any per-change workspace token.
+
+    Implementations MUST reject a configured pattern containing `{{change.workspace}}` the same way they reject `{{change.scope}}` — by throwing `UnsupportedPatternError` at construction time, not by leaving the token unexpanded or substituting a fallback value.
+
+- op: modified
+  description: Active change listing order is canonical index order, not directory walk.
+  selector:
+    type: section
+    matches: 'Requirement: Change directory listing order'
+  content: |
+    `ChangeRepository.list()` MUST return active changes in canonical sort order: `createdAt` ascending (oldest first). With the `fs` adapter, this order is owned by the active-changes index helper under `{configPath}/tmp/fs-cache/changes/` — not by sorting directory entries at list time.
+
+- op: modified
+  description: Archive list index lives under fs-cache, not at archive root.
+  selector:
+    type: section
+    matches: 'Requirement: Archive index'
+  content: |
+    Filesystem-backed archive listing MUST use a list index under `{configPath}/tmp/fs-cache/archive/`, not a root-local index at the archive storage root.
+
+    Each fs-cache bucket directory contains:
+
+    - `.specd-index.jsonl` — one JSON object per line with wire shape `{ entry, sourceMtime?, sourceFiles? }` where `entry` is the public list-entry payload for that bucket and freshness fields are helper-only (never returned from `list()`).
+    - `.specd-index-meta.json` — `{ totalCount, generatedAt, isInvalidated }`.
+
+    For archive, each line's `entry` is an `ArchiveListEntry`; `sourceMtime` records the manifest mtime used for freshness.
+
+    `ArchiveRepository.reindex()` MUST rebuild the archive list index in `fs-cache/archive/` by scanning archived manifests. It MUST NOT write or maintain `.specd-index.jsonl` / `.specd-index-meta.json` at the archive root as part of normal list/count operation.
+
+    `get(name)` MAY still resolve archive paths by scanning stored manifests or other adapter-specific lookup — it MUST NOT depend on a root-local JSONL index for routine reads.
+
+    On first use or forced rebuild, implementations MUST migrate from any legacy root-local `.specd-index.jsonl` / `.specd-index-meta.json` by rebuilding into `fs-cache/archive/` (migrate and forget — no dual-read compatibility).
+
+    Orphan cleanup: when `reindex()` or the first full rebuild materializes `fs-cache/archive/`, delete legacy `.specd-index.jsonl` and `.specd-index-meta.json` from the archive root if present (ignore ENOENT). Normal `list()` / `count()` cache hits MUST NOT scan or delete root-local legacy files.
+
+    `specd storage reindex` invokes port `reindex()` methods only — see [`cli:storage-reindex`](../../cli/storage-reindex/spec.md). Storage specs MUST NOT require the CLI to know JSONL layout.
+
+- op: modified
+  description: Archive root gitignore covers staging only; list index is under tmp fs-cache.
+  selector:
+    type: section
+    matches: 'Requirement: Archive runtime ignore hygiene'
+  content: |
+    Fs-backed archive storage MUST maintain an archive-local `.gitignore` for runtime archive artifacts.
+
+    `FsArchiveRepository` MUST ensure that the archive root ignores `.staging`.
+
+    Legacy root-local index files (`.specd-index.jsonl`, `.specd-index-meta.json`) are obsolete; orphan cleanup removes them on rebuild/migration only. Runtime archive behavior MUST NOT re-add index-only ignore lines for those files after migration.
+
+    This guarantee MUST be exercised by runtime archive behavior rather than relying on project bootstrap state alone, so archive ignore hygiene remains correct after archive directory relocation, recreation, or index recovery.
+
+    `FsArchiveRepository` MAY centralize this behavior in a shared internal archive-directory preparation helper, but the runtime guarantee MUST cover archive creation and staged commit paths.
+
+- op: added
+  description: Normative fs-cache layout for all FS list indexes.
+  position:
+    parent:
+      type: section
+      matches: Requirements
+    after:
+      type: section
+      matches: 'Requirement: Change locks directory placement'
+  content: |
+    ### Requirement: Filesystem list index cache layout
+
+    Fs-backed list/count implementations MUST store derived list indexes under:
+
+    ```text
+    {configPath}/tmp/fs-cache/
+      archive/
+      changes/
+      drafts/
+      discarded/
+      specs/<workspace>/
+    ```
+
+    Each bucket directory contains `.specd-index.jsonl` and `.specd-index-meta.json` as defined in the archive index requirement. Change buckets store `sourceMtime` from `manifest.json`. Spec buckets store `sourceFiles` with per-file mtimes used for freshness.
+
+    Repositories MUST NOT read or write these cache files directly except through dedicated index helper classes (`FsChangeIndexCache`, `FsSpecIndexCache`). Helpers own canonical sort, pagination, freshness, regeneration, and per-bucket locking.
+
+    Index entries store the full CLI-usable list-entry payload; port `include*` flags are response projection only.
+
+- op: added
+  description: Keep all tmp artifacts out of version control.
+  position:
+    parent:
+      type: section
+      matches: Requirements
+    after:
+      type: section
+      matches: 'Requirement: Filesystem list index cache layout'
+  content: |
+    ### Requirement: configPath tmp gitignore
+
+    Fs-backed repositories and project initialisation MUST ensure `{configPath}/tmp/.gitignore` exists with normative contents:
+
+    ```gitignore
+    *
+    !.gitignore
+    ```
+
+    Meaning: ignore all tmp artifacts (`fs-cache/`, change-locks, and other runtime files) while allowing the ignore rule file itself to remain un-ignored.
+
+    Runtime repository behaviour MUST create or update this file idempotently when tmp paths are first used. `initProject` MUST create the same file for new projects (see [`core:config-writer-port`](../config-writer-port/spec.md)).
+
+- op: modified
+  description: Remove obsolete archive-root index path constraint.
+  selector:
+    type: section
+    matches: Constraints
+  content: |
+    - Manifest files must be written atomically (write to temp file, then rename) to prevent partial reads
+    - Fs-cache index entries MUST use forward slashes as path separators in serialized path fields regardless of host OS
+    - The timestamp in a change directory name must be derived from `change.createdAt`, not from the system clock at write time
+    - Derived list indexes under `{configPath}/tmp/fs-cache/` are runtime caches and MUST NOT be committed to version control

@@ -206,28 +206,95 @@
 
 - **GIVEN** three changes exist: one active (created first), one drafted, one active (created last)
 - **WHEN** `list()` is called
-- **THEN** only the two active changes are returned, ordered oldest first
+- **THEN** the result is `ListResult<ActiveChangeListEntry>`
+- **AND** only the two active changes are returned in `createdAt` ascending order
 
 #### Scenario: No active changes
 
 - **WHEN** `list()` is called and no active changes exist
-- **THEN** an empty array is returned
+- **THEN** `{ items: [], meta: { total: 0, count: 0, limit: 100 } }` is returned
+
+#### Scenario: List entries exclude full Change detail
+
+- **GIVEN** an active change with history and artifact state maps
+- **WHEN** `list()` is called
+- **THEN** returned items are `ActiveChangeListEntry` rows without history, artifact content, or derived artifact state maps
 
 ### Requirement: listDrafts returns drafted changes in creation order
 
-#### Scenario: Only drafted changes returned
+#### Scenario: Only drafted changes returned newest first
 
-- **GIVEN** two drafted changes and one active change exist
+- **GIVEN** two drafted changes drafted at different times and one active change exist
 - **WHEN** `listDrafts()` is called
-- **THEN** only the two drafted changes are returned, ordered oldest first
+- **THEN** the result is `ListResult<DraftedChangeListEntry>`
+- **AND** only the two drafted changes are returned in `draftedAt` descending order
+
+#### Scenario: List drafts excludes DraftedChangeView
+
+- **GIVEN** a drafted change with artifact statuses on disk
+- **WHEN** `listDrafts()` is called
+- **THEN** returned items are list entries without artifact content or history
+- **AND** no returned item is a `DraftedChangeView` or mutable `Change`
 
 ### Requirement: listDiscarded returns discarded changes in creation order
 
-#### Scenario: Only discarded changes returned
+#### Scenario: Only discarded changes returned newest first
 
 - **GIVEN** one discarded change and two active changes exist
 - **WHEN** `listDiscarded()` is called
-- **THEN** only the discarded change is returned
+- **THEN** the result is `ListResult<DiscardedChangeListEntry>`
+- **AND** only the discarded change is returned
+
+#### Scenario: List discarded excludes DiscardedChangeView
+
+- **GIVEN** a discarded change with discard history metadata
+- **WHEN** `listDiscarded()` is called
+- **THEN** returned items are list entries without artifact content or history
+- **AND** no returned item is a `DiscardedChangeView` or mutable `Change`
+
+### Requirement: Change list counts
+
+#### Scenario: Active count matches list meta.total
+
+- **GIVEN** a repository with known active, drafted, and discarded changes
+- **WHEN** `count()` and `list().meta.total` are queried
+- **THEN** both return the same active change total
+- **AND** `count()` does not materialize full `Change` aggregates
+
+#### Scenario: Draft and discarded counts match their list totals
+
+- **GIVEN** a repository with known drafted and discarded changes
+- **WHEN** `countDrafts()` and `listDrafts().meta.total` are queried
+- **THEN** both return the same drafted total
+- **WHEN** `countDiscarded()` and `listDiscarded().meta.total` are queried
+- **THEN** both return the same discarded total
+
+### Requirement: Change list reindex
+
+#### Scenario: reindex rebuilds all change list buckets
+
+- **GIVEN** filesystem-backed change list indexes under `{configPath}/tmp/fs-cache/`
+- **WHEN** `reindex()` is called
+- **THEN** active, drafted, and discarded list indexes are fully rebuilt from disk
+
+#### Scenario: Per-bucket reindex methods rebuild one bucket
+
+- **WHEN** `reindexActive()` is called
+- **THEN** only the active-changes index is rebuilt
+- **WHEN** `reindexDrafts()` is called
+- **THEN** only the drafts index is rebuilt
+- **WHEN** `reindexDiscarded()` is called
+- **THEN** only the discarded index is rebuilt
+
+### Requirement: Change list include projection
+
+#### Scenario: Include flags project cached optional fields only
+
+- **GIVEN** a cached list entry payload that already contains optional `description` and `reason`
+- **WHEN** `list({ includeDescription: true })` is called
+- **THEN** returned items include projected `description` without extra manifest reads
+- **WHEN** the same list call omits `includeDescription`
+- **THEN** returned items omit `description`
 
 ### Requirement: save persists the change manifest only
 

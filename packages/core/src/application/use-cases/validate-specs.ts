@@ -140,9 +140,11 @@ export class ValidateSpecs {
       if (specRepo === undefined) {
         throw new WorkspaceNotFoundError(input.workspace)
       }
-      const specs = await specRepo.list()
-      for (const spec of specs) {
-        const entry = await this._validateSpec(
+      const listed = await specRepo.list(undefined, { limit: Number.MAX_SAFE_INTEGER })
+      for (const entry of listed.items) {
+        const spec = await specRepo.get(SpecPath.parse(entry.path))
+        if (spec === null) continue
+        const entryResult = await this._validateSpec(
           specRepo,
           spec.workspace,
           spec.name.toFsPath('/'),
@@ -151,13 +153,15 @@ export class ValidateSpecs {
           crossRules,
           schema,
         )
-        entries.push(entry)
+        entries.push(entryResult)
       }
     } else {
       for (const [, specRepo] of this._specs) {
-        const specs = await specRepo.list()
-        for (const spec of specs) {
-          const entry = await this._validateSpec(
+        const listed = await specRepo.list(undefined, { limit: Number.MAX_SAFE_INTEGER })
+        for (const row of listed.items) {
+          const spec = await specRepo.get(SpecPath.parse(row.path))
+          if (spec === null) continue
+          const entryResult = await this._validateSpec(
             specRepo,
             spec.workspace,
             spec.name.toFsPath('/'),
@@ -166,7 +170,7 @@ export class ValidateSpecs {
             crossRules,
             schema,
           )
-          entries.push(entry)
+          entries.push(entryResult)
         }
       }
     }

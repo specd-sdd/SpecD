@@ -143,12 +143,10 @@ export class RunStepHooks {
           return { hooks: [], success: true, failedHooks: [] }
         }
 
-        const workspace = archived.specIds[0]?.split(':')[0] ?? 'default'
         const variables: TemplateVariables = {
           change: {
             name: archived.name,
             archivedName: archived.archivedName,
-            workspace,
             path: this._archive.archivePath(archived),
           },
         }
@@ -195,10 +193,8 @@ export class RunStepHooks {
       return { hooks: [], success: true, failedHooks: [] }
     }
 
-    // Build contextual variables
-    const workspace = change.workspaces[0] ?? 'default'
     const variables: TemplateVariables = {
-      change: { name: change.name, workspace, path: this._changes.changePath(change) },
+      change: { name: change.name, path: this._changes.changePath(change) },
     }
 
     return this._executeHooks(runHooks, variables, input.phase, onProgress)

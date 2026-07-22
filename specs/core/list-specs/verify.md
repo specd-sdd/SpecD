@@ -9,6 +9,7 @@
 - **GIVEN** two workspaces `alpha` and `beta` configured in that order, each containing specs
 - **WHEN** `execute()` is called with no options
 - **THEN** all entries from `alpha` appear before all entries from `beta`
+- **AND** each workspace's items remain in repository canonical path order
 
 #### Scenario: Empty workspace included without error
 
@@ -22,125 +23,102 @@
 - **WHEN** `execute({ workspaces: ["alpha"] })` is called
 - **THEN** only entries from workspace `alpha` are returned
 
-#### Scenario: Unknown workspace name in filter silently ignored
+#### Scenario: ListSpecs forwards include flags to each repository
 
-- **GIVEN** no workspace named `nonexistent` is configured
-- **WHEN** `execute({ workspaces: ["nonexistent"] })` is called
-- **THEN** the result array is empty and no error is thrown
-
-#### Scenario: Empty workspaces array includes all
-
-- **GIVEN** specs exist in workspaces `alpha` and `beta`
-- **WHEN** `execute({ workspaces: [] })` is called
-- **THEN** entries from both workspaces are returned
-
-#### Scenario: ListSpecs uses orchestrated project structure
-
-- **WHEN** `ListSpecs.execute()` is called
-- **THEN** it obtains the list of workspaces via the `ListWorkspaces` orchestrator
-- **AND** it enumerates all specs through the provided repository instances
+- **WHEN** `execute({ includeSummary: true, includeMetadataStatus: true, limit: 50 })` is called
+- **THEN** each workspace `SpecRepository.list()` receives the same forwarded options
+- **AND** the use case does not re-sort or re-paginate per-workspace results
 
 ### Requirement: Always resolve a title for each entry
 
-#### Scenario: Title from metadata
+#### Scenario: Title supplied by repository list
 
-- **GIVEN** a spec with metadata containing `title: "OAuth Login"`
+- **GIVEN** `SpecRepository.list()` returns entries with resolved titles
 - **WHEN** `execute()` is called
-- **THEN** the entry's `title` is `"OAuth Login"`
+- **THEN** each entry's `title` matches the repository-provided value
+- **AND** the use case does not perform additional metadata or file reads to resolve titles
 
-#### Scenario: Title fallback to path segment
+#### Scenario: Title fallback comes from repository index materialization
 
-- **GIVEN** a spec at path `auth/login` with no metadata
+- **GIVEN** a spec at path `auth/login` indexed without metadata title
 - **WHEN** `execute()` is called
-- **THEN** the entry's `title` is `"login"`
+- **THEN** the entry's `title` is `"login"` as returned by `SpecRepository.list()`
+- **AND** `ListSpecs` does not read metadata or spec files to derive the title
 
-#### Scenario: Empty metadata title triggers fallback
+#### Scenario: Empty metadata title fallback comes from repository
 
-- **GIVEN** a spec at path `auth/login` with metadata containing `title: "  "`
+- **GIVEN** a spec indexed with empty trimmed metadata title and path `auth/login`
 - **WHEN** `execute()` is called
-- **THEN** the entry's `title` is `"login"` (fallback applied)
+- **THEN** the entry's `title` is `"login"` from the repository result
 
 ### Requirement: Optional summary resolution
 
-#### Scenario: Summary from metadata description
+#### Scenario: Summary forwarded from repository when requested
 
-- **GIVEN** a spec with metadata containing `description: "Handles OAuth flows"`
+- **GIVEN** `SpecRepository.list({ includeSummary: true })` returns entries with cached `summary`
 - **WHEN** `execute({ includeSummary: true })` is called
-- **THEN** the entry's `summary` is `"Handles OAuth flows"`
+- **THEN** merged entries include the repository-provided `summary`
 
-#### Scenario: Summary extracted from spec.md when no description in metadata
-
-- **GIVEN** a spec with no `description` in metadata but a `spec.md` with an extractable overview
-- **WHEN** `execute({ includeSummary: true })` is called
-- **THEN** the entry's `summary` is the extracted overview text
-
-#### Scenario: Summary omitted when no source available
-
-- **GIVEN** a spec with no metadata description and no `spec.md`
-- **WHEN** `execute({ includeSummary: true })` is called
-- **THEN** the entry has no `summary` property
-
-#### Scenario: Summary not present when not requested
+#### Scenario: Summary omitted when not requested
 
 - **WHEN** `execute()` is called without `includeSummary`
 - **THEN** no entry has a `summary` property
 
+#### Scenario: Use case does not re-resolve summary with extra I/O
+
+- **GIVEN** the repository already returned a cached summary for a spec entry
+- **WHEN** `execute({ includeSummary: true })` is called
+- **THEN** the use case does not call `metadata()`, read `spec.md`, or invoke summary extraction helpers for that entry
+
 ### Requirement: Optional metadata freshness status
 
-#### Scenario: Status is missing when no metadata
+#### Scenario: metadataStatus forwarded from repository when requested
 
-- **GIVEN** a spec with no metadata
+- **GIVEN** `SpecRepository.list({ includeMetadataStatus: true })` returns entries with cached `metadataStatus`
 - **WHEN** `execute({ includeMetadataStatus: true })` is called
-- **THEN** the entry's `metadataStatus` is `'missing'`
-
-#### Scenario: Status is invalid when metadata fails structural validation
-
-- **GIVEN** a spec with metadata that fails `strictSpecMetadataSchema` parsing
-- **WHEN** `execute({ includeMetadataStatus: true })` is called
-- **THEN** the entry's `metadataStatus` is `'invalid'`
-
-#### Scenario: Status is stale when hashes do not match
-
-- **GIVEN** a spec with valid metadata whose `contentHashes` do not match current file contents
-- **WHEN** `execute({ includeMetadataStatus: true })` is called
-- **THEN** the entry's `metadataStatus` is `'stale'`
-
-#### Scenario: Status is fresh when all hashes match
-
-- **GIVEN** a spec with valid metadata whose `contentHashes` all match current file contents
-- **WHEN** `execute({ includeMetadataStatus: true })` is called
-- **THEN** the entry's `metadataStatus` is `'fresh'`
+- **THEN** merged entries include the repository-provided `metadataStatus`
 
 #### Scenario: Status not present when not requested
 
 - **WHEN** `execute()` is called without `includeMetadataStatus`
 - **THEN** no entry has a `metadataStatus` property
 
+#### Scenario: Use case does not re-compute freshness with extra I/O
+
+- **GIVEN** the repository already returned `metadataStatus` for a spec entry
+- **WHEN** `execute({ includeMetadataStatus: true })` is called
+- **THEN** the use case does not call `metadata()`, content hashing, or schema validation for that entry
+
 ### Requirement: Silent error handling for metadata and summary reads
 
-#### Scenario: Metadata read error does not propagate
+#### Scenario: Repository swallows per-spec resolution errors at index time
 
-- **GIVEN** `repo.metadata(spec)` throws an I/O error
+- **GIVEN** a spec whose title/summary/status resolution fails during index materialization
 - **WHEN** `execute()` is called
-- **THEN** the entry still appears with the path-segment fallback title and no error is thrown
+- **THEN** the entry still appears with repository-provided fallback fields
+- **AND** no error is thrown to the caller
 
-#### Scenario: spec.md read error does not propagate
+#### Scenario: ListSpecs does not perform supplementary I/O for optional fields
 
-- **GIVEN** `repo.artifact(spec, 'spec.md')` throws an I/O error during summary resolution
-- **WHEN** `execute({ includeSummary: true })` is called
-- **THEN** the entry still appears without a `summary` and no error is thrown
+- **WHEN** `execute({ includeSummary: true, includeMetadataStatus: true })` is called
+- **THEN** the use case merges repository list results without additional per-spec file reads beyond repository delegation
 
 ### Requirement: SpecListEntry shape
 
-#### Scenario: Entry contains required fields
+#### Scenario: Entry contains required fields from repository
 
 - **WHEN** `execute()` is called
-- **THEN** each entry contains `workspace` (string), `path` (string), and `title` (string)
+- **THEN** each entry contains `workspace`, `path`, and `title` as returned by `SpecRepository.list()`
 
-#### Scenario: Entry may contain optional fields when requested
+#### Scenario: Optional fields appear only when requested and projected
 
 - **WHEN** `execute({ includeSummary: true, includeMetadataStatus: true })` is called
-- **THEN** entries may contain `summary` and `metadataStatus` in addition to required fields
+- **THEN** entries may contain `summary` and `metadataStatus` only when the repository projected them
+
+#### Scenario: Workspace filter limits merged results
+
+- **WHEN** `execute({ workspaces: ["alpha"] })` is called
+- **THEN** the result array contains entries only from workspace `alpha`
 
 ### Requirement: Config-based factory delegates through resolveListSpecsDeps
 

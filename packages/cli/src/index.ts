@@ -5,6 +5,9 @@ import { handleError } from './handle-error.js'
 import { renderBanner } from './banner.js'
 import { CLI_VERSION, CODE_GRAPH_VERSION, CORE_VERSION, SDK_VERSION } from './version.js'
 
+// storage
+import { registerStorageReindex } from './commands/storage/reindex.js'
+
 // change
 import { registerChangeCreate } from './commands/change/create.js'
 import { registerChangeList } from './commands/change/list.js'
@@ -233,6 +236,12 @@ registerGraphStats(graphCmd)
 registerGraphImpact(graphCmd)
 registerGraphSearch(graphCmd)
 registerGraphHotspots(graphCmd)
+
+// ---- storage ----
+const storageCmd = program
+  .command('storage')
+  .description('Commands for maintaining derived storage indexes and caches.')
+registerStorageReindex(storageCmd)
 
 // ---- default action (no subcommand) ----
 // When `specd` is invoked with no subcommand, auto-show the project dashboard

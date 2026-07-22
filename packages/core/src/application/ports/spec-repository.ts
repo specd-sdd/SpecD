@@ -2,9 +2,30 @@ import { type Spec } from '../../domain/entities/spec.js'
 import { type SpecPath } from '../../domain/value-objects/spec-path.js'
 import { type SpecArtifact } from '../../domain/value-objects/spec-artifact.js'
 import { type PersistedSpecMetadata } from '../../domain/services/parse-metadata.js'
-import { Repository, type RepositoryConfig } from './repository.js'
+import {
+  Repository,
+  type RepositoryConfig,
+  type ListOptions,
+  type ListResult,
+} from './repository.js'
 
 export { type RepositoryConfig as SpecRepositoryConfig }
+export type { ListOptions, ListResult }
+
+/** Lightweight spec row returned by {@link SpecRepository.list}. */
+export interface SpecListEntry {
+  readonly workspace: string
+  readonly path: string
+  readonly title: string
+  readonly summary?: string
+  readonly metadataStatus?: 'missing' | 'invalid' | 'stale' | 'fresh'
+}
+
+/** Options for listing specs within a workspace. */
+export interface SpecListOptions extends ListOptions {
+  readonly includeSummary?: boolean
+  readonly includeMetadataStatus?: boolean
+}
 
 /** A single match location within a spec artifact. */
 export interface SpecSearchMatch {
@@ -79,14 +100,16 @@ export abstract class SpecRepository extends Repository {
   abstract get(name: SpecPath): Promise<Spec | null>
 
   /**
-   * Lists all spec metadata in this workspace, optionally filtered by a path prefix.
+   * Lists specs in this workspace, optionally filtered by a path prefix.
    *
-   * Returns lightweight {@link Spec} objects — no artifact content is loaded.
+   * Returns lightweight {@link SpecListEntry} rows — no artifact content is loaded
+   * unless include flags request projected fields already materialized in the index.
    *
    * @param prefix - Optional path prefix to filter results (e.g. `auth` returns all `auth/*`)
-   * @returns All matching specs, in repository order
+   * @param options - Pagination and include projection options
+   * @returns Paginated matching specs in canonical path order
    */
-  abstract list(prefix?: SpecPath): Promise<Spec[]>
+  abstract list(prefix?: SpecPath, options?: SpecListOptions): Promise<ListResult<SpecListEntry>>
 
   /**
    * Returns the total number of specs in this workspace.
@@ -94,9 +117,14 @@ export abstract class SpecRepository extends Repository {
    * This provides an efficient way to discover workspace size without loading
    * all lightweight metadata into memory.
    *
-   * @returns The total spec count
+   * @returns The total spec count (same source as `list().meta.total`)
    */
   abstract count(): Promise<number>
+
+  /**
+   * Rebuilds the spec list fs-cache index for this workspace.
+   */
+  abstract reindex(): Promise<void>
 
   /**
    * Loads the content of a single artifact file within a spec.

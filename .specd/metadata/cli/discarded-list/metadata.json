@@ -4,7 +4,7 @@
   "dependsOn": [
     "cli:entrypoint",
     "core:list-discarded",
-    "core:discarded-change-view",
+    "core:change-list-entry",
     "cli:command-resource-naming"
   ],
   "context": [
@@ -14,37 +14,43 @@
     {
       "requirement": "Command signature",
       "rules": [
-        "```\nspecd discarded list [--format text|json|toon]\n```\n\nNo positional arguments. The `--format` flag controls output encoding; defaults to `text`."
+        "```\nspecd discarded list [--format text|json|toon] [--limit <n>] [--page <p>] [--after-key <iso>] [--after-id <name>] [--description] [--reason] [--superseded-by]\n```\n\n- `--format text|json|toon` — optional; output encoding, defaults to `text`\n- `--limit <n>` — optional; maximum number of entries to return; defaults to `100`\n- `--page <p>` — optional; 1-based page number (uses `--limit`, defaulting to `100` when omitted)\n- `--after-key <iso>` — optional; exclusive keyset cursor — ISO-8601 `discardedAt` of the last seen row\n- `--after-id <name>` — optional; tiebreak change `name` when `--after-key` collides; MUST accompany `--after-key`\n- `--description` — optional; include `description` (`includeDescription`)\n- `--reason` — optional; include discard `reason` (`includeReason`)\n- `--superseded-by` — optional; include `supersededBy` (`includeSupersededBy`)\n\n`--page` is mutually exclusive with `--after-key` / `--after-id`.\n\nNo positional arguments."
       ]
     },
     {
       "requirement": "Uses ListDiscarded read model",
       "rules": [
-        "The command MUST invoke `ListDiscarded.execute()` and treat each entry as `DiscardedChangeView`.\n\nDiscard metadata (`discardReason`, `discardedAt`, `discardedBy`, `supersededBy`) MUST be read from the view, not by scanning raw `Change` history in the command."
+        "The command MUST invoke `ListDiscarded.execute()` with list options derived from the flags and treat each entry as a `DiscardedChangeListEntry`.\n\nDiscard metadata (`reason`, `discardedAt`, `discardedBy`, `supersededBy`, `description`) MUST be read from the list entry returned by the use case — not by scanning raw `Change` history in the command."
+      ]
+    },
+    {
+      "requirement": "List options forwarding",
+      "rules": [
+        "The command MUST map CLI flags to list options:\n\n- `--limit`, `--page`, `--after-key`, `--after-id` → `limit`, `page`, and `after: { key, id? }`\n- `--description` → `includeDescription: true`\n- `--reason` → `includeReason: true`\n- `--superseded-by` → `includeSupersededBy: true`\n\nWhen include flags are omitted, the CLI MUST NOT set them. The command MUST NOT re-sort or paginate after the use case returns."
       ]
     },
     {
       "requirement": "Output format — text",
       "rules": [
-        "The command prints a human-readable table to stdout. Changes are sorted by discard date descending (most recently discarded first).\n\nThe output has an inverse-video column header row `NAME  DATE  BY  REASON` above the data rows. Column widths are fixed at render time, computed from the widest value across all rows for each column (global, not per-group). The REASON column uses wrap overflow capped at 60 characters."
+        "The command prints a human-readable table to stdout. Rows appear in canonical order (`discardedAt` descending — most recently discarded first) as returned by the use case; the CLI MUST NOT re-sort.\n\nThe output has an inverse-video column header row. Base columns are always `NAME  DATE  BY`. When `--reason` is set, `REASON` is appended. When `--superseded-by` is set and an entry has superseded targets, the row includes a `→ <names>` segment after the reason column (or in place of reason when reason is omitted). Column widths are fixed at render time, computed from the widest value across all rows for each column (global, not per-group). The REASON column uses wrap overflow capped at 60 characters.\n\nWhen `--description` is set and an entry includes a description, a dim indented description line is printed below the main row.\n\nWhen `meta.count < meta.total`, the command MUST print a trailing hint line:\n\n```\nshowing <count> of <total> (use --limit/--page)\n```"
       ]
     },
     {
       "requirement": "Output format — JSON",
       "rules": [
-        "When `--format json` is passed, the command writes a JSON array to stdout:\n\n```json\n[\n  {\n    \"name\": \"...\",\n    \"discardedAt\": \"...\",\n    \"discardedBy\": { \"name\": \"...\", \"email\": \"...\" },\n    \"reason\": \"...\",\n    \"supersededBy\": [\"...\"]\n  }\n]\n```\n\nOne object per discarded change, sorted by discard date descending. `supersededBy` is omitted when empty. `discardedBy` is omitted when not recorded."
+        "When `--format json` is passed, the command writes a paginated envelope to stdout:\n\n```json\n{\n  \"items\": [\n    {\n      \"name\": \"...\",\n      \"createdAt\": \"...\",\n      \"state\": \"...\",\n      \"specIds\": [\"...\"],\n      \"schemaName\": \"...\",\n      \"schemaVersion\": 1,\n      \"discardedAt\": \"...\",\n      \"discardedBy\": { \"name\": \"...\", \"email\": \"...\" },\n      \"description\": \"...\",\n      \"reason\": \"...\",\n      \"supersededBy\": [\"...\"]\n    }\n  ],\n  \"meta\": {\n    \"total\": 125,\n    \"count\": 100,\n    \"limit\": 100,\n    \"page\": 1\n  }\n}\n```\n\nOptional fields appear only when present on the entry and when the matching include flag was set. `supersededBy` is omitted when empty even when `--superseded-by` is set."
       ]
     },
     {
       "requirement": "Output format — toon",
       "rules": [
-        "When `--format toon` is passed, the command writes the same data model as JSON encoded in Token-Oriented Object Notation (toon) to stdout."
+        "When `--format toon` is passed, the command writes the same `{ items, meta }` data model as JSON encoded in Token-Oriented Object Notation (toon) to stdout."
       ]
     },
     {
       "requirement": "Empty discarded list",
       "rules": [
-        "If there are no discarded changes, the command prints `no discarded changes` to stdout in text mode, or `[]` in JSON/toon mode, and exits with code 0."
+        "If there are no discarded changes, the command prints `no discarded changes` to stdout in text mode, or `{\"items\":[],\"meta\":{\"total\":0,\"count\":0,\"limit\":100}}` in JSON/toon mode, and exits with code 0."
       ]
     },
     {
@@ -69,10 +75,23 @@
       ]
     },
     {
+      "requirement": "Command signature",
+      "name": "Default limit is 100",
+      "given": ["more than 100 discarded changes exist"],
+      "when": ["specd discarded list --format json is run without --limit"],
+      "then": ["meta.limit is 100"]
+    },
+    {
+      "requirement": "Command signature",
+      "name": "--page and keyset cursors are mutually exclusive",
+      "when": ["specd discarded list --page 2 --after-key 2024-01-01T00:00:00.000Z is run"],
+      "then": ["the command exits with a CLI usage error before invoking the use case"]
+    },
+    {
       "requirement": "Uses ListDiscarded read model",
       "name": "Invokes ListDiscarded",
-      "when": ["specd discarded list runs"],
-      "then": ["ListDiscarded.execute is called"]
+      "when": ["specd discarded list --limit 10 runs"],
+      "then": ["ListDiscarded.execute is called with list options derived from CLI flags"]
     },
     {
       "requirement": "Uses ListDiscarded read model",
@@ -82,11 +101,19 @@
       "then": ["GetStatus is not invoked for each listed name"]
     },
     {
-      "requirement": "Uses ListDiscarded read model",
-      "name": "Text output includes discard reason per row",
-      "given": ["ListDiscarded returns a view with discardReason: 'superseded'"],
-      "when": ["specd discarded list runs in text mode"],
-      "then": ["stdout includes that reason for the listed change"]
+      "requirement": "List options forwarding",
+      "name": "Include flags forwarded only when set",
+      "when": ["specd discarded list --description --reason --superseded-by --format json is run"],
+      "then": [
+        "ListDiscarded.execute is called with includeDescription: true, includeReason: true, and includeSupersededBy: true"
+      ]
+    },
+    {
+      "requirement": "List options forwarding",
+      "name": "CLI does not re-sort after the use case returns",
+      "given": ["ListDiscarded.execute returns items in repository canonical order"],
+      "when": ["specd discarded list --format json is run"],
+      "then": ["stdout items appear in the same order as returned by the use case"]
     },
     {
       "requirement": "Output format — toon",
@@ -101,7 +128,7 @@
       "given": [
         "discarded/ contains two changes: old-experiment (discarded 2024-01-10, actor alice, reason \"no longer needed\", no supersededBy) and bad-idea (discarded 2024-01-08, actor bob, reason \"duplicate effort\", supersededBy ['new-approach'])"
       ],
-      "when": ["specd discarded list is run"],
+      "when": ["specd discarded list --reason --superseded-by is run"],
       "then": [
         "stdout contains one row for each change showing name, date, actor, and reason",
         "AND the row for bad-idea includes → new-approach",
@@ -111,10 +138,26 @@
     },
     {
       "requirement": "Output format — text",
-      "name": "Rows sorted by discard date descending",
-      "given": ["discarded/ contains change older-discard discarded before newer-discard"],
+      "name": "Reason and superseded-by hidden without include flags",
+      "given": [
+        "a discarded change with reason \"duplicate effort\" and supersededBy ['new-approach']"
+      ],
+      "when": ["specd discarded list is run without --reason or --superseded-by"],
+      "then": ["stdout does not include the reason text or → new-approach"]
+    },
+    {
+      "requirement": "Output format — text",
+      "name": "Truncation hint when results are partial",
+      "given": ["125 discarded changes and default pagination"],
       "when": ["specd discarded list is run"],
-      "then": ["newer-discard appears before older-discard in the output"]
+      "then": ["stdout contains showing 100 of 125 (use --limit/--page)"]
+    },
+    {
+      "requirement": "Output format — text",
+      "name": "CLI preserves use-case row order",
+      "given": ["ListDiscarded.execute returns entries ordered by discardedAt descending"],
+      "when": ["specd discarded list is run"],
+      "then": ["stdout rows appear in the same order as the returned items"]
     },
     {
       "requirement": "Output format — JSON",
@@ -124,8 +167,9 @@
       ],
       "when": ["specd discarded list --format json is run"],
       "then": [
-        "stdout is a JSON array with one object containing name, discardedAt, discardedBy, and reason fields",
-        "AND the object does not contain a supersededBy field",
+        "stdout is valid JSON with items and meta",
+        "AND the object for old-experiment contains name, discardedAt, and discardedBy",
+        "AND the object does not contain reason, description, or supersededBy",
         "AND the process exits with code 0"
       ]
     },
@@ -135,7 +179,7 @@
       "given": [
         "discarded/ contains one change named bad-idea with supersededBy set to ['new-approach']"
       ],
-      "when": ["specd discarded list --format json is run"],
+      "when": ["specd discarded list --format json --superseded-by is run"],
       "then": [
         "the JSON object for bad-idea contains a supersededBy array with \"new-approach\"",
         "AND the process exits with code 0"
@@ -153,7 +197,10 @@
       "name": "No discarded changes — JSON",
       "given": ["discarded/ is empty"],
       "when": ["specd discarded list --format json is run"],
-      "then": ["stdout is []", "AND the process exits with code 0"]
+      "then": [
+        "stdout is {\"items\":[],\"meta\":{\"total\":0,\"count\":0,\"limit\":100}}",
+        "AND the process exits with code 0"
+      ]
     },
     {
       "requirement": "Error cases",
@@ -164,16 +211,17 @@
     }
   ],
   "implementation": {
-    "files": [
+    "symbols": [
       {
         "specId": "cli:discarded-list",
-        "file": "cli:src/commands/discarded/list.ts"
+        "file": "cli:src/commands/discarded/list.ts",
+        "symbol": "registerDiscardedList"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:11941f57ceb1544b8803f1fcfec6795ac71aabafc94d0667adf068b5846dd152",
-    "verify.md": "sha256:3ead2e4f57f7ed657f96390d2f5252c3ba7bebdaceb47f04493d940fe7486e09"
+    "spec.md": "sha256:b43575c026057a1aa93257e90c3dc1734acfd568e4778be40626f9ef87c8c230",
+    "verify.md": "sha256:3230702e88c41e8a1ea80615342e01df22bfdf4695a1b16a3fd56b513e5b0f63"
   },
   "generatedBy": "core"
 }

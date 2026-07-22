@@ -58,7 +58,12 @@ export type {
   LogLevel,
   LoggerPort,
 } from './application/ports/logger.port.js'
-export type { ChangeRepository, SpecRepository, SchemaRegistry } from './application/ports/index.js'
+export type {
+  ChangeRepository,
+  SpecRepository,
+  SchemaRegistry,
+  ArchiveRepository,
+} from './application/ports/index.js'
 export { InvalidCompositionFactoryArgumentsError } from './domain/errors/index.js'
 
 // Use-case types and helpers
@@ -77,6 +82,8 @@ export {
   type UpdateSpecDepsInput,
   type UpdateSpecDepsResult,
   type ListSpecs,
+  type ListSpecsResult,
+  type ListSpecsWorkspaceSlice,
   type SpecListEntry,
   type SpecMetadataStatus,
   type SearchSpecs,
@@ -467,10 +474,22 @@ export {
   toArchivedChangeView,
 } from './domain/read-only-change-view.js'
 export {
+  type ArchiveListEntry,
   type ArchivedChangeIndexEntry,
   workspacesFromSpecIds,
 } from './domain/archived-change-index-entry.js'
-
+export {
+  type ChangeListEntryBase,
+  type ActiveChangeListEntry,
+  type DraftedChangeListEntry,
+  type DiscardedChangeListEntry,
+} from './domain/change-list-entry.js'
+export {
+  type ListCursor,
+  type ListOptions,
+  type ListMeta,
+  type ListResult,
+} from './application/ports/repository.js'
 // Domain services
 export { applyPreHashCleanup } from './domain/services/pre-hash-cleanup.js'
 export {

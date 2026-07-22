@@ -1,0 +1,149 @@
+- op: added
+  description: Verify workspace is excluded from the archive pattern variable catalog, rejected like scope.
+  position:
+    parent:
+      type: section
+      matches: Requirements
+    after:
+      type: section
+      matches: 'Requirement: Scope excluded from archive pattern'
+  content: |
+    ### Requirement: Workspace excluded from archive pattern
+
+    #### Scenario: Pattern uses workspace variable
+
+    - **WHEN** `storage.archive.pattern` contains `{{change.workspace}}`
+    - **THEN** `FsArchiveRepository` must reject it as an unsupported variable, throwing `UnsupportedPatternError` at construction time — the same as `{{change.scope}}`
+
+    #### Scenario: Normative catalog omits any workspace token
+
+    - **GIVEN** the normative supported-variable catalog for `storage.archive.pattern`
+    - **WHEN** the catalog is inspected
+    - **THEN** it contains only `{{year}}`, `{{month}}`, `{{day}}`, `{{change.name}}`, `{{change.archivedName}}`
+    - **AND** it contains no per-change workspace token
+
+- op: modified
+  description: Active listing order comes from fs-cache index helper.
+  selector:
+    type: section
+    matches: 'Requirement: Change directory listing order'
+  content: |
+    #### Scenario: Multiple changes listed in createdAt order
+
+    - **GIVEN** two active changes with `createdAt` timestamps where `alpha` is older than `beta`
+    - **WHEN** `ChangeRepository.list()` is called through the fs adapter
+    - **THEN** `alpha` appears before `beta` in canonical sort order
+    - **AND** the order is produced by the active-changes index helper under `{configPath}/tmp/fs-cache/changes/` without re-sorting at list time
+
+    #### Scenario: List order matches index helper not directory walk
+
+    - **GIVEN** change directories on disk whose lexical order differs from `createdAt` ascending
+    - **WHEN** `ChangeRepository.list()` is called
+    - **THEN** returned items follow `createdAt` ascending from the fs-cache index
+    - **AND** the adapter does not sort directory entries at list time
+
+- op: modified
+  description: Archive list index lives under fs-cache.
+  selector:
+    type: section
+    matches: 'Requirement: Archive index'
+  content: |
+    #### Scenario: Change archived upserts fs-cache index entry
+
+    - **WHEN** `archive(change)` completes successfully
+    - **THEN** an `ArchiveListEntry` row is upserted in `{configPath}/tmp/fs-cache/archive/.specd-index.jsonl`
+    - **AND** no root-local `.specd-index.jsonl` is written at the archive storage root
+
+    #### Scenario: Archive list serves from fs-cache index
+
+    - **GIVEN** archived changes exist on disk and the fs-cache archive index is fresh
+    - **WHEN** `ArchiveRepository.list()` is called
+    - **THEN** entries are returned from `{configPath}/tmp/fs-cache/archive/` without reading every manifest
+    - **AND** results are ordered by `archivedAt` descending (newest first)
+
+    #### Scenario: Archive reindex rebuilds fs-cache index
+
+    - **WHEN** `ArchiveRepository.reindex()` is invoked after manual filesystem changes
+    - **THEN** `{configPath}/tmp/fs-cache/archive/.specd-index.jsonl` is rebuilt from archived manifests
+    - **AND** `meta.totalCount` reflects the full archive count
+
+    #### Scenario: Legacy root index migrated on rebuild
+
+    - **GIVEN** legacy `.specd-index.jsonl` exists at the archive storage root
+    - **WHEN** `ArchiveRepository.reindex()` or the first full rebuild materializes `fs-cache/archive/`
+    - **THEN** the legacy root-local index files are deleted (ENOENT ignored)
+    - **AND** listing uses only the fs-cache index thereafter
+
+    #### Scenario: get does not depend on root-local index
+
+    - **GIVEN** no root-local archive index file exists
+    - **WHEN** `ArchiveRepository.get(name)` is called for an archived change
+    - **THEN** the change is resolved without requiring a root-local JSONL index
+
+- op: modified
+  description: Archive gitignore covers staging only after migration.
+  selector:
+    type: section
+    matches: 'Requirement: Archive runtime ignore hygiene'
+  content: |
+    #### Scenario: Runtime archive behavior ensures staging is ignored
+
+    - **GIVEN** the archive root exists without an archive-local `.gitignore`
+    - **WHEN** `FsArchiveRepository` performs archive creation or index rebuild that touches the archive root
+    - **THEN** the archive root `.gitignore` is created or updated
+    - **AND** it contains an entry for `.staging`
+    - **AND** it does not require entries for `.specd-index.jsonl` or `.specd-index-meta.json`
+
+    #### Scenario: Shared helper preserves staging ignore across runtime paths
+
+    - **WHEN** archive creation, `reindex()`, or staged commit paths prepare the archive directory
+    - **THEN** each path preserves the archive-local ignore entry for `.staging`
+
+- op: added
+  description: Verify fs-cache layout under configPath tmp.
+  position:
+    parent:
+      type: section
+      matches: Requirements
+    after:
+      type: section
+      matches: 'Requirement: Change locks directory placement'
+  content: |
+    ### Requirement: Filesystem list index cache layout
+
+    #### Scenario: List indexes stored under fs-cache buckets
+
+    - **GIVEN** an fs-backed project with active changes, drafts, discarded changes, archive entries, and workspace specs
+    - **WHEN** list/count operations populate derived indexes
+    - **THEN** index files exist under `{configPath}/tmp/fs-cache/` in bucket directories `changes/`, `drafts/`, `discarded/`, `archive/`, and `specs/<workspace>/`
+    - **AND** each bucket contains `.specd-index.jsonl` and `.specd-index-meta.json`
+
+    #### Scenario: Index meta exposes totalCount for count operations
+
+    - **GIVEN** a populated fs-cache bucket with `totalCount: 5` in meta
+    - **WHEN** the corresponding repository `count()` is called with a fresh index
+    - **THEN** the returned count is `5` without materializing full list entries
+
+- op: added
+  description: Verify configPath tmp gitignore hygiene.
+  position:
+    parent:
+      type: section
+      matches: Requirements
+    after:
+      type: section
+      matches: 'Requirement: Filesystem list index cache layout'
+  content: |
+    ### Requirement: configPath tmp gitignore
+
+    #### Scenario: Runtime ensures tmp gitignore contents
+
+    - **GIVEN** `{configPath}/tmp/` is first used by an fs-backed repository
+    - **WHEN** runtime tmp hygiene runs
+    - **THEN** `{configPath}/tmp/.gitignore` exists with contents ignoring `*` and un-ignoring `!.gitignore`
+
+    #### Scenario: Fs-cache artifacts remain gitignored
+
+    - **GIVEN** `{configPath}/tmp/.gitignore` is present
+    - **WHEN** `{configPath}/tmp/fs-cache/` indexes are generated
+    - **THEN** those cache files are ignored by git via the tmp gitignore rule

@@ -1,0 +1,22 @@
+- op: modified
+  description: Contextual template variables drop the singular workspace token.
+  selector:
+    type: section
+    matches: 'Requirement: Instruction resolution'
+  content: |
+    ### Requirement: Instruction resolution
+
+    `GetArtifactInstruction` MUST build contextual `TemplateVariables` for expansion from only `change.name` and `change.path` (via `ChangeRepository.changePath()`). It MUST NOT build a `change.workspace` variable or inject any singular/primary workspace value (for example via `change.workspaces[0] ?? 'default'`) into the `change` namespace — per [`core:template-variables`](../template-variables/spec.md), `change.workspace` is not a supported token, and a change has no single primary workspace.
+
+    `GetArtifactInstruction` MUST resolve each instruction component independently:
+
+    - **`rulesPre`** — if the artifact declares `rules.pre`, collect all entries' `text` in declaration order. These are composition rules added by extending schemas or plugins to augment the base instruction.
+    - **`instruction`** — the artifact's `instruction` field from the schema. `null` if not declared.
+    - **`template`** — if the artifact declares a `template` path, read the file content from the schema directory via `SchemaRegistry` and return the resolved string. `null` if the artifact has no template. Template variable expansion (via `TemplateExpander`) MUST be applied to the template content using the same contextual variables as `instruction`.
+    - **`delta`** — if the artifact has `delta: true`, resolve three sub-components:
+      - **`formatInstructions`** — call `parsers.get(artifact.format).deltaInstructions()` for the technical delta format guidance.
+      - **`domainInstructions`** — the artifact's `deltaInstruction` field. `null` if not declared.
+      - **`availableOutlines`** — for each spec ID in `change.specIds`, if the corresponding artifact file exists in `SpecRepository`, include that `specId` in `availableOutlines`. `availableOutlines` is strictly `string[]` of spec IDs. The use case MUST NOT embed full outline trees in this payload. Full outline content is retrieved on demand via `GetSpecOutline` (CLI: `specd specs outline <specPath> --artifact <artifactId>`).
+    - **`rulesPost`** — if the artifact declares `rules.post`, collect all entries' `text` in declaration order.
+
+    When `delta` is `false`, the `delta` field in the result is `null`.

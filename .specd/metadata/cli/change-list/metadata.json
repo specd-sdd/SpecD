@@ -1,7 +1,12 @@
 {
   "title": "Change List",
   "description": "Teams need a quick overview of all in-flight work to coordinate and avoid conflicts. `specd changes list` is the canonical form and lists all active changes in the project (those in `changes/`), sorted by creation date.\n\n`specd change list` remains supported as an alias.",
-  "dependsOn": ["cli:entrypoint", "core:change", "cli:command-resource-naming"],
+  "dependsOn": [
+    "cli:entrypoint",
+    "core:list-changes",
+    "core:change-list-entry",
+    "cli:command-resource-naming"
+  ],
   "context": [
     "Teams need a quick overview of all in-flight work to coordinate and avoid conflicts. `specd changes list` is the canonical form and lists all active changes in the project (those in `changes/`), sorted by creation date.\n\n`specd change list` remains supported as an alias."
   ],
@@ -9,19 +14,25 @@
     {
       "requirement": "Command signature",
       "rules": [
-        "```\nspecd changes list [--format text|json|toon]\n```\n\nAlias:\n\n```\nspecd change list [--format text|json|toon]\n```\n\n- `--format text|json|toon` — optional; output format, defaults to `text`"
+        "```\nspecd changes list [--format text|json|toon] [--limit <n>] [--page <p>] [--after-key <iso>] [--after-id <name>] [--description]\n```\n\nAlias:\n\n```\nspecd change list [--format text|json|toon] [--limit <n>] [--page <p>] [--after-key <iso>] [--after-id <name>] [--description]\n```\n\n- `--format text|json|toon` — optional; output format, defaults to `text`\n- `--limit <n>` — optional; maximum number of entries to return; defaults to `100`\n- `--page <p>` — optional; 1-based page number (uses `--limit`, defaulting to `100` when omitted)\n- `--after-key <iso>` — optional; exclusive keyset cursor — ISO-8601 `createdAt` of the last seen row\n- `--after-id <name>` — optional; tiebreak change `name` when `--after-key` collides; MUST accompany `--after-key`\n- `--description` — optional; include the `description` field on each entry (maps to `includeDescription`)\n\n`--page` is mutually exclusive with `--after-key` / `--after-id`."
+      ]
+    },
+    {
+      "requirement": "List options forwarding",
+      "rules": [
+        "The command MUST map CLI flags to `ListOptions` and include flags as follows:\n\n- `--limit`, `--page`, `--after-key`, `--after-id` → `limit`, `page`, and `after: { key, id? }` on the use-case input\n- `--description` → `includeDescription: true`; when omitted, the CLI MUST NOT set include flags (defaults are port-side false)\n\nThe command MUST NOT re-sort, filter, or paginate results after the use case returns — it renders the `items` array and `meta` envelope as returned."
       ]
     },
     {
       "requirement": "Output format",
       "rules": [
-        "The command prints a human-readable table to stdout showing only active changes (in `changes/`). Changes are sorted by `createdAt` ascending (oldest first).\n\nThe output has an inverse-video column header row `NAME  STATE  SPECS  SCHEMA` above the data rows. Column widths are fixed at render time, computed from the widest value across all rows for each column (global, not per-group).\n\nEach data row shows:\n\n```\n  <name>  <state>  <specIds>  <schema-name>@<schema-version>\n```\n\nwhere `<specIds>` is a comma-separated list of the spec IDs on the change.\n\nWhen a description is set on the change, a dim indented description line is printed below the main row:\n\n```\n    <description>\n```\n\nDescription sub-rows are NOT part of the column structure — they are printed outside the fixed-width grid.\n\nIn `json` or `toon` format, the output is an array of objects:\n\n```json\n[{\"name\":\"...\",\"state\":\"...\",\"specIds\":[...],\"schema\":{\"name\":\"...\",\"version\":N},\"description\":\"...\"}]\n```\n\n`description` is omitted from the JSON object when not set."
+        "The command invokes `ListChanges.execute()` with list options derived from the flags and prints the returned `ListResult<ActiveChangeListEntry>` without re-sorting — canonical order (`createdAt` ascending) is owned by the repository layer.\n\nIn `text` mode, the command prints a human-readable table to stdout showing only active changes (in `changes/`).\n\nThe output has an inverse-video column header row `NAME  STATE  SPECS  SCHEMA` above the data rows. Column widths are fixed at render time, computed from the widest value across all rows for each column (global, not per-group).\n\nEach data row shows:\n\n```\n  <name>  <state>  <specIds>  <schema-name>@<schema-version>\n```\n\nwhere `<specIds>` is a comma-separated list of the spec IDs on the change.\n\nWhen `--description` is set and the entry includes a description, a dim indented description line is printed below the main row:\n\n```\n    <description>\n```\n\nDescription sub-rows are NOT part of the column structure — they are printed outside the fixed-width grid.\n\nWhen `meta.count < meta.total`, the command MUST print a trailing hint line after the table:\n\n```\nshowing <count> of <total> (use --limit/--page)\n```\n\nIn `json` or `toon` format, stdout is a paginated envelope:\n\n```json\n{\n  \"items\": [\n    {\n      \"name\": \"...\",\n      \"state\": \"...\",\n      \"specIds\": [\"...\"],\n      \"schemaName\": \"...\",\n      \"schemaVersion\": 1,\n      \"createdAt\": \"...\",\n      \"description\": \"...\"\n    }\n  ],\n  \"meta\": {\n    \"total\": 125,\n    \"count\": 100,\n    \"limit\": 100,\n    \"page\": 1\n  }\n}\n```\n\nOptional fields (`description`) appear in `items` only when the corresponding include flag was set. `meta.after` is included when keyset pagination was used."
       ]
     },
     {
       "requirement": "Empty output",
       "rules": [
-        "If there are no active changes, the command prints `no changes` to stdout in `text` mode, or `[]` as valid JSON in `json`/`toon` mode. The process exits with code 0."
+        "If there are no active changes, the command prints `no changes` to stdout in `text` mode, or `{\"items\":[],\"meta\":{\"total\":0,\"count\":0,\"limit\":100}}` in `json`/`toon` mode. The process exits with code 0."
       ]
     }
   ],
@@ -43,6 +54,54 @@
       "then": ["it behaves as an alias of specd changes list"]
     },
     {
+      "requirement": "Command signature",
+      "name": "Default limit is 100",
+      "given": ["more than 100 active changes exist"],
+      "when": ["specd change list --format json is run without --limit"],
+      "then": ["meta.limit is 100", "AND items contains at most 100 entries"]
+    },
+    {
+      "requirement": "Command signature",
+      "name": "--page and keyset cursors are mutually exclusive",
+      "when": ["specd change list --page 2 --after-key 2024-01-01T00:00:00.000Z is run"],
+      "then": ["the command exits with a CLI usage error before invoking the use case"]
+    },
+    {
+      "requirement": "Command signature",
+      "name": "--after-id requires --after-key",
+      "when": ["specd change list --after-id add-login is run without --after-key"],
+      "then": ["the command exits with a CLI usage error before invoking the use case"]
+    },
+    {
+      "requirement": "List options forwarding",
+      "name": "Pagination flags forwarded to ListChanges",
+      "when": ["specd change list --limit 25 --page 2 --format json is run"],
+      "then": ["ListChanges.execute is called with limit 25 and page 2"]
+    },
+    {
+      "requirement": "List options forwarding",
+      "name": "Keyset cursor forwarded with tiebreak id",
+      "when": [
+        "specd change list --after-key 2024-01-01T00:00:00.000Z --after-id add-login --format json is run"
+      ],
+      "then": [
+        "ListChanges.execute is called with after.key equal to the ISO timestamp and after.id equal to add-login"
+      ]
+    },
+    {
+      "requirement": "List options forwarding",
+      "name": "--description sets includeDescription only when present",
+      "when": ["specd change list --description --format json is run"],
+      "then": ["ListChanges.execute is called with includeDescription: true"]
+    },
+    {
+      "requirement": "List options forwarding",
+      "name": "CLI does not re-sort results",
+      "given": ["ListChanges.execute returns items in repository canonical order"],
+      "when": ["specd change list --format json is run"],
+      "then": ["stdout items appear in the same order as returned by the use case"]
+    },
+    {
       "requirement": "Output format",
       "name": "Only active changes shown",
       "given": ["the project has one active change in changes/ and one drafted change in drafts/"],
@@ -62,19 +121,38 @@
       "given": [
         "a change named add-login in state designing with specIds ['auth/login'] and schema std version 1"
       ],
+      "when": ["specd change list is run without --description"],
+      "then": [
+        "the row for add-login shows add-login, designing, auth/login, and std@1",
+        "AND no description sub-row is printed"
+      ]
+    },
+    {
+      "requirement": "Output format",
+      "name": "--description includes description sub-row",
+      "given": ["an active change with description Add OAuth2 login"],
+      "when": ["specd change list --description is run"],
+      "then": ["a dim indented description line Add OAuth2 login is printed below the main row"]
+    },
+    {
+      "requirement": "Output format",
+      "name": "Truncation hint when results are partial",
+      "given": ["125 active changes and default pagination"],
       "when": ["specd change list is run"],
-      "then": ["the row for add-login shows add-login, designing, auth/login, and std@1"]
+      "then": ["stdout contains showing 100 of 125 (use --limit/--page)"]
     },
     {
       "requirement": "Output format",
       "name": "JSON format output",
       "given": [
-        "one active change add-login in state designing with specId auth/login and schema std version 1"
+        "one active change add-login in state designing with specId auth/login, schema std version 1, and createdAt recorded"
       ],
       "when": ["specd change list --format json is run"],
       "then": [
-        "stdout is a valid JSON array containing one object with name, state, specIds, and schema",
-        "AND schema has name equal to \"std\" and version equal to 1",
+        "stdout is valid JSON with items array and meta object",
+        "AND items[0] contains name, state, specIds, schemaName, schemaVersion, and createdAt",
+        "AND items[0] does not contain a description field",
+        "AND meta contains total, count, limit, and page",
         "AND the process exits with code 0"
       ]
     },
@@ -88,12 +166,24 @@
       "requirement": "Empty output",
       "name": "No active changes — JSON mode",
       "when": ["specd change list --format json is run with no active changes"],
-      "then": ["stdout is []", "AND the process exits with code 0"]
+      "then": [
+        "stdout is {\"items\":[],\"meta\":{\"total\":0,\"count\":0,\"limit\":100}}",
+        "AND the process exits with code 0"
+      ]
     }
   ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "cli:change-list",
+        "file": "cli:src/commands/change/list.ts",
+        "symbol": "registerChangeList"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:ff8fa450b00918864dce31eedc4e0840544f0b224738a798937bfa848facf81d",
-    "verify.md": "sha256:4aadb61a41565eaf3d3e0f09c25ec7ff6f77c8c06fdabe95410727bdb85f457f"
+    "spec.md": "sha256:de4621523b895fd47346ec261815655fb0961fcc5f28802bc43926952cca616e",
+    "verify.md": "sha256:fd0310470fa73e40556f444e58739aebb0134cfc4ed2ef6ef8009e8476b126a8"
   },
   "generatedBy": "core"
 }

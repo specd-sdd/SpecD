@@ -162,7 +162,7 @@ workflow:
           run: echo "Implementation started for {{change.name}}"
 ```
 
-Hook `run:` commands support template variables (`{{change.name}}`, `{{change.workspace}}`, `{{change.path}}`, `{{project.root}}`). Schema-level hooks fire first, then project-level overrides, in declaration order.
+Hook `run:` commands support template variables (`{{change.name}}`, `{{change.path}}`, `{{project.root}}`). Schema-level hooks fire first, then project-level overrides, in declaration order.
 
 ## Multi-workspace projects
 

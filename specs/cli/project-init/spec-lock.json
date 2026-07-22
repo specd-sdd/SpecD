@@ -9,13 +9,5 @@
     "core:composition",
     "core:config-writer-port"
   ],
-  "implementation": [
-    {
-      "file": "cli:src/commands/project/init.ts",
-      "symbols": ["registerProjectInit"]
-    },
-    {
-      "file": "cli:test/commands/project-init.spec.ts"
-    }
-  ]
+  "implementation": []
 }

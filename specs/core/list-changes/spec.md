@@ -8,19 +8,27 @@ Delivery mechanisms need a way to show the current working set at a glance, filt
 
 ### Requirement: Returns all active changes
 
-`ListChanges.execute()` MUST return all changes that are neither drafted nor discarded. The result MUST be sorted by creation order, oldest first.
+`ListChanges.execute(options?)` MUST return `ListResult<ActiveChangeListEntry>` for all active (non-drafted, non-discarded) changes.
+
+It MUST forward `ListOptions` and `includeDescription` to `ChangeRepository.list()` without re-sorting, re-filtering, or re-paginating. Canonical order (`createdAt` ascending) is owned by the repository index helper.
+
+Default `limit` is **100** when callers omit options.
 
 ### Requirement: Returns Change entities without content
 
-The returned `Change[]` MUST contain artifact state (status, validated hashes) but MUST NOT include artifact file content. Content is loaded on demand through separate use cases.
+The returned `ActiveChangeListEntry` items MUST NOT include artifact file content, history, validated hashes, artifact state maps, or other detail fields reserved for `get(name)`.
+
+Optional `description` appears only when `includeDescription` is set on the forwarded options and the repository projected it from the cached entry.
 
 ### Requirement: Constructor accepts a ChangeRepository
 
-`ListChanges` MUST accept a `ChangeRepository` as its sole constructor argument. It MUST delegate to `ChangeRepository.list()` to retrieve changes.
+`ListChanges` MUST accept a `ChangeRepository` as its sole constructor argument. It MUST delegate to `ChangeRepository.list(options)` and return the resulting `ListResult<ActiveChangeListEntry>` unchanged.
+
+The use case MUST NOT re-sort, filter, or paginate after the repository returns.
 
 ### Requirement: Returns an empty array when no active changes exist
 
-When the repository contains no active changes (all are drafted, discarded, or none exist), `execute()` MUST return an empty array. It MUST NOT throw.
+When the repository contains no active changes, `execute()` MUST return `{ items: [], meta: { total: 0, count: 0, limit: <resolved limit> } }`. It MUST NOT throw.
 
 ### Requirement: Config-based factory preserves complete change repository bootstrap
 
@@ -41,5 +49,7 @@ The helper is the only use-case-specific composition entry for config-based boot
 ## Spec Dependencies
 
 - [`core:change`](../change/spec.md)
+- [`core:change-list-entry`](../change-list-entry/spec.md) — `ActiveChangeListEntry` row shape
+- [`core:change-repository-port`](../change-repository-port/spec.md) — paginated list/count contract
 - [`core:kernel`](../kernel/spec.md)
 - [`core:composition-resolver`](../composition-resolver/spec.md)

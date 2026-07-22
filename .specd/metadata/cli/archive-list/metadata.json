@@ -1,7 +1,7 @@
 {
   "title": "Archive List",
   "description": "Teams need a way to review past work without digging through the archive directory by hand. The `specd archive list` command lists all archived changes from the directory configured by `storage.archivePath`, sorted by archive date descending (most recent first).",
-  "dependsOn": ["cli:entrypoint", "core:archived-change-index-entry"],
+  "dependsOn": ["cli:entrypoint", "core:list-archived", "core:archived-change-index-entry"],
   "context": [
     "Teams need a way to review past work without digging through the archive directory by hand. The `specd archive list` command lists all archived changes from the directory configured by `storage.archivePath`, sorted by archive date descending (most recent first)."
   ],
@@ -9,19 +9,25 @@
     {
       "requirement": "Command signature",
       "rules": [
-        "```\nspecd archive list [--format text|json|toon] [--limit <n>] [--page <p>] [--start-at <name>]\n```\n\n- `--format` — controls output encoding; defaults to `text`\n- `--limit` — maximum number of entries to return; defaults to `100`\n- `--page` — 1-based page number (requires `--limit`)\n- `--start-at` — exclusive cursor for keyset pagination; name of the change to start after\n\n`--page` and `--start-at` are mutually exclusive."
+        "```\nspecd archive list [--format text|json|toon] [--limit <n>] [--page <p>] [--after-key <iso>] [--after-id <name>] [--archived-by]\n```\n\n- `--format` — controls output encoding; defaults to `text`\n- `--limit <n>` — maximum number of entries to return; defaults to `100`\n- `--page <p>` — 1-based page number (uses `--limit`, defaulting to `100` when omitted)\n- `--after-key <iso>` — exclusive keyset cursor — ISO-8601 `archivedAt` of the last seen row\n- `--after-id <name>` — tiebreak change `name` when `--after-key` collides; MUST accompany `--after-key`\n- `--archived-by` — optional; include `archivedBy` on each entry (`includeArchivedBy`)\n\n`--page` is mutually exclusive with `--after-key` / `--after-id`."
+      ]
+    },
+    {
+      "requirement": "List options forwarding",
+      "rules": [
+        "The command MUST invoke `ListArchived.execute()` and map CLI flags to list options:\n\n- `--limit`, `--page`, `--after-key`, `--after-id` → `limit`, `page`, and `after: { key, id? }`\n- `--archived-by` → `includeArchivedBy: true`\n\nWhen `--archived-by` is omitted, the CLI MUST NOT set include flags. The command MUST NOT re-sort or paginate after the use case returns."
       ]
     },
     {
       "requirement": "Output format — text",
       "rules": [
-        "The command prints a human-readable table to stdout. Changes are sorted by archive date descending (most recently archived first).\n\nThe output has an inverse-video column header row `NAME  DATE` above the data rows. Column widths are fixed at render time, computed from the widest value across all rows for each column (global, not per-group).\n\nAt the end of the table, a summary line SHALL be printed:\n`Showing <count> archived changes of <total>. Increase limit or specify another page.`"
+        "The command prints a human-readable table to stdout. Rows appear in canonical order (`archivedAt` descending — most recently archived first) as returned by the use case; the CLI MUST NOT re-sort.\n\nThe output has an inverse-video column header row `NAME  DATE` above the data rows. When `--archived-by` is set, an `BY` column is appended. Column widths are fixed at render time, computed from the widest value across all rows for each column (global, not per-group).\n\nWhen `meta.count < meta.total`, the command MUST print a trailing hint line:\n\n```\nshowing <count> of <total> (use --limit/--page)\n```"
       ]
     },
     {
       "requirement": "Output format — JSON",
       "rules": [
-        "When `--format json` is passed, the command writes a JSON object to stdout containing the list and metadata:\n\n```json\n{\n  \"items\": [\n    {\n      \"name\": \"...\",\n      \"archivedName\": \"...\",\n      \"archivedAt\": \"...\",\n      \"archivedBy\": { \"name\": \"...\", \"email\": \"...\" },\n      \"artifacts\": [\"...\"],\n      \"specIds\": [\"...\"]\n    }\n  ],\n  \"meta\": {\n    \"total\": 125,\n    \"count\": 100,\n    \"limit\": 100,\n    \"page\": 1\n  }\n}\n```\n\nOne object per archived change, sorted by archive date descending. `archivedBy` is omitted when not recorded. `artifacts` is an array of artifact type IDs.\n\nThe command MUST NOT read every archived change `manifest.json` to produce this listing; it SHOULD rely on archive index entries."
+        "When `--format json` is passed, the command writes a JSON object to stdout containing the list and metadata:\n\n```json\n{\n  \"items\": [\n    {\n      \"name\": \"...\",\n      \"archivedName\": \"...\",\n      \"archivedAt\": \"...\",\n      \"specIds\": [\"...\"],\n      \"schemaName\": \"...\",\n      \"schemaVersion\": 1,\n      \"archivedBy\": { \"name\": \"...\", \"email\": \"...\" }\n    }\n  ],\n  \"meta\": {\n    \"total\": 125,\n    \"count\": 100,\n    \"limit\": 100,\n    \"page\": 1\n  }\n}\n```\n\nOne object per archived change in canonical order as returned by the use case. `archivedBy` appears only when `--archived-by` was set and the entry includes it. List entries MUST NOT include `artifacts` — artifact detail belongs on `get`.\n\nThe command MUST NOT read every archived change `manifest.json` to produce this listing; it MUST rely on the archive list index via `ListArchived`."
       ]
     },
     {
@@ -61,8 +67,49 @@
     {
       "requirement": "Command signature",
       "name": "Pagination flags are accepted",
-      "when": ["specd archive list --limit 10 --page 2 is run"],
-      "then": ["the command parses the flags and delegates them to the use case"]
+      "when": [
+        "specd archive list --limit 10 --after-key 2024-01-01T00:00:00.000Z --after-id archived-change is run"
+      ],
+      "then": ["ListArchived.execute is called with limit 10 and keyset cursor { key, id }"]
+    },
+    {
+      "requirement": "Command signature",
+      "name": "Default limit is 100",
+      "given": ["the archive contains more than 100 changes"],
+      "when": ["specd archive list --format json is run without --limit"],
+      "then": ["meta.limit is 100"]
+    },
+    {
+      "requirement": "Command signature",
+      "name": "--page and keyset cursors are mutually exclusive",
+      "when": ["specd archive list --page 2 --after-key 2024-01-01T00:00:00.000Z is run"],
+      "then": ["the command exits with a CLI usage error before invoking the use case"]
+    },
+    {
+      "requirement": "Command signature",
+      "name": "--after-id requires --after-key",
+      "when": ["specd archive list --after-id archived-change is run without --after-key"],
+      "then": ["the command exits with a CLI usage error before invoking the use case"]
+    },
+    {
+      "requirement": "List options forwarding",
+      "name": "--archived-by sets includeArchivedBy",
+      "when": ["specd archive list --archived-by --format json is run"],
+      "then": ["ListArchived.execute is called with includeArchivedBy: true"]
+    },
+    {
+      "requirement": "List options forwarding",
+      "name": "archivedBy omitted without include flag",
+      "given": ["an archived entry includes archivedBy"],
+      "when": ["specd archive list --format json is run without --archived-by"],
+      "then": ["stdout items[0] does not contain archivedBy"]
+    },
+    {
+      "requirement": "List options forwarding",
+      "name": "CLI does not re-sort or paginate after the use case returns",
+      "given": ["ListArchived.execute returns items in repository canonical order"],
+      "when": ["specd archive list --format json is run"],
+      "then": ["stdout items appear in the same order as returned by the use case"]
     },
     {
       "requirement": "Output format — toon",
@@ -74,13 +121,26 @@
     {
       "requirement": "Output format — text",
       "name": "Normal text output",
-      "given": ["the archive contains 5 changes"],
+      "given": ["the archive contains 125 changes and default pagination"],
       "when": ["specd archive list is run"],
       "then": [
         "stdout contains a table with NAME and DATE columns",
-        "AND the WORKSPACE column is NOT present",
-        "AND the summary line Showing 5 archived changes of 5. is printed at the end"
+        "AND stdout contains showing 100 of 125 (use --limit/--page)"
       ]
+    },
+    {
+      "requirement": "Output format — text",
+      "name": "BY column appears only with --archived-by",
+      "given": ["an archived change with archivedBy recorded"],
+      "when": ["specd archive list --archived-by is run"],
+      "then": ["stdout includes a BY column header", "AND the actor appears in the row"]
+    },
+    {
+      "requirement": "Output format — text",
+      "name": "CLI preserves use-case row order",
+      "given": ["ListArchived.execute returns entries ordered by archivedAt descending"],
+      "when": ["specd archive list is run"],
+      "then": ["stdout rows appear in the same order as the returned items"]
     },
     {
       "requirement": "Output format — JSON",
@@ -92,7 +152,8 @@
         "AND meta.total is 125",
         "AND meta.count is 100",
         "AND meta.limit is 100",
-        "AND meta.page is 1"
+        "AND meta.page is 1",
+        "AND list entries do not include an artifacts field"
       ]
     },
     {
@@ -107,7 +168,10 @@
       "name": "No archived changes — JSON",
       "given": ["the archive directory is empty"],
       "when": ["specd archive list --format json is run"],
-      "then": ["stdout is []", "AND the process exits with code 0"]
+      "then": [
+        "stdout is {\"items\":[],\"meta\":{\"total\":0,\"count\":0,\"limit\":100}}",
+        "AND the process exits with code 0"
+      ]
     },
     {
       "requirement": "Error cases",
@@ -127,8 +191,8 @@
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:185a30b301e8a4c4a108e1f54352eb6e7cb8da3babdd2c3845a024c36352b111",
-    "verify.md": "sha256:5b35ea8d21df1a623420152cb0918a215318d08a8d7ce877efd1a5f52e7ac222"
+    "spec.md": "sha256:4d72b7932011f5d3c74fc80a58960df0d7bc0a495f229eee734370c8b45052fd",
+    "verify.md": "sha256:2e264afd1439bccce5baeb7d13060e88dc027448f62e7ce3d1fbb6d7a88315b8"
   },
   "generatedBy": "core"
 }

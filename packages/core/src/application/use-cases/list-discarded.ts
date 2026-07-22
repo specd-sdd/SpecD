@@ -1,5 +1,9 @@
-import { type DiscardedChangeView } from '../../domain/read-only-change-view.js'
-import { type ChangeRepository } from '../ports/change-repository.js'
+import { type DiscardedChangeListEntry } from '../../domain/change-list-entry.js'
+import {
+  type ChangeRepository,
+  type DiscardedChangeListOptions,
+} from '../ports/change-repository.js'
+import { type ListResult } from '../ports/repository.js'
 
 /**
  * Lists all discarded changes in the default workspace.
@@ -19,9 +23,12 @@ export class ListDiscarded {
   /**
    * Executes the use case.
    *
-   * @returns All discarded changes, oldest first
+   * @param options - Pagination and include projection options
+   * @returns Paginated discarded change list entries, newest first
    */
-  async execute(): Promise<DiscardedChangeView[]> {
-    return this._changes.listDiscarded()
+  async execute(
+    options?: DiscardedChangeListOptions,
+  ): Promise<ListResult<DiscardedChangeListEntry>> {
+    return this._changes.listDiscarded(options)
   }
 }

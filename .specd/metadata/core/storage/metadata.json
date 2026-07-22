@@ -20,7 +20,7 @@
     {
       "requirement": "Change directory listing order",
       "rules": [
-        "`ChangeRepository.list()` must return changes in creation order (oldest first). With the `fs` adapter, this is achieved by sorting directory entries by name, which is chronological given the timestamp prefix."
+        "`ChangeRepository.list()` MUST return active changes in canonical sort order: `createdAt` ascending (oldest first). With the `fs` adapter, this order is owned by the active-changes index helper under `{configPath}/tmp/fs-cache/changes/` — not by sorting directory entries at list time."
       ]
     },
     {
@@ -54,15 +54,21 @@
       ]
     },
     {
+      "requirement": "Workspace excluded from archive pattern",
+      "rules": [
+        "`{{change.workspace}}` MUST NOT be a supported archive pattern variable. A change has no single primary workspace — only workspaces touched via `specIds` (see [`core:change`](../change/spec.md)). The normative supported-variable catalog for `storage.archive.pattern` is `{{year}}`, `{{month}}`, `{{day}}`, `{{change.name}}`, `{{change.archivedName}}`; it MUST NOT include any per-change workspace token.\n\nImplementations MUST reject a configured pattern containing `{{change.workspace}}` the same way they reject `{{change.scope}}` — by throwing `UnsupportedPatternError` at construction time, not by leaving the token unexpanded or substituting a fallback value."
+      ]
+    },
+    {
       "requirement": "Archive index",
       "rules": [
-        "`FsArchiveRepository` must maintain an `index.jsonl` at the archive root. Each line must be a JSON object with `name` and `path` fields. The file must be kept in chronological order (oldest first, newest last) so that git diffs only show lines added at the bottom or lines removed — never reorderings. `archive(change)` must append one line at the end (O(1)). `get(name)` must scan the file from the end without loading it fully into memory; if not found, it must fall back to a recursive glob `**/*-<name>` and append the recovered entry. `reindex()` must be declared on the `ArchiveRepository` port. The `fs` adapter implements it by globbing all `manifest.json` files under the archive root, sorting entries by `archivedAt`, and writing a clean `index.jsonl` in chronological order. Other adapters implement it according to their storage mechanism. `specd storage reindex` calls the port method — it has no knowledge of the underlying implementation."
+        "Filesystem-backed archive listing MUST use a list index under `{configPath}/tmp/fs-cache/archive/`, not a root-local index at the archive storage root.\n\nEach fs-cache bucket directory contains:\n\n- `.specd-index.jsonl` — one JSON object per line with wire shape `{ entry, sourceMtime?, sourceFiles? }` where `entry` is the public list-entry payload for that bucket and freshness fields are helper-only (never returned from `list()`).\n- `.specd-index-meta.json` — `{ totalCount, generatedAt, isInvalidated }`.\n\nFor archive, each line's `entry` is an `ArchiveListEntry`; `sourceMtime` records the manifest mtime used for freshness.\n\n`ArchiveRepository.reindex()` MUST rebuild the archive list index in `fs-cache/archive/` by scanning archived manifests. It MUST NOT write or maintain `.specd-index.jsonl` / `.specd-index-meta.json` at the archive root as part of normal list/count operation.\n\n`get(name)` MAY still resolve archive paths by scanning stored manifests or other adapter-specific lookup — it MUST NOT depend on a root-local JSONL index for routine reads.\n\nOn first use or forced rebuild, implementations MUST migrate from any legacy root-local `.specd-index.jsonl` / `.specd-index-meta.json` by rebuilding into `fs-cache/archive/` (migrate and forget — no dual-read compatibility).\n\nOrphan cleanup: when `reindex()` or the first full rebuild materializes `fs-cache/archive/`, delete legacy `.specd-index.jsonl` and `.specd-index-meta.json` from the archive root if present (ignore ENOENT). Normal `list()` / `count()` cache hits MUST NOT scan or delete root-local legacy files.\n\n`specd storage reindex` invokes port `reindex()` methods only — see [`cli:storage-reindex`](../../cli/storage-reindex/spec.md). Storage specs MUST NOT require the CLI to know JSONL layout."
       ]
     },
     {
       "requirement": "Archive runtime ignore hygiene",
       "rules": [
-        "Fs-backed archive storage MUST maintain an archive-local `.gitignore` for runtime archive artifacts.\n\n`FsArchiveRepository` MUST ensure that the archive root ignores both `.specd-index.jsonl` and `.staging`.\n\nThis guarantee MUST be exercised by runtime archive behavior rather than relying on project bootstrap state alone, so archive ignore hygiene remains correct after archive directory relocation, recreation, or index recovery.\n\n`FsArchiveRepository` MAY centralize this behavior in a shared internal archive-directory preparation helper, but the runtime guarantee MUST cover archive creation, index rebuild, and runtime index recovery or append paths."
+        "Fs-backed archive storage MUST maintain an archive-local `.gitignore` for runtime archive artifacts.\n\n`FsArchiveRepository` MUST ensure that the archive root ignores `.staging`.\n\nLegacy root-local index files (`.specd-index.jsonl`, `.specd-index-meta.json`) are obsolete; orphan cleanup removes them on rebuild/migration only. Runtime archive behavior MUST NOT re-add index-only ignore lines for those files after migration.\n\nThis guarantee MUST be exercised by runtime archive behavior rather than relying on project bootstrap state alone, so archive ignore hygiene remains correct after archive directory relocation, recreation, or index recovery.\n\n`FsArchiveRepository` MAY centralize this behavior in a shared internal archive-directory preparation helper, but the runtime guarantee MUST cover archive creation and staged commit paths."
       ]
     },
     {
@@ -106,12 +112,25 @@
       "rules": [
         "The `FsChangeRepository` implementation derives its change lock directory path internally\nfrom the `configPath` field: `{configPath}/tmp/change-locks`. This directory is distinct\nfrom the changes storage root and allows per-change lock files to be co-located with\nother config-scoped temporary artifacts.\n\nThe `configPath` field is part of the `ChangeRepositoryConfig` port contract, provided\nat construction time. The repository derives the locks directory internally as\n`path.join(configPath, 'tmp', 'change-locks')`."
       ]
+    },
+    {
+      "requirement": "Filesystem list index cache layout",
+      "rules": [
+        "Fs-backed list/count implementations MUST store derived list indexes under:\n\n```text\n{configPath}/tmp/fs-cache/\n  archive/\n  changes/\n  drafts/\n  discarded/\n  specs/<workspace>/\n```\n\nEach bucket directory contains `.specd-index.jsonl` and `.specd-index-meta.json` as defined in the archive index requirement. Change buckets store `sourceMtime` from `manifest.json`. Spec buckets store `sourceFiles` with per-file mtimes used for freshness.\n\nRepositories MUST NOT read or write these cache files directly except through dedicated index helper classes (`FsChangeIndexCache`, `FsSpecIndexCache`). Helpers own canonical sort, pagination, freshness, regeneration, and per-bucket locking.\n\nIndex entries store the full CLI-usable list-entry payload; port `include*` flags are response projection only."
+      ]
+    },
+    {
+      "requirement": "configPath tmp gitignore",
+      "rules": [
+        "Fs-backed repositories and project initialisation MUST ensure `{configPath}/tmp/.gitignore` exists with normative contents:\n\n```gitignore\n*\n!.gitignore\n```\n\nMeaning: ignore all tmp artifacts (`fs-cache/`, change-locks, and other runtime files) while allowing the ignore rule file itself to remain un-ignored.\n\nRuntime repository behaviour MUST create or update this file idempotently when tmp paths are first used. `initProject` MUST create the same file for new projects (see [`core:config-writer-port`](../config-writer-port/spec.md))."
+      ]
     }
   ],
   "constraints": [
     "Manifest files must be written atomically (write to temp file, then rename) to prevent partial reads",
-    "Archive index entries must use forward slashes as path separators regardless of host OS",
-    "The timestamp in a change directory name must be derived from change.createdAt, not from the system clock at write time"
+    "Fs-cache index entries MUST use forward slashes as path separators in serialized path fields regardless of host OS",
+    "The timestamp in a change directory name must be derived from change.createdAt, not from the system clock at write time",
+    "Derived list indexes under {configPath}/tmp/fs-cache/ are runtime caches and MUST NOT be committed to version control"
   ],
   "scenarios": [
     {
@@ -128,9 +147,23 @@
     },
     {
       "requirement": "Change directory listing order",
-      "name": "Multiple changes listed",
-      "when": ["list() is called with two changes created at different times"],
-      "then": ["the older change appears first in the result"]
+      "name": "Multiple changes listed in createdAt order",
+      "given": ["two active changes with createdAt timestamps where alpha is older than beta"],
+      "when": ["ChangeRepository.list() is called through the fs adapter"],
+      "then": [
+        "alpha appears before beta in canonical sort order",
+        "AND the order is produced by the active-changes index helper under {configPath}/tmp/fs-cache/changes/ without re-sorting at list time"
+      ]
+    },
+    {
+      "requirement": "Change directory listing order",
+      "name": "List order matches index helper not directory walk",
+      "given": ["change directories on disk whose lexical order differs from createdAt ascending"],
+      "when": ["ChangeRepository.list() is called"],
+      "then": [
+        "returned items follow createdAt ascending from the fs-cache index",
+        "AND the adapter does not sort directory entries at list time"
+      ]
     },
     {
       "requirement": "Artifact status derivation",
@@ -249,44 +282,88 @@
       "then": ["FsArchiveRepository must reject it as an unsupported variable"]
     },
     {
-      "requirement": "Archive index",
-      "name": "Change archived",
-      "when": ["archive(change) is called"],
-      "then": ["one line is appended to index.jsonl — existing lines are not modified"]
-    },
-    {
-      "requirement": "Archive index",
-      "name": "Change not in index",
-      "when": ["get(name) scans index.jsonl and finds no match"],
-      "then": ["it falls back to globbing **/*-<name> and appends the recovered entry to the index"]
-    },
-    {
-      "requirement": "Archive index",
-      "name": "reindex called",
-      "when": ["specd storage reindex is run after manual filesystem changes"],
+      "requirement": "Workspace excluded from archive pattern",
+      "name": "Pattern uses workspace variable",
+      "when": ["storage.archive.pattern contains {{change.workspace}}"],
       "then": [
-        "index.jsonl is rewritten in chronological order based on each manifest's archivedAt"
+        "FsArchiveRepository must reject it as an unsupported variable, throwing UnsupportedPatternError at construction time — the same as {{change.scope}}"
       ]
     },
     {
-      "requirement": "Archive runtime ignore hygiene",
-      "name": "Runtime archive behavior recreates ignore file when missing",
-      "given": ["the archive root exists without an archive-local .gitignore"],
-      "when": ["FsArchiveRepository recreates or rebuilds .specd-index.jsonl"],
+      "requirement": "Workspace excluded from archive pattern",
+      "name": "Normative catalog omits any workspace token",
+      "given": ["the normative supported-variable catalog for storage.archive.pattern"],
+      "when": ["the catalog is inspected"],
       "then": [
-        "the archive root .gitignore is created or updated",
-        "AND it contains entries for .specd-index.jsonl and .staging"
+        "it contains only {{year}}, {{month}}, {{day}}, {{change.name}}, {{change.archivedName}}",
+        "AND it contains no per-change workspace token"
       ]
     },
     {
-      "requirement": "Archive runtime ignore hygiene",
-      "name": "Shared helper coverage includes all runtime index-maintenance paths",
+      "requirement": "Archive index",
+      "name": "Change archived upserts fs-cache index entry",
+      "when": ["archive(change) completes successfully"],
+      "then": [
+        "an ArchiveListEntry row is upserted in {configPath}/tmp/fs-cache/archive/.specd-index.jsonl",
+        "AND no root-local .specd-index.jsonl is written at the archive storage root"
+      ]
+    },
+    {
+      "requirement": "Archive index",
+      "name": "Archive list serves from fs-cache index",
+      "given": ["archived changes exist on disk and the fs-cache archive index is fresh"],
+      "when": ["ArchiveRepository.list() is called"],
+      "then": [
+        "entries are returned from {configPath}/tmp/fs-cache/archive/ without reading every manifest",
+        "AND results are ordered by archivedAt descending (newest first)"
+      ]
+    },
+    {
+      "requirement": "Archive index",
+      "name": "Archive reindex rebuilds fs-cache index",
+      "when": ["ArchiveRepository.reindex() is invoked after manual filesystem changes"],
+      "then": [
+        "{configPath}/tmp/fs-cache/archive/.specd-index.jsonl is rebuilt from archived manifests",
+        "AND meta.totalCount reflects the full archive count"
+      ]
+    },
+    {
+      "requirement": "Archive index",
+      "name": "Legacy root index migrated on rebuild",
+      "given": ["legacy .specd-index.jsonl exists at the archive storage root"],
       "when": [
-        "archive creation, reindex(), or runtime index recovery or append behavior maintains the archive index"
+        "ArchiveRepository.reindex() or the first full rebuild materializes fs-cache/archive/"
       ],
       "then": [
-        "each path preserves the archive-local ignore entries for .specd-index.jsonl and .staging"
+        "the legacy root-local index files are deleted (ENOENT ignored)",
+        "AND listing uses only the fs-cache index thereafter"
       ]
+    },
+    {
+      "requirement": "Archive index",
+      "name": "get does not depend on root-local index",
+      "given": ["no root-local archive index file exists"],
+      "when": ["ArchiveRepository.get(name) is called for an archived change"],
+      "then": ["the change is resolved without requiring a root-local JSONL index"]
+    },
+    {
+      "requirement": "Archive runtime ignore hygiene",
+      "name": "Runtime archive behavior ensures staging is ignored",
+      "given": ["the archive root exists without an archive-local .gitignore"],
+      "when": [
+        "FsArchiveRepository performs archive creation or index rebuild that touches the archive root"
+      ],
+      "then": [
+        "the archive root .gitignore is created or updated",
+        "AND it contains an entry for .staging",
+        "AND it does not require entries for .specd-index.jsonl or .specd-index-meta.json"
+      ]
+    },
+    {
+      "requirement": "Archive runtime ignore hygiene",
+      "name": "Shared helper preserves staging ignore across runtime paths",
+      "when": ["archive creation, reindex(), or staged commit paths prepare the archive directory"],
+      "then": ["each path preserves the archive-local ignore entry for .staging"]
     },
     {
       "requirement": "Named storage factories",
@@ -395,27 +472,55 @@
         "lock files are under .specd/config/tmp/change-locks/",
         "AND not under .specd/changes/"
       ]
+    },
+    {
+      "requirement": "Filesystem list index cache layout",
+      "name": "List indexes stored under fs-cache buckets",
+      "given": [
+        "an fs-backed project with active changes, drafts, discarded changes, archive entries, and workspace specs"
+      ],
+      "when": ["list/count operations populate derived indexes"],
+      "then": [
+        "index files exist under {configPath}/tmp/fs-cache/ in bucket directories changes/, drafts/, discarded/, archive/, and specs/<workspace>/",
+        "AND each bucket contains .specd-index.jsonl and .specd-index-meta.json"
+      ]
+    },
+    {
+      "requirement": "Filesystem list index cache layout",
+      "name": "Index meta exposes totalCount for count operations",
+      "given": ["a populated fs-cache bucket with totalCount: 5 in meta"],
+      "when": ["the corresponding repository count() is called with a fresh index"],
+      "then": ["the returned count is 5 without materializing full list entries"]
+    },
+    {
+      "requirement": "configPath tmp gitignore",
+      "name": "Runtime ensures tmp gitignore contents",
+      "given": ["{configPath}/tmp/ is first used by an fs-backed repository"],
+      "when": ["runtime tmp hygiene runs"],
+      "then": [
+        "{configPath}/tmp/.gitignore exists with contents ignoring * and un-ignoring !.gitignore"
+      ]
+    },
+    {
+      "requirement": "configPath tmp gitignore",
+      "name": "Fs-cache artifacts remain gitignored",
+      "given": ["{configPath}/tmp/.gitignore is present"],
+      "when": ["{configPath}/tmp/fs-cache/ indexes are generated"],
+      "then": ["those cache files are ignored by git via the tmp gitignore rule"]
     }
   ],
   "implementation": {
     "symbols": [
       {
         "specId": "core:storage",
-        "file": "core:src/infrastructure/fs/change-repository.ts",
-        "symbol": "_manifestToChange"
-      },
-      {
-        "specId": "core:storage",
-        "file": "core:src/infrastructure/fs/change-repository.ts",
-        "symbol": "_ensureArtifactTypes"
+        "file": "core:src/infrastructure/fs/archive-repository.ts",
+        "symbol": "FsArchiveRepository"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:6752d7727ef9afcbdbf9d14610497b8d3b4983c3854653b9e70144774607b71e",
-    "verify.md": "sha256:f4a99863b564dedd25f31570eb304a0871b8b7a79309a8fa3a31a728cd4e90b8"
+    "spec.md": "sha256:0edcf1399481eee00d7aa7204273fbfeaf23fbb1c1401580bb1dcdbfe3773b40",
+    "verify.md": "sha256:5020c3081ba25c82c241e9160d8ac5c90cde7268f06fb0b117e5f27b242900ff"
   },
-  "generatedBy": "agent",
-  "optimizedDescription": "domain application layers must remain agnostic where changes, drafts, archives physically live, so future storage backends can swapped touching busin…",
-  "optimizedContext": "# Storage\n\n## Rules\n- Change directory naming: Active change directories must use format YYYYMMDD-HHmmss-<name>, where timestamp moment change was created. prefix must filesystem convention only — must not appear domain model, change manifest, any CLI argument. FsChangeRepository must resolve change name using glob pattern *-<name>.\n- Change directory listing order: ChangeRepository. list() must return changes creation order (oldest first). fs adapter, achieved sorting directory entries name, which chronological given timestamp prefix.\n- Artifact status derivation: Artifact status (missing, in-progress, complete, skipped) must derived load time — must not stored directly manifest. manifest stores only validatedHash per artifact. FsChangeRepository must compute status using precedence: 1. validatedHash === \"__skipped__\" → skipped (only valid optional: true artifacts) 2. File absent no sentinel) → missing 3. File present cleaned hash matches validatedHash → complete 4. File present but hash differs validatedHash null → in-progress \"Cleaned hash\" means: read file content, apply artifact type's preHashCleanup rules order same rules ValidateArtifacts applies before computing validatedHash), then compute SHA-256 result. FsChangeRepository must have access s…\n- Artifact dependency cascade: Change. effectiveStatus(type) must cascade through artifact dependency graph. artifact whose own hash matches validatedHash must still reported in-progress if any artifact requires chain neither complete nor skipped. skipped optional artifact satisfies dependency — does not block downstream artifacts.\n- ValidateArtifacts is the sole path to complete: Artifact. markComplete(hash) must only called ValidateArtifacts use case. Artifact. markSkipped() must only called skip use case (sets validatedHash \"__skipped__\"). No other code path may set values.\n- Archive pattern configuration: fs archive adapter must support configurable pattern field specd. yaml under storage. archive. pattern. pattern controls directory structure within archive root. Supported variables: {{year}}, {{month}}, {{day}}, {{change. name}}, {{change. archivedName}}. default pattern must {{change. archivedName}}.\n- Scope excluded from archive pattern: {{change. scope}} must not supported archive pattern variable. Scope paths use / segment separator, which produces ambiguous slugs when normalized use directory names.\n- Archive index: FsArchiveRepository must maintain index. jsonl archive root. Each line must JSON object name path fields. file must kept chronological order (oldest first, newest last) so git diffs only show lines added bottom lines removed — never reorderings. archive(change) must append one line end (O(1)). get(name) must scan file end loading fully memory; if not found, must fall back recursive glob **/*-<name> append recovered entry. reindex() must declared ArchiveRepository port. fs adapter implements globbing all manifest. json files under archive root, sorting entries archivedAt, writing clean index. jsonl chronological order. Other adapters implement according storage mechanism. specd storage reind…\n- Archive runtime ignore hygiene: Fs-backed archive storage MUST maintain archive-local. gitignore runtime archive artifacts. FsArchiveRepository MUST ensure archive root ignores both. specd-index. jsonl. staging. guarantee MUST exercised runtime archive behavior rather than relying project bootstrap state alone, so archive ignore hygiene remains correct after archive directory relocation, recreation, index recovery. FsArchiveRepository MAY centralize behavior shared internal archive-directory preparation helper, but runtime guarantee MUST cover archive creation, index rebuild, runtime index recovery append paths.\n- Named storage factories: Kernel composition SHALL support named storage factories repository-backed capabilities. storage factory SHALL selected adapter name SHALL responsible creating repository implementation needed storage mode. When storage selection requires workspace-specific VCS null-VCS handling, responsibility SHALL remain within selected storage factory rather than leaking unrelated composition paths.\n- Archive pattern date variables are zero-padded: {{month}} {{day}} must zero-padded two digits. {{year}} four digits. ensures lexicographic sort produces chronological order.\n- Change manifest format: format manifest. json — fields, event shapes, schema version behavior — defined core: change-manifest. FsChangeRepository reads writes manifest according format must write atomically (temp file + rename) prevent partial reads.\n- Repository path confinement: Fs-backed repositories MUST treat path confinement storage invariant. Change, spec, archive, metadata operations MUST reject any derived path would escape configured storage root address arbitrary untracked file outside permitted artifact set operation.\n- Staged archive persistence: Fs-backed archive persistence MUST prefer staged commit semantics over ad hoc rollback. When archive requires multiple durable updates, storage behavior MUST prepare complete result first only then expose committed archive result, so failures before commit do not leave partially visible permanent archive state.\n- Storage debug logging: Fs-backed repositories SHOULD emit debug-level logs tracked artifact resolution, path-confinement rejections, staged archive commit progress, archive failure diagnostics. logs MUST follow project's global logging conventions.\n- Change locks directory placement: FsChangeRepository implementation derives change lock directory path internally configPath field: {configPath}/tmp/change-locks. directory distinct changes storage root allows per-change lock files co-located other config-scoped temporary artifacts. configPath field part ChangeRepositoryConfig port contract, provided construction time. repository derives locks directory internally path. join(configPath, 'tmp', 'change-locks')."
+  "generatedBy": "core"
 }

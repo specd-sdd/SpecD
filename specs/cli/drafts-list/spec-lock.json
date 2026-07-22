@@ -6,12 +6,13 @@
   "dependsOn": [
     "cli:entrypoint",
     "core:list-drafts",
-    "core:drafted-change-view",
+    "core:change-list-entry",
     "cli:command-resource-naming"
   ],
   "implementation": [
     {
-      "file": "cli:src/commands/drafts/list.ts"
+      "file": "cli:src/commands/drafts/list.ts",
+      "symbols": ["registerDraftsList"]
     }
   ]
 }

@@ -12,8 +12,43 @@
 
 #### Scenario: Pagination flags are accepted
 
-- **WHEN** `specd archive list --limit 10 --page 2` is run
-- **THEN** the command parses the flags and delegates them to the use case
+- **WHEN** `specd archive list --limit 10 --after-key 2024-01-01T00:00:00.000Z --after-id archived-change` is run
+- **THEN** `ListArchived.execute` is called with `limit` 10 and keyset cursor `{ key, id }`
+
+#### Scenario: Default limit is 100
+
+- **GIVEN** the archive contains more than 100 changes
+- **WHEN** `specd archive list --format json` is run without `--limit`
+- **THEN** `meta.limit` is 100
+
+#### Scenario: --page and keyset cursors are mutually exclusive
+
+- **WHEN** `specd archive list --page 2 --after-key 2024-01-01T00:00:00.000Z` is run
+- **THEN** the command exits with a CLI usage error before invoking the use case
+
+#### Scenario: --after-id requires --after-key
+
+- **WHEN** `specd archive list --after-id archived-change` is run without `--after-key`
+- **THEN** the command exits with a CLI usage error before invoking the use case
+
+### Requirement: List options forwarding
+
+#### Scenario: --archived-by sets includeArchivedBy
+
+- **WHEN** `specd archive list --archived-by --format json` is run
+- **THEN** `ListArchived.execute` is called with `includeArchivedBy: true`
+
+#### Scenario: archivedBy omitted without include flag
+
+- **GIVEN** an archived entry includes `archivedBy`
+- **WHEN** `specd archive list --format json` is run without `--archived-by`
+- **THEN** stdout `items[0]` does not contain `archivedBy`
+
+#### Scenario: CLI does not re-sort or paginate after the use case returns
+
+- **GIVEN** `ListArchived.execute` returns items in repository canonical order
+- **WHEN** `specd archive list --format json` is run
+- **THEN** stdout `items` appear in the same order as returned by the use case
 
 ### Requirement: Output format — toon
 
@@ -27,11 +62,23 @@
 
 #### Scenario: Normal text output
 
-- **GIVEN** the archive contains 5 changes
+- **GIVEN** the archive contains 125 changes and default pagination
 - **WHEN** `specd archive list` is run
 - **THEN** stdout contains a table with `NAME` and `DATE` columns
-- **AND** the `WORKSPACE` column is NOT present
-- **AND** the summary line `Showing 5 archived changes of 5.` is printed at the end
+- **AND** stdout contains `showing 100 of 125 (use --limit/--page)`
+
+#### Scenario: BY column appears only with --archived-by
+
+- **GIVEN** an archived change with `archivedBy` recorded
+- **WHEN** `specd archive list --archived-by` is run
+- **THEN** stdout includes a `BY` column header
+- **AND** the actor appears in the row
+
+#### Scenario: CLI preserves use-case row order
+
+- **GIVEN** `ListArchived.execute` returns entries ordered by `archivedAt` descending
+- **WHEN** `specd archive list` is run
+- **THEN** stdout rows appear in the same order as the returned `items`
 
 ### Requirement: Output format — JSON
 
@@ -44,6 +91,7 @@
 - **AND** `meta.count` is 100
 - **AND** `meta.limit` is 100
 - **AND** `meta.page` is 1
+- **AND** list entries do not include an `artifacts` field
 
 ### Requirement: Empty archive
 
@@ -58,7 +106,7 @@
 
 - **GIVEN** the archive directory is empty
 - **WHEN** `specd archive list --format json` is run
-- **THEN** stdout is `[]`
+- **THEN** stdout is `{"items":[],"meta":{"total":0,"count":0,"limit":100}}`
 - **AND** the process exits with code 0
 
 ### Requirement: Error cases

@@ -2,7 +2,7 @@ import { readFileSync, statSync, rmSync, existsSync, mkdirSync, writeFileSync } 
 import { join, relative } from 'node:path'
 import { setImmediate } from 'node:timers'
 import { performance } from 'node:perf_hooks'
-import { type Spec, Logger } from '@specd/core'
+import { type Spec, SpecPath, Logger } from '@specd/core'
 import { type GraphStore } from '../../domain/ports/graph-store.js'
 import { type FileNode, createFileNode } from '../../domain/value-objects/file-node.js'
 import { type DocumentNode, createDocumentNode } from '../../domain/value-objects/document-node.js'
@@ -955,7 +955,12 @@ export class IndexCodeGraph {
       const listStart = performance.now()
       for (const ws of options.workspaces) {
         Logger.debug(`[IndexCodeGraph] listing specs in: ${ws.specRepo.specsPath}`)
-        const repoSpecs = await ws.specRepo.list()
+        const listed = await ws.specRepo.list(undefined, { limit: Number.MAX_SAFE_INTEGER })
+        const repoSpecs: Spec[] = []
+        for (const entry of listed.items) {
+          const spec = await ws.specRepo.get(SpecPath.parse(entry.path))
+          if (spec !== null) repoSpecs.push(spec)
+        }
         specsByWorkspace.set(ws.name, repoSpecs)
         totalSpecsToProcess += repoSpecs.length
 

@@ -334,11 +334,11 @@ Without the `schemas` section, any schema reference targeting the `billing` work
 
 ---
 
-## Archive patterns with workspaces
+## Archive patterns
 
-When changes are archived, their location in the archive directory is controlled by the `pattern` field. The `{{change.workspace}}` template variable expands to the primary workspace of the change — the workspace of the first spec listed in the change.
+When changes are archived, their location in the archive directory is controlled by the `pattern` field. Archive patterns support `{{change.name}}`, `{{change.archivedName}}`, and date tokens — not a singular workspace token.
 
-This lets you organize archives by workspace:
+Example — organise by change slug:
 
 ```yaml
 storage:
@@ -346,10 +346,8 @@ storage:
     adapter: fs
     fs:
       path: .specd/archive
-      pattern: '{{change.workspace}}/{{change.archivedName}}'
+      pattern: '{{change.name}}/{{change.archivedName}}'
 ```
-
-With this pattern, a change whose first spec belongs to `core` is archived under `.specd/archive/core/2024-03-15-add-schema-format`. This keeps cross-workspace change histories cleanly separated without manual organization.
 
 Available template variables in archive patterns:
 
@@ -357,9 +355,10 @@ Available template variables in archive patterns:
 | ------------------------- | ------------------------------------------------------------------ |
 | `{{change.name}}`         | The change's slug name                                             |
 | `{{change.archivedName}}` | Date-prefixed slug (e.g. `2024-01-15-add-auth-flow`) — the default |
-| `{{change.workspace}}`    | The primary workspace of the change                                |
 | `{{year}}`                | Four-digit year at archive time                                    |
 | `{{date}}`                | ISO date at archive time                                           |
+
+`{{change.workspace}}` is not supported. A change may touch multiple workspaces (derived from its `specIds`); there is no primary workspace for path templating.
 
 ---
 

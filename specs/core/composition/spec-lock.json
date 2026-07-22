@@ -12,7 +12,10 @@
   ],
   "implementation": [
     {
-      "file": "core:src/composition/composition-resolver.ts"
+      "file": "core:src/composition/use-cases/get-project-summary.ts"
+    },
+    {
+      "file": "core:src/composition/use-cases/list-specs.ts"
     }
   ]
 }

@@ -1,7 +1,13 @@
 {
   "title": "FsChangeRepository",
   "description": "`FsChangeRepository` is the filesystem-backed implementation of the `ChangeRepository` port. It manages active changes, drafts, and discarded changes as distinct subdirectories within local or external storage, validating configuration options strictly against its Zod schema while receiving runtime dependencies via its `context: ChangeRepositoryConfig` parameter.",
-  "dependsOn": ["default:_global/architecture", "core:composition"],
+  "dependsOn": [
+    "default:_global/architecture",
+    "core:composition",
+    "core:storage",
+    "core:change-list-entry",
+    "core:change-repository-port"
+  ],
   "context": [
     "`FsChangeRepository` is the filesystem-backed implementation of the `ChangeRepository` port. It manages active changes, drafts, and discarded changes as distinct subdirectories within local or external storage, validating configuration options strictly against its Zod schema while receiving runtime dependencies via its `context: ChangeRepositoryConfig` parameter."
   ],
@@ -16,6 +22,30 @@
       "requirement": "Storage factory registration",
       "rules": [
         "`FsChangeRepository` SHALL expose a creator function `createFsChangeStorageFactory()` that returns a `ChangeStorageFactory` instance.\n\nThis factory SHALL construct and return `FsChangeRepository` instances when `create(context, config)` is called, forwarding the parameters without merging."
+      ]
+    },
+    {
+      "requirement": "FsChangeIndexCache helper",
+      "rules": [
+        "`FsChangeRepository` MUST delegate active, draft, and discarded list/count/reindex operations to one `FsChangeIndexCache` instance per bucket under `{configPath}/tmp/fs-cache/changes/`, `.../drafts/`, and `.../discarded/`.\n\nThe repository MUST NOT read or write `.specd-index.jsonl` or `.specd-index-meta.json` directly. It projects list entries from persisted manifests (including history-derived `state`, draft/discard timestamps, actors, reasons, and superseded-by) and forwards `list`, `count`, `reindex*`, and cache invalidation to the helpers.\n\nCanonical sort order per bucket:\n\n| Bucket | Sort key | Direction |\n| --- | --- | --- |\n| Active | `createdAt` | oldest → newest |\n| Drafts | `draftedAt` | newest → oldest |\n| Discarded | `discardedAt` | newest → oldest |"
+      ]
+    },
+    {
+      "requirement": "Index helper mutate and lock",
+      "rules": [
+        "Each `FsChangeIndexCache` MUST expose a `mutate(fn)`-style API as the **only** allowed write path for its bucket index files. It MUST acquire a per-bucket file lock, run `fn`, and release the lock — including on failure. Concurrent mutators MUST wait (they MUST NOT fail with lock contention).\n\nInside `mutate`, updates to `.specd-index.jsonl` or `.specd-index-meta.json` MUST write a temp file and `rename` atomically over the live path:\n\n1. Meta-only update → temp+rename of `.specd-index-meta.json` only.\n2. JSONL-only update → temp+rename of `.specd-index.jsonl`, then meta update via temp+rename.\n3. Both files change → publish jsonl first, then meta.\n4. If `fn` fails mid-flight → discard temps; do not leave a half-published pair; release the lock.\n\n`list` and `count` MUST NOT take the lock; with atomic publish they observe a complete prior or complete next snapshot.\n\nHigher-level helper operations (`invalidate`, `reindex`, entry upsert, full rebuild) MUST go through `mutate`, not ad hoc file writes."
+      ]
+    },
+    {
+      "requirement": "Index freshness model",
+      "rules": [
+        "On `list` / `count`, each helper MUST apply this sequence (no VCS coupling):\n\n1. If `isInvalidated` in meta → mandatory incremental rebuild.\n2. Else compare disk presence/mtimes to cached `sourceMtime` (manifest for change buckets) → incremental rebuild when stale.\n3. Else if `now - generatedAt > 300_000` ms (fixed 5-minute TTL) → mandatory regenerate.\n4. Else serve from index.\n\n`FsChangeRepository.invalidateCache()` MUST mark all three bucket helpers invalidated. External callers MAY invoke `invalidateCache()` when the tree changed outside normal write paths.\n\nRebuild algorithm: single-pass disk scan of mtimes → stream old JSONL → copy hits / rewrite misses → append new → atomic rename; update meta (`totalCount`, `generatedAt`, clear `isInvalidated`)."
+      ]
+    },
+    {
+      "requirement": "Write-path index maintenance",
+      "rules": [
+        "After `save(manifest)` in the same bucket, `FsChangeRepository` MUST project the new list entry (including history-derived fields) and compare to the cached entry. If equal → no index write. If different → upsert that row via the bucket helper (update `totalCount` as needed).\n\n- **create / delete:** update or remove the row (and `totalCount`) or invalidate the bucket.\n- **Moves** between `changes` ↔ `drafts` ↔ `discarded`: update/invalidate **both** affected buckets.\n- **`saveArtifact()` / skip / non-listing history:** MUST NOT require list-index updates.\n\n`reindex()`, `reindexActive()`, `reindexDrafts()`, and `reindexDiscarded()` MUST delegate to the corresponding helper full rebuild."
       ]
     }
   ],
@@ -59,20 +89,132 @@
       "given": ["a ChangeStorageFactory created by createFsChangeStorageFactory()"],
       "when": ["create is invoked with valid repository context and filesystem options"],
       "then": ["it returns an instance of FsChangeRepository configured with those options"]
+    },
+    {
+      "requirement": "FsChangeIndexCache helper",
+      "name": "Active list delegates to changes bucket helper",
+      "given": ["active changes exist under the configured changes directory"],
+      "when": ["FsChangeRepository.list() is called"],
+      "then": [
+        "results are served from {configPath}/tmp/fs-cache/changes/",
+        "AND items are ActiveChangeListEntry rows ordered by createdAt ascending"
+      ]
+    },
+    {
+      "requirement": "FsChangeIndexCache helper",
+      "name": "Draft and discarded lists use separate bucket helpers",
+      "given": ["drafted and discarded changes exist on disk"],
+      "when": ["listDrafts() and listDiscarded() are called"],
+      "then": [
+        "drafts are served from {configPath}/tmp/fs-cache/drafts/ ordered by draftedAt descending",
+        "AND discarded rows are served from {configPath}/tmp/fs-cache/discarded/ ordered by discardedAt descending"
+      ]
+    },
+    {
+      "requirement": "FsChangeIndexCache helper",
+      "name": "Reindex methods rebuild bucket indexes",
+      "when": ["reindexActive(), reindexDrafts(), or reindexDiscarded() is invoked"],
+      "then": [
+        "the corresponding bucket helper performs a full rebuild",
+        "AND reindex() rebuilds all three buckets"
+      ]
+    },
+    {
+      "requirement": "Index helper mutate and lock",
+      "name": "Index writes go through mutate under bucket lock",
+      "when": ["a bucket helper upserts an entry or rebuilds its index"],
+      "then": [
+        "the write occurs inside mutate(fn) after acquiring the per-bucket lock",
+        "AND the lock is released after fn completes or fails"
+      ]
+    },
+    {
+      "requirement": "Index helper mutate and lock",
+      "name": "Concurrent mutators wait rather than fail",
+      "given": ["one mutator holds the bucket lock"],
+      "when": ["a second mutator attempts an index write on the same bucket"],
+      "then": [
+        "the second mutator waits until the lock is released",
+        "AND it does not fail with lock contention"
+      ]
+    },
+    {
+      "requirement": "Index helper mutate and lock",
+      "name": "Reads do not take the write lock",
+      "when": ["list() or count() is called while a mutator is publishing"],
+      "then": [
+        "the read observes a complete prior or complete next snapshot",
+        "AND it does not acquire the bucket write lock"
+      ]
+    },
+    {
+      "requirement": "Index freshness model",
+      "name": "Invalidated meta triggers rebuild",
+      "given": ["bucket meta has isInvalidated: true"],
+      "when": ["list() or count() is called"],
+      "then": ["the helper rebuilds the index before serving results"]
+    },
+    {
+      "requirement": "Index freshness model",
+      "name": "Manifest mtime mismatch triggers rebuild",
+      "given": ["a cached change row with sourceMtime older than the on-disk manifest.json mtime"],
+      "when": ["list() is called"],
+      "then": ["the helper incrementally rebuilds that bucket"]
+    },
+    {
+      "requirement": "Index freshness model",
+      "name": "TTL max-age triggers regenerate",
+      "given": [
+        "bucket meta is not invalidated and mtimes match",
+        "AND generatedAt is more than five minutes ago"
+      ],
+      "when": ["count() is called"],
+      "then": ["the helper regenerates the index before returning totalCount"]
+    },
+    {
+      "requirement": "Index freshness model",
+      "name": "invalidateCache marks all change buckets invalidated",
+      "when": ["FsChangeRepository.invalidateCache() is called"],
+      "then": ["active, drafts, and discarded bucket helpers are marked invalidated"]
+    },
+    {
+      "requirement": "Write-path index maintenance",
+      "name": "save upserts when projected list entry changes",
+      "given": [
+        "an active change whose projected ActiveChangeListEntry differs after save(manifest)"
+      ],
+      "when": ["the save completes in the same bucket"],
+      "then": ["the changes bucket helper upserts the row without a full rebuild"]
+    },
+    {
+      "requirement": "Write-path index maintenance",
+      "name": "save skips index write when projection unchanged",
+      "given": [
+        "a save that does not change the projected list entry (including history-derived fields)"
+      ],
+      "when": ["save(manifest) completes"],
+      "then": ["the bucket index files are not rewritten for that row"]
+    },
+    {
+      "requirement": "Write-path index maintenance",
+      "name": "Move between buckets updates both indexes",
+      "when": ["a change moves from changes/ to drafts/"],
+      "then": [
+        "the active bucket row is removed or invalidated",
+        "AND the drafts bucket row is upserted or the bucket is invalidated"
+      ]
+    },
+    {
+      "requirement": "Write-path index maintenance",
+      "name": "saveArtifact does not update list indexes",
+      "when": ["saveArtifact() completes without changing list-entry fields"],
+      "then": ["no list-index upsert is required for that operation"]
     }
   ],
-  "implementation": {
-    "symbols": [
-      {
-        "specId": "core:fs-change-repository",
-        "file": "core:src/infrastructure/fs/change-repository.ts",
-        "symbol": "FsChangeRepository"
-      }
-    ]
-  },
+  "implementation": {},
   "contentHashes": {
-    "spec.md": "sha256:9fe9395feb354718811fa6acd86c555f436dc7bda0911553e8bdb1ad7d59febd",
-    "verify.md": "sha256:fef1e833bd34d934193e1a0288c8920e5f897e53f647d631e33ed2fec720a361"
+    "spec.md": "sha256:5d24c9c8c0dd203142bf3074739558184cc17ca1634f2c3f77189e86cbeb4f07",
+    "verify.md": "sha256:220356cba8c9c402f06ea35eeee83865fb602920c2dec96fb7e9db2a028b2d7f"
   },
   "generatedBy": "core"
 }

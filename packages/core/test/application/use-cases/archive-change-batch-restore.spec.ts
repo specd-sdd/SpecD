@@ -45,8 +45,9 @@ import {
 import {
   ArchiveRepository,
   type ArchiveListOptions,
-  type ArchiveListResult,
 } from '../../../src/application/ports/archive-repository.js'
+import { type ListResult } from '../../../src/application/ports/repository.js'
+import { type ArchiveListEntry } from '../../../src/domain/archived-change-index-entry.js'
 import { type ArchivedChange } from '../../../src/domain/entities/archived-change.js'
 import { toArchivedChangeView } from '../../../src/domain/read-only-change-view.js'
 import { Change, type ChangeEvent } from '../../../src/domain/entities/change.js'
@@ -79,7 +80,7 @@ async function setupFsSpecRepo(): Promise<{
     workspace: 'default',
     ownership: 'owned',
     isExternal: false,
-    configPath: '/test',
+    configPath: tmpDir,
     specsPath,
     metadataPath,
   })
@@ -104,7 +105,7 @@ function makeArchiveRepo(): ArchiveRepository {
         archiveDirPath: `/archive/${archivedName}`,
       }
     }
-    override async list(options?: ArchiveListOptions): Promise<ArchiveListResult> {
+    override async list(options?: ArchiveListOptions): Promise<ListResult<ArchiveListEntry>> {
       return {
         items: [],
         meta: {
@@ -113,6 +114,9 @@ function makeArchiveRepo(): ArchiveRepository {
           limit: options?.limit ?? 100,
         },
       }
+    }
+    override async count(): Promise<number> {
+      return 0
     }
     override async get() {
       return null

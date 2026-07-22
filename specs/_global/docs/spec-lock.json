@@ -6,25 +6,13 @@
   "dependsOn": ["default:_global/conventions"],
   "implementation": [
     {
-      "file": "default:docs/adr/0015-use-case-level-composition.md"
-    },
-    {
-      "file": "default:docs/adr/0018-graduated-composition-levels.md"
-    },
-    {
-      "file": "default:docs/core/examples/implementing-a-port.md"
-    },
-    {
-      "file": "default:docs/core/overview.md"
-    },
-    {
-      "file": "default:docs/core/ports.md"
-    },
-    {
-      "file": "default:docs/core/services.md"
-    },
-    {
       "file": "default:docs/config/config-reference.md"
+    },
+    {
+      "file": "default:docs/guide/workspaces.md"
+    },
+    {
+      "file": "default:docs/core/use-cases.md"
     }
   ]
 }

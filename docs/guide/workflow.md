@@ -388,12 +388,11 @@ External hooks use the same workflow phase semantics as shell hooks:
 
 Hook `run:` commands support template variable substitution:
 
-| Variable               | Value                                                        |
-| ---------------------- | ------------------------------------------------------------ |
-| `{{change.name}}`      | The change's slug name (e.g. `add-auth`)                     |
-| `{{change.workspace}}` | The primary workspace of the change                          |
-| `{{change.path}}`      | Absolute path to the change directory                        |
-| `{{project.root}}`     | Absolute path to the project root (where `specd.yaml` lives) |
+| Variable           | Value                                                        |
+| ------------------ | ------------------------------------------------------------ |
+| `{{change.name}}`  | The change's slug name (e.g. `add-auth`)                     |
+| `{{change.path}}`  | Absolute path to the change directory                        |
+| `{{project.root}}` | Absolute path to the project root (where `specd.yaml` lives) |
 
 ### Hook execution order
 

@@ -17,7 +17,10 @@ describe('UpdateProjectMetadata', () => {
     } as unknown as SpecdConfig
 
     const specRepo = {
-      list: vi.fn().mockResolvedValue([{ name: { toString: () => 'auth/login' } }]),
+      list: vi.fn().mockResolvedValue({
+        items: [{ workspace: 'default', path: 'auth/login', title: 'login' }],
+        meta: { total: 1, count: 1, limit: Number.MAX_SAFE_INTEGER },
+      }),
       metadata: vi.fn().mockResolvedValue({
         contentHashes: { 'spec.md': 'sha256:spec' },
       }),

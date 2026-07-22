@@ -23,25 +23,25 @@
     {
       "requirement": "Orchestrates existing list use cases",
       "rules": [
-        "`GetProjectSummary` MUST obtain change counts by delegating to:\n\n- `ListChanges.execute()` for `activeCount`\n- `ListDrafts.execute()` for `draftCount`\n- `ListDiscarded.execute()` for `discardedCount`\n- `ListArchived.execute()` for `archivedCount`\n\nChange counts from `ListChanges`, `ListDrafts`, and `ListDiscarded` MUST be the `.length` of the corresponding result arrays.\n\n`archivedCount` MUST be `meta.total` from the `ArchiveListResult` returned by `ListArchived.execute()` (not `items.length`, because listing may be paginated)."
+        "`GetProjectSummary` MUST obtain change counts without materializing full list results:\n\n- `activeCount` — `ChangeRepository.count()` via the wired `ListChanges` repository (or direct `ChangeRepository` access with the same bootstrap path)\n- `draftCount` — `ChangeRepository.countDrafts()`\n- `discardedCount` — `ChangeRepository.countDiscarded()`\n- `archivedCount` — `ListArchived.execute().meta.total` (or `ArchiveRepository.count()` with equivalent bootstrap)\n\nIt MUST NOT call `ListChanges.execute()`, `ListDrafts.execute()`, or `ListDiscarded.execute()` solely to measure `.length` of returned arrays.\n\n`archivedCount` MUST NOT use `items.length` from a paginated list when `meta.total` is available."
       ]
     },
     {
       "requirement": "Orchestrates workspace spec counting",
       "rules": [
-        "`GetProjectSummary` MUST obtain spec counts by delegating to `ListWorkspaces.execute()` and calling `SpecRepository.count()` on each returned workspace's `specRepo`. Results MUST be assembled into `specsByWorkspace` keyed by workspace `name`, preserving declaration order from configuration when iterated.\n\n`workspaceCount` MUST equal the number of workspaces returned by `ListWorkspaces`."
+        "`GetProjectSummary` MUST obtain spec counts by delegating to `ListWorkspaces.execute()` and calling `SpecRepository.count()` on each returned workspace's `specRepo`. Results MUST be assembled into `specsByWorkspace` keyed by workspace `name`, preserving declaration order from configuration when iterated.\n\nIt MUST NOT invoke `ListSpecs.execute()` or materialize spec list entries solely to count specs.\n\n`workspaceCount` MUST equal the number of workspaces returned by `ListWorkspaces`."
       ]
     },
     {
       "requirement": "Parallelizes independent queries",
       "rules": [
-        "`GetProjectSummary.execute()` MUST run independent list and count operations concurrently (for example via `Promise.all`) so summary assembly does not serialize unrelated I/O."
+        "`GetProjectSummary.execute()` MUST run independent count operations concurrently (for example via `Promise.all`) so summary assembly does not serialize unrelated I/O.\n\nChange-bucket counts and per-workspace spec counts MAY run in parallel when their repository instances are independent."
       ]
     },
     {
       "requirement": "Constructor accepts orchestration dependencies",
       "rules": [
-        "`GetProjectSummary` MUST accept the five list use cases and `ListWorkspaces` as constructor dependencies. It MUST NOT construct repositories or read `specd.yaml` directly."
+        "`GetProjectSummary` MUST accept constructor dependencies sufficient to invoke `ChangeRepository.count()` / `countDrafts()` / `countDiscarded()`, `ArchiveRepository.count()` or `ListArchived` for `meta.total`, and `ListWorkspaces` for per-workspace `SpecRepository.count()`.\n\nIt MUST NOT construct repositories or read `specd.yaml` directly."
       ]
     },
     {
@@ -65,13 +65,13 @@
     {
       "requirement": "Config-based factory delegates through resolveGetProjectSummaryDeps",
       "rules": [
-        "The config-based `createGetProjectSummary(config, options?)` form MUST derive `GetProjectSummaryDeps` through `resolveGetProjectSummaryDeps(resolver)` and then delegate to canonical `createGetProjectSummary(deps)`.\n\n`resolveGetProjectSummaryDeps(resolver)` MUST resolve:\n\n- `listChanges: ListChanges`\n- `listDrafts: ListDrafts`\n- `listDiscarded: ListDiscarded`\n- `listArchived: ListArchived`\n- `listWorkspaces: ListWorkspaces`\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
+        "The config-based `createGetProjectSummary(config, options?)` form MUST derive `GetProjectSummaryDeps` through `resolveGetProjectSummaryDeps(resolver)` and then delegate to canonical `createGetProjectSummary(deps)`.\n\n`resolveGetProjectSummaryDeps(resolver)` MUST resolve:\n\n- `changes: ChangeRepository`\n- `archive: ArchiveRepository`\n- `listWorkspaces: ListWorkspaces`\n\nIt MUST NOT resolve `listChanges: ListChanges`, `listDrafts: ListDrafts`, `listDiscarded: ListDiscarded`, or `listArchived: ListArchived` — `GetProjectSummary` obtains counts directly from `ChangeRepository.count()` / `countDrafts()` / `countDiscarded()` and `ArchiveRepository.count()`, never by wiring the list use cases and measuring result length.\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
       ]
     }
   ],
   "constraints": [
     "The use case MUST NOT invoke code-graph providers or context compilation.",
-    "The use case MUST NOT load spec metadata or change artifact content.",
+    "The use case MUST NOT load spec metadata, change artifact content, or materialize list entries.",
     "The use case MUST NOT mutate configuration, repositories, or stored changes."
   ],
   "scenarios": [
@@ -89,61 +89,87 @@
     },
     {
       "requirement": "Orchestrates existing list use cases",
-      "name": "Active count matches ListChanges length",
-      "given": ["ListChanges.execute() returns three active changes"],
+      "name": "Active count uses ChangeRepository.count()",
+      "given": ["ChangeRepository.count() returns 3"],
       "when": ["GetProjectSummary.execute() is called"],
-      "then": ["activeCount is 3"]
+      "then": [
+        "activeCount is 3",
+        "AND ListChanges.execute() is not invoked solely to measure length"
+      ]
     },
     {
       "requirement": "Orchestrates existing list use cases",
-      "name": "Draft count matches ListDrafts length",
-      "given": ["ListDrafts.execute() returns two drafts"],
+      "name": "Draft count uses ChangeRepository.countDrafts()",
+      "given": ["ChangeRepository.countDrafts() returns 2"],
       "when": ["GetProjectSummary.execute() is called"],
       "then": ["draftCount is 2"]
     },
     {
       "requirement": "Orchestrates existing list use cases",
-      "name": "Discarded count matches ListDiscarded length",
-      "given": ["ListDiscarded.execute() returns one discarded change"],
+      "name": "Discarded count uses ChangeRepository.countDiscarded()",
+      "given": ["ChangeRepository.countDiscarded() returns 1"],
       "when": ["GetProjectSummary.execute() is called"],
       "then": ["discardedCount is 1"]
     },
     {
       "requirement": "Orchestrates existing list use cases",
-      "name": "Archived count uses ArchiveListResult meta total",
+      "name": "Archived count uses meta.total not items.length",
       "given": [
-        "ListArchived.execute() returns { items: [...], meta: { total: 5, count: 5, limit: 100 } }"
+        "ListArchived.execute() or ArchiveRepository.count() yields { items: [...], meta: { total: 5, count: 1, limit: 1 } }"
+      ],
+      "when": ["GetProjectSummary.execute() is called"],
+      "then": ["archivedCount is 5", "AND archivedCount is not derived from items.length"]
+    },
+    {
+      "requirement": "Orchestrates workspace spec counting",
+      "name": "Spec counts keyed by workspace name from count()",
+      "given": [
+        "ListWorkspaces.execute() returns workspaces default and core",
+        "AND their SpecRepository.count() results are 3 and 10"
       ],
       "when": ["GetProjectSummary.execute() is called"],
       "then": [
-        "archivedCount is 5",
-        "AND archivedCount is not derived from items.length when pagination limits returned items"
+        "specsByWorkspace is { default: 3, core: 10 }",
+        "AND workspaceCount is 2",
+        "AND ListSpecs.execute() is not invoked solely to count specs"
       ]
     },
     {
       "requirement": "Orchestrates workspace spec counting",
-      "name": "Spec counts keyed by workspace name",
-      "given": [
-        "ListWorkspaces.execute() returns workspaces default (3 specs) and core (10 specs)"
-      ],
+      "name": "Workspace count matches ListWorkspaces length",
+      "given": ["ListWorkspaces.execute() returns three configured workspaces"],
       "when": ["GetProjectSummary.execute() is called"],
-      "then": ["specsByWorkspace is { default: 3, core: 10 }", "AND workspaceCount is 2"]
+      "then": ["workspaceCount is 3"]
     },
     {
       "requirement": "Parallelizes independent queries",
-      "name": "Independent list operations run concurrently",
+      "name": "Independent count operations run concurrently",
       "when": ["GetProjectSummary.execute() runs"],
       "then": [
-        "list use case calls and per-workspace count() operations are not serialized behind unrelated awaits"
+        "change-bucket count() calls and per-workspace spec count() operations are not serialized behind unrelated awaits"
+      ]
+    },
+    {
+      "requirement": "Parallelizes independent queries",
+      "name": "Summary does not materialize list entries during counting",
+      "when": ["GetProjectSummary.execute() runs"],
+      "then": ["it does not invoke list use cases solely to measure returned array lengths"]
+    },
+    {
+      "requirement": "Constructor accepts orchestration dependencies",
+      "name": "Constructor requires count-capable dependencies",
+      "when": ["GetProjectSummary is instantiated"],
+      "then": [
+        "it receives dependencies sufficient to call ChangeRepository.count(), countDrafts(), countDiscarded(), archive count() or ListArchived for meta.total, and ListWorkspaces for per-workspace SpecRepository.count()",
+        "AND it does not construct repositories or read configuration directly"
       ]
     },
     {
       "requirement": "Constructor accepts orchestration dependencies",
-      "name": "Constructor requires injected list use cases",
-      "when": ["GetProjectSummary is instantiated"],
+      "name": "Constructor does not require list use cases for counting",
+      "when": ["GetProjectSummary is instantiated for count-only summary assembly"],
       "then": [
-        "it requires ListChanges, ListDrafts, ListDiscarded, ListArchived, and ListWorkspaces as constructor dependencies",
-        "AND it does not construct repositories or read configuration directly"
+        "it is wired to repository count surfaces rather than ListChanges.execute() / ListDrafts.execute() / ListDiscarded.execute() / ListSpecs.execute() for measurement"
       ]
     },
     {
@@ -185,16 +211,22 @@
     }
   ],
   "implementation": {
-    "files": [
+    "symbols": [
       {
         "specId": "core:get-project-summary",
-        "file": "core:src/composition/use-cases/get-project-summary.ts"
+        "file": "core:src/application/use-cases/get-project-summary.ts",
+        "symbol": "GetProjectSummary"
+      },
+      {
+        "specId": "core:get-project-summary",
+        "file": "core:src/composition/use-cases/get-project-summary.ts",
+        "symbol": "resolveGetProjectSummaryDeps"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:32a98f91fcf943e97d468cf5f34dc861d4fe1aef2e264937621050ab1ca6677c",
-    "verify.md": "sha256:8411743e18837c91c1ae67c46648804e40751f968e718b7f5b0fc35d2e429044"
+    "spec.md": "sha256:b169003e2b4fdcae11618a3a8ac0fa4424e3f06ee9f97111ac469fdbd95af0e0",
+    "verify.md": "sha256:b7e582a880f95bf214fed616e65ff27363f747bcd29e4af968f8c7db5aeb816b"
   },
   "generatedBy": "core"
 }

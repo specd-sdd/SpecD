@@ -49,6 +49,7 @@ import { type UpdateSpecMetadata } from '../application/use-cases/update-spec-me
 import { type ValidateArtifacts } from '../application/use-cases/validate-artifacts.js'
 import { type ValidateSchema } from '../application/use-cases/validate-schema.js'
 import { type ValidateSpecs } from '../application/use-cases/validate-specs.js'
+import { type ArchiveRepository } from '../application/ports/archive-repository.js'
 import { type ChangeRepository } from '../application/ports/change-repository.js'
 import { Logger } from '../application/logger.js'
 import { type LogDestination } from '../application/ports/logger.port.js'
@@ -161,6 +162,7 @@ export interface Kernel {
   schemas: SchemaRegistry
   changes: {
     repo: ChangeRepository
+    archiveRepo: ArchiveRepository
     create: CreateChange
     status: GetStatus
     transition: TransitionChange
@@ -248,6 +250,7 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
   const resolver = createCompositionResolver(config, options)
 
   const changesRepo = resolver.getChangeRepository()
+  const archiveRepo = resolver.getArchiveRepository()
   const specsRepos = resolver.getSpecRepositories()
   const schemas = resolver.getSchemaRegistry()
 
@@ -332,6 +335,7 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
     schemas,
     changes: {
       repo: changesRepo,
+      archiveRepo,
       create,
       status,
       transition,

@@ -4,5 +4,14 @@
     "version": 1
   },
   "dependsOn": ["default:_global/architecture"],
-  "implementation": []
+  "implementation": [
+    {
+      "file": "core:src/application/ports/repository.ts",
+      "symbols": ["ListCursor", "ListOptions", "ListMeta", "ListResult", "Repository"]
+    },
+    {
+      "file": "core:src/infrastructure/fs/list-pagination.ts",
+      "symbols": ["paginateList"]
+    }
+  ]
 }

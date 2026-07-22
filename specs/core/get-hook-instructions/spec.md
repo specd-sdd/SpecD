@@ -34,9 +34,11 @@ class GetHookInstructions {
 
 ### Requirement: Change lookup
 
-`GetHookInstructions` loads the change by name via `ChangeRepository`. If no change exists with the given name **and** the requested step is `'archiving'` with phase `'post'`, it MUST fall back to `ArchiveRepository.get(name)`. If the change is found in the archive, it MUST be used for template variable construction (using `ArchivedChange.name`, `ArchivedChange.workspace`, and `ArchiveRepository.archivePath(archivedChange)` for the `change.path` variable). If the change is not found in the archive either, it MUST throw `ChangeNotFoundError`.
+`GetHookInstructions` loads the change by name via `ChangeRepository`. If no change exists with the given name **and** the requested step is `'archiving'` with phase `'post'`, it MUST fall back to `ArchiveRepository.get(name)`. If the change is found in the archive, it MUST be used for template variable construction (using `ArchivedChange.name` and `ArchiveRepository.archivePath(archivedChange)` for the `change.path` variable). If the change is not found in the archive either, it MUST throw `ChangeNotFoundError`.
 
 For all other step/phase combinations, if `ChangeRepository.get(name)` returns null, `GetHookInstructions` MUST throw `ChangeNotFoundError` immediately — the archive fallback does not apply.
+
+Neither lookup path reads or derives a workspace value: `GetHookInstructions` MUST NOT build a `change.workspace` variable or inject any singular/primary workspace value (for example via `change.workspaces[0] ?? 'default'` or `specIds[0]?.split(':')[0]`) into the `change` namespace passed to `TemplateExpander.expand()`. Per [`core:template-variables`](../template-variables/spec.md), `change.workspace` is not a supported token.
 
 ### Requirement: Schema name guard
 

@@ -1,0 +1,54 @@
+- op: modified
+  description: Remove the singular change.workspace token from the change namespace.
+  selector:
+    type: section
+    matches: 'Requirement: Contextual namespaces'
+  content: |
+    ### Requirement: Contextual namespaces
+
+    Contextual namespaces are added by the use case that performs the expansion, based on the runtime context. A namespace is a flat object of key-value pairs grouped under a name.
+
+    The `change` namespace is present when a change is active:
+
+    | Variable              | Type   | Description                                                                         |
+    | --------------------- | ------ | ----------------------------------------------------------------------------------- |
+    | `change.name`         | string | The change's kebab-case name                                                        |
+    | `change.path`         | string | Absolute path to the change directory                                               |
+    | `change.archivedName` | string | Archived directory basename (`YYYYMMDD-HHmmss-<name>`) when the runtime is archived |
+
+    `change.archivedName` is optional in mixed contexts: it is present for archived-change runtime flows (for example archiving post hooks) and may be absent for active-change runtime flows.
+
+    `change.workspace` MUST NOT be a supported token. A change has no single primary workspace — it only has workspaces touched via `specIds` (see [`core:change`](../change/spec.md)). Consumers that build the `change` namespace MUST NOT inject a workspace key (not `change.workspace`, not any `[0] ?? 'default'` derivation) into the variable map. Callers needing workspace context for a change use `specIds`-derived workspace sets directly, outside the template variable system.
+
+    Future use cases may introduce additional namespaces (e.g. `spec`, `schema`). The expansion engine does not restrict which namespaces can exist — it traverses whatever object it receives.
+
+- op: modified
+  description: Drop workspace from the example variable map.
+  selector:
+    type: section
+    matches: 'Requirement: Variable map shape'
+  content: |
+    ### Requirement: Variable map shape
+
+    The variable map is a plain object where each top-level key is a namespace name and each value is a flat record of string keys to primitive values:
+
+    ```typescript
+    type TemplateVariables = Record<string, Record<string, string | number | boolean>>
+    ```
+
+    Example:
+
+    ```typescript
+    {
+      project: { root: '/Users/dev/my-project' },
+      change: {
+        name: 'add-auth',
+        path: '/Users/dev/my-project/changes/add-auth',
+        archivedName: '20260418-103000-add-auth',
+      },
+    }
+    ```
+
+    `archivedName` is context-dependent and may be omitted when no archived-change context exists. The `change` namespace MUST NOT include a `workspace` key.
+
+    This replaces the current typed `HookVariables` interface with a generic structure that supports arbitrary namespaces without code changes.

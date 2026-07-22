@@ -265,8 +265,13 @@ export class ArchiveChange {
 
     // --- Overlap guard ---
     const invalidatedChanges: InvalidatedChangesEntry[] = []
-    const allChanges = await this._changes.list()
-    const others = allChanges.filter((c) => c.name !== change.name)
+    const listed = await this._changes.list({ limit: Number.MAX_SAFE_INTEGER })
+    const others: Change[] = []
+    for (const entry of listed.items) {
+      if (entry.name === change.name) continue
+      const loaded = await this._changes.get(entry.name)
+      if (loaded !== null) others.push(loaded)
+    }
     if (others.length > 0) {
       const combined = [...others, change]
       const overlapReport = detectSpecOverlap(combined)

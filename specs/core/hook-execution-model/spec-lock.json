@@ -1,0 +1,19 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "core:workflow-model",
+    "core:schema-format",
+    "core:hook-runner-port",
+    "core:transition-change",
+    "core:archive-change",
+    "core:run-step-hooks",
+    "core:get-hook-instructions",
+    "core:config",
+    "cli:change-transition",
+    "cli:change-archive"
+  ],
+  "implementation": []
+}

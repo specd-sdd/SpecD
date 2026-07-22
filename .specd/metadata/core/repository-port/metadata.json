@@ -35,14 +35,27 @@
       "rules": [
         "`Repository` MUST export a `ReadOnlyWorkspaceError` class for use by subclasses and use cases that enforce `readOnly` ownership. The error MUST extend the project's base `DomainError` class.\n\nThe constructor MUST accept a `message` string. Callers construct the message with context appropriate to the enforcement point (spec ID, workspace name, operation type). The error class itself does not format messages — it is a marker type that consumers can catch or inspect.\n\n`ReadOnlyWorkspaceError` is a domain error because ownership is a domain concept — it represents a violated invariant, not an I/O failure or a user input error."
       ]
+    },
+    {
+      "requirement": "Shared list pagination types",
+      "rules": [
+        "`Repository` and listable repository ports MUST use these shared types for paginated listing:\n\n```typescript\ninterface ListCursor {\n  /** Sort-key value in canonical order (ISO timestamp for time-sorted buckets; capability path for specs). */\n  key: string\n  /** Tiebreak id when keys collide (change `name` for change/archive buckets; omit for specs). */\n  id?: string\n}\n\ninterface ListOptions {\n  limit?: number\n  page?: number\n  /** Exclusive keyset cursor: continue after this position in canonical sort order. Mutually exclusive with `page`. */\n  after?: ListCursor\n}\n\ninterface ListMeta {\n  total: number\n  count: number\n  limit: number\n  page?: number\n  after?: ListCursor\n}\n\ninterface ListResult<T> {\n  items: T[]\n  meta: ListMeta\n}\n```\n\n- `limit` defaults to **100** when omitted on every listable port.\n- `page` is 1-based and MUST be mutually exclusive with `after`.\n- `after` is an exclusive keyset cursor: return the next `limit` items strictly after `{ key, id? }` in the bucket's canonical sort order.\n- Pagination applies over canonical sort order owned by the index helper; use cases and CLI MUST NOT re-sort list results.\n\n`ListMeta.after` (normative): when a `list()` call returns a page and more items remain beyond it in canonical order, `meta.after` MUST be the cursor `{ key, id? }` of the **last item actually returned** in that page — computed via the bucket's cursor extraction, never echoed from the request's `options.after`. When the returned page reaches the end of the bucket (no more items remain), `meta.after` MUST be omitted entirely. Callers page forward by feeding the previous response's `meta.after` into the next request's `options.after`; an implementation that echoes the input cursor back as `meta.after` violates this requirement because it yields the same page indefinitely.\n\nKeyset cursor semantics by bucket:\n\n| Bucket | `after.key` | `after.id` |\n| --- | --- | --- |\n| Active changes | `createdAt` ISO-8601 | change `name` |\n| Drafts | `draftedAt` ISO-8601 | change `name` |\n| Discarded | `discardedAt` ISO-8601 | change `name` |\n| Archive | `archivedAt` ISO-8601 | change `name` |\n| Specs | capability path | omit |"
+      ]
+    },
+    {
+      "requirement": "invalidateCache resets adapter caches",
+      "rules": [
+        "`Repository` MUST expose:\n\n```typescript\nasync invalidateCache(): Promise<void> {\n  // default no-op\n}\n```\n\nSemantics: reset whatever this adapter caches — not filesystem-specific and not list-only by name. The base implementation MUST be a no-op. Subclasses MAY override to mark index helpers or other adapter caches invalidated. Callers that know storage changed outside normal repository write paths MAY invoke `invalidateCache()` without knowing adapter internals."
+      ]
     }
   ],
   "constraints": [
-    "Repository defines no storage operations — it is purely a construction and accessor base",
-    "All three accessors are explicit methods, not property signatures (per architecture spec)",
+    "Repository defines no storage operations — it is purely a construction, accessor, and shared listing-type base",
+    "All four accessors are explicit methods, not property signatures (per architecture spec)",
     "Backing fields are private to Repository — subclasses cannot access them directly",
     "RepositoryConfig is a plain interface, not a class",
-    "ReadOnlyWorkspaceError extends DomainError and is exported from the repository-port module"
+    "ReadOnlyWorkspaceError extends DomainError and is exported from the repository-port module",
+    "Shared list types (ListOptions, ListMeta, ListResult, ListCursor) are exported from the repository-port module for use by listable ports"
   ],
   "scenarios": [
     {
@@ -98,6 +111,51 @@
       "then": ["error.message equals the provided message"]
     },
     {
+      "requirement": "Shared list pagination types",
+      "name": "Default limit is 100",
+      "when": ["a listable repository list() method is called without limit"],
+      "then": ["meta.limit is 100", "AND at most 100 items are returned unless fewer exist"]
+    },
+    {
+      "requirement": "Shared list pagination types",
+      "name": "Page and after are mutually exclusive",
+      "when": ["list options include both page and after"],
+      "then": [
+        "the repository rejects the request or normalizes to one pagination mode without applying both"
+      ]
+    },
+    {
+      "requirement": "Shared list pagination types",
+      "name": "After cursor returns the next page in canonical order",
+      "given": ["a bucket with at least three entries in canonical sort order"],
+      "when": [
+        "list({ limit: 1, after: { key: <first-key>, id: <first-id> } }) is called for a change bucket"
+      ],
+      "then": [
+        "the first returned item is strictly after that cursor position",
+        "AND meta.after reflects the last returned position when more items remain"
+      ]
+    },
+    {
+      "requirement": "invalidateCache resets adapter caches",
+      "name": "Base implementation is a no-op",
+      "given": ["a concrete repository subclass that does not override cache invalidation"],
+      "when": ["invalidateCache() is called"],
+      "then": [
+        "it resolves without throwing",
+        "AND it performs no adapter-specific side effects beyond the default no-op"
+      ]
+    },
+    {
+      "requirement": "invalidateCache resets adapter caches",
+      "name": "Filesystem subclass may mark caches invalidated",
+      "given": ["a filesystem-backed repository that overrides invalidateCache()"],
+      "when": ["invalidateCache() is called after external storage changes"],
+      "then": [
+        "subsequent list or count operations observe invalidated index state and rebuild as required"
+      ]
+    },
+    {
       "requirement": "RepositoryConfig shape",
       "name": "RepositoryConfig includes configPath",
       "given": [
@@ -116,12 +174,43 @@
       ]
     }
   ],
-  "implementation": {},
-  "contentHashes": {
-    "spec.md": "sha256:76981c40fed1bab528e359b0dd67d8f786d934fffb14b335bce2de9fc996b74f",
-    "verify.md": "sha256:b70e53c5dfe2ce58e719db753d1355080fd2ff17ebc9dff461d90127224bc865"
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "core:repository-port",
+        "file": "core:src/application/ports/repository.ts",
+        "symbol": "ListCursor"
+      },
+      {
+        "specId": "core:repository-port",
+        "file": "core:src/application/ports/repository.ts",
+        "symbol": "ListOptions"
+      },
+      {
+        "specId": "core:repository-port",
+        "file": "core:src/application/ports/repository.ts",
+        "symbol": "ListMeta"
+      },
+      {
+        "specId": "core:repository-port",
+        "file": "core:src/application/ports/repository.ts",
+        "symbol": "ListResult"
+      },
+      {
+        "specId": "core:repository-port",
+        "file": "core:src/application/ports/repository.ts",
+        "symbol": "Repository"
+      },
+      {
+        "specId": "core:repository-port",
+        "file": "core:src/infrastructure/fs/list-pagination.ts",
+        "symbol": "paginateList"
+      }
+    ]
   },
-  "generatedBy": "agent",
-  "optimizedDescription": "All repository ports share construction-time invariants determine how use cases interact stored data: workspace, ownership, locality, config-root pat…",
-  "optimizedContext": "# Repository Base\n\n## Rules\n- RepositoryConfig shape: Repository constructed RepositoryConfig object: - workspace — workspace name repository bound (e. g. \"default\", \"billing\") - ownership — ownership level declared specd. yaml: - owned — full control, no restrictions - shared — writes allowed but recorded change manifest touchedSharedSpecs - readOnly — no writes allowed; data may only read - isExternal — whether repository points data outside current git repository. External repositories may not accessible agents restricted git root. - configPath — absolute path config directory. Repository implementations use derive runtime-owned paths such change locks, graph persistence, other repository-local support files.\n- Abstract class, not interface: Repository MUST abstract class. sets four invariant fields constructor RepositoryConfig exposes methods. follows architecture spec requirement ports shared construction abstract classes — TypeScript compiler enforces both construction contract method contract.\n- Immutable accessors: Repository MUST expose four methods return values set construction time: - workspace(): string — workspace name - ownership(): 'owned' | 'shared' | 'readOnly' — ownership level - isExternal(): boolean — whether repository external - configPath(): string — absolute config directory path values MUST NOT change during lifetime instance. backing fields private — subclasses access only through methods.\n- Subclass contract: Subclasses (ChangeRepository, SpecRepository, ArchiveRepository) extend Repository declare storage operations abstract methods. base class defines no storage operations — only provides shared construction accessor contract.\n- ReadOnlyWorkspaceError: Repository MUST export ReadOnlyWorkspaceError class use subclasses use cases enforce readOnly ownership. error MUST extend project's base DomainError class. constructor MUST accept message string. Callers construct message context appropriate enforcement point (spec ID, workspace name, operation type). error class itself does not format messages — marker type consumers can catch inspect. ReadOnlyWorkspaceError domain error because ownership domain concept — represents violated invariant, not I/O failure user input error."
+  "contentHashes": {
+    "spec.md": "sha256:918726b65029b489afacbd52dfb65430d4da7f8e729c4f6763d4515121ef6bee",
+    "verify.md": "sha256:937a1cbc577c4bf8e5618dbe1d6a12a58eae9e5baf58f59be080f7fe25cdd366"
+  },
+  "generatedBy": "core"
 }

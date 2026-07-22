@@ -16,7 +16,14 @@ import {
 import { Schema } from '../../../src/domain/value-objects/schema.js'
 import { ChangeRepository } from '../../../src/application/ports/change-repository.js'
 import {
+  type ActiveChangeListOptions,
+  type DiscardedChangeListOptions,
+  type DraftedChangeListOptions,
+} from '../../../src/application/ports/change-repository.js'
+import {
   type SpecPublication,
+  type SpecListEntry,
+  type SpecListOptions,
   SpecRepository,
   type ResolveFromPathResult,
   type SpecSearchResult,
@@ -24,10 +31,20 @@ import {
 import { type PersistedSpecMetadata } from '../../../src/domain/services/parse-metadata.js'
 import {
   ArchiveRepository,
-  type ArchivePathEntry,
-  type ArchiveListResult,
   type ArchiveListOptions,
+  type ArchivePathEntry,
 } from '../../../src/application/ports/archive-repository.js'
+import { type ListResult } from '../../../src/application/ports/repository.js'
+import {
+  paginateActiveChanges,
+  paginateDiscardedChanges,
+  paginateDraftedChanges,
+  toActiveChangeListEntry,
+  toDiscardedChangeListEntry,
+  toDraftedChangeListEntry,
+} from '../../../src/infrastructure/fs/change-list-projection.js'
+import { paginateList } from '../../../src/infrastructure/fs/list-pagination.js'
+import { type ArchiveListEntry } from '../../../src/domain/archived-change-index-entry.js'
 import { type SchemaProvider } from '../../../src/application/ports/schema-provider.js'
 import {
   type ArtifactParser,
@@ -141,21 +158,45 @@ export class StubChangeRepository extends ChangeRepository {
     this.store.delete(change.name)
   }
 
-  async list(): Promise<Change[]> {
-    return Array.from(this.store.values()).filter((c) => !c.isDrafted && !isDiscardedStub(c))
+  async list(options?: ActiveChangeListOptions) {
+    const entries = Array.from(this.store.values())
+      .filter((c) => !c.isDrafted && !isDiscardedStub(c))
+      .map((c) => toActiveChangeListEntry(c, options))
+    return paginateActiveChanges(entries, options)
   }
 
-  async listDrafts(): Promise<DraftedChangeView[]> {
-    return Array.from(this.store.values())
+  async listDrafts(options?: DraftedChangeListOptions) {
+    const entries = Array.from(this.store.values())
       .filter((c) => c.isDrafted)
-      .map(toDraftedChangeView)
+      .map((c) => toDraftedChangeListEntry(c, options))
+      .filter((e): e is NonNullable<typeof e> => e !== null)
+    return paginateDraftedChanges(entries, options)
   }
 
-  async listDiscarded(): Promise<DiscardedChangeView[]> {
-    return Array.from(this.store.values())
+  async listDiscarded(options?: DiscardedChangeListOptions) {
+    const entries = Array.from(this.store.values())
       .filter((c) => isDiscardedStub(c))
-      .map(toDiscardedChangeView)
+      .map((c) => toDiscardedChangeListEntry(c, options))
+      .filter((e): e is NonNullable<typeof e> => e !== null)
+    return paginateDiscardedChanges(entries, options)
   }
+
+  async count(): Promise<number> {
+    return Array.from(this.store.values()).filter((c) => !c.isDrafted && !isDiscardedStub(c)).length
+  }
+
+  async countDrafts(): Promise<number> {
+    return Array.from(this.store.values()).filter((c) => c.isDrafted).length
+  }
+
+  async countDiscarded(): Promise<number> {
+    return Array.from(this.store.values()).filter((c) => isDiscardedStub(c)).length
+  }
+
+  async reindex(): Promise<void> {}
+  async reindexActive(): Promise<void> {}
+  async reindexDrafts(): Promise<void> {}
+  async reindexDiscarded(): Promise<void> {}
 
   async mutate<T>(name: string, fn: (c: Change) => Promise<T> | T): Promise<T> {
     const change = this.store.get(name)
@@ -256,14 +297,25 @@ export class StubSpecRepository extends SpecRepository {
     return this._specs.find((s) => s.name.toString() === name.toString()) ?? null
   }
 
-  override async list(prefix?: SpecPath): Promise<Spec[]> {
-    if (prefix === undefined) return this._specs
-    return this._specs.filter((s) => prefix.equals(s.name) || prefix.isAncestorOf(s.name))
+  override async list(prefix?: SpecPath, options?: SpecListOptions) {
+    const filtered =
+      prefix === undefined
+        ? this._specs
+        : this._specs.filter((s) => prefix.equals(s.name) || prefix.isAncestorOf(s.name))
+    const entries: SpecListEntry[] = filtered.map((spec) => ({
+      workspace: spec.workspace,
+      path: spec.name.toFsPath('/'),
+      title: spec.name.toString().split('/').at(-1) ?? spec.name.toString(),
+    }))
+    const sorted = [...entries].sort((a, b) => a.path.localeCompare(b.path))
+    return paginateList(sorted, options, (item) => ({ key: item.path }))
   }
 
   override async count(): Promise<number> {
     return this._specs.length
   }
+
+  override async reindex(): Promise<void> {}
 
   override async specHash(): Promise<string | null> {
     return 'sha256:test'
@@ -505,24 +557,25 @@ export function makeArchiveRepository(initial: ArchivedChange[] = []): ArchiveRe
         archiveDirPath: `/test/archive/${change.name}`,
       }
     },
-    async list(_options?: ArchiveListOptions): Promise<ArchiveListResult> {
-      return {
-        items: initial.map((c) => ({
-          name: c.name,
-          archivedName: c.archivedName,
-          archivedAt: c.archivedAt,
-          workspaces: c.workspaces,
-          artifacts: [],
-          specIds: [],
-          schemaName: '',
-          schemaVersion: 0,
-        })),
-        meta: {
-          total: initial.length,
-          count: initial.length,
-          limit: 100,
-        },
-      }
+    async list(_options?: ArchiveListOptions): Promise<ListResult<ArchiveListEntry>> {
+      const items: ArchiveListEntry[] = initial.map((c) => ({
+        name: c.name,
+        archivedName: c.archivedName,
+        archivedAt: c.archivedAt,
+        specIds: [...c.specIds],
+        schemaName: c.schemaName,
+        schemaVersion: c.schemaVersion,
+      }))
+      const sorted = [...items].sort(
+        (a, b) => b.archivedAt.getTime() - a.archivedAt.getTime() || a.name.localeCompare(b.name),
+      )
+      return paginateList(sorted, _options, (item) => ({
+        key: item.archivedAt.toISOString(),
+        id: item.name,
+      }))
+    },
+    async count(): Promise<number> {
+      return initial.length
     },
     async get(name: string): Promise<ArchivedChange | null> {
       return initial.find((c) => c.archivedName === name) ?? null

@@ -1,0 +1,19 @@
+- op: modified
+  description: initProject creates configPath tmp gitignore for fs-cache and locks.
+  selector:
+    type: section
+    matches: 'Requirement: InitProject behaviour'
+  content: |
+    The `initProject` method MUST:
+
+    1. Create a `specd.yaml` file in `projectRoot` with the schema and default workspace configuration. The `storage` block is omitted by default, allowing storage paths to resolve automatically to standard `fs` defaults under `specdPath`.
+    2. Create the workspace specs directory (e.g. `specs/`) and the required default storage directories (`.specd/changes/`, `.specd/drafts/`, `.specd/discarded/`, `.specd/archive/`)
+    3. Create `{configPath}/tmp/.gitignore` idempotently with normative contents:
+
+       ```gitignore
+       *
+       !.gitignore
+       ```
+
+       so all tmp artifacts (including `{configPath}/tmp/fs-cache/` and change locks) stay out of version control while the ignore file itself remains trackable.
+    4. Append both `specd.local.yaml` and the `specd.local.*.yaml` local-variant pattern to `.gitignore` if not already present

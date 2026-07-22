@@ -7,7 +7,7 @@
   "implementation": [
     {
       "file": "core:src/infrastructure/fs/config-writer.ts",
-      "symbols": ["FsConfigWriter"]
+      "symbols": ["FsConfigWriter.initProject"]
     }
   ]
 }

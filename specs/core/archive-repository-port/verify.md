@@ -78,24 +78,25 @@
 
 ### Requirement: list returns all archived changes in chronological order
 
-#### Scenario: Multiple archived changes
+#### Scenario: List with limit and page
 
-- **GIVEN** the archive has 250 changes
+- **GIVEN** the archive has 250 archived changes indexed in fs-cache
 - **WHEN** `list({ limit: 100, page: 2 })` is called
-- **THEN** it returns 100 changes (entries 101 to 200)
+- **THEN** it returns 100 `ArchiveListEntry` rows (entries 101 to 200 in canonical order)
 - **AND** `meta.total` is 250
 - **AND** `meta.page` is 2
+- **AND** items are ordered by `archivedAt` descending (newest first)
 
 #### Scenario: Duplicate entries in index
 
-- **GIVEN** `index.jsonl` contains duplicate entries for the same change name (from manual recovery)
+- **GIVEN** the fs-cache archive index contains duplicate entries for the same change name
 - **WHEN** `list()` is called
 - **THEN** only the last entry per name is included in the result
 
 #### Scenario: No archived changes
 
 - **WHEN** `list()` is called and no changes have been archived
-- **THEN** an empty array is returned
+- **THEN** `{ items: [], meta: { total: 0, count: 0, limit: 100 } }` is returned
 
 ### Requirement: list returns index entries
 
@@ -103,8 +104,31 @@
 
 - **GIVEN** the archive contains archived changes
 - **WHEN** `list()` is called
-- **THEN** the result is an object with `items` (array) and `meta` (object)
-- **AND** `meta.total` reflects the count from `.specd-index-meta.json`
+- **THEN** the result is `ListResult<ArchiveListEntry>` with `items` and `meta`
+- **AND** `meta.total` reflects the count from `{configPath}/tmp/fs-cache/archive/.specd-index-meta.json`
+
+#### Scenario: archivedBy appears only when includeArchivedBy is set
+
+- **GIVEN** cached archive list entries that include `archivedBy`
+- **WHEN** `list({ includeArchivedBy: true })` is called
+- **THEN** returned items may include projected `archivedBy`
+- **WHEN** `list()` is called without `includeArchivedBy`
+- **THEN** returned items do not include `archivedBy`
+
+#### Scenario: List does not read every manifest
+
+- **GIVEN** an archive with many indexed entries
+- **WHEN** `list()` is called
+- **THEN** the repository satisfies the listing from index entries without reading every archive `manifest.json`
+
+### Requirement: Archive list count
+
+#### Scenario: Count matches list meta.total from fs-cache index
+
+- **GIVEN** an archive with a known number of indexed entries
+- **WHEN** `count()` and `list().meta.total` are queried
+- **THEN** both return the same total
+- **AND** `count()` does not scan every archive manifest
 
 ### Requirement: get returns an archived change or null
 
@@ -130,38 +154,33 @@
 
 ### Requirement: fs implementation maintains archive runtime ignore rules
 
-#### Scenario: Archive creation ensures runtime ignore rules
+#### Scenario: Archive creation ensures staging ignore rule
 
 - **GIVEN** the archive root `.gitignore` is missing or incomplete
 - **WHEN** `FsArchiveRepository.archive(change)` commits a successful archive
-- **THEN** the archive root `.gitignore` contains entries for `.specd-index.jsonl` and `.staging`
+- **THEN** the archive root `.gitignore` contains an entry for `.staging`
 
-#### Scenario: Runtime index recovery restores ignore rules
-
-- **GIVEN** runtime lookup recovers or appends an archive index entry
-- **WHEN** `FsArchiveRepository` maintains `.specd-index.jsonl` through recovery or append behavior
-- **THEN** the archive root `.gitignore` contains entries for `.specd-index.jsonl` and `.staging`
-
-#### Scenario: Reindex restores ignore rules
+#### Scenario: Reindex does not require root-local index gitignore entries
 
 - **GIVEN** the archive root `.gitignore` is missing or incomplete
-- **WHEN** `FsArchiveRepository.reindex()` rebuilds the archive index
-- **THEN** the archive root `.gitignore` contains entries for `.specd-index.jsonl` and `.staging`
+- **WHEN** `FsArchiveRepository.reindex()` rebuilds the fs-cache archive index
+- **THEN** the archive root `.gitignore` contains an entry for `.staging`
+- **AND** list index files remain governed by `{configPath}/tmp/.gitignore`, not the archive root `.gitignore`
 
 ### Requirement: archivePath returns the absolute path for an archived change
 
-#### Scenario: Path resolved from archive pattern
+#### Scenario: Path resolved from archive pattern for ArchivedChange
 
 - **GIVEN** an archive pattern `{{year}}/{{change.archivedName}}` and archive root `/project/.specd/archive`
 - **AND** an `ArchivedChange` with `archivedName: "20260322-120000-my-change"`
 - **WHEN** `archivePath(archivedChange)` is called
-- **THEN** it returns the absolute path to the archived change directory (e.g. `/project/.specd/archive/20260322-120000-my-change`)
+- **THEN** it returns the absolute path to the archived change directory
 
-#### Scenario: Path is consistent with archive() result
+#### Scenario: Path resolved from ArchiveListEntry
 
-- **GIVEN** an `ArchivedChange` returned by `archive(change)`
-- **WHEN** `archivePath(archivedChange)` is called with the same `ArchivedChange`
-- **THEN** the returned path matches the `archiveDirPath` that was returned by `archive()`
+- **GIVEN** an `ArchiveListEntry` for the same archived change
+- **WHEN** `archivePath(entry)` is called
+- **THEN** it returns the same absolute archived directory path as for the full `ArchivedChange`
 
 ### Requirement: internalPaths returns absolute storage paths
 
@@ -179,12 +198,19 @@
 
 ### Requirement: reindex rebuilds the archive index
 
-#### Scenario: Corrupted index is rebuilt
+#### Scenario: Corrupted fs-cache index is rebuilt newest first
 
-- **GIVEN** an `index.jsonl` with missing or extra entries
+- **GIVEN** a corrupted or stale index under `{configPath}/tmp/fs-cache/archive/`
 - **WHEN** `reindex()` is called
-- **THEN** `index.jsonl` is rewritten with all archive entries sorted by `archivedAt` (oldest first)
+- **THEN** the fs-cache index is rewritten with all archive entries sorted by `archivedAt` descending
 - **AND** each entry corresponds to a manifest file found in the archive directory
+
+#### Scenario: Migration deletes legacy root-local index files
+
+- **GIVEN** legacy `.specd-index.jsonl` and `.specd-index-meta.json` exist at the archive root
+- **WHEN** `reindex()` or the first full fs-cache rebuild runs
+- **THEN** those legacy root-local index files are deleted (ENOENT ignored)
+- **AND** normal cache-hit `list()` / `count()` calls do not scan or delete root-local legacy files
 
 ### Requirement: Append-only archive semantics
 
@@ -206,14 +232,20 @@
 #### Scenario: ArchiveRepository declares abstract methods
 
 - **WHEN** `ArchiveRepository` is declared
-- **THEN** it is an abstract class with abstract methods for `archive`, `list`, `get`, and `archivePath`
+- **THEN** it is an abstract class with abstract methods for `archive`, `list`, `count`, `get`, and `reindex`
 - **AND** concrete implementations must implement all abstract methods
 
 ### Requirement: Archive index metadata persistence
 
-#### Scenario: reindex rebuilds metadata file
+#### Scenario: reindex rebuilds fs-cache metadata file
 
 - **GIVEN** the archive has 150 directories with manifests
-- **AND** `.specd-index-meta.json` is missing or incorrect
+- **AND** `{configPath}/tmp/fs-cache/archive/.specd-index-meta.json` is missing or incorrect
 - **WHEN** `reindex()` is called
-- **THEN** `.specd-index-meta.json` is created/updated with `totalCount: 150`
+- **THEN** the fs-cache meta file is created or updated with `totalCount: 150`
+
+#### Scenario: list and count share fs-cache meta total
+
+- **GIVEN** a populated fs-cache archive index with `totalCount` recorded in meta
+- **WHEN** `list().meta.total` and `count()` are queried after freshness checks
+- **THEN** both return the same total from the fs-cache meta file

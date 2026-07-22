@@ -33,7 +33,7 @@
     {
       "requirement": "InitProject behaviour",
       "rules": [
-        "The `initProject` method MUST:\n\n1. Create a `specd.yaml` file in `projectRoot` with the schema and default workspace configuration. The `storage` block is omitted by default, allowing storage paths to resolve automatically to standard `fs` defaults under `specdPath`.\n2. Create the workspace specs directory (e.g. `specs/`) and the required default storage directories (`.specd/changes/`, `.specd/drafts/`, `.specd/discarded/`, `.specd/archive/`)\n3. Append both `specd.local.yaml` and the `specd.local.*.yaml` local-variant pattern to `.gitignore` if not already present"
+        "The `initProject` method MUST:\n\n1. Create a `specd.yaml` file in `projectRoot` with the schema and default workspace configuration. The `storage` block is omitted by default, allowing storage paths to resolve automatically to standard `fs` defaults under `specdPath`.\n2. Create the workspace specs directory (e.g. `specs/`) and the required default storage directories (`.specd/changes/`, `.specd/drafts/`, `.specd/discarded/`, `.specd/archive/`)\n3. Create `{configPath}/tmp/.gitignore` idempotently with normative contents: so all tmp artifacts (including `{configPath}/tmp/fs-cache/` and change locks) stay out of version control while the ignore file itself remains trackable.\n4. Append both `specd.local.yaml` and the `specd.local.*.yaml` local-variant pattern to `.gitignore` if not already present"
       ]
     },
     {
@@ -84,6 +84,15 @@
         "a specd.yaml is created with the schema reference and default workspace config (omitting the storage block by default)",
         "AND the workspace specs directory and standard storage directories under .specd/ are created",
         "AND both specd.local.yaml and specd.local.*.yaml are appended to .gitignore"
+      ]
+    },
+    {
+      "requirement": "InitProject behaviour",
+      "name": "initProject creates tmp gitignore for fs-cache and locks",
+      "given": ["a directory with no existing specd.yaml"],
+      "when": ["initProject completes successfully"],
+      "then": [
+        "{configPath}/tmp/.gitignore exists with contents ignoring * and un-ignoring !.gitignore"
       ]
     },
     {
@@ -174,13 +183,13 @@
       {
         "specId": "core:config-writer-port",
         "file": "core:src/infrastructure/fs/config-writer.ts",
-        "symbol": "FsConfigWriter"
+        "symbol": "FsConfigWriter.initProject"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:762bcc673d4a94229142276b2d61e1ae10bb64500199b88319c61a3d7a63437b",
-    "verify.md": "sha256:4e0590564cec94e56c485e3d3a1be5e95599844668a089a017ca43b15b3bb431"
+    "spec.md": "sha256:6ee866edfe2bc5a9aeefb6a8ac9a3b61232739ef911cc4198776bc58e22758b9",
+    "verify.md": "sha256:a068ba79f638523c7aee3fbfaa6528b07271918620c98dd78019f5fa243a755c"
   },
   "generatedBy": "core"
 }

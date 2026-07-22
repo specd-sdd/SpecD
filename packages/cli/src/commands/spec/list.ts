@@ -8,6 +8,11 @@ import {
 } from '@specd/sdk'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { parseCommaSeparatedValues } from '../../helpers/parse-comma-values.js'
+import {
+  addListPaginationOptions,
+  formatTruncationHint,
+  parseListPaginationFlags,
+} from '../../helpers/list-pagination.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
 import { colWidth, renderTable } from '../../helpers/table.js'
@@ -24,7 +29,6 @@ function collect(value: string, previous: string[]): string[] {
 
 /**
  * Column widths shared across all workspace groups in a single `spec list` run.
- * Computed once over all entries so every group renders identically wide columns.
  */
 type GlobalWidths = { pathW: number; titleW: number; metadataStatusW: number; summaryW: number }
 
@@ -38,7 +42,7 @@ type GlobalWidths = { pathW: number; titleW: number; metadataStatusW: number; su
  * @returns The computed column widths.
  */
 function computeGlobalWidths(
-  entries: SpecListEntry[],
+  entries: readonly SpecListEntry[],
   includeMetadataStatus: boolean,
   includeSummary: boolean,
 ): GlobalWidths {
@@ -71,7 +75,6 @@ function computeGlobalWidths(
 
 /**
  * Renders one workspace group using the globally fixed column widths.
- * An empty workspace shows the workspace name followed by `  (none)`.
  *
  * @param workspaceObj - Workspace details used as the table title.
  * @param specs - Entries belonging to this workspace.
@@ -87,7 +90,6 @@ function renderWorkspaceGroup(
   includeSummary: boolean,
   widths: GlobalWidths,
 ): string {
-  // Inner width = all columns + separators between them (2 spaces each)
   let innerWidth = widths.pathW + 2 + widths.titleW
   if (includeMetadataStatus) innerWidth += 2 + widths.metadataStatusW
   if (includeSummary) innerWidth += 2 + widths.summaryW
@@ -118,7 +120,6 @@ function renderWorkspaceGroup(
     return wsHeader + '\n\n  (none)'
   }
 
-  // renderTable handles the column header and data rows; we prepend the workspace header
   const table = renderTable(
     null,
     columns,
@@ -138,7 +139,7 @@ function renderWorkspaceGroup(
  * @param parent - The parent Commander command to attach the subcommand to.
  */
 export function registerSpecList(parent: Command): void {
-  parent
+  const cmd = parent
     .command('list')
     .allowExcessArguments(false)
     .description(
@@ -152,6 +153,10 @@ export function registerSpecList(parent: Command): void {
     .option('--workspace <name>', 'filter by workspace (repeatable)', collect, [])
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
+
+  addListPaginationOptions(cmd, { includeAfterId: false })
+
+  cmd
     .addHelpText(
       'after',
       `
@@ -162,12 +167,8 @@ JSON/TOON output schema:
   {
     workspaces: Array<{
       name: string
-      specs: Array<{
-        path: string
-        title: string
-        metadataStatus?: "fresh" | "stale" | "missing" | "invalid"
-        summary?: string
-      }>
+      specs: Array<{ path, title, metadataStatus?, summary? }>
+      meta: { total, count, limit, page?, after? }
     }>
   }
 `,
@@ -179,25 +180,32 @@ JSON/TOON output schema:
         workspace: string[]
         format: string
         config?: string
+        limit?: number
+        page?: number
+        afterKey?: string
       }) => {
         try {
           const { kernel } = await resolveCliContext({ configPath: opts.config })
           const includeSummary = opts.summary === true
           const includeMetadataStatus = opts.metadataStatus !== undefined
           const metadataStatusFilter = parseMetadataStatusFilter(opts.metadataStatus)
-          let entries = await kernel.specs.list.execute({
+          const pagination = parseListPaginationFlags(opts, { allowAfterId: false })
+
+          const result = await kernel.specs.list.execute({
+            ...pagination,
             includeSummary,
             includeMetadataStatus,
             ...(opts.workspace.length > 0 ? { workspaces: opts.workspace } : {}),
           })
           const fmt = parseFormat(opts.format)
 
-          // Apply status filter when a filter value is provided
-          if (metadataStatusFilter !== null) {
-            entries = entries.filter(
-              (e) => e.metadataStatus !== undefined && metadataStatusFilter.has(e.metadataStatus),
-            )
-          }
+          const filteredItems =
+            metadataStatusFilter === null
+              ? result.items
+              : result.items.filter(
+                  (e) =>
+                    e.metadataStatus !== undefined && metadataStatusFilter.has(e.metadataStatus),
+                )
 
           const workspaces = await kernel.project.listWorkspaces.execute()
           const workspaceNames = workspaces.map((w) => w.name)
@@ -207,18 +215,22 @@ JSON/TOON output schema:
               ? workspaceNames.filter((n) => workspaceFilter.has(n))
               : workspaceNames
 
+          const byWorkspace = new Map<string, SpecListEntry[]>()
+          for (const name of visibleWorkspaces) byWorkspace.set(name, [])
+          for (const entry of filteredItems) byWorkspace.get(entry.workspace)?.push(entry)
+
+          const workspaceMeta = new Map(
+            result.byWorkspace.map((slice) => [slice.workspace, slice.meta]),
+          )
+
           if (fmt === 'text') {
             if (visibleWorkspaces.length === 0) {
               output('no workspaces configured', 'text')
               return
             }
 
-            const byWorkspace = new Map<string, SpecListEntry[]>()
-            for (const name of visibleWorkspaces) byWorkspace.set(name, [])
-            for (const entry of entries) byWorkspace.get(entry.workspace)?.push(entry)
-
             const workspaceMap = new Map(workspaces.map((w) => [w.name, w]))
-            const widths = computeGlobalWidths(entries, includeMetadataStatus, includeSummary)
+            const widths = computeGlobalWidths(filteredItems, includeMetadataStatus, includeSummary)
             const groups = visibleWorkspaces.map((name) => {
               const wsObj: ProjectWorkspace = workspaceMap.get(name) ?? {
                 name,
@@ -228,33 +240,41 @@ JSON/TOON output schema:
                 codeRoot: '',
                 specRepo: null as unknown as SpecRepository,
               }
-              return renderWorkspaceGroup(
+              const block = renderWorkspaceGroup(
                 wsObj,
                 byWorkspace.get(name) ?? [],
                 includeMetadataStatus,
                 includeSummary,
                 widths,
               )
+              const meta = workspaceMeta.get(name)
+              const hint = meta !== undefined ? formatTruncationHint(meta) : null
+              return hint !== null ? `${block}\n${hint}` : block
             })
             output(groups.join('\n\n'), 'text')
           } else {
-            const byWorkspace = new Map<string, SpecListEntry[]>()
-            for (const name of visibleWorkspaces) byWorkspace.set(name, [])
-            for (const entry of entries) byWorkspace.get(entry.workspace)?.push(entry)
-
             output(
               {
-                workspaces: [...byWorkspace.entries()].map(([name, specs]) => ({
-                  name,
-                  specs: specs.map((s) => ({
-                    path: `${name}:${s.path}`,
-                    title: s.title,
-                    ...(includeMetadataStatus && s.metadataStatus !== undefined
-                      ? { metadataStatus: s.metadataStatus }
-                      : {}),
-                    ...(includeSummary && s.summary !== undefined ? { summary: s.summary } : {}),
-                  })),
-                })),
+                workspaces: visibleWorkspaces.map((name) => {
+                  const specs = byWorkspace.get(name) ?? []
+                  const meta = workspaceMeta.get(name) ?? {
+                    total: 0,
+                    count: 0,
+                    limit: pagination.limit ?? 100,
+                  }
+                  return {
+                    name,
+                    specs: specs.map((s) => ({
+                      path: `${name}:${s.path}`,
+                      title: s.title,
+                      ...(includeMetadataStatus && s.metadataStatus !== undefined
+                        ? { metadataStatus: s.metadataStatus }
+                        : {}),
+                      ...(includeSummary && s.summary !== undefined ? { summary: s.summary } : {}),
+                    })),
+                    meta,
+                  }
+                }),
               },
               fmt,
             )

@@ -1,0 +1,97 @@
+- op: modified
+  description: Spec list returns paginated SpecListEntry rows with prefix filter.
+  selector:
+    type: section
+    matches: 'Requirement: list returns spec metadata with optional prefix filter'
+  content: |
+    #### Scenario: List all specs as SpecListEntry rows
+
+    - **GIVEN** a workspace with specs `auth/login`, `auth/oauth`, and `billing/invoices`
+    - **WHEN** `list()` is called without a prefix
+    - **THEN** the result is `ListResult<SpecListEntry>` containing all three entries ordered by capability path ascending
+    - **AND** each item includes resolved `workspace`, `path`, and `title`
+
+    #### Scenario: List with prefix filter
+
+    - **GIVEN** a workspace with specs `auth/login`, `auth/oauth`, and `billing/invoices`
+    - **WHEN** `list(SpecPath.parse("auth"))` is called
+    - **THEN** only `auth/login` and `auth/oauth` are returned
+
+    #### Scenario: Empty workspace
+
+    - **WHEN** `list()` is called on an empty workspace
+    - **THEN** `{ items: [], meta: { total: 0, count: 0, limit: 100 } }` is returned
+
+- op: modified
+  description: Count reads from the same index source as list meta.total.
+  selector:
+    type: section
+    matches: '^Scenario: Count returns total spec size$'
+  rename: 'Scenario: Count matches list meta.total from index source'
+  content: |
+    - **GIVEN** a workspace with a known number of specs indexed for listing
+    - **WHEN** `count()` and `list().meta.total` are queried
+    - **THEN** both return the same total
+    - **AND** `count()` does not load metadata for every spec via repeated full list materialization
+
+- op: added
+  description: Verify normative SpecListEntry fields and projection flags.
+  position:
+    parent:
+      type: section
+      matches: Requirements
+    after:
+      type: section
+      matches: 'Requirement: list returns spec metadata with optional prefix filter'
+  content: |
+    ### Requirement: SpecListEntry port shape
+
+    #### Scenario: Title falls back to path segment
+
+    - **GIVEN** a spec with no valid metadata title
+    - **WHEN** the repository projects a `SpecListEntry`
+    - **THEN** `title` equals the last segment of `path`
+
+    #### Scenario: Summary and metadataStatus respect include flags
+
+    - **GIVEN** a cached spec list entry payload with resolvable summary and metadata status
+    - **WHEN** `list(undefined, { includeSummary: true, includeMetadataStatus: true })` is called
+    - **THEN** returned items include projected `summary` and `metadataStatus`
+    - **WHEN** the same call omits both include flags
+    - **THEN** returned items omit `summary` and `metadataStatus`
+
+    #### Scenario: Resolution errors still return an entry with title fallback
+
+    - **GIVEN** a spec whose summary or status resolution encounters an I/O error during indexing
+    - **WHEN** `list()` is called
+    - **THEN** the spec still appears with a title fallback
+    - **AND** the list call does not fail because of that individual spec
+
+- op: added
+  description: Verify spec list reindex rebuilds workspace fs-cache index.
+  position:
+    parent:
+      type: section
+      matches: Requirements
+    after:
+      type: section
+      matches: 'Requirement: Spec counting'
+  content: |
+    ### Requirement: Spec list reindex
+
+    #### Scenario: reindex rebuilds workspace spec list cache
+
+    - **GIVEN** a filesystem-backed `SpecRepository` for workspace `core`
+    - **WHEN** `reindex()` is called
+    - **THEN** the spec list index under `{configPath}/tmp/fs-cache/specs/core/` is fully rebuilt from disk
+
+- op: modified
+  description: Declare list, count, and reindex on the abstract port.
+  selector:
+    type: section
+    matches: '^Scenario: Port is an abstract class with abstract storage methods$'
+  content: |
+    - **WHEN** `SpecRepository` is examined
+    - **THEN** it is declared as `abstract class`
+    - **AND** `get`, `list`, `count`, `reindex`, `artifact`, `save`, `delete`, `resolveFromPath`, `metadata`, `saveMetadata`, and `search` are declared as `abstract` methods
+    - **AND** a concrete implementation can extend it and implement these methods

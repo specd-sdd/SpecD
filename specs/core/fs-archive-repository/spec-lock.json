@@ -3,11 +3,17 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": ["default:_global/architecture", "core:composition"],
+  "dependsOn": [
+    "default:_global/architecture",
+    "core:composition",
+    "core:storage",
+    "core:archived-change-index-entry",
+    "core:archive-repository-port"
+  ],
   "implementation": [
     {
       "file": "core:src/infrastructure/fs/archive-repository.ts",
-      "symbols": ["FsArchiveRepository"]
+      "symbols": ["FsArchiveRepository", "_expandPattern"]
     }
   ]
 }

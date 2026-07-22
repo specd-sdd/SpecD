@@ -10,7 +10,13 @@ export {
   type UpdateSpecDepsInput,
   type UpdateSpecDepsResult,
 } from './update-spec-deps.js'
-export { type ListSpecs, type SpecListEntry, type SpecMetadataStatus } from './list-specs.js'
+export {
+  type ListSpecs,
+  type ListSpecsResult,
+  type ListSpecsWorkspaceSlice,
+  type SpecListEntry,
+} from './list-specs.js'
+export { type SpecMetadataStatus } from './_shared/metadata-freshness.js'
 export {
   type SearchSpecs,
   type SpecSearchEntry,

@@ -31,3 +31,97 @@
 - **GIVEN** a `ChangeStorageFactory` created by `createFsChangeStorageFactory()`
 - **WHEN** `create` is invoked with valid repository context and filesystem options
 - **THEN** it returns an instance of `FsChangeRepository` configured with those options
+
+### Requirement: FsChangeIndexCache helper
+
+#### Scenario: Active list delegates to changes bucket helper
+
+- **GIVEN** active changes exist under the configured changes directory
+- **WHEN** `FsChangeRepository.list()` is called
+- **THEN** results are served from `{configPath}/tmp/fs-cache/changes/`
+- **AND** items are `ActiveChangeListEntry` rows ordered by `createdAt` ascending
+
+#### Scenario: Draft and discarded lists use separate bucket helpers
+
+- **GIVEN** drafted and discarded changes exist on disk
+- **WHEN** `listDrafts()` and `listDiscarded()` are called
+- **THEN** drafts are served from `{configPath}/tmp/fs-cache/drafts/` ordered by `draftedAt` descending
+- **AND** discarded rows are served from `{configPath}/tmp/fs-cache/discarded/` ordered by `discardedAt` descending
+
+#### Scenario: Reindex methods rebuild bucket indexes
+
+- **WHEN** `reindexActive()`, `reindexDrafts()`, or `reindexDiscarded()` is invoked
+- **THEN** the corresponding bucket helper performs a full rebuild
+- **AND** `reindex()` rebuilds all three buckets
+
+### Requirement: Index helper mutate and lock
+
+#### Scenario: Index writes go through mutate under bucket lock
+
+- **WHEN** a bucket helper upserts an entry or rebuilds its index
+- **THEN** the write occurs inside `mutate(fn)` after acquiring the per-bucket lock
+- **AND** the lock is released after `fn` completes or fails
+
+#### Scenario: Concurrent mutators wait rather than fail
+
+- **GIVEN** one mutator holds the bucket lock
+- **WHEN** a second mutator attempts an index write on the same bucket
+- **THEN** the second mutator waits until the lock is released
+- **AND** it does not fail with lock contention
+
+#### Scenario: Reads do not take the write lock
+
+- **WHEN** `list()` or `count()` is called while a mutator is publishing
+- **THEN** the read observes a complete prior or complete next snapshot
+- **AND** it does not acquire the bucket write lock
+
+### Requirement: Index freshness model
+
+#### Scenario: Invalidated meta triggers rebuild
+
+- **GIVEN** bucket meta has `isInvalidated: true`
+- **WHEN** `list()` or `count()` is called
+- **THEN** the helper rebuilds the index before serving results
+
+#### Scenario: Manifest mtime mismatch triggers rebuild
+
+- **GIVEN** a cached change row with `sourceMtime` older than the on-disk `manifest.json` mtime
+- **WHEN** `list()` is called
+- **THEN** the helper incrementally rebuilds that bucket
+
+#### Scenario: TTL max-age triggers regenerate
+
+- **GIVEN** bucket meta is not invalidated and mtimes match
+- **AND** `generatedAt` is more than five minutes ago
+- **WHEN** `count()` is called
+- **THEN** the helper regenerates the index before returning `totalCount`
+
+#### Scenario: invalidateCache marks all change buckets invalidated
+
+- **WHEN** `FsChangeRepository.invalidateCache()` is called
+- **THEN** active, drafts, and discarded bucket helpers are marked invalidated
+
+### Requirement: Write-path index maintenance
+
+#### Scenario: save upserts when projected list entry changes
+
+- **GIVEN** an active change whose projected `ActiveChangeListEntry` differs after `save(manifest)`
+- **WHEN** the save completes in the same bucket
+- **THEN** the changes bucket helper upserts the row without a full rebuild
+
+#### Scenario: save skips index write when projection unchanged
+
+- **GIVEN** a save that does not change the projected list entry (including history-derived fields)
+- **WHEN** `save(manifest)` completes
+- **THEN** the bucket index files are not rewritten for that row
+
+#### Scenario: Move between buckets updates both indexes
+
+- **WHEN** a change moves from `changes/` to `drafts/`
+- **THEN** the active bucket row is removed or invalidated
+- **AND** the drafts bucket row is upserted or the bucket is invalidated
+
+#### Scenario: saveArtifact does not update list indexes
+
+- **WHEN** `saveArtifact()` completes without changing list-entry fields
+- **THEN** no list-index upsert is required for that operation

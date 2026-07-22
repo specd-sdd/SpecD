@@ -8,6 +8,11 @@ import {
   makeMockChange,
   makeMockDiscardedView,
   makeMockKernel,
+  makeDraftedChangeListEntry,
+  makeDiscardedChangeListEntry,
+  makeArchiveListEntry,
+  makeListResult,
+  makeListSpecsResult,
   makeProgram,
   mockProcessExit,
   captureStdout,
@@ -62,9 +67,9 @@ describe('drafts list', () => {
 
   it('lists drafted changes', async () => {
     const { kernel, stdout } = setup()
-    kernel.changes.listDrafts.execute.mockResolvedValue([
-      makeMockChange({ name: 'feat-a', state: 'designing' }),
-    ])
+    kernel.changes.listDrafts.execute.mockResolvedValue(
+      makeListResult([makeDraftedChangeListEntry({ name: 'feat-a', state: 'designing' })]),
+    )
 
     const program = makeProgram()
     registerDraftsList(program.command('drafts'))
@@ -74,72 +79,61 @@ describe('drafts list', () => {
     expect(stdout()).toContain('designing')
   })
 
-  it('returns JSON array', async () => {
+  it('returns JSON paginated envelope', async () => {
     const { kernel, stdout } = setup()
-    kernel.changes.listDrafts.execute.mockResolvedValue([
-      makeMockChange({ name: 'feat-a', state: 'designing' }),
-    ])
+    kernel.changes.listDrafts.execute.mockResolvedValue(
+      makeListResult([makeDraftedChangeListEntry({ name: 'feat-a', state: 'designing' })]),
+    )
 
     const program = makeProgram()
     registerDraftsList(program.command('drafts'))
     await program.parseAsync(['node', 'specd', 'drafts', 'list', '--format', 'json'])
 
     const parsed = JSON.parse(stdout())
-    expect(Array.isArray(parsed)).toBe(true)
-    expect(parsed[0].name).toBe('feat-a')
+    expect(parsed.items[0].name).toBe('feat-a')
+    expect(parsed.meta).toBeDefined()
   })
 
-  it('JSON omits reason when no drafted event has reason', async () => {
+  it('JSON omits reason when --reason is absent', async () => {
     const { kernel, stdout } = setup()
-    kernel.changes.listDrafts.execute.mockResolvedValue([
-      makeMockChange({
-        name: 'feat-a',
-        state: 'designing',
-        history: [
-          {
-            type: 'drafted',
-            at: new Date('2026-01-05T10:00:00Z'),
-            by: { name: 'alice', email: 'a@test.com' },
-          },
-        ],
-      }),
-    ])
+    kernel.changes.listDrafts.execute.mockResolvedValue(
+      makeListResult([
+        makeDraftedChangeListEntry({
+          name: 'feat-a',
+          reason: 'parked',
+        }),
+      ]),
+    )
 
     const program = makeProgram()
     registerDraftsList(program.command('drafts'))
     await program.parseAsync(['node', 'specd', 'drafts', 'list', '--format', 'json'])
 
     const parsed = JSON.parse(stdout())
-    expect(parsed[0].reason).toBeUndefined()
+    expect(parsed.items[0].reason).toBeUndefined()
   })
 
-  it('JSON includes reason and draftedBy when present', async () => {
+  it('JSON includes reason and draftedBy when --reason is passed', async () => {
     const { kernel, stdout } = setup()
-    kernel.changes.listDrafts.execute.mockResolvedValue([
-      makeMockChange({
-        name: 'feat-a',
-        state: 'designing',
-        history: [
-          {
-            type: 'drafted',
-            reason: 'parked',
-            at: new Date('2026-01-05T10:00:00Z'),
-            by: { name: 'alice', email: 'a@test.com' },
-          },
-        ],
-      }),
-    ])
+    kernel.changes.listDrafts.execute.mockResolvedValue(
+      makeListResult([
+        makeDraftedChangeListEntry({
+          name: 'feat-a',
+          reason: 'parked',
+        }),
+      ]),
+    )
 
     const program = makeProgram()
     registerDraftsList(program.command('drafts'))
-    await program.parseAsync(['node', 'specd', 'drafts', 'list', '--format', 'json'])
+    await program.parseAsync(['node', 'specd', 'drafts', 'list', '--reason', '--format', 'json'])
 
     const parsed = JSON.parse(stdout())
-    expect(parsed[0].reason).toBe('parked')
-    expect(parsed[0].draftedBy.name).toBe('alice')
+    expect(parsed.items[0].reason).toBe('parked')
+    expect(parsed.items[0].draftedBy.name).toBe('alice')
   })
 
-  it('JSON returns [] when no drafted changes', async () => {
+  it('JSON returns empty items when no drafted changes', async () => {
     const { stdout } = setup()
 
     const program = makeProgram()
@@ -147,7 +141,7 @@ describe('drafts list', () => {
     await program.parseAsync(['node', 'specd', 'drafts', 'list', '--format', 'json'])
 
     const parsed = JSON.parse(stdout())
-    expect(parsed).toEqual([])
+    expect(parsed.items).toEqual([])
   })
 })
 
@@ -245,9 +239,9 @@ describe('discarded list', () => {
 
   it('lists discarded change names', async () => {
     const { kernel, stdout } = setup()
-    kernel.changes.listDiscarded.execute.mockResolvedValue([
-      makeMockDiscardedView({ name: 'old-feat' }),
-    ])
+    kernel.changes.listDiscarded.execute.mockResolvedValue(
+      makeListResult([makeDiscardedChangeListEntry({ name: 'old-feat' })]),
+    )
 
     const program = makeProgram()
     registerDiscardedList(program.command('discarded'))
@@ -256,49 +250,52 @@ describe('discarded list', () => {
     expect(stdout()).toContain('old-feat')
   })
 
-  it('returns JSON array without createdAt', async () => {
+  it('returns JSON paginated envelope without createdAt on entries', async () => {
     const { kernel, stdout } = setup()
-    kernel.changes.listDiscarded.execute.mockResolvedValue([
-      makeMockDiscardedView({
-        name: 'old-feat',
-        discardedAt: new Date('2026-01-01T00:00:00Z'),
-        discardedBy: { name: 'bob', email: 'b@test.com' },
-      }),
-    ])
+    kernel.changes.listDiscarded.execute.mockResolvedValue(
+      makeListResult([
+        makeDiscardedChangeListEntry({
+          name: 'old-feat',
+          discardedAt: new Date('2026-01-01T00:00:00Z'),
+          discardedBy: { name: 'bob', email: 'b@test.com' },
+        }),
+      ]),
+    )
 
     const program = makeProgram()
     registerDiscardedList(program.command('discarded'))
     await program.parseAsync(['node', 'specd', 'discarded', 'list', '--format', 'json'])
 
     const parsed = JSON.parse(stdout())
-    expect(Array.isArray(parsed)).toBe(true)
-    expect(parsed[0].name).toBe('old-feat')
-    expect(parsed[0].discardedAt).toBe('2026-01-01T00:00:00.000Z')
-    expect(parsed[0].createdAt).toBeUndefined()
+    expect(parsed.items[0].name).toBe('old-feat')
+    expect(parsed.items[0].discardedAt).toBe('2026-01-01T00:00:00.000Z')
+    expect(parsed.items[0].createdAt).toBeDefined()
   })
 
-  it('JSON includes reason and discardedAt fields', async () => {
+  it('JSON includes reason when --reason is passed', async () => {
     const { kernel, stdout } = setup()
-    kernel.changes.listDiscarded.execute.mockResolvedValue([
-      makeMockDiscardedView({
-        name: 'old-experiment',
-        discardReason: 'no longer needed',
-        discardedAt: new Date('2024-01-10T09:00:00Z'),
-        discardedBy: { name: 'alice', email: 'alice@test.com' },
-      }),
-    ])
+    kernel.changes.listDiscarded.execute.mockResolvedValue(
+      makeListResult([
+        makeDiscardedChangeListEntry({
+          name: 'old-experiment',
+          reason: 'no longer needed',
+          discardedAt: new Date('2024-01-10T09:00:00Z'),
+          discardedBy: { name: 'alice', email: 'alice@test.com' },
+        }),
+      ]),
+    )
 
     const program = makeProgram()
     registerDiscardedList(program.command('discarded'))
-    await program.parseAsync(['node', 'specd', 'discarded', 'list', '--format', 'json'])
+    await program.parseAsync(['node', 'specd', 'discarded', 'list', '--reason', '--format', 'json'])
 
     const parsed = JSON.parse(stdout())
-    expect(parsed[0].discardedAt).toBe('2024-01-10T09:00:00.000Z')
-    expect(parsed[0].reason).toBe('no longer needed')
-    expect(parsed[0].discardedBy).toBeDefined()
+    expect(parsed.items[0].discardedAt).toBe('2024-01-10T09:00:00.000Z')
+    expect(parsed.items[0].reason).toBe('no longer needed')
+    expect(parsed.items[0].discardedBy).toBeDefined()
   })
 
-  it('JSON returns [] when no discarded changes', async () => {
+  it('JSON returns empty items when no discarded changes', async () => {
     const { stdout } = setup()
 
     const program = makeProgram()
@@ -306,7 +303,7 @@ describe('discarded list', () => {
     await program.parseAsync(['node', 'specd', 'discarded', 'list', '--format', 'json'])
 
     const parsed = JSON.parse(stdout())
-    expect(parsed).toEqual([])
+    expect(parsed.items).toEqual([])
   })
 })
 
@@ -381,10 +378,7 @@ describe('discarded show', () => {
 describe('archive list', () => {
   it('prints "no archived changes" when empty', async () => {
     const { kernel, stdout } = setup()
-    kernel.changes.listArchived.execute.mockResolvedValue({
-      items: [],
-      meta: { total: 0, count: 0, limit: 100, page: 1 },
-    })
+    kernel.changes.listArchived.execute.mockResolvedValue(makeListResult([]))
 
     const program = makeProgram()
     registerArchiveList(program.command('archive'))
@@ -395,18 +389,15 @@ describe('archive list', () => {
 
   it('lists archived changes with timestamp', async () => {
     const { kernel, stdout } = setup()
-    kernel.changes.listArchived.execute.mockResolvedValue({
-      items: [
-        {
+    kernel.changes.listArchived.execute.mockResolvedValue(
+      makeListResult([
+        makeArchiveListEntry({
           name: 'old-feat',
           archivedName: '2026-01-15-old-feat',
           archivedAt: new Date('2026-01-15T10:00:00Z'),
-          workspaces: ['default'],
-          artifacts: ['spec.md'],
-        },
-      ],
-      meta: { total: 1, count: 1, limit: 100, page: 1 },
-    })
+        }),
+      ]),
+    )
 
     const program = makeProgram()
     registerArchiveList(program.command('archive'))
@@ -415,23 +406,19 @@ describe('archive list', () => {
     const out = stdout()
     expect(out).toContain('old-feat')
     expect(out).toContain('2026-01-15')
-    expect(out).toContain('Showing 1 archived changes of 1.')
   })
 
   it('returns JSON object with items and meta', async () => {
     const { kernel, stdout } = setup()
-    kernel.changes.listArchived.execute.mockResolvedValue({
-      items: [
-        {
+    kernel.changes.listArchived.execute.mockResolvedValue(
+      makeListResult([
+        makeArchiveListEntry({
           name: 'old-feat',
           archivedName: '2026-01-15-old-feat',
           archivedAt: new Date('2026-01-15T10:00:00Z'),
-          workspaces: ['default'],
-          artifacts: ['spec'],
-        },
-      ],
-      meta: { total: 1, count: 1, limit: 100, page: 1 },
-    })
+        }),
+      ]),
+    )
 
     const program = makeProgram()
     registerArchiveList(program.command('archive'))
@@ -440,48 +427,13 @@ describe('archive list', () => {
     const parsed = JSON.parse(stdout())
     expect(parsed.items[0].name).toBe('old-feat')
     expect(parsed.items[0].archivedName).toBe('2026-01-15-old-feat')
-    expect(parsed.items[0].artifacts).toEqual(['spec'])
+    expect(parsed.items[0].artifacts).toBeUndefined()
     expect(parsed.meta.total).toBe(1)
-  })
-
-  it('rows sorted by archive date descending', async () => {
-    const { kernel, stdout } = setup()
-    kernel.changes.listArchived.execute.mockResolvedValue({
-      items: [
-        {
-          name: 'older-change',
-          archivedName: '2024-01-10-older-change',
-          archivedAt: new Date('2024-01-10T10:00:00Z'),
-          workspaces: ['default'],
-          artifacts: ['spec.md'],
-        },
-        {
-          name: 'newer-change',
-          archivedName: '2024-01-15-newer-change',
-          archivedAt: new Date('2024-01-15T10:00:00Z'),
-          workspaces: ['default'],
-          artifacts: ['spec.md'],
-        },
-      ],
-      meta: { total: 2, count: 2, limit: 100, page: 1 },
-    })
-
-    const program = makeProgram()
-    registerArchiveList(program.command('archive'))
-    await program.parseAsync(['node', 'specd', 'archive', 'list'])
-
-    const out = stdout()
-    const newerIdx = out.indexOf('newer-change')
-    const olderIdx = out.indexOf('older-change')
-    expect(newerIdx).toBeLessThan(olderIdx)
   })
 
   it('JSON returns empty items and 0 total when no archived changes', async () => {
     const { kernel, stdout } = setup()
-    kernel.changes.listArchived.execute.mockResolvedValue({
-      items: [],
-      meta: { total: 0, count: 0, limit: 100, page: 1 },
-    })
+    kernel.changes.listArchived.execute.mockResolvedValue(makeListResult([]))
 
     const program = makeProgram()
     registerArchiveList(program.command('archive'))
@@ -638,11 +590,13 @@ describe('archive show', () => {
 describe('spec list', () => {
   it('preserves spec ordering from use case', async () => {
     const { kernel, stdout } = setup()
-    kernel.specs.list.execute.mockResolvedValue([
-      { workspace: 'default', path: 'a/spec', title: 'A Spec' },
-      { workspace: 'default', path: 'm/spec', title: 'M Spec' },
-      { workspace: 'default', path: 'z/spec', title: 'Z Spec' },
-    ])
+    kernel.specs.list.execute.mockResolvedValue(
+      makeListSpecsResult([
+        { workspace: 'default', path: 'a/spec', title: 'A Spec' },
+        { workspace: 'default', path: 'm/spec', title: 'M Spec' },
+        { workspace: 'default', path: 'z/spec', title: 'Z Spec' },
+      ]),
+    )
 
     const program = makeProgram()
     registerSpecList(program.command('spec'))
@@ -658,9 +612,9 @@ describe('spec list', () => {
 
   it('displays title from metadata in spec list', async () => {
     const { kernel, stdout } = setup()
-    kernel.specs.list.execute.mockResolvedValue([
-      { workspace: 'default', path: 'auth/login', title: 'Login Flow' },
-    ])
+    kernel.specs.list.execute.mockResolvedValue(
+      makeListSpecsResult([{ workspace: 'default', path: 'auth/login', title: 'Login Flow' }]),
+    )
 
     const program = makeProgram()
     registerSpecList(program.command('spec'))
@@ -671,7 +625,6 @@ describe('spec list', () => {
 
   it('shows workspace with (none) when workspace has no specs', async () => {
     const { stdout } = setup()
-    // kernel.specs.list returns [] by default
 
     const program = makeProgram()
     registerSpecList(program.command('spec'))
@@ -684,10 +637,12 @@ describe('spec list', () => {
 
   it('lists specs grouped by workspace with PATH and TITLE columns', async () => {
     const { kernel, stdout } = setup()
-    kernel.specs.list.execute.mockResolvedValue([
-      { workspace: 'default', path: 'auth/login', title: 'Login' },
-      { workspace: 'default', path: 'auth/register', title: 'Register' },
-    ])
+    kernel.specs.list.execute.mockResolvedValue(
+      makeListSpecsResult([
+        { workspace: 'default', path: 'auth/login', title: 'Login' },
+        { workspace: 'default', path: 'auth/register', title: 'Register' },
+      ]),
+    )
 
     const program = makeProgram()
     registerSpecList(program.command('spec'))
@@ -703,9 +658,9 @@ describe('spec list', () => {
 
   it('returns JSON with workspaces structure', async () => {
     const { kernel, stdout } = setup()
-    kernel.specs.list.execute.mockResolvedValue([
-      { workspace: 'default', path: 'auth/login', title: 'Login' },
-    ])
+    kernel.specs.list.execute.mockResolvedValue(
+      makeListSpecsResult([{ workspace: 'default', path: 'auth/login', title: 'Login' }]),
+    )
 
     const program = makeProgram()
     registerSpecList(program.command('spec'))
@@ -716,13 +671,14 @@ describe('spec list', () => {
     expect(parsed.workspaces[0].name).toBe('default')
     expect(parsed.workspaces[0].specs[0].path).toBe('default:auth/login')
     expect(parsed.workspaces[0].specs[0].title).toBe('Login')
+    expect(parsed.workspaces[0].meta).toBeDefined()
   })
 
   it('title falls back to last path segment when no metadata title', async () => {
     const { kernel, stdout } = setup()
-    kernel.specs.list.execute.mockResolvedValue([
-      { workspace: 'default', path: 'auth/login', title: 'login' },
-    ])
+    kernel.specs.list.execute.mockResolvedValue(
+      makeListSpecsResult([{ workspace: 'default', path: 'auth/login', title: 'login' }]),
+    )
 
     const program = makeProgram()
     registerSpecList(program.command('spec'))

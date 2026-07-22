@@ -13,18 +13,17 @@
     "core:drafted-change-read-only-error",
     "core:storage",
     "core:change-manifest",
-    "default:_global/logging"
+    "default:_global/logging",
+    "core:change-list-entry"
   ],
   "implementation": [
     {
-      "file": "core:src/infrastructure/fs/change-repository.ts",
+      "file": "core:src/application/ports/change-repository.ts",
       "symbols": [
-        "FsChangeRepository",
-        "_getInternal",
-        "_manifestToChange",
-        "get",
-        "mutate",
-        "list"
+        "ChangeRepository",
+        "ActiveChangeListOptions",
+        "DraftedChangeListOptions",
+        "DiscardedChangeListOptions"
       ]
     }
   ]

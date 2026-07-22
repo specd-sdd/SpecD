@@ -1,7 +1,5 @@
-import { type ListArchived } from './list-archived.js'
-import { type ListChanges } from './list-changes.js'
-import { type ListDiscarded } from './list-discarded.js'
-import { type ListDrafts } from './list-drafts.js'
+import { type ChangeRepository } from '../ports/change-repository.js'
+import { type ArchiveRepository } from '../ports/archive-repository.js'
 import { type ListWorkspaces } from './list-workspaces.js'
 
 /** Count-only aggregate of project-level change and spec totals. */
@@ -19,32 +17,24 @@ export interface GetProjectSummaryResult {
  * spec metadata, graph statistics, or compiled context.
  */
 export class GetProjectSummary {
-  private readonly _listChanges: ListChanges
-  private readonly _listDrafts: ListDrafts
-  private readonly _listDiscarded: ListDiscarded
-  private readonly _listArchived: ListArchived
+  private readonly _changes: ChangeRepository
+  private readonly _archive: ArchiveRepository
   private readonly _listWorkspaces: ListWorkspaces
 
   /**
    * Creates a new `GetProjectSummary` use case instance.
    *
-   * @param listChanges - Active change listing use case
-   * @param listDrafts - Draft listing use case
-   * @param listDiscarded - Discarded change listing use case
-   * @param listArchived - Archived change listing use case
+   * @param changes - Change repository for active/draft/discarded counts
+   * @param archive - Archive repository for archived counts
    * @param listWorkspaces - Workspace orchestration use case
    */
   constructor(
-    listChanges: ListChanges,
-    listDrafts: ListDrafts,
-    listDiscarded: ListDiscarded,
-    listArchived: ListArchived,
+    changes: ChangeRepository,
+    archive: ArchiveRepository,
     listWorkspaces: ListWorkspaces,
   ) {
-    this._listChanges = listChanges
-    this._listDrafts = listDrafts
-    this._listDiscarded = listDiscarded
-    this._listArchived = listArchived
+    this._changes = changes
+    this._archive = archive
     this._listWorkspaces = listWorkspaces
   }
 
@@ -54,11 +44,11 @@ export class GetProjectSummary {
    * @returns Count-only project summary aggregates
    */
   async execute(): Promise<GetProjectSummaryResult> {
-    const [active, drafts, discarded, archived, workspaces] = await Promise.all([
-      this._listChanges.execute(),
-      this._listDrafts.execute(),
-      this._listDiscarded.execute(),
-      this._listArchived.execute(),
+    const [activeCount, draftCount, discardedCount, archivedCount, workspaces] = await Promise.all([
+      this._changes.count(),
+      this._changes.countDrafts(),
+      this._changes.countDiscarded(),
+      this._archive.count(),
       this._listWorkspaces.execute(),
     ])
 
@@ -67,15 +57,15 @@ export class GetProjectSummary {
     )
 
     const specsByWorkspace: Record<string, number> = {}
-    for (const [name, count] of specCountEntries) {
-      specsByWorkspace[name] = count
+    for (const [name, specCount] of specCountEntries) {
+      specsByWorkspace[name] = specCount
     }
 
     return {
-      activeCount: active.length,
-      draftCount: drafts.length,
-      discardedCount: discarded.length,
-      archivedCount: archived.meta.total,
+      activeCount,
+      draftCount,
+      discardedCount,
+      archivedCount,
       specsByWorkspace,
       workspaceCount: workspaces.length,
     }

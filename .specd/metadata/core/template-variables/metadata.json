@@ -28,13 +28,13 @@
     {
       "requirement": "Contextual namespaces",
       "rules": [
-        "Contextual namespaces are added by the use case that performs the expansion, based on the runtime context. A namespace is a flat object of key-value pairs grouped under a name.\n\nThe `change` namespace is present when a change is active:\n\n| Variable              | Type   | Description                                                                         |\n| --------------------- | ------ | ----------------------------------------------------------------------------------- |\n| `change.name`         | string | The change's kebab-case name                                                        |\n| `change.workspace`    | string | The primary workspace name (first entry in `change.workspaces`)                     |\n| `change.path`         | string | Absolute path to the change directory                                               |\n| `change.archivedName` | string | Archived directory basename (`YYYYMMDD-HHmmss-<name>`) when the runtime is archived |\n\n`change.archivedName` is optional in mixed contexts: it is present for archived-change runtime flows (for example archiving post hooks) and may be absent for active-change runtime flows.\n\nFuture use cases may introduce additional namespaces (e.g. `spec`, `schema`). The expansion engine does not restrict which namespaces can exist — it traverses whatever object it receives."
+        "Contextual namespaces are added by the use case that performs the expansion, based on the runtime context. A namespace is a flat object of key-value pairs grouped under a name.\n\nThe `change` namespace is present when a change is active:\n\n| Variable              | Type   | Description                                                                         |\n| --------------------- | ------ | ----------------------------------------------------------------------------------- |\n| `change.name`         | string | The change's kebab-case name                                                        |\n| `change.path`         | string | Absolute path to the change directory                                               |\n| `change.archivedName` | string | Archived directory basename (`YYYYMMDD-HHmmss-<name>`) when the runtime is archived |\n\n`change.archivedName` is optional in mixed contexts: it is present for archived-change runtime flows (for example archiving post hooks) and may be absent for active-change runtime flows.\n\n`change.workspace` MUST NOT be a supported token. A change has no single primary workspace — it only has workspaces touched via `specIds` (see [`core:change`](../change/spec.md)). Consumers that build the `change` namespace MUST NOT inject a workspace key (not `change.workspace`, not any `[0] ?? 'default'` derivation) into the variable map. Callers needing workspace context for a change use `specIds`-derived workspace sets directly, outside the template variable system.\n\nFuture use cases may introduce additional namespaces (e.g. `spec`, `schema`). The expansion engine does not restrict which namespaces can exist — it traverses whatever object it receives."
       ]
     },
     {
       "requirement": "Variable map shape",
       "rules": [
-        "The variable map is a plain object where each top-level key is a namespace name and each value is a flat record of string keys to primitive values:\n\n```typescript\ntype TemplateVariables = Record<string, Record<string, string | number | boolean>>\n```\n\nExample:\n\n```typescript\n{\n  project: { root: '/Users/dev/my-project' },\n  change: {\n    name: 'add-auth',\n    workspace: 'default',\n    path: '/Users/dev/my-project/changes/add-auth',\n    archivedName: '20260418-103000-add-auth',\n  },\n}\n```\n\n`archivedName` is context-dependent and may be omitted when no archived-change context exists.\n\nThis replaces the current typed `HookVariables` interface with a generic structure that supports arbitrary namespaces without code changes."
+        "The variable map is a plain object where each top-level key is a namespace name and each value is a flat record of string keys to primitive values:\n\n```typescript\ntype TemplateVariables = Record<string, Record<string, string | number | boolean>>\n```\n\nExample:\n\n```typescript\n{\n  project: { root: '/Users/dev/my-project' },\n  change: {\n    name: 'add-auth',\n    path: '/Users/dev/my-project/changes/add-auth',\n    archivedName: '20260418-103000-add-auth',\n  },\n}\n```\n\n`archivedName` is context-dependent and may be omitted when no archived-change context exists. The `change` namespace MUST NOT include a `workspace` key.\n\nThis replaces the current typed `HookVariables` interface with a generic structure that supports arbitrary namespaces without code changes."
       ]
     },
     {
@@ -93,11 +93,11 @@
       "requirement": "Syntax",
       "name": "Multiple tokens in one string",
       "given": [
-        "a template \"{{change.name}} in {{change.workspace}}\"",
-        "AND variables { change: { name: \"add-auth\", workspace: \"default\" } }"
+        "a template \"{{change.name}} at {{change.path}}\"",
+        "AND variables { change: { name: \"add-auth\", path: \"/project/changes/add-auth\" } }"
       ],
       "when": ["expand() is called"],
-      "then": ["the result is \"add-auth in default\""]
+      "then": ["the result is \"add-auth at /project/changes/add-auth\""]
     },
     {
       "requirement": "Built-in namespace",
@@ -137,6 +137,15 @@
       ],
       "when": ["expand() is called"],
       "then": ["the token is preserved unchanged because object values are not expanded"]
+    },
+    {
+      "requirement": "Variable map shape",
+      "name": "Example variable map has no workspace key",
+      "given": [
+        "the normative example variable map { project: { root: '/Users/dev/my-project' }, change: { name: 'add-auth', path: '/Users/dev/my-project/changes/add-auth', archivedName: '20260418-103000-add-auth' } }"
+      ],
+      "when": ["the shape is checked against TemplateVariables"],
+      "then": ["the change namespace contains no workspace key"]
     },
     {
       "requirement": "Expansion semantics",
@@ -278,10 +287,11 @@
     {
       "requirement": "Contextual namespaces",
       "name": "Change namespace populated from change entity",
-      "given": ["a change named add-auth in workspace default at path /project/changes/add-auth"],
+      "given": ["a change named add-auth at path /project/changes/add-auth"],
       "when": ["the use case builds the variable map"],
       "then": [
-        "the map contains { change: { name: \"add-auth\", workspace: \"default\", path: \"/project/changes/add-auth\" } }"
+        "the map contains { change: { name: \"add-auth\", path: \"/project/changes/add-auth\" } }",
+        "AND the map does not contain a change.workspace key"
       ]
     },
     {
@@ -300,13 +310,36 @@
       "given": ["an active (non-archived) runtime context"],
       "when": ["the use case builds the variable map"],
       "then": ["change.archivedName may be absent without invalidating expansion"]
+    },
+    {
+      "requirement": "Contextual namespaces",
+      "name": "change.workspace is never injected regardless of workspace count",
+      "given": [
+        "a change with specIds: ['default:auth/login', 'billing:invoices'] touching two workspaces"
+      ],
+      "when": ["any use case builds the change namespace for template expansion"],
+      "then": [
+        "the resulting namespace has no workspace key",
+        "AND the namespace is not populated via change.workspaces[0], specIds[0]?.split(':')[0], or any other singular-workspace derivation"
+      ]
+    },
+    {
+      "requirement": "Contextual namespaces",
+      "name": "{{change.workspace}} token is left unexpanded",
+      "given": [
+        "a template \"{{change.workspace}}\"",
+        "AND a change namespace built by any consuming use case"
+      ],
+      "when": ["expand() is called"],
+      "then": [
+        "the token is left unexpanded because change.workspace is never a key in the built namespace"
+      ]
     }
   ],
+  "implementation": {},
   "contentHashes": {
-    "spec.md": "sha256:3c6b2d7a4d700290199f4718f009b07f6de6d77bf64994a250e8db41694db1b2",
-    "verify.md": "sha256:84b5f672f9d27f00fb4938bb9f208fb820c99f3e92d824efd909766b6aef6fed"
+    "spec.md": "sha256:ac81ccfdaccd651772b91cb81bdff87438149a854d3717d5ccef133d1291d0ee",
+    "verify.md": "sha256:918883e8d0dd465bc3527551b9ac13f6952deff4cd39f7af54534f94c9c0c81a"
   },
-  "generatedBy": "agent",
-  "optimizedDescription": "Workflow hooks (run: commands, instruction: text) artifact instructions contain {{namespace. key}} tokens must expanded runtime values before text co…",
-  "optimizedContext": "# Template Variables\n\n## Rules\n- Syntax: Template variables use {{namespace. key}} syntax. token identified regex \\{\\{([^}]+)\\}\\}. content between braces dot-separated path (e. g. project. root, change. name). Only string, number, boolean values substitutable. Object array values not expanded — original token preserved.\n- Built-in namespace: project namespace always present every expansion context. contains: | Variable | Type | Description | | -------------- | ------ | ------------------------------------------------------------------------- | | project. root | string | Absolute path project root directory containing specd. yaml) | Built-in variables injected composition layer construction time. Use cases do not build per invocation.\n- Contextual namespaces: Contextual namespaces added use case performs expansion, based runtime context. namespace flat object key-value pairs grouped under name. change namespace present when change active: | Variable | Type | Description | | --------------------- | ------ | ----------------------------------------------------------------------------------- | | change. name | string | change's kebab-case name | | change. workspace | string | primary workspace name (first entry change. workspaces) | | change. path | string | Absolute path change directory | | change. archivedName | string | Archived directory basename (YYYYMMDD-HHmmss-<name>) when runtime archived | change. archivedName optional mixed contexts: pre…\n- Variable map shape: variable map plain object where each top-level key namespace name each value flat record string keys primitive values: Example: archivedName context-dependent may omitted when no archived-change context exists. replaces current typed HookVariables interface generic structure supports arbitrary namespaces code changes.\n- Expansion semantics: When expanding template string: 1. Each {{namespace. key}} token resolved traversing variable map: first look up namespace, then key within it. 2. If namespace exists key resolves string, number, boolean, token replaced value. 3. If namespace does not exist, key does not exist, value not primitive, original {{namespace. key}} token preserved unchanged. 4. Expansion single-pass — expanded values not re-scanned further tokens. When token not resolved (step 3), TemplateExpander MUST invoke onUnknown callback if provided construction. callback receives unresolved token string. If no callback provided, unknown tokens silently preserved no side effects.\n- Shell escaping for run hooks: When expanding variables run: hook commands, all substituted values MUST shell-escaped prevent injection attacks. Values wrapped single quotes embedded single quotes escaped using '\\'' idiom. When expanding variables instruction: text artifact instructions, values substituted verbatim shell escaping — text blocks consumed agents, not shell commands.\n- TemplateExpander class: TemplateExpander class (not port) encapsulates template expansion logic. receives built-in variables construction time: - builtins provided construction (e. g. { project: { root: '. . . ' } }) always present every expansion. - onUnknown optional callback invoked when {{namespace. key}} token cannot resolved. When provided, called once per unresolved token. callback informational only — does not affect expansion result. - expand(template, variables?) — merges contextual variables built-ins substitutes values verbatim. Used GetHookInstructions GetArtifactInstruction instruction text. - expandForShell(template, variables?) — merges contextual variables built-ins substitutes values shell escapi…\n- Variable map construction: Each use case needs template expansion passes contextual variables expander methods. expander merges built-ins internally: 1. Built-in variables — project. root, injected TemplateExpander construction time 2. Contextual variables — passed per invocation runtime context (e. g. change namespace built resolved change) use case responsible building contextual variables before calling expander. expander handles merging precedence.\n- Namespace naming rules: Namespace names key names MUST lowercase alphanumeric hyphens allowed ([a-z0-9-]+). Dots path separators, not part names. token like {{change. spec-ids}} valid; {{Change. Name}} not."
+  "generatedBy": "core"
 }

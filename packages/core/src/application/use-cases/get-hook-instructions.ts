@@ -66,7 +66,7 @@ export class GetHookInstructions {
     const change = await this._changes.get(input.name)
 
     // Fallback to archive for post-archive instructions
-    let contextVars: { change: { name: string; workspace: string; path: string } }
+    let contextVars: { change: { name: string; path: string; archivedName?: string } }
     let schemaName: string
 
     if (change === null) {
@@ -78,7 +78,7 @@ export class GetHookInstructions {
         contextVars = {
           change: {
             name: archived.name,
-            workspace: archived.specIds[0]?.split(':')[0] ?? 'default',
+            archivedName: archived.archivedName,
             path: this._archive.archivePath(archived),
           },
         }
@@ -87,9 +87,8 @@ export class GetHookInstructions {
       }
     } else {
       schemaName = change.schemaName
-      const workspace = change.workspaces[0] ?? 'default'
       contextVars = {
-        change: { name: change.name, workspace, path: this._changes.changePath(change) },
+        change: { name: change.name, path: this._changes.changePath(change) },
       }
     }
 

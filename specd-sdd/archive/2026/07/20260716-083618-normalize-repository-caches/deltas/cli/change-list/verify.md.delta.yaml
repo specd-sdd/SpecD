@@ -1,0 +1,110 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Command signature'
+  content: |
+    #### Scenario: Default limit is 100
+
+    - **GIVEN** more than 100 active changes exist
+    - **WHEN** `specd change list --format json` is run without `--limit`
+    - **THEN** `meta.limit` is 100
+    - **AND** `items` contains at most 100 entries
+
+    #### Scenario: --page and keyset cursors are mutually exclusive
+
+    - **WHEN** `specd change list --page 2 --after-key 2024-01-01T00:00:00.000Z` is run
+    - **THEN** the command exits with a CLI usage error before invoking the use case
+
+    #### Scenario: --after-id requires --after-key
+
+    - **WHEN** `specd change list --after-id add-login` is run without `--after-key`
+    - **THEN** the command exits with a CLI usage error before invoking the use case
+
+- op: modified
+  description: Description is opt-in via --description
+  selector:
+    type: section
+    matches: 'Scenario: Rows contain name, state, specIds, and schema'
+  content: |
+    - **GIVEN** a change named `add-login` in state `designing` with specIds `['auth/login']` and schema `std` version `1`
+    - **WHEN** `specd change list` is run without `--description`
+    - **THEN** the row for `add-login` shows `add-login`, `designing`, `auth/login`, and `std@1`
+    - **AND** no description sub-row is printed
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Output format'
+    after:
+      type: section
+      matches: 'Scenario: Rows contain name, state, specIds, and schema'
+  content: |
+    #### Scenario: --description includes description sub-row
+
+    - **GIVEN** an active change with description `Add OAuth2 login`
+    - **WHEN** `specd change list --description` is run
+    - **THEN** a dim indented description line `Add OAuth2 login` is printed below the main row
+
+    #### Scenario: Truncation hint when results are partial
+
+    - **GIVEN** 125 active changes and default pagination
+    - **WHEN** `specd change list` is run
+    - **THEN** stdout contains `showing 100 of 125 (use --limit/--page)`
+
+- op: modified
+  description: JSON output uses paginated envelope
+  selector:
+    type: section
+    matches: 'Scenario: JSON format output'
+  content: |
+    - **GIVEN** one active change `add-login` in state `designing` with specId `auth/login`, schema `std` version `1`, and `createdAt` recorded
+    - **WHEN** `specd change list --format json` is run
+    - **THEN** stdout is valid JSON with `items` array and `meta` object
+    - **AND** `items[0]` contains `name`, `state`, `specIds`, `schemaName`, `schemaVersion`, and `createdAt`
+    - **AND** `items[0]` does not contain a `description` field
+    - **AND** `meta` contains `total`, `count`, `limit`, and `page`
+    - **AND** the process exits with code 0
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: Requirements
+    after:
+      type: section
+      matches: 'Requirement: Command signature'
+  content: |
+    ### Requirement: List options forwarding
+
+    #### Scenario: Pagination flags forwarded to ListChanges
+
+    - **WHEN** `specd change list --limit 25 --page 2 --format json` is run
+    - **THEN** `ListChanges.execute` is called with `limit` 25 and `page` 2
+
+    #### Scenario: Keyset cursor forwarded with tiebreak id
+
+    - **WHEN** `specd change list --after-key 2024-01-01T00:00:00.000Z --after-id add-login --format json` is run
+    - **THEN** `ListChanges.execute` is called with `after.key` equal to the ISO timestamp and `after.id` equal to `add-login`
+
+    #### Scenario: --description sets includeDescription only when present
+
+    - **WHEN** `specd change list --description --format json` is run
+    - **THEN** `ListChanges.execute` is called with `includeDescription: true`
+
+    #### Scenario: CLI does not re-sort results
+
+    - **GIVEN** `ListChanges.execute` returns items in repository canonical order
+    - **WHEN** `specd change list --format json` is run
+    - **THEN** stdout `items` appear in the same order as returned by the use case
+
+- op: modified
+  description: Empty JSON uses paginated envelope
+  selector:
+    type: section
+    matches: 'Scenario: No active changes — JSON mode'
+  content: |
+    - **WHEN** `specd change list --format json` is run with no active changes
+    - **THEN** stdout is `{"items":[],"meta":{"total":0,"count":0,"limit":100}}`
+    - **AND** the process exits with code 0

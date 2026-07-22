@@ -58,6 +58,10 @@ async function cleanupRepo(ctx: RepoContext): Promise<void> {
   await fs.rm(ctx.tmpDir, { recursive: true, force: true })
 }
 
+function changeCacheDir(configPath: string, bucket: 'changes' | 'drafts' | 'discarded'): string {
+  return path.join(configPath, 'tmp', 'fs-cache', bucket)
+}
+
 function makeChange(name: string, createdAt?: Date): Change {
   const at = createdAt ?? new Date('2024-01-15T10:00:00.000Z')
   return new Change({
@@ -521,7 +525,7 @@ describe('FsChangeRepository', () => {
       await ctx.repo.save(c3)
 
       const changes = await ctx.repo.list()
-      expect(changes.map((c) => c.name)).toEqual(['alpha', 'beta', 'gamma'])
+      expect(changes.items.map((c) => c.name)).toEqual(['alpha', 'beta', 'gamma'])
     })
 
     it('given a drafted change and an active change, when list is called, then only the active change is returned', async () => {
@@ -535,12 +539,12 @@ describe('FsChangeRepository', () => {
       })
 
       const changes = await ctx.repo.list()
-      expect(changes.map((c) => c.name)).toEqual(['active'])
+      expect(changes.items.map((c) => c.name)).toEqual(['active'])
     })
 
     it('given no changes, when list is called, then an empty array is returned', async () => {
       const result = await ctx.repo.list()
-      expect(result).toEqual([])
+      expect(result.items).toEqual([])
     })
   })
 
@@ -1068,9 +1072,7 @@ describe('FsChangeRepository', () => {
       change.discard('superseded', actor, ['new-auth'])
       await ctx.repo.save(change)
 
-      // Discarded changes are excluded from get() — use listDiscarded()
-      const discarded = await ctx.repo.listDiscarded()
-      const loaded = discarded.find((c) => c.name === 'add-auth')
+      const loaded = await ctx.repo.getDiscarded('add-auth')
       expect(loaded).toBeDefined()
       const draftedEvent = loaded?.history.find((e) => e.type === 'drafted')
       expect(draftedEvent?.type === 'drafted' && draftedEvent.reason).toBe('parking for now')
@@ -2428,6 +2430,33 @@ describe('FsChangeRepository', () => {
       // Even though the spec exists (per resolveSpecExists), the filename should NOT
       // have flipped to deltas/ because the hash is null (it's unvalidated).
       expect(file?.filename).toBe('specs/core/auth/spec.md')
+    })
+  })
+
+  describe('fs-cache index', () => {
+    it('creates index under configPath/tmp/fs-cache/changes on list', async () => {
+      await ctx.repo.save(makeChange('indexed'))
+
+      await ctx.repo.list()
+
+      const indexPath = path.join(changeCacheDir(ctx.configPath, 'changes'), '.specd-index.jsonl')
+      await expect(fs.access(indexPath)).resolves.toBeUndefined()
+    })
+
+    it('upserts active index on save', async () => {
+      await ctx.repo.save(makeChange('upserted'))
+
+      expect(await ctx.repo.count()).toBe(1)
+    })
+
+    it('invalidateCache triggers rebuild on next list', async () => {
+      await ctx.repo.save(makeChange('rebuild-me'))
+      await ctx.repo.list()
+
+      await ctx.repo.invalidateCache()
+
+      const result = await ctx.repo.list()
+      expect(result.items.map((entry) => entry.name)).toEqual(['rebuild-me'])
     })
   })
 })

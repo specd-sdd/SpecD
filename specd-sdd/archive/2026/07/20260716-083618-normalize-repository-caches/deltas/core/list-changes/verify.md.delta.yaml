@@ -1,0 +1,83 @@
+- op: modified
+  description: Return paginated ActiveChangeListEntry ListResult.
+  selector:
+    type: section
+    matches: 'Requirement: Returns all active changes'
+  content: |
+    #### Scenario: Multiple active changes returned in canonical order
+
+    - **GIVEN** the repository contains three active changes where `alpha` has the oldest `createdAt`
+    - **WHEN** `execute()` is called without options
+    - **THEN** the result is `ListResult<ActiveChangeListEntry>` with default `limit: 100`
+    - **AND** items appear in `createdAt` ascending order: `alpha`, then the others
+
+    #### Scenario: Drafted and discarded changes are excluded
+
+    - **GIVEN** the repository contains active change `alpha`, drafted change `beta`, and discarded change `gamma`
+    - **WHEN** `execute()` is called
+    - **THEN** `items` contains only `alpha`
+    - **AND** `meta.total` counts active changes only
+
+    #### Scenario: Pagination limit truncates items but preserves total
+
+    - **GIVEN** five active changes exist
+    - **WHEN** `execute({ limit: 2 })` is called
+    - **THEN** `items.length` is `2`
+    - **AND** `meta.total` is `5`
+    - **AND** `meta.count` is `2`
+
+- op: modified
+  description: List entries are lightweight rows without detail fields.
+  selector:
+    type: section
+    matches: 'Requirement: Returns Change entities without content'
+  content: |
+    #### Scenario: Entries omit artifact content and history
+
+    - **WHEN** `execute()` returns a non-empty result
+    - **THEN** each item is an `ActiveChangeListEntry`
+    - **AND** items do not include artifact file content, history, validated hashes, or artifact state maps
+
+    #### Scenario: Description appears only when includeDescription is set
+
+    - **GIVEN** cached list entries include a stored description
+    - **WHEN** `execute({ includeDescription: true })` is called
+    - **THEN** returned items may include `description`
+    - **WHEN** `execute()` is called without `includeDescription`
+    - **THEN** returned items omit `description`
+
+- op: modified
+  description: Empty result uses ListResult envelope.
+  selector:
+    type: section
+    matches: 'Requirement: Returns an empty array when no active changes exist'
+  content: |
+    #### Scenario: Repository is empty
+
+    - **GIVEN** the repository contains no changes at all
+    - **WHEN** `execute()` is called
+    - **THEN** the result is `{ items: [], meta: { total: 0, count: 0, limit: 100 } }`
+
+    #### Scenario: All changes are drafted or discarded
+
+    - **GIVEN** the repository contains only drafted and discarded changes
+    - **WHEN** `execute()` is called
+    - **THEN** the result is `{ items: [], meta: { total: 0, count: 0, limit: 100 } }`
+
+- op: modified
+  description: Delegate list options without re-sorting.
+  selector:
+    type: section
+    matches: 'Requirement: Constructor accepts a ChangeRepository'
+  content: |
+    #### Scenario: Constructor accepts ChangeRepository
+
+    - **WHEN** `ListChanges` is instantiated
+    - **THEN** it requires a `ChangeRepository` in its constructor
+
+    #### Scenario: Execute forwards options and returns repository result unchanged
+
+    - **GIVEN** `ChangeRepository.list(options)` returns a specific `ListResult<ActiveChangeListEntry>`
+    - **WHEN** `execute(options)` is called
+    - **THEN** the result is identical to the repository output
+    - **AND** the use case does not re-sort, filter, or paginate after delegation

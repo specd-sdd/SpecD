@@ -16,10 +16,19 @@
 
 ### Requirement: Change directory listing order
 
-#### Scenario: Multiple changes listed
+#### Scenario: Multiple changes listed in createdAt order
 
-- **WHEN** `list()` is called with two changes created at different times
-- **THEN** the older change appears first in the result
+- **GIVEN** two active changes with `createdAt` timestamps where `alpha` is older than `beta`
+- **WHEN** `ChangeRepository.list()` is called through the fs adapter
+- **THEN** `alpha` appears before `beta` in canonical sort order
+- **AND** the order is produced by the active-changes index helper under `{configPath}/tmp/fs-cache/changes/` without re-sorting at list time
+
+#### Scenario: List order matches index helper not directory walk
+
+- **GIVEN** change directories on disk whose lexical order differs from `createdAt` ascending
+- **WHEN** `ChangeRepository.list()` is called
+- **THEN** returned items follow `createdAt` ascending from the fs-cache index
+- **AND** the adapter does not sort directory entries at list time
 
 ### Requirement: Artifact status derivation
 
@@ -116,36 +125,68 @@
 - **WHEN** `storage.archive.pattern` contains `{{change.scope}}`
 - **THEN** `FsArchiveRepository` must reject it as an unsupported variable
 
+### Requirement: Workspace excluded from archive pattern
+
+#### Scenario: Pattern uses workspace variable
+
+- **WHEN** `storage.archive.pattern` contains `{{change.workspace}}`
+- **THEN** `FsArchiveRepository` must reject it as an unsupported variable, throwing `UnsupportedPatternError` at construction time — the same as `{{change.scope}}`
+
+#### Scenario: Normative catalog omits any workspace token
+
+- **GIVEN** the normative supported-variable catalog for `storage.archive.pattern`
+- **WHEN** the catalog is inspected
+- **THEN** it contains only `{{year}}`, `{{month}}`, `{{day}}`, `{{change.name}}`, `{{change.archivedName}}`
+- **AND** it contains no per-change workspace token
+
 ### Requirement: Archive index
 
-#### Scenario: Change archived
+#### Scenario: Change archived upserts fs-cache index entry
 
-- **WHEN** `archive(change)` is called
-- **THEN** one line is appended to `index.jsonl` — existing lines are not modified
+- **WHEN** `archive(change)` completes successfully
+- **THEN** an `ArchiveListEntry` row is upserted in `{configPath}/tmp/fs-cache/archive/.specd-index.jsonl`
+- **AND** no root-local `.specd-index.jsonl` is written at the archive storage root
 
-#### Scenario: Change not in index
+#### Scenario: Archive list serves from fs-cache index
 
-- **WHEN** `get(name)` scans `index.jsonl` and finds no match
-- **THEN** it falls back to globbing `**/*-<name>` and appends the recovered entry to the index
+- **GIVEN** archived changes exist on disk and the fs-cache archive index is fresh
+- **WHEN** `ArchiveRepository.list()` is called
+- **THEN** entries are returned from `{configPath}/tmp/fs-cache/archive/` without reading every manifest
+- **AND** results are ordered by `archivedAt` descending (newest first)
 
-#### Scenario: reindex called
+#### Scenario: Archive reindex rebuilds fs-cache index
 
-- **WHEN** `specd storage reindex` is run after manual filesystem changes
-- **THEN** `index.jsonl` is rewritten in chronological order based on each manifest's `archivedAt`
+- **WHEN** `ArchiveRepository.reindex()` is invoked after manual filesystem changes
+- **THEN** `{configPath}/tmp/fs-cache/archive/.specd-index.jsonl` is rebuilt from archived manifests
+- **AND** `meta.totalCount` reflects the full archive count
+
+#### Scenario: Legacy root index migrated on rebuild
+
+- **GIVEN** legacy `.specd-index.jsonl` exists at the archive storage root
+- **WHEN** `ArchiveRepository.reindex()` or the first full rebuild materializes `fs-cache/archive/`
+- **THEN** the legacy root-local index files are deleted (ENOENT ignored)
+- **AND** listing uses only the fs-cache index thereafter
+
+#### Scenario: get does not depend on root-local index
+
+- **GIVEN** no root-local archive index file exists
+- **WHEN** `ArchiveRepository.get(name)` is called for an archived change
+- **THEN** the change is resolved without requiring a root-local JSONL index
 
 ### Requirement: Archive runtime ignore hygiene
 
-#### Scenario: Runtime archive behavior recreates ignore file when missing
+#### Scenario: Runtime archive behavior ensures staging is ignored
 
 - **GIVEN** the archive root exists without an archive-local `.gitignore`
-- **WHEN** `FsArchiveRepository` recreates or rebuilds `.specd-index.jsonl`
+- **WHEN** `FsArchiveRepository` performs archive creation or index rebuild that touches the archive root
 - **THEN** the archive root `.gitignore` is created or updated
-- **AND** it contains entries for `.specd-index.jsonl` and `.staging`
+- **AND** it contains an entry for `.staging`
+- **AND** it does not require entries for `.specd-index.jsonl` or `.specd-index-meta.json`
 
-#### Scenario: Shared helper coverage includes all runtime index-maintenance paths
+#### Scenario: Shared helper preserves staging ignore across runtime paths
 
-- **WHEN** archive creation, `reindex()`, or runtime index recovery or append behavior maintains the archive index
-- **THEN** each path preserves the archive-local ignore entries for `.specd-index.jsonl` and `.staging`
+- **WHEN** archive creation, `reindex()`, or staged commit paths prepare the archive directory
+- **THEN** each path preserves the archive-local ignore entry for `.staging`
 
 ### Requirement: Named storage factories
 
@@ -240,3 +281,32 @@
 - **WHEN** locks are acquired
 - **THEN** lock files are under `.specd/config/tmp/change-locks/`
 - **AND** not under `.specd/changes/`
+
+### Requirement: Filesystem list index cache layout
+
+#### Scenario: List indexes stored under fs-cache buckets
+
+- **GIVEN** an fs-backed project with active changes, drafts, discarded changes, archive entries, and workspace specs
+- **WHEN** list/count operations populate derived indexes
+- **THEN** index files exist under `{configPath}/tmp/fs-cache/` in bucket directories `changes/`, `drafts/`, `discarded/`, `archive/`, and `specs/<workspace>/`
+- **AND** each bucket contains `.specd-index.jsonl` and `.specd-index-meta.json`
+
+#### Scenario: Index meta exposes totalCount for count operations
+
+- **GIVEN** a populated fs-cache bucket with `totalCount: 5` in meta
+- **WHEN** the corresponding repository `count()` is called with a fresh index
+- **THEN** the returned count is `5` without materializing full list entries
+
+### Requirement: configPath tmp gitignore
+
+#### Scenario: Runtime ensures tmp gitignore contents
+
+- **GIVEN** `{configPath}/tmp/` is first used by an fs-backed repository
+- **WHEN** runtime tmp hygiene runs
+- **THEN** `{configPath}/tmp/.gitignore` exists with contents ignoring `*` and un-ignoring `!.gitignore`
+
+#### Scenario: Fs-cache artifacts remain gitignored
+
+- **GIVEN** `{configPath}/tmp/.gitignore` is present
+- **WHEN** `{configPath}/tmp/fs-cache/` indexes are generated
+- **THEN** those cache files are ignored by git via the tmp gitignore rule

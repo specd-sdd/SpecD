@@ -6,12 +6,13 @@
   "dependsOn": [
     "cli:entrypoint",
     "core:list-discarded",
-    "core:discarded-change-view",
+    "core:change-list-entry",
     "cli:command-resource-naming"
   ],
   "implementation": [
     {
-      "file": "cli:src/commands/discarded/list.ts"
+      "file": "cli:src/commands/discarded/list.ts",
+      "symbols": ["registerDiscardedList"]
     }
   ]
 }

@@ -1,5 +1,6 @@
-import { type DraftedChangeView } from '../../domain/read-only-change-view.js'
-import { type ChangeRepository } from '../ports/change-repository.js'
+import { type DraftedChangeListEntry } from '../../domain/change-list-entry.js'
+import { type ChangeRepository, type DraftedChangeListOptions } from '../ports/change-repository.js'
+import { type ListResult } from '../ports/repository.js'
 
 /**
  * Lists all drafted changes in the default workspace.
@@ -19,9 +20,10 @@ export class ListDrafts {
   /**
    * Executes the use case.
    *
-   * @returns All drafted changes, oldest first
+   * @param options - Pagination and include projection options
+   * @returns Paginated drafted change list entries, newest first
    */
-  async execute(): Promise<DraftedChangeView[]> {
-    return this._changes.listDrafts()
+  async execute(options?: DraftedChangeListOptions): Promise<ListResult<DraftedChangeListEntry>> {
+    return this._changes.listDrafts(options)
   }
 }

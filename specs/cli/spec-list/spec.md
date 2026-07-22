@@ -11,22 +11,27 @@ Without a quick inventory of all specs, users and agents cannot orient themselve
 ### Requirement: Command signature
 
 ```
-specd specs list [--workspace <name>] [--summary] [--metadata-status [filter]] [--format text|json|toon]
+specd specs list [--workspace <name>] [--summary] [--metadata-status [filter]] [--limit <n>] [--page <p>] [--after-key <path>] [--format text|json|toon]
 ```
 
 Alias:
 
 ```
-specd spec list [--workspace <name>] [--summary] [--metadata-status [filter]] [--format text|json|toon]
+specd spec list [--workspace <name>] [--summary] [--metadata-status [filter]] [--limit <n>] [--page <p>] [--after-key <path>] [--format text|json|toon]
 ```
 
 - `--workspace <name>` — optional, repeatable; include only specs belonging to the named workspace(s). When omitted, all workspaces are included
-- `--summary` — optional flag; when present, a short summary is included for each spec alongside the title
-- `--metadata-status` — optional flag with optional filter value; when present, a metadata-freshness METADATA STATUS column is included for each spec
+- `--summary` — optional flag; when present, a short summary is included for each spec alongside the title (`includeSummary`)
+- `--metadata-status` — optional flag with optional filter value; when present, a metadata-freshness METADATA STATUS column is included for each spec (`includeMetadataStatus`)
   - Without a filter value (`--metadata-status`), all specs are shown with their status
   - With a comma-separated filter value (`--metadata-status stale`, `--metadata-status stale,missing`), only specs matching at least one of the listed statuses are shown
   - Valid filter tokens: `fresh`, `stale`, `missing`, `invalid`
+- `--limit <n>` — optional; maximum number of spec entries to return **per workspace query**; defaults to `100`
+- `--page <p>` — optional; 1-based page number (uses `--limit`, defaulting to `100` when omitted)
+- `--after-key <path>` — optional; exclusive keyset cursor — capability path (with `/` separators) of the last seen spec in the workspace being paginated
 - `--format text|json|toon` — optional; output format, defaults to `text`
+
+`--page` is mutually exclusive with `--after-key`. Spec list keyset cursors omit `after-id` (path alone is the sort key).
 
 ### Requirement: Workspace filtering
 
@@ -35,6 +40,16 @@ The command SHALL use `ListWorkspaces` to obtain the official project structure.
 When `--workspace` is provided one or more times, only the matching `ProjectWorkspace` entities SHALL be processed. If a requested workspace name does not exist in the orchestrated list, it SHALL be ignored.
 
 In text mode, the command MUST group specs by workspace, displaying the workspace name and its directory root. Read-only and external workspaces SHOULD be visually flagged.
+
+### Requirement: List options forwarding
+
+The command MUST invoke `ListSpecs.execute()` and map CLI flags to list options:
+
+- `--limit`, `--page`, `--after-key` → `limit`, `page`, and `after: { key }` (no `id` for specs)
+- `--summary` → `includeSummary: true`
+- `--metadata-status` → `includeMetadataStatus: true`
+
+Include flags MUST be set only when the corresponding CLI flag is present. The command MUST NOT re-resolve summary or metadata status with extra I/O when the repository already returned those fields. The command MUST NOT re-sort or paginate after the use case returns.
 
 ### Requirement: Title resolution
 
@@ -80,37 +95,22 @@ In `text` mode (default), specs are grouped by workspace. Each group is rendered
 - The workspace name is printed as a bold title line above the table.
 - Each workspace group begins with an inverse-video workspace header row: `  workspace: <name>  `, padded to the same inner width as the column header row below it.
 - Immediately below the workspace header is an inverse-video column header row. The header includes columns depending on which flags are passed: `PATH  TITLE` (default), with `METADATA STATUS` appended when `--metadata-status` is present, and `SUMMARY` appended when `--summary` is present.
-- Data rows list one spec per line. The PATH column displays the fully-qualified spec identifier `workspace:capability-path` (e.g. `default:auth/login`). All columns are aligned to globally fixed widths (computed across all entries in all workspaces).
+- Data rows list one spec per line. The PATH column displays the fully-qualified spec identifier `workspace:capability-path` (e.g. `default:auth/login`). All columns are aligned to globally fixed widths (computed across all entries in all workspaces on the current page).
 - When `--metadata-status` is passed, a `METADATA STATUS` column appears after `TITLE`, showing `fresh`, `stale`, `missing`, or `invalid`.
 - When `--summary` is passed, `SUMMARY` follows as an additional aligned column using wrap overflow (capped at 60 characters).
 - Workspace groups are separated by a blank line.
 
+Rows within each workspace appear in canonical order (capability path ascending) as returned by `ListSpecs`; the CLI MUST NOT re-sort.
+
+When a workspace group's `meta.count < meta.total`, the command MUST print a trailing hint line after that group's table:
+
+```
+showing <count> of <total> (use --limit/--page)
+```
+
 When `--workspace` filters are applied, only workspace groups matching the filter are rendered. Column widths are computed across all remaining entries (not across all workspaces).
 
-```
-  workspace: default
-  PATH                      TITLE
-  default:<capability-path>  <title>
-  default:<capability-path>  <title>
-
-  workspace: default  (with --metadata-status)
-  PATH                      TITLE     METADATA STATUS
-  default:<capability-path>  <title>  fresh
-  default:<capability-path>  <title>  stale
-  default:<capability-path>  <title>  missing
-
-  workspace: default  (with --summary)
-  PATH                      TITLE    SUMMARY
-  default:<capability-path>  <title>  <summary>
-  default:<capability-path>  <title>
-
-  workspace: default  (with --metadata-status --summary)
-  PATH                      TITLE    METADATA STATUS   SUMMARY
-  default:<capability-path>  <title>  fresh    <summary>
-  default:<capability-path>  <title>  stale
-```
-
-In `json` or `toon` mode, each spec entry is an object. The `path` field uses the fully-qualified `workspace:capability-path` format:
+In `json` or `toon` mode, each workspace entry includes paginated spec results:
 
 ```json
 {
@@ -124,13 +124,19 @@ In `json` or `toon` mode, each spec entry is an object. The `path` field uses th
           "metadataStatus": "fresh",
           "summary": "..."
         }
-      ]
+      ],
+      "meta": {
+        "total": 125,
+        "count": 100,
+        "limit": 100,
+        "page": 1
+      }
     }
   ]
 }
 ```
 
-When `--workspace` filters are applied in JSON/toon mode, the `workspaces` array contains entries for all configured workspace names; filtered-out workspaces appear with an empty `specs` array, matching the existing empty-workspace behavior.
+When `--workspace` filters are applied in JSON/toon mode, the `workspaces` array contains entries **only** for the filtered/matching workspace names — non-matching configured workspaces MUST NOT appear, not even as empty stubs. This mirrors text mode, where only matching workspace groups render. When no `--workspace` filter is given, the `workspaces` array contains all configured workspaces, including those with no specs (empty `specs` array).
 
 When `--summary` is not passed, `summary` is omitted from text rows and from JSON/toon objects. When `--summary` is passed but no summary is available for a spec, the text row shows the title only and the JSON/toon object omits `summary` (does not include `null`).
 
@@ -193,10 +199,10 @@ $ specd spec list --summary
   default:auth/register   Register
 
 $ specd spec list --format json
-{"workspaces":[{"name":"default","specs":[{"path":"default:auth/login","title":"Login"},{"path":"default:auth/register","title":"Register"}]}]}
+{"workspaces":[{"name":"default","specs":[{"path":"default:auth/login","title":"Login"},{"path":"default:auth/register","title":"Register"}],"meta":{"total":2,"count":2,"limit":100,"page":1}}]}
 
 $ specd spec list --summary --format json
-{"workspaces":[{"name":"default","specs":[{"path":"default:auth/login","title":"Login","summary":"Handles user authentication via login form"}]}]}
+{"workspaces":[{"name":"default","specs":[{"path":"default:auth/login","title":"Login","summary":"Handles user authentication via login form"}],"meta":{"total":1,"count":1,"limit":100,"page":1}}]}
 
 $ specd spec list --metadata-status
   workspace: default
@@ -212,16 +218,19 @@ $ specd spec list --metadata-status stale,missing
   default:billing/invoices  Invoices  missing
 
 $ specd spec list --metadata-status --format json
-{"workspaces":[{"name":"default","specs":[{"path":"default:auth/login","title":"Login","metadataStatus":"fresh"},{"path":"default:auth/register","title":"Register","metadataStatus":"stale"}]}]}
+{"workspaces":[{"name":"default","specs":[{"path":"default:auth/login","title":"Login","metadataStatus":"fresh"},{"path":"default:auth/register","title":"Register","metadataStatus":"stale"}],"meta":{"total":2,"count":2,"limit":100,"page":1}}]}
 
 $ specd spec list --workspace default --format json
-{"workspaces":[{"name":"default","specs":[{"path":"default:auth/login","title":"Login"},{"path":"default:auth/register","title":"Register"}]},{"name":"billing","specs":[]}]}
+{"workspaces":[{"name":"default","specs":[{"path":"default:auth/login","title":"Login"},{"path":"default:auth/register","title":"Register"}],"meta":{"total":2,"count":2,"limit":100,"page":1}}]}
 ```
+
+The last example shows `--workspace default` filtering in JSON mode: only the matching `default` workspace appears in `workspaces` — `billing` (unmatched) is absent entirely, not present as an empty stub.
 
 ## Spec Dependencies
 
 - [`cli:entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
-- [`core:spec`](../../core/spec/spec.md) — spec metadata access and listing model
-- [`core:list-workspaces`](../../core/list-workspaces/spec.md) — project orchestration source
-- [`cli:command-resource-naming`](../command-resource-naming/spec.md) — canonical plural naming
-- [`cli:spec-search`](../spec-search/spec.md) — dedicated spec search
+- [`core:list-specs`](../../core/list-specs/spec.md) — paginated spec listing across workspaces
+- [`core:spec-repository-port`](../../core/spec-repository-port/spec.md) — `SpecListEntry` row shape
+- [`cli:command-resource-naming`](../command-resource-naming/spec.md) — canonical plural naming and singular alias policy
+- [`cli:spec-search`](../spec-search/spec.md) — related spec discovery commands
+- [`core:list-workspaces`](../../core/list-workspaces/spec.md) — workspace orchestration

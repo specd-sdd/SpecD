@@ -9,11 +9,8 @@
     "core:kernel",
     "default:_global/architecture",
     "core:archived-change-index-entry",
-    "core:composition-resolver"
+    "core:composition-resolver",
+    "core:archive-repository-port"
   ],
-  "implementation": [
-    {
-      "file": "core:src/composition/use-cases/list-archived.ts"
-    }
-  ]
+  "implementation": []
 }

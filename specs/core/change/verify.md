@@ -49,6 +49,19 @@
 - **THEN** `specDependsOn` no longer has an entry for `'auth/session'`
 - **AND** `specDependsOn` still has the entry for `'auth/login'`
 
+#### Scenario: workspaces is not usable as a singular primary workspace
+
+- **GIVEN** a Change with `specIds: ['default:auth/login', 'billing:invoices']` so `workspaces` is `['default', 'billing']`
+- **WHEN** a consumer building template variables (see `core:template-variables`) or an archive path pattern (see `core:storage`) needs "the change's workspace"
+- **THEN** there is no such singular value — `workspaces[0]` MUST NOT be read or treated as a primary/home workspace for the change
+- **AND** the two touched workspaces remain equally valid members of the derived set
+
+#### Scenario: Single-workspace change still has no primary-workspace semantics
+
+- **GIVEN** a Change with `specIds: ['default:auth/login']` so `workspaces` is `['default']`
+- **WHEN** a consumer inspects `workspaces`
+- **THEN** `workspaces[0]` being the only element does not make `default` a "primary" workspace identity — it remains the derived touched-set of size one
+
 ### Requirement: Lifecycle
 
 #### Scenario: Valid transition — drafting to designing

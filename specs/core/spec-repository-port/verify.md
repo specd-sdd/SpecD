@@ -14,11 +14,20 @@
 
 ### Requirement: Spec counting
 
-#### Scenario: Count returns total spec size
+#### Scenario: Count matches list meta.total from index source
 
-- **GIVEN** a workspace with a known number of specs
-- **WHEN** `SpecRepository.count()` is called
-- **THEN** it returns an integer equal to the number of specs in the workspace
+- **GIVEN** a workspace with a known number of specs indexed for listing
+- **WHEN** `count()` and `list().meta.total` are queried
+- **THEN** both return the same total
+- **AND** `count()` does not load metadata for every spec via repeated full list materialization
+
+### Requirement: Spec list reindex
+
+#### Scenario: reindex rebuilds workspace spec list cache
+
+- **GIVEN** a filesystem-backed `SpecRepository` for workspace `core`
+- **WHEN** `reindex()` is called
+- **THEN** the spec list index under `{configPath}/tmp/fs-cache/specs/core/` is fully rebuilt from disk
 
 ### Requirement: saveMetadata persists metadata with conflict detection
 
@@ -48,7 +57,7 @@
 
 - **WHEN** `SpecRepository` is examined
 - **THEN** it is declared as `abstract class`
-- **AND** `get`, `list`, `artifact`, `save`, `delete`, `resolveFromPath`, `metadata`, `saveMetadata`, and `search` are declared as `abstract` methods
+- **AND** `get`, `list`, `count`, `reindex`, `artifact`, `save`, `delete`, `resolveFromPath`, `metadata`, `saveMetadata`, and `search` are declared as `abstract` methods
 - **AND** a concrete implementation can extend it and implement these methods
 
 ### Requirement: Workspace scoping
@@ -74,11 +83,12 @@
 
 ### Requirement: list returns spec metadata with optional prefix filter
 
-#### Scenario: List all specs
+#### Scenario: List all specs as SpecListEntry rows
 
 - **GIVEN** a workspace with specs `auth/login`, `auth/oauth`, and `billing/invoices`
 - **WHEN** `list()` is called without a prefix
-- **THEN** all three specs are returned
+- **THEN** the result is `ListResult<SpecListEntry>` containing all three entries ordered by capability path ascending
+- **AND** each item includes resolved `workspace`, `path`, and `title`
 
 #### Scenario: List with prefix filter
 
@@ -89,7 +99,30 @@
 #### Scenario: Empty workspace
 
 - **WHEN** `list()` is called on an empty workspace
-- **THEN** an empty array is returned
+- **THEN** `{ items: [], meta: { total: 0, count: 0, limit: 100 } }` is returned
+
+### Requirement: SpecListEntry port shape
+
+#### Scenario: Title falls back to path segment
+
+- **GIVEN** a spec with no valid metadata title
+- **WHEN** the repository projects a `SpecListEntry`
+- **THEN** `title` equals the last segment of `path`
+
+#### Scenario: Summary and metadataStatus respect include flags
+
+- **GIVEN** a cached spec list entry payload with resolvable summary and metadata status
+- **WHEN** `list(undefined, { includeSummary: true, includeMetadataStatus: true })` is called
+- **THEN** returned items include projected `summary` and `metadataStatus`
+- **WHEN** the same call omits both include flags
+- **THEN** returned items omit `summary` and `metadataStatus`
+
+#### Scenario: Resolution errors still return an entry with title fallback
+
+- **GIVEN** a spec whose summary or status resolution encounters an I/O error during indexing
+- **WHEN** `list()` is called
+- **THEN** the spec still appears with a title fallback
+- **AND** the list call does not fail because of that individual spec
 
 ### Requirement: artifact loads a single artifact file
 

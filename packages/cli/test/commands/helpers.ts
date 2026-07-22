@@ -8,7 +8,13 @@
 import type { Stats } from 'node:fs'
 import { vi } from 'vitest'
 import { Command } from 'commander'
-import type { SpecdConfig, Kernel, SpecRepository, ChangeRepository } from '@specd/sdk'
+import type {
+  SpecdConfig,
+  Kernel,
+  SpecRepository,
+  ChangeRepository,
+  ArchiveRepository,
+} from '@specd/sdk'
 
 /**
  * Mirrors the {@link Kernel} shape but with every `execute` replaced by a
@@ -108,6 +114,117 @@ export function makeMockChange(overrides: Record<string, unknown> = {}): Record<
   }
 }
 
+/** Default page size for list commands (matches {@link DEFAULT_LIST_LIMIT} in list-pagination). */
+export const DEFAULT_LIST_LIMIT = 100
+
+/** Builds list metadata for mocked {@link ListResult} envelopes. */
+export function makeListMeta(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+  return { total: 0, count: 0, limit: DEFAULT_LIST_LIMIT, page: 1, ...overrides }
+}
+
+/** Builds a mocked paginated list result. */
+export function makeListResult<T>(
+  items: readonly T[],
+  metaOverrides: Record<string, unknown> = {},
+): { items: readonly T[]; meta: Record<string, unknown> } {
+  return {
+    items,
+    meta: makeListMeta({ total: items.length, count: items.length, ...metaOverrides }),
+  }
+}
+
+/** Minimal active-change list entry for CLI list tests. */
+export function makeActiveChangeListEntry(
+  overrides: Record<string, unknown> = {},
+): Record<string, unknown> {
+  return {
+    name: 'my-change',
+    state: 'designing',
+    specIds: ['auth/login'],
+    schemaName: '@specd/schema-std',
+    schemaVersion: 1,
+    createdAt: new Date('2026-01-15T10:00:00Z'),
+    ...overrides,
+  }
+}
+
+/** Minimal drafted-change list entry for CLI list tests. */
+export function makeDraftedChangeListEntry(
+  overrides: Record<string, unknown> = {},
+): Record<string, unknown> {
+  return {
+    name: 'my-draft',
+    state: 'designing',
+    specIds: ['auth/login'],
+    schemaName: '@specd/schema-std',
+    schemaVersion: 1,
+    createdAt: new Date('2026-01-05T00:00:00Z'),
+    draftedAt: new Date('2026-01-05T10:00:00Z'),
+    draftedBy: { name: 'alice', email: 'alice@test.com' },
+    ...overrides,
+  }
+}
+
+/** Minimal discarded-change list entry for CLI list tests. */
+export function makeDiscardedChangeListEntry(
+  overrides: Record<string, unknown> = {},
+): Record<string, unknown> {
+  return {
+    name: 'old-feat',
+    state: 'designing',
+    specIds: ['auth/login'],
+    schemaName: '@specd/schema-std',
+    schemaVersion: 1,
+    createdAt: new Date('2026-01-01T00:00:00Z'),
+    discardedAt: new Date('2026-01-10T09:00:00Z'),
+    discardedBy: { name: 'bob', email: 'bob@test.com' },
+    ...overrides,
+  }
+}
+
+/** Minimal archive list entry for CLI list tests. */
+export function makeArchiveListEntry(
+  overrides: Record<string, unknown> = {},
+): Record<string, unknown> {
+  return {
+    name: 'old-feat',
+    archivedName: '2026-01-15-old-feat',
+    archivedAt: new Date('2026-01-15T10:00:00Z'),
+    specIds: ['default:auth/login'],
+    schemaName: 'schema-std',
+    schemaVersion: 1,
+    ...overrides,
+  }
+}
+
+/** Builds a mocked {@link ListSpecsResult} for spec list tests. */
+export function makeListSpecsResult(
+  items: Array<Record<string, unknown>>,
+  metaOverrides: Record<string, unknown> = {},
+): Record<string, unknown> {
+  const byWorkspaceMap = new Map<string, Array<Record<string, unknown>>>()
+  for (const item of items) {
+    const ws = typeof item.workspace === 'string' ? item.workspace : 'default'
+    const bucket = byWorkspaceMap.get(ws) ?? []
+    bucket.push(item)
+    byWorkspaceMap.set(ws, bucket)
+  }
+  const workspaces = byWorkspaceMap.size > 0 ? [...byWorkspaceMap.keys()] : (['default'] as const)
+  const byWorkspace = workspaces.map((workspace) => {
+    const wsItems = byWorkspaceMap.get(workspace) ?? []
+    return {
+      workspace,
+      items: wsItems,
+      meta: makeListMeta({ total: wsItems.length, count: wsItems.length, ...metaOverrides }),
+    }
+  })
+  return {
+    items,
+    meta: makeListMeta({ total: items.length, count: items.length, ...metaOverrides }),
+    byWorkspace,
+  }
+}
+
 /** Minimal {@link DiscardedChangeView}-shaped object for CLI list/show tests. */
 export function makeMockDiscardedView(
   overrides: Record<string, unknown> = {},
@@ -139,17 +256,23 @@ export function makeMockDiscardedView(
 // ---------------------------------------------------------------------------
 
 export function makeMockKernel(overrides: Record<string, unknown> = {}): Kernel & MockKernel {
+  const emptyList = makeListResult([])
+
   const changes = {
     repo: {
       get: vi.fn().mockResolvedValue(makeMockChange()),
       artifactExists: vi.fn().mockResolvedValue(false),
       deltaExists: vi.fn().mockResolvedValue(false),
+      reindex: vi.fn().mockResolvedValue(undefined),
     } as unknown as ChangeRepository,
+    archiveRepo: {
+      reindex: vi.fn().mockResolvedValue(undefined),
+    } as unknown as ArchiveRepository,
     create: { execute: vi.fn() },
-    list: { execute: vi.fn().mockResolvedValue([]) },
-    listDrafts: { execute: vi.fn().mockResolvedValue([]) },
-    listDiscarded: { execute: vi.fn().mockResolvedValue([]) },
-    listArchived: { execute: vi.fn().mockResolvedValue([]) },
+    list: { execute: vi.fn().mockResolvedValue(emptyList) },
+    listDrafts: { execute: vi.fn().mockResolvedValue(emptyList) },
+    listDiscarded: { execute: vi.fn().mockResolvedValue(emptyList) },
+    listArchived: { execute: vi.fn().mockResolvedValue(emptyList) },
     getArchived: { execute: vi.fn() },
     status: { execute: vi.fn() },
     getDraft: { execute: vi.fn() },
@@ -190,7 +313,7 @@ export function makeMockKernel(overrides: Record<string, unknown> = {}): Kernel 
         { resolveFromPath: vi.fn().mockResolvedValue(null) } as unknown as SpecRepository,
       ],
     ]),
-    list: { execute: vi.fn().mockResolvedValue([]) },
+    list: { execute: vi.fn().mockResolvedValue(makeListSpecsResult([])) },
     search: { execute: vi.fn().mockResolvedValue([]) },
     get: { execute: vi.fn() },
     getOutline: { execute: vi.fn() },
