@@ -11,8 +11,7 @@
   ],
   "implementation": [
     {
-      "file": "cli:src/commands/discarded/list.ts",
-      "symbols": ["registerDiscardedList"]
+      "file": "cli:src/commands/discarded/list.ts"
     }
   ]
 }

@@ -24,7 +24,7 @@ export function registerArchiveList(parent: Command): void {
     .option('--config <path>', 'path to specd.yaml')
     .option('--archived-by', 'include archivedBy on each entry')
 
-  addListPaginationOptions(cmd)
+  addListPaginationOptions(cmd, { defaultLimit: 100 })
 
   cmd
     .addHelpText(
@@ -56,14 +56,14 @@ JSON/TOON output schema:
         format: string
         config?: string
         archivedBy?: boolean
-        limit?: number
+        limit?: string
         page?: number
         afterKey?: string
         afterId?: string
       }) => {
         try {
           const { kernel } = await resolveCliContext({ configPath: opts.config })
-          const pagination = parseListPaginationFlags(opts)
+          const pagination = parseListPaginationFlags(opts, { defaultLimit: 100 })
           const result = await kernel.changes.listArchived.execute({
             ...pagination,
             ...(opts.archivedBy === true ? { includeArchivedBy: true } : {}),

@@ -10,7 +10,7 @@ Agents and CLI users need a single query to discover what specs exist across all
 
 `ListSpecs.execute(options?)` SHALL obtain the orchestrated project structure via the `ListWorkspaces` use case (or the corresponding kernel capability). It SHALL iterate through the resulting `ProjectWorkspace` entities and call `SpecRepository.list(options)` on each workspace's `specRepo`.
 
-It MUST forward the same `ListOptions`, `includeSummary`, and `includeMetadataStatus` to every workspace repository call. It MUST NOT re-sort, re-filter, or re-paginate per-workspace results after the repository returns.
+It MUST forward the same `ListOptions`, `includeSummary`, and `includeMetadataStatus` to every workspace repository call. It MUST NOT apply a default `limit` of its own — when the host omits `limit`, each repository MUST return its full filtered set per [`core:repository-port`](../repository-port/spec.md). It MUST NOT re-sort, re-filter, or re-paginate per-workspace results after the repository returns.
 
 The merged result MUST preserve workspace declaration order from `ListWorkspaces`, with each workspace's items in the repository's canonical path order. Cross-workspace pagination is out of scope for v1 — callers paginate within a single workspace via the port or filter workspaces explicitly.
 

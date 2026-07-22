@@ -1,0 +1,8 @@
+- op: modified
+  description: 'Empty active list meta.limit equals total when unpaginated'
+  selector:
+    type: section
+    matches: 'Scenario: No active changes'
+  content: |
+    - **WHEN** `list()` is called and no active changes exist
+    - **THEN** `{ items: [], meta: { total: 0, count: 0, limit: 0 } }` is returned

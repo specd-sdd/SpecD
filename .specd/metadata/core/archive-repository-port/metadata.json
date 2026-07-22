@@ -54,7 +54,7 @@
     {
       "requirement": "list returns all archived changes in chronological order",
       "rules": [
-        "`list(options?)` MUST return archived changes in this workspace sorted by canonical order: `archivedAt` descending (newest → oldest).\n\n`ArchiveListOptions` extends `ListOptions` with:\n\n- `includeArchivedBy?: boolean` — when `true`, projected entries MAY include `archivedBy`; when `false` or omitted, `archivedBy` MUST NOT appear\n\nPagination uses shared `ListOptions` / `ListResult` from [`core:repository-port`](../repository-port/spec.md). The former `startAt` cursor is replaced by `after: { key, id? }` where `after.key` is `archivedAt` ISO-8601 and `after.id` is the change `name` tiebreak.\n\nDefault `limit` is **100** when omitted."
+        "`list(options?)` MUST return archived changes in this workspace sorted by canonical order: `archivedAt` descending (newest → oldest).\n\n`ArchiveListOptions` extends `ListOptions` with:\n\n- `includeArchivedBy?: boolean` — when `true`, projected entries MAY include `archivedBy`; when `false` or omitted, `archivedBy` MUST NOT appear\n\nPagination uses shared `ListOptions` / `ListResult` from [`core:repository-port`](../repository-port/spec.md). The former `startAt` cursor is replaced by `after: { key, id? }` where `after.key` is `archivedAt` ISO-8601 and `after.id` is the change `name` tiebreak.\n\nPagination has **no default `limit`**. When `limit` is omitted, `list()` returns the full archive index and `meta.limit` equals `meta.total` per [`core:repository-port`](../repository-port/spec.md)."
       ]
     },
     {
@@ -122,7 +122,7 @@
     "The archive is append-only — archived changes are never modified after creation",
     "Archive list indexes live under {configPath}/tmp/fs-cache/archive/, not at the archive root",
     "Canonical archive list sort is archivedAt descending (newest → oldest)",
-    "Default list limit is 100",
+    "List pagination has no default limit; when omitted, list() returns the full archive index and meta.limit equals meta.total per core:repository-port",
     "archive() upserts the archive list entry through the fs-cache helper",
     "get() loads full detail from the archived directory manifest.json; list/count use index entries only",
     "The force option on archive() bypasses the state check entirely",
@@ -246,7 +246,7 @@
       "requirement": "list returns all archived changes in chronological order",
       "name": "No archived changes",
       "when": ["list() is called and no changes have been archived"],
-      "then": ["{ items: [], meta: { total: 0, count: 0, limit: 100 } } is returned"]
+      "then": ["{ items: [], meta: { total: 0, count: 0, limit: 0 } } is returned"]
     },
     {
       "requirement": "list returns index entries",
@@ -430,24 +430,14 @@
     "symbols": [
       {
         "specId": "core:archive-repository-port",
-        "file": "core:src/application/ports/archive-repository.ts",
-        "symbol": "ArchiveRepository"
-      },
-      {
-        "specId": "core:archive-repository-port",
-        "file": "core:src/application/ports/archive-repository.ts",
-        "symbol": "ArchiveListOptions"
-      },
-      {
-        "specId": "core:archive-repository-port",
-        "file": "core:src/application/ports/archive-repository.ts",
-        "symbol": "ArchivePathEntry"
+        "file": "core:src/infrastructure/fs/archive-repository.ts",
+        "symbol": "FsArchiveRepository"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:0aefa4a95d7717a74f3906b946054a5e4883318da56d5a30aa669bd8f8a2951e",
-    "verify.md": "sha256:e8042ecba858d2858614a5aa297d460227a56d936cd5fb4d54cdb657700d1d33"
+    "spec.md": "sha256:d3e0c531c1dbb0e6419ebfab9e1a3d2acceab39a6623bf2cc8f64738edb106fd",
+    "verify.md": "sha256:3f18602b3914129c0744e5edd26ba6e40b7b5f0b3e44f20f054ec332997f547e"
   },
   "generatedBy": "core"
 }

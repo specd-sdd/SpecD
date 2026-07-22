@@ -7,7 +7,7 @@
   "implementation": [
     {
       "file": "core:src/application/ports/repository.ts",
-      "symbols": ["ListCursor", "ListOptions", "ListMeta", "ListResult", "Repository"]
+      "symbols": ["ListOptions", "ListMeta"]
     },
     {
       "file": "core:src/infrastructure/fs/list-pagination.ts",

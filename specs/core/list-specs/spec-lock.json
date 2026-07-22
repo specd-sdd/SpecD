@@ -15,10 +15,6 @@
     {
       "file": "core:src/application/use-cases/list-specs.ts",
       "symbols": ["ListSpecs"]
-    },
-    {
-      "file": "core:src/composition/use-cases/list-specs.ts",
-      "symbols": ["resolveListSpecsDeps"]
     }
   ]
 }

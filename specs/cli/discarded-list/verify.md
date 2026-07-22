@@ -16,10 +16,29 @@
 - **WHEN** `specd discarded list --format json` is run without `--limit`
 - **THEN** `meta.limit` is 100
 
+#### Scenario: --limit all omits limit from ListDiscarded
+
+- **WHEN** `specd discarded list --limit all --format json` is run
+- **THEN** `ListDiscarded.execute` is called without a `limit` option
+
+#### Scenario: --page with omitted limit uses host default 100
+
+- **WHEN** `specd discarded list --page 2 --format json` is run without `--limit`
+- **THEN** `ListDiscarded.execute` is called with `limit` 100 and `page` 2
+
+#### Scenario: --page with --limit all is rejected
+
+- **WHEN** `specd discarded list --page 2 --limit all` is run
+- **THEN** a typed validation error is thrown (e.g. `CliValidationError`)
+- **AND** the machine-readable code is `CLI_VALIDATION_ERROR`
+- **AND** `ListDiscarded.execute` is not invoked
+
 #### Scenario: --page and keyset cursors are mutually exclusive
 
 - **WHEN** `specd discarded list --page 2 --after-key 2024-01-01T00:00:00.000Z` is run
-- **THEN** the command exits with a CLI usage error before invoking the use case
+- **THEN** a typed validation error is thrown (e.g. `CliValidationError`)
+- **AND** the machine-readable code is `CLI_VALIDATION_ERROR`
+- **AND** `ListDiscarded.execute` is not invoked
 
 ### Requirement: Uses ListDiscarded read model
 

@@ -99,7 +99,7 @@
 #### Scenario: Empty workspace
 
 - **WHEN** `list()` is called on an empty workspace
-- **THEN** `{ items: [], meta: { total: 0, count: 0, limit: 100 } }` is returned
+- **THEN** `{ items: [], meta: { total: 0, count: 0, limit: 0 } }` is returned
 
 ### Requirement: SpecListEntry port shape
 

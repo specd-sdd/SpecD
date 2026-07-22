@@ -712,14 +712,14 @@ Lists all specs across all configured workspaces, resolving title and optionally
 
 **Input (options object):**
 
-| Option                  | Type                | Description                                                   |
-| ----------------------- | ------------------- | ------------------------------------------------------------- |
-| `limit`                 | `number`            | Page size (default `100`).                                    |
-| `page`                  | `number`            | 1-based page (mutually exclusive with `after`).               |
-| `after`                 | `ListCursor`        | Keyset cursor for pagination.                                 |
-| `workspaces`            | `readonly string[]` | When set, list only these workspaces.                         |
-| `includeSummary`        | `boolean`           | Resolve a short description per spec. Default: `false`.       |
-| `includeMetadataStatus` | `boolean`           | Resolve metadata freshness status per spec. Default: `false`. |
+| Option                  | Type                | Description                                                                                 |
+| ----------------------- | ------------------- | ------------------------------------------------------------------------------------------- |
+| `limit`                 | `number`            | Page size. Hosts (e.g. CLI) may inject a default; core ports apply no default when omitted. |
+| `page`                  | `number`            | 1-based page (mutually exclusive with `after`).                                             |
+| `after`                 | `ListCursor`        | Keyset cursor for pagination.                                                               |
+| `workspaces`            | `readonly string[]` | When set, list only these workspaces.                                                       |
+| `includeSummary`        | `boolean`           | Resolve a short description per spec. Default: `false`.                                     |
+| `includeMetadataStatus` | `boolean`           | Resolve metadata freshness status per spec. Default: `false`.                               |
 
 **Returns:** `Promise<ListSpecsResult>` — aggregate `items`/`meta` plus `byWorkspace` slices per repository.
 

@@ -6,8 +6,7 @@
   "dependsOn": ["cli:entrypoint", "core:list-archived", "core:archived-change-index-entry"],
   "implementation": [
     {
-      "file": "cli:src/commands/archive/list.ts",
-      "symbols": ["registerArchiveList"]
+      "file": "cli:src/commands/archive/list.ts"
     }
   ]
 }

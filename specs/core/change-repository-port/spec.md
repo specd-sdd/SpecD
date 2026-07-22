@@ -282,7 +282,7 @@ These logs MUST follow the project's global logging conventions.
 - `get()` in `FsChangeRepository` may auto-invalidate and persist the change under the mutation lock before returning, if artifact drift is detected and the change is beyond `designing` or has active approvals
 - `list`, `listDrafts`, and `listDiscarded` return lightweight list entries with no artifact content, history, or derived artifact state maps
 - `get`, `getDraft`, and `getDiscarded` remain the detail surfaces for full manifest-backed inspection
-- Default list `limit` is **100**; callers needing more MUST pass a higher limit or paginate with `page` or `after`
+- List pagination has no default `limit`; when omitted, `list()` returns the full bucket and `meta.limit` equals `meta.total` per `core:repository-port`
 - `save()` writes the manifest only; `saveArtifact()` writes file content only — these are separate operations
 - `ArtifactConflictError` is the sole error type for concurrent modification detection
 - The `force` option on `saveArtifact()` bypasses conflict detection entirely

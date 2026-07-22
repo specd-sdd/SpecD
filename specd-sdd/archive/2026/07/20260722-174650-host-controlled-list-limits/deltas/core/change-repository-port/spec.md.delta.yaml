@@ -1,0 +1,16 @@
+- op: modified
+  description: 'Update Constraints — remove default limit 100'
+  selector:
+    type: section
+    matches: 'Constraints'
+  content: |
+    - Changes are stored globally, not per-workspace — the inherited workspace context is unused
+    - `get()` in `FsChangeRepository` may auto-invalidate and persist the change under the mutation lock before returning, if artifact drift is detected and the change is beyond `designing` or has active approvals
+    - `list`, `listDrafts`, and `listDiscarded` return lightweight list entries with no artifact content, history, or derived artifact state maps
+    - `get`, `getDraft`, and `getDiscarded` remain the detail surfaces for full manifest-backed inspection
+    - List pagination has no default `limit`; when omitted, `list()` returns the full bucket and `meta.limit` equals `meta.total` per `core:repository-port`
+    - `save()` writes the manifest only; `saveArtifact()` writes file content only — these are separate operations
+    - `ArtifactConflictError` is the sole error type for concurrent modification detection
+    - The `force` option on `saveArtifact()` bypasses conflict detection entirely
+    - `originalHash` on loaded artifacts MUST use `sha256` of the file content as read from disk
+    - Manifest writes MUST be atomic to prevent corruption from partial reads

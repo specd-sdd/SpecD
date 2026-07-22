@@ -955,7 +955,7 @@ export class IndexCodeGraph {
       const listStart = performance.now()
       for (const ws of options.workspaces) {
         Logger.debug(`[IndexCodeGraph] listing specs in: ${ws.specRepo.specsPath}`)
-        const listed = await ws.specRepo.list(undefined, { limit: Number.MAX_SAFE_INTEGER })
+        const listed = await ws.specRepo.list(undefined)
         const repoSpecs: Spec[] = []
         for (const entry of listed.items) {
           const spec = await ws.specRepo.get(SpecPath.parse(entry.path))

@@ -11,13 +11,13 @@ Without a quick inventory of all specs, users and agents cannot orient themselve
 ### Requirement: Command signature
 
 ```
-specd specs list [--workspace <name>] [--summary] [--metadata-status [filter]] [--limit <n>] [--page <p>] [--after-key <path>] [--format text|json|toon]
+specd specs list [--workspace <name>] [--summary] [--metadata-status [filter]] [--limit <n|all>] [--page <p>] [--after-key <path>] [--format text|json|toon]
 ```
 
 Alias:
 
 ```
-specd spec list [--workspace <name>] [--summary] [--metadata-status [filter]] [--limit <n>] [--page <p>] [--after-key <path>] [--format text|json|toon]
+specd spec list [--workspace <name>] [--summary] [--metadata-status [filter]] [--limit <n|all>] [--page <p>] [--after-key <path>] [--format text|json|toon]
 ```
 
 - `--workspace <name>` — optional, repeatable; include only specs belonging to the named workspace(s). When omitted, all workspaces are included
@@ -26,12 +26,12 @@ specd spec list [--workspace <name>] [--summary] [--metadata-status [filter]] [-
   - Without a filter value (`--metadata-status`), all specs are shown with their status
   - With a comma-separated filter value (`--metadata-status stale`, `--metadata-status stale,missing`), only specs matching at least one of the listed statuses are shown
   - Valid filter tokens: `fresh`, `stale`, `missing`, `invalid`
-- `--limit <n>` — optional; maximum number of spec entries to return **per workspace query**; defaults to `100`
-- `--page <p>` — optional; 1-based page number (uses `--limit`, defaulting to `100` when omitted)
+- `--limit <n|all>` — optional; when a positive integer is given, caps entries **per workspace query**. When omitted or set to `all`, the host MUST NOT pass `limit` to `ListSpecs` (full catalog per workspace). There is **no** CLI default numeric limit.
+- `--page <p>` — optional; 1-based page number; MUST be paired with a numeric `--limit` (not `all`)
 - `--after-key <path>` — optional; exclusive keyset cursor — capability path (with `/` separators) of the last seen spec in the workspace being paginated
 - `--format text|json|toon` — optional; output format, defaults to `text`
 
-`--page` is mutually exclusive with `--after-key`. Spec list keyset cursors omit `after-id` (path alone is the sort key).
+`--page` is mutually exclusive with `--after-key`. `--page` with `--limit all` or without a numeric `--limit` MUST be rejected. Spec list keyset cursors omit `after-id` (path alone is the sort key). `--after-key` with `--limit all` (or omitted limit) is allowed and returns the remainder after the cursor.
 
 ### Requirement: Workspace filtering
 
@@ -45,7 +45,8 @@ In text mode, the command MUST group specs by workspace, displaying the workspac
 
 The command MUST invoke `ListSpecs.execute()` and map CLI flags to list options:
 
-- `--limit`, `--page`, `--after-key` → `limit`, `page`, and `after: { key }` (no `id` for specs)
+- Numeric `--limit`, `--page`, `--after-key` → `limit`, `page`, and `after: { key }` (no `id` for specs)
+- `--limit all` or omitted `--limit` → omit `limit` from the use-case input
 - `--summary` → `includeSummary: true`
 - `--metadata-status` → `includeMetadataStatus: true`
 
@@ -102,11 +103,13 @@ In `text` mode (default), specs are grouped by workspace. Each group is rendered
 
 Rows within each workspace appear in canonical order (capability path ascending) as returned by `ListSpecs`; the CLI MUST NOT re-sort.
 
-When a workspace group's `meta.count < meta.total`, the command MUST print a trailing hint line after that group's table:
+When a workspace group's result was truncated by an explicit numeric `--limit` (`meta.count < meta.total`), the command MUST print a trailing hint line after that group's table:
 
 ```
 showing <count> of <total> (use --limit/--page)
 ```
+
+When no numeric `--limit` was applied (omitted or `all`), the command MUST NOT print a truncation hint.
 
 When `--workspace` filters are applied, only workspace groups matching the filter are rendered. Column widths are computed across all remaining entries (not across all workspaces).
 
@@ -127,14 +130,15 @@ In `json` or `toon` mode, each workspace entry includes paginated spec results:
       ],
       "meta": {
         "total": 125,
-        "count": 100,
-        "limit": 100,
-        "page": 1
+        "count": 125,
+        "limit": 125
       }
     }
   ]
 }
 ```
+
+When unpaginated, `meta.limit` equals `meta.total`. When a numeric `--limit` is applied, `meta` reflects that page (`limit`, optional `page` / `after`).
 
 When `--workspace` filters are applied in JSON/toon mode, the `workspaces` array contains entries **only** for the filtered/matching workspace names — non-matching configured workspaces MUST NOT appear, not even as empty stubs. This mirrors text mode, where only matching workspace groups render. When no `--workspace` filter is given, the `workspaces` array contains all configured workspaces, including those with no specs (empty `specs` array).
 
@@ -199,10 +203,10 @@ $ specd spec list --summary
   default:auth/register   Register
 
 $ specd spec list --format json
-{"workspaces":[{"name":"default","specs":[{"path":"default:auth/login","title":"Login"},{"path":"default:auth/register","title":"Register"}],"meta":{"total":2,"count":2,"limit":100,"page":1}}]}
+{"workspaces":[{"name":"default","specs":[{"path":"default:auth/login","title":"Login"},{"path":"default:auth/register","title":"Register"}],"meta":{"total":2,"count":2,"limit":2}}]}
 
 $ specd spec list --summary --format json
-{"workspaces":[{"name":"default","specs":[{"path":"default:auth/login","title":"Login","summary":"Handles user authentication via login form"}],"meta":{"total":1,"count":1,"limit":100,"page":1}}]}
+{"workspaces":[{"name":"default","specs":[{"path":"default:auth/login","title":"Login","summary":"Handles user authentication via login form"}],"meta":{"total":1,"count":1,"limit":1}}]}
 
 $ specd spec list --metadata-status
   workspace: default
@@ -218,13 +222,13 @@ $ specd spec list --metadata-status stale,missing
   default:billing/invoices  Invoices  missing
 
 $ specd spec list --metadata-status --format json
-{"workspaces":[{"name":"default","specs":[{"path":"default:auth/login","title":"Login","metadataStatus":"fresh"},{"path":"default:auth/register","title":"Register","metadataStatus":"stale"}],"meta":{"total":2,"count":2,"limit":100,"page":1}}]}
+{"workspaces":[{"name":"default","specs":[{"path":"default:auth/login","title":"Login","metadataStatus":"fresh"},{"path":"default:auth/register","title":"Register","metadataStatus":"stale"}],"meta":{"total":2,"count":2,"limit":2}}]}
 
 $ specd spec list --workspace default --format json
-{"workspaces":[{"name":"default","specs":[{"path":"default:auth/login","title":"Login"},{"path":"default:auth/register","title":"Register"}],"meta":{"total":2,"count":2,"limit":100,"page":1}}]}
+{"workspaces":[{"name":"default","specs":[{"path":"default:auth/login","title":"Login"},{"path":"default:auth/register","title":"Register"}],"meta":{"total":2,"count":2,"limit":2}}]}
 ```
 
-The last example shows `--workspace default` filtering in JSON mode: only the matching `default` workspace appears in `workspaces` — `billing` (unmatched) is absent entirely, not present as an empty stub.
+The last example shows `--workspace default` filtering in JSON mode: only the matching `default` workspace appears in `workspaces` — `billing` (unmatched) is absent entirely, not present as an empty stub. When no numeric `--limit` is applied, `meta.limit` equals `meta.total` and `page` is omitted.
 
 ## Spec Dependencies
 

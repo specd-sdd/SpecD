@@ -3,6 +3,7 @@ import {
   type ListOptions,
   type ListResult,
 } from '../../application/ports/repository.js'
+import { InvalidInputError } from '../../domain/errors/index.js'
 
 /**
  * Applies shared list pagination to an in-memory sorted collection.
@@ -11,40 +12,68 @@ import {
  * @param options - Pagination options
  * @param getCursor - Maps an item to its keyset cursor
  * @returns Paginated list envelope
+ * @throws {InvalidInputError} When `page` is set without `limit` or together with `after`
  */
 export function paginateList<T>(
   allItems: readonly T[],
   options: ListOptions | undefined,
   getCursor: (item: T) => ListCursor,
 ): ListResult<T> {
-  const limit = options?.limit ?? 100
   const total = allItems.length
+  const limit = options?.limit
+  const page = options?.page
+  const after = options?.after
+
+  if (page !== undefined && limit === undefined) {
+    throw new InvalidInputError('page requires an explicit limit')
+  }
+  if (page !== undefined && after !== undefined) {
+    throw new InvalidInputError('page and after are mutually exclusive')
+  }
+
+  if (limit === undefined && after === undefined) {
+    return {
+      items: allItems,
+      meta: {
+        total,
+        count: total,
+        limit: total,
+      },
+    }
+  }
+
+  if (limit === undefined && after !== undefined) {
+    const startIdx = findStartIndex(allItems, after, getCursor)
+    const items = allItems.slice(startIdx)
+    return {
+      items,
+      meta: {
+        total,
+        count: items.length,
+        limit: items.length,
+      },
+    }
+  }
+
+  if (limit === undefined) {
+    throw new InvalidInputError('page requires an explicit limit')
+  }
 
   let window = allItems
-  let page: number | undefined
+  let resolvedPage: number | undefined
 
-  if (options?.after !== undefined) {
-    const afterCursor = options.after
-    let startIdx = allItems.findIndex((item) => {
-      const cursor = getCursor(item)
-      return cursor.key === afterCursor.key && cursor.id === afterCursor.id
-    })
-    if (startIdx >= 0) {
-      startIdx += 1
-    } else {
-      startIdx = allItems.findIndex((item) => compareCursor(getCursor(item), afterCursor) > 0)
-      if (startIdx < 0) startIdx = allItems.length
-    }
+  if (after !== undefined) {
+    const startIdx = findStartIndex(allItems, after, getCursor)
     window = allItems.slice(startIdx)
   } else {
-    page = options?.page ?? 1
-    const offset = (page - 1) * limit
+    resolvedPage = page ?? 1
+    const offset = (resolvedPage - 1) * limit
     window = allItems.slice(offset)
   }
 
   const items = window.slice(0, limit)
   const hasMore = window.length > limit
-  const after = hasMore && items.length > 0 ? getCursor(items[items.length - 1]!) : undefined
+  const metaAfter = hasMore && items.length > 0 ? getCursor(items[items.length - 1]!) : undefined
 
   return {
     items,
@@ -52,17 +81,38 @@ export function paginateList<T>(
       total,
       count: items.length,
       limit,
-      ...(page !== undefined ? { page } : {}),
-      ...(after !== undefined ? { after } : {}),
+      ...(resolvedPage !== undefined ? { page: resolvedPage } : {}),
+      ...(metaAfter !== undefined ? { after: metaAfter } : {}),
     },
   }
 }
 
 /**
+ * Finds the first index strictly after `afterCursor` in canonical sort order.
  *
- * @param a
- * @param b
+ * @param allItems - Full sorted collection
+ * @param afterCursor - Exclusive keyset cursor
+ * @param getCursor - Maps an item to its keyset cursor
+ * @returns Start index for the remainder window
  */
+function findStartIndex<T>(
+  allItems: readonly T[],
+  afterCursor: ListCursor,
+  getCursor: (item: T) => ListCursor,
+): number {
+  let startIdx = allItems.findIndex((item) => {
+    const cursor = getCursor(item)
+    return cursor.key === afterCursor.key && cursor.id === afterCursor.id
+  })
+  if (startIdx >= 0) {
+    startIdx += 1
+  } else {
+    startIdx = allItems.findIndex((item) => compareCursor(getCursor(item), afterCursor) > 0)
+    if (startIdx < 0) startIdx = allItems.length
+  }
+  return startIdx
+}
+
 /**
  * Compares two keyset cursors in canonical sort order.
  *

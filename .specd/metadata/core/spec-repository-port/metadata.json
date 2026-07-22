@@ -39,7 +39,7 @@
     {
       "requirement": "list returns spec metadata with optional prefix filter",
       "rules": [
-        "`list(prefix?, options?)` MUST return `ListResult<SpecListEntry>` for all specs in this workspace.\n\nWhen a `SpecPath` prefix is provided, only specs whose capability path starts with that prefix MUST be included (e.g. prefix `auth` returns `auth/login`, `auth/oauth`, etc.).\n\n`SpecListOptions` extends `ListOptions` with:\n\n- `includeSummary?: boolean` — when `true`, projected entries MAY include `summary`; when `false` or omitted, `summary` MUST NOT appear\n- `includeMetadataStatus?: boolean` — when `true`, projected entries MAY include `metadataStatus`; when `false` or omitted, `metadataStatus` MUST NOT appear\n\nSort order MUST be canonical: capability path ascending (lexicographic).\n\n`list()` MUST NOT return lightweight `Spec` metadata alone. Each item MUST be a port-level `SpecListEntry` with resolved `title` and optional projected fields.\n\n`meta.total` and `count()` MUST read from the same index source."
+        "`list(prefix?, options?)` MUST return `ListResult<SpecListEntry>` for specs in this workspace.\n\nWhen a `SpecPath` prefix is provided, only specs whose capability path starts with that prefix MUST be included (e.g. prefix `auth` returns `auth/login`, `auth/oauth`, etc.).\n\n`SpecListOptions` extends `ListOptions` with:\n\n- `includeSummary?: boolean` — when `true`, projected entries MAY include `summary`; when `false` or omitted, `summary` MUST NOT appear\n- `includeMetadataStatus?: boolean` — when `true`, projected entries MAY include `metadataStatus`; when `false` or omitted, `metadataStatus` MUST NOT appear\n\nSort order MUST be canonical: capability path ascending (lexicographic).\n\nPagination semantics MUST follow [`core:repository-port`](../repository-port/spec.md): no default `limit`; when `limit` is omitted the full matching set is returned and `meta.limit` equals `meta.total`.\n\n`list()` MUST NOT return lightweight `Spec` metadata alone. Each item MUST be a port-level `SpecListEntry` with resolved `title` and optional projected fields.\n\n`meta.total` and `count()` MUST read from the same index source."
       ]
     },
     {
@@ -140,7 +140,7 @@
   "constraints": [
     "Each instance is bound to a single workspace; workspace is immutable after construction",
     "get returns lightweight Spec metadata — artifact content is never loaded by get",
-    "list returns paginated SpecListEntry rows with default limit 100; artifact content is never loaded by list",
+    "list returns ListResult<SpecListEntry> rows with host-controlled pagination (no default limit); artifact content is never loaded by list",
     "search loads artifact content as needed to perform matching — it is more expensive than list",
     "save creates the spec directory if it does not already exist",
     "ArtifactConflictError is the sole error type for concurrent modification detection on save, saveMetadata, and semantic update operations",
@@ -268,7 +268,7 @@
       "requirement": "list returns spec metadata with optional prefix filter",
       "name": "Empty workspace",
       "when": ["list() is called on an empty workspace"],
-      "then": ["{ items: [], meta: { total: 0, count: 0, limit: 100 } } is returned"]
+      "then": ["{ items: [], meta: { total: 0, count: 0, limit: 0 } } is returned"]
     },
     {
       "requirement": "SpecListEntry port shape",
@@ -559,24 +559,14 @@
     "symbols": [
       {
         "specId": "core:spec-repository-port",
-        "file": "core:src/application/ports/spec-repository.ts",
-        "symbol": "SpecListEntry"
-      },
-      {
-        "specId": "core:spec-repository-port",
-        "file": "core:src/application/ports/spec-repository.ts",
-        "symbol": "SpecListOptions"
-      },
-      {
-        "specId": "core:spec-repository-port",
-        "file": "core:src/application/ports/spec-repository.ts",
-        "symbol": "SpecRepository"
+        "file": "core:src/infrastructure/fs/spec-repository.ts",
+        "symbol": "FsSpecRepository"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:ab21dc21e6595066f103a6de2ba3f1cefd2ead58278875666807e73eac716c7b",
-    "verify.md": "sha256:4112072e5c7df84f885572f8a3934a8b671f26157123877bf2ab503da7f589f1"
+    "spec.md": "sha256:71633d5f2405155a04b56be1c6e3520fdf4d5be2ac9ab32571a0f90e64d34559",
+    "verify.md": "sha256:6387c4558ca3fc461ef91e859a9ee7b4a7d903c64b97787236cfd105bb3bca53"
   },
   "generatedBy": "core"
 }

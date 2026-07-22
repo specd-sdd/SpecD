@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { ListSpecs } from '../../../src/application/use-cases/list-specs.js'
 import { Spec } from '../../../src/domain/entities/spec.js'
 import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
@@ -71,6 +71,18 @@ describe('ListSpecs', () => {
     const result = await uc.execute({ includeMetadataStatus: true })
 
     expect(result.items[0]!.title).toBe('login')
+  })
+
+  it('forwards list options without inventing a default limit', async () => {
+    const spec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+    const repo = makeSpecRepository({ specs: [spec] })
+    const listSpy = vi.spyOn(repo, 'list')
+    const specRepos = new Map([['default', repo]])
+
+    const uc = new ListSpecs(makeListWorkspaces(specRepos))
+    await uc.execute()
+
+    expect(listSpy).toHaveBeenCalledWith(undefined, {})
   })
 
   describe('workspace filtering', () => {

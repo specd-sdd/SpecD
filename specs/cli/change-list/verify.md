@@ -21,15 +21,36 @@
 - **THEN** `meta.limit` is 100
 - **AND** `items` contains at most 100 entries
 
+#### Scenario: --limit all omits limit from ListChanges
+
+- **WHEN** `specd change list --limit all --format json` is run
+- **THEN** `ListChanges.execute` is called without a `limit` option
+
+#### Scenario: --page with omitted limit uses host default 100
+
+- **WHEN** `specd change list --page 2 --format json` is run without `--limit`
+- **THEN** `ListChanges.execute` is called with `limit` 100 and `page` 2
+
+#### Scenario: --page with --limit all is rejected
+
+- **WHEN** `specd change list --page 2 --limit all` is run
+- **THEN** a typed validation error is thrown (e.g. `CliValidationError`)
+- **AND** the machine-readable code is `CLI_VALIDATION_ERROR`
+- **AND** `ListChanges.execute` is not invoked
+
 #### Scenario: --page and keyset cursors are mutually exclusive
 
 - **WHEN** `specd change list --page 2 --after-key 2024-01-01T00:00:00.000Z` is run
-- **THEN** the command exits with a CLI usage error before invoking the use case
+- **THEN** a typed validation error is thrown (e.g. `CliValidationError`)
+- **AND** the machine-readable code is `CLI_VALIDATION_ERROR`
+- **AND** `ListChanges.execute` is not invoked
 
 #### Scenario: --after-id requires --after-key
 
 - **WHEN** `specd change list --after-id add-login` is run without `--after-key`
-- **THEN** the command exits with a CLI usage error before invoking the use case
+- **THEN** a typed validation error is thrown (e.g. `CliValidationError`)
+- **AND** the machine-readable code is `CLI_VALIDATION_ERROR`
+- **AND** `ListChanges.execute` is not invoked
 
 ### Requirement: List options forwarding
 
@@ -37,6 +58,16 @@
 
 - **WHEN** `specd change list --limit 25 --page 2 --format json` is run
 - **THEN** `ListChanges.execute` is called with `limit` 25 and `page` 2
+
+#### Scenario: Omitted limit applies host default 100
+
+- **WHEN** `specd change list --format json` is run without `--limit`
+- **THEN** `ListChanges.execute` is called with `limit` 100
+
+#### Scenario: --page with omitted limit applies host default 100
+
+- **WHEN** `specd change list --page 2 --format json` is run without `--limit`
+- **THEN** `ListChanges.execute` is called with `limit` 100 and `page` 2
 
 #### Scenario: Keyset cursor forwarded with tiebreak id
 
@@ -47,12 +78,6 @@
 
 - **WHEN** `specd change list --description --format json` is run
 - **THEN** `ListChanges.execute` is called with `includeDescription: true`
-
-#### Scenario: CLI does not re-sort results
-
-- **GIVEN** `ListChanges.execute` returns items in repository canonical order
-- **WHEN** `specd change list --format json` is run
-- **THEN** stdout `items` appear in the same order as returned by the use case
 
 ### Requirement: Output format
 

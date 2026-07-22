@@ -109,7 +109,7 @@ export function registerDraftsList(parent: Command): void {
     .option('--description', 'include change description on each entry')
     .option('--reason', 'include draft reason on each entry')
 
-  addListPaginationOptions(cmd)
+  addListPaginationOptions(cmd, { defaultLimit: 100 })
 
   cmd
     .addHelpText(
@@ -128,14 +128,14 @@ JSON/TOON output schema:
         config?: string
         description?: boolean
         reason?: boolean
-        limit?: number
+        limit?: string
         page?: number
         afterKey?: string
         afterId?: string
       }) => {
         try {
           const { kernel } = await resolveCliContext({ configPath: opts.config })
-          const pagination = parseListPaginationFlags(opts)
+          const pagination = parseListPaginationFlags(opts, { defaultLimit: 100 })
           const result = await kernel.changes.listDrafts.execute({
             ...pagination,
             ...(opts.description === true ? { includeDescription: true } : {}),

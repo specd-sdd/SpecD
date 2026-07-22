@@ -167,9 +167,54 @@ describe('Pagination and includes', () => {
     registerChangeList(program.command('change'))
     await program.parseAsync(['node', 'specd', 'change', 'list', '--format', 'json'])
 
-    expect(kernel.changes.list.execute).toHaveBeenCalledWith({})
+    expect(kernel.changes.list.execute).toHaveBeenCalledWith({ limit: 100 })
     const parsed = JSON.parse(stdout())
     expect(parsed.meta.limit).toBe(DEFAULT_LIST_LIMIT)
+  })
+
+  it('omits limit when --limit all is passed', async () => {
+    const { kernel } = setup()
+    kernel.changes.list.execute.mockResolvedValue(makeListResult([]))
+
+    const program = makeProgram()
+    registerChangeList(program.command('change'))
+    await program.parseAsync([
+      'node',
+      'specd',
+      'change',
+      'list',
+      '--limit',
+      'all',
+      '--format',
+      'json',
+    ])
+
+    expect(kernel.changes.list.execute).toHaveBeenCalledWith({})
+  })
+
+  it('forwards --page with host default limit when --limit is omitted', async () => {
+    const { kernel } = setup()
+    kernel.changes.list.execute.mockResolvedValue(makeListResult([]))
+
+    const program = makeProgram()
+    registerChangeList(program.command('change'))
+    await program.parseAsync(['node', 'specd', 'change', 'list', '--page', '2', '--format', 'json'])
+
+    expect(kernel.changes.list.execute).toHaveBeenCalledWith({ limit: 100, page: 2 })
+  })
+
+  it('rejects --page with --limit all', async () => {
+    const { kernel, stderr } = setup()
+
+    const program = makeProgram()
+    registerChangeList(program.command('change'))
+    await program
+      .parseAsync(['node', 'specd', 'change', 'list', '--page', '2', '--limit', 'all'])
+      .catch(() => {})
+
+    expect(process.exit).toHaveBeenCalledWith(1)
+    expect(stderr()).toMatch(/--page requires a numeric --limit/)
+    expect(kernel.changes.list.execute).not.toHaveBeenCalled()
   })
 
   it('forwards --limit and --page to ListChanges', async () => {
@@ -215,6 +260,7 @@ describe('Pagination and includes', () => {
 
     expect(kernel.changes.list.execute).toHaveBeenCalledWith({
       after: { key: '2024-01-01T00:00:00.000Z', id: 'add-login' },
+      limit: DEFAULT_LIST_LIMIT,
     })
   })
 

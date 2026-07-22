@@ -63,7 +63,7 @@ export class ListSpecs {
     const items: SpecListEntry[] = []
     let total = 0
     let count = 0
-    let limit = listOptions.limit ?? 100
+    let limit = 0
 
     for (const ws of workspaces) {
       if (workspaceFilter !== null && !workspaceFilter.has(ws.name)) continue

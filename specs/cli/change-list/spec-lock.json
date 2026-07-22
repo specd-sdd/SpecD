@@ -11,8 +11,11 @@
   ],
   "implementation": [
     {
-      "file": "cli:src/commands/change/list.ts",
-      "symbols": ["registerChangeList"]
+      "file": "cli:src/commands/change/list.ts"
+    },
+    {
+      "file": "cli:src/helpers/list-pagination.ts",
+      "symbols": ["parseListPaginationFlags", "parseLimitFlag", "addListPaginationOptions"]
     }
   ]
 }

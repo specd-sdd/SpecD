@@ -9,23 +9,26 @@ Teams need a way to review past work without digging through the archive directo
 ### Requirement: Command signature
 
 ```
-specd archive list [--format text|json|toon] [--limit <n>] [--page <p>] [--after-key <iso>] [--after-id <name>] [--archived-by]
+specd archive list [--format text|json|toon] [--limit <n|all>] [--page <p>] [--after-key <iso>] [--after-id <name>] [--archived-by]
 ```
 
 - `--format` — controls output encoding; defaults to `text`
-- `--limit <n>` — maximum number of entries to return; defaults to `100`
-- `--page <p>` — 1-based page number (uses `--limit`, defaulting to `100` when omitted)
+- `--limit <n|all>` — maximum number of entries to return. When omitted, the CLI host defaults to `100`. When set to `all`, the CLI MUST NOT pass `limit` to the use case.
+- `--page <p>` — 1-based page number; MUST be paired with a numeric `--limit` (not `all`)
 - `--after-key <iso>` — exclusive keyset cursor — ISO-8601 `archivedAt` of the last seen row
 - `--after-id <name>` — tiebreak change `name` when `--after-key` collides; MUST accompany `--after-key`
-- `--archived-by` — optional; include `archivedBy` on each entry (`includeArchivedBy`)
+- `--archived-by` — optional; include archived-by actor on each entry
 
-`--page` is mutually exclusive with `--after-key` / `--after-id`.
+`--page` is mutually exclusive with `--after-key` / `--after-id`. `--page` with `--limit all` MUST be rejected. `--after-key` with `--limit all` is allowed.
 
 ### Requirement: List options forwarding
 
-The command MUST invoke `ListArchived.execute()` and map CLI flags to list options:
+The command MUST map CLI flags to list options as follows:
 
-- `--limit`, `--page`, `--after-key`, `--after-id` → `limit`, `page`, and `after: { key, id? }`
+- When `--limit` is omitted → pass `limit: 100` (CLI host default)
+- When `--limit` is a positive integer → pass that `limit`
+- When `--limit all` → omit `limit` from the use-case input
+- `--page`, `--after-key`, `--after-id` → `page` and `after: { key, id? }` when provided
 - `--archived-by` → `includeArchivedBy: true`
 
 When `--archived-by` is omitted, the CLI MUST NOT set include flags. The command MUST NOT re-sort or paginate after the use case returns.
@@ -36,11 +39,13 @@ The command prints a human-readable table to stdout. Rows appear in canonical or
 
 The output has an inverse-video column header row `NAME  DATE` above the data rows. When `--archived-by` is set, an `BY` column is appended. Column widths are fixed at render time, computed from the widest value across all rows for each column (global, not per-group).
 
-When `meta.count < meta.total`, the command MUST print a trailing hint line:
+When a numeric `--limit` is in effect (explicit or host default) and `meta.count < meta.total`, the command MUST print a trailing hint line:
 
 ```
 showing <count> of <total> (use --limit/--page)
 ```
+
+When `--limit all` was used, the command MUST NOT print a truncation hint.
 
 ### Requirement: Output format — JSON
 
@@ -78,7 +83,7 @@ When `--format toon` is passed, the command writes the same data model as JSON e
 
 ### Requirement: Empty archive
 
-If there are no archived changes, the command prints `no archived changes` to stdout in text mode, or `{"items":[],"meta":{"total":0,"count":0,"limit":100}}` (or equivalent empty paginated envelope) in JSON/toon mode, and exits with code 0.
+If there are no archived changes, the command prints `no archived changes` to stdout in text mode, or `{"items":[],"meta":{"total":0,"count":0,"limit":100}}` in JSON/toon mode when the host default limit applies, or `{"items":[],"meta":{"total":0,"count":0,"limit":0}}` when `--limit all` was used. The process exits with code 0.
 
 ### Requirement: Error cases
 

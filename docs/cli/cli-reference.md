@@ -57,15 +57,15 @@ specd changes list [options]
 
 List all active changes as a table with columns: `NAME`, `STATE`, `SPECS`, `SCHEMA`.
 
-| Option                      | Description                                                |
-| --------------------------- | ---------------------------------------------------------- |
-| `--limit <n>`               | Maximum entries to return (default **100**).               |
-| `--page <p>`                | 1-based page number (mutually exclusive with `--after-*`). |
-| `--after-key <key>`         | Exclusive keyset cursor sort key.                          |
-| `--after-id <id>`           | Tiebreak id when used with `--after-key`.                  |
-| `--description`             | Include change description as a dim sub-row per entry.     |
-| `--format text\|json\|toon` | Output format. JSON/TOON return `{ items, meta }`.         |
-| `--config <path>`           | Config file path.                                          |
+| Option                      | Description                                                          |
+| --------------------------- | -------------------------------------------------------------------- |
+| `--limit <n>`               | Maximum entries to return (default **100**; use `all` for no limit). |
+| `--page <p>`                | 1-based page number (mutually exclusive with `--after-*`).           |
+| `--after-key <key>`         | Exclusive keyset cursor sort key.                                    |
+| `--after-id <id>`           | Tiebreak id when used with `--after-key`.                            |
+| `--description`             | Include change description as a dim sub-row per entry.               |
+| `--format text\|json\|toon` | Output format. JSON/TOON return `{ items, meta }`.                   |
+| `--config <path>`           | Config file path.                                                    |
 
 When the returned page is incomplete, text mode appends a truncation hint:
 
@@ -620,16 +620,16 @@ specd drafts list [options]
 
 List all drafted changes as a table with columns: `NAME`, `STATE`, `DATE`, `BY`, and optionally `REASON`.
 
-| Option                      | Description                                                |
-| --------------------------- | ---------------------------------------------------------- |
-| `--limit <n>`               | Maximum entries to return (default **100**).               |
-| `--page <p>`                | 1-based page number (mutually exclusive with `--after-*`). |
-| `--after-key <key>`         | Exclusive keyset cursor sort key.                          |
-| `--after-id <id>`           | Tiebreak id when used with `--after-key`.                  |
-| `--description`             | Include change description as a dim sub-row per entry.     |
-| `--reason`                  | Include draft reason column / JSON field (opt-in).         |
-| `--format text\|json\|toon` | Output format. JSON/TOON return `{ items, meta }`.         |
-| `--config <path>`           | Config file path.                                          |
+| Option                      | Description                                                          |
+| --------------------------- | -------------------------------------------------------------------- |
+| `--limit <n>`               | Maximum entries to return (default **100**; use `all` for no limit). |
+| `--page <p>`                | 1-based page number (mutually exclusive with `--after-*`).           |
+| `--after-key <key>`         | Exclusive keyset cursor sort key.                                    |
+| `--after-id <id>`           | Tiebreak id when used with `--after-key`.                            |
+| `--description`             | Include change description as a dim sub-row per entry.               |
+| `--reason`                  | Include draft reason column / JSON field (opt-in).                   |
+| `--format text\|json\|toon` | Output format. JSON/TOON return `{ items, meta }`.                   |
+| `--config <path>`           | Config file path.                                                    |
 
 Truncated text output includes `showing <count> of <total> (use --limit/--page)`.
 
@@ -673,17 +673,17 @@ specd discarded list [options]
 
 List all discarded changes as a table with columns: `NAME`, `DATE`, `BY`, and optionally `REASON` and `SUPERSEDED`.
 
-| Option                      | Description                                                |
-| --------------------------- | ---------------------------------------------------------- |
-| `--limit <n>`               | Maximum entries to return (default **100**).               |
-| `--page <p>`                | 1-based page number (mutually exclusive with `--after-*`). |
-| `--after-key <key>`         | Exclusive keyset cursor sort key.                          |
-| `--after-id <id>`           | Tiebreak id when used with `--after-key`.                  |
-| `--description`             | Include change description as a dim sub-row per entry.     |
-| `--reason`                  | Include discard reason column / JSON field (opt-in).       |
-| `--superseded-by`           | Include superseded-by target column / JSON field.          |
-| `--format text\|json\|toon` | Output format. JSON/TOON return `{ items, meta }`.         |
-| `--config <path>`           | Config file path.                                          |
+| Option                      | Description                                                          |
+| --------------------------- | -------------------------------------------------------------------- |
+| `--limit <n>`               | Maximum entries to return (default **100**; use `all` for no limit). |
+| `--page <p>`                | 1-based page number (mutually exclusive with `--after-*`).           |
+| `--after-key <key>`         | Exclusive keyset cursor sort key.                                    |
+| `--after-id <id>`           | Tiebreak id when used with `--after-key`.                            |
+| `--description`             | Include change description as a dim sub-row per entry.               |
+| `--reason`                  | Include discard reason column / JSON field (opt-in).                 |
+| `--superseded-by`           | Include superseded-by target column / JSON field.                    |
+| `--format text\|json\|toon` | Output format. JSON/TOON return `{ items, meta }`.                   |
+| `--config <path>`           | Config file path.                                                    |
 
 Truncated text output includes `showing <count> of <total> (use --limit/--page)`.
 
@@ -716,7 +716,7 @@ List archived changes as a table with columns: `NAME`, `DATE`, and optionally `B
 
 | Option                      | Description                                                            |
 | --------------------------- | ---------------------------------------------------------------------- |
-| `--limit <n>`               | Maximum entries to return (default **100**).                           |
+| `--limit <n>`               | Maximum entries to return (default **100**; use `all` for no limit).   |
 | `--page <p>`                | 1-based page number (mutually exclusive with `--after-*`).             |
 | `--after-key <key>`         | Exclusive keyset cursor for pagination (replaces legacy `--start-at`). |
 | `--after-id <id>`           | Tiebreak id when used with `--after-key`.                              |
@@ -755,7 +755,7 @@ List all specs known to the project, grouped by workspace.
 
 | Option                       | Description                                                                                                                                |
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `--limit <n>`                | Maximum entries per workspace (default **100**).                                                                                           |
+| `--limit <n>`                | Maximum entries per workspace (optional; use `all` for no limit).                                                                          |
 | `--page <p>`                 | 1-based page number (mutually exclusive with `--after-key`).                                                                               |
 | `--after-key <key>`          | Exclusive keyset cursor sort key (`--after-id` is not supported for spec lists).                                                           |
 | `--summary`                  | Include a short description (`SUMMARY` column) for each spec.                                                                              |

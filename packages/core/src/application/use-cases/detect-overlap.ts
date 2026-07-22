@@ -37,7 +37,7 @@ export class DetectOverlap {
    * @throws ChangeNotFoundError when `input.name` is provided but not found
    */
   async execute(input?: DetectOverlapInput): Promise<OverlapReport> {
-    const listed = await this._changes.list({ limit: Number.MAX_SAFE_INTEGER })
+    const listed = await this._changes.list()
     const changes: Change[] = []
     for (const entry of listed.items) {
       const change = await this._changes.get(entry.name)

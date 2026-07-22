@@ -11,7 +11,7 @@ const makeMockRepo = (): SpecRepository =>
     get specsPath() {
       return undefined
     },
-    list: async () => [],
+    list: async () => ({ items: [], meta: { total: 0, count: 0, limit: 0 } }),
     count: async () => 0,
     specHash: async () => null,
     metadata: async () => null,

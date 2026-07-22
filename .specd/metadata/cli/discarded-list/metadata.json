@@ -14,7 +14,7 @@
     {
       "requirement": "Command signature",
       "rules": [
-        "```\nspecd discarded list [--format text|json|toon] [--limit <n>] [--page <p>] [--after-key <iso>] [--after-id <name>] [--description] [--reason] [--superseded-by]\n```\n\n- `--format text|json|toon` — optional; output encoding, defaults to `text`\n- `--limit <n>` — optional; maximum number of entries to return; defaults to `100`\n- `--page <p>` — optional; 1-based page number (uses `--limit`, defaulting to `100` when omitted)\n- `--after-key <iso>` — optional; exclusive keyset cursor — ISO-8601 `discardedAt` of the last seen row\n- `--after-id <name>` — optional; tiebreak change `name` when `--after-key` collides; MUST accompany `--after-key`\n- `--description` — optional; include `description` (`includeDescription`)\n- `--reason` — optional; include discard `reason` (`includeReason`)\n- `--superseded-by` — optional; include `supersededBy` (`includeSupersededBy`)\n\n`--page` is mutually exclusive with `--after-key` / `--after-id`.\n\nNo positional arguments."
+        "```\nspecd discarded list [--format text|json|toon] [--limit <n|all>] [--page <p>] [--after-key <iso>] [--after-id <name>] [--description] [--reason] [--superseded-by]\n```\n\n- `--format text|json|toon` — optional; output encoding, defaults to `text`\n- `--limit <n|all>` — optional; maximum number of entries to return. When omitted, the CLI host defaults to `100`. When set to `all`, the CLI MUST NOT pass `limit` to the use case.\n- `--page <p>` — optional; 1-based page number; MUST be paired with a numeric `--limit` (not `all`)\n- `--after-key <iso>` — optional; exclusive keyset cursor — ISO-8601 `discardedAt` of the last seen row\n- `--after-id <name>` — optional; tiebreak change `name` when `--after-key` collides; MUST accompany `--after-key`\n- `--description` / `--reason` / `--superseded-by` — optional include flags\n\n`--page` is mutually exclusive with `--after-key` / `--after-id`. `--page` with `--limit all` MUST be rejected. `--after-key` with `--limit all` is allowed."
       ]
     },
     {
@@ -26,13 +26,13 @@
     {
       "requirement": "List options forwarding",
       "rules": [
-        "The command MUST map CLI flags to list options:\n\n- `--limit`, `--page`, `--after-key`, `--after-id` → `limit`, `page`, and `after: { key, id? }`\n- `--description` → `includeDescription: true`\n- `--reason` → `includeReason: true`\n- `--superseded-by` → `includeSupersededBy: true`\n\nWhen include flags are omitted, the CLI MUST NOT set them. The command MUST NOT re-sort or paginate after the use case returns."
+        "The command MUST map CLI flags to list options as follows:\n\n- When `--limit` is omitted → pass `limit: 100` (CLI host default)\n- When `--limit` is a positive integer → pass that `limit`\n- When `--limit all` → omit `limit` from the use-case input\n- `--page`, `--after-key`, `--after-id` → `page` and `after: { key, id? }` when provided\n- Include flags → set only when the corresponding CLI flag is present\n\nThe command MUST NOT re-sort, filter, or paginate results after the use case returns."
       ]
     },
     {
       "requirement": "Output format — text",
       "rules": [
-        "The command prints a human-readable table to stdout. Rows appear in canonical order (`discardedAt` descending — most recently discarded first) as returned by the use case; the CLI MUST NOT re-sort.\n\nThe output has an inverse-video column header row. Base columns are always `NAME  DATE  BY`. When `--reason` is set, `REASON` is appended. When `--superseded-by` is set and an entry has superseded targets, the row includes a `→ <names>` segment after the reason column (or in place of reason when reason is omitted). Column widths are fixed at render time, computed from the widest value across all rows for each column (global, not per-group). The REASON column uses wrap overflow capped at 60 characters.\n\nWhen `--description` is set and an entry includes a description, a dim indented description line is printed below the main row.\n\nWhen `meta.count < meta.total`, the command MUST print a trailing hint line:\n\n```\nshowing <count> of <total> (use --limit/--page)\n```"
+        "The command prints a human-readable table to stdout. Rows appear in canonical order as returned by the use case; the CLI MUST NOT re-sort.\n\nWhen a numeric `--limit` is in effect (explicit or host default) and `meta.count < meta.total`, the command MUST print a trailing hint line:\n\n```\nshowing <count> of <total> (use --limit/--page)\n```\n\nWhen `--limit all` was used, the command MUST NOT print a truncation hint."
       ]
     },
     {
@@ -50,7 +50,7 @@
     {
       "requirement": "Empty discarded list",
       "rules": [
-        "If there are no discarded changes, the command prints `no discarded changes` to stdout in text mode, or `{\"items\":[],\"meta\":{\"total\":0,\"count\":0,\"limit\":100}}` in JSON/toon mode, and exits with code 0."
+        "If there are no discarded changes, the command prints `no discarded changes` to stdout in text mode, or `{\"items\":[],\"meta\":{\"total\":0,\"count\":0,\"limit\":100}}` in JSON/toon mode when the host default limit applies, or `{\"items\":[],\"meta\":{\"total\":0,\"count\":0,\"limit\":0}}` when `--limit all` was used. The process exits with code 0."
       ]
     },
     {
@@ -83,9 +83,35 @@
     },
     {
       "requirement": "Command signature",
+      "name": "--limit all omits limit from ListDiscarded",
+      "when": ["specd discarded list --limit all --format json is run"],
+      "then": ["ListDiscarded.execute is called without a limit option"]
+    },
+    {
+      "requirement": "Command signature",
+      "name": "--page with omitted limit uses host default 100",
+      "when": ["specd discarded list --page 2 --format json is run without --limit"],
+      "then": ["ListDiscarded.execute is called with limit 100 and page 2"]
+    },
+    {
+      "requirement": "Command signature",
+      "name": "--page with --limit all is rejected",
+      "when": ["specd discarded list --page 2 --limit all is run"],
+      "then": [
+        "a typed validation error is thrown (e.g. CliValidationError)",
+        "AND the machine-readable code is CLI_VALIDATION_ERROR",
+        "AND ListDiscarded.execute is not invoked"
+      ]
+    },
+    {
+      "requirement": "Command signature",
       "name": "--page and keyset cursors are mutually exclusive",
       "when": ["specd discarded list --page 2 --after-key 2024-01-01T00:00:00.000Z is run"],
-      "then": ["the command exits with a CLI usage error before invoking the use case"]
+      "then": [
+        "a typed validation error is thrown (e.g. CliValidationError)",
+        "AND the machine-readable code is CLI_VALIDATION_ERROR",
+        "AND ListDiscarded.execute is not invoked"
+      ]
     },
     {
       "requirement": "Uses ListDiscarded read model",
@@ -211,17 +237,16 @@
     }
   ],
   "implementation": {
-    "symbols": [
+    "files": [
       {
         "specId": "cli:discarded-list",
-        "file": "cli:src/commands/discarded/list.ts",
-        "symbol": "registerDiscardedList"
+        "file": "cli:src/commands/discarded/list.ts"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:b43575c026057a1aa93257e90c3dc1734acfd568e4778be40626f9ef87c8c230",
-    "verify.md": "sha256:3230702e88c41e8a1ea80615342e01df22bfdf4695a1b16a3fd56b513e5b0f63"
+    "spec.md": "sha256:3dfd1d8b2b9e3e5164cec6643417acc76d2af2d1000e96fbb08e83c0f3c06000",
+    "verify.md": "sha256:a07ebbdf9ae258d666ac64372124cb6543dafe31fbceba3e952b1ef6e30b1548"
   },
   "generatedBy": "core"
 }

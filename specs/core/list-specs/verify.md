@@ -29,6 +29,13 @@
 - **THEN** each workspace `SpecRepository.list()` receives the same forwarded options
 - **AND** the use case does not re-sort or re-paginate per-workspace results
 
+#### Scenario: Omitted limit is forwarded without inventing a default
+
+- **GIVEN** a workspace repository with more than 100 specs
+- **WHEN** `execute()` is called without `limit`
+- **THEN** each workspace `SpecRepository.list()` is called without a `limit` option
+- **AND** the merged per-workspace results include the full repository catalogs
+
 ### Requirement: Always resolve a title for each entry
 
 #### Scenario: Title supplied by repository list
@@ -127,8 +134,6 @@
 - **WHEN** `createListSpecs(config, options?)` is invoked
 - **THEN** it creates a composition resolver for that composition session
 - **AND** it derives `ListSpecsDeps` through `resolveListSpecsDeps(resolver)`
-- **AND** `resolveListSpecsDeps(resolver)` resolves:
-- `listWorkspaces: ListWorkspaces`
-- `hasher: ContentHasher`
-- `yaml: YamlSerializer`
+- **AND** `resolveListSpecsDeps(resolver)` resolves `listWorkspaces: ListWorkspaces`
+- **AND** it MUST NOT resolve `hasher: ContentHasher` or `yaml: YamlSerializer`
 - **AND** the factory delegates to canonical `createListSpecs(deps)`

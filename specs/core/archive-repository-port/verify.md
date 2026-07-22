@@ -96,7 +96,7 @@
 #### Scenario: No archived changes
 
 - **WHEN** `list()` is called and no changes have been archived
-- **THEN** `{ items: [], meta: { total: 0, count: 0, limit: 100 } }` is returned
+- **THEN** `{ items: [], meta: { total: 0, count: 0, limit: 0 } }` is returned
 
 ### Requirement: list returns index entries
 

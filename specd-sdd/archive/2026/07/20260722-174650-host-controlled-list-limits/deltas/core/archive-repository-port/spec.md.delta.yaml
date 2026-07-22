@@ -1,0 +1,29 @@
+- op: modified
+  description: 'Remove default limit 100 — rewrite archive chronological list requirement'
+  selector:
+    type: section
+    matches: 'Requirement: list returns all archived changes in chronological order'
+  content: |
+    `list(options?)` MUST return archived changes in this workspace sorted by canonical order: `archivedAt` descending (newest → oldest).
+
+    `ArchiveListOptions` extends `ListOptions` with:
+
+    - `includeArchivedBy?: boolean` — when `true`, projected entries MAY include `archivedBy`; when `false` or omitted, `archivedBy` MUST NOT appear
+
+    Pagination uses shared `ListOptions` / `ListResult` from [`core:repository-port`](../repository-port/spec.md). The former `startAt` cursor is replaced by `after: { key, id? }` where `after.key` is `archivedAt` ISO-8601 and `after.id` is the change `name` tiebreak.
+
+    Pagination has **no default `limit`**. When `limit` is omitted, `list()` returns the full archive index and `meta.limit` equals `meta.total` per [`core:repository-port`](../repository-port/spec.md).
+- op: modified
+  description: 'Update Constraints — remove default limit 100'
+  selector:
+    type: section
+    matches: 'Constraints'
+  content: |
+    - The archive is append-only — archived changes are never modified after creation
+    - Archive list indexes live under `{configPath}/tmp/fs-cache/archive/`, not at the archive root
+    - Canonical archive list sort is `archivedAt` descending (newest → oldest)
+    - List pagination has no default `limit`; when omitted, `list()` returns the full archive index and `meta.limit` equals `meta.total` per `core:repository-port`
+    - `archive()` upserts the archive list entry through the fs-cache helper
+    - `get()` loads full detail from the archived directory `manifest.json`; list/count use index entries only
+    - The `force` option on `archive()` bypasses the state check entirely
+    - `ArchivedChange` is immutable once created — no setters, no mutation methods

@@ -16,7 +16,7 @@
     {
       "requirement": "Enumerate specs across all workspaces",
       "rules": [
-        "`ListSpecs.execute(options?)` SHALL obtain the orchestrated project structure via the `ListWorkspaces` use case (or the corresponding kernel capability). It SHALL iterate through the resulting `ProjectWorkspace` entities and call `SpecRepository.list(options)` on each workspace's `specRepo`.\n\nIt MUST forward the same `ListOptions`, `includeSummary`, and `includeMetadataStatus` to every workspace repository call. It MUST NOT re-sort, re-filter, or re-paginate per-workspace results after the repository returns.\n\nThe merged result MUST preserve workspace declaration order from `ListWorkspaces`, with each workspace's items in the repository's canonical path order. Cross-workspace pagination is out of scope for v1 — callers paginate within a single workspace via the port or filter workspaces explicitly.\n\nWorkspace filtering SHALL be performed by matching workspace names against the orchestrated list before invoking `list()`."
+        "`ListSpecs.execute(options?)` SHALL obtain the orchestrated project structure via the `ListWorkspaces` use case (or the corresponding kernel capability). It SHALL iterate through the resulting `ProjectWorkspace` entities and call `SpecRepository.list(options)` on each workspace's `specRepo`.\n\nIt MUST forward the same `ListOptions`, `includeSummary`, and `includeMetadataStatus` to every workspace repository call. It MUST NOT apply a default `limit` of its own — when the host omits `limit`, each repository MUST return its full filtered set per [`core:repository-port`](../repository-port/spec.md). It MUST NOT re-sort, re-filter, or re-paginate per-workspace results after the repository returns.\n\nThe merged result MUST preserve workspace declaration order from `ListWorkspaces`, with each workspace's items in the repository's canonical path order. Cross-workspace pagination is out of scope for v1 — callers paginate within a single workspace via the port or filter workspaces explicitly.\n\nWorkspace filtering SHALL be performed by matching workspace names against the orchestrated list before invoking `list()`."
       ]
     },
     {
@@ -96,6 +96,16 @@
       "then": [
         "each workspace SpecRepository.list() receives the same forwarded options",
         "AND the use case does not re-sort or re-paginate per-workspace results"
+      ]
+    },
+    {
+      "requirement": "Enumerate specs across all workspaces",
+      "name": "Omitted limit is forwarded without inventing a default",
+      "given": ["a workspace repository with more than 100 specs"],
+      "when": ["execute() is called without limit"],
+      "then": [
+        "each workspace SpecRepository.list() is called without a limit option",
+        "AND the merged per-workspace results include the full repository catalogs"
       ]
     },
     {
@@ -220,7 +230,8 @@
       "then": [
         "it creates a composition resolver for that composition session",
         "AND it derives ListSpecsDeps through resolveListSpecsDeps(resolver)",
-        "AND resolveListSpecsDeps(resolver) resolves:",
+        "AND resolveListSpecsDeps(resolver) resolves listWorkspaces: ListWorkspaces",
+        "AND it MUST NOT resolve hasher: ContentHasher or yaml: YamlSerializer",
         "AND the factory delegates to canonical createListSpecs(deps)"
       ]
     }
@@ -231,17 +242,12 @@
         "specId": "core:list-specs",
         "file": "core:src/application/use-cases/list-specs.ts",
         "symbol": "ListSpecs"
-      },
-      {
-        "specId": "core:list-specs",
-        "file": "core:src/composition/use-cases/list-specs.ts",
-        "symbol": "resolveListSpecsDeps"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:865b6d4149d9557a020f46abd3de08b8f71b8068445e416d5e84228373ad1bb7",
-    "verify.md": "sha256:c64426c605e7089ad1887538b9378e63821b56109544885dd94e73a4968579a4"
+    "spec.md": "sha256:15585db904bb03a6c04abf01df6f0b40474e9a61080788270bdbe86a0e948d44",
+    "verify.md": "sha256:1ebb1f68c12224bd25f39574b6cf9300d1578c6309e7b93d4e4272ed33798b99"
   },
   "generatedBy": "core"
 }

@@ -545,6 +545,7 @@ describe('FsChangeRepository', () => {
     it('given no changes, when list is called, then an empty array is returned', async () => {
       const result = await ctx.repo.list()
       expect(result.items).toEqual([])
+      expect(result.meta).toEqual({ total: 0, count: 0, limit: 0 })
     })
   })
 

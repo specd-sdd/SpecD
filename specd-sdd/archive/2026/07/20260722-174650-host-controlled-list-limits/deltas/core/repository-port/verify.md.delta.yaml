@@ -1,0 +1,47 @@
+- op: modified
+  description: 'Replace default-100 scenarios with host-controlled limit scenarios'
+  selector:
+    type: section
+    matches: 'Requirement: Shared list pagination types'
+  content: |
+    #### Scenario: Omitted limit returns full set
+
+    - **GIVEN** a listable bucket with more than 100 entries
+    - **WHEN** a listable repository `list()` method is called without `limit`
+    - **THEN** all matching entries are returned
+    - **AND** `meta.limit` equals `meta.total`
+    - **AND** `meta.count` equals `meta.total`
+
+    #### Scenario: Explicit limit caps the page
+
+    - **GIVEN** a listable bucket with more than 10 entries
+    - **WHEN** `list({ limit: 10 })` is called
+    - **THEN** at most 10 items are returned
+    - **AND** `meta.limit` is 10
+
+    #### Scenario: Page without limit is rejected
+
+    - **WHEN** list options include `page` without `limit`
+    - **THEN** a typed validation error is thrown (e.g. `InvalidInputError`)
+    - **AND** the machine-readable code is `INVALID_INPUT`
+
+    #### Scenario: Page and after are mutually exclusive
+
+    - **WHEN** list options include both `page` and `after`
+    - **THEN** a typed validation error is thrown (e.g. `InvalidInputError`)
+    - **AND** the machine-readable code is `INVALID_INPUT`
+
+    #### Scenario: After cursor with limit returns the next page in canonical order
+
+    - **GIVEN** a bucket with at least three entries in canonical sort order
+    - **WHEN** `list({ limit: 1, after: { key: <first-key>, id: <first-id> } })` is called for a change bucket
+    - **THEN** the first returned item is strictly after that cursor position
+    - **AND** `meta.after` reflects the last returned position when more items remain
+
+    #### Scenario: After cursor without limit returns remainder
+
+    - **GIVEN** a bucket with at least three entries in canonical sort order
+    - **WHEN** `list({ after: { key: <first-key>, id: <first-id> } })` is called without `limit`
+    - **THEN** all remaining items strictly after the cursor are returned
+    - **AND** `meta.limit` equals `meta.count`
+    - **AND** `meta.after` is omitted

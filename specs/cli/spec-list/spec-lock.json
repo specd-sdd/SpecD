@@ -13,11 +13,7 @@
   ],
   "implementation": [
     {
-      "file": "cli:src/commands/spec/list.ts",
-      "symbols": ["registerSpecList"]
-    },
-    {
-      "file": "cli:src/commands/spec/generate-metadata.ts"
+      "file": "cli:src/commands/spec/list.ts"
     }
   ]
 }

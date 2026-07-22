@@ -1,0 +1,8 @@
+- op: modified
+  description: 'Empty archive list meta.limit equals total when unpaginated'
+  selector:
+    type: section
+    matches: 'Scenario: No archived changes'
+  content: |
+    - **WHEN** `list()` is called and no changes have been archived
+    - **THEN** `{ items: [], meta: { total: 0, count: 0, limit: 0 } }` is returned

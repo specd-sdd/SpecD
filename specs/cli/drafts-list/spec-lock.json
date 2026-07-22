@@ -11,8 +11,7 @@
   ],
   "implementation": [
     {
-      "file": "cli:src/commands/drafts/list.ts",
-      "symbols": ["registerDraftsList"]
+      "file": "cli:src/commands/drafts/list.ts"
     }
   ]
 }

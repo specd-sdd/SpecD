@@ -192,7 +192,7 @@
     "get() in FsChangeRepository may auto-invalidate and persist the change under the mutation lock before returning, if artifact drift is detected and the change is beyond designing or has active approvals",
     "list, listDrafts, and listDiscarded return lightweight list entries with no artifact content, history, or derived artifact state maps",
     "get, getDraft, and getDiscarded remain the detail surfaces for full manifest-backed inspection",
-    "Default list limit is 100; callers needing more MUST pass a higher limit or paginate with page or after",
+    "List pagination has no default limit; when omitted, list() returns the full bucket and meta.limit equals meta.total per core:repository-port",
     "save() writes the manifest only; saveArtifact() writes file content only — these are separate operations",
     "ArtifactConflictError is the sole error type for concurrent modification detection",
     "The force option on saveArtifact() bypasses conflict detection entirely",
@@ -458,7 +458,7 @@
       "requirement": "list returns active changes in creation order",
       "name": "No active changes",
       "when": ["list() is called and no active changes exist"],
-      "then": ["{ items: [], meta: { total: 0, count: 0, limit: 100 } } is returned"]
+      "then": ["{ items: [], meta: { total: 0, count: 0, limit: 0 } } is returned"]
     },
     {
       "requirement": "list returns active changes in creation order",
@@ -837,29 +837,14 @@
     "symbols": [
       {
         "specId": "core:change-repository-port",
-        "file": "core:src/application/ports/change-repository.ts",
-        "symbol": "ChangeRepository"
-      },
-      {
-        "specId": "core:change-repository-port",
-        "file": "core:src/application/ports/change-repository.ts",
-        "symbol": "ActiveChangeListOptions"
-      },
-      {
-        "specId": "core:change-repository-port",
-        "file": "core:src/application/ports/change-repository.ts",
-        "symbol": "DraftedChangeListOptions"
-      },
-      {
-        "specId": "core:change-repository-port",
-        "file": "core:src/application/ports/change-repository.ts",
-        "symbol": "DiscardedChangeListOptions"
+        "file": "core:src/infrastructure/fs/change-repository.ts",
+        "symbol": "FsChangeRepository"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:0c316531330f164c5738bf3ece9e101b714f2e564e5b663a084a6939201b31a9",
-    "verify.md": "sha256:29ac2b4b4915be014dc3de4bf7c6c6940ab858ac5efe9fc630d4005571da0a30"
+    "spec.md": "sha256:72ddcb320702f92cd5f79f0cb43f51a282abd7ec2f39e4b87c6ef140740f14f9",
+    "verify.md": "sha256:c12dd080b2ff511352e53f54f58daae3994ffc74aca26449bb7e7c69dede61d4"
   },
   "generatedBy": "core"
 }

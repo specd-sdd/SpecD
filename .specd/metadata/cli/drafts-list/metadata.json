@@ -14,7 +14,7 @@
     {
       "requirement": "Command signature",
       "rules": [
-        "```\nspecd drafts list [--format text|json|toon] [--limit <n>] [--page <p>] [--after-key <iso>] [--after-id <name>] [--description] [--reason]\n```\n\nAlias:\n\n```\nspecd draft list [--format text|json|toon] [--limit <n>] [--page <p>] [--after-key <iso>] [--after-id <name>] [--description] [--reason]\n```\n\n- `--format text|json|toon` — optional; output encoding, defaults to `text`\n- `--limit <n>` — optional; maximum number of entries to return; defaults to `100`\n- `--page <p>` — optional; 1-based page number (uses `--limit`, defaulting to `100` when omitted)\n- `--after-key <iso>` — optional; exclusive keyset cursor — ISO-8601 `draftedAt` of the last seen row\n- `--after-id <name>` — optional; tiebreak change `name` when `--after-key` collides; MUST accompany `--after-key`\n- `--description` — optional; include `description` (`includeDescription`)\n- `--reason` — optional; include draft `reason` (`includeReason`)\n\n`--page` is mutually exclusive with `--after-key` / `--after-id`.\n\nNo positional arguments."
+        "```\nspecd drafts list [--format text|json|toon] [--limit <n|all>] [--page <p>] [--after-key <iso>] [--after-id <name>] [--description] [--reason]\n```\n\nAlias:\n\n```\nspecd draft list [--format text|json|toon] [--limit <n|all>] [--page <p>] [--after-key <iso>] [--after-id <name>] [--description] [--reason]\n```\n\n- `--format text|json|toon` — optional; output encoding, defaults to `text`\n- `--limit <n|all>` — optional; maximum number of entries to return. When omitted, the CLI host defaults to `100`. When set to `all`, the CLI MUST NOT pass `limit` to the use case.\n- `--page <p>` — optional; 1-based page number; MUST be paired with a numeric `--limit` (not `all`)\n- `--after-key <iso>` — optional; exclusive keyset cursor — ISO-8601 `draftedAt` of the last seen row\n- `--after-id <name>` — optional; tiebreak change `name` when `--after-key` collides; MUST accompany `--after-key`\n- `--description` — optional; include description on each entry\n- `--reason` — optional; include draft reason on each entry\n\n`--page` is mutually exclusive with `--after-key` / `--after-id`. `--page` with `--limit all` MUST be rejected. `--after-key` with `--limit all` is allowed."
       ]
     },
     {
@@ -26,13 +26,13 @@
     {
       "requirement": "List options forwarding",
       "rules": [
-        "The command MUST map CLI flags to list options:\n\n- `--limit`, `--page`, `--after-key`, `--after-id` → `limit`, `page`, and `after: { key, id? }`\n- `--description` → `includeDescription: true`\n- `--reason` → `includeReason: true`\n\nWhen include flags are omitted, the CLI MUST NOT set them. The command MUST NOT re-sort or paginate after the use case returns."
+        "The command MUST map CLI flags to list options as follows:\n\n- When `--limit` is omitted → pass `limit: 100` (CLI host default)\n- When `--limit` is a positive integer → pass that `limit`\n- When `--limit all` → omit `limit` from the use-case input\n- `--page`, `--after-key`, `--after-id` → `page` and `after: { key, id? }` when provided\n- `--description` → `includeDescription: true`\n- `--reason` → `includeReason: true`\n\nWhen include flags are omitted, the CLI MUST NOT set them. The command MUST NOT re-sort or paginate after the use case returns."
       ]
     },
     {
       "requirement": "Output format — text",
       "rules": [
-        "The command prints a human-readable table to stdout. Rows appear in canonical order (`draftedAt` descending — most recently drafted first) as returned by the use case; the CLI MUST NOT re-sort.\n\nThe output has an inverse-video column header row. Base columns are always `NAME  STATE  DATE  BY`. When `--reason` is set, `REASON` is appended. Column widths are fixed at render time, computed from the widest value across all rows for each column (global, not per-group). The REASON column uses wrap overflow when its content exceeds the column width.\n\nWhen `--description` is set and an entry includes a description, a dim indented description line is printed below the main row (same convention as active change list).\n\nWhen `meta.count < meta.total`, the command MUST print a trailing hint line:\n\n```\nshowing <count> of <total> (use --limit/--page)\n```"
+        "The command prints a human-readable table to stdout. Rows appear in canonical order (`draftedAt` descending — most recently drafted first) as returned by the use case; the CLI MUST NOT re-sort.\n\nThe output has an inverse-video column header row. Base columns are always `NAME  STATE  DATE  BY`. When `--reason` is set, `REASON` is appended. Column widths are fixed at render time, computed from the widest value across all rows for each column (global, not per-group). The REASON column uses wrap overflow when its content exceeds the column width.\n\nWhen `--description` is set and an entry includes a description, a dim indented description line is printed below the main row (same convention as active change list).\n\nWhen a numeric `--limit` is in effect (explicit or host default) and `meta.count < meta.total`, the command MUST print a trailing hint line:\n\n```\nshowing <count> of <total> (use --limit/--page)\n```\n\nWhen `--limit all` was used, the command MUST NOT print a truncation hint."
       ]
     },
     {
@@ -50,7 +50,7 @@
     {
       "requirement": "Empty drafts",
       "rules": [
-        "If there are no changes in `drafts/`, the command prints `no drafts` to stdout in text mode, or `{\"items\":[],\"meta\":{\"total\":0,\"count\":0,\"limit\":100}}` in JSON/toon mode, and exits with code 0."
+        "If there are no changes in `drafts/`, the command prints `no drafts` to stdout in text mode, or `{\"items\":[],\"meta\":{\"total\":0,\"count\":0,\"limit\":100}}` in JSON/toon mode when the host default limit applies, or `{\"items\":[],\"meta\":{\"total\":0,\"count\":0,\"limit\":0}}` when `--limit all` was used. The process exits with code 0."
       ]
     },
     {
@@ -83,9 +83,35 @@
     },
     {
       "requirement": "Command signature",
+      "name": "--limit all omits limit from ListDrafts",
+      "when": ["specd drafts list --limit all --format json is run"],
+      "then": ["ListDrafts.execute is called without a limit option"]
+    },
+    {
+      "requirement": "Command signature",
+      "name": "--page with omitted limit uses host default 100",
+      "when": ["specd drafts list --page 2 --format json is run without --limit"],
+      "then": ["ListDrafts.execute is called with limit 100 and page 2"]
+    },
+    {
+      "requirement": "Command signature",
+      "name": "--page with --limit all is rejected",
+      "when": ["specd drafts list --page 2 --limit all is run"],
+      "then": [
+        "a typed validation error is thrown (e.g. CliValidationError)",
+        "AND the machine-readable code is CLI_VALIDATION_ERROR",
+        "AND ListDrafts.execute is not invoked"
+      ]
+    },
+    {
+      "requirement": "Command signature",
       "name": "--page and keyset cursors are mutually exclusive",
       "when": ["specd drafts list --page 2 --after-key 2024-01-01T00:00:00.000Z is run"],
-      "then": ["the command exits with a CLI usage error before invoking the use case"]
+      "then": [
+        "a typed validation error is thrown (e.g. CliValidationError)",
+        "AND the machine-readable code is CLI_VALIDATION_ERROR",
+        "AND ListDrafts.execute is not invoked"
+      ]
     },
     {
       "requirement": "Uses ListDrafts read model",
@@ -228,17 +254,16 @@
     }
   ],
   "implementation": {
-    "symbols": [
+    "files": [
       {
         "specId": "cli:drafts-list",
-        "file": "cli:src/commands/drafts/list.ts",
-        "symbol": "registerDraftsList"
+        "file": "cli:src/commands/drafts/list.ts"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:31cb3f10b2b31b0e52034116b5dc00546b24c86a499691e3d51133c2e2e34655",
-    "verify.md": "sha256:0a432c05ed83e7a65a92ecd14d917e062cae10b0a5612f29c78ee02c91a4cd7b"
+    "spec.md": "sha256:7eee0ede388a89cde8c1f68f95c6651702082ca855eb8ccc37a1b07f70f9399c",
+    "verify.md": "sha256:6ac7fee129a02a8d55aedd1a2753c5b0cbab055dab32a575de485662f70fb369"
   },
   "generatedBy": "core"
 }

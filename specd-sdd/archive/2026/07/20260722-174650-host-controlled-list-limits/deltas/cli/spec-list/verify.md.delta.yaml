@@ -1,0 +1,67 @@
+- op: modified
+  description: 'No default CLI limit; --limit all; truncation only with numeric limit'
+  selector:
+    type: section
+    matches: 'Requirement: Command signature'
+  content: |
+    #### Scenario: Canonical plural command
+
+    - **WHEN** `specd specs list --format json` is run
+    - **THEN** the command executes using the canonical plural group
+
+    #### Scenario: Singular alias command
+
+    - **WHEN** `specd spec list --format json` is run
+    - **THEN** it behaves as an alias of `specd specs list --format json`
+
+    #### Scenario: Omitted limit returns full workspace catalog
+
+    - **GIVEN** workspace `default` contains more than 100 specs
+    - **WHEN** `specd spec list --workspace default --format json` is run without `--limit`
+    - **THEN** `workspaces[0].meta.limit` equals `workspaces[0].meta.total`
+    - **AND** `workspaces[0].specs` contains every spec in that workspace
+
+    #### Scenario: --limit all omits limit from ListSpecs
+
+    - **WHEN** `specd spec list --limit all --format json` is run
+    - **THEN** `ListSpecs.execute` is called without a `limit` option
+
+    #### Scenario: --page requires numeric --limit
+
+    - **WHEN** `specd spec list --page 2` is run without a numeric `--limit`
+    - **THEN** a typed validation error is thrown (e.g. `CliValidationError`)
+    - **AND** the machine-readable code is `CLI_VALIDATION_ERROR`
+    - **AND** `ListSpecs.execute` is not invoked
+
+    #### Scenario: --page and --after-key are mutually exclusive
+
+    - **WHEN** `specd spec list --page 2 --after-key default:auth/login` is run
+    - **THEN** a typed validation error is thrown (e.g. `CliValidationError`)
+    - **AND** the machine-readable code is `CLI_VALIDATION_ERROR`
+    - **AND** `ListSpecs.execute` is not invoked
+
+- op: modified
+  description: 'Truncation hint only when numeric --limit truncates'
+  selector:
+    type: section
+    matches: 'Scenario: Truncation hint per workspace group when partial'
+  content: |
+    - **GIVEN** workspace `default` has 125 specs
+    - **WHEN** `specd spec list --workspace default --limit 100` is run
+    - **THEN** stdout contains `showing 100 of 125 (use --limit/--page)` after the `default` group table
+
+- op: added
+  description: 'No truncation hint when limit omitted'
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Output format'
+    after:
+      type: section
+      matches: 'Scenario: Truncation hint per workspace group when partial'
+  content: |
+    #### Scenario: No truncation hint when limit omitted
+
+    - **GIVEN** workspace `default` has 125 specs
+    - **WHEN** `specd spec list --workspace default` is run without `--limit`
+    - **THEN** stdout does not contain `showing`

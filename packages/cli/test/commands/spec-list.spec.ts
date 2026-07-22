@@ -5,6 +5,7 @@ import {
   makeListSpecsResult,
   makeProgram,
   captureStdout,
+  captureStderr,
   mockProcessExit,
   DEFAULT_LIST_LIMIT,
 } from './helpers.js'
@@ -462,7 +463,23 @@ describe('spec list pagination', () => {
     expect(optionNames).not.toContain('after-id')
   })
 
-  it('prints per-workspace truncation hint', async () => {
+  it('prints per-workspace truncation hint when numeric --limit truncates', async () => {
+    const { kernel, stdout } = setup()
+    kernel.specs.list.execute.mockResolvedValue(
+      makeListSpecsResult([{ workspace: 'default', path: 'auth/login', title: 'Login' }], {
+        total: 500,
+        count: 1,
+      }),
+    )
+
+    const program = makeProgram()
+    registerSpecList(program.command('spec'))
+    await program.parseAsync(['node', 'specd', 'spec', 'list', '--limit', '1'])
+
+    expect(stdout()).toContain('showing 1 of 500 (use --limit/--page)')
+  })
+
+  it('does not print truncation hint when --limit is omitted', async () => {
     const { kernel, stdout } = setup()
     kernel.specs.list.execute.mockResolvedValue(
       makeListSpecsResult([{ workspace: 'default', path: 'auth/login', title: 'Login' }], {
@@ -475,13 +492,17 @@ describe('spec list pagination', () => {
     registerSpecList(program.command('spec'))
     await program.parseAsync(['node', 'specd', 'spec', 'list'])
 
-    expect(stdout()).toContain('showing 1 of 500 (use --limit/--page)')
+    expect(stdout()).not.toContain('showing')
   })
 
-  it('JSON workspaces include meta with default limit', async () => {
+  it('JSON workspaces include meta from use case without host default', async () => {
     const { kernel, stdout } = setup()
     kernel.specs.list.execute.mockResolvedValue(
-      makeListSpecsResult([{ workspace: 'default', path: 'auth/login', title: 'Login' }]),
+      makeListSpecsResult([{ workspace: 'default', path: 'auth/login', title: 'Login' }], {
+        total: 1,
+        count: 1,
+        limit: 1,
+      }),
     )
 
     const program = makeProgram()
@@ -489,6 +510,38 @@ describe('spec list pagination', () => {
     await program.parseAsync(['node', 'specd', 'spec', 'list', '--format', 'json'])
 
     const json = JSON.parse(stdout())
-    expect(json.workspaces[0].meta.limit).toBe(DEFAULT_LIST_LIMIT)
+    expect(json.workspaces[0].meta.limit).toBe(1)
+    expect(kernel.specs.list.execute).toHaveBeenCalledWith({
+      includeSummary: false,
+      includeMetadataStatus: false,
+    })
+  })
+
+  it('forwards --limit all without limit to ListSpecs', async () => {
+    const { kernel } = setup()
+    kernel.specs.list.execute.mockResolvedValue(makeListSpecsResult([]))
+
+    const program = makeProgram()
+    registerSpecList(program.command('spec'))
+    await program.parseAsync(['node', 'specd', 'spec', 'list', '--limit', 'all'])
+
+    expect(kernel.specs.list.execute).toHaveBeenCalledWith({
+      includeSummary: false,
+      includeMetadataStatus: false,
+    })
+  })
+
+  it('rejects --page without numeric --limit', async () => {
+    mockProcessExit()
+    const stderr = captureStderr()
+    const { kernel } = setup()
+
+    const program = makeProgram()
+    registerSpecList(program.command('spec'))
+    await program.parseAsync(['node', 'specd', 'spec', 'list', '--page', '2']).catch(() => {})
+
+    expect(process.exit).toHaveBeenCalledWith(1)
+    expect(stderr()).toMatch(/--page requires a numeric --limit/)
+    expect(kernel.specs.list.execute).not.toHaveBeenCalled()
   })
 })

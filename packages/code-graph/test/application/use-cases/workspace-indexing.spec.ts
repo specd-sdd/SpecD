@@ -16,6 +16,24 @@ import {
 } from '../../helpers/expected-fingerprint-map.js'
 
 /**
+ * Builds a paginated list envelope for mock spec repositories.
+ *
+ * @param specs - Spec entities to expose as list entries
+ * @returns List result matching {@link SpecRepository.list}
+ */
+function makeListResult(specs: Spec[]) {
+  const items = specs.map((spec) => ({
+    workspace: spec.workspace,
+    path: spec.name.toFsPath('/'),
+    title: spec.name.toString().split('/').at(-1) ?? spec.name.toString(),
+  }))
+  return {
+    items,
+    meta: { total: items.length, count: items.length, limit: items.length },
+  }
+}
+
+/**
  * Creates a mock spec repository.
  * @param specs - List of specs to return.
  * @param metadataMap - Optional map of specId to metadata.
@@ -29,7 +47,7 @@ function makeMockRepo(
     get specsPath() {
       return undefined
     },
-    list: async () => specs,
+    list: async () => makeListResult(specs),
     count: async () => specs.length,
     specHash: async () => 'sha256:test',
     metadata: async (s: Spec) =>
@@ -340,7 +358,7 @@ describe('Workspace indexing', () => {
       get specsPath() {
         return specsDir
       },
-      list: async () => [],
+      list: async () => makeListResult([]),
       count: async () => 0,
       specHash: async () => 'sha256:test',
       metadata: async () => null,
@@ -431,7 +449,7 @@ describe('Workspace indexing', () => {
     ])
 
     const repo = {
-      list: async () => [spec1],
+      list: async () => makeListResult([spec1]),
       count: async () => 1,
       specHash: async () => 'sha256:sidecar-hash',
       metadata: async () => ({ title: 'Test' }),

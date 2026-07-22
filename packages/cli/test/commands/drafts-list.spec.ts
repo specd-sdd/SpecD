@@ -141,6 +141,17 @@ describe('Output format — JSON', () => {
 })
 
 describe('Pagination and includes', () => {
+  it('forwards --page with host default limit when --limit is omitted', async () => {
+    const { kernel } = setup()
+    kernel.changes.listDrafts.execute.mockResolvedValue(makeListResult([]))
+
+    const program = makeProgram()
+    registerDraftsList(program.command('drafts'))
+    await program.parseAsync(['node', 'specd', 'drafts', 'list', '--page', '2', '--format', 'json'])
+
+    expect(kernel.changes.listDrafts.execute).toHaveBeenCalledWith({ limit: 100, page: 2 })
+  })
+
   it('forwards pagination flags to ListDrafts', async () => {
     const { kernel } = setup()
     kernel.changes.listDrafts.execute.mockResolvedValue(makeListResult([]))
@@ -179,6 +190,40 @@ describe('Pagination and includes', () => {
 
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toMatch(/mutually exclusive/)
+    expect(kernel.changes.listDrafts.execute).not.toHaveBeenCalled()
+  })
+
+  it('omits limit when --limit all is passed', async () => {
+    const { kernel } = setup()
+    kernel.changes.listDrafts.execute.mockResolvedValue(makeListResult([]))
+
+    const program = makeProgram()
+    registerDraftsList(program.command('drafts'))
+    await program.parseAsync([
+      'node',
+      'specd',
+      'drafts',
+      'list',
+      '--limit',
+      'all',
+      '--format',
+      'json',
+    ])
+
+    expect(kernel.changes.listDrafts.execute).toHaveBeenCalledWith({})
+  })
+
+  it('rejects --page with --limit all', async () => {
+    const { kernel, stderr } = setup()
+
+    const program = makeProgram()
+    registerDraftsList(program.command('drafts'))
+    await program
+      .parseAsync(['node', 'specd', 'drafts', 'list', '--page', '2', '--limit', 'all'])
+      .catch(() => {})
+
+    expect(process.exit).toHaveBeenCalledWith(1)
+    expect(stderr()).toMatch(/--page requires a numeric --limit/)
     expect(kernel.changes.listDrafts.execute).not.toHaveBeenCalled()
   })
 

@@ -356,7 +356,7 @@ describe('FsArchiveRepository', () => {
     it('returns empty result when archive is empty', async () => {
       const result = await ctx.archive.list()
       expect(result.items).toHaveLength(0)
-      expect(result.meta.total).toBe(0)
+      expect(result.meta).toEqual({ total: 0, count: 0, limit: 0 })
     })
 
     it('returns archived changes newest first', async () => {

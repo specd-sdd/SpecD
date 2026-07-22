@@ -265,7 +265,7 @@ export class ArchiveChange {
 
     // --- Overlap guard ---
     const invalidatedChanges: InvalidatedChangesEntry[] = []
-    const listed = await this._changes.list({ limit: Number.MAX_SAFE_INTEGER })
+    const listed = await this._changes.list()
     const others: Change[] = []
     for (const entry of listed.items) {
       if (entry.name === change.name) continue

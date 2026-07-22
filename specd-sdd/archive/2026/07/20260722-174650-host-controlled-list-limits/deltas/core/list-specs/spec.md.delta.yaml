@@ -1,0 +1,13 @@
+- op: modified
+  description: 'Clarify ListSpecs forwards host options without applying a default limit'
+  selector:
+    type: section
+    matches: 'Requirement: Enumerate specs across all workspaces'
+  content: |
+    `ListSpecs.execute(options?)` SHALL obtain the orchestrated project structure via the `ListWorkspaces` use case (or the corresponding kernel capability). It SHALL iterate through the resulting `ProjectWorkspace` entities and call `SpecRepository.list(options)` on each workspace's `specRepo`.
+
+    It MUST forward the same `ListOptions`, `includeSummary`, and `includeMetadataStatus` to every workspace repository call. It MUST NOT apply a default `limit` of its own — when the host omits `limit`, each repository MUST return its full filtered set per [`core:repository-port`](../repository-port/spec.md). It MUST NOT re-sort, re-filter, or re-paginate per-workspace results after the repository returns.
+
+    The merged result MUST preserve workspace declaration order from `ListWorkspaces`, with each workspace's items in the repository's canonical path order. Cross-workspace pagination is out of scope for v1 — callers paginate within a single workspace via the port or filter workspaces explicitly.
+
+    Workspace filtering SHALL be performed by matching workspace names against the orchestrated list before invoking `list()`.

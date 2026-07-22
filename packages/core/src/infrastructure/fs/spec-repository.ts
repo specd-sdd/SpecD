@@ -892,7 +892,7 @@ export class FsSpecRepository extends SpecRepository {
   override async search(query: string, options?: { limit?: number }): Promise<SpecSearchResult[]> {
     const limit = options?.limit
     const lowerQuery = query.toLowerCase()
-    const listed = await this.list(undefined, { limit: Number.MAX_SAFE_INTEGER })
+    const listed = await this.list(undefined)
     const results: SpecSearchResult[] = []
 
     for (const entry of listed.items) {

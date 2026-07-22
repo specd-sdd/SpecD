@@ -9,26 +9,24 @@ Shelved work is invisible to the active change list, so users need a dedicated v
 ### Requirement: Command signature
 
 ```
-specd drafts list [--format text|json|toon] [--limit <n>] [--page <p>] [--after-key <iso>] [--after-id <name>] [--description] [--reason]
+specd drafts list [--format text|json|toon] [--limit <n|all>] [--page <p>] [--after-key <iso>] [--after-id <name>] [--description] [--reason]
 ```
 
 Alias:
 
 ```
-specd draft list [--format text|json|toon] [--limit <n>] [--page <p>] [--after-key <iso>] [--after-id <name>] [--description] [--reason]
+specd draft list [--format text|json|toon] [--limit <n|all>] [--page <p>] [--after-key <iso>] [--after-id <name>] [--description] [--reason]
 ```
 
 - `--format text|json|toon` — optional; output encoding, defaults to `text`
-- `--limit <n>` — optional; maximum number of entries to return; defaults to `100`
-- `--page <p>` — optional; 1-based page number (uses `--limit`, defaulting to `100` when omitted)
+- `--limit <n|all>` — optional; maximum number of entries to return. When omitted, the CLI host defaults to `100`. When set to `all`, the CLI MUST NOT pass `limit` to the use case.
+- `--page <p>` — optional; 1-based page number; MUST be paired with a numeric `--limit` (not `all`)
 - `--after-key <iso>` — optional; exclusive keyset cursor — ISO-8601 `draftedAt` of the last seen row
 - `--after-id <name>` — optional; tiebreak change `name` when `--after-key` collides; MUST accompany `--after-key`
-- `--description` — optional; include `description` (`includeDescription`)
-- `--reason` — optional; include draft `reason` (`includeReason`)
+- `--description` — optional; include description on each entry
+- `--reason` — optional; include draft reason on each entry
 
-`--page` is mutually exclusive with `--after-key` / `--after-id`.
-
-No positional arguments.
+`--page` is mutually exclusive with `--after-key` / `--after-id`. `--page` with `--limit all` MUST be rejected. `--after-key` with `--limit all` is allowed.
 
 ### Requirement: Uses ListDrafts read model
 
@@ -40,9 +38,12 @@ The command MUST NOT assume entries are mutable `Change` instances or full draft
 
 ### Requirement: List options forwarding
 
-The command MUST map CLI flags to list options:
+The command MUST map CLI flags to list options as follows:
 
-- `--limit`, `--page`, `--after-key`, `--after-id` → `limit`, `page`, and `after: { key, id? }`
+- When `--limit` is omitted → pass `limit: 100` (CLI host default)
+- When `--limit` is a positive integer → pass that `limit`
+- When `--limit all` → omit `limit` from the use-case input
+- `--page`, `--after-key`, `--after-id` → `page` and `after: { key, id? }` when provided
 - `--description` → `includeDescription: true`
 - `--reason` → `includeReason: true`
 
@@ -56,11 +57,13 @@ The output has an inverse-video column header row. Base columns are always `NAME
 
 When `--description` is set and an entry includes a description, a dim indented description line is printed below the main row (same convention as active change list).
 
-When `meta.count < meta.total`, the command MUST print a trailing hint line:
+When a numeric `--limit` is in effect (explicit or host default) and `meta.count < meta.total`, the command MUST print a trailing hint line:
 
 ```
 showing <count> of <total> (use --limit/--page)
 ```
+
+When `--limit all` was used, the command MUST NOT print a truncation hint.
 
 ### Requirement: Output format — JSON
 
@@ -99,7 +102,7 @@ When `--format toon` is passed, the command writes the same `{ items, meta }` da
 
 ### Requirement: Empty drafts
 
-If there are no changes in `drafts/`, the command prints `no drafts` to stdout in text mode, or `{"items":[],"meta":{"total":0,"count":0,"limit":100}}` in JSON/toon mode, and exits with code 0.
+If there are no changes in `drafts/`, the command prints `no drafts` to stdout in text mode, or `{"items":[],"meta":{"total":0,"count":0,"limit":100}}` in JSON/toon mode when the host default limit applies, or `{"items":[],"meta":{"total":0,"count":0,"limit":0}}` when `--limit all` was used. The process exits with code 0.
 
 ### Requirement: Error cases
 

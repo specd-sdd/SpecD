@@ -1,0 +1,44 @@
+- op: modified
+  description: 'Align list() with host-controlled limits from repository-port'
+  selector:
+    type: section
+    matches: 'Requirement: list returns spec metadata with optional prefix filter'
+  content: |
+    `list(prefix?, options?)` MUST return `ListResult<SpecListEntry>` for specs in this workspace.
+
+    When a `SpecPath` prefix is provided, only specs whose capability path starts with that prefix MUST be included (e.g. prefix `auth` returns `auth/login`, `auth/oauth`, etc.).
+
+    `SpecListOptions` extends `ListOptions` with:
+
+    - `includeSummary?: boolean` — when `true`, projected entries MAY include `summary`; when `false` or omitted, `summary` MUST NOT appear
+    - `includeMetadataStatus?: boolean` — when `true`, projected entries MAY include `metadataStatus`; when `false` or omitted, `metadataStatus` MUST NOT appear
+
+    Sort order MUST be canonical: capability path ascending (lexicographic).
+
+    Pagination semantics MUST follow [`core:repository-port`](../repository-port/spec.md): no default `limit`; when `limit` is omitted the full matching set is returned and `meta.limit` equals `meta.total`.
+
+    `list()` MUST NOT return lightweight `Spec` metadata alone. Each item MUST be a port-level `SpecListEntry` with resolved `title` and optional projected fields.
+
+    `meta.total` and `count()` MUST read from the same index source.
+- op: modified
+  description: 'Update Constraints — remove default limit 100 from list bullet'
+  selector:
+    type: section
+    matches: 'Constraints'
+  content: |
+    - Each instance is bound to a single workspace; workspace is immutable after construction
+    - `get` returns lightweight `Spec` metadata — artifact content is never loaded by `get`
+    - `list` returns `ListResult<SpecListEntry>` rows with host-controlled pagination (no default `limit`); artifact content is never loaded by `list`
+    - `search` loads artifact content as needed to perform matching — it is more expensive than `list`
+    - `save` creates the spec directory if it does not already exist
+    - `ArtifactConflictError` is the sole error type for concurrent modification detection on `save`, `saveMetadata`, and semantic `update` operations
+    - `resolveFromPath` with a relative path and no `from` parameter is invalid and the implementation MUST handle this as an error or return `null`
+    - `originalHash` on loaded artifacts MUST use `sha256` of the file content as read from disk
+    - `metadata` and `saveMetadata` operate on a storage location determined by the adapter — callers MUST NOT assume metadata lives alongside spec content
+    - `metadata` returns parsed content; `artifact` returns raw content — they are not interchangeable
+    - `save`, `saveMetadata`, and semantic `update` operations MUST throw `ReadOnlyWorkspaceError` before any I/O when ownership is `readOnly`
+    - Read operations (`get`, `list`, `count`, `artifact`, `metadata`, `resolveFromPath`, `search`, `specHash`, and semantic `read` operations) are not affected by ownership — readOnly workspaces can always be read
+    - Use cases MUST interact with specs through semantic repository operations only.
+    - Sidecar files (like `spec-lock.json`) are an implementation detail of the repository adapter and MUST NOT be accessed directly by application logic.
+    - The `specHash()` MUST be stable and deterministic across multiple calls for the same spec state.
+    - `specsPath` is a repository capability for filesystem-backed adapters only; consumers MUST NOT assume it exists for every `SpecRepository`

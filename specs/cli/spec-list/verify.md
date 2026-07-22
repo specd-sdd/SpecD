@@ -14,16 +14,31 @@
 - **WHEN** `specd spec list --format json` is run
 - **THEN** it behaves as an alias of `specd specs list --format json`
 
-#### Scenario: Default limit is 100 per workspace query
+#### Scenario: Omitted limit returns full workspace catalog
 
 - **GIVEN** workspace `default` contains more than 100 specs
 - **WHEN** `specd spec list --workspace default --format json` is run without `--limit`
-- **THEN** `workspaces[0].meta.limit` is 100
+- **THEN** `workspaces[0].meta.limit` equals `workspaces[0].meta.total`
+- **AND** `workspaces[0].specs` contains every spec in that workspace
+
+#### Scenario: --limit all omits limit from ListSpecs
+
+- **WHEN** `specd spec list --limit all --format json` is run
+- **THEN** `ListSpecs.execute` is called without a `limit` option
+
+#### Scenario: --page requires numeric --limit
+
+- **WHEN** `specd spec list --page 2` is run without a numeric `--limit`
+- **THEN** a typed validation error is thrown (e.g. `CliValidationError`)
+- **AND** the machine-readable code is `CLI_VALIDATION_ERROR`
+- **AND** `ListSpecs.execute` is not invoked
 
 #### Scenario: --page and --after-key are mutually exclusive
 
 - **WHEN** `specd spec list --page 2 --after-key default:auth/login` is run
-- **THEN** the command exits with a CLI usage error before invoking the use case
+- **THEN** a typed validation error is thrown (e.g. `CliValidationError`)
+- **AND** the machine-readable code is `CLI_VALIDATION_ERROR`
+- **AND** `ListSpecs.execute` is not invoked
 
 ### Requirement: Workspace filtering
 
@@ -205,9 +220,15 @@
 
 #### Scenario: Truncation hint per workspace group when partial
 
-- **GIVEN** workspace `default` has 125 specs and default pagination
-- **WHEN** `specd spec list --workspace default` is run
+- **GIVEN** workspace `default` has 125 specs
+- **WHEN** `specd spec list --workspace default --limit 100` is run
 - **THEN** stdout contains `showing 100 of 125 (use --limit/--page)` after the `default` group table
+
+#### Scenario: No truncation hint when limit omitted
+
+- **GIVEN** workspace `default` has 125 specs
+- **WHEN** `specd spec list --workspace default` is run without `--limit`
+- **THEN** stdout does not contain `showing`
 
 #### Scenario: CLI preserves repository order within workspace
 

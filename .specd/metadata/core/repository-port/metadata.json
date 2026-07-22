@@ -39,7 +39,7 @@
     {
       "requirement": "Shared list pagination types",
       "rules": [
-        "`Repository` and listable repository ports MUST use these shared types for paginated listing:\n\n```typescript\ninterface ListCursor {\n  /** Sort-key value in canonical order (ISO timestamp for time-sorted buckets; capability path for specs). */\n  key: string\n  /** Tiebreak id when keys collide (change `name` for change/archive buckets; omit for specs). */\n  id?: string\n}\n\ninterface ListOptions {\n  limit?: number\n  page?: number\n  /** Exclusive keyset cursor: continue after this position in canonical sort order. Mutually exclusive with `page`. */\n  after?: ListCursor\n}\n\ninterface ListMeta {\n  total: number\n  count: number\n  limit: number\n  page?: number\n  after?: ListCursor\n}\n\ninterface ListResult<T> {\n  items: T[]\n  meta: ListMeta\n}\n```\n\n- `limit` defaults to **100** when omitted on every listable port.\n- `page` is 1-based and MUST be mutually exclusive with `after`.\n- `after` is an exclusive keyset cursor: return the next `limit` items strictly after `{ key, id? }` in the bucket's canonical sort order.\n- Pagination applies over canonical sort order owned by the index helper; use cases and CLI MUST NOT re-sort list results.\n\n`ListMeta.after` (normative): when a `list()` call returns a page and more items remain beyond it in canonical order, `meta.after` MUST be the cursor `{ key, id? }` of the **last item actually returned** in that page — computed via the bucket's cursor extraction, never echoed from the request's `options.after`. When the returned page reaches the end of the bucket (no more items remain), `meta.after` MUST be omitted entirely. Callers page forward by feeding the previous response's `meta.after` into the next request's `options.after`; an implementation that echoes the input cursor back as `meta.after` violates this requirement because it yields the same page indefinitely.\n\nKeyset cursor semantics by bucket:\n\n| Bucket | `after.key` | `after.id` |\n| --- | --- | --- |\n| Active changes | `createdAt` ISO-8601 | change `name` |\n| Drafts | `draftedAt` ISO-8601 | change `name` |\n| Discarded | `discardedAt` ISO-8601 | change `name` |\n| Archive | `archivedAt` ISO-8601 | change `name` |\n| Specs | capability path | omit |"
+        "`Repository` and listable repository ports MUST use these shared types for paginated listing:\n\n```typescript\ninterface ListCursor {\n  /** Sort-key value in canonical order (ISO timestamp for time-sorted buckets; capability path for specs). */\n  key: string\n  /** Tiebreak id when keys collide (change `name` for change/archive buckets; omit for specs). */\n  id?: string\n}\n\ninterface ListOptions {\n  limit?: number\n  page?: number\n  /** Exclusive keyset cursor: continue after this position in canonical sort order. Mutually exclusive with `page`. */\n  after?: ListCursor\n}\n\ninterface ListMeta {\n  total: number\n  count: number\n  limit: number\n  page?: number\n  after?: ListCursor\n}\n\ninterface ListResult<T> {\n  items: T[]\n  meta: ListMeta\n}\n```\n\n- When `limit` is **omitted**, the listable port MUST return the **full** filtered result set in canonical order (no default page size). Hosts (CLI, API, agents) that want a capped page MUST pass an explicit `limit`.\n- When `limit` is omitted and the result is unpaginated, `meta.limit` MUST equal `meta.total` and `meta.count` MUST equal `meta.total`.\n- When `limit` is provided, pagination applies: return at most `limit` items from the selected window.\n- `page` is 1-based and MUST be mutually exclusive with `after`. Providing `page` without `limit` MUST be rejected as invalid.\n- `after` is an exclusive keyset cursor. When `limit` is also provided, return the next `limit` items strictly after `{ key, id? }` in the bucket's canonical sort order. When `after` is provided **without** `limit`, return **all** remaining items strictly after the cursor (no final slice by page size).\n- Pagination applies over canonical sort order owned by the index helper; use cases and CLI MUST NOT re-sort list results.\n\n`ListMeta.after` (normative): when a `list()` call returns a page and more items remain beyond it in canonical order, `meta.after` MUST be the cursor `{ key, id? }` of the **last item actually returned** in that page — computed via the bucket's cursor extraction, never echoed from the request's `options.after`. When the returned page reaches the end of the bucket (no more items remain), `meta.after` MUST be omitted entirely. Callers page forward by feeding the previous response's `meta.after` into the next request's `options.after`; an implementation that echoes the input cursor back as `meta.after` violates this requirement because it yields the same page indefinitely.\n\nKeyset cursor semantics by bucket:\n\n| Bucket         | `after.key`            | `after.id`    |\n| -------------- | ---------------------- | ------------- |\n| Active changes | `createdAt` ISO-8601   | change `name` |\n| Drafts         | `draftedAt` ISO-8601   | change `name` |\n| Discarded      | `discardedAt` ISO-8601 | change `name` |\n| Archive        | `archivedAt` ISO-8601  | change `name` |\n| Specs          | capability path        | omit          |"
       ]
     },
     {
@@ -112,21 +112,43 @@
     },
     {
       "requirement": "Shared list pagination types",
-      "name": "Default limit is 100",
+      "name": "Omitted limit returns full set",
+      "given": ["a listable bucket with more than 100 entries"],
       "when": ["a listable repository list() method is called without limit"],
-      "then": ["meta.limit is 100", "AND at most 100 items are returned unless fewer exist"]
+      "then": [
+        "all matching entries are returned",
+        "AND meta.limit equals meta.total",
+        "AND meta.count equals meta.total"
+      ]
+    },
+    {
+      "requirement": "Shared list pagination types",
+      "name": "Explicit limit caps the page",
+      "given": ["a listable bucket with more than 10 entries"],
+      "when": ["list({ limit: 10 }) is called"],
+      "then": ["at most 10 items are returned", "AND meta.limit is 10"]
+    },
+    {
+      "requirement": "Shared list pagination types",
+      "name": "Page without limit is rejected",
+      "when": ["list options include page without limit"],
+      "then": [
+        "a typed validation error is thrown (e.g. InvalidInputError)",
+        "AND the machine-readable code is INVALID_INPUT"
+      ]
     },
     {
       "requirement": "Shared list pagination types",
       "name": "Page and after are mutually exclusive",
       "when": ["list options include both page and after"],
       "then": [
-        "the repository rejects the request or normalizes to one pagination mode without applying both"
+        "a typed validation error is thrown (e.g. InvalidInputError)",
+        "AND the machine-readable code is INVALID_INPUT"
       ]
     },
     {
       "requirement": "Shared list pagination types",
-      "name": "After cursor returns the next page in canonical order",
+      "name": "After cursor with limit returns the next page in canonical order",
       "given": ["a bucket with at least three entries in canonical sort order"],
       "when": [
         "list({ limit: 1, after: { key: <first-key>, id: <first-id> } }) is called for a change bucket"
@@ -134,6 +156,17 @@
       "then": [
         "the first returned item is strictly after that cursor position",
         "AND meta.after reflects the last returned position when more items remain"
+      ]
+    },
+    {
+      "requirement": "Shared list pagination types",
+      "name": "After cursor without limit returns remainder",
+      "given": ["a bucket with at least three entries in canonical sort order"],
+      "when": ["list({ after: { key: <first-key>, id: <first-id> } }) is called without limit"],
+      "then": [
+        "all remaining items strictly after the cursor are returned",
+        "AND meta.limit equals meta.count",
+        "AND meta.after is omitted"
       ]
     },
     {
@@ -179,11 +212,6 @@
       {
         "specId": "core:repository-port",
         "file": "core:src/application/ports/repository.ts",
-        "symbol": "ListCursor"
-      },
-      {
-        "specId": "core:repository-port",
-        "file": "core:src/application/ports/repository.ts",
         "symbol": "ListOptions"
       },
       {
@@ -193,24 +221,14 @@
       },
       {
         "specId": "core:repository-port",
-        "file": "core:src/application/ports/repository.ts",
-        "symbol": "ListResult"
-      },
-      {
-        "specId": "core:repository-port",
-        "file": "core:src/application/ports/repository.ts",
-        "symbol": "Repository"
-      },
-      {
-        "specId": "core:repository-port",
         "file": "core:src/infrastructure/fs/list-pagination.ts",
         "symbol": "paginateList"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:918726b65029b489afacbd52dfb65430d4da7f8e729c4f6763d4515121ef6bee",
-    "verify.md": "sha256:937a1cbc577c4bf8e5618dbe1d6a12a58eae9e5baf58f59be080f7fe25cdd366"
+    "spec.md": "sha256:67136846061ba0b0517b1527d6b4634b4fdf69dfb23383052e26e8f000624ed6",
+    "verify.md": "sha256:3e4d91bd1ea9f300b64582c79dca3638e0e2fa791778e4fd2a0826ab5aa8fd87"
   },
   "generatedBy": "core"
 }

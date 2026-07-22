@@ -140,7 +140,7 @@ export class ValidateSpecs {
       if (specRepo === undefined) {
         throw new WorkspaceNotFoundError(input.workspace)
       }
-      const listed = await specRepo.list(undefined, { limit: Number.MAX_SAFE_INTEGER })
+      const listed = await specRepo.list(undefined)
       for (const entry of listed.items) {
         const spec = await specRepo.get(SpecPath.parse(entry.path))
         if (spec === null) continue
@@ -157,7 +157,7 @@ export class ValidateSpecs {
       }
     } else {
       for (const [, specRepo] of this._specs) {
-        const listed = await specRepo.list(undefined, { limit: Number.MAX_SAFE_INTEGER })
+        const listed = await specRepo.list(undefined)
         for (const row of listed.items) {
           const spec = await specRepo.get(SpecPath.parse(row.path))
           if (spec === null) continue

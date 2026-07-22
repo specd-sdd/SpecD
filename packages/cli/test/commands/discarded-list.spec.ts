@@ -76,7 +76,7 @@ describe('Output format — text', () => {
     registerDiscardedList(program.command('discarded'))
     await program.parseAsync(['node', 'specd', 'discarded', 'list'])
 
-    expect(kernel.changes.listDiscarded.execute).toHaveBeenCalledWith({})
+    expect(kernel.changes.listDiscarded.execute).toHaveBeenCalledWith({ limit: DEFAULT_LIST_LIMIT })
   })
 })
 
@@ -142,6 +142,26 @@ describe('Output format — JSON', () => {
 })
 
 describe('Pagination', () => {
+  it('forwards --page with host default limit when --limit is omitted', async () => {
+    const { kernel } = setup()
+    kernel.changes.listDiscarded.execute.mockResolvedValue(makeListResult([]))
+
+    const program = makeProgram()
+    registerDiscardedList(program.command('discarded'))
+    await program.parseAsync([
+      'node',
+      'specd',
+      'discarded',
+      'list',
+      '--page',
+      '2',
+      '--format',
+      'json',
+    ])
+
+    expect(kernel.changes.listDiscarded.execute).toHaveBeenCalledWith({ limit: 100, page: 2 })
+  })
+
   it('forwards --after-key and --after-id', async () => {
     const { kernel } = setup()
     kernel.changes.listDiscarded.execute.mockResolvedValue(makeListResult([]))
@@ -161,7 +181,42 @@ describe('Pagination', () => {
 
     expect(kernel.changes.listDiscarded.execute).toHaveBeenCalledWith({
       after: { key: '2024-01-10', id: 'bad-idea' },
+      limit: DEFAULT_LIST_LIMIT,
     })
+  })
+
+  it('omits limit when --limit all is passed', async () => {
+    const { kernel } = setup()
+    kernel.changes.listDiscarded.execute.mockResolvedValue(makeListResult([]))
+
+    const program = makeProgram()
+    registerDiscardedList(program.command('discarded'))
+    await program.parseAsync([
+      'node',
+      'specd',
+      'discarded',
+      'list',
+      '--limit',
+      'all',
+      '--format',
+      'json',
+    ])
+
+    expect(kernel.changes.listDiscarded.execute).toHaveBeenCalledWith({})
+  })
+
+  it('rejects --page with --limit all', async () => {
+    const { kernel, stderr } = setup()
+
+    const program = makeProgram()
+    registerDiscardedList(program.command('discarded'))
+    await program
+      .parseAsync(['node', 'specd', 'discarded', 'list', '--page', '2', '--limit', 'all'])
+      .catch(() => {})
+
+    expect(process.exit).toHaveBeenCalledWith(1)
+    expect(stderr()).toMatch(/--page requires a numeric --limit/)
+    expect(kernel.changes.listDiscarded.execute).not.toHaveBeenCalled()
   })
 
   it('prints truncation hint when partial page', async () => {

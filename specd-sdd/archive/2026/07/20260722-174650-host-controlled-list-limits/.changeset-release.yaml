@@ -1,0 +1,11 @@
+releases:
+  core:core/repository-port: minor
+  core:core/list-specs: patch
+  core:core/spec-repository-port: patch
+  core:core/change-repository-port: patch
+  core:core/archive-repository-port: patch
+  cli:cli/spec-list: patch
+  cli:cli/change-list: patch
+  cli:cli/drafts-list: patch
+  cli:cli/archive-list: patch
+  cli:cli/discarded-list: patch

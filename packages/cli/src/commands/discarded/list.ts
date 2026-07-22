@@ -116,7 +116,7 @@ export function registerDiscardedList(parent: Command): void {
     .option('--reason', 'include discard reason on each entry')
     .option('--superseded-by', 'include superseded-by target on each entry')
 
-  addListPaginationOptions(cmd)
+  addListPaginationOptions(cmd, { defaultLimit: 100 })
 
   cmd
     .addHelpText(
@@ -136,14 +136,14 @@ JSON/TOON output schema:
         description?: boolean
         reason?: boolean
         supersededBy?: boolean
-        limit?: number
+        limit?: string
         page?: number
         afterKey?: string
         afterId?: string
       }) => {
         try {
           const { kernel } = await resolveCliContext({ configPath: opts.config })
-          const pagination = parseListPaginationFlags(opts)
+          const pagination = parseListPaginationFlags(opts, { defaultLimit: 100 })
           const result = await kernel.changes.listDiscarded.execute({
             ...pagination,
             ...(opts.description === true ? { includeDescription: true } : {}),

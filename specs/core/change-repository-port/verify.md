@@ -212,7 +212,7 @@
 #### Scenario: No active changes
 
 - **WHEN** `list()` is called and no active changes exist
-- **THEN** `{ items: [], meta: { total: 0, count: 0, limit: 100 } }` is returned
+- **THEN** `{ items: [], meta: { total: 0, count: 0, limit: 0 } }` is returned
 
 #### Scenario: List entries exclude full Change detail
 

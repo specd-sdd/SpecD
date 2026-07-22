@@ -1,0 +1,54 @@
+- op: modified
+  description: 'Add scenario that ListSpecs does not invent a default limit'
+  selector:
+    type: section
+    matches: 'Requirement: Enumerate specs across all workspaces'
+  content: |
+    #### Scenario: Multiple workspaces returned in declaration order
+
+    - **GIVEN** two workspaces `alpha` and `beta` configured in that order, each containing specs
+    - **WHEN** `execute()` is called with no options
+    - **THEN** all entries from `alpha` appear before all entries from `beta`
+    - **AND** each workspace's items remain in repository canonical path order
+
+    #### Scenario: Empty workspace included without error
+
+    - **GIVEN** a workspace with no specs
+    - **WHEN** `execute()` is called
+    - **THEN** the result array contains no entries for that workspace and no error is thrown
+
+    #### Scenario: Workspace filter limits results
+
+    - **GIVEN** specs exist in workspaces `alpha` and `beta`
+    - **WHEN** `execute({ workspaces: ["alpha"] })` is called
+    - **THEN** only entries from workspace `alpha` are returned
+
+    #### Scenario: ListSpecs forwards include flags to each repository
+
+    - **WHEN** `execute({ includeSummary: true, includeMetadataStatus: true, limit: 50 })` is called
+    - **THEN** each workspace `SpecRepository.list()` receives the same forwarded options
+    - **AND** the use case does not re-sort or re-paginate per-workspace results
+
+    #### Scenario: Omitted limit is forwarded without inventing a default
+
+    - **GIVEN** a workspace repository with more than 100 specs
+    - **WHEN** `execute()` is called without `limit`
+    - **THEN** each workspace `SpecRepository.list()` is called without a `limit` option
+    - **AND** the merged per-workspace results include the full repository catalogs
+
+- op: modified
+  description: 'Align resolveListSpecsDeps verify with spec — no hasher/yaml'
+  selector:
+    type: section
+    matches: 'Requirement: Config-based factory delegates through resolveListSpecsDeps'
+  content: |
+    ### Requirement: Config-based factory delegates through resolveListSpecsDeps
+
+    #### Scenario: createListSpecs config form derives ListSpecsDeps through resolveListSpecsDeps
+
+    - **WHEN** `createListSpecs(config, options?)` is invoked
+    - **THEN** it creates a composition resolver for that composition session
+    - **AND** it derives `ListSpecsDeps` through `resolveListSpecsDeps(resolver)`
+    - **AND** `resolveListSpecsDeps(resolver)` resolves `listWorkspaces: ListWorkspaces`
+    - **AND** it MUST NOT resolve `hasher: ContentHasher` or `yaml: YamlSerializer`
+    - **AND** the factory delegates to canonical `createListSpecs(deps)`

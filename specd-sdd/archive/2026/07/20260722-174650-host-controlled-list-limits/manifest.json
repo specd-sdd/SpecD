@@ -1,0 +1,1185 @@
+{
+  "name": "host-controlled-list-limits",
+  "createdAt": "2026-07-22T17:46:50.026Z",
+  "description": "Remove default list limit from repository ports; CLI defaults limit to 100 for change buckets only, spec list remains unlimited for agents.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "core:repository-port",
+    "core:list-specs",
+    "core:spec-repository-port",
+    "core:change-repository-port",
+    "core:archive-repository-port",
+    "cli:spec-list",
+    "cli:change-list",
+    "cli:drafts-list",
+    "cli:archive-list",
+    "cli:discarded-list"
+  ],
+  "specDependsOn": {
+    "core:repository-port": ["default:_global/architecture"],
+    "core:list-specs": [
+      "core:spec-metadata",
+      "core:storage",
+      "core:workspace",
+      "core:list-workspaces",
+      "core:spec-repository-port",
+      "core:composition-resolver"
+    ],
+    "core:spec-repository-port": [
+      "core:repository-port",
+      "default:_global/architecture",
+      "core:change",
+      "core:storage",
+      "core:workspace",
+      "core:spec-id-format",
+      "core:spec-metadata",
+      "core:content-extraction",
+      "core:search-specs",
+      "default:_global/logging",
+      "core:spec-lock"
+    ],
+    "core:change-repository-port": [
+      "core:repository-port",
+      "default:_global/architecture",
+      "core:change",
+      "core:read-only-change-view",
+      "core:drafted-change-view",
+      "core:discarded-change-view",
+      "core:drafted-change-read-only-error",
+      "core:storage",
+      "core:change-manifest",
+      "default:_global/logging",
+      "core:change-list-entry"
+    ],
+    "core:archive-repository-port": [
+      "core:repository-port",
+      "default:_global/architecture",
+      "core:change",
+      "core:storage",
+      "core:archive-change",
+      "default:_global/logging",
+      "core:read-only-change-view",
+      "core:archived-change-index-entry"
+    ],
+    "cli:spec-list": [
+      "cli:entrypoint",
+      "core:list-specs",
+      "core:spec-repository-port",
+      "cli:command-resource-naming",
+      "cli:spec-search",
+      "core:list-workspaces"
+    ],
+    "cli:change-list": [
+      "cli:entrypoint",
+      "core:list-changes",
+      "core:change-list-entry",
+      "cli:command-resource-naming"
+    ],
+    "cli:drafts-list": [
+      "cli:entrypoint",
+      "core:list-drafts",
+      "core:change-list-entry",
+      "cli:command-resource-naming"
+    ],
+    "cli:archive-list": [
+      "cli:entrypoint",
+      "core:list-archived",
+      "core:archived-change-index-entry"
+    ],
+    "cli:discarded-list": [
+      "cli:entrypoint",
+      "core:list-discarded",
+      "core:change-list-entry",
+      "cli:command-resource-naming"
+    ]
+  },
+  "invalidationPolicy": "downstream",
+  "trackedImplementationFiles": [
+    {
+      "file": ".specd/metadata/core/change/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/repository-port/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/default/_global/docs/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": "EXPLORATION_EVENT_BUS.md",
+      "state": "ignored"
+    },
+    {
+      "file": "EXPLORATION_SPECD_BRANCH_MERGE_SKILL.md",
+      "state": "ignored"
+    },
+    {
+      "file": "EXPLORATION_STORAGE_ABSTRACTION.md",
+      "state": "ignored"
+    },
+    {
+      "file": "assets/specd-changes-hooks.svg",
+      "state": "ignored"
+    },
+    {
+      "file": "assets/specd-changes-status.svg",
+      "state": "ignored"
+    },
+    {
+      "file": "assets/specd-changes-validate.svg",
+      "state": "ignored"
+    },
+    {
+      "file": "assets/specd-specs-lists.svg",
+      "state": "ignored"
+    },
+    {
+      "file": "assets/specd.svg",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-changes-hooks.svg",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-changes-status.svg",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-changes-validate.svg",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-specs-lists.svg",
+      "state": "ignored"
+    },
+    {
+      "file": "specd.svg",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/ports/repository.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/infrastructure/fs/list-pagination.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/list-specs.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/infrastructure/fs/spec-repository.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/spec/list.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/change/list.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/drafts/list.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/discarded/list.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/archive/list.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/helpers/list-pagination.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/cli/cli-reference.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/core/use-cases.md",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/archive-list.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/change-list.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/discarded-list.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/drafts-list.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/spec-list.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/use-cases/index-code-graph.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/index-project-graph-integration.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/workspace-indexing.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/composition/code-graph-provider.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/_shared/spec-pattern-matching.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/archive-change.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/detect-overlap.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/validate-specs.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/list-specs.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/infrastructure/fs/archive-repository.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/infrastructure/fs/change-repository.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/infrastructure/fs/list-pagination.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/infrastructure/fs/change-repository.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/infrastructure/fs/archive-repository.ts",
+      "state": "resolved"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "core:repository-port",
+      "file": "packages/core/src/application/ports/repository.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["ListOptions", "ListMeta"]
+    },
+    {
+      "specId": "core:repository-port",
+      "file": "packages/core/src/infrastructure/fs/list-pagination.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["paginateList"]
+    },
+    {
+      "specId": "core:list-specs",
+      "file": "packages/core/src/application/use-cases/list-specs.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["ListSpecs"]
+    },
+    {
+      "specId": "core:spec-repository-port",
+      "file": "packages/core/src/infrastructure/fs/spec-repository.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["FsSpecRepository"]
+    },
+    {
+      "specId": "cli:spec-list",
+      "file": "packages/cli/src/commands/spec/list.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:change-list",
+      "file": "packages/cli/src/commands/change/list.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:drafts-list",
+      "file": "packages/cli/src/commands/drafts/list.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:discarded-list",
+      "file": "packages/cli/src/commands/discarded/list.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:archive-list",
+      "file": "packages/cli/src/commands/archive/list.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:change-list",
+      "file": "packages/cli/src/helpers/list-pagination.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["parseListPaginationFlags", "parseLimitFlag", "addListPaginationOptions"]
+    },
+    {
+      "specId": "core:change-repository-port",
+      "file": "packages/core/src/infrastructure/fs/change-repository.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["FsChangeRepository"]
+    },
+    {
+      "specId": "core:archive-repository-port",
+      "file": "packages/core/src/infrastructure/fs/archive-repository.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["FsArchiveRepository"]
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:24ec037b6a755dd38f1f8575847b2fa07c74a453b02215cce299353ed378b559"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:repository-port",
+          "filename": "deltas/core/repository-port/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:51957b4efaacadd6c81976fcbb582314dcf343971d770b9d579518a60ad3d4b0"
+        },
+        {
+          "key": "core:list-specs",
+          "filename": "deltas/core/list-specs/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:c76083139fa5ba01b33cc30a0a8dd1db7e27100f1337ced48f4625843adf0c28"
+        },
+        {
+          "key": "core:spec-repository-port",
+          "filename": "deltas/core/spec-repository-port/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b41245770788e3d45ad8446a82a05dcb486e938402abaa9a7def42b5daafacf2"
+        },
+        {
+          "key": "core:change-repository-port",
+          "filename": "deltas/core/change-repository-port/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:504509a6c72c8e2996cf4c4e8fc41d55ddf1af637a87b82c35a369b742f42cc7"
+        },
+        {
+          "key": "core:archive-repository-port",
+          "filename": "deltas/core/archive-repository-port/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:fee4e7b7b946ed61109fff40c1165d1ac8d8805cbae5d8ca831dd299d99199c1"
+        },
+        {
+          "key": "cli:spec-list",
+          "filename": "deltas/cli/spec-list/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b4a8034e22b03aa82898eba7c133b022d2c9afb6658494dcb2b1f96d217a3a63"
+        },
+        {
+          "key": "cli:change-list",
+          "filename": "deltas/cli/change-list/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:4692deb65a5092535ddc529f2a778caffbe5940a96af18fd37f55c3485b0b30e"
+        },
+        {
+          "key": "cli:drafts-list",
+          "filename": "deltas/cli/drafts-list/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:982eb35b32a304249ab9851a6afddfc2d61925c50741645d261cf58069c2dab6"
+        },
+        {
+          "key": "cli:archive-list",
+          "filename": "deltas/cli/archive-list/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:0a08587da5ad6425984646c77f196fd395e756b9d7db48099a98be653e91caff"
+        },
+        {
+          "key": "cli:discarded-list",
+          "filename": "deltas/cli/discarded-list/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:1317b74b64557de25a5b2590c689e00666000955bf01e73aba51f6a5d3425b58"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:repository-port",
+          "filename": "deltas/core/repository-port/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:9d05a09a88fcdfd8b66df8e0725ecf685dee3db4f19451a19d02da9583b610a3"
+        },
+        {
+          "key": "core:list-specs",
+          "filename": "deltas/core/list-specs/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:6f0ed7acf720a1b3451e26536c19f5781ec4633a74f7005e18c2e9eb5f7b39c4"
+        },
+        {
+          "key": "core:spec-repository-port",
+          "filename": "deltas/core/spec-repository-port/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:18419484f2d1653637345b33e3deedd9215f35a94cc414fed767438fb9a6549a"
+        },
+        {
+          "key": "core:change-repository-port",
+          "filename": "deltas/core/change-repository-port/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:db3ade71f72c75da08ee9be9e86fd0480a21a69e1d87e6081181b094fa8e058d"
+        },
+        {
+          "key": "core:archive-repository-port",
+          "filename": "deltas/core/archive-repository-port/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:c95c41779ce3299dc36769716a34bc3678c9b07540b0f7174cefa5382450bf9f"
+        },
+        {
+          "key": "cli:spec-list",
+          "filename": "deltas/cli/spec-list/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:39998cfa284c7b2eb84c1fd96a7115d1a33418990b8511c3361c5b008bcc12a0"
+        },
+        {
+          "key": "cli:change-list",
+          "filename": "deltas/cli/change-list/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:8b91a158e1385c60cc404aef175cd0e037b519a2b6a13a3d1ca7a24c34575a78"
+        },
+        {
+          "key": "cli:drafts-list",
+          "filename": "deltas/cli/drafts-list/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:cdbe49f479e7f48092b2b8af66dbf9de709e902591bdea9258d0123140bbfe81"
+        },
+        {
+          "key": "cli:archive-list",
+          "filename": "deltas/cli/archive-list/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:2bb128ae9b6eed89770e8dfa80b9deb948d78731bb81ed5b3b8d53ba1f454d12"
+        },
+        {
+          "key": "cli:discarded-list",
+          "filename": "deltas/cli/discarded-list/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:870b2e0f6bab7f6ff643c1ce48f351c08fe67def6f49ddcf6cf62256dd0cdc37"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:9bcf6c67ffde32fe40403322d6ddec2d3b45d599afe9a35f8dd23fcae79d9264"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:734a00ee04489105fb6025e32d42e090c2b56e41ae92e9b4a99b1b2eab2acfd8"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-07-22T17:46:50.026Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": [
+        "core:repository-port",
+        "core:list-specs",
+        "core:spec-repository-port",
+        "core:change-repository-port",
+        "core:archive-repository-port",
+        "cli:spec-list",
+        "cli:change-list",
+        "cli:drafts-list",
+        "cli:archive-list",
+        "cli:discarded-list"
+      ],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-22T17:46:50.043Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "core:repository-port"
+        },
+        {
+          "type": "specs",
+          "key": "core:list-specs"
+        },
+        {
+          "type": "specs",
+          "key": "core:spec-repository-port"
+        },
+        {
+          "type": "specs",
+          "key": "core:change-repository-port"
+        },
+        {
+          "type": "specs",
+          "key": "core:archive-repository-port"
+        },
+        {
+          "type": "specs",
+          "key": "cli:spec-list"
+        },
+        {
+          "type": "specs",
+          "key": "cli:change-list"
+        },
+        {
+          "type": "specs",
+          "key": "cli:drafts-list"
+        },
+        {
+          "type": "specs",
+          "key": "cli:archive-list"
+        },
+        {
+          "type": "specs",
+          "key": "cli:discarded-list"
+        },
+        {
+          "type": "verify",
+          "key": "core:repository-port"
+        },
+        {
+          "type": "verify",
+          "key": "core:list-specs"
+        },
+        {
+          "type": "verify",
+          "key": "core:spec-repository-port"
+        },
+        {
+          "type": "verify",
+          "key": "core:change-repository-port"
+        },
+        {
+          "type": "verify",
+          "key": "core:archive-repository-port"
+        },
+        {
+          "type": "verify",
+          "key": "cli:spec-list"
+        },
+        {
+          "type": "verify",
+          "key": "cli:change-list"
+        },
+        {
+          "type": "verify",
+          "key": "cli:drafts-list"
+        },
+        {
+          "type": "verify",
+          "key": "cli:archive-list"
+        },
+        {
+          "type": "verify",
+          "key": "cli:discarded-list"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-22T17:58:06.215Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-22T18:01:43.016Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:spec-list]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["cli:spec-list"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:repository-port",
+            "core:list-specs",
+            "core:spec-repository-port",
+            "core:change-repository-port",
+            "core:archive-repository-port",
+            "cli:spec-list",
+            "cli:change-list",
+            "cli:drafts-list",
+            "cli:archive-list",
+            "cli:discarded-list"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-22T18:02:31.591Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:archive-list, core:archive-repository-port, core:change-repository-port, core:spec-repository-port]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "cli:archive-list",
+            "core:archive-repository-port",
+            "core:change-repository-port",
+            "core:spec-repository-port"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:repository-port",
+            "core:list-specs",
+            "core:spec-repository-port",
+            "core:change-repository-port",
+            "core:archive-repository-port",
+            "cli:spec-list",
+            "cli:change-list",
+            "cli:drafts-list",
+            "cli:archive-list",
+            "cli:discarded-list"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-22T18:04:50.091Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-22T18:12:27.214Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [cli:archive-list, cli:change-list, cli:discarded-list, cli:drafts-list, cli:spec-list, core:repository-port]; design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": [
+            "cli:archive-list",
+            "cli:change-list",
+            "cli:discarded-list",
+            "cli:drafts-list",
+            "cli:spec-list",
+            "core:repository-port"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-22T18:12:27.214Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-22T18:20:07.875Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-22T18:21:14.035Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-22T18:38:01.407Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:change-list]; verify [cli:archive-list, cli:change-list, cli:discarded-list, cli:drafts-list]; design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["cli:change-list"]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:archive-list", "cli:change-list", "cli:discarded-list", "cli:drafts-list"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-22T18:38:01.407Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-22T18:39:22.823Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-22T18:39:23.479Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-22T18:39:31.742Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-22T18:39:34.971Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-22T18:40:45.744Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-22T18:41:25.533Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:repository-port",
+            "core:list-specs",
+            "core:spec-repository-port",
+            "core:change-repository-port",
+            "core:archive-repository-port",
+            "cli:spec-list",
+            "cli:change-list",
+            "cli:drafts-list",
+            "cli:archive-list",
+            "cli:discarded-list"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:repository-port",
+            "core:list-specs",
+            "core:spec-repository-port",
+            "core:change-repository-port",
+            "core:archive-repository-port",
+            "cli:spec-list",
+            "cli:change-list",
+            "cli:drafts-list",
+            "cli:archive-list",
+            "cli:discarded-list"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-22T18:41:25.533Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-22T18:41:51.046Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-22T18:41:58.093Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-22T18:43:22.254Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-22T18:48:55.921Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:repository-port",
+            "core:list-specs",
+            "core:spec-repository-port",
+            "core:change-repository-port",
+            "core:archive-repository-port",
+            "cli:spec-list",
+            "cli:change-list",
+            "cli:drafts-list",
+            "cli:archive-list",
+            "cli:discarded-list"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:repository-port",
+            "core:list-specs",
+            "core:spec-repository-port",
+            "core:change-repository-port",
+            "core:archive-repository-port",
+            "cli:spec-list",
+            "cli:change-list",
+            "cli:drafts-list",
+            "cli:archive-list",
+            "cli:discarded-list"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-22T18:48:55.921Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-22T18:51:04.271Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-22T18:51:12.746Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-22T18:54:42.670Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-22T19:04:18.028Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-22T19:04:25.544Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-07-22T19:10:18.596Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'core:list-specs': extracted dependencies [core:spec-metadata, core:storage, core:workspace, core:list-workspaces, core:spec-repository-port, core:composition-resolver] do not match persisted dependencies [core:spec-metadata, core:storage, core:workspace, core:list-workspaces, core:spec-repository-port, core:composition-resolver, core:repository-port]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-22T19:10:28.079Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-07-22T19:10:28.383Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

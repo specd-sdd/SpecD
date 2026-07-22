@@ -1,0 +1,8 @@
+- op: modified
+  description: 'Empty workspace meta.limit equals total (0) when unpaginated'
+  selector:
+    type: section
+    matches: 'Scenario: Empty workspace'
+  content: |
+    - **WHEN** `list()` is called on an empty workspace
+    - **THEN** `{ items: [], meta: { total: 0, count: 0, limit: 0 } }` is returned

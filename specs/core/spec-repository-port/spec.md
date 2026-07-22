@@ -20,7 +20,7 @@ Each `SpecRepository` instance is bound to exactly one workspace. All operations
 
 ### Requirement: list returns spec metadata with optional prefix filter
 
-`list(prefix?, options?)` MUST return `ListResult<SpecListEntry>` for all specs in this workspace.
+`list(prefix?, options?)` MUST return `ListResult<SpecListEntry>` for specs in this workspace.
 
 When a `SpecPath` prefix is provided, only specs whose capability path starts with that prefix MUST be included (e.g. prefix `auth` returns `auth/login`, `auth/oauth`, etc.).
 
@@ -30,6 +30,8 @@ When a `SpecPath` prefix is provided, only specs whose capability path starts wi
 - `includeMetadataStatus?: boolean` — when `true`, projected entries MAY include `metadataStatus`; when `false` or omitted, `metadataStatus` MUST NOT appear
 
 Sort order MUST be canonical: capability path ascending (lexicographic).
+
+Pagination semantics MUST follow [`core:repository-port`](../repository-port/spec.md): no default `limit`; when `limit` is omitted the full matching set is returned and `meta.limit` equals `meta.total`.
 
 `list()` MUST NOT return lightweight `Spec` metadata alone. Each item MUST be a port-level `SpecListEntry` with resolved `title` and optional projected fields.
 
@@ -195,7 +197,7 @@ When `specsPath` is exposed:
 
 - Each instance is bound to a single workspace; workspace is immutable after construction
 - `get` returns lightweight `Spec` metadata — artifact content is never loaded by `get`
-- `list` returns paginated `SpecListEntry` rows with default `limit` **100**; artifact content is never loaded by `list`
+- `list` returns `ListResult<SpecListEntry>` rows with host-controlled pagination (no default `limit`); artifact content is never loaded by `list`
 - `search` loads artifact content as needed to perform matching — it is more expensive than `list`
 - `save` creates the spec directory if it does not already exist
 - `ArtifactConflictError` is the sole error type for concurrent modification detection on `save`, `saveMetadata`, and semantic `update` operations

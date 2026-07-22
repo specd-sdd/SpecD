@@ -11,6 +11,7 @@ import { parseCommaSeparatedValues } from '../../helpers/parse-comma-values.js'
 import {
   addListPaginationOptions,
   formatTruncationHint,
+  parseLimitFlag,
   parseListPaginationFlags,
 } from '../../helpers/list-pagination.js'
 import { output, parseFormat } from '../../formatter.js'
@@ -180,7 +181,7 @@ JSON/TOON output schema:
         workspace: string[]
         format: string
         config?: string
-        limit?: number
+        limit?: string
         page?: number
         afterKey?: string
       }) => {
@@ -189,6 +190,7 @@ JSON/TOON output schema:
           const includeSummary = opts.summary === true
           const includeMetadataStatus = opts.metadataStatus !== undefined
           const metadataStatusFilter = parseMetadataStatusFilter(opts.metadataStatus)
+          const parsedLimit = parseLimitFlag(opts.limit)
           const pagination = parseListPaginationFlags(opts, { allowAfterId: false })
 
           const result = await kernel.specs.list.execute({
@@ -248,7 +250,10 @@ JSON/TOON output schema:
                 widths,
               )
               const meta = workspaceMeta.get(name)
-              const hint = meta !== undefined ? formatTruncationHint(meta) : null
+              const hint =
+                parsedLimit.kind === 'number' && meta !== undefined
+                  ? formatTruncationHint(meta)
+                  : null
               return hint !== null ? `${block}\n${hint}` : block
             })
             output(groups.join('\n\n'), 'text')
@@ -260,7 +265,7 @@ JSON/TOON output schema:
                   const meta = workspaceMeta.get(name) ?? {
                     total: 0,
                     count: 0,
-                    limit: pagination.limit ?? 100,
+                    limit: 0,
                   }
                   return {
                     name,

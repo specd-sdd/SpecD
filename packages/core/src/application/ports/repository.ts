@@ -13,8 +13,15 @@ export interface ListCursor {
 /**
  * Shared pagination options for listable repository ports.
  *
- * - `limit` defaults to **100** when omitted.
- * - `page` is 1-based and mutually exclusive with `after`.
+ * Host-controlled pagination — ports apply **no default limit** when `limit` is omitted.
+ *
+ * - Omitted `limit` and `after` → return the full sorted set; `meta.limit === meta.total`
+ *   (empty lists → `meta.limit === 0`).
+ * - `after` without `limit` → return the remainder strictly after the cursor; `meta.limit`
+ *   equals the returned count.
+ * - `limit` set → page or keyset window of at most `limit` items; `meta.limit === limit`.
+ * - `page` requires an explicit `limit`; `page` and `after` are mutually exclusive.
+ * - `page` is 1-based when used with `limit`.
  * - `after` continues strictly after the cursor position in canonical sort order.
  */
 export interface ListOptions {

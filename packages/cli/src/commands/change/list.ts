@@ -89,7 +89,7 @@ export function registerChangeList(parent: Command): void {
     .option('--config <path>', 'path to specd.yaml')
     .option('--description', 'include change description on each entry')
 
-  addListPaginationOptions(cmd)
+  addListPaginationOptions(cmd, { defaultLimit: 100 })
 
   cmd
     .addHelpText(
@@ -115,14 +115,14 @@ JSON/TOON output schema:
         format: string
         config?: string
         description?: boolean
-        limit?: number
+        limit?: string
         page?: number
         afterKey?: string
         afterId?: string
       }) => {
         try {
           const { kernel } = await resolveCliContext({ configPath: opts.config })
-          const pagination = parseListPaginationFlags(opts)
+          const pagination = parseListPaginationFlags(opts, { defaultLimit: 100 })
           const result = await kernel.changes.list.execute({
             ...pagination,
             ...(opts.description === true ? { includeDescription: true } : {}),

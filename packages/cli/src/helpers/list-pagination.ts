@@ -1,6 +1,6 @@
 import { CliValidationError } from '../errors/cli-validation-error.js'
 
-/** Default page size for list commands when `--limit` is omitted. */
+/** Default page size for change-bucket list commands when `--limit` is omitted. */
 export const DEFAULT_LIST_LIMIT = 100
 
 /** Exclusive keyset cursor for paginated lists. */
@@ -18,10 +18,37 @@ export interface ListOptions {
 
 /** Raw CLI flags before mapping to {@link ListOptions}. */
 export interface ListPaginationFlags {
-  readonly limit?: number
+  readonly limit?: string
   readonly page?: number
   readonly afterKey?: string
   readonly afterId?: string
+}
+
+/** Parsed `--limit` flag: numeric page size, unlimited (`all`), or omitted. */
+export type ParsedLimit = { kind: 'number'; value: number } | { kind: 'all' } | { kind: 'omitted' }
+
+/** Options for {@link parseListPaginationFlags}. */
+export interface ParseListPaginationOptions {
+  allowAfterId?: boolean
+  /** When set, omitted --limit becomes this numeric limit. Spec list passes undefined. */
+  defaultLimit?: number
+}
+
+/**
+ * Parses a raw `--limit` flag value.
+ *
+ * @param raw - Raw option value from Commander
+ * @returns Parsed limit kind
+ * @throws {CliValidationError} When the value is not a positive integer or `all`
+ */
+export function parseLimitFlag(raw: string | undefined): ParsedLimit {
+  if (raw === undefined) return { kind: 'omitted' }
+  if (raw === 'all') return { kind: 'all' }
+  const value = Number.parseInt(raw, 10)
+  if (!Number.isFinite(value) || value <= 0 || String(value) !== raw.trim()) {
+    throw new CliValidationError('--limit must be a positive integer or "all"')
+  }
+  return { kind: 'number', value }
 }
 
 /**
@@ -29,16 +56,16 @@ export interface ListPaginationFlags {
  *
  * @param flags - Parsed Commander option values
  * @param options - Parsing options
- * @param options.allowAfterId - When false, `--after-id` is rejected (spec lists)
  * @returns List options for use-case invocation
  * @throws {CliValidationError} When pagination flags are mutually exclusive or invalid
  */
 export function parseListPaginationFlags(
   flags: ListPaginationFlags,
-  options?: { allowAfterId?: boolean },
+  options?: ParseListPaginationOptions,
 ): ListOptions {
   const allowAfterId = options?.allowAfterId ?? true
-  const { limit, page, afterKey, afterId } = flags
+  const { page, afterKey, afterId } = flags
+  const parsedLimit = parseLimitFlag(flags.limit)
 
   if (page !== undefined && afterKey !== undefined) {
     throw new CliValidationError('--page is mutually exclusive with --after-key/--after-id')
@@ -49,6 +76,12 @@ export function parseListPaginationFlags(
   if (!allowAfterId && afterId !== undefined) {
     throw new CliValidationError('--after-id is not supported for this command')
   }
+  if (page !== undefined && parsedLimit.kind === 'all') {
+    throw new CliValidationError('--page requires a numeric --limit')
+  }
+  if (page !== undefined && parsedLimit.kind === 'omitted' && options?.defaultLimit === undefined) {
+    throw new CliValidationError('--page requires a numeric --limit')
+  }
 
   const result: {
     limit?: number
@@ -56,7 +89,12 @@ export function parseListPaginationFlags(
     after?: ListCursor
   } = {}
 
-  if (limit !== undefined) result.limit = limit
+  if (parsedLimit.kind === 'number') {
+    result.limit = parsedLimit.value
+  } else if (parsedLimit.kind === 'omitted' && options?.defaultLimit !== undefined) {
+    result.limit = options.defaultLimit
+  }
+
   if (page !== undefined) result.page = page
   if (afterKey !== undefined) {
     result.after =
@@ -89,16 +127,18 @@ import { type Command } from 'commander'
  * @param command - Commander command to extend
  * @param options - Flag registration options
  * @param options.includeAfterId - When false, omit `--after-id` (spec lists)
+ * @param options.defaultLimit - When set, help text documents this host default
  */
 export function addListPaginationOptions(
   command: Command,
-  options?: { includeAfterId?: boolean },
+  options?: { includeAfterId?: boolean; defaultLimit?: number },
 ): void {
-  command.option(
-    '--limit <n>',
-    `maximum number of entries to return (default ${DEFAULT_LIST_LIMIT.toString()})`,
-    (v) => parseInt(v, 10),
-  )
+  const limitHelp =
+    options?.defaultLimit !== undefined
+      ? `maximum number of entries to return (default ${String(options.defaultLimit)}; use "all" for no limit)`
+      : 'maximum number of entries to return (optional; use "all" for no limit)'
+
+  command.option('--limit <n>', limitHelp)
   command.option('--page <p>', '1-based page number', (v) => parseInt(v, 10))
   command.option('--after-key <key>', 'exclusive keyset cursor sort key')
   if (options?.includeAfterId !== false) {

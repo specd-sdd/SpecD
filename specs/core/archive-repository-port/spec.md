@@ -54,7 +54,7 @@ When a change is not in `archivable` state and `options.force` is not `true`, `a
 
 Pagination uses shared `ListOptions` / `ListResult` from [`core:repository-port`](../repository-port/spec.md). The former `startAt` cursor is replaced by `after: { key, id? }` where `after.key` is `archivedAt` ISO-8601 and `after.id` is the change `name` tiebreak.
 
-Default `limit` is **100** when omitted.
+Pagination has **no default `limit`**. When `limit` is omitted, `list()` returns the full archive index and `meta.limit` equals `meta.total` per [`core:repository-port`](../repository-port/spec.md).
 
 ### Requirement: list returns index entries
 
@@ -147,7 +147,7 @@ Once a change is archived, the resulting `ArchivedChange` record and its directo
 - The archive is append-only — archived changes are never modified after creation
 - Archive list indexes live under `{configPath}/tmp/fs-cache/archive/`, not at the archive root
 - Canonical archive list sort is `archivedAt` descending (newest → oldest)
-- Default list `limit` is **100**
+- List pagination has no default `limit`; when omitted, `list()` returns the full archive index and `meta.limit` equals `meta.total` per `core:repository-port`
 - `archive()` upserts the archive list entry through the fs-cache helper
 - `get()` loads full detail from the archived directory `manifest.json`; list/count use index entries only
 - The `force` option on `archive()` bypasses the state check entirely

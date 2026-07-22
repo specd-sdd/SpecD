@@ -76,7 +76,7 @@ describe('Output format — text', () => {
     registerArchiveList(program.command('archive'))
     await program.parseAsync(['node', 'specd', 'archive', 'list'])
 
-    expect(kernel.changes.listArchived.execute).toHaveBeenCalledWith({})
+    expect(kernel.changes.listArchived.execute).toHaveBeenCalledWith({ limit: DEFAULT_LIST_LIMIT })
   })
 })
 
@@ -113,6 +113,26 @@ describe('Output format — JSON', () => {
 })
 
 describe('Pagination', () => {
+  it('forwards --page with host default limit when --limit is omitted', async () => {
+    const { kernel } = setup()
+    kernel.changes.listArchived.execute.mockResolvedValue(makeListResult([]))
+
+    const program = makeProgram()
+    registerArchiveList(program.command('archive'))
+    await program.parseAsync([
+      'node',
+      'specd',
+      'archive',
+      'list',
+      '--page',
+      '2',
+      '--format',
+      'json',
+    ])
+
+    expect(kernel.changes.listArchived.execute).toHaveBeenCalledWith({ limit: 100, page: 2 })
+  })
+
   it('forwards --after-key and --after-id instead of --start-at', async () => {
     const { kernel } = setup()
     kernel.changes.listArchived.execute.mockResolvedValue(makeListResult([]))
@@ -149,6 +169,40 @@ describe('Pagination', () => {
 
     expect(process.exit).toHaveBeenCalledWith(1)
     expect(stderr()).toMatch(/mutually exclusive/)
+    expect(kernel.changes.listArchived.execute).not.toHaveBeenCalled()
+  })
+
+  it('omits limit when --limit all is passed', async () => {
+    const { kernel } = setup()
+    kernel.changes.listArchived.execute.mockResolvedValue(makeListResult([]))
+
+    const program = makeProgram()
+    registerArchiveList(program.command('archive'))
+    await program.parseAsync([
+      'node',
+      'specd',
+      'archive',
+      'list',
+      '--limit',
+      'all',
+      '--format',
+      'json',
+    ])
+
+    expect(kernel.changes.listArchived.execute).toHaveBeenCalledWith({})
+  })
+
+  it('rejects --page with --limit all', async () => {
+    const { kernel, stderr } = setup()
+
+    const program = makeProgram()
+    registerArchiveList(program.command('archive'))
+    await program
+      .parseAsync(['node', 'specd', 'archive', 'list', '--page', '2', '--limit', 'all'])
+      .catch(() => {})
+
+    expect(process.exit).toHaveBeenCalledWith(1)
+    expect(stderr()).toMatch(/--page requires a numeric --limit/)
     expect(kernel.changes.listArchived.execute).not.toHaveBeenCalled()
   })
 

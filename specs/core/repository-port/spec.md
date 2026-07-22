@@ -87,9 +87,11 @@ interface ListResult<T> {
 }
 ```
 
-- `limit` defaults to **100** when omitted on every listable port.
-- `page` is 1-based and MUST be mutually exclusive with `after`.
-- `after` is an exclusive keyset cursor: return the next `limit` items strictly after `{ key, id? }` in the bucket's canonical sort order.
+- When `limit` is **omitted**, the listable port MUST return the **full** filtered result set in canonical order (no default page size). Hosts (CLI, API, agents) that want a capped page MUST pass an explicit `limit`.
+- When `limit` is omitted and the result is unpaginated, `meta.limit` MUST equal `meta.total` and `meta.count` MUST equal `meta.total`.
+- When `limit` is provided, pagination applies: return at most `limit` items from the selected window.
+- `page` is 1-based and MUST be mutually exclusive with `after`. Providing `page` without `limit` MUST be rejected as invalid.
+- `after` is an exclusive keyset cursor. When `limit` is also provided, return the next `limit` items strictly after `{ key, id? }` in the bucket's canonical sort order. When `after` is provided **without** `limit`, return **all** remaining items strictly after the cursor (no final slice by page size).
 - Pagination applies over canonical sort order owned by the index helper; use cases and CLI MUST NOT re-sort list results.
 
 `ListMeta.after` (normative): when a `list()` call returns a page and more items remain beyond it in canonical order, `meta.after` MUST be the cursor `{ key, id? }` of the **last item actually returned** in that page — computed via the bucket's cursor extraction, never echoed from the request's `options.after`. When the returned page reaches the end of the bucket (no more items remain), `meta.after` MUST be omitted entirely. Callers page forward by feeding the previous response's `meta.after` into the next request's `options.after`; an implementation that echoes the input cursor back as `meta.after` violates this requirement because it yields the same page indefinitely.

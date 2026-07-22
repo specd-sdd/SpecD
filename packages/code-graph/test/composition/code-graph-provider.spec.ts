@@ -9,12 +9,24 @@ import { StoreNotOpenError } from '../../src/domain/errors/store-not-open-error.
 import { GraphProviderStaleError } from '../../src/domain/errors/graph-provider-stale-error.js'
 import { InMemoryGraphStore } from '../helpers/in-memory-graph-store.js'
 
+const makeListResult = (specs: Spec[] = []) => {
+  const items = specs.map((spec) => ({
+    workspace: spec.workspace,
+    path: spec.name.toFsPath('/'),
+    title: spec.name.toString().split('/').at(-1) ?? spec.name.toString(),
+  }))
+  return {
+    items,
+    meta: { total: items.length, count: items.length, limit: items.length },
+  }
+}
+
 const makeMockRepo = (specs: Spec[] = []): SpecRepository =>
   ({
     get specsPath() {
       return undefined
     },
-    list: async () => specs,
+    list: async () => makeListResult(specs),
     count: async () => specs.length,
     specHash: async () => null,
     metadata: async () => null,

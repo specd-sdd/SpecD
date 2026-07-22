@@ -11,29 +11,32 @@ Teams need a quick overview of all in-flight work to coordinate and avoid confli
 ### Requirement: Command signature
 
 ```
-specd changes list [--format text|json|toon] [--limit <n>] [--page <p>] [--after-key <iso>] [--after-id <name>] [--description]
+specd changes list [--format text|json|toon] [--limit <n|all>] [--page <p>] [--after-key <iso>] [--after-id <name>] [--description]
 ```
 
 Alias:
 
 ```
-specd change list [--format text|json|toon] [--limit <n>] [--page <p>] [--after-key <iso>] [--after-id <name>] [--description]
+specd change list [--format text|json|toon] [--limit <n|all>] [--page <p>] [--after-key <iso>] [--after-id <name>] [--description]
 ```
 
 - `--format text|json|toon` — optional; output format, defaults to `text`
-- `--limit <n>` — optional; maximum number of entries to return; defaults to `100`
-- `--page <p>` — optional; 1-based page number (uses `--limit`, defaulting to `100` when omitted)
+- `--limit <n|all>` — optional; maximum number of entries to return. When omitted, the CLI host defaults to `100`. When set to `all`, the CLI MUST NOT pass `limit` to the use case (full listing).
+- `--page <p>` — optional; 1-based page number; MUST be paired with a numeric `--limit` (not `all`)
 - `--after-key <iso>` — optional; exclusive keyset cursor — ISO-8601 `createdAt` of the last seen row
 - `--after-id <name>` — optional; tiebreak change `name` when `--after-key` collides; MUST accompany `--after-key`
 - `--description` — optional; include the `description` field on each entry (maps to `includeDescription`)
 
-`--page` is mutually exclusive with `--after-key` / `--after-id`.
+`--page` is mutually exclusive with `--after-key` / `--after-id`. `--page` with `--limit all` MUST be rejected. Omitted `--limit` uses the host default (`100`) and MAY be combined with `--page`. `--after-key` with `--limit all` is allowed.
 
 ### Requirement: List options forwarding
 
 The command MUST map CLI flags to `ListOptions` and include flags as follows:
 
-- `--limit`, `--page`, `--after-key`, `--after-id` → `limit`, `page`, and `after: { key, id? }` on the use-case input
+- When `--limit` is omitted → pass `limit: 100` (CLI host default)
+- When `--limit` is a positive integer → pass that `limit`
+- When `--limit all` → omit `limit` from the use-case input
+- `--page`, `--after-key`, `--after-id` → `page` and `after: { key, id? }` when provided
 - `--description` → `includeDescription: true`; when omitted, the CLI MUST NOT set include flags (defaults are port-side false)
 
 The command MUST NOT re-sort, filter, or paginate results after the use case returns — it renders the `items` array and `meta` envelope as returned.
@@ -62,11 +65,13 @@ When `--description` is set and the entry includes a description, a dim indented
 
 Description sub-rows are NOT part of the column structure — they are printed outside the fixed-width grid.
 
-When `meta.count < meta.total`, the command MUST print a trailing hint line after the table:
+When a numeric `--limit` is in effect (explicit or host default) and `meta.count < meta.total`, the command MUST print a trailing hint line after the table:
 
 ```
 showing <count> of <total> (use --limit/--page)
 ```
+
+When `--limit all` was used, the command MUST NOT print a truncation hint.
 
 In `json` or `toon` format, stdout is a paginated envelope:
 
@@ -92,11 +97,11 @@ In `json` or `toon` format, stdout is a paginated envelope:
 }
 ```
 
-Optional fields (`description`) appear in `items` only when the corresponding include flag was set. `meta.after` is included when keyset pagination was used.
+Optional fields (`description`) appear in `items` only when the corresponding include flag was set. `meta.after` is included when keyset pagination was used. With `--limit all`, `meta.limit` equals `meta.total`.
 
 ### Requirement: Empty output
 
-If there are no active changes, the command prints `no changes` to stdout in `text` mode, or `{"items":[],"meta":{"total":0,"count":0,"limit":100}}` in `json`/`toon` mode. The process exits with code 0.
+If there are no active changes, the command prints `no changes` to stdout in `text` mode, or `{"items":[],"meta":{"total":0,"count":0,"limit":100}}` in `json`/`toon` mode when the host default limit applies, or `{"items":[],"meta":{"total":0,"count":0,"limit":0}}` when `--limit all` was used (`meta.limit` equals `meta.total`). The process exits with code 0.
 
 ## Constraints
 
