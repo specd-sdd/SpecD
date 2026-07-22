@@ -7,6 +7,8 @@ import { fileURLToPath } from 'node:url'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.resolve(__dirname, '..', '..', '..')
 const ARCHIVE_DIR_CANDIDATES = ['specd-sdd/archive', '.specd/archive']
+const CONFIG_PATH_CANDIDATES = ['.specd/config']
+const INDEX_FILE = '.specd-index.jsonl'
 
 const WORKSPACE_PACKAGE_MAP = {
   'core': '@specd/core',
@@ -22,11 +24,29 @@ const WORKSPACE_PACKAGE_MAP = {
   'plugin-agent-standard': '@specd/plugin-agent-standard',
 }
 
+async function resolveConfigPath() {
+  for (const relPath of CONFIG_PATH_CANDIDATES) {
+    const candidate = path.join(ROOT, relPath)
+    try {
+      const stat = await fs.stat(candidate)
+      if (stat.isDirectory()) {
+        return candidate
+      }
+    } catch {
+      continue
+    }
+  }
+
+  return null
+}
+
 async function findIndexFile(archiveDir) {
+  const configPath = await resolveConfigPath()
   const candidates = [
-    path.join(archiveDir, '.specd-index.jsonl'),
+    configPath ? path.join(configPath, 'tmp', 'fs-cache', 'archive', INDEX_FILE) : null,
+    path.join(archiveDir, INDEX_FILE),
     path.join(archiveDir, 'index.jsonl'),
-  ]
+  ].filter(Boolean)
 
   for (const candidate of candidates) {
     try {
@@ -38,6 +58,44 @@ async function findIndexFile(archiveDir) {
   }
 
   return null
+}
+
+function parseIndexLine(raw) {
+  const parsed = JSON.parse(raw)
+  if (parsed.entry && typeof parsed.entry === 'object') {
+    return parsed.entry
+  }
+  return parsed
+}
+
+function matchesChangeName(record, changeName) {
+  return (
+    record.path === changeName ||
+    record.path?.endsWith('/' + changeName) ||
+    record.name === changeName ||
+    record.archivedName === changeName
+  )
+}
+
+function inferArchiveRelativePath(changeName) {
+  const match = /^(\d{4})(\d{2})\d{2}-/.exec(changeName)
+  if (match) {
+    return `${match[1]}/${match[2]}/${changeName}`
+  }
+  return changeName
+}
+
+async function readManifestAtArchivePath(archiveDir, archivePath) {
+  const manifestPath = path.join(archiveDir, archivePath, 'manifest.json')
+  const content = await fs.readFile(manifestPath, 'utf-8')
+  const manifest = JSON.parse(content)
+  return {
+    name: manifest.name,
+    archivedName: manifest.archivedName ?? path.basename(archivePath),
+    archivedAt: manifest.archivedAt ?? null,
+    specIds: manifest.specIds ?? [],
+    path: archivePath,
+  }
 }
 
 async function resolveArchiveDir() {
@@ -61,27 +119,37 @@ async function getArchivedChangeInfo(changeName) {
   const archiveDir = await resolveArchiveDir()
   const indexPath = await findIndexFile(archiveDir)
 
-  if (!indexPath) {
-    console.warn(`[changeset-hook] Could not find index file in ${archiveDir}`)
-    return null
+  if (indexPath) {
+    try {
+      const content = await fs.readFile(indexPath, 'utf-8')
+      const lines = content.trim().split('\n').filter((line) => line.length > 0)
+
+      for (const line of lines.reverse()) {
+        const record = parseIndexLine(line)
+        if (matchesChangeName(record, changeName)) {
+          return record
+        }
+      }
+    } catch (err) {
+      console.warn(`[changeset-hook] Could not read archive index: ${err.message}`)
+    }
+  } else {
+    console.warn(
+      `[changeset-hook] Could not find archive index under fs-cache or ${archiveDir}`,
+    )
   }
 
-  try {
-    const content = await fs.readFile(indexPath, 'utf-8')
-    const lines = content.trim().split('\n')
+  const fallbackPaths = [
+    inferArchiveRelativePath(changeName),
+    changeName,
+  ]
 
-    for (const line of lines.reverse()) {
-      const manifest = JSON.parse(line)
-      if (
-        manifest.path === changeName ||
-        manifest.path.endsWith('/' + changeName) ||
-        manifest.name === changeName
-      ) {
-        return manifest
-      }
+  for (const archivePath of fallbackPaths) {
+    try {
+      return await readManifestAtArchivePath(archiveDir, archivePath)
+    } catch {
+      continue
     }
-  } catch (err) {
-    console.warn(`[changeset-hook] Could not read archive index: ${err.message}`)
   }
 
   return null
