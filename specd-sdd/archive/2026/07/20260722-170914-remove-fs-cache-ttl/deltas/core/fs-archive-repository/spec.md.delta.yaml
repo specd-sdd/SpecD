@@ -1,0 +1,13 @@
+- op: modified
+  description: Clarify archive helper freshness has no max-age TTL.
+  selector:
+    type: section
+    matches: 'Requirement: Archive list index in fs-cache'
+  content: |
+    `FsArchiveRepository` MUST maintain its archive list index under `{configPath}/tmp/fs-cache/archive/` via an `FsChangeIndexCache`-style index helper (same wire shapes and `mutate`/freshness rules as change buckets — invalidation flag, then manifest mtime comparison, with no max-age TTL).
+
+    `list()`, `count()`, and `reindex()` MUST delegate to that helper. The repository MUST NOT read or write root-local `.specd-index.jsonl` or `.specd-index-meta.json` during normal operation.
+
+    Canonical sort: `archivedAt` descending (newest → oldest).
+
+    On first use or `reindex()`, the helper MUST rebuild from archived manifests under the archive storage root. This is a migrate-and-forget cutover — no dual-read of legacy root index files.

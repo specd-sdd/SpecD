@@ -89,12 +89,12 @@
 - **WHEN** `list()` is called
 - **THEN** the helper incrementally rebuilds that bucket
 
-#### Scenario: TTL max-age triggers regenerate
+#### Scenario: Fresh stamps serve without time-based rebuild
 
-- **GIVEN** bucket meta is not invalidated and mtimes match
+- **GIVEN** bucket meta is not invalidated and on-disk manifest mtimes match cached `sourceMtime` values
 - **AND** `generatedAt` is more than five minutes ago
-- **WHEN** `count()` is called
-- **THEN** the helper regenerates the index before returning `totalCount`
+- **WHEN** `list()` is called
+- **THEN** the helper serves from the existing index without rebuilding solely because of index age
 
 #### Scenario: invalidateCache marks all change buckets invalidated
 

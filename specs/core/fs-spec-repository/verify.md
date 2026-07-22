@@ -57,6 +57,13 @@
 - **WHEN** `FsSpecRepository.invalidateCache()` is called
 - **THEN** the workspace spec index helper is marked invalidated
 
+#### Scenario: Fresh sourceFiles serve without time-based rebuild
+
+- **GIVEN** spec bucket meta is not invalidated and on-disk file mtimes match cached `sourceFiles`
+- **AND** `generatedAt` is more than five minutes ago
+- **WHEN** `list()` is called
+- **THEN** the helper serves from the existing index without rebuilding solely because of index age
+
 ### Requirement: SpecListEntry materialization in index
 
 #### Scenario: Index stores full CLI-usable SpecListEntry payload

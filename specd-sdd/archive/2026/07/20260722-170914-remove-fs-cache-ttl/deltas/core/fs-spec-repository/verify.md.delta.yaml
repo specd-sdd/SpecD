@@ -1,0 +1,16 @@
+- op: added
+  description: Verify spec bucket does not rebuild on index age alone.
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: FsSpecIndexCache helper'
+    after:
+      type: section
+      matches: 'Scenario: invalidateCache marks spec bucket invalidated'
+  content: |
+    #### Scenario: Fresh sourceFiles serve without time-based rebuild
+
+    - **GIVEN** spec bucket meta is not invalidated and on-disk file mtimes match cached `sourceFiles`
+    - **AND** `generatedAt` is more than five minutes ago
+    - **WHEN** `list()` is called
+    - **THEN** the helper serves from the existing index without rebuilding solely because of index age

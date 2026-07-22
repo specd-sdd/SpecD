@@ -1,0 +1,22 @@
+- op: removed
+  description: TTL max-age is no longer part of freshness model.
+  selector:
+    type: section
+    matches: 'Scenario: TTL max-age triggers regenerate'
+
+- op: added
+  description: Verify fresh index serves without time-based rebuild.
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Index freshness model'
+    after:
+      type: section
+      matches: 'Scenario: Manifest mtime mismatch triggers rebuild'
+  content: |
+    #### Scenario: Fresh stamps serve without time-based rebuild
+
+    - **GIVEN** bucket meta is not invalidated and on-disk manifest mtimes match cached `sourceMtime` values
+    - **AND** `generatedAt` is more than five minutes ago
+    - **WHEN** `list()` is called
+    - **THEN** the helper serves from the existing index without rebuilding solely because of index age

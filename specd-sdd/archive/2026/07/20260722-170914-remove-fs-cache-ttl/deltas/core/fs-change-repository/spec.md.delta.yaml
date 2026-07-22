@@ -1,0 +1,15 @@
+- op: modified
+  description: Remove 5-minute TTL from index freshness sequence.
+  selector:
+    type: section
+    matches: 'Requirement: Index freshness model'
+  content: |
+    On `list` / `count`, each helper MUST apply this sequence (no VCS coupling):
+
+    1. If `isInvalidated` in meta → mandatory incremental rebuild.
+    2. Else compare disk presence/mtimes to cached `sourceMtime` (manifest for change buckets) → incremental rebuild when stale.
+    3. Else serve from index.
+
+    `FsChangeRepository.invalidateCache()` MUST mark all three bucket helpers invalidated. External callers MAY invoke `invalidateCache()` when the tree changed outside normal write paths.
+
+    Rebuild algorithm: single-pass disk scan of mtimes → stream old JSONL → copy hits / rewrite misses → append new → atomic rename; update meta (`totalCount`, `generatedAt`, clear `isInvalidated`).

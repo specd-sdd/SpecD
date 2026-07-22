@@ -1,0 +1,16 @@
+- op: added
+  description: Verify archive bucket does not rebuild on index age alone.
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Archive list index in fs-cache'
+    after:
+      type: section
+      matches: 'Scenario: archive upserts archive row and updates source bucket'
+  content: |
+    #### Scenario: Fresh manifest mtimes serve without time-based rebuild
+
+    - **GIVEN** archive bucket meta is not invalidated and on-disk manifest mtimes match cached `sourceMtime` values
+    - **AND** `generatedAt` is more than five minutes ago
+    - **WHEN** `list()` is called
+    - **THEN** the helper serves from the existing index without rebuilding solely because of index age

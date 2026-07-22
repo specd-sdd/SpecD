@@ -9,5 +9,10 @@
     "core:storage",
     "core:spec-repository-port"
   ],
-  "implementation": []
+  "implementation": [
+    {
+      "file": "core:src/infrastructure/fs/fs-index-cache-base.ts",
+      "symbols": ["FsIndexCache", "_ensureFresh"]
+    }
+  ]
 }

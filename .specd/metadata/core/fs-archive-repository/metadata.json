@@ -27,7 +27,7 @@
     {
       "requirement": "Archive list index in fs-cache",
       "rules": [
-        "`FsArchiveRepository` MUST maintain its archive list index under `{configPath}/tmp/fs-cache/archive/` via an `FsChangeIndexCache`-style index helper (same wire shapes and `mutate`/freshness rules as change buckets).\n\n`list()`, `count()`, and `reindex()` MUST delegate to that helper. The repository MUST NOT read or write root-local `.specd-index.jsonl` or `.specd-index-meta.json` during normal operation.\n\nCanonical sort: `archivedAt` descending (newest → oldest).\n\nOn first use or `reindex()`, the helper MUST rebuild from archived manifests under the archive storage root. This is a migrate-and-forget cutover — no dual-read of legacy root index files."
+        "`FsArchiveRepository` MUST maintain its archive list index under `{configPath}/tmp/fs-cache/archive/` via an `FsChangeIndexCache`-style index helper (same wire shapes and `mutate`/freshness rules as change buckets — invalidation flag, then manifest mtime comparison, with no max-age TTL).\n\n`list()`, `count()`, and `reindex()` MUST delegate to that helper. The repository MUST NOT read or write root-local `.specd-index.jsonl` or `.specd-index-meta.json` during normal operation.\n\nCanonical sort: `archivedAt` descending (newest → oldest).\n\nOn first use or `reindex()`, the helper MUST rebuild from archived manifests under the archive storage root. This is a migrate-and-forget cutover — no dual-read of legacy root index files."
       ]
     },
     {
@@ -120,6 +120,18 @@
       ]
     },
     {
+      "requirement": "Archive list index in fs-cache",
+      "name": "Fresh manifest mtimes serve without time-based rebuild",
+      "given": [
+        "archive bucket meta is not invalidated and on-disk manifest mtimes match cached sourceMtime values",
+        "AND generatedAt is more than five minutes ago"
+      ],
+      "when": ["list() is called"],
+      "then": [
+        "the helper serves from the existing index without rebuilding solely because of index age"
+      ]
+    },
+    {
       "requirement": "Legacy archive root index orphan cleanup",
       "name": "Rebuild deletes legacy root index files",
       "given": [
@@ -174,19 +186,19 @@
     "symbols": [
       {
         "specId": "core:fs-archive-repository",
-        "file": "core:src/infrastructure/fs/archive-repository.ts",
-        "symbol": "FsArchiveRepository"
+        "file": "core:src/infrastructure/fs/fs-index-cache-base.ts",
+        "symbol": "FsIndexCache"
       },
       {
         "specId": "core:fs-archive-repository",
-        "file": "core:src/infrastructure/fs/archive-repository.ts",
-        "symbol": "_expandPattern"
+        "file": "core:src/infrastructure/fs/fs-index-cache-base.ts",
+        "symbol": "_ensureFresh"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:bbfb53e41665e883deeae1c52d68479e14f83cd72ac0ac69256bbf82a21a38e2",
-    "verify.md": "sha256:046fb5db71dd1b211d9f47b9da089d66e0ba153fee809e10d56ecd2ce9ff4f87"
+    "spec.md": "sha256:fe9ed9e51662bc22dd906959d21891306cf4495a9369f314dc70749767b034ce",
+    "verify.md": "sha256:493be8fed5bd3be60c1c7c41da51ab1dc594330133ff2cd807cb0862a5af63bb"
   },
   "generatedBy": "core"
 }

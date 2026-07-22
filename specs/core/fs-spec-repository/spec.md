@@ -36,7 +36,7 @@ The repository MUST NOT read or write `.specd-index.jsonl` or `.specd-index-meta
 
 Canonical sort: capability path lexicographic ascending.
 
-The helper uses the same `mutate`/lock, atomic publish, and freshness rules as change index helpers, with `sourceFiles` (per-file mtimes) instead of `sourceMtime`.
+The helper uses the same `mutate`/lock, atomic publish, and freshness rules as change index helpers — invalidation flag, then per-file mtime comparison via `sourceFiles` — with no max-age TTL. Freshness MUST NOT depend on `generatedAt` age alone.
 
 ### Requirement: SpecListEntry materialization in index
 

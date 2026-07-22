@@ -30,7 +30,7 @@ This factory SHALL construct and return `FsArchiveRepository` instances when `cr
 
 ### Requirement: Archive list index in fs-cache
 
-`FsArchiveRepository` MUST maintain its archive list index under `{configPath}/tmp/fs-cache/archive/` via an `FsChangeIndexCache`-style index helper (same wire shapes and `mutate`/freshness rules as change buckets).
+`FsArchiveRepository` MUST maintain its archive list index under `{configPath}/tmp/fs-cache/archive/` via an `FsChangeIndexCache`-style index helper (same wire shapes and `mutate`/freshness rules as change buckets — invalidation flag, then manifest mtime comparison, with no max-age TTL).
 
 `list()`, `count()`, and `reindex()` MUST delegate to that helper. The repository MUST NOT read or write root-local `.specd-index.jsonl` or `.specd-index-meta.json` during normal operation.
 

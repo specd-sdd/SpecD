@@ -26,7 +26,7 @@
     {
       "requirement": "FsSpecIndexCache helper",
       "rules": [
-        "`FsSpecRepository` MUST delegate `list`, `count`, `reindex`, and cache invalidation to an `FsSpecIndexCache` instance under `{configPath}/tmp/fs-cache/specs/<workspace>/`.\n\nThe repository MUST NOT read or write `.specd-index.jsonl` or `.specd-index-meta.json` directly.\n\nCanonical sort: capability path lexicographic ascending.\n\nThe helper uses the same `mutate`/lock, atomic publish, and freshness rules as change index helpers, with `sourceFiles` (per-file mtimes) instead of `sourceMtime`."
+        "`FsSpecRepository` MUST delegate `list`, `count`, `reindex`, and cache invalidation to an `FsSpecIndexCache` instance under `{configPath}/tmp/fs-cache/specs/<workspace>/`.\n\nThe repository MUST NOT read or write `.specd-index.jsonl` or `.specd-index-meta.json` directly.\n\nCanonical sort: capability path lexicographic ascending.\n\nThe helper uses the same `mutate`/lock, atomic publish, and freshness rules as change index helpers — invalidation flag, then per-file mtime comparison via `sourceFiles` — with no max-age TTL. Freshness MUST NOT depend on `generatedAt` age alone."
       ]
     },
     {
@@ -109,6 +109,18 @@
       "then": ["the workspace spec index helper is marked invalidated"]
     },
     {
+      "requirement": "FsSpecIndexCache helper",
+      "name": "Fresh sourceFiles serve without time-based rebuild",
+      "given": [
+        "spec bucket meta is not invalidated and on-disk file mtimes match cached sourceFiles",
+        "AND generatedAt is more than five minutes ago"
+      ],
+      "when": ["list() is called"],
+      "then": [
+        "the helper serves from the existing index without rebuilding solely because of index age"
+      ]
+    },
+    {
       "requirement": "SpecListEntry materialization in index",
       "name": "Index stores full CLI-usable SpecListEntry payload",
       "given": ["a spec with metadata title and resolvable summary/status fields"],
@@ -135,10 +147,23 @@
       ]
     }
   ],
-  "implementation": {},
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "core:fs-spec-repository",
+        "file": "core:src/infrastructure/fs/fs-index-cache-base.ts",
+        "symbol": "FsIndexCache"
+      },
+      {
+        "specId": "core:fs-spec-repository",
+        "file": "core:src/infrastructure/fs/fs-index-cache-base.ts",
+        "symbol": "_ensureFresh"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:abd98b44ec838dca397d5a1bfb2c587d0ca7e8ce64d73a73c6054298f23d4ea7",
-    "verify.md": "sha256:4102aabeae7561c9ef228dfc9be51bf0887f28c2f8aa7b8b10022035b1a2a5a2"
+    "spec.md": "sha256:e92150dbcf7ebc4157b6aaedf3b95ae7bab7439ac4f8bbd027fb085ec8112a39",
+    "verify.md": "sha256:5eea4d481a0ca21fe647946a22986eb0f450c0dd0bbe9fe94dc9a1f9560de51d"
   },
   "generatedBy": "core"
 }

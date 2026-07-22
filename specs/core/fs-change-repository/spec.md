@@ -62,8 +62,7 @@ On `list` / `count`, each helper MUST apply this sequence (no VCS coupling):
 
 1. If `isInvalidated` in meta → mandatory incremental rebuild.
 2. Else compare disk presence/mtimes to cached `sourceMtime` (manifest for change buckets) → incremental rebuild when stale.
-3. Else if `now - generatedAt > 300_000` ms (fixed 5-minute TTL) → mandatory regenerate.
-4. Else serve from index.
+3. Else serve from index.
 
 `FsChangeRepository.invalidateCache()` MUST mark all three bucket helpers invalidated. External callers MAY invoke `invalidateCache()` when the tree changed outside normal write paths.
 

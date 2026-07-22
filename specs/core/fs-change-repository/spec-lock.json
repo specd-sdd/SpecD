@@ -10,5 +10,13 @@
     "core:change-list-entry",
     "core:change-repository-port"
   ],
-  "implementation": []
+  "implementation": [
+    {
+      "file": "core:src/infrastructure/fs/fs-index-cache-base.ts",
+      "symbols": ["FsIndexCache", "_ensureFresh"]
+    },
+    {
+      "file": "core:test/infrastructure/fs/fs-index-cache-base.spec.ts"
+    }
+  ]
 }

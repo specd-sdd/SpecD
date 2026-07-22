@@ -1,0 +1,367 @@
+{
+  "name": "remove-fs-cache-ttl",
+  "createdAt": "2026-07-22T17:09:14.772Z",
+  "description": "Remove the 5-minute TTL from fs-cache index freshness; rely on invalidation flag and mtime comparison only.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": ["core:fs-change-repository", "core:fs-spec-repository", "core:fs-archive-repository"],
+  "specDependsOn": {
+    "core:fs-change-repository": [
+      "default:_global/architecture",
+      "core:composition",
+      "core:storage",
+      "core:change-list-entry",
+      "core:change-repository-port"
+    ],
+    "core:fs-spec-repository": [
+      "default:_global/architecture",
+      "core:composition",
+      "core:storage",
+      "core:spec-repository-port"
+    ],
+    "core:fs-archive-repository": [
+      "default:_global/architecture",
+      "core:composition",
+      "core:storage",
+      "core:archived-change-index-entry",
+      "core:archive-repository-port"
+    ]
+  },
+  "invalidationPolicy": "downstream",
+  "trackedImplementationFiles": [
+    {
+      "file": "packages/core/src/infrastructure/fs/fs-index-cache-base.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/infrastructure/fs/fs-index-cache-base.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "EXPLORATION_EVENT_BUS.md",
+      "state": "ignored"
+    },
+    {
+      "file": "EXPLORATION_SPECD_BRANCH_MERGE_SKILL.md",
+      "state": "ignored"
+    },
+    {
+      "file": "EXPLORATION_STORAGE_ABSTRACTION.md",
+      "state": "ignored"
+    },
+    {
+      "file": "assets/specd-changes-hooks.svg",
+      "state": "ignored"
+    },
+    {
+      "file": "assets/specd-changes-status.svg",
+      "state": "ignored"
+    },
+    {
+      "file": "assets/specd-changes-validate.svg",
+      "state": "ignored"
+    },
+    {
+      "file": "assets/specd-specs-lists.svg",
+      "state": "ignored"
+    },
+    {
+      "file": "assets/specd.svg",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-changes-hooks.svg",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-changes-status.svg",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-changes-validate.svg",
+      "state": "ignored"
+    },
+    {
+      "file": "specd-specs-lists.svg",
+      "state": "ignored"
+    },
+    {
+      "file": "specd.svg",
+      "state": "ignored"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "core:fs-change-repository",
+      "file": "packages/core/src/infrastructure/fs/fs-index-cache-base.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["FsIndexCache", "_ensureFresh"]
+    },
+    {
+      "specId": "core:fs-spec-repository",
+      "file": "packages/core/src/infrastructure/fs/fs-index-cache-base.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["FsIndexCache", "_ensureFresh"]
+    },
+    {
+      "specId": "core:fs-archive-repository",
+      "file": "packages/core/src/infrastructure/fs/fs-index-cache-base.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["FsIndexCache", "_ensureFresh"]
+    },
+    {
+      "specId": "core:fs-change-repository",
+      "file": "packages/core/test/infrastructure/fs/fs-index-cache-base.spec.ts",
+      "fileLinkExplicit": true
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:9a8bd039225e4458e128b28759d9fa4a239097280fe2c156c72a17393c1979fb"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:fs-change-repository",
+          "filename": "deltas/core/fs-change-repository/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:a9f1cc8f4dd6eb261099f01a23e65f6404d3494bb1a99b9c5a546465ba1bbfcf"
+        },
+        {
+          "key": "core:fs-spec-repository",
+          "filename": "deltas/core/fs-spec-repository/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:d358bda2f78eca042a92592b2b80862e028c90a47d6daa43cea5a3c68e74dce0"
+        },
+        {
+          "key": "core:fs-archive-repository",
+          "filename": "deltas/core/fs-archive-repository/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:76a8746ad0846f199c651adc7a3445acba4bd38dc3feea6182de4b3b90a85d59"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:fs-change-repository",
+          "filename": "deltas/core/fs-change-repository/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:dc0c7ea9c1b6929b16b506581c47c8ebf55a7e74f256bb97fc998e744fd17bdf"
+        },
+        {
+          "key": "core:fs-spec-repository",
+          "filename": "deltas/core/fs-spec-repository/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:92bc0bba8957581efc58a05af58fa4ebe937cddf875b66e959e2c33e70fccc22"
+        },
+        {
+          "key": "core:fs-archive-repository",
+          "filename": "deltas/core/fs-archive-repository/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:60ea07635881017943efaeeb50b3bc43b3cd83e7da2851d9e51e3415f4343bda"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:5984017b7e07c793047d3dcff856b66fbd8432d41792eccdec85389187499e96"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:8750db0fd9b51d751cb02c63dc408d51ed3a4cfbf2e116fcc702c66d1956199a"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-07-22T17:09:14.772Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": [
+        "core:fs-change-repository",
+        "core:fs-spec-repository",
+        "core:fs-archive-repository"
+      ],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-22T17:09:14.783Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "core:fs-change-repository"
+        },
+        {
+          "type": "specs",
+          "key": "core:fs-spec-repository"
+        },
+        {
+          "type": "specs",
+          "key": "core:fs-archive-repository"
+        },
+        {
+          "type": "verify",
+          "key": "core:fs-change-repository"
+        },
+        {
+          "type": "verify",
+          "key": "core:fs-spec-repository"
+        },
+        {
+          "type": "verify",
+          "key": "core:fs-archive-repository"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-22T17:09:51.138Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-22T17:11:07.170Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-22T17:12:31.351Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-22T17:18:06.576Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-22T17:23:03.630Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-22T17:23:09.981Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-22T17:25:45.327Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-07-22T17:25:45.445Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

@@ -12,8 +12,8 @@
   ],
   "implementation": [
     {
-      "file": "core:src/infrastructure/fs/archive-repository.ts",
-      "symbols": ["FsArchiveRepository", "_expandPattern"]
+      "file": "core:src/infrastructure/fs/fs-index-cache-base.ts",
+      "symbols": ["FsIndexCache", "_ensureFresh"]
     }
   ]
 }

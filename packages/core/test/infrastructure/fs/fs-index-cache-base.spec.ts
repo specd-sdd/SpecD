@@ -2,7 +2,7 @@ import * as fs from 'node:fs/promises'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { FsIndexCache, INDEX_TTL_MS } from '../../../src/infrastructure/fs/fs-index-cache-base.js'
+import { FsIndexCache } from '../../../src/infrastructure/fs/fs-index-cache-base.js'
 
 interface TestEntry {
   readonly id: string
@@ -99,7 +99,7 @@ describe('FsIndexCache', () => {
     expect(rebuildCalls).toBe(1)
   })
 
-  it('rebuilds when TTL expires', async () => {
+  it('serves from cache when stamps match regardless of generatedAt age', async () => {
     vi.useFakeTimers()
     try {
       const cache = createCache()
@@ -107,9 +107,9 @@ describe('FsIndexCache', () => {
       stampMap.set('item-1', mtime)
       await cache.upsert({ id: 'item-1', value: 1 }, { sourceMtime: mtime })
 
-      vi.advanceTimersByTime(INDEX_TTL_MS + 1)
+      vi.advanceTimersByTime(300_001)
       await cache.list()
-      expect(rebuildCalls).toBe(1)
+      expect(rebuildCalls).toBe(0)
     } finally {
       vi.useRealTimers()
     }

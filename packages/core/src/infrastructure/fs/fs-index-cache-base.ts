@@ -9,9 +9,6 @@ import {
   type ListResult,
 } from '../../application/ports/repository.js'
 
-/** Fixed max-age safety net for fs-cache list indexes (5 minutes). */
-export const INDEX_TTL_MS = 300_000
-
 const INDEX_FILE = '.specd-index.jsonl'
 const META_FILE = '.specd-index-meta.json'
 
@@ -78,7 +75,7 @@ export interface FsIndexCacheConfig<TEntry> {
  * Generic filesystem-backed list-index cache for one bucket directory.
  *
  * Owns the JSONL index, meta file, per-bucket mutation lock (`mutate`),
- * atomic temp+rename publish, and the invalidated/mtime/TTL freshness
+ * atomic temp+rename publish, and the invalidated/mtime freshness
  * sequence described in `core:storage`. Bucket-specific wrappers
  * (`FsChangeIndexCache`, `FsSpecIndexCache`) configure sort/id/serialization
  * and expose a narrower, type-safe surface to repositories.
@@ -312,7 +309,7 @@ export class FsIndexCache<TEntry> {
   }
 
   /**
-   * Applies the freshness sequence: invalidated flag -> mtime mismatch -> TTL -> serve.
+   * Applies the freshness sequence: invalidated flag -> mtime mismatch -> serve.
    */
   private async _ensureFresh(): Promise<void> {
     const meta = await this._readMeta()
@@ -322,11 +319,6 @@ export class FsIndexCache<TEntry> {
     }
 
     if (await this._isStale(meta)) {
-      await this.reindex()
-      return
-    }
-
-    if (Date.now() - Date.parse(meta.generatedAt) > INDEX_TTL_MS) {
       await this.reindex()
     }
   }

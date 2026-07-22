@@ -59,6 +59,13 @@
 - **THEN** an `ArchiveListEntry` is upserted in the fs-cache archive index
 - **AND** the source active change bucket index is updated or invalidated as required
 
+#### Scenario: Fresh manifest mtimes serve without time-based rebuild
+
+- **GIVEN** archive bucket meta is not invalidated and on-disk manifest mtimes match cached `sourceMtime` values
+- **AND** `generatedAt` is more than five minutes ago
+- **WHEN** `list()` is called
+- **THEN** the helper serves from the existing index without rebuilding solely because of index age
+
 ### Requirement: Legacy archive root index orphan cleanup
 
 #### Scenario: Rebuild deletes legacy root index files
