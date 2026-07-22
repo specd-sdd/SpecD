@@ -1,7 +1,8 @@
 {
-  "version": 1,
-  "specId": "cli:change-validate",
-  "artifactHashes": {},
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
   "dependsOn": [
     "cli:entrypoint",
     "core:change",
