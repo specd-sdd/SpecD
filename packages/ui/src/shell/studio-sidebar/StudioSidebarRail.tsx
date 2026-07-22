@@ -36,7 +36,7 @@ export function StudioSidebarRail({
   const collapsed = !open
 
   return (
-    <SidebarGroup className="p-2 py-0 group-data-[collapsible=icon]:p-0">
+    <SidebarGroup className="p-2 group-data-[collapsible=icon]:p-0">
       <SidebarGroupContent>
         <SidebarMenu data-testid="studio-activity-rail">
           {embeddedSidebarToggle && collapsed ? (

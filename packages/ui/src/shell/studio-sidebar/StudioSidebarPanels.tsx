@@ -15,7 +15,7 @@ export function StudioSidebarPanels({
         <GitPullRequest className="h-3 w-3 text-studio-success" />
         <span>Changes</span>
       </div>
-      <div className="studio-scrollbar max-h-[45%] min-h-0 shrink-0 overflow-y-auto border-b border-border">
+      <div className="studio-scrollbar max-h-[45%] min-h-0 shrink-0 overflow-y-auto border-border">
         <ChangesSidebar
           active={changes.active}
           drafts={changes.drafts}

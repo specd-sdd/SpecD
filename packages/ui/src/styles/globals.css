@@ -144,7 +144,7 @@
   }
 
   .studio-panel-header {
-    @apply border-b border-border bg-panel-header px-2 py-1 text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground;
+    @apply border-b border-t border-border bg-panel-header px-2 py-1 text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground;
   }
 
   .studio-dialog-panel {
