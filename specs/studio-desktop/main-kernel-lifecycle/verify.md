@@ -57,6 +57,13 @@
 - **AND** the host opens one long-lived provider and reuses it while healthy
 - **AND** `@specd/code-graph-electron` is not imported for that path
 
+#### Scenario: Desktop index reuses the long-lived provider without host reload
+
+- **WHEN** desktop index orchestration runs with optional `force: true`
+- **THEN** it calls `runIndexProjectGraph` with the session long-lived opened provider as `input.provider`
+- **AND** it does not require replace/reopen of that provider solely because indexing completed
+- **AND** healthy reopen on `GraphProviderStaleError` remains available
+
 #### Scenario: CLI and API keep the standard SDK-backed graph runtime
 
 - **WHEN** CLI and API package dependencies and bootstrap code are inspected

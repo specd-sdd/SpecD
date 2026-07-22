@@ -16,6 +16,12 @@
     {
       "file": "api:src/delivery/http/handlers/handler-graph.ts",
       "symbols": ["registerGraphRoutes"]
+    },
+    {
+      "file": "api:test/handler-graph-index-provider.spec.ts"
+    },
+    {
+      "file": "api:test/graph.spec.ts"
     }
   ]
 }

@@ -43,9 +43,12 @@ Desktop MUST NOT import `@specd/code-graph-electron` for this path. The existing
 `@specd/code-graph-electron` package MAY remain in the monorepo unused.
 
 Desktop MUST NOT use `withOpenGraphProvider` for routine local graph IPC (that helper
-is the short-lived CLI/one-shot path). Index orchestration MAY still call
-`runIndexProjectGraph` (which opens a short-lived provider internally); after index
-completes the desktop host MUST replace/reopen its long-lived provider.
+is the short-lived CLI/one-shot path). Index orchestration MUST call
+`runIndexProjectGraph` with the session long-lived opened provider as `input.provider`.
+After index completes — including when `force: true` — the desktop host MUST NOT be
+required to replace/reopen that provider solely because indexing ran; force recreate
+and generation refresh are owned by `CodeGraphProvider.index` on the injected instance.
+Healthy reopen on `GraphProviderStaleError` remains required.
 
 This wiring isolates the native SQLite runtime required by the Electron desktop
 host without retargeting CLI or API away from the standard non-Electron graph
@@ -81,3 +84,4 @@ without ANSI escape sequences. Top-level `logFormatter` / `logRing` on
 - [`client:specd-data-port`](../../../../../../specs/client/specd-data-port/spec.md) — IPC data contract implemented by the desktop adapter
 - [`code-graph-sqlite-electron:sqlite-electron-store`](../../code-graph-sqlite-electron/sqlite-electron-store/spec.md) — Electron SQLite factory and vendored runtime used for local graph
 - [`code-graph:composition`](../../code-graph/composition/spec.md) — long-lived provider lifecycle for Electron hosts
+- [`sdk:run-index-project-graph`](../../sdk/run-index-project-graph/spec.md) — project index orchestration with optional injected provider

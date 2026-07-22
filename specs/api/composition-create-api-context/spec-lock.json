@@ -12,7 +12,7 @@
   "implementation": [
     {
       "file": "api:src/composition/create-api-context.ts",
-      "symbols": ["createApiContext", "ApiContext", "ApiServerState"]
+      "symbols": ["ApiContext", "createApiContext"]
     }
   ]
 }

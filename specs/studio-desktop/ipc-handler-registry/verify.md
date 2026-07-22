@@ -61,6 +61,14 @@
 - **AND** routine graph IPC does not call `withOpenGraphProvider` or `createCodeGraphProvider` directly
 - **AND** `@specd/code-graph-electron` is not imported for provider construction
 
+#### Scenario: Graph index IPC passes the long-lived provider to runIndexProjectGraph
+
+- **WHEN** `indexGraph` IPC runs
+- **THEN** desktop calls `runIndexProjectGraph` with `provider` set to the session long-lived opened provider
+- **AND** it does not call `createIndexProjectGraph` directly as the routine path
+- **AND** it does not replace/reopen the long-lived provider solely because index completed
+- **AND** when `force: true`, the same long-lived instance remains the session provider afterward
+
 #### Scenario: Renderer graph calls stay on the shared data port
 
 - **WHEN** the renderer requests graph data in desktop-local mode

@@ -22,7 +22,9 @@ export async function openLongLivedGraphProvider(
 /**
  * Closes the held provider without opening a replacement.
  *
- * Used before short-lived index orchestration so the store is not locked.
+ * Used by {@link refreshLongLivedGraphProvider} before opening a replacement
+ * (stale recovery / explicit host refresh). Routine index keeps the provider open
+ * and passes it into `runIndexProjectGraph`.
  *
  * @param holder - Mutable long-lived provider holder
  */

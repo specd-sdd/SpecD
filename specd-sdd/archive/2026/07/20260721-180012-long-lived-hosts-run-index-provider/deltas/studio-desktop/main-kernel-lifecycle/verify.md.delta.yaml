@@ -1,0 +1,41 @@
+- op: modified
+  description: 'Add scenario for index via injected provider without post-index reopen'
+  selector:
+    type: section
+    matches: 'Requirement: desktop startup prepares the Electron SQLite graph runtime'
+  content: |
+    #### Scenario: Desktop package exposes Electron graph rebuild wiring
+
+    - **WHEN** the desktop package scripts are inspected
+    - **THEN** `rebuild:graph-sqlite-electron` rebuilds the locally generated vendored Electron SQLite addon owned by `@specd/code-graph-sqlite-electron`
+    - **AND** `rebuild:graph-electron` aliases that rebuild
+    - **AND** `prestart` executes the Electron SQLite rebuild before app startup
+
+    #### Scenario: Desktop startup does not require git-tracked vendor artifacts
+
+    - **GIVEN** a fresh clone without committed vendored sqlite artifacts
+    - **WHEN** desktop startup preparation runs
+    - **THEN** it triggers the Electron sqlite rebuild workflow
+    - **AND** desktop local graph startup does not depend on vendored sqlite files being
+      present in git
+
+    #### Scenario: Desktop local host depends on the sqlite-electron package
+
+    - **WHEN** the desktop package dependencies and local graph wiring are inspected
+    - **THEN** `@specd/code-graph-sqlite-electron` is present for desktop-local graph execution
+    - **AND** the project host selects `graphStoreId: 'sqlite-electron'` via SDK graph options
+    - **AND** the host opens one long-lived provider and reuses it while healthy
+    - **AND** `@specd/code-graph-electron` is not imported for that path
+
+    #### Scenario: Desktop index reuses the long-lived provider without host reload
+
+    - **WHEN** desktop index orchestration runs with optional `force: true`
+    - **THEN** it calls `runIndexProjectGraph` with the session long-lived opened provider as `input.provider`
+    - **AND** it does not require replace/reopen of that provider solely because indexing completed
+    - **AND** healthy reopen on `GraphProviderStaleError` remains available
+
+    #### Scenario: CLI and API keep the standard SDK-backed graph runtime
+
+    - **WHEN** CLI and API package dependencies and bootstrap code are inspected
+    - **THEN** they do not depend on `@specd/code-graph-sqlite-electron` for default Node graph execution
+    - **AND** they access the standard graph runtime through `@specd/sdk`

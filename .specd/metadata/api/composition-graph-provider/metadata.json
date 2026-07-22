@@ -37,9 +37,9 @@
       ]
     },
     {
-      "requirement": "long-lived provider refresh after index and stale errors",
+      "requirement": "long-lived provider stale reopen and index on injected provider",
       "rules": [
-        "After `runIndexProjectGraph` completes (which may open a short-lived provider\ninternally), the API host MUST replace or reopen its long-lived provider before\nsubsequent graph reads.\n\nWhen a graph operation on the long-lived provider throws `GraphProviderStaleError`,\nthe healthy accessor (`withGraphProvider`) MUST close and reopen (or replace) the\nprovider and MAY retry the operation once."
+        "When indexing, the API host MUST pass its process-scoped long-lived opened provider\ninto `runIndexProjectGraph` as `input.provider`. The host MUST NOT close or replace\nthat provider solely because indexing completed — including when `force: true` —\nbecause force recreate and storage-generation refresh are owned by\n`CodeGraphProvider.index` on that same instance.\n\nWhen a graph operation on the long-lived provider throws `GraphProviderStaleError`,\nthe healthy accessor (`withGraphProvider`) MUST close and reopen (or replace) the\nprovider and MAY retry the operation once.\n\nHost helpers such as `refreshGraphProvider` MAY remain for explicit stale recovery or\nother host-owned replacement, but MUST NOT be required as a post-index step when\nindex used the injected long-lived provider."
       ]
     }
   ],
@@ -113,25 +113,36 @@
       ]
     },
     {
-      "requirement": "long-lived provider refresh after index and stale errors",
+      "requirement": "long-lived provider stale reopen and index on injected provider",
       "name": "Stale provider is reopened",
       "given": ["the long-lived provider throws GraphProviderStaleError"],
       "when": ["the healthy accessor recovers"],
       "then": ["it closes and reopens (or replaces) the process-scoped provider"]
     },
     {
-      "requirement": "long-lived provider refresh after index and stale errors",
-      "name": "Index completion refreshes the long-lived provider",
-      "when": ["runIndexProjectGraph completes"],
-      "then": ["the API replaces or reopens its long-lived provider before the next graph read"]
+      "requirement": "long-lived provider stale reopen and index on injected provider",
+      "name": "Index on injected provider does not require post-index host refresh",
+      "when": [
+        "runIndexProjectGraph completes with input.provider set to the process long-lived provider"
+      ],
+      "then": [
+        "the API does not replace or reopen that provider solely because indexing completed",
+        "AND when force: true, the same long-lived instance remains authoritative for subsequent graph reads"
+      ]
     }
   ],
   "implementation": {
+    "files": [
+      {
+        "specId": "api:composition-graph-provider",
+        "file": "api:test/long-lived-graph.spec.ts"
+      }
+    ],
     "symbols": [
       {
         "specId": "api:composition-graph-provider",
         "file": "api:src/composition/long-lived-graph.ts",
-        "symbol": "openLongLivedGraphProvider"
+        "symbol": "closeLongLivedGraphProvider"
       },
       {
         "specId": "api:composition-graph-provider",
@@ -142,17 +153,12 @@
         "specId": "api:composition-graph-provider",
         "file": "api:src/composition/long-lived-graph.ts",
         "symbol": "refreshLongLivedGraphProvider"
-      },
-      {
-        "specId": "api:composition-graph-provider",
-        "file": "api:src/composition/long-lived-graph.ts",
-        "symbol": "closeLongLivedGraphProvider"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:ae70ae1e87aa4036eb49f83adf0cb66f7505770f473f1cbbd6f3f64e7e8c562a",
-    "verify.md": "sha256:d85c7df3478fb212e06b228ff1a6788eb22a337ad4fec521a4d1842a51507054"
+    "spec.md": "sha256:4971edeb24dd34b2db6535f3cb36e10d4fb280eb5e608469e8643f869e8b60dc",
+    "verify.md": "sha256:e47c7c1b3a5b7334c59f883bbeea112bb5a925a592136c8cd06e859fd6934968"
   },
   "generatedBy": "core"
 }

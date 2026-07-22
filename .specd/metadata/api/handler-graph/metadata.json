@@ -23,7 +23,7 @@
     {
       "requirement": "handler delegates to kernel without duplicating domain rules",
       "rules": [
-        "Business rules MUST live in core and code-graph use cases. This handler MUST invoke only:\n\n- `apiContext.withGraphProvider()` (healthy long-lived opened provider) for stats, search, impact, and hotspots\n- `runIndexProjectGraph` from `@specd/sdk` for `POST /v1/graph/index`, then rely on host refresh of the long-lived provider\n- change-scoped graph view composed from change `specIds` via kernel use cases\n\nThe handler MUST NOT import `createCodeGraphProvider` from `@specd/code-graph` directly.\nThe handler MUST NOT open/close a provider per HTTP request and MUST NOT call\n`withOpenGraphProvider` for routine graph routes."
+        "Business rules MUST live in core and code-graph use cases. This handler MUST invoke only:\n\n- `apiContext.withGraphProvider()` (healthy long-lived opened provider) for stats, search, impact, and hotspots\n- `runIndexProjectGraph` from `@specd/sdk` for `POST /v1/graph/index`, passing the process-scoped long-lived opened provider as `input.provider` (obtained via `withGraphProvider` / `getGraphProvider` as appropriate)\n- change-scoped graph view composed from change `specIds` via kernel use cases\n\nThe handler MUST NOT import `createCodeGraphProvider` from `@specd/code-graph` directly.\nThe handler MUST NOT open/close a provider per HTTP request and MUST NOT call\n`withOpenGraphProvider` for routine graph routes.\nThe handler MUST NOT release/close the long-lived provider before index, and MUST NOT\nrequire a host-level replace/reopen after index solely because indexing ran — including\nwhen `force: true` (provider-owned `recreate` updates that same instance). Healthy\nreopen on `GraphProviderStaleError` remains required via `withGraphProvider`."
       ]
     },
     {
@@ -41,7 +41,7 @@
     {
       "requirement": "graph indexing uses CLI-aligned project assembly",
       "rules": [
-        "For `POST /v1/graph/index`, the handler MUST call `runIndexProjectGraph` from `@specd/sdk` with the resolved `SpecdConfig` and process-scoped kernel. It MUST NOT build a parallel legacy workspace-target shape or duplicate CLI assembly logic outside the SDK helper."
+        "For `POST /v1/graph/index`, the handler MUST call `runIndexProjectGraph` from `@specd/sdk`\nwith the process-scoped `SdkHostContext`, optional `force` / progress inputs, and\n`provider` set to the already-open long-lived `CodeGraphProvider` for the served project.\nIt MUST NOT build a parallel legacy workspace-target shape or duplicate CLI assembly\nlogic outside the SDK helper. It MUST NOT omit `provider` in a way that forces a\nshort-lived `withOpenGraphProvider` path for routine API index."
       ]
     },
     {
@@ -93,6 +93,17 @@
     },
     {
       "requirement": "handler delegates to kernel without duplicating domain rules",
+      "name": "Graph index passes the long-lived provider without release/refresh",
+      "when": ["POST /v1/graph/index is handled"],
+      "then": [
+        "the handler calls runIndexProjectGraph with provider set to the process long-lived opened provider",
+        "AND it does not release/close that provider before index",
+        "AND it does not require a host replace/reopen after index solely because indexing ran",
+        "AND when force: true, the same long-lived instance remains the session provider afterward"
+      ]
+    },
+    {
+      "requirement": "handler delegates to kernel without duplicating domain rules",
       "name": "Handler invokes change-scoped graph view composed from change specIds",
       "when": ["a valid request for this handler is processed"],
       "then": [
@@ -105,8 +116,18 @@
       "name": "Graph index builds provider input from ListWorkspaces and project graph config",
       "when": ["POST /v1/graph/index is handled"],
       "then": [
-        "the handler loads workspaces from kernel.project.listWorkspaces.execute()",
-        "AND it assembles effective graph config from project configuration before calling the provider"
+        "the handler calls runIndexProjectGraph with the process SdkHostContext",
+        "AND that SDK helper loads workspaces via kernel.project.listWorkspaces.execute() and assembles effective graph config before calling the provider",
+        "AND the handler does not duplicate that project-assembly logic outside runIndexProjectGraph"
+      ]
+    },
+    {
+      "requirement": "graph indexing uses CLI-aligned project assembly",
+      "name": "Routine API index does not use short-lived withOpenGraphProvider path",
+      "when": ["POST /v1/graph/index is handled without omitting the long-lived provider"],
+      "then": [
+        "runIndexProjectGraph receives input.provider",
+        "AND the call does not rely on omitting provider to open a transient provider via withOpenGraphProvider"
       ]
     },
     {
@@ -173,6 +194,16 @@
     }
   ],
   "implementation": {
+    "files": [
+      {
+        "specId": "api:handler-graph",
+        "file": "api:test/handler-graph-index-provider.spec.ts"
+      },
+      {
+        "specId": "api:handler-graph",
+        "file": "api:test/graph.spec.ts"
+      }
+    ],
     "symbols": [
       {
         "specId": "api:handler-graph",
@@ -182,8 +213,8 @@
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:42e25696416b2ea5308bd3f1e2d6cc5aa9e9e053b92547cf4501f9855885a4a3",
-    "verify.md": "sha256:3c4a22983b02d58f7c8054f4eea5196ced77f8fa357882a50a70cb10fd85021e"
+    "spec.md": "sha256:bcb06d9ec4116e76d7a28a1f744d6b356200d1acda418fdf8dfefb54ea293b8c",
+    "verify.md": "sha256:0776e9a229fe9a7b5b2c7b61dad6a412b77477f925757ff81dccd00b1a2670e7"
   },
   "generatedBy": "core"
 }

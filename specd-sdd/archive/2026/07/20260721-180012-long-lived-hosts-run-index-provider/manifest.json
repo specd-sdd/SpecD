@@ -1,0 +1,708 @@
+{
+  "name": "long-lived-hosts-run-index-provider",
+  "createdAt": "2026-07-21T18:00:12.416Z",
+  "updatedAt": "2026-07-22T07:41:45.611Z",
+  "description": "Adapt API and Studio desktop long-lived graph hosts to index via runIndexProjectGraph({ provider }), dropping release/refresh cycles and manual IndexProjectGraph orchestration.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "api:handler-graph",
+    "api:composition-create-api-context",
+    "api:composition-graph-provider",
+    "studio-desktop:ipc-handler-registry",
+    "studio-desktop:main-kernel-lifecycle"
+  ],
+  "specDependsOn": {
+    "api:handler-graph": [
+      "default:_global/architecture",
+      "default:_global/conventions",
+      "sdk:composition",
+      "sdk:run-index-project-graph",
+      "api:routes-graph",
+      "code-graph:composition",
+      "api:composition-graph-provider"
+    ],
+    "api:composition-create-api-context": [
+      "default:_global/architecture",
+      "default:_global/conventions",
+      "sdk:host-context",
+      "code-graph:composition"
+    ],
+    "api:composition-graph-provider": [
+      "default:_global/architecture",
+      "default:_global/conventions",
+      "sdk:run-index-project-graph",
+      "sdk:host-context",
+      "code-graph:composition"
+    ],
+    "studio-desktop:ipc-handler-registry": [
+      "client:specd-data-port",
+      "client:ipc-message-envelope",
+      "sdk:host-context",
+      "client:dto-project-status",
+      "code-graph-sqlite-electron:sqlite-electron-store",
+      "code-graph:composition",
+      "sdk:run-index-project-graph"
+    ],
+    "studio-desktop:main-kernel-lifecycle": [
+      "client:specd-data-port",
+      "sdk:host-context",
+      "code-graph-sqlite-electron:sqlite-electron-store",
+      "code-graph:composition",
+      "sdk:run-index-project-graph"
+    ]
+  },
+  "invalidationPolicy": "downstream",
+  "trackedImplementationFiles": [
+    {
+      "file": ".specd/metadata/api/dto-project-status/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/code-graph-electron/composition/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/config/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/kernel/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/sdk/composition/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/sdk/host-context/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/api/src/delivery/http/handlers/handler-graph.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/api/src/composition/create-api-context.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/api/src/composition/long-lived-graph.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "apps/specd-studio-desktop/src/main/ipc-handlers.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "apps/specd-studio-desktop/test/ipc-graph-provider.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/api/test/graph.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/api/test/handler-graph-index-provider.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/api/test/long-lived-graph.spec.ts",
+      "state": "resolved"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "api:handler-graph",
+      "file": "packages/api/src/delivery/http/handlers/handler-graph.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["registerGraphRoutes"]
+    },
+    {
+      "specId": "api:composition-create-api-context",
+      "file": "packages/api/src/composition/create-api-context.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["ApiContext", "createApiContext"]
+    },
+    {
+      "specId": "api:composition-graph-provider",
+      "file": "packages/api/src/composition/long-lived-graph.ts",
+      "fileLinkExplicit": false,
+      "symbols": [
+        "closeLongLivedGraphProvider",
+        "withHealthyGraphProvider",
+        "refreshLongLivedGraphProvider"
+      ]
+    },
+    {
+      "specId": "studio-desktop:ipc-handler-registry",
+      "file": "apps/specd-studio-desktop/src/main/ipc-handlers.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["handlePortMethod", "withGraphProvider"]
+    },
+    {
+      "specId": "studio-desktop:main-kernel-lifecycle",
+      "file": "apps/specd-studio-desktop/src/main/ipc-handlers.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["getHost", "withGraphProvider"]
+    },
+    {
+      "specId": "api:composition-graph-provider",
+      "file": "packages/api/test/long-lived-graph.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "api:handler-graph",
+      "file": "packages/api/test/handler-graph-index-provider.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "api:handler-graph",
+      "file": "packages/api/test/graph.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "studio-desktop:ipc-handler-registry",
+      "file": "apps/specd-studio-desktop/test/ipc-graph-provider.spec.ts",
+      "fileLinkExplicit": true
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:ca2ab0c45fe06c82d62f0d77163e0b6b328cccdd85e5f40c1453247c2ae185ac"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "api:handler-graph",
+          "filename": "deltas/api/handler-graph/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:0550499e239f179030e3a0c3ad340caa568f9b0b1efe801bada45be644435c9b"
+        },
+        {
+          "key": "api:composition-create-api-context",
+          "filename": "deltas/api/composition-create-api-context/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:9c86b24ea9e1b12295628397a4500d7283174b47c7ade32f8b89aeacf214b47f"
+        },
+        {
+          "key": "api:composition-graph-provider",
+          "filename": "deltas/api/composition-graph-provider/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:bae82c9ae57edffd70bee0bf3bb2c65e80a6c8d810b24875f4bf81512a74ae6a"
+        },
+        {
+          "key": "studio-desktop:ipc-handler-registry",
+          "filename": "deltas/studio-desktop/ipc-handler-registry/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b6484e44d40d04dfe5cec71c664ad888ee4a4adb47eeaf10ae6391dfb0bd4455"
+        },
+        {
+          "key": "studio-desktop:main-kernel-lifecycle",
+          "filename": "deltas/studio-desktop/main-kernel-lifecycle/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:255ed72190c7332ae742cb4281fc2992dc3824031d7ac754d27c17c56b033aee"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "api:handler-graph",
+          "filename": "deltas/api/handler-graph/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:f08253fb7aa5cc747a5a15d82b8eff8dc302a558c7128179e3cdfca5d96da4f5"
+        },
+        {
+          "key": "api:composition-create-api-context",
+          "filename": "deltas/api/composition-create-api-context/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:aea7c2dbbeb2287cde327239aec77c4a99ee224d66a76083ac19b61c5ee13ef6"
+        },
+        {
+          "key": "api:composition-graph-provider",
+          "filename": "deltas/api/composition-graph-provider/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b5d6715e66893f659e8421c7dd658034fd6190b4bea1b94b67f83864dc5e31cf"
+        },
+        {
+          "key": "studio-desktop:ipc-handler-registry",
+          "filename": "deltas/studio-desktop/ipc-handler-registry/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:aa4772d8c8fe26fe62f747005d1491320c3af9985857cb6194f4adda3733a04a"
+        },
+        {
+          "key": "studio-desktop:main-kernel-lifecycle",
+          "filename": "deltas/studio-desktop/main-kernel-lifecycle/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b370fd87d96c93e7cdcb97a369dbc0b7c2732b3d129436d4a369ee3290f801b7"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:26d8d20ff96f51398694dc580fc5d4480256f19caeb517a634fbfd85a5ad2124"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:d623a5740c246978ee5d9a52a1065ba140e1a93f0e3de1c6db3cf42c16d5fd7c"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-07-21T18:00:12.416Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": [
+        "api:handler-graph",
+        "api:composition-create-api-context",
+        "api:composition-graph-provider",
+        "studio-desktop:ipc-handler-registry",
+        "studio-desktop:main-kernel-lifecycle",
+        "sdk:run-index-project-graph"
+      ],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-21T18:00:12.445Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "api:handler-graph"
+        },
+        {
+          "type": "specs",
+          "key": "api:composition-create-api-context"
+        },
+        {
+          "type": "specs",
+          "key": "api:composition-graph-provider"
+        },
+        {
+          "type": "specs",
+          "key": "studio-desktop:ipc-handler-registry"
+        },
+        {
+          "type": "specs",
+          "key": "studio-desktop:main-kernel-lifecycle"
+        },
+        {
+          "type": "specs",
+          "key": "sdk:run-index-project-graph"
+        },
+        {
+          "type": "verify",
+          "key": "api:handler-graph"
+        },
+        {
+          "type": "verify",
+          "key": "api:composition-create-api-context"
+        },
+        {
+          "type": "verify",
+          "key": "api:composition-graph-provider"
+        },
+        {
+          "type": "verify",
+          "key": "studio-desktop:ipc-handler-registry"
+        },
+        {
+          "type": "verify",
+          "key": "studio-desktop:main-kernel-lifecycle"
+        },
+        {
+          "type": "verify",
+          "key": "sdk:run-index-project-graph"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-21T21:03:03.097Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "api:handler-graph",
+            "api:composition-create-api-context",
+            "api:composition-graph-provider",
+            "studio-desktop:ipc-handler-registry",
+            "studio-desktop:main-kernel-lifecycle",
+            "sdk:run-index-project-graph"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "api:handler-graph",
+            "api:composition-create-api-context",
+            "api:composition-graph-provider",
+            "studio-desktop:ipc-handler-registry",
+            "studio-desktop:main-kernel-lifecycle",
+            "sdk:run-index-project-graph"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-21T21:03:03.097Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-21T21:03:03.098Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [],
+      "filesRemoved": [
+        {
+          "type": "specs",
+          "key": "sdk:run-index-project-graph"
+        },
+        {
+          "type": "verify",
+          "key": "sdk:run-index-project-graph"
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-21T21:20:05.846Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "api:handler-graph",
+            "api:composition-create-api-context",
+            "api:composition-graph-provider",
+            "studio-desktop:ipc-handler-registry",
+            "studio-desktop:main-kernel-lifecycle"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "api:handler-graph",
+            "api:composition-create-api-context",
+            "api:composition-graph-provider",
+            "studio-desktop:ipc-handler-registry",
+            "studio-desktop:main-kernel-lifecycle"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-21T21:21:08.723Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [studio-desktop:main-kernel-lifecycle]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["studio-desktop:main-kernel-lifecycle"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "api:handler-graph",
+            "api:composition-create-api-context",
+            "api:composition-graph-provider",
+            "studio-desktop:ipc-handler-registry",
+            "studio-desktop:main-kernel-lifecycle"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-21T21:26:59.814Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-21T21:27:59.845Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-21T21:39:30.209Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-21T21:49:24.758Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "api:handler-graph",
+            "api:composition-create-api-context",
+            "api:composition-graph-provider",
+            "studio-desktop:ipc-handler-registry",
+            "studio-desktop:main-kernel-lifecycle"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "api:handler-graph",
+            "api:composition-create-api-context",
+            "api:composition-graph-provider",
+            "studio-desktop:ipc-handler-registry",
+            "studio-desktop:main-kernel-lifecycle"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-21T21:49:24.758Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-21T21:50:17.813Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-21T21:50:19.714Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-21T21:55:20.031Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-21T21:58:24.107Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-21T21:58:46.697Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-22T07:41:45.610Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-07-22T07:41:45.735Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

@@ -40,15 +40,21 @@ Construction MUST still go through `SdkHostContext.createGraphProvider`.
 Handlers MUST NOT import `createCodeGraphProvider` from `@specd/code-graph` directly.
 Handlers MUST NOT call `withOpenGraphProvider` for routine graph HTTP routes.
 
-### Requirement: long-lived provider refresh after index and stale errors
+### Requirement: long-lived provider stale reopen and index on injected provider
 
-After `runIndexProjectGraph` completes (which may open a short-lived provider
-internally), the API host MUST replace or reopen its long-lived provider before
-subsequent graph reads.
+When indexing, the API host MUST pass its process-scoped long-lived opened provider
+into `runIndexProjectGraph` as `input.provider`. The host MUST NOT close or replace
+that provider solely because indexing completed — including when `force: true` —
+because force recreate and storage-generation refresh are owned by
+`CodeGraphProvider.index` on that same instance.
 
 When a graph operation on the long-lived provider throws `GraphProviderStaleError`,
 the healthy accessor (`withGraphProvider`) MUST close and reopen (or replace) the
 provider and MAY retry the operation once.
+
+Host helpers such as `refreshGraphProvider` MAY remain for explicit stale recovery or
+other host-owned replacement, but MUST NOT be required as a post-index step when
+index used the injected long-lived provider.
 
 ## Constraints
 

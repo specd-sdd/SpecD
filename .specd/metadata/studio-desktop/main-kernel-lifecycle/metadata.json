@@ -5,7 +5,8 @@
     "client:specd-data-port",
     "sdk:host-context",
     "code-graph-sqlite-electron:sqlite-electron-store",
-    "code-graph:composition"
+    "code-graph:composition",
+    "sdk:run-index-project-graph"
   ],
   "context": [
     "Electron desktop host concern — **Main Kernel Lifecycle**. Local mode bootstraps an SDK host context (`createSdkContext`) in the main process and exposes IPC-backed ports; remote mode reuses the HTTP client stack. The main process owns one SDK host context per locally opened project."
@@ -26,7 +27,7 @@
     {
       "requirement": "desktop startup prepares the Electron SQLite graph runtime",
       "rules": [
-        "The desktop host MUST prepare its Electron-native SQLite graph runtime before the\napp starts local graph work.\n\nThe desktop package MUST:\n\n- depend on `@specd/code-graph-sqlite-electron` for the Electron-vendored SQLite\n  graph-store factory used by desktop-local graph execution\n- expose `rebuild:graph-sqlite-electron` for rebuilding the locally generated\n  vendored Electron SQLite addon owned by `@specd/code-graph-sqlite-electron`\n- expose `rebuild:graph-electron` as an alias of that rebuild\n- run the Electron SQLite rebuild from `prestart`\n\nDesktop startup MUST NOT assume that the vendored sqlite tree or its Electron-targeted\nnative addon are present in git. The first successful desktop start on a fresh clone\nMAY require a local native rebuild when the generated addon is missing or stale for\nthe current Electron version, platform, or architecture.\n\nDesktop-local graph MUST follow the long-lived host model from `code-graph:composition`:\nconstruct the process/project SDK host with `graphStoreId: 'sqlite-electron'` and the\nadditive factory from `@specd/code-graph-sqlite-electron`, create one provider via\n`createGraphProvider()`, `await open()`, reuse it while healthy, reopen on\n`GraphProviderStaleError`, and `close()` on project switch or host teardown.\n\nDesktop MUST NOT import `@specd/code-graph-electron` for this path. The existing\n`@specd/code-graph-electron` package MAY remain in the monorepo unused.\n\nDesktop MUST NOT use `withOpenGraphProvider` for routine local graph IPC (that helper\nis the short-lived CLI/one-shot path). Index orchestration MAY still call\n`runIndexProjectGraph` (which opens a short-lived provider internally); after index\ncompletes the desktop host MUST replace/reopen its long-lived provider.\n\nThis wiring isolates the native SQLite runtime required by the Electron desktop\nhost without retargeting CLI or API away from the standard non-Electron graph\nruntime exposed through `@specd/sdk` and backed by `@specd/code-graph`."
+        "The desktop host MUST prepare its Electron-native SQLite graph runtime before the\napp starts local graph work.\n\nThe desktop package MUST:\n\n- depend on `@specd/code-graph-sqlite-electron` for the Electron-vendored SQLite\n  graph-store factory used by desktop-local graph execution\n- expose `rebuild:graph-sqlite-electron` for rebuilding the locally generated\n  vendored Electron SQLite addon owned by `@specd/code-graph-sqlite-electron`\n- expose `rebuild:graph-electron` as an alias of that rebuild\n- run the Electron SQLite rebuild from `prestart`\n\nDesktop startup MUST NOT assume that the vendored sqlite tree or its Electron-targeted\nnative addon are present in git. The first successful desktop start on a fresh clone\nMAY require a local native rebuild when the generated addon is missing or stale for\nthe current Electron version, platform, or architecture.\n\nDesktop-local graph MUST follow the long-lived host model from `code-graph:composition`:\nconstruct the process/project SDK host with `graphStoreId: 'sqlite-electron'` and the\nadditive factory from `@specd/code-graph-sqlite-electron`, create one provider via\n`createGraphProvider()`, `await open()`, reuse it while healthy, reopen on\n`GraphProviderStaleError`, and `close()` on project switch or host teardown.\n\nDesktop MUST NOT import `@specd/code-graph-electron` for this path. The existing\n`@specd/code-graph-electron` package MAY remain in the monorepo unused.\n\nDesktop MUST NOT use `withOpenGraphProvider` for routine local graph IPC (that helper\nis the short-lived CLI/one-shot path). Index orchestration MUST call\n`runIndexProjectGraph` with the session long-lived opened provider as `input.provider`.\nAfter index completes — including when `force: true` — the desktop host MUST NOT be\nrequired to replace/reopen that provider solely because indexing ran; force recreate\nand generation refresh are owned by `CodeGraphProvider.index` on the injected instance.\nHealthy reopen on `GraphProviderStaleError` remains required.\n\nThis wiring isolates the native SQLite runtime required by the Electron desktop\nhost without retargeting CLI or API away from the standard non-Electron graph\nruntime exposed through `@specd/sdk` and backed by `@specd/code-graph`."
       ]
     },
     {
@@ -111,6 +112,16 @@
     },
     {
       "requirement": "desktop startup prepares the Electron SQLite graph runtime",
+      "name": "Desktop index reuses the long-lived provider without host reload",
+      "when": ["desktop index orchestration runs with optional force: true"],
+      "then": [
+        "it calls runIndexProjectGraph with the session long-lived opened provider as input.provider",
+        "AND it does not require replace/reopen of that provider solely because indexing completed",
+        "AND healthy reopen on GraphProviderStaleError remains available"
+      ]
+    },
+    {
+      "requirement": "desktop startup prepares the Electron SQLite graph runtime",
       "name": "CLI and API keep the standard SDK-backed graph runtime",
       "when": ["CLI and API package dependencies and bootstrap code are inspected"],
       "then": [
@@ -148,24 +159,6 @@
     }
   ],
   "implementation": {
-    "files": [
-      {
-        "specId": "studio-desktop:main-kernel-lifecycle",
-        "file": "studio-desktop:package.json"
-      },
-      {
-        "specId": "studio-desktop:main-kernel-lifecycle",
-        "file": "studio-desktop:tsup.main.config.ts"
-      },
-      {
-        "specId": "studio-desktop:main-kernel-lifecycle",
-        "file": "studio-desktop:test/desktop-graph-runtime.spec.ts"
-      },
-      {
-        "specId": "studio-desktop:main-kernel-lifecycle",
-        "file": "studio-desktop:test/desktop-host-lifecycle.spec.ts"
-      }
-    ],
     "symbols": [
       {
         "specId": "studio-desktop:main-kernel-lifecycle",
@@ -176,27 +169,12 @@
         "specId": "studio-desktop:main-kernel-lifecycle",
         "file": "studio-desktop:src/main/ipc-handlers.ts",
         "symbol": "withGraphProvider"
-      },
-      {
-        "specId": "studio-desktop:main-kernel-lifecycle",
-        "file": "studio-desktop:src/main/ipc-handlers.ts",
-        "symbol": "resetDesktopKernel"
-      },
-      {
-        "specId": "studio-desktop:main-kernel-lifecycle",
-        "file": "studio-desktop:src/main/long-lived-graph.ts",
-        "symbol": "openLongLivedGraphProvider"
-      },
-      {
-        "specId": "studio-desktop:main-kernel-lifecycle",
-        "file": "studio-desktop:src/main/long-lived-graph.ts",
-        "symbol": "withHealthyGraphProvider"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:e9ca27951434cfadafdb20c852e492786cf6e0555c8081a0769f3aa5ed5e9fdd",
-    "verify.md": "sha256:f1bf739f0738e7ad691c26a1735d2760a5efbfb0d586ad80d1a79060e5bdffd6"
+    "spec.md": "sha256:af061f773ba499b832b033dd59852ece77d940bbd582b7d979fae0894ce47418",
+    "verify.md": "sha256:fbda2d92a848d20c66d73b62ad705485c537748eaa89cdc6d384b2ea50f211f3"
   },
   "generatedBy": "core"
 }

@@ -64,7 +64,7 @@
 - **AND** it does not import `createCodeGraphProvider` from `@specd/code-graph`
 - **AND** it does not open/close a provider per HTTP request
 
-### Requirement: long-lived provider refresh after index and stale errors
+### Requirement: long-lived provider stale reopen and index on injected provider
 
 #### Scenario: Stale provider is reopened
 
@@ -72,7 +72,8 @@
 - **WHEN** the healthy accessor recovers
 - **THEN** it closes and reopens (or replaces) the process-scoped provider
 
-#### Scenario: Index completion refreshes the long-lived provider
+#### Scenario: Index on injected provider does not require post-index host refresh
 
-- **WHEN** `runIndexProjectGraph` completes
-- **THEN** the API replaces or reopens its long-lived provider before the next graph read
+- **WHEN** `runIndexProjectGraph` completes with `input.provider` set to the process long-lived provider
+- **THEN** the API does not replace or reopen that provider solely because indexing completed
+- **AND** when `force: true`, the same long-lived instance remains authoritative for subsequent graph reads

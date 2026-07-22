@@ -14,11 +14,13 @@
     {
       "file": "api:src/composition/long-lived-graph.ts",
       "symbols": [
-        "openLongLivedGraphProvider",
+        "closeLongLivedGraphProvider",
         "withHealthyGraphProvider",
-        "refreshLongLivedGraphProvider",
-        "closeLongLivedGraphProvider"
+        "refreshLongLivedGraphProvider"
       ]
+    },
+    {
+      "file": "api:test/long-lived-graph.spec.ts"
     }
   ]
 }

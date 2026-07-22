@@ -31,6 +31,14 @@
 - **AND** index still goes through `runIndexProjectGraph`
 - **AND** the handler does not call `createCodeGraphProvider` directly
 
+#### Scenario: Graph index passes the long-lived provider without release/refresh
+
+- **WHEN** `POST /v1/graph/index` is handled
+- **THEN** the handler calls `runIndexProjectGraph` with `provider` set to the process long-lived opened provider
+- **AND** it does not release/close that provider before index
+- **AND** it does not require a host replace/reopen after index solely because indexing ran
+- **AND** when `force: true`, the same long-lived instance remains the session provider afterward
+
 #### Scenario: Handler invokes change-scoped graph view composed from change specIds
 
 - **WHEN** a valid request for this handler is processed
@@ -42,8 +50,15 @@
 #### Scenario: Graph index builds provider input from ListWorkspaces and project graph config
 
 - **WHEN** `POST /v1/graph/index` is handled
-- **THEN** the handler loads workspaces from `kernel.project.listWorkspaces.execute()`
-- **AND** it assembles effective graph config from project configuration before calling the provider
+- **THEN** the handler calls `runIndexProjectGraph` with the process `SdkHostContext`
+- **AND** that SDK helper loads workspaces via `kernel.project.listWorkspaces.execute()` and assembles effective graph config before calling the provider
+- **AND** the handler does not duplicate that project-assembly logic outside `runIndexProjectGraph`
+
+#### Scenario: Routine API index does not use short-lived withOpenGraphProvider path
+
+- **WHEN** `POST /v1/graph/index` is handled without omitting the long-lived provider
+- **THEN** `runIndexProjectGraph` receives `input.provider`
+- **AND** the call does not rely on omitting `provider` to open a transient provider via `withOpenGraphProvider`
 
 ### Requirement: successful responses use presenters and DTO wire shapes
 

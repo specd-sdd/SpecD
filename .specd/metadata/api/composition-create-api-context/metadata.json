@@ -20,7 +20,7 @@
     {
       "requirement": "graph provider factory is per project config",
       "rules": [
-        "`createGraphProvider()` on the API context MUST delegate to the `createGraphProvider` factory from the process-scoped `SdkHostContext`. It MUST NOT construct `@specd/code-graph` providers independently of that factory.\n\nGraph HTTP handlers MUST obtain the opened provider through `withGraphProvider()` (healthy long-lived accessor) rather than calling `createGraphProvider()` + `open()` + `close()` per request. `getGraphProvider()` MAY be used when a caller only needs the current held instance without stale recovery."
+        "`createGraphProvider()` on the API context MUST delegate to the `createGraphProvider`\nfactory from the process-scoped `SdkHostContext`. It MUST NOT construct\n`@specd/code-graph` providers independently of that factory.\n\nGraph HTTP handlers MUST obtain the opened provider through `withGraphProvider()`\n(healthy long-lived accessor) rather than calling `createGraphProvider()` + `open()` +\n`close()` per request. `getGraphProvider()` MAY be used when a caller only needs the\ncurrent held instance without stale recovery.\n\nFor `POST /v1/graph/index`, handlers MUST pass that long-lived opened provider into\n`runIndexProjectGraph` as `input.provider`. The context MUST NOT require closing or\nreleasing the long-lived provider before index as the routine path. Optional\n`refreshGraphProvider` (or equivalent) MAY exist for stale recovery / explicit\nreplacement, but MUST NOT be mandated after index when the injected provider was used."
       ]
     }
   ],
@@ -71,15 +71,20 @@
         "it calls withGraphProvider() (or equivalent healthy process accessor)",
         "AND it does not open/close a new provider for that single request"
       ]
+    },
+    {
+      "requirement": "graph provider factory is per project config",
+      "name": "Graph index does not require release-before-index",
+      "when": ["POST /v1/graph/index runs through the request context"],
+      "then": [
+        "the long-lived opened provider is passed into runIndexProjectGraph as input.provider",
+        "AND the routine path does not close or release that provider before index",
+        "AND post-index refreshGraphProvider is not required when that injected provider was used"
+      ]
     }
   ],
   "implementation": {
     "symbols": [
-      {
-        "specId": "api:composition-create-api-context",
-        "file": "api:src/composition/create-api-context.ts",
-        "symbol": "createApiContext"
-      },
       {
         "specId": "api:composition-create-api-context",
         "file": "api:src/composition/create-api-context.ts",
@@ -88,13 +93,13 @@
       {
         "specId": "api:composition-create-api-context",
         "file": "api:src/composition/create-api-context.ts",
-        "symbol": "ApiServerState"
+        "symbol": "createApiContext"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:22de5cf52b277483625fec7d0b98044d4cd2f8f8a10ea7050c56cad57738b8f5",
-    "verify.md": "sha256:4ebec7f1746ab66abede934565e15b2832bc5ce6b3fd2c0500ed60b86b807e70"
+    "spec.md": "sha256:a9b5c35cbc9c03ae472431ffd51ee6f25a1494fd5d3c0c829c324a46dcbe8977",
+    "verify.md": "sha256:9171d471396b4d52bd0ea49741781bdc9ed935eea14f32bf9fad4b368a40f9ca"
   },
   "generatedBy": "core"
 }

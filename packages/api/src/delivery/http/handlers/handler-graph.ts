@@ -64,15 +64,13 @@ export function registerGraphRoutes(app: FastifyInstance): void {
     },
     apiHandler(async (ctx, req) => {
       const body = (req.body ?? {}) as { force?: boolean }
-      await ctx.releaseGraphProviderForIndex()
-      try {
-        const result = await runIndexProjectGraph(ctx, {
+      const result = await ctx.withGraphProvider(async (provider) =>
+        runIndexProjectGraph(ctx, {
+          provider,
           ...(body.force === true ? { force: true } : {}),
-        })
-        return toGraphIndexResultDto(result)
-      } finally {
-        await ctx.refreshGraphProvider()
-      }
+        }),
+      )
+      return toGraphIndexResultDto(result)
     }),
   )
 

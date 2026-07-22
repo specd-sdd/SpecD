@@ -11,17 +11,16 @@ import { getSetting, setSetting, removeSetting } from './settings-store.js'
 
 import {
   type SymbolKind,
-  buildProjectGraphConfig,
   codeGraphVersion,
   createDefaultConfigLoader,
   createGetGraphHealth,
-  createIndexProjectGraph,
   createLogFormatter,
   createSdkContext,
   createVcsAdapter,
   createVcsActorResolver,
   Logger,
   LogRingBuffer,
+  runIndexProjectGraph,
   SpecPath,
   type ArchivedChange,
   type Change,
@@ -1789,33 +1788,16 @@ async function handlePortMethod(envelope: IpcRequestEnvelope): Promise<IpcRespon
     case 'indexGraph': {
       const [input = {}] = params as [GraphIndexInput?]
       const host = await getHost()
-      const indexResult = await withGraphProvider(async (provider) => {
-        const workspaces = await host.kernel.project.listWorkspaces.execute()
-        const graphConfig = buildProjectGraphConfig(host.config)
-        const vcs = await createVcsAdapter(host.config.projectRoot).catch(() => null)
-        const vcsRef = (await vcs?.ref()) ?? undefined
-        const vcsRoot =
-          vcs === null
-            ? null
-            : (() => {
-                try {
-                  return vcs.rootDir()
-                } catch {
-                  return null
-                }
-              })()
-        const indexProjectGraph = createIndexProjectGraph()
-        return indexProjectGraph.execute({
+      const sdkCtx = {
+        kernel: host.kernel,
+        createGraphProvider: host.createGraphProvider,
+      }
+      const indexResult = await withGraphProvider(async (provider) =>
+        runIndexProjectGraph(sdkCtx, {
           provider,
-          projectRoot: host.config.projectRoot,
-          workspaces,
-          graphConfig,
-          codeGraphVersion,
-          vcsRoot,
           ...(input?.force === true ? { force: true } : {}),
-          ...(vcsRef !== undefined ? { vcsRef } : {}),
-        })
-      })
+        }),
+      )
       return createIpcSuccess(envelope.id, toGraphIndexResultDto(indexResult))
     }
     case 'getHotspots': {

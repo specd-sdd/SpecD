@@ -20,9 +20,20 @@ HTTP route handlers need a consistent way to reach the kernel, the request actor
 
 ### Requirement: graph provider factory is per project config
 
-`createGraphProvider()` on the API context MUST delegate to the `createGraphProvider` factory from the process-scoped `SdkHostContext`. It MUST NOT construct `@specd/code-graph` providers independently of that factory.
+`createGraphProvider()` on the API context MUST delegate to the `createGraphProvider`
+factory from the process-scoped `SdkHostContext`. It MUST NOT construct
+`@specd/code-graph` providers independently of that factory.
 
-Graph HTTP handlers MUST obtain the opened provider through `withGraphProvider()` (healthy long-lived accessor) rather than calling `createGraphProvider()` + `open()` + `close()` per request. `getGraphProvider()` MAY be used when a caller only needs the current held instance without stale recovery.
+Graph HTTP handlers MUST obtain the opened provider through `withGraphProvider()`
+(healthy long-lived accessor) rather than calling `createGraphProvider()` + `open()` +
+`close()` per request. `getGraphProvider()` MAY be used when a caller only needs the
+current held instance without stale recovery.
+
+For `POST /v1/graph/index`, handlers MUST pass that long-lived opened provider into
+`runIndexProjectGraph` as `input.provider`. The context MUST NOT require closing or
+releasing the long-lived provider before index as the routine path. Optional
+`refreshGraphProvider` (or equivalent) MAY exist for stale recovery / explicit
+replacement, but MUST NOT be mandated after index when the injected provider was used.
 
 ## Constraints
 

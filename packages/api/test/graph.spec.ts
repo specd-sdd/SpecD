@@ -121,6 +121,13 @@ describe('Graph API', () => {
     expect(Array.isArray(data.workspaces)).toBe(true)
     expect(data.workspaces.length).toBeGreaterThan(0)
     expect(typeof data.fullRebuildReason === 'string' || data.fullRebuildReason === null).toBe(true)
+
+    const status = await apiJson<{
+      lastIndexedAt: string | null
+      fileCount: number | null
+    }>('/graph/status')
+    expect(status.res.ok).toBe(true)
+    expect(status.data).toBeDefined()
   })
 
   it('given unsupported workspaces property, when POST /graph/index, then returns problem+json', async () => {

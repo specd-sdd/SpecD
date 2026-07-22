@@ -34,9 +34,12 @@ On `GraphProviderStaleError`, the desktop host MUST `close()` and `open()` (or
 replace) the long-lived provider before retrying the IPC operation. On project
 switch or host teardown, the desktop host MUST `close()` the long-lived provider.
 
-Desktop MUST NOT use `withOpenGraphProvider` for routine graph IPC. After
-`runIndexProjectGraph` (short-lived internal provider), the host MUST replace/reopen
-its long-lived provider before subsequent graph IPC.
+Desktop MUST NOT use `withOpenGraphProvider` for routine graph IPC. Graph index IPC
+MUST call `runIndexProjectGraph` from `@specd/sdk` with `provider` set to the
+session long-lived opened provider. Desktop MUST NOT index by calling
+`createIndexProjectGraph` directly as the routine path, and MUST NOT replace/reopen
+the long-lived provider solely because index completed — including when `force: true`
+(provider-owned recreate updates that same instance).
 
 The Electron main process MUST keep graph execution inside the desktop-local host
 runtime. Renderer code MUST continue to call the shared `SpecdDataPort` surface and
@@ -59,3 +62,4 @@ The IPC result MUST have the same `ProjectStatusDto` shape and optional-field se
 - [`client:dto-project-status`](../../client/dto-project-status/spec.md) — canonical status DTO and pure mapper shared with HTTP
 - [`code-graph-sqlite-electron:sqlite-electron-store`](../../code-graph-sqlite-electron/sqlite-electron-store/spec.md) — Electron SQLite factory used by local graph IPC
 - [`code-graph:composition`](../../code-graph/composition/spec.md) — long-lived provider lifecycle for Electron hosts
+- [`sdk:run-index-project-graph`](../../sdk/run-index-project-graph/spec.md) — project index orchestration with optional injected provider

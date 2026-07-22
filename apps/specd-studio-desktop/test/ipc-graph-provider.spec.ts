@@ -15,4 +15,15 @@ describe('desktop graph provider wiring', () => {
     expect(source).not.toContain("from '@specd/code-graph-electron'")
     expect(source).not.toContain('../../../../packages/code-graph/dist/index.js')
   })
+
+  it('indexes via runIndexProjectGraph with the session provider', () => {
+    const source = readFileSync(path.join(desktopRoot, 'src/main/ipc-handlers.ts'), 'utf8')
+
+    expect(source).toContain('runIndexProjectGraph')
+    expect(source).toContain("case 'indexGraph'")
+    expect(source).toContain('runIndexProjectGraph(sdkCtx, {')
+    expect(source).toContain('provider,')
+    expect(source).not.toContain('createIndexProjectGraph')
+    expect(source).not.toContain('buildProjectGraphConfig(host.config)')
+  })
 })

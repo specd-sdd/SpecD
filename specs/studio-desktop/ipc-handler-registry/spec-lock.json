@@ -9,18 +9,16 @@
     "sdk:host-context",
     "client:dto-project-status",
     "code-graph-sqlite-electron:sqlite-electron-store",
-    "code-graph:composition"
+    "code-graph:composition",
+    "sdk:run-index-project-graph"
   ],
   "implementation": [
     {
       "file": "studio-desktop:src/main/ipc-handlers.ts",
-      "symbols": ["withGraphProvider", "getHost"]
+      "symbols": ["handlePortMethod", "withGraphProvider"]
     },
     {
       "file": "studio-desktop:test/ipc-graph-provider.spec.ts"
-    },
-    {
-      "file": "studio-desktop:test/desktop-host-lifecycle.spec.ts"
     }
   ]
 }

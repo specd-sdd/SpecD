@@ -15,12 +15,16 @@ The module MUST implement every method, path, query, and body declared in [`api:
 Business rules MUST live in core and code-graph use cases. This handler MUST invoke only:
 
 - `apiContext.withGraphProvider()` (healthy long-lived opened provider) for stats, search, impact, and hotspots
-- `runIndexProjectGraph` from `@specd/sdk` for `POST /v1/graph/index`, then rely on host refresh of the long-lived provider
+- `runIndexProjectGraph` from `@specd/sdk` for `POST /v1/graph/index`, passing the process-scoped long-lived opened provider as `input.provider` (obtained via `withGraphProvider` / `getGraphProvider` as appropriate)
 - change-scoped graph view composed from change `specIds` via kernel use cases
 
 The handler MUST NOT import `createCodeGraphProvider` from `@specd/code-graph` directly.
 The handler MUST NOT open/close a provider per HTTP request and MUST NOT call
 `withOpenGraphProvider` for routine graph routes.
+The handler MUST NOT release/close the long-lived provider before index, and MUST NOT
+require a host-level replace/reopen after index solely because indexing ran — including
+when `force: true` (provider-owned `recreate` updates that same instance). Healthy
+reopen on `GraphProviderStaleError` remains required via `withGraphProvider`.
 
 ### Requirement: successful responses use presenters and DTO wire shapes
 
@@ -32,7 +36,12 @@ Thrown kernel errors and validation failures MUST be converted through `api:prob
 
 ### Requirement: graph indexing uses CLI-aligned project assembly
 
-For `POST /v1/graph/index`, the handler MUST call `runIndexProjectGraph` from `@specd/sdk` with the resolved `SpecdConfig` and process-scoped kernel. It MUST NOT build a parallel legacy workspace-target shape or duplicate CLI assembly logic outside the SDK helper.
+For `POST /v1/graph/index`, the handler MUST call `runIndexProjectGraph` from `@specd/sdk`
+with the process-scoped `SdkHostContext`, optional `force` / progress inputs, and
+`provider` set to the already-open long-lived `CodeGraphProvider` for the served project.
+It MUST NOT build a parallel legacy workspace-target shape or duplicate CLI assembly
+logic outside the SDK helper. It MUST NOT omit `provider` in a way that forces a
+short-lived `withOpenGraphProvider` path for routine API index.
 
 ### Requirement: SDK delivery imports
 

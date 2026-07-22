@@ -1,0 +1,55 @@
+- op: modified
+  description: 'Index reuses long-lived provider via runIndex; no post-index reopen for short-lived path'
+  selector:
+    type: section
+    matches: 'Requirement: desktop startup prepares the Electron SQLite graph runtime'
+  content: |
+    The desktop host MUST prepare its Electron-native SQLite graph runtime before the
+    app starts local graph work.
+
+    The desktop package MUST:
+
+    - depend on `@specd/code-graph-sqlite-electron` for the Electron-vendored SQLite
+      graph-store factory used by desktop-local graph execution
+    - expose `rebuild:graph-sqlite-electron` for rebuilding the locally generated
+      vendored Electron SQLite addon owned by `@specd/code-graph-sqlite-electron`
+    - expose `rebuild:graph-electron` as an alias of that rebuild
+    - run the Electron SQLite rebuild from `prestart`
+
+    Desktop startup MUST NOT assume that the vendored sqlite tree or its Electron-targeted
+    native addon are present in git. The first successful desktop start on a fresh clone
+    MAY require a local native rebuild when the generated addon is missing or stale for
+    the current Electron version, platform, or architecture.
+
+    Desktop-local graph MUST follow the long-lived host model from `code-graph:composition`:
+    construct the process/project SDK host with `graphStoreId: 'sqlite-electron'` and the
+    additive factory from `@specd/code-graph-sqlite-electron`, create one provider via
+    `createGraphProvider()`, `await open()`, reuse it while healthy, reopen on
+    `GraphProviderStaleError`, and `close()` on project switch or host teardown.
+
+    Desktop MUST NOT import `@specd/code-graph-electron` for this path. The existing
+    `@specd/code-graph-electron` package MAY remain in the monorepo unused.
+
+    Desktop MUST NOT use `withOpenGraphProvider` for routine local graph IPC (that helper
+    is the short-lived CLI/one-shot path). Index orchestration MUST call
+    `runIndexProjectGraph` with the session long-lived opened provider as `input.provider`.
+    After index completes — including when `force: true` — the desktop host MUST NOT be
+    required to replace/reopen that provider solely because indexing ran; force recreate
+    and generation refresh are owned by `CodeGraphProvider.index` on the injected instance.
+    Healthy reopen on `GraphProviderStaleError` remains required.
+
+    This wiring isolates the native SQLite runtime required by the Electron desktop
+    host without retargeting CLI or API away from the standard non-Electron graph
+    runtime exposed through `@specd/sdk` and backed by `@specd/code-graph`.
+
+- op: modified
+  description: 'Add sdk:run-index-project-graph dependency'
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`sdk:host-context`](../../sdk/host-context/spec.md) — `createSdkContext` bootstrap for desktop main
+    - [`client:specd-data-port`](../../../../../../specs/client/specd-data-port/spec.md) — IPC data contract implemented by the desktop adapter
+    - [`code-graph-sqlite-electron:sqlite-electron-store`](../../code-graph-sqlite-electron/sqlite-electron-store/spec.md) — Electron SQLite factory and vendored runtime used for local graph
+    - [`code-graph:composition`](../../code-graph/composition/spec.md) — long-lived provider lifecycle for Electron hosts
+    - [`sdk:run-index-project-graph`](../../sdk/run-index-project-graph/spec.md) — project index orchestration with optional injected provider

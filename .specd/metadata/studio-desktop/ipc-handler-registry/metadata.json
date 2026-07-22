@@ -7,7 +7,8 @@
     "sdk:host-context",
     "client:dto-project-status",
     "code-graph-sqlite-electron:sqlite-electron-store",
-    "code-graph:composition"
+    "code-graph:composition",
+    "sdk:run-index-project-graph"
   ],
   "context": [
     "Electron desktop host concern — **Ipc Handler Registry**. Local mode uses an SDK-bootstrapped kernel in the main process and exposes IPC-backed ports; remote mode reuses the HTTP client stack. Register main-process IPC channels that implement `client:port-*` semantics without HTTP."
@@ -32,7 +33,7 @@
     {
       "requirement": "graph IPC methods use the Electron graph runtime",
       "rules": [
-        "Desktop-local graph IPC methods MUST reuse a long-lived, already-open\n`CodeGraphProvider` owned by the process/project SDK host context — not open and\nclose a provider per IPC call, and not call `createCodeGraphProvider` directly.\n\nThe host context MUST be constructed with SDK `graph` options that select\n`graphStoreId: 'sqlite-electron'` and register the additive factory from\n`@specd/code-graph-sqlite-electron`.\n\nOn `GraphProviderStaleError`, the desktop host MUST `close()` and `open()` (or\nreplace) the long-lived provider before retrying the IPC operation. On project\nswitch or host teardown, the desktop host MUST `close()` the long-lived provider.\n\nDesktop MUST NOT use `withOpenGraphProvider` for routine graph IPC. After\n`runIndexProjectGraph` (short-lived internal provider), the host MUST replace/reopen\nits long-lived provider before subsequent graph IPC.\n\nThe Electron main process MUST keep graph execution inside the desktop-local host\nruntime. Renderer code MUST continue to call the shared `SpecdDataPort` surface and\nMUST NOT import graph runtime packages directly.\n\nDesktop-local graph IPC MUST NOT import `@specd/code-graph-electron` for provider\nconstruction on this path."
+        "Desktop-local graph IPC methods MUST reuse a long-lived, already-open\n`CodeGraphProvider` owned by the process/project SDK host context — not open and\nclose a provider per IPC call, and not call `createCodeGraphProvider` directly.\n\nThe host context MUST be constructed with SDK `graph` options that select\n`graphStoreId: 'sqlite-electron'` and register the additive factory from\n`@specd/code-graph-sqlite-electron`.\n\nOn `GraphProviderStaleError`, the desktop host MUST `close()` and `open()` (or\nreplace) the long-lived provider before retrying the IPC operation. On project\nswitch or host teardown, the desktop host MUST `close()` the long-lived provider.\n\nDesktop MUST NOT use `withOpenGraphProvider` for routine graph IPC. Graph index IPC\nMUST call `runIndexProjectGraph` from `@specd/sdk` with `provider` set to the\nsession long-lived opened provider. Desktop MUST NOT index by calling\n`createIndexProjectGraph` directly as the routine path, and MUST NOT replace/reopen\nthe long-lived provider solely because index completed — including when `force: true`\n(provider-owned recreate updates that same instance).\n\nThe Electron main process MUST keep graph execution inside the desktop-local host\nruntime. Renderer code MUST continue to call the shared `SpecdDataPort` surface and\nMUST NOT import graph runtime packages directly.\n\nDesktop-local graph IPC MUST NOT import `@specd/code-graph-electron` for provider\nconstruction on this path."
       ]
     },
     {
@@ -104,6 +105,17 @@
     },
     {
       "requirement": "graph IPC methods use the Electron graph runtime",
+      "name": "Graph index IPC passes the long-lived provider to runIndexProjectGraph",
+      "when": ["indexGraph IPC runs"],
+      "then": [
+        "desktop calls runIndexProjectGraph with provider set to the session long-lived opened provider",
+        "AND it does not call createIndexProjectGraph directly as the routine path",
+        "AND it does not replace/reopen the long-lived provider solely because index completed",
+        "AND when force: true, the same long-lived instance remains the session provider afterward"
+      ]
+    },
+    {
+      "requirement": "graph IPC methods use the Electron graph runtime",
       "name": "Renderer graph calls stay on the shared data port",
       "when": ["the renderer requests graph data in desktop-local mode"],
       "then": [
@@ -134,28 +146,24 @@
       {
         "specId": "studio-desktop:ipc-handler-registry",
         "file": "studio-desktop:test/ipc-graph-provider.spec.ts"
-      },
-      {
-        "specId": "studio-desktop:ipc-handler-registry",
-        "file": "studio-desktop:test/desktop-host-lifecycle.spec.ts"
       }
     ],
     "symbols": [
       {
         "specId": "studio-desktop:ipc-handler-registry",
         "file": "studio-desktop:src/main/ipc-handlers.ts",
-        "symbol": "withGraphProvider"
+        "symbol": "handlePortMethod"
       },
       {
         "specId": "studio-desktop:ipc-handler-registry",
         "file": "studio-desktop:src/main/ipc-handlers.ts",
-        "symbol": "getHost"
+        "symbol": "withGraphProvider"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:e8d698c076d70217405eb0f625f428cedc4705c5705c7ad318cb8b254180c9eb",
-    "verify.md": "sha256:4a9371374cf73e92a3b3008806e68d7fe1f36f94f5aa6f48e05e1ba3c092d703"
+    "spec.md": "sha256:3b0e7971a54119e788472954cbdd6b264fe827bfe8441726ee4003b30bc02355",
+    "verify.md": "sha256:bd68b179a050fc123ec11558318931dade369f455185a1cbc8c98badb4cd1d88"
   },
   "generatedBy": "core"
 }

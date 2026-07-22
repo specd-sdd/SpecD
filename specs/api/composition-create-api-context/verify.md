@@ -32,3 +32,10 @@
 - **WHEN** a graph route needs an opened provider
 - **THEN** it calls `withGraphProvider()` (or equivalent healthy process accessor)
 - **AND** it does not open/close a new provider for that single request
+
+#### Scenario: Graph index does not require release-before-index
+
+- **WHEN** `POST /v1/graph/index` runs through the request context
+- **THEN** the long-lived opened provider is passed into `runIndexProjectGraph` as `input.provider`
+- **AND** the routine path does not close or release that provider before index
+- **AND** post-index `refreshGraphProvider` is not required when that injected provider was used
