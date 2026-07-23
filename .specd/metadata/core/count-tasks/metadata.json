@@ -1,0 +1,169 @@
+{
+  "title": "CountTasks",
+  "description": "Task-completion parsing is needed by both status reporting and lifecycle gating, and duplicating it risks inconsistent results. `CountTasks` provides one application-layer query that reads a change's task-capable artifacts, applies their declared task patterns safely, and returns both per-artifact and change-wide counts.",
+  "dependsOn": ["core:change", "core:schema-format", "core:composition-resolver"],
+  "context": [
+    "Task-completion parsing is needed by both status reporting and lifecycle gating, and duplicating it risks inconsistent results. `CountTasks` provides one application-layer query that reads a change's task-capable artifacts, applies their declared task patterns safely, and returns both per-artifact and change-wide counts."
+  ],
+  "rules": [
+    {
+      "requirement": "Counts qualifying task artifacts",
+      "rules": [
+        "`CountTasks.execute()` MUST accept a `Change` and obtain the resolved schema through `SchemaProvider`.\n\nFor each artifact attached to the change, the use case MUST consider it task-capable only when its schema artifact type declares both `hasTasks: true` and `taskCompletionCheck`. It MUST read the artifact files through `ChangeRepository.artifact()` and aggregate matches across all existing, non-empty files for that artifact.\n\nFor every schema artifact type with `hasTasks: true`, the resolved schema MUST materialize `taskCompletionCheck` before `CountTasks.execute()` inspects it. `CountTasks` MUST consume the resolved `incompletePattern` and `completePattern` and MUST NOT define or substitute fallback patterns. The schema defaults are `^\\s*-\\s+\\[ \\]` for incomplete items and `^\\s*-\\s+\\[[xX]\\]` for complete items. The use case MUST compile the resolved patterns with `safeRegex` using the `gm` flags. A pattern that cannot be safely compiled MUST produce no matches and MUST NOT throw; a qualifying artifact with non-empty content MUST still receive a zero-valued entry."
+      ]
+    },
+    {
+      "requirement": "Returns per-artifact and aggregate completion status",
+      "rules": [
+        "`CountTasks.execute()` MUST return `CountTasksResult` with:\n\n- `byArtifact` — a readonly map keyed by artifact type ID, containing one `TaskCompletionStatus` only for each qualifying artifact with at least one existing, non-empty file.\n- `total` — a `TaskCompletionStatus` that sums `complete`, `incomplete`, and `total` from every entry in `byArtifact`.\n\nEach `TaskCompletionStatus` MUST contain `complete`, `incomplete`, and `total`. `total` MUST equal `complete + incomplete`, including when either pattern is defaulted.\n\nWhen no qualifying artifact has content, `byArtifact` MUST be empty and `total` MUST contain zeroes."
+      ]
+    },
+    {
+      "requirement": "Does not infer task capability from counts",
+      "rules": [
+        "An absent `byArtifact` entry MUST mean only that `CountTasks` found no qualifying content for that artifact. Consumers that need to reject an artifact without task capability MUST inspect its schema artifact definition and preserve their own missing-capability behavior."
+      ]
+    },
+    {
+      "requirement": "Supports composition and kernel wiring",
+      "rules": [
+        "`CountTasks` MUST accept `ChangeRepository` and `SchemaProvider` as constructor dependencies. `createCountTasks(deps)` and `createCountTasks(config, options?)` MUST follow the shared normalized factory-argument contract and construct the config form through `resolveCountTasksDeps(resolver)`.\n\nAs an exported application use case, `CountTasks` MUST be exposed as `kernel.changes.countTasks` and use the same resolver-backed dependencies as its standalone factory."
+      ]
+    }
+  ],
+  "constraints": [
+    "The use case is read-only and MUST NOT mutate the change or artifact files.",
+    "It MUST NOT decide whether a lifecycle transition is permitted.",
+    "It MUST preserve the existing empty or missing artifact behavior by omitting those artifacts from byArtifact."
+  ],
+  "scenarios": [
+    {
+      "requirement": "Counts qualifying task artifacts",
+      "name": "Safe patterns count across multiple files",
+      "given": [
+        "a task-capable artifact has two non-empty files with complete and incomplete markdown checkboxes"
+      ],
+      "when": ["CountTasks.execute() runs"],
+      "then": ["its per-artifact result aggregates the matches from both files"]
+    },
+    {
+      "requirement": "Counts qualifying task artifacts",
+      "name": "Unsafe pattern does not fail the query",
+      "given": ["a task-capable artifact declares a pattern rejected by safeRegex"],
+      "when": ["CountTasks.execute() runs"],
+      "then": [
+        "the query does not throw",
+        "AND the rejected pattern contributes no matches",
+        "AND the non-empty qualifying artifact remains in byArtifact with zeroes when both patterns are rejected"
+      ]
+    },
+    {
+      "requirement": "Counts qualifying task artifacts",
+      "name": "Resolved schema provides markdown-checkbox defaults",
+      "given": [
+        "a task-capable artifact has a completion check with an omitted pattern",
+        "AND schema construction materializes the missing pattern before CountTasks.execute() runs"
+      ],
+      "when": [
+        "the artifact content contains standard complete and incomplete markdown checkboxes"
+      ],
+      "then": [
+        "CountTasks counts them using the resolved schema patterns without substituting a fallback"
+      ]
+    },
+    {
+      "requirement": "Counts qualifying task artifacts",
+      "name": "Resolved complete pattern accepts uppercase marker",
+      "given": [
+        "schema construction materializes an omitted complete pattern as ^\\s*-\\s+\\[[xX]\\]"
+      ],
+      "when": ["CountTasks.execute() processes content containing - [X] completed"],
+      "then": ["the completed item is counted"]
+    },
+    {
+      "requirement": "Returns per-artifact and aggregate completion status",
+      "name": "Aggregate combines qualifying artifacts",
+      "given": [
+        "two qualifying artifacts have task counts of 2 complete and 1 incomplete, and 3 complete and 0 incomplete"
+      ],
+      "when": ["CountTasks.execute() runs"],
+      "then": [
+        "byArtifact contains both artifact IDs",
+        "AND total is 5 complete, 1 incomplete, and 6 total"
+      ]
+    },
+    {
+      "requirement": "Returns per-artifact and aggregate completion status",
+      "name": "Empty task content returns zero aggregate",
+      "given": ["no task-capable artifact has an existing non-empty file"],
+      "when": ["CountTasks.execute() runs"],
+      "then": ["byArtifact is empty", "AND total is 0 complete, 0 incomplete, and 0 total"]
+    },
+    {
+      "requirement": "Does not infer task capability from counts",
+      "name": "Missing content does not imply missing capability",
+      "given": ["an artifact declares task capability but has no existing artifact file"],
+      "when": ["CountTasks.execute() runs"],
+      "then": [
+        "byArtifact has no entry for that artifact",
+        "AND the result does not report an error about task capability"
+      ]
+    },
+    {
+      "requirement": "Supports composition and kernel wiring",
+      "name": "Kernel exposes shared task-counting query",
+      "when": ["createKernel(config) is called"],
+      "then": ["kernel.changes.countTasks is a ready CountTasks use case"]
+    },
+    {
+      "requirement": "Supports composition and kernel wiring",
+      "name": "Config factory delegates through resolver dependencies",
+      "when": ["createCountTasks(config, options?) is called"],
+      "then": ["it derives dependencies through resolveCountTasksDeps(resolver)"]
+    }
+  ],
+  "implementation": {
+    "files": [
+      {
+        "specId": "core:count-tasks",
+        "file": "core:test/application/use-cases/count-tasks.spec.ts"
+      },
+      {
+        "specId": "core:count-tasks",
+        "file": "core:test/composition/use-cases/count-tasks.spec.ts"
+      }
+    ],
+    "symbols": [
+      {
+        "specId": "core:count-tasks",
+        "file": "core:src/application/use-cases/count-tasks.ts",
+        "symbol": "CountTasks"
+      },
+      {
+        "specId": "core:count-tasks",
+        "file": "core:src/application/use-cases/count-tasks.ts",
+        "symbol": "TaskCompletionStatus"
+      },
+      {
+        "specId": "core:count-tasks",
+        "file": "core:src/application/use-cases/count-tasks.ts",
+        "symbol": "CountTasksResult"
+      },
+      {
+        "specId": "core:count-tasks",
+        "file": "core:src/composition/use-cases/count-tasks.ts",
+        "symbol": "createCountTasks"
+      },
+      {
+        "specId": "core:count-tasks",
+        "file": "core:src/composition/use-cases/count-tasks.ts",
+        "symbol": "resolveCountTasksDeps"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:0e2312c41d00651146e5b076f2b7a9d89cbc87f884ddecb2d4320451bdd279fe",
+    "verify.md": "sha256:94034ebef28bba172b9b9770f2129ca267817ce3f0a3908b086d2d88f817de84"
+  },
+  "generatedBy": "core"
+}

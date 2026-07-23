@@ -1,0 +1,23 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["core:change", "core:schema-format", "core:composition-resolver"],
+  "implementation": [
+    {
+      "file": "core:src/application/use-cases/count-tasks.ts",
+      "symbols": ["CountTasks", "TaskCompletionStatus", "CountTasksResult"]
+    },
+    {
+      "file": "core:src/composition/use-cases/count-tasks.ts",
+      "symbols": ["createCountTasks", "resolveCountTasksDeps"]
+    },
+    {
+      "file": "core:test/application/use-cases/count-tasks.spec.ts"
+    },
+    {
+      "file": "core:test/composition/use-cases/count-tasks.spec.ts"
+    }
+  ]
+}

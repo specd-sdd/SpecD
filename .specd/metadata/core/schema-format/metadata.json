@@ -62,7 +62,7 @@
     {
       "requirement": "taskCompletionCheck",
       "rules": [
-        "`taskCompletionCheck` defines how the system identifies incomplete tasks within an artifact's file. This requirement is only active when `hasTasks: true` is set for the artifact.\n\nThe fields are optional and default to standard markdown checkbox syntax:\n\n- `incompletePattern` (string, regex, default `^\\s*-\\s+\\[ \\]`) — matches an incomplete task item\n- `completePattern` (string, regex, default `^\\s*-\\s+\\[x\\]`, case-insensitive) — matches a complete task item"
+        "`taskCompletionCheck` defines how the system identifies incomplete tasks within an artifact. It is meaningful only when the artifact also declares `hasTasks: true`.\n\nThe fields are optional and default to standard markdown checkbox syntax:\n\n- `incompletePattern` (string, regex, default `^\\s*-\\s+\\[ \\]`) — matches an incomplete task item.\n- `completePattern` (string, regex, default `^\\s*-\\s+\\[[xX]\\]`) — matches a complete task item, including both `[x]` and `[X]`."
       ]
     },
     {
@@ -511,14 +511,12 @@
     {
       "requirement": "taskCompletionCheck",
       "name": "Default patterns detect markdown checkboxes",
-      "given": [
-        "an artifact with hasTasks: true and no taskCompletionCheck declared",
-        "AND its file contains - [ ] pending and - [x] done"
-      ],
-      "when": ["the CLI checks task completion"],
+      "given": ["an artifact declares hasTasks: true and omits taskCompletionCheck"],
+      "when": ["SchemaRegistry.resolve() materializes the artifact type"],
       "then": [
-        "incompletePattern defaults to ^\\s*-\\s+\\[ \\] and matches - [ ] pending",
-        "AND completePattern defaults to ^\\s*-\\s+\\[x\\] (case-insensitive) and matches - [x] done"
+        "incompletePattern defaults to ^\\s*-\\s+\\[ \\]",
+        "AND completePattern defaults to ^\\s*-\\s+\\[[xX]\\]",
+        "AND the complete pattern matches both [x] and [X] markdown task markers"
       ]
     },
     {
@@ -541,6 +539,16 @@
       ],
       "when": ["the implementing → verifying transition is attempted"],
       "then": ["incompletePattern matches zero lines and the transition is allowed"]
+    },
+    {
+      "requirement": "taskCompletionCheck",
+      "name": "Default complete pattern accepts uppercase markers",
+      "given": ["an artifact declares hasTasks: true and an empty taskCompletionCheck"],
+      "when": ["SchemaRegistry.resolve() materializes the artifact type"],
+      "then": [
+        "its default completePattern is ^\\s*-\\s+\\[[xX]\\]",
+        "AND that pattern matches both [x] and [X] markdown task markers"
+      ]
     },
     {
       "requirement": "Delta validation rules",
@@ -1069,29 +1077,23 @@
     }
   ],
   "implementation": {
+    "files": [
+      {
+        "specId": "core:schema-format",
+        "file": "core:test/domain/services/build-schema.spec.ts"
+      }
+    ],
     "symbols": [
       {
         "specId": "core:schema-format",
-        "file": "core:src/domain/value-objects/artifact-dag.ts",
-        "symbol": "ArtifactDag"
-      },
-      {
-        "specId": "core:schema-format",
-        "file": "core:src/domain/value-objects/artifact-dag.ts",
-        "symbol": "artifactDagFromChangeArtifacts"
-      },
-      {
-        "specId": "core:schema-format",
-        "file": "core:src/domain/value-objects/schema.ts",
-        "symbol": "Schema"
+        "file": "core:src/domain/services/build-schema.ts",
+        "symbol": "buildArtifactType"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:2fcb3b96a308e609866f4843e2af35fc21843d6ba89300149ab8fe7f12e2685c",
-    "verify.md": "sha256:f99fd9ad6e70e8166195a8929c3796ee4eff35e62913bd3d17b8a2490b6d5ff7"
+    "spec.md": "sha256:f3d49ebfc79bc5b977a584f81eb28e2bc6790c2c1c7b089d2d5a2293af0e6203",
+    "verify.md": "sha256:bc0b442dbf8e5456ee9940d5877651700d9c3228c5d6c5a3e7876af37809db36"
   },
-  "generatedBy": "agent",
-  "optimizedDescription": "Without a single declarative definition of a project's artifact workflow, every tool in the ecosystem would need to hardcode artifact types,…",
-  "optimizedContext": "# Schema Format\n\n## Rules\n- Schema file structure: A schema file must be a valid YAML document with the following top-level fields: - kind (schema | schema-plugin, required) — discriminates full schemas from plugins; see…\n- Schema kind field: Every schema file must declare a kind field: - kind: schema — a full schema with artifacts, workflow, metadataExtraction, and optional extends.\n- Schema extends: A schema with kind: schema may declare an extends field — a string referencing another schema.\n- Array entry identity: Every entry in the following schema arrays must carry an id field: - workflow[].hooks.pre[] and workflow[].hooks.post[] - artifacts[].validations[] -…\n- Artifact definition: Each entry in artifacts must include: - id (string, required) — unique identifier within the schema, e.g.\n- Schema artifact DAG API: A resolved Schema MUST expose artifactDag(): ArtifactDag — the single canonical runtime API for artifact dependency structure derived only from artifacts[].requires.\n- Canonical artifact DAG derivation: Runtime code that needs artifact DAG structure (roots, children, topological order, descendants, or equivalent adjacency) MUST obtain it through schema.artifactDag() and MUST NOT…\n- preHashCleanup: preHashCleanup is a list of regex substitutions applied to the artifact content before computing any hash (both validatedHash for ArtifactStatus and the approval hash).\n- taskCompletionCheck: taskCompletionCheck defines how the system identifies incomplete tasks within an artifact's file.\n- Template resolution: Template files are bundled alongside schema.yaml in a templates/ subdirectory by convention.\n- Validation rules: validations on an artifact defines structural constraints checked by ValidateArtifacts against the artifact content (after delta application for scope: spec artifacts).\n- Delta validation rules: deltaValidations on a schema artifact defines rules that ValidateArtifacts checks against the delta file before application.\n- Cross-artifact validation rules: crossArtifactValidations is an optional top-level schema field that defines relational structural rules across multiple artifacts.\n- Per-spec approval: Any spec file touched by a delta — whether created via an added operation or modified via a modified or removed operation — requires explicit approval before the change can be…\n- Metadata extraction: metadataExtraction is a top-level schema field that declares how to extract metadata fields from artifact content using selectors and the existing parser infrastructure.\n- Artifact scope: scope on an artifact is the single source of truth for what constitutes a complete spec and what files are expected in the spec directory.\n- Workflow: A workflow defines the sequence of steps a change follows.\n- Explicit external hook entries: Workflow hook entries SHALL support an explicit external hook form in addition to instruction: and shell run: entries.\n- Schema plugin kind: A schema file with kind: schema-plugin is a partial schema that provides only merge operations for composing with a base schema.\n- Schema resolution: SchemaRegistry.resolve(ref) interprets the schema value from specd.yaml using a prefix convention.\n- Schema validation on load: SchemaRegistry.resolve() must validate the parsed YAML against a Zod schema before constructing the Schema object.\n- verify.md format: verify.md is the verification artifact for a spec.\n- Dependencies: core:delta-format, core:selector-model, core:content-extraction, core:schema-merge\n\n## Constraints\n- kind is required on every schema file; must be schema or schema-plugin\n- kind: schema-plugin must not declare artifacts, workflow, metadataExtraction, or extends\n- extends is only valid on kind: schema; cycles in extends chains are a validation error\n- artifact.id must match /^[a-z][a-z0-9-] $/ and must be unique within a schema\n- Array entry id must match /^[a-z][a-z0-9] (-[a-z0-9]+) $/, 1–64 characters, unique within its immediate array\n- artifact.scope must be spec or change; it is required and has no default\n- artifact.optional defaults to false; a non-optional artifact with scope: spec must be present in every spec directory and every change\n- artifact.hasTasks is optional and defaults to false\n- workflow[].requiresTaskCompletion MUST ONLY reference artifacts with hasTasks: true\n- artifact.rules.pre and artifact.rules.post are optional arrays of { id, instruction } entries\n- workflow[].step must be unique — duplicate step names in the same workflow array are a schema validation error\n- Every hook entry must include an id field alongside its instruction or run field\n- requires must not contain cycles; circular dependencies in the artifact graph are a schema validation error\n- If artifact A is optional: true, any artifact that lists A in its requires must also be optional: true\n- deltaValidations is only valid on artifacts with delta: true; declaring deltaValidations on a non-delta artifact is a schema validation error\n- The order of entries in workflow is the intended display order for tooling; it does not enforce sequential blocking between consecutive steps\n- Delta file format, selector model, and application constraints are defined in specs/core/delta-format/spec.md\n"
+  "generatedBy": "core"
 }

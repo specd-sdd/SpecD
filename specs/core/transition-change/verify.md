@@ -94,58 +94,43 @@
 
 ### Requirement: Task completion check during requires enforcement
 
-#### Scenario: Transition blocked by requiresTaskCompletion artifact with incomplete items
+#### Scenario: Incomplete delegated count blocks transition
 
-- **GIVEN** a change in `implementing` state
-- **AND** the `verifying` step declares `requiresTaskCompletion: [tasks]`
-- **AND** the `LifecycleEngine` has already identified `verifying` as the effective target
-- **AND** the `tasks` artifact file contains `- [ ] unfinished task`
-- **WHEN** `execute` is called with `to: 'verifying'`
-- **THEN** it throws `InvalidStateTransitionError` with reason `incomplete-tasks`
+- **GIVEN** a completion-gated artifact has an incomplete count returned by `CountTasks`
+- **WHEN** `TransitionChange.execute()` targets that step
+- **THEN** it emits `task-completion-failed`
+- **AND** throws `InvalidStateTransitionError` with reason `incomplete-tasks` and the counts
 
-#### Scenario: Transition blocked by missing task capability (defensive check)
+#### Scenario: Missing task capability blocks a gated artifact
 
-- **GIVEN** a workflow step declares `requiresTaskCompletion: [proposal]`
-- **AND** artifact `proposal` has `hasTasks: false`
-- **WHEN** `execute` is called
+- **GIVEN** a workflow step requires task completion for an artifact without `hasTasks: true`
+- **WHEN** `TransitionChange.execute()` targets that step
 - **THEN** it throws `InvalidStateTransitionError` with reason `missing-task-capability`
 
-#### Scenario: Transition allowed when all tasks complete
+#### Scenario: Missing completion configuration blocks a gated artifact
 
-- **GIVEN** a change in `implementing` state
-- **AND** the `verifying` step declares `requiresTaskCompletion: [tasks]`
-- **AND** the `LifecycleEngine` has already identified `verifying` as the effective target
-- **AND** the tasks file contains only `- [x] done task`
-- **WHEN** `execute` is called with `to: 'verifying'`
-- **THEN** the change transitions to `verifying`
+- **GIVEN** a workflow step requires task completion for an artifact with `hasTasks: true` but no `taskCompletionCheck`
+- **WHEN** `TransitionChange.execute()` targets that step
+- **THEN** it throws `InvalidStateTransitionError` with reason `missing-task-capability`
 
-#### Scenario: No gating when requiresTaskCompletion absent
+#### Scenario: All completed tasks allow transition
 
-- **GIVEN** a change in `implementing` state
-- **AND** the `verifying` step has `requires: [tasks]` but no `requiresTaskCompletion`
-- **AND** the tasks file contains incomplete items
-- **WHEN** `execute` is called with `to: 'verifying'`
-- **THEN** the change transitions to `verifying` — no content check
+- **GIVEN** every completion-gated artifact has no incomplete count in `CountTasksResult.byArtifact`
+- **WHEN** `TransitionChange.execute()` targets that step
+- **THEN** the change transitions to the target state
 
-#### Scenario: Missing artifact file is skipped
+#### Scenario: No task gate does not inspect content
 
-- **GIVEN** a step with `requiresTaskCompletion: [tasks]`
-- **AND** the tasks file does not exist
-- **WHEN** `execute` is called
-- **THEN** the check is skipped and the transition proceeds
+- **GIVEN** the target workflow step omits `requiresTaskCompletion`
+- **WHEN** `TransitionChange.execute()` targets that step
+- **THEN** it does not apply task-completion gating
 
-#### Scenario: Error carries incomplete and complete counts
+#### Scenario: Missing task content does not block a capable artifact
 
-- **GIVEN** a step with `requiresTaskCompletion: [tasks]`
-- **AND** the tasks file has 5 complete items and 3 incomplete items
-- **WHEN** `execute` is called
-- **THEN** the error reason includes `artifactId: 'tasks'`, `incomplete: 3`, `complete: 5`, `total: 8`
-
-#### Scenario: task-completion-failed progress event emitted before throwing
-
-- **GIVEN** a step with `requiresTaskCompletion: [tasks]` and incomplete items
-- **WHEN** `execute` is called with an `onProgress` callback
-- **THEN** a `task-completion-failed` event is emitted with counts before the error is thrown
+- **GIVEN** a completion-gated artifact declares both task capability and `taskCompletionCheck`
+- **AND** `CountTasksResult.byArtifact` has no entry because no qualifying content exists
+- **WHEN** `TransitionChange.execute()` targets that step
+- **THEN** it does not block the transition for task completion
 
 ### Requirement: Workflow requires enforcement
 

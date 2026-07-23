@@ -34,6 +34,8 @@ describe('createTransitionChange', () => {
       runStepHooks: {} as never,
       refreshImplementationTracking: {} as never,
       approvals: { spec: false, signoff: false },
+      lifecycle: {} as never,
+      countTasks: {} as never,
     }
 
     expect(createTransitionChange(deps)).toBeInstanceOf(TransitionChange)
@@ -47,6 +49,8 @@ describe('createTransitionChange', () => {
       runStepHooks: {} as never,
       refreshImplementationTracking: {} as never,
       approvals: { spec: false, signoff: false },
+      lifecycle: {} as never,
+      countTasks: {} as never,
     }
 
     expect(() =>

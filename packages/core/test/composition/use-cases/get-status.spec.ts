@@ -79,6 +79,7 @@ describe('createGetStatus', () => {
       approvals: { spec: false, signoff: false },
       refreshImplementationTracking: {} as never,
       lifecycle: {} as never,
+      countTasks: {} as never,
     }
     const useCase = createGetStatus(deps)
 
@@ -92,6 +93,7 @@ describe('createGetStatus', () => {
       approvals: { spec: false, signoff: false },
       refreshImplementationTracking: {} as never,
       lifecycle: {} as never,
+      countTasks: {} as never,
     }
 
     expect(() =>

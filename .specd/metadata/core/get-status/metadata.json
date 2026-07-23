@@ -9,7 +9,8 @@
     "core:config",
     "core:lifecycle-engine",
     "core:refresh-implementation-tracking",
-    "core:composition-resolver"
+    "core:composition-resolver",
+    "core:count-tasks"
   ],
   "context": [
     "Users and tooling need a quick way to see where a change stands — both its lifecycle state and which artifacts are actually ready — without loading file content. The `GetStatus` use case loads a single change by name and reports its current lifecycle state along with the effective status of each artifact, cascading through dependency chains so that an artifact whose hashes match may still show `in-progress` if any of its required dependencies are not `complete`."
@@ -54,7 +55,7 @@
     {
       "requirement": "Reports task completion counts for task-capable artifacts",
       "rules": [
-        "When the schema artifact type has `hasTasks: true` and declares `taskCompletionCheck`, `GetStatus` MUST load each file of that artifact and count completed and incomplete task items using the declared patterns.\n\n`GetStatus` MUST use `ChangeRepository.artifact()` to load file content. The task completion counts MUST be exposed as an optional `taskCompletion` field on each `ArtifactStatusEntry` that corresponds to a task-capable artifact.\n\nThe `taskCompletion` object MUST contain:\n\n- `complete` — count of complete task items (matched via `completePattern`)\n- `incomplete` — count of incomplete task items (matched via `incompletePattern`)\n- `total` — sum of complete and incomplete (when `completePattern` is declared), or equal to `incomplete` (when only `incompletePattern` is declared)\n\nWhen the artifact file does not exist or the file content is empty, the `taskCompletion` field MUST be omitted."
+        "When the schema artifact type has `hasTasks: true` and declares `taskCompletionCheck`, `GetStatus` MUST obtain task-completion counts from `CountTasks`.\n\nThe task completion counts MUST be exposed as an optional `taskCompletion` field on each `ArtifactStatusEntry` that corresponds to a task-capable artifact with qualifying content. `GetStatus` MUST map that field from `CountTasksResult.byArtifact` by artifact type ID.\n\nThe `taskCompletion` object MUST contain:\n\n- `complete` — count of complete task items (matched via `completePattern`)\n- `incomplete` — count of incomplete task items (matched via `incompletePattern`)\n- `total` — sum of complete and incomplete; omitted patterns use the schema defaults.\n\nWhen the artifact file does not exist or the file content is empty, the `taskCompletion` field MUST be omitted."
       ]
     },
     {
@@ -66,7 +67,7 @@
     {
       "requirement": "Constructor dependencies",
       "rules": [
-        "`GetStatus` MUST accept the following constructor arguments:\n\n- `changes: ChangeRepository` — for loading changes by name\n- `schemaProvider: SchemaProvider` — for obtaining the fully-resolved active schema\n- `lifecycle: LifecycleEngine` — for deriving effective artifact status, blockers, routing, and next-action guidance from the change plus active schema\n- `approvals: { readonly spec: boolean; readonly signoff: boolean }` — whether approval gates are active\n- `refreshImplementationTracking: RefreshImplementationTracking` — primitive used for optional pre-read refresh\n\nIt MUST load the change via `ChangeRepository.get(name)` and, when that returns `null`, via `ChangeRepository.getDraft(name)`. It MUST NOT use `getDiscarded`.\n\n`SchemaProvider` replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple, providing the fully-resolved schema with plugins and overrides applied.\n\n`GetStatus` MUST NOT accept `ImplementationDetector` and MUST NOT invoke implementation autodetection directly."
+        "`GetStatus` MUST accept the following constructor arguments:\n\n- `changes: ChangeRepository` — for loading changes by name\n- `schemaProvider: SchemaProvider` — for obtaining the fully-resolved active schema\n- `lifecycle: LifecycleEngine` — for deriving effective artifact status, blockers, routing, and next-action guidance from the change plus active schema\n- `approvals: { readonly spec: boolean; readonly signoff: boolean }` — whether approval gates are active\n- `refreshImplementationTracking: RefreshImplementationTracking` — primitive used for optional pre-read refresh\n- `countTasks: CountTasks` — required shared query for task-completion counts\n\nIt MUST load the change via `ChangeRepository.get(name)` and, when that returns `null`, via `ChangeRepository.getDraft(name)`. It MUST NOT use `getDiscarded`.\n\n`SchemaProvider` replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple, providing the fully-resolved schema with plugins and overrides applied.\n\n`GetStatus` MUST NOT accept `ImplementationDetector` and MUST NOT invoke implementation autodetection directly."
       ]
     },
     {
@@ -102,16 +103,16 @@
     {
       "requirement": "Config-based factory delegates through resolveGetStatusDeps",
       "rules": [
-        "The config-based `createGetStatus(config, options?)` form MUST derive `GetStatusDeps` through `resolveGetStatusDeps(resolver)` and then delegate to canonical `createGetStatus(deps)`.\n\n`resolveGetStatusDeps(resolver)` MUST resolve:\n\n- `changes: ChangeRepository`\n- `schemaProvider: SchemaProvider`\n- `approvals: { readonly spec: boolean; readonly signoff: boolean }`\n- `refreshImplementationTracking: RefreshImplementationTracking`\n- `lifecycle: LifecycleEngine`\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
+        "The config-based `createGetStatus(config, options?)` form MUST derive `GetStatusDeps` through `resolveGetStatusDeps(resolver)` and then delegate to canonical `createGetStatus(deps)`.\n\n`resolveGetStatusDeps(resolver)` MUST resolve:\n\n- `changes: ChangeRepository`\n- `schemaProvider: SchemaProvider`\n- `approvals: { readonly spec: boolean; readonly signoff: boolean }`\n- `refreshImplementationTracking: RefreshImplementationTracking`\n- `lifecycle: LifecycleEngine`\n- `countTasks: CountTasks`\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
       ]
     }
   ],
   "constraints": [
-    "The use case does not modify the change — it is a read-only query",
-    "Artifact content is not loaded; only status metadata is returned",
-    "The effective status computation may be delegated to LifecycleEngine; it is not an entity-owned concern of Change",
-    "The lifecycle computation adds zero additional I/O beyond schema resolution — VALID_TRANSITIONS is a static lookup, while derived lifecycle interpretation is computed in memory from the loaded change, schema, and approval config",
-    "changePath is obtained from ChangeRepository.changePath(change) which the repository already exposes"
+    "The use case does not modify the change — it is a read-only query.",
+    "Artifact content is not loaded for lifecycle and artifact-status metadata. When task-completion projection is applicable, GetStatus delegates the required content reads to CountTasks.",
+    "The effective status computation may be delegated to LifecycleEngine; it is not an entity-owned concern of Change.",
+    "The lifecycle computation adds zero additional I/O beyond schema resolution — VALID_TRANSITIONS is a static lookup, while derived lifecycle interpretation is computed in memory from the loaded change, schema, and approval config.",
+    "changePath is obtained from ChangeRepository.changePath(change) which the repository already exposes."
   ],
   "scenarios": [
     {
@@ -287,42 +288,29 @@
     {
       "requirement": "Reports task completion counts for task-capable artifacts",
       "name": "Task completion counts returned for task-capable artifacts",
-      "given": [
-        "a change with an artifact type that has hasTasks: true and taskCompletionCheck.incompletePattern set",
-        "AND taskCompletionCheck.completePattern is also set",
-        "AND the artifact file contains [ ] task 1, [x] task 2, [ ] task 3"
-      ],
+      "given": ["a task-capable artifact contains one complete and two incomplete checkbox items"],
       "when": ["GetStatus.execute() is called"],
       "then": [
-        "the ArtifactStatusEntry for that artifact includes taskCompletion",
-        "AND taskCompletion.incomplete is 2",
-        "AND taskCompletion.complete is 1",
-        "AND taskCompletion.total is 3"
+        "its artifact status maps the matching CountTasksResult.byArtifact entry as taskCompletion",
+        "AND taskCompletion.complete is 1, taskCompletion.incomplete is 2, and taskCompletion.total is 3"
       ]
     },
     {
       "requirement": "Reports task completion counts for task-capable artifacts",
-      "name": "Task completion omitted when artifact file does not exist",
-      "given": [
-        "a change with an artifact type that has hasTasks: true",
-        "AND the artifact file does not exist on disk"
-      ],
+      "name": "Task completion omitted when no qualifying content exists",
+      "given": ["a task-capable artifact has no existing or non-empty file"],
       "when": ["GetStatus.execute() is called"],
-      "then": ["the ArtifactStatusEntry for that artifact does NOT include taskCompletion"]
+      "then": ["its artifact status omits taskCompletion"]
     },
     {
       "requirement": "Reports task completion counts for task-capable artifacts",
-      "name": "Task completion with only incompletePattern",
+      "name": "Omitted complete pattern uses the default",
       "given": [
-        "a change with an artifact type that has hasTasks: true",
-        "AND only taskCompletionCheck.incompletePattern is set (no completePattern)",
-        "AND the artifact file contains [ ] task 1, [ ] task 2"
+        "a task-capable artifact declares only incompletePattern",
+        "AND its content contains two incomplete checkbox items"
       ],
       "when": ["GetStatus.execute() is called"],
-      "then": [
-        "taskCompletion.incomplete is 2",
-        "AND taskCompletion.total equals taskCompletion.incomplete"
-      ]
+      "then": ["taskCompletion.incomplete is 2 and taskCompletion.total is 2"]
     },
     {
       "requirement": "Throws ChangeNotFoundError for unknown changes",
@@ -536,13 +524,30 @@
     "files": [
       {
         "specId": "core:get-status",
-        "file": "core:src/composition/use-cases/get-status.ts"
+        "file": "core:test/application/use-cases/get-status.spec.ts"
+      }
+    ],
+    "symbols": [
+      {
+        "specId": "core:get-status",
+        "file": "core:src/application/use-cases/get-status.ts",
+        "symbol": "GetStatus"
+      },
+      {
+        "specId": "core:get-status",
+        "file": "core:src/composition/use-cases/get-status.ts",
+        "symbol": "GetStatusDeps"
+      },
+      {
+        "specId": "core:get-status",
+        "file": "core:src/composition/use-cases/get-status.ts",
+        "symbol": "resolveGetStatusDeps"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:4800123d5e941d22be588e41a2726d0a881996e24f09f44a156fa29e5af60c6f",
-    "verify.md": "sha256:b39161f8fb7eeb270de29b1c64309c70c284934cb8c1862ffe96ae2a539c6064"
+    "spec.md": "sha256:cf1c8042f72fda3dc1b227ef6b987ab72fb92f4e66d7ec93ea9187be75ab5d05",
+    "verify.md": "sha256:c4992085605027e0a03f0ae130f86297db8443543a8026afcb6cb44c13d7344e"
   },
   "generatedBy": "core"
 }

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { TransitionChange } from '../../../src/application/use-cases/transition-change.js'
+import { CountTasks } from '../../../src/application/use-cases/count-tasks.js'
 import { type TransitionProgressEvent } from '../../../src/application/use-cases/transition-change.js'
 import { RefreshImplementationTracking } from '../../../src/application/use-cases/refresh-implementation-tracking.js'
 import { ChangeNotFoundError } from '../../../src/application/errors/change-not-found-error.js'
@@ -9,6 +10,8 @@ import { Change, type ChangeEvent } from '../../../src/domain/entities/change.js
 import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
 import { ArtifactFile } from '../../../src/domain/value-objects/artifact-file.js'
 import { SpecArtifact } from '../../../src/domain/value-objects/spec-artifact.js'
+import { LifecycleEngine } from '../../../src/domain/services/lifecycle-engine.js'
+import { Logger } from '../../../src/application/logger.js'
 import {
   makeChangeRepository,
   makeActorResolver,
@@ -46,6 +49,7 @@ function makeUseCase(
     refresh?: RefreshImplementationTracking
     refreshExecute?: ReturnType<typeof vi.fn>
     approvals?: { spec: boolean; signoff: boolean }
+    countTasks?: CountTasks
   },
 ): TransitionChange {
   const refresh =
@@ -53,13 +57,18 @@ function makeUseCase(
     makeRefreshImplementationTracking(
       overrides?.refreshExecute ?? vi.fn().mockResolvedValue({ trackedFiles: [], links: [] }),
     )
+  const schemaProvider = makeSchemaProvider(
+    overrides?.schema !== undefined ? overrides.schema : makeSchema(),
+  )
   return new TransitionChange(
     repo,
     makeActorResolver(),
-    makeSchemaProvider(overrides?.schema !== undefined ? overrides.schema : makeSchema()),
+    schemaProvider,
     overrides?.runStepHooks ?? makeRunStepHooks(),
     refresh,
     overrides?.approvals ?? { spec: false, signoff: false },
+    new LifecycleEngine(Logger.debug.bind(Logger)),
+    overrides?.countTasks ?? new CountTasks(repo, schemaProvider),
   )
 }
 
@@ -544,6 +553,29 @@ describe('TransitionChange', () => {
 
       expect(result.change.state).toBe('verifying')
       expect(artifactSpy).not.toHaveBeenCalled()
+    })
+
+    it('rejects a completion-gated artifact without taskCompletionCheck', async () => {
+      const change = makeImplementingChange('missing-task-configuration')
+      setupChangeWithTaskArtifact(change)
+      const schema = makeSchema({
+        artifacts: [makeArtifactType('tasks', { hasTasks: true }), makeArtifactType('verify')],
+        workflow: [
+          {
+            step: 'verifying',
+            requires: ['verify', 'tasks'],
+            requiresTaskCompletion: ['tasks'],
+            hooks: { pre: [], post: [] },
+          },
+        ],
+      })
+      const uc = makeUseCase(makeChangeRepository([change]), { schema })
+
+      await expect(
+        uc.execute({ name: 'missing-task-configuration', to: 'verifying' }),
+      ).rejects.toMatchObject({
+        reason: { type: 'missing-task-capability', artifactId: 'tasks' },
+      })
     })
 
     it('blocks transition on any step with taskCompletionCheck requires', async () => {

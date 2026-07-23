@@ -1,0 +1,2 @@
+- op: no-op
+  description: Existing kernel entry and grouped-use-case scenarios cover the additional CountTasks entry.

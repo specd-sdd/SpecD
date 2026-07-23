@@ -257,11 +257,11 @@
 
 #### Scenario: Default patterns detect markdown checkboxes
 
-- **GIVEN** an artifact with `hasTasks: true` and no `taskCompletionCheck` declared
-- **AND** its file contains `- [ ] pending` and `- [x] done`
-- **WHEN** the CLI checks task completion
-- **THEN** `incompletePattern` defaults to `^\s*-\s+\[ \]` and matches `- [ ] pending`
-- **AND** `completePattern` defaults to `^\s*-\s+\[x\]` (case-insensitive) and matches `- [x] done`
+- **GIVEN** an artifact declares `hasTasks: true` and omits `taskCompletionCheck`
+- **WHEN** `SchemaRegistry.resolve()` materializes the artifact type
+- **THEN** `incompletePattern` defaults to `^\s*-\s+\[ \]`
+- **AND** `completePattern` defaults to `^\s*-\s+\[[xX]\]`
+- **AND** the complete pattern matches both `[x]` and `[X]` markdown task markers
 
 #### Scenario: Custom patterns override defaults
 
@@ -277,6 +277,13 @@
 - **AND** a file where all checkboxes are checked and none are unchecked
 - **WHEN** the `implementing → verifying` transition is attempted
 - **THEN** `incompletePattern` matches zero lines and the transition is allowed
+
+#### Scenario: Default complete pattern accepts uppercase markers
+
+- **GIVEN** an artifact declares `hasTasks: true` and an empty `taskCompletionCheck`
+- **WHEN** `SchemaRegistry.resolve()` materializes the artifact type
+- **THEN** its default `completePattern` is `^\s*-\s+\[[xX]\]`
+- **AND** that pattern matches both `[x]` and `[X]` markdown task markers
 
 ### Requirement: Delta validation rules
 

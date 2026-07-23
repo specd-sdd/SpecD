@@ -1,0 +1,25 @@
+- op: added
+  description: Verify that the materialized default accepts uppercase completed checkboxes.
+  position:
+    parent:
+      type: section
+      matches: '^Requirement: taskCompletionCheck$'
+  content: |
+    #### Scenario: Default complete pattern accepts uppercase markers
+
+    - **GIVEN** an artifact declares `hasTasks: true` and an empty `taskCompletionCheck`
+    - **WHEN** `SchemaRegistry.resolve()` materializes the artifact type
+    - **THEN** its default `completePattern` is `^\s*-\s+\[[xX]\]`
+    - **AND** that pattern matches both `[x]` and `[X]` markdown task markers
+
+- op: modified
+  description: Correct the older default-pattern scenario to the materialized schema contract.
+  selector:
+    type: section
+    matches: '^Scenario: Default patterns detect markdown checkboxes$'
+  content: |
+    - **GIVEN** an artifact declares `hasTasks: true` and omits `taskCompletionCheck`
+    - **WHEN** `SchemaRegistry.resolve()` materializes the artifact type
+    - **THEN** `incompletePattern` defaults to `^\s*-\s+\[ \]`
+    - **AND** `completePattern` defaults to `^\s*-\s+\[[xX]\]`
+    - **AND** the complete pattern matches both `[x]` and `[X]` markdown task markers

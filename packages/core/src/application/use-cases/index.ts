@@ -58,6 +58,12 @@ export {
 export { GetConfig } from './get-config.js'
 export { type CreateChange, type CreateChangeInput } from './create-change.js'
 export {
+  CountTasks,
+  type CountTasksInput,
+  type CountTasksResult,
+  type TaskCompletionStatus,
+} from './count-tasks.js'
+export {
   type GetStatus,
   type GetStatusInput,
   type GetStatusResult,

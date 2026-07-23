@@ -125,12 +125,12 @@ Substitutions are applied in declaration order. The result of each substitution 
 
 ### Requirement: taskCompletionCheck
 
-`taskCompletionCheck` defines how the system identifies incomplete tasks within an artifact's file. This requirement is only active when `hasTasks: true` is set for the artifact.
+`taskCompletionCheck` defines how the system identifies incomplete tasks within an artifact. It is meaningful only when the artifact also declares `hasTasks: true`.
 
 The fields are optional and default to standard markdown checkbox syntax:
 
-- `incompletePattern` (string, regex, default `^\s*-\s+\[ \]`) — matches an incomplete task item
-- `completePattern` (string, regex, default `^\s*-\s+\[x\]`, case-insensitive) — matches a complete task item
+- `incompletePattern` (string, regex, default `^\s*-\s+\[ \]`) — matches an incomplete task item.
+- `completePattern` (string, regex, default `^\s*-\s+\[[xX]\]`) — matches a complete task item, including both `[x]` and `[X]`.
 
 ### Requirement: Template resolution
 

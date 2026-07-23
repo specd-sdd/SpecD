@@ -89,19 +89,11 @@ The use case MUST emit a `requires-check` progress event per artifact checked, r
 
 ### Requirement: Task completion check during requires enforcement
 
-After workflow requires enforcement passes, if the target workflow step declares a non-empty `requiresTaskCompletion` array, the use case MUST check each listed artifact for incomplete task items:
+For every artifact listed in the effective workflow step's `requiresTaskCompletion`, `TransitionChange` MUST first verify that the schema artifact type declares `hasTasks: true` and `taskCompletionCheck`. If either is absent, it MUST throw `InvalidStateTransitionError` with reason `missing-task-capability`.
 
-1. Look up the `ArtifactType` from the schema.
-2. **Defensive Check**: If the `ArtifactType` has `hasTasks: false`, the use case MUST throw `InvalidStateTransitionError` with reason `missing-task-capability`. This represents an invariant violation where a completion-gated step references an artifact that does not support tasks.
-3. If `hasTasks: true`, proceed with content check.
-4. Get the `ChangeArtifact` via `change.getArtifact(artifactId)`. If it does not exist, skip it.
-5. Iterate the artifact's `files` map. For each `ArtifactFile`, load the file content via `ChangeRepository.artifact(change, file.filename)`.
-6. If the file does not exist (returns `null`), skip it.
-7. Use standard markdown checkbox patterns if `taskCompletionCheck` patterns are omitted in the schema:
-   - `incompletePattern`: `^\s*-\s+\[ \]`
-   - `completePattern`: `^\s*-\s+\[x\]`
-8. Compile the patterns using `safeRegex` with the `'gm'` flags.
-9. If the incomplete regex matches any line in the file content, throw `InvalidStateTransitionError` with reason `incomplete-tasks`, including the artifact ID and counts.
+`TransitionChange` MUST obtain task counts once through `CountTasks` and look up each required artifact in `CountTasksResult.byArtifact`. An absent entry after capability validation MUST be treated as no qualifying task content and MUST NOT block the transition.
+
+When a required artifact's count has `incomplete > 0`, `TransitionChange` MUST emit the `task-completion-failed` progress event and throw `InvalidStateTransitionError` with reason `incomplete-tasks`, including that artifact's complete, incomplete, and total counts.
 
 The target step and the set of completion-gated artifacts SHALL be interpreted in the same lifecycle decision flow as approval routing and requires enforcement. `TransitionChange` MAY ask `LifecycleEngine` to resolve that lifecycle decision context first, but content inspection of task artifacts remains the responsibility of this use case.
 
@@ -195,7 +187,7 @@ The previous `postHookFailures` field is removed because both hook phases are no
 
 ### Requirement: Dependencies
 
-`TransitionChange` depends on `ChangeRepository`, `ActorResolver`, `SchemaProvider`, `LifecycleEngine`, `RunStepHooks`, and `RefreshImplementationTracking`.
+`TransitionChange` depends on `ChangeRepository`, `ActorResolver`, `SchemaProvider`, `LifecycleEngine`, `RunStepHooks`, `RefreshImplementationTracking`, and `CountTasks`.
 
 `TransitionChange` MUST NOT depend on `ImplementationDetector` or invoke implementation autodetection directly.
 
@@ -212,6 +204,7 @@ The config-based `createTransitionChange(config, options?)` form MUST derive `Tr
 - `refreshImplementationTracking: RefreshImplementationTracking`
 - `approvals: ApprovalGates`
 - `lifecycle: LifecycleEngine`
+- `countTasks: CountTasks`
 
 The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
 
@@ -238,3 +231,4 @@ The helper is the only use-case-specific composition entry for config-based boot
 - [`core:lifecycle-engine`](../lifecycle-engine/spec.md)
 - [`core:refresh-implementation-tracking`](../refresh-implementation-tracking/spec.md)
 - [`core:composition-resolver`](../composition-resolver/spec.md)
+- [`core:count-tasks`](../count-tasks/spec.md) — supplies shared task-completion counts.

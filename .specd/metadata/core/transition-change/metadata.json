@@ -9,7 +9,8 @@
     "default:_global/architecture",
     "core:lifecycle-engine",
     "core:refresh-implementation-tracking",
-    "core:composition-resolver"
+    "core:composition-resolver",
+    "core:count-tasks"
   ],
   "context": [
     "Changes must advance through a strict lifecycle, and the rules for doing so — approval gates, task completion checks, validation clearing, requires enforcement, and hook execution — are too complex for callers to enforce ad-hoc. The `TransitionChange` use case centralises lifecycle state transitions, delegating schema-aware lifecycle interpretation (approval-gate routing, workflow requires evaluation, recursive blocking, and task gating) to `LifecycleEngine` while still owning hook execution, redesign invalidation, and persistence of the final transitioned state."
@@ -72,7 +73,7 @@
     {
       "requirement": "Task completion check during requires enforcement",
       "rules": [
-        "After workflow requires enforcement passes, if the target workflow step declares a non-empty `requiresTaskCompletion` array, the use case MUST check each listed artifact for incomplete task items:\n\n1. Look up the `ArtifactType` from the schema.\n2. **Defensive Check**: If the `ArtifactType` has `hasTasks: false`, the use case MUST throw `InvalidStateTransitionError` with reason `missing-task-capability`. This represents an invariant violation where a completion-gated step references an artifact that does not support tasks.\n3. If `hasTasks: true`, proceed with content check.\n4. Get the `ChangeArtifact` via `change.getArtifact(artifactId)`. If it does not exist, skip it.\n5. Iterate the artifact's `files` map. For each `ArtifactFile`, load the file content via `ChangeRepository.artifact(change, file.filename)`.\n6. If the file does not exist (returns `null`), skip it.\n7. Use standard markdown checkbox patterns if `taskCompletionCheck` patterns are omitted in the schema:\n   - `incompletePattern`: `^\\s*-\\s+\\[ \\]`\n   - `completePattern`: `^\\s*-\\s+\\[x\\]`\n8. Compile the patterns using `safeRegex` with the `'gm'` flags.\n9. If the incomplete regex matches any line in the file content, throw `InvalidStateTransitionError` with reason `incomplete-tasks`, including the artifact ID and counts.\n\nThe target step and the set of completion-gated artifacts SHALL be interpreted in the same lifecycle decision flow as approval routing and requires enforcement. `TransitionChange` MAY ask `LifecycleEngine` to resolve that lifecycle decision context first, but content inspection of task artifacts remains the responsibility of this use case.\n\nOnly artifacts listed in `requiresTaskCompletion` are content-checked. When `requiresTaskCompletion` is absent or empty, no task completion gating applies."
+        "For every artifact listed in the effective workflow step's `requiresTaskCompletion`, `TransitionChange` MUST first verify that the schema artifact type declares `hasTasks: true` and `taskCompletionCheck`. If either is absent, it MUST throw `InvalidStateTransitionError` with reason `missing-task-capability`.\n\n`TransitionChange` MUST obtain task counts once through `CountTasks` and look up each required artifact in `CountTasksResult.byArtifact`. An absent entry after capability validation MUST be treated as no qualifying task content and MUST NOT block the transition.\n\nWhen a required artifact's count has `incomplete > 0`, `TransitionChange` MUST emit the `task-completion-failed` progress event and throw `InvalidStateTransitionError` with reason `incomplete-tasks`, including that artifact's complete, incomplete, and total counts.\n\nThe target step and the set of completion-gated artifacts SHALL be interpreted in the same lifecycle decision flow as approval routing and requires enforcement. `TransitionChange` MAY ask `LifecycleEngine` to resolve that lifecycle decision context first, but content inspection of task artifacts remains the responsibility of this use case.\n\nOnly artifacts listed in `requiresTaskCompletion` are content-checked. When `requiresTaskCompletion` is absent or empty, no task completion gating applies."
       ]
     },
     {
@@ -138,13 +139,13 @@
     {
       "requirement": "Dependencies",
       "rules": [
-        "`TransitionChange` depends on `ChangeRepository`, `ActorResolver`, `SchemaProvider`, `LifecycleEngine`, `RunStepHooks`, and `RefreshImplementationTracking`.\n\n`TransitionChange` MUST NOT depend on `ImplementationDetector` or invoke implementation autodetection directly."
+        "`TransitionChange` depends on `ChangeRepository`, `ActorResolver`, `SchemaProvider`, `LifecycleEngine`, `RunStepHooks`, `RefreshImplementationTracking`, and `CountTasks`.\n\n`TransitionChange` MUST NOT depend on `ImplementationDetector` or invoke implementation autodetection directly."
       ]
     },
     {
       "requirement": "Config-based factory delegates through resolveTransitionChangeDeps",
       "rules": [
-        "The config-based `createTransitionChange(config, options?)` form MUST derive `TransitionChangeDeps` through `resolveTransitionChangeDeps(resolver)` and then delegate to canonical `createTransitionChange(deps)`.\n\n`resolveTransitionChangeDeps(resolver)` MUST resolve:\n\n- `changes: ChangeRepository`\n- `actor: ActorResolver`\n- `schemaProvider: SchemaProvider`\n- `runStepHooks: RunStepHooks`\n- `refreshImplementationTracking: RefreshImplementationTracking`\n- `approvals: ApprovalGates`\n- `lifecycle: LifecycleEngine`\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
+        "The config-based `createTransitionChange(config, options?)` form MUST derive `TransitionChangeDeps` through `resolveTransitionChangeDeps(resolver)` and then delegate to canonical `createTransitionChange(deps)`.\n\n`resolveTransitionChangeDeps(resolver)` MUST resolve:\n\n- `changes: ChangeRepository`\n- `actor: ActorResolver`\n- `schemaProvider: SchemaProvider`\n- `runStepHooks: RunStepHooks`\n- `refreshImplementationTracking: RefreshImplementationTracking`\n- `approvals: ApprovalGates`\n- `lifecycle: LifecycleEngine`\n- `countTasks: CountTasks`\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
       ]
     }
   ],
@@ -288,74 +289,55 @@
     },
     {
       "requirement": "Task completion check during requires enforcement",
-      "name": "Transition blocked by requiresTaskCompletion artifact with incomplete items",
-      "given": [
-        "a change in implementing state",
-        "AND the verifying step declares requiresTaskCompletion: [tasks]",
-        "AND the LifecycleEngine has already identified verifying as the effective target",
-        "AND the tasks artifact file contains - [ ] unfinished task"
-      ],
-      "when": ["execute is called with to: 'verifying'"],
-      "then": ["it throws InvalidStateTransitionError with reason incomplete-tasks"]
-    },
-    {
-      "requirement": "Task completion check during requires enforcement",
-      "name": "Transition blocked by missing task capability (defensive check)",
-      "given": [
-        "a workflow step declares requiresTaskCompletion: [proposal]",
-        "AND artifact proposal has hasTasks: false"
-      ],
-      "when": ["execute is called"],
-      "then": ["it throws InvalidStateTransitionError with reason missing-task-capability"]
-    },
-    {
-      "requirement": "Task completion check during requires enforcement",
-      "name": "Transition allowed when all tasks complete",
-      "given": [
-        "a change in implementing state",
-        "AND the verifying step declares requiresTaskCompletion: [tasks]",
-        "AND the LifecycleEngine has already identified verifying as the effective target",
-        "AND the tasks file contains only - [x] done task"
-      ],
-      "when": ["execute is called with to: 'verifying'"],
-      "then": ["the change transitions to verifying"]
-    },
-    {
-      "requirement": "Task completion check during requires enforcement",
-      "name": "No gating when requiresTaskCompletion absent",
-      "given": [
-        "a change in implementing state",
-        "AND the verifying step has requires: [tasks] but no requiresTaskCompletion",
-        "AND the tasks file contains incomplete items"
-      ],
-      "when": ["execute is called with to: 'verifying'"],
-      "then": ["the change transitions to verifying — no content check"]
-    },
-    {
-      "requirement": "Task completion check during requires enforcement",
-      "name": "Missing artifact file is skipped",
-      "given": ["a step with requiresTaskCompletion: [tasks]", "AND the tasks file does not exist"],
-      "when": ["execute is called"],
-      "then": ["the check is skipped and the transition proceeds"]
-    },
-    {
-      "requirement": "Task completion check during requires enforcement",
-      "name": "Error carries incomplete and complete counts",
-      "given": [
-        "a step with requiresTaskCompletion: [tasks]",
-        "AND the tasks file has 5 complete items and 3 incomplete items"
-      ],
-      "when": ["execute is called"],
+      "name": "Incomplete delegated count blocks transition",
+      "given": ["a completion-gated artifact has an incomplete count returned by CountTasks"],
+      "when": ["TransitionChange.execute() targets that step"],
       "then": [
-        "the error reason includes artifactId: 'tasks', incomplete: 3, complete: 5, total: 8"
+        "it emits task-completion-failed",
+        "AND throws InvalidStateTransitionError with reason incomplete-tasks and the counts"
       ]
     },
     {
       "requirement": "Task completion check during requires enforcement",
-      "name": "task-completion-failed progress event emitted before throwing",
-      "given": ["a step with requiresTaskCompletion: [tasks] and incomplete items"],
-      "when": ["execute is called with an onProgress callback"],
-      "then": ["a task-completion-failed event is emitted with counts before the error is thrown"]
+      "name": "Missing task capability blocks a gated artifact",
+      "given": ["a workflow step requires task completion for an artifact without hasTasks: true"],
+      "when": ["TransitionChange.execute() targets that step"],
+      "then": ["it throws InvalidStateTransitionError with reason missing-task-capability"]
+    },
+    {
+      "requirement": "Task completion check during requires enforcement",
+      "name": "Missing completion configuration blocks a gated artifact",
+      "given": [
+        "a workflow step requires task completion for an artifact with hasTasks: true but no taskCompletionCheck"
+      ],
+      "when": ["TransitionChange.execute() targets that step"],
+      "then": ["it throws InvalidStateTransitionError with reason missing-task-capability"]
+    },
+    {
+      "requirement": "Task completion check during requires enforcement",
+      "name": "All completed tasks allow transition",
+      "given": [
+        "every completion-gated artifact has no incomplete count in CountTasksResult.byArtifact"
+      ],
+      "when": ["TransitionChange.execute() targets that step"],
+      "then": ["the change transitions to the target state"]
+    },
+    {
+      "requirement": "Task completion check during requires enforcement",
+      "name": "No task gate does not inspect content",
+      "given": ["the target workflow step omits requiresTaskCompletion"],
+      "when": ["TransitionChange.execute() targets that step"],
+      "then": ["it does not apply task-completion gating"]
+    },
+    {
+      "requirement": "Task completion check during requires enforcement",
+      "name": "Missing task content does not block a capable artifact",
+      "given": [
+        "a completion-gated artifact declares both task capability and taskCompletionCheck",
+        "AND CountTasksResult.byArtifact has no entry because no qualifying content exists"
+      ],
+      "when": ["TransitionChange.execute() targets that step"],
+      "then": ["it does not block the transition for task completion"]
     },
     {
       "requirement": "Workflow requires enforcement",
@@ -677,13 +659,30 @@
     "files": [
       {
         "specId": "core:transition-change",
-        "file": "core:src/composition/use-cases/transition-change.ts"
+        "file": "core:test/application/use-cases/transition-change.spec.ts"
+      }
+    ],
+    "symbols": [
+      {
+        "specId": "core:transition-change",
+        "file": "core:src/application/use-cases/transition-change.ts",
+        "symbol": "TransitionChange"
+      },
+      {
+        "specId": "core:transition-change",
+        "file": "core:src/composition/use-cases/transition-change.ts",
+        "symbol": "TransitionChangeDeps"
+      },
+      {
+        "specId": "core:transition-change",
+        "file": "core:src/composition/use-cases/transition-change.ts",
+        "symbol": "resolveTransitionChangeDeps"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:ee9cfc196185241a38a7fa109246420db878054fed9a6f6e02e5c533c9824673",
-    "verify.md": "sha256:507ac222c819449d23f33ce41647309557e1dbba363a23d298b851f6d357fdd9"
+    "spec.md": "sha256:591e7d5e5f4747bef3113c5ff753769123f0961850037056ac299153e5856893",
+    "verify.md": "sha256:de2be579910393b515ecdc460f3d41914c71c8717acf5410c9913506bf09dbe2"
   },
   "generatedBy": "core"
 }

@@ -10,7 +10,7 @@ Consumers of `@specd/core` need a single, stable entry point that exposes domain
 
 The `Kernel` interface organises use cases into three groups that mirror the domain areas of the platform:
 
-- `changes` — use cases that operate on change lifecycle (create, transition, approve spec, approve signoff, draft, restore, discard, archive, validate, compile context, list, edit, skip artifact, update spec deps, list drafts, list discarded, list archived, get archived, get status, detect overlap)
+- `changes` — use cases that operate on change lifecycle (create, status, count tasks, transition, approve spec, approve signoff, draft, restore, discard, archive, validate, compile context, list, edit, skip artifact, update spec deps, list drafts, list discarded, list archived, get archived, detect overlap)
 - `specs` — use cases that operate on specs (list, get, save metadata, invalidate metadata, get active schema, validate, generate metadata, get context, resolve schema)
 - `project` — use cases that query project configuration (list workspaces, get project context, **get config** — host-facing readonly `SpecdConfig` snapshot including `plugins`, get metadata, update metadata)
 
@@ -128,6 +128,7 @@ The following table is the exhaustive mapping between kernel paths and use case 
 | `changes.repo`                   | `ChangeRepository`       | —                                                                    | Underlying repository for adapter-level queries         |
 | `changes.create`                 | `CreateChange`           | [core:create-change](../create-change/spec.md)                       | Creates a new change                                    |
 | `changes.status`                 | `GetStatus`              | [core:get-status](../get-status/spec.md)                             | Reports lifecycle state and artifact statuses           |
+| `changes.countTasks`             | `CountTasks`             | [core:count-tasks](../count-tasks/spec.md)                           | Counts task completion by artifact and for the change   |
 | `changes.transition`             | `TransitionChange`       | [core:transition-change](../transition-change/spec.md)               | Performs a lifecycle state transition                   |
 | `changes.approveSpec`            | `ApproveSpec`            | [core:approve-spec](../approve-spec/spec.md)                         | Records spec gate approval and transitions state        |
 | `changes.approveSignoff`         | `ApproveSignoff`         | [core:approve-signoff](../approve-signoff/spec.md)                   | Records signoff gate approval and transitions state     |
@@ -311,3 +312,4 @@ await writer.initProject({
 - [`core:resolve-schema`](../resolve-schema/spec.md)
 - [`core:spec-overlap`](../spec-overlap/spec.md)
 - [`core:get-specs-health`](../get-specs-health/spec.md)
+- [`core:count-tasks`](../count-tasks/spec.md) — shared task-completion query exposed by the kernel.

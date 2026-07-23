@@ -20,6 +20,7 @@ export { createGetProjectContext, type GetProjectContextDeps } from './get-proje
 export { createGetConfig, type GetConfigDeps } from './get-config.js'
 export { createCreateChange, type CreateChangeDeps } from './create-change.js'
 export { createGetStatus, type GetStatusDeps } from './get-status.js'
+export { createCountTasks, type CountTasksDeps } from './count-tasks.js'
 export { createTransitionChange, type TransitionChangeDeps } from './transition-change.js'
 export { createDraftChange, type DraftChangeDeps } from './draft-change.js'
 export { createRestoreChange, type RestoreChangeDeps } from './restore-change.js'

@@ -84,15 +84,15 @@ Each ArtifactStatusEntry MUST include:
 
 ### Requirement: Reports task completion counts for task-capable artifacts
 
-When the schema artifact type has `hasTasks: true` and declares `taskCompletionCheck`, `GetStatus` MUST load each file of that artifact and count completed and incomplete task items using the declared patterns.
+When the schema artifact type has `hasTasks: true` and declares `taskCompletionCheck`, `GetStatus` MUST obtain task-completion counts from `CountTasks`.
 
-`GetStatus` MUST use `ChangeRepository.artifact()` to load file content. The task completion counts MUST be exposed as an optional `taskCompletion` field on each `ArtifactStatusEntry` that corresponds to a task-capable artifact.
+The task completion counts MUST be exposed as an optional `taskCompletion` field on each `ArtifactStatusEntry` that corresponds to a task-capable artifact with qualifying content. `GetStatus` MUST map that field from `CountTasksResult.byArtifact` by artifact type ID.
 
 The `taskCompletion` object MUST contain:
 
 - `complete` — count of complete task items (matched via `completePattern`)
 - `incomplete` — count of incomplete task items (matched via `incompletePattern`)
-- `total` — sum of complete and incomplete (when `completePattern` is declared), or equal to `incomplete` (when only `incompletePattern` is declared)
+- `total` — sum of complete and incomplete; omitted patterns use the schema defaults.
 
 When the artifact file does not exist or the file content is empty, the `taskCompletion` field MUST be omitted.
 
@@ -109,6 +109,7 @@ If no change with the given name exists in the repository, `execute()` MUST thro
 - `lifecycle: LifecycleEngine` — for deriving effective artifact status, blockers, routing, and next-action guidance from the change plus active schema
 - `approvals: { readonly spec: boolean; readonly signoff: boolean }` — whether approval gates are active
 - `refreshImplementationTracking: RefreshImplementationTracking` — primitive used for optional pre-read refresh
+- `countTasks: CountTasks` — required shared query for task-completion counts
 
 It MUST load the change via `ChangeRepository.get(name)` and, when that returns `null`, via `ChangeRepository.getDraft(name)`. It MUST NOT use `getDiscarded`.
 
@@ -192,16 +193,17 @@ The config-based `createGetStatus(config, options?)` form MUST derive `GetStatus
 - `approvals: { readonly spec: boolean; readonly signoff: boolean }`
 - `refreshImplementationTracking: RefreshImplementationTracking`
 - `lifecycle: LifecycleEngine`
+- `countTasks: CountTasks`
 
 The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
 
 ## Constraints
 
-- The use case does not modify the change — it is a read-only query
-- Artifact content is not loaded; only status metadata is returned
-- The effective status computation may be delegated to `LifecycleEngine`; it is not an entity-owned concern of `Change`
-- The `lifecycle` computation adds zero additional I/O beyond schema resolution — `VALID_TRANSITIONS` is a static lookup, while derived lifecycle interpretation is computed in memory from the loaded change, schema, and approval config
-- `changePath` is obtained from `ChangeRepository.changePath(change)` which the repository already exposes
+- The use case does not modify the change — it is a read-only query.
+- Artifact content is not loaded for lifecycle and artifact-status metadata. When task-completion projection is applicable, `GetStatus` delegates the required content reads to `CountTasks`.
+- The effective status computation may be delegated to `LifecycleEngine`; it is not an entity-owned concern of `Change`.
+- The lifecycle computation adds zero additional I/O beyond schema resolution — `VALID_TRANSITIONS` is a static lookup, while derived lifecycle interpretation is computed in memory from the loaded change, schema, and approval config.
+- `changePath` is obtained from `ChangeRepository.changePath(change)` which the repository already exposes.
 
 ## Spec Dependencies
 
@@ -213,3 +215,4 @@ The helper is the only use-case-specific composition entry for config-based boot
 - [`core:lifecycle-engine`](../lifecycle-engine/spec.md)
 - [`core:refresh-implementation-tracking`](../refresh-implementation-tracking/spec.md)
 - [`core:composition-resolver`](../composition-resolver/spec.md)
+- [`core:count-tasks`](../count-tasks/spec.md) — supplies shared task-completion counts.

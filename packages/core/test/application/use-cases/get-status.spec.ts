@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { GetStatus } from '../../../src/application/use-cases/get-status.js'
+import { CountTasks } from '../../../src/application/use-cases/count-tasks.js'
 import { RefreshImplementationTracking } from '../../../src/application/use-cases/refresh-implementation-tracking.js'
 import { ChangeNotFoundError } from '../../../src/application/errors/change-not-found-error.js'
 import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
@@ -46,11 +47,13 @@ function makeGetStatus(
     failSchema?: boolean
     refresh?: RefreshImplementationTracking
     refreshExecute?: ReturnType<typeof vi.fn>
+    countTasks?: CountTasks
   } = {},
 ) {
   const schema = opts.schema === undefined ? makeStdSchema() : opts.schema
   const schemaProvider = makeSchemaProvider(schema)
   const lifecycle = new LifecycleEngine(Logger.debug.bind(Logger))
+  const countTasks = opts.countTasks ?? new CountTasks(changes, schemaProvider)
   const refresh =
     opts.refresh ??
     makeRefreshImplementationTracking(
@@ -62,6 +65,7 @@ function makeGetStatus(
     opts.approvals ?? defaultApprovals,
     refresh,
     lifecycle,
+    countTasks,
   )
 }
 
@@ -307,6 +311,31 @@ describe('GetStatus', () => {
         total: 2,
       })
     })
+  })
+
+  it('delegates task projection to CountTasks once', async () => {
+    const change = makeChange('delegated-tasks')
+    change.transition('designing', testActor)
+    const countTasks = {
+      execute: vi.fn().mockResolvedValue({
+        byArtifact: { tasks: { complete: 1, incomplete: 0, total: 1 } },
+        total: { complete: 1, incomplete: 0, total: 1 },
+      }),
+    } as unknown as CountTasks
+    const schema = makeSchema([
+      makeArtifactType('tasks', { hasTasks: true, taskCompletionCheck: {} }),
+    ])
+    const uc = makeGetStatus(makeChangeRepository([change]), { schema, countTasks })
+
+    const result = await uc.execute({ name: 'delegated-tasks' })
+
+    expect(countTasks.execute).toHaveBeenCalledOnce()
+    expect(result.artifactStatuses[0]?.taskCompletion).toEqual({
+      complete: 1,
+      incomplete: 0,
+      total: 1,
+    })
+    expect(result).not.toHaveProperty('total')
   })
 
   describe('missing application-level test requirements', () => {

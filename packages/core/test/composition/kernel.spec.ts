@@ -8,6 +8,7 @@ import { createKernel } from '../../src/composition/kernel.js'
 import { NullActorResolver } from '../../src/infrastructure/null/actor-resolver.js'
 import { GetSpecsHealth } from '../../src/application/use-cases/get-specs-health.js'
 import { SearchSpecs } from '../../src/application/use-cases/search-specs.js'
+import { CountTasks } from '../../src/application/use-cases/count-tasks.js'
 import { type ArtifactParser } from '../../src/application/ports/artifact-parser.js'
 import { type SpecdConfig } from '../../src/application/specd-config.js'
 
@@ -161,5 +162,12 @@ describe('createKernel', () => {
     const kernel = await createKernel(config)
 
     expect(kernel.specs.getHealth).toBeInstanceOf(GetSpecsHealth)
+  })
+
+  it('wires kernel.changes.countTasks as CountTasks', async () => {
+    const config = await makeConfig()
+    const kernel = await createKernel(config)
+
+    expect(kernel.changes.countTasks).toBeInstanceOf(CountTasks)
   })
 })

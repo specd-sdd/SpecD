@@ -457,7 +457,10 @@ describe('buildSchema', () => {
     expect(artifact.hasTasks).toBe(true)
     expect(artifact.taskCompletionCheck).toBeDefined()
     expect(artifact.taskCompletionCheck!.incompletePattern).toBe('^\\s*-\\s+\\[ \\]')
-    expect(artifact.taskCompletionCheck!.completePattern).toBe('^\\s*-\\s+\\[x\\]')
+    expect(artifact.taskCompletionCheck!.completePattern).toBe('^\\s*-\\s+\\[[xX]\\]')
+    const completePattern = new RegExp(artifact.taskCompletionCheck!.completePattern!, 'm')
+    expect(completePattern.test('- [x] complete')).toBe(true)
+    expect(completePattern.test('- [X] complete')).toBe(true)
   })
 
   it('rejects crossArtifactValidations relation alias that is not declared by participants', () => {

@@ -1,6 +1,8 @@
 import { type ChangeRepository } from '../../application/ports/change-repository.js'
 import { type SchemaProvider } from '../../application/ports/schema-provider.js'
 import { GetStatus } from '../../application/use-cases/get-status.js'
+import { CountTasks } from '../../application/use-cases/count-tasks.js'
+import { createCountTasks, resolveCountTasksDeps } from './count-tasks.js'
 import { type RefreshImplementationTracking } from '../../application/use-cases/refresh-implementation-tracking.js'
 import { type SpecdConfig } from '../../application/specd-config.js'
 import { type LifecycleEngine } from '../../domain/services/lifecycle-engine.js'
@@ -25,6 +27,7 @@ export interface GetStatusDeps {
   readonly refreshImplementationTracking: RefreshImplementationTracking
   /** Lifecycle engine used by the use case. */
   readonly lifecycle: LifecycleEngine
+  readonly countTasks: CountTasks
 }
 
 /**
@@ -40,6 +43,7 @@ export function resolveGetStatusDeps(resolver: CompositionResolver): GetStatusDe
     approvals: resolver.config.approvals,
     refreshImplementationTracking: resolver.getRefreshImplementationTracking(),
     lifecycle: resolver.getLifecycleEngine(),
+    countTasks: createCountTasks(resolveCountTasksDeps(resolver)),
   }
 }
 
@@ -91,14 +95,21 @@ function createGetStatusFromNormalized(
   input: FactoryInput<GetStatusDeps, CompositionResolutionOptions>,
 ): GetStatus {
   if (input.kind === 'deps') {
-    const { changes, schemaProvider, approvals, refreshImplementationTracking, lifecycle } =
-      input.deps
+    const {
+      changes,
+      schemaProvider,
+      approvals,
+      refreshImplementationTracking,
+      lifecycle,
+      countTasks,
+    } = input.deps
     return new GetStatus(
       changes,
       schemaProvider,
       approvals,
       refreshImplementationTracking,
       lifecycle,
+      countTasks,
     )
   }
 
@@ -118,6 +129,7 @@ function isGetStatusDeps(value: GetStatusDeps | SpecdConfig): value is GetStatus
     'schemaProvider' in value &&
     'approvals' in value &&
     'refreshImplementationTracking' in value &&
-    'lifecycle' in value
+    'lifecycle' in value &&
+    'countTasks' in value
   )
 }

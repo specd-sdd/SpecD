@@ -13,6 +13,7 @@ const packageRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
 const KERNEL_ASSEMBLY_EXPORTS: Record<string, string> = {
   'changes.create': 'createCreateChange',
   'changes.status': 'createGetStatus',
+  'changes.countTasks': 'createCountTasks',
   'changes.transition': 'createTransitionChange',
   'changes.draft': 'createDraftChange',
   'changes.restore': 'createRestoreChange',

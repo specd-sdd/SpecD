@@ -149,30 +149,23 @@
 
 #### Scenario: Task completion counts returned for task-capable artifacts
 
-- **GIVEN** a change with an artifact type that has `hasTasks: true` and `taskCompletionCheck.incompletePattern` set
-- **AND** `taskCompletionCheck.completePattern` is also set
-- **AND** the artifact file contains `[ ] task 1`, `[x] task 2`, `[ ] task 3`
+- **GIVEN** a task-capable artifact contains one complete and two incomplete checkbox items
 - **WHEN** `GetStatus.execute()` is called
-- **THEN** the `ArtifactStatusEntry` for that artifact includes `taskCompletion`
-- **AND** `taskCompletion.incomplete` is `2`
-- **AND** `taskCompletion.complete` is `1`
-- **AND** `taskCompletion.total` is `3`
+- **THEN** its artifact status maps the matching `CountTasksResult.byArtifact` entry as `taskCompletion`
+- **AND** `taskCompletion.complete` is `1`, `taskCompletion.incomplete` is `2`, and `taskCompletion.total` is `3`
 
-#### Scenario: Task completion omitted when artifact file does not exist
+#### Scenario: Task completion omitted when no qualifying content exists
 
-- **GIVEN** a change with an artifact type that has `hasTasks: true`
-- **AND** the artifact file does not exist on disk
+- **GIVEN** a task-capable artifact has no existing or non-empty file
 - **WHEN** `GetStatus.execute()` is called
-- **THEN** the `ArtifactStatusEntry` for that artifact does NOT include `taskCompletion`
+- **THEN** its artifact status omits `taskCompletion`
 
-#### Scenario: Task completion with only incompletePattern
+#### Scenario: Omitted complete pattern uses the default
 
-- **GIVEN** a change with an artifact type that has `hasTasks: true`
-- **AND** only `taskCompletionCheck.incompletePattern` is set (no `completePattern`)
-- **AND** the artifact file contains `[ ] task 1`, `[ ] task 2`
+- **GIVEN** a task-capable artifact declares only `incompletePattern`
+- **AND** its content contains two incomplete checkbox items
 - **WHEN** `GetStatus.execute()` is called
-- **THEN** `taskCompletion.incomplete` is `2`
-- **AND** `taskCompletion.total` equals `taskCompletion.incomplete`
+- **THEN** `taskCompletion.incomplete` is `2` and `taskCompletion.total` is `2`
 
 ### Requirement: Throws ChangeNotFoundError for unknown changes
 

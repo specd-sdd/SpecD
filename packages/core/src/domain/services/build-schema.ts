@@ -523,7 +523,7 @@ function buildArtifactType(
   if (raw.hasTasks === true) {
     taskCompletionCheck = {
       incompletePattern: taskCompletionCheck?.incompletePattern ?? '^\\s*-\\s+\\[ \\]',
-      completePattern: taskCompletionCheck?.completePattern ?? '^\\s*-\\s+\\[x\\]',
+      completePattern: taskCompletionCheck?.completePattern ?? '^\\s*-\\s+\\[[xX]\\]',
     }
   }
 

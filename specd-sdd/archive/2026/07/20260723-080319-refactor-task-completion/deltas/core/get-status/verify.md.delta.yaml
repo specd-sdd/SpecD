@@ -1,0 +1,25 @@
+- op: modified
+  description: Verify delegated status counts retain default-pattern semantics.
+  selector:
+    type: section
+    matches: '^Requirement: Reports task completion counts for task-capable artifacts$'
+  content: |
+    #### Scenario: Task completion counts returned for task-capable artifacts
+
+    - **GIVEN** a task-capable artifact contains one complete and two incomplete checkbox items
+    - **WHEN** `GetStatus.execute()` is called
+    - **THEN** its artifact status maps the matching `CountTasksResult.byArtifact` entry as `taskCompletion`
+    - **AND** `taskCompletion.complete` is `1`, `taskCompletion.incomplete` is `2`, and `taskCompletion.total` is `3`
+
+    #### Scenario: Task completion omitted when no qualifying content exists
+
+    - **GIVEN** a task-capable artifact has no existing or non-empty file
+    - **WHEN** `GetStatus.execute()` is called
+    - **THEN** its artifact status omits `taskCompletion`
+
+    #### Scenario: Omitted complete pattern uses the default
+
+    - **GIVEN** a task-capable artifact declares only `incompletePattern`
+    - **AND** its content contains two incomplete checkbox items
+    - **WHEN** `GetStatus.execute()` is called
+    - **THEN** `taskCompletion.incomplete` is `2` and `taskCompletion.total` is `2`

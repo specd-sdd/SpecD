@@ -1511,3 +1511,7 @@ interface UpdateImplementationTrackingResult {
 | `ImplementationFileNotFoundError` | A file-required action targets a file that does not exist on disk. |
 | `ImplementationLinksExistError`   | `ignore` targets a file that still has live implementation links.  |
 ````
+
+# Task completion query
+
+`CountTasks` is the shared read-only query for task-capable change artifacts. Use `createCountTasks(deps)` with explicit ports, or `createCountTasks(config, options?)` for resolver-backed composition. `createKernel(config).changes.countTasks` exposes the same capability from the kernel. Its result provides `byArtifact` plus a change-wide `total`; `GetStatus` intentionally projects only the per-artifact entries.

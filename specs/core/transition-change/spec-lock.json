@@ -11,11 +11,20 @@
     "default:_global/architecture",
     "core:lifecycle-engine",
     "core:refresh-implementation-tracking",
-    "core:composition-resolver"
+    "core:composition-resolver",
+    "core:count-tasks"
   ],
   "implementation": [
     {
-      "file": "core:src/composition/use-cases/transition-change.ts"
+      "file": "core:src/application/use-cases/transition-change.ts",
+      "symbols": ["TransitionChange"]
+    },
+    {
+      "file": "core:src/composition/use-cases/transition-change.ts",
+      "symbols": ["TransitionChangeDeps", "resolveTransitionChangeDeps"]
+    },
+    {
+      "file": "core:test/application/use-cases/transition-change.spec.ts"
     }
   ]
 }

@@ -11,11 +11,20 @@
     "core:config",
     "core:lifecycle-engine",
     "core:refresh-implementation-tracking",
-    "core:composition-resolver"
+    "core:composition-resolver",
+    "core:count-tasks"
   ],
   "implementation": [
     {
-      "file": "core:src/composition/use-cases/get-status.ts"
+      "file": "core:src/application/use-cases/get-status.ts",
+      "symbols": ["GetStatus"]
+    },
+    {
+      "file": "core:src/composition/use-cases/get-status.ts",
+      "symbols": ["GetStatusDeps", "resolveGetStatusDeps"]
+    },
+    {
+      "file": "core:test/application/use-cases/get-status.spec.ts"
     }
   ]
 }

@@ -1,0 +1,43 @@
+- op: modified
+  description: Verify required completion configuration is enforced through CountTasks.
+  selector:
+    type: section
+    matches: '^Requirement: Task completion check during requires enforcement$'
+  content: |
+    #### Scenario: Incomplete delegated count blocks transition
+
+    - **GIVEN** a completion-gated artifact has an incomplete count returned by `CountTasks`
+    - **WHEN** `TransitionChange.execute()` targets that step
+    - **THEN** it emits `task-completion-failed`
+    - **AND** throws `InvalidStateTransitionError` with reason `incomplete-tasks` and the counts
+
+    #### Scenario: Missing task capability blocks a gated artifact
+
+    - **GIVEN** a workflow step requires task completion for an artifact without `hasTasks: true`
+    - **WHEN** `TransitionChange.execute()` targets that step
+    - **THEN** it throws `InvalidStateTransitionError` with reason `missing-task-capability`
+
+    #### Scenario: Missing completion configuration blocks a gated artifact
+
+    - **GIVEN** a workflow step requires task completion for an artifact with `hasTasks: true` but no `taskCompletionCheck`
+    - **WHEN** `TransitionChange.execute()` targets that step
+    - **THEN** it throws `InvalidStateTransitionError` with reason `missing-task-capability`
+
+    #### Scenario: All completed tasks allow transition
+
+    - **GIVEN** every completion-gated artifact has no incomplete count in `CountTasksResult.byArtifact`
+    - **WHEN** `TransitionChange.execute()` targets that step
+    - **THEN** the change transitions to the target state
+
+    #### Scenario: No task gate does not inspect content
+
+    - **GIVEN** the target workflow step omits `requiresTaskCompletion`
+    - **WHEN** `TransitionChange.execute()` targets that step
+    - **THEN** it does not apply task-completion gating
+
+    #### Scenario: Missing task content does not block a capable artifact
+
+    - **GIVEN** a completion-gated artifact declares both task capability and `taskCompletionCheck`
+    - **AND** `CountTasksResult.byArtifact` has no entry because no qualifying content exists
+    - **WHEN** `TransitionChange.execute()` targets that step
+    - **THEN** it does not block the transition for task completion

@@ -1,0 +1,81 @@
+- op: modified
+  description: Delegate task counting while preserving per-artifact status projection.
+  selector:
+    type: section
+    matches: '^Requirement: Reports task completion counts for task-capable artifacts$'
+  content: |
+    When the schema artifact type has `hasTasks: true` and declares `taskCompletionCheck`, `GetStatus` MUST obtain task-completion counts from `CountTasks`.
+
+    The task completion counts MUST be exposed as an optional `taskCompletion` field on each `ArtifactStatusEntry` that corresponds to a task-capable artifact with qualifying content. `GetStatus` MUST map that field from `CountTasksResult.byArtifact` by artifact type ID.
+
+    The `taskCompletion` object MUST contain:
+
+    - `complete` — count of complete task items (matched via `completePattern`)
+    - `incomplete` — count of incomplete task items (matched via `incompletePattern`)
+    - `total` — sum of complete and incomplete; omitted patterns use the schema defaults.
+
+    When the artifact file does not exist or the file content is empty, the `taskCompletion` field MUST be omitted.
+- op: modified
+  description: Inject the shared CountTasks use case.
+  selector:
+    type: section
+    matches: '^Requirement: Constructor dependencies$'
+  content: |
+    `GetStatus` MUST accept the following constructor arguments:
+
+    - `changes: ChangeRepository` — for loading changes by name
+    - `schemaProvider: SchemaProvider` — for obtaining the fully-resolved active schema
+    - `lifecycle: LifecycleEngine` — for deriving effective artifact status, blockers, routing, and next-action guidance from the change plus active schema
+    - `approvals: { readonly spec: boolean; readonly signoff: boolean }` — whether approval gates are active
+    - `refreshImplementationTracking: RefreshImplementationTracking` — primitive used for optional pre-read refresh
+    - `countTasks: CountTasks` — required shared query for task-completion counts
+
+    It MUST load the change via `ChangeRepository.get(name)` and, when that returns `null`, via `ChangeRepository.getDraft(name)`. It MUST NOT use `getDiscarded`.
+
+    `SchemaProvider` replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple, providing the fully-resolved schema with plugins and overrides applied.
+
+    `GetStatus` MUST NOT accept `ImplementationDetector` and MUST NOT invoke implementation autodetection directly.
+- op: modified
+  description: Resolve CountTasks through the config-based factory.
+  selector:
+    type: section
+    matches: '^Requirement: Config-based factory delegates through resolveGetStatusDeps$'
+  content: |
+    The config-based `createGetStatus(config, options?)` form MUST derive `GetStatusDeps` through `resolveGetStatusDeps(resolver)` and then delegate to canonical `createGetStatus(deps)`.
+
+    `resolveGetStatusDeps(resolver)` MUST resolve:
+
+    - `changes: ChangeRepository`
+    - `schemaProvider: SchemaProvider`
+    - `approvals: { readonly spec: boolean; readonly signoff: boolean }`
+    - `refreshImplementationTracking: RefreshImplementationTracking`
+    - `lifecycle: LifecycleEngine`
+    - `countTasks: CountTasks`
+
+    The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+- op: modified
+  description: Record the shared task-counting dependency.
+  selector:
+    type: section
+    matches: '^Spec Dependencies$'
+  content: |
+    - [`core:change`](../change/spec.md)
+    - [`core:kernel`](../kernel/spec.md)
+    - [`core:transition-change`](../transition-change/spec.md)
+    - [`core:schema-format`](../schema-format/spec.md)
+    - [`core:config`](../config/spec.md)
+    - [`core:lifecycle-engine`](../lifecycle-engine/spec.md)
+    - [`core:refresh-implementation-tracking`](../refresh-implementation-tracking/spec.md)
+    - [`core:composition-resolver`](../composition-resolver/spec.md)
+    - [`core:count-tasks`](../count-tasks/spec.md) — supplies shared task-completion counts.
+- op: modified
+  description: Permit the delegated task-count projection to read artifact content.
+  selector:
+    type: section
+    matches: '^Constraints$'
+  content: |
+    - The use case does not modify the change — it is a read-only query.
+    - Artifact content is not loaded for lifecycle and artifact-status metadata. When task-completion projection is applicable, `GetStatus` delegates the required content reads to `CountTasks`.
+    - The effective status computation may be delegated to `LifecycleEngine`; it is not an entity-owned concern of `Change`.
+    - The lifecycle computation adds zero additional I/O beyond schema resolution — `VALID_TRANSITIONS` is a static lookup, while derived lifecycle interpretation is computed in memory from the loaded change, schema, and approval config.
+    - `changePath` is obtained from `ChangeRepository.changePath(change)` which the repository already exposes.

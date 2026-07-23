@@ -11,12 +11,11 @@
   ],
   "implementation": [
     {
-      "file": "core:src/domain/value-objects/artifact-dag.ts",
-      "symbols": ["ArtifactDag", "artifactDagFromChangeArtifacts"]
+      "file": "core:src/domain/services/build-schema.ts",
+      "symbols": ["buildArtifactType"]
     },
     {
-      "file": "core:src/domain/value-objects/schema.ts",
-      "symbols": ["Schema"]
+      "file": "core:test/domain/services/build-schema.spec.ts"
     }
   ]
 }

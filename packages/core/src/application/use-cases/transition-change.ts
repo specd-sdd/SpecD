@@ -7,7 +7,7 @@ import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
 import { InvalidStateTransitionError } from '../../domain/errors/invalid-state-transition-error.js'
 import { HookFailedError } from '../../domain/errors/hook-failed-error.js'
 import { LifecycleEngine } from '../../domain/services/lifecycle-engine.js'
-import { safeRegex } from '../../domain/services/safe-regex.js'
+import { CountTasks } from './count-tasks.js'
 import { type RunStepHooks, type OnHookProgress } from './run-step-hooks.js'
 import { RefreshImplementationTracking } from './refresh-implementation-tracking.js'
 import { Logger } from '../logger.js'
@@ -106,6 +106,7 @@ export class TransitionChange {
   private readonly _refresh: RefreshImplementationTracking
   private readonly _approvals: ApprovalGates
   private readonly _lifecycle: LifecycleEngine
+  private readonly _countTasks: CountTasks
 
   /**
    * Creates a new `TransitionChange` use case instance.
@@ -117,6 +118,7 @@ export class TransitionChange {
    * @param refreshImplementationTracking - Primitive for optional pre-transition refresh
    * @param approvals - Whether approval gates are active in the project configuration
    * @param lifecycle - Shared lifecycle interpreter
+   * @param countTasks - Shared task-completion query
    */
   constructor(
     changes: ChangeRepository,
@@ -125,7 +127,8 @@ export class TransitionChange {
     runStepHooks: RunStepHooks,
     refreshImplementationTracking: RefreshImplementationTracking,
     approvals: ApprovalGates,
-    lifecycle: LifecycleEngine = new LifecycleEngine(Logger.debug.bind(Logger)),
+    lifecycle: LifecycleEngine,
+    countTasks: CountTasks,
   ) {
     this._changes = changes
     this._actor = actor
@@ -134,6 +137,7 @@ export class TransitionChange {
     this._refresh = refreshImplementationTracking
     this._approvals = approvals
     this._lifecycle = lifecycle
+    this._countTasks = countTasks
   }
 
   /**
@@ -246,26 +250,31 @@ export class TransitionChange {
       workflowStep !== null &&
       workflowStep.requiresTaskCompletion.length > 0
     ) {
+      const taskCounts = await this._countTasks.execute({ change })
       for (const artifactId of workflowStep.requiresTaskCompletion) {
         const artifactType = schema.artifact(artifactId)
 
         // Defensive check: invariant violation
-        if (artifactType === null || !artifactType.hasTasks) {
+        if (
+          artifactType === null ||
+          !artifactType.hasTasks ||
+          artifactType.taskCompletionCheck === undefined
+        ) {
           throw new InvalidStateTransitionError(fromState, effectiveTarget, {
             type: 'missing-task-capability',
             artifactId,
           })
         }
 
-        if (artifactType.taskCompletionCheck === undefined) continue
-
-        await this._checkTaskCompletionForArtifact(
-          change,
-          artifactId,
-          artifactType.taskCompletionCheck,
-          effectiveTarget,
-          onProgress,
-        )
+        const count = taskCounts.byArtifact[artifactId]
+        if (count?.incomplete !== undefined && count.incomplete > 0) {
+          onProgress?.({ type: 'task-completion-failed', artifactId, ...count })
+          throw new InvalidStateTransitionError(change.state, effectiveTarget, {
+            type: 'incomplete-tasks',
+            artifactId,
+            ...count,
+          })
+        }
       }
     }
 
@@ -345,69 +354,6 @@ export class TransitionChange {
     const failedHook = result.failedHooks[0]
     if (!result.success && failedHook !== undefined) {
       throw new HookFailedError(failedHook.command, failedHook.exitCode, failedHook.stderr)
-    }
-  }
-
-  /**
-   * Checks all files in an artifact for incomplete task items, counting matches
-   * and emitting a progress event before throwing.
-   *
-   * @param change - The change whose artifact files are checked
-   * @param artifactId - The artifact type ID to check
-   * @param taskCheck - The task completion check config from the artifact type
-   * @param taskCheck.incompletePattern - Regex pattern for incomplete task items
-   * @param taskCheck.completePattern - Optional regex pattern for complete task items (used for counting)
-   * @param effectiveTarget - The target state (for error context)
-   * @param onProgress - Optional progress callback
-   * @throws {InvalidStateTransitionError} If any file contains incomplete task items
-   */
-  private async _checkTaskCompletionForArtifact(
-    change: Change,
-    artifactId: string,
-    taskCheck: { readonly incompletePattern?: string; readonly completePattern?: string },
-    effectiveTarget: ChangeState,
-    onProgress?: OnTransitionProgress,
-  ): Promise<void> {
-    if (taskCheck.incompletePattern === undefined) return
-
-    const changeArtifact = change.getArtifact(artifactId)
-    if (changeArtifact === null) return
-
-    const incompleteRe = safeRegex(taskCheck.incompletePattern, 'gm')
-    if (incompleteRe === null) return
-
-    const completeRe =
-      taskCheck.completePattern !== undefined ? safeRegex(taskCheck.completePattern, 'gm') : null
-
-    let incompleteCount = 0
-    let completeCount = 0
-
-    for (const file of changeArtifact.files.values()) {
-      const loaded = await this._changes.artifact(change, file.filename)
-      if (loaded === null) continue
-
-      incompleteCount += (loaded.content.match(incompleteRe) ?? []).length
-      if (completeRe !== null) {
-        completeCount += (loaded.content.match(completeRe) ?? []).length
-      }
-    }
-
-    if (incompleteCount > 0) {
-      const total = incompleteCount + completeCount
-      onProgress?.({
-        type: 'task-completion-failed',
-        artifactId,
-        incomplete: incompleteCount,
-        complete: completeCount,
-        total,
-      })
-      throw new InvalidStateTransitionError(change.state, effectiveTarget, {
-        type: 'incomplete-tasks',
-        artifactId,
-        incomplete: incompleteCount,
-        complete: completeCount,
-        total,
-      })
     }
   }
 }
