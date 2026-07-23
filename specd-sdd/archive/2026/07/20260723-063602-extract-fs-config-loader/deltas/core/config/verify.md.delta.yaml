@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'metadataPath ownership fix is in spec.md only; existing verify scenarios already attribute absent-path derivation to kernel composition where applicable, and schemas default examples remain valid.'

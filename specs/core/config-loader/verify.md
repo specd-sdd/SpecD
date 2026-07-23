@@ -232,7 +232,8 @@
 
 - **GIVEN** the config file is at `/repo/specd.yaml` and declares `specs.fs.metadataPath: .specd/metadata`
 - **WHEN** `load()` is called
-- **THEN** the workspace's `metadataPath` is `/repo/.specd/metadata`
+- **THEN** the default workspace's specs adapter config retains `metadataPath` as `/repo/.specd/metadata`
+- **AND** the value is present on the returned `SpecdConfig` binding (not discarded during `fs` normalization)
 
 #### Scenario: Absent metadataPath auto-derived from VCS root
 
@@ -240,7 +241,7 @@
 - **AND** the specs path is inside a git repo rooted at `/repo`
 - **WHEN** kernel composition initializes the workspace
 - **THEN** the workspace's `metadataPath` is `/repo/.specd/metadata`
-- **NOTE** auto-derivation of absent `metadataPath` is a kernel composition responsibility (see `kernel-internals.ts`), not `config-loader.load()`. The loader only resolves explicit `metadataPath` values.
+- **NOTE** auto-derivation of absent `metadataPath` is a kernel composition responsibility (see `composition-resolver.ts` / `resolveMetadataPathForWorkspace`), not `config-loader.load()`. The loader only resolves explicit `metadataPath` values.
 
 #### Scenario: Absent metadataPath with NullVcsAdapter fallback
 
@@ -248,7 +249,7 @@
 - **AND** `/external/specs` is not inside any VCS
 - **WHEN** kernel composition initializes the workspace
 - **THEN** the workspace's `metadataPath` is `/external/.specd/metadata`
-- **NOTE** same as above — fallback derivation is kernel composition responsibility.
+- **NOTE** same as above — fallback derivation is composition responsibility via `resolveMetadataPathForWorkspace`, not `config-loader.load()`.
 
 ### Requirement: Storage path containment
 
@@ -323,7 +324,7 @@
 
 - **GIVEN** the `default` workspace omits `schemas` and the config is at `/repo/specd.yaml`
 - **WHEN** `load()` is called
-- **THEN** the default workspace's `schemasPath` is `/repo/specd/schemas`
+- **THEN** the default workspace's `schemasPath` is `/repo/.specd/schemas`
 
 #### Scenario: Non-default workspace schemasPath is null when omitted
 

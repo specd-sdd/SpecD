@@ -10,5 +10,49 @@
     "default:_global/architecture",
     "core:vcs-adapter-port"
   ],
-  "implementation": []
+  "implementation": [
+    {
+      "file": "core:src/infrastructure/fs/config-cascade.ts",
+      "symbols": [
+        "LayerExtendsZodSchema",
+        "RemovalMatcherZodSchema",
+        "LayerRemovalZodSchema",
+        "LayerRawZodSchema",
+        "candidateSortKey",
+        "discoverCandidateFiles",
+        "findCandidateDirectory",
+        "determineExtendsMode",
+        "parseCascadeLayer",
+        "resolveActiveChain",
+        "resolveForcedCascade",
+        "matchesContextEntry",
+        "findContextEntryIndex",
+        "applyRemovals",
+        "mergeActiveLayers",
+        "tryLoadEnvFiles",
+        "applyEnvOverrides"
+      ]
+    },
+    {
+      "file": "core:src/infrastructure/fs/config-loader.ts",
+      "symbols": [
+        "FsConfigLoaderOptions",
+        "FsConfigLoader",
+        "constructor",
+        "load",
+        "resolvePath",
+        "_resolveCascade",
+        "_buildConfig",
+        "parseRawAdapter",
+        "resolveAdapterBinding"
+      ]
+    },
+    {
+      "file": "core:src/composition/config-loader.ts",
+      "symbols": ["createDefaultConfigLoader"]
+    },
+    {
+      "file": "core:test/infrastructure/fs/config-loader.spec.ts"
+    }
+  ]
 }

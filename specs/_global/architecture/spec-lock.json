@@ -6,10 +6,10 @@
   "dependsOn": [],
   "implementation": [
     {
-      "file": "default:packages/core/src/composition/composition-resolver.ts"
+      "file": "default:packages/core/src/public.ts"
     },
     {
-      "file": "default:packages/core/src/composition/kernel.ts"
+      "file": "default:packages/core/src/composition/config-loader.ts"
     }
   ]
 }

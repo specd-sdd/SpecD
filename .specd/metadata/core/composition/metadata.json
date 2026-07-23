@@ -1,6 +1,6 @@
 {
   "title": "Composition Layer",
-  "description": "Delivery mechanisms must not know how ports, adapters, and use cases are wired together, yet something needs to assemble these pieces. The `composition/` layer in `@specd/core` serves this role as the only layer permitted to import from `infrastructure/`, exposing use-case factories, config I/O factories (`createConfigLoader`, `createConfigWriter`), a kernel that builds domain use cases from a resolved config object, and ports for config read/write. CLI, MCP, and plugin adapters interact exclusively with this layer.",
+  "description": "Delivery mechanisms must not know how ports, adapters, and use cases are wired together, yet something needs to assemble these pieces. The `composition/` layer in `@specd/core` serves this role as the only layer permitted to import from `infrastructure/`, exposing use-case factories, config I/O factories (`createDefaultConfigLoader`, `createConfigWriter`), a kernel that builds domain use cases from a resolved config object, and ports for config read/write. CLI, MCP, and plugin adapters interact exclusively with this layer.",
   "dependsOn": [
     "default:_global/architecture",
     "core:resolve-schema",
@@ -9,7 +9,7 @@
     "core:composition-resolver"
   ],
   "context": [
-    "Delivery mechanisms must not know how ports, adapters, and use cases are wired together, yet something needs to assemble these pieces. The `composition/` layer in `@specd/core` serves this role as the only layer permitted to import from `infrastructure/`, exposing use-case factories, config I/O factories (`createConfigLoader`, `createConfigWriter`), a kernel that builds domain use cases from a resolved config object, and ports for config read/write. CLI, MCP, and plugin adapters interact exclusively with this layer."
+    "Delivery mechanisms must not know how ports, adapters, and use cases are wired together, yet something needs to assemble these pieces. The `composition/` layer in `@specd/core` serves this role as the only layer permitted to import from `infrastructure/`, exposing use-case factories, config I/O factories (`createDefaultConfigLoader`, `createConfigWriter`), a kernel that builds domain use cases from a resolved config object, and ports for config read/write. CLI, MCP, and plugin adapters interact exclusively with this layer."
   ],
   "rules": [
     {
@@ -75,7 +75,13 @@
     {
       "requirement": "ConfigLoader is an application port",
       "rules": [
-        "`ConfigLoader` is defined in `application/ports/config-loader.ts` as an interface. It has a single method `load(): Promise<SpecdConfig>`. The `FsConfigLoader` implementation reads `specd.yaml` and `specd.local.yaml`, with local values taking precedence. Future implementations (`EnvConfigLoader`, `CompositeConfigLoader`) add new config sources without touching the kernel or any delivery layer."
+        "`ConfigLoader` is defined in `application/ports/config-loader.ts` as an abstract class with shared `rootPath` construction. It exposes `load(): Promise<SpecdConfig>` and `resolvePath(): Promise<string | null>`. The `FsConfigLoader` implementation discovers and resolves layered config candidates (`specd.yaml`, named variants, local variants). Future implementations (`EnvConfigLoader`, `CompositeConfigLoader`) add new config sources without touching the kernel or any delivery layer.\n\nDelivery hosts obtain a wired instance via `createDefaultConfigLoader(options)` — they MUST NOT construct `FsConfigLoader` directly."
+      ]
+    },
+    {
+      "requirement": "Spec repository metadataPath preference",
+      "rules": [
+        "When composition constructs a `SpecRepository` for a workspace, it MUST use an absolute `metadataPath` from the workspace's specs adapter config when that field is present (as retained by `ConfigLoader.load()` after resolving a declared path). When the field is absent, composition MUST derive the metadata root (VCS walk from the specs path, with NullVcs / non-VCS fallback) and MUST NOT invent a path in the config loader."
       ]
     },
     {
@@ -105,7 +111,7 @@
     {
       "requirement": "@specd/sdk orchestrates cross-package host bootstrap",
       "rules": [
-        "Delivery hosts (CLI, MCP, API, IPC) MUST bootstrap through `@specd/sdk` (`openSpecdHost`, `createSdkContext`) rather than wiring `createConfigLoader`, `createKernel`, and `createCodeGraphProvider` independently in each adapter.\n\n`@specd/core` composition factories remain the underlying building blocks. `@specd/sdk` composes them with `@specd/code-graph` for host-facing lifecycle and orchestration.\n\n`@specd/cli` and `@specd/mcp` MUST declare `@specd/sdk` as their only direct runtime dependency on specd platform packages. Direct core/code-graph bootstrap imports in delivery hosts are permitted only in `@specd/sdk` itself and in tests."
+        "Delivery hosts (CLI, MCP, API, IPC) MUST bootstrap through `@specd/sdk` (`openSpecdHost`, `createSdkContext`) rather than wiring `createDefaultConfigLoader`, `createKernel`, and `createCodeGraphProvider` independently in each adapter.\n\n`@specd/core` composition factories remain the underlying building blocks. `@specd/sdk` composes them with `@specd/code-graph` for host-facing lifecycle and orchestration.\n\n`@specd/cli` and `@specd/mcp` MUST declare `@specd/sdk` as their only direct runtime dependency on specd platform packages. Direct core/code-graph bootstrap imports in delivery hosts are permitted only in `@specd/sdk` itself and in tests."
       ]
     },
     {
@@ -137,8 +143,8 @@
     "composition/ is the only directory in @specd/core permitted to import from infrastructure/",
     "Concrete adapter classes (FsSpecRepository, NodeHookRunner, GitVcsAdapter, FsFileReader, FsSchemaRegistry, etc.) must not appear on any public entry point (\".\", \"./ports\", \"./extensions\")",
     "Repository-level factories (createSpecRepository, createChangeRepository, createArchiveRepository, createSchemaRepository, createSchemaRegistry) and standalone use-case createX factories for kernel-mounted use cases MUST appear on the \".\" public barrel",
-    "The \".\" barrel exports createKernel, createConfigLoader, createConfigWriter, createVcsAdapter, Kernel, all kernel-equivalent factories, kernel use-case I/O types, domain entities, and SpecdError hierarchy",
-    "ConfigLoader and ConfigWriter implementations live in infrastructure/; port interfaces live in application/ports/ and are exported from \"./ports\"",
+    "The \".\" barrel exports createKernel, createDefaultConfigLoader, createConfigWriter, createVcsAdapter, Kernel, all kernel-equivalent factories, kernel use-case I/O types, domain entities, and SpecdError hierarchy",
+    "ConfigLoader and ConfigWriter implementations live in infrastructure/; port contracts live in application/ports/ and are exported from \"./ports\"",
     "The kernel groups use cases under domain-area namespaces — use cases are not properties at the top level of the kernel object",
     "Symbols only needed by monorepo composition internals (concrete adapters, kernel-internals, builtin FS_* markers) remain on \"./internal\" only"
   ],
@@ -160,7 +166,7 @@
     {
       "requirement": "Use-case factories are the unit of composition",
       "name": "Config I/O factories return ports directly",
-      "when": ["createConfigLoader() or createConfigWriter() is called"],
+      "when": ["createDefaultConfigLoader() or createConfigWriter() is called"],
       "then": [
         "each returns a port instance (ConfigLoader or ConfigWriter)",
         "AND neither wraps the port in a pass-through use-case class"
@@ -332,6 +338,46 @@
       "then": ["values in specd.local.yaml take precedence over values in specd.yaml"]
     },
     {
+      "requirement": "ConfigLoader is an application port",
+      "name": "ConfigLoader exposes resolvePath",
+      "when": ["the ConfigLoader port contract is inspected"],
+      "then": [
+        "it is an abstract class with shared rootPath construction",
+        "AND it exposes resolvePath(): Promise<string | null> in addition to load()"
+      ]
+    },
+    {
+      "requirement": "ConfigLoader is an application port",
+      "name": "Hosts use createDefaultConfigLoader",
+      "when": ["a delivery host needs a config loader"],
+      "then": [
+        "it calls createDefaultConfigLoader(options)",
+        "AND it does not construct FsConfigLoader directly"
+      ]
+    },
+    {
+      "requirement": "Spec repository metadataPath preference",
+      "name": "Explicit metadataPath preferred over derivation",
+      "given": [
+        "ConfigLoader.load() returned a workspace specs adapter config with absolute metadataPath: /custom/meta"
+      ],
+      "when": ["composition constructs the workspace SpecRepository"],
+      "then": [
+        "the repository is wired with metadataPath /custom/meta",
+        "AND VCS-based derivation is not used for that workspace"
+      ]
+    },
+    {
+      "requirement": "Spec repository metadataPath preference",
+      "name": "Absent metadataPath still derived by composition",
+      "given": [
+        "the loaded specs adapter config has no metadataPath",
+        "AND the specs path is inside a git repo rooted at /repo"
+      ],
+      "when": ["composition constructs the workspace SpecRepository"],
+      "then": ["the repository metadataPath is derived as /repo/.specd/metadata"]
+    },
+    {
       "requirement": "ConfigWriter is an application port",
       "name": "createConfigWriter returns FsConfigWriter by default",
       "when": ["createConfigWriter() is called without options"],
@@ -482,13 +528,30 @@
     "files": [
       {
         "specId": "core:composition",
-        "file": "core:src/composition/composition-resolver.ts"
+        "file": "core:test/composition/composition-resolver.spec.ts"
+      }
+    ],
+    "symbols": [
+      {
+        "specId": "core:composition",
+        "file": "core:src/composition/config-loader.ts",
+        "symbol": "createDefaultConfigLoader"
+      },
+      {
+        "specId": "core:composition",
+        "file": "core:src/application/ports/config-loader.ts",
+        "symbol": "ConfigLoader"
+      },
+      {
+        "specId": "core:composition",
+        "file": "core:src/composition/composition-resolver.ts",
+        "symbol": "resolveMetadataPathForWorkspace"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:3eebce9d3b54892752f13a7dbe7a95a0df95c5e59276622a9587f12df16e437f",
-    "verify.md": "sha256:fec92a579a42808ec616bea9691cbea45c5530f203dce85c0c8e6325fb6e6e9f"
+    "spec.md": "sha256:5e47298b6c89f365dbf26316995c8264833bfe35791582756145339f3ffb59dc",
+    "verify.md": "sha256:16fb86b63ad01ca8053c8826c7c38b0684a01bfe22c70ff9654f3a0c3c95964d"
   },
   "generatedBy": "core"
 }

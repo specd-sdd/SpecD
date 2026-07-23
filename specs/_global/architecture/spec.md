@@ -45,7 +45,7 @@ Dependencies are wired manually at the application entry point of each package. 
 Each package with business logic may have a `composition/` layer above `infrastructure/`. This layer is the only layer permitted to import from `infrastructure/`. It exposes:
 
 - **Kernel** — `createKernel(config: SpecdConfig, options?)` wires domain use cases and returns grouped use cases. Config mutation is not wired into the kernel. Hosts read config via `kernel.project.getConfig` when needed.
-- **Config loader port** — `createConfigLoader()` returns a `ConfigLoader`. Implementations live in `infrastructure/`.
+- **Config loader port** — `createDefaultConfigLoader()` returns a `ConfigLoader`. Implementations live in `infrastructure/`.
 - **Config writer port** — `createConfigWriter()` returns a `ConfigWriter` for mutating `specd.yaml`. Delivery mechanisms call port methods on the returned instance.
 
 Every capability mounted on `Kernel` MUST also be obtainable without `createKernel`. Public use-case factories MUST expose canonical dependency-based construction as `createX(deps)` and MAY expose a convenience bootstrap form as `createX(config, options?)`. The config-based form MUST delegate through one shared composition-resolver path that resolves normalized dependencies from config instead of reintroducing per-factory fs-specific wiring branches.
@@ -83,7 +83,7 @@ Packages with business logic (`@specd/core`, `@specd/code-graph`) and the host f
 - In any package with business logic, `application/` must not import from `infrastructure/` or `composition/`
 - In any package with business logic, `infrastructure/` must not import from `composition/`
 - Only `composition/` may import from `infrastructure/`; concrete adapter classes and repository-level factories must not be exported from `index.ts`
-- Delivery mechanisms import use-case factories, the kernel, `createConfigLoader`, and `createConfigWriter` — they MAY call methods on the returned `ConfigLoader` and `ConfigWriter` port instances but MUST NOT import infrastructure adapters or construct use cases directly
+- Delivery mechanisms import use-case factories, the kernel, `createDefaultConfigLoader`, and `createConfigWriter` — they MAY call methods on the returned `ConfigLoader` and `ConfigWriter` port instances but MUST NOT import infrastructure adapters or construct use cases directly
 - Use cases receive all dependencies via constructor — no module-level singletons, in any package
 - Domain entities must throw typed errors (subclasses of `SpecdError`) for invalid operations
 - Stateless domain operations must be plain functions, not classes

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Delivery mechanisms need to load and validate `specd.yaml` without knowing the details of filesystem discovery, YAML parsing, Zod validation, or path resolution. `createConfigLoader` is the composition factory that encapsulates all of this and produces a `ConfigLoader` instance. This spec covers the public contract of config loading as consumed by CLI and MCP adapters — it does not duplicate the `SpecdConfig` structure or field semantics already specified in `specs/core/config/spec.md`.
+Delivery mechanisms need to load and validate `specd.yaml` without knowing the details of filesystem discovery, YAML parsing, Zod validation, or path resolution. `createDefaultConfigLoader` is the composition factory that encapsulates all of this and produces a `ConfigLoader` instance. This spec covers the public contract of config loading as consumed by CLI and MCP adapters — it does not duplicate the `SpecdConfig` structure or field semantics already specified in `specs/core/config/spec.md`.
 
 ## Requirements
 
@@ -107,7 +107,7 @@ The loader MUST verify that `workspaces.default` exists in the parsed config. If
 
 All relative paths in the parsed config — `specs.fs.path`, `specs.fs.metadataPath`, `schemas.fs.path`, `codeRoot`, and all `storage.*.fs.path` values — MUST be resolved relative to the directory containing the active config file. The resolved `SpecdConfig.projectRoot` MUST be set to the config file's parent directory.
 
-When `specs.fs.metadataPath` is explicitly declared, the loader MUST resolve it relative to the config directory. When `specs.fs.metadataPath` is absent, auto-derivation of `metadataPath` from the VCS root is a kernel composition responsibility (see `kernel-internals.ts`) and is not performed by `config-loader.load()`.
+When `specs.fs.metadataPath` is explicitly declared, the loader MUST resolve it relative to the config directory and MUST retain the absolute path on the workspace's specs adapter binding in the returned `SpecdConfig` (including for `adapter: fs` normalization). When `specs.fs.metadataPath` is absent, auto-derivation of `metadataPath` from the VCS root is a kernel composition responsibility (see composition-resolver / kernel wiring) and is NOT performed by `config-loader.load()`.
 
 ### Requirement: Storage path containment
 
@@ -127,7 +127,7 @@ The loader MUST apply the following defaults when workspace fields are omitted:
 
 - **`ownership`**: `'owned'` for the `default` workspace; `'readOnly'` for all other workspaces.
 - **`codeRoot`**: the config file directory for the `default` workspace. For non-default workspaces, `codeRoot` is required — its absence MUST produce `ConfigValidationError`.
-- **`schemasPath`**: for the `default` workspace, when `schemas` is omitted, defaults to `<configDir>/specd/schemas`. For non-default workspaces, when `schemas` is omitted, `schemasPath` MUST be `null`.
+- **`schemasPath`**: for the `default` workspace, when `schemas` is omitted, defaults to `<configDir>/.specd/schemas`. For non-default workspaces, when `schemas` is omitted, `schemasPath` MUST be `null`.
 
 ### Requirement: contextIncludeSpecs and contextExcludeSpecs pattern validation
 
@@ -164,8 +164,8 @@ No generic YAML/runtime exception SHALL escape for configuration validation fail
 
 ## Constraints
 
-- `createConfigLoader` is the only public entry point for config loading — `FsConfigLoader` MUST NOT be exported from `@specd/core`
-- The factory returns a `ConfigLoader` port interface, not the concrete `FsConfigLoader` class
+- `createDefaultConfigLoader` is the only public entry point for config loading — `FsConfigLoader` MUST NOT be exported from `@specd/core`
+- The factory returns a `ConfigLoader` port (abstract class), not the concrete `FsConfigLoader` class
 - Discovery mode resolves a layered active chain rather than selecting `specd.local.yaml` as an exclusive winner
 - Forced mode resolves only the selected entrypoint plus its `extends` chain
 - Zod validation precedes all path resolution and domain construction for each parsed layer

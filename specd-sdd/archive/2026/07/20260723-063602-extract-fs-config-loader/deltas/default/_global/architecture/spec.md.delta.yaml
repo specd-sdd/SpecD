@@ -1,0 +1,40 @@
+- op: modified
+  description: 'Composition wiring uses createDefaultConfigLoader'
+  selector:
+    type: section
+    matches: 'Requirement: Composition layer for use-case wiring'
+  content: |
+    Each package with business logic may have a `composition/` layer above `infrastructure/`. This layer is the only layer permitted to import from `infrastructure/`. It exposes:
+
+    - **Kernel** — `createKernel(config: SpecdConfig, options?)` wires domain use cases and returns grouped use cases. Config mutation is not wired into the kernel. Hosts read config via `kernel.project.getConfig` when needed.
+    - **Config loader port** — `createDefaultConfigLoader()` returns a `ConfigLoader`. Implementations live in `infrastructure/`.
+    - **Config writer port** — `createConfigWriter()` returns a `ConfigWriter` for mutating `specd.yaml`. Delivery mechanisms call port methods on the returned instance.
+
+    Every capability mounted on `Kernel` MUST also be obtainable without `createKernel`. Public use-case factories MUST expose canonical dependency-based construction as `createX(deps)` and MAY expose a convenience bootstrap form as `createX(config, options?)`. The config-based form MUST delegate through one shared composition-resolver path that resolves normalized dependencies from config instead of reintroducing per-factory fs-specific wiring branches.
+
+    `createKernel` is a convenience orchestration layer over the same reusable factory logic. `createKernelBuilder` is a convenience surface for full-kernel additive registration over that same resolver path; neither one defines a second source of truth for per-use-case composition semantics.
+
+    Concrete adapter classes are never exported from public entry points. Delivery hosts (`@specd/cli`, `@specd/mcp`) that use both core and code-graph MUST import from `@specd/sdk` per the import policy in `sdk:composition`.
+
+- op: modified
+  description: 'Constraints reference createDefaultConfigLoader (preserve all bullets)'
+  selector:
+    type: section
+    matches: 'Constraints'
+  content: |
+    - In any package with business logic, `domain/` must not import from `application/`, `infrastructure/`, or `composition/`
+    - In any package with business logic, `application/` must not import from `infrastructure/` or `composition/`
+    - In any package with business logic, `infrastructure/` must not import from `composition/`
+    - Only `composition/` may import from `infrastructure/`; concrete adapter classes and repository-level factories must not be exported from `index.ts`
+    - Delivery mechanisms import use-case factories, the kernel, `createDefaultConfigLoader`, and `createConfigWriter` — they MAY call methods on the returned `ConfigLoader` and `ConfigWriter` port instances but MUST NOT import infrastructure adapters or construct use cases directly
+    - Use cases receive all dependencies via constructor — no module-level singletons, in any package
+    - Domain entities must throw typed errors (subclasses of `SpecdError`) for invalid operations
+    - Stateless domain operations must be plain functions, not classes
+    - Ports with invariant constructor arguments are `abstract class`, not `interface`
+    - All port methods are explicit methods — no property signatures
+    - No package may introduce a circular `workspace:*` dependency
+    - Infrastructure adapters that read external YAML files must validate the parsed content with a schema validator before constructing any domain or application objects; unvalidated YAML must never reach domain or application code
+    - Public `"."` barrels MUST NOT export concrete adapter classes or infrastructure implementations
+    - Public `"."` barrels MUST export kernel-equivalent `createX` use-case factories and repository-level factories for every capability on `Kernel`
+    - Port contracts live on `@specd/core/ports` (and `@specd/sdk/ports`); extension registration types live on `@specd/core/extensions` (and `@specd/sdk/extensions`)
+    - Delivery hosts (`cli`, `mcp`) MUST NOT declare direct runtime dependencies on both `@specd/core` and `@specd/code-graph` when `@specd/sdk` covers their needs

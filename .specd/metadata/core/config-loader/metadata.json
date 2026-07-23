@@ -1,6 +1,6 @@
 {
   "title": "Config Loader",
-  "description": "Delivery mechanisms need to load and validate `specd.yaml` without knowing the details of filesystem discovery, YAML parsing, Zod validation, or path resolution. `createConfigLoader` is the composition factory that encapsulates all of this and produces a `ConfigLoader` instance. This spec covers the public contract of config loading as consumed by CLI and MCP adapters — it does not duplicate the `SpecdConfig` structure or field semantics already specified in `specs/core/config/spec.md`.",
+  "description": "Delivery mechanisms need to load and validate `specd.yaml` without knowing the details of filesystem discovery, YAML parsing, Zod validation, or path resolution. `createDefaultConfigLoader` is the composition factory that encapsulates all of this and produces a `ConfigLoader` instance. This spec covers the public contract of config loading as consumed by CLI and MCP adapters — it does not duplicate the `SpecdConfig` structure or field semantics already specified in `specs/core/config/spec.md`.",
   "dependsOn": [
     "core:config",
     "core:composition",
@@ -9,7 +9,7 @@
     "core:vcs-adapter-port"
   ],
   "context": [
-    "Delivery mechanisms need to load and validate `specd.yaml` without knowing the details of filesystem discovery, YAML parsing, Zod validation, or path resolution. `createConfigLoader` is the composition factory that encapsulates all of this and produces a `ConfigLoader` instance. This spec covers the public contract of config loading as consumed by CLI and MCP adapters — it does not duplicate the `SpecdConfig` structure or field semantics already specified in `specs/core/config/spec.md`."
+    "Delivery mechanisms need to load and validate `specd.yaml` without knowing the details of filesystem discovery, YAML parsing, Zod validation, or path resolution. `createDefaultConfigLoader` is the composition factory that encapsulates all of this and produces a `ConfigLoader` instance. This spec covers the public contract of config loading as consumed by CLI and MCP adapters — it does not duplicate the `SpecdConfig` structure or field semantics already specified in `specs/core/config/spec.md`."
   ],
   "rules": [
     {
@@ -63,7 +63,7 @@
     {
       "requirement": "Path resolution relative to config directory",
       "rules": [
-        "All relative paths in the parsed config — `specs.fs.path`, `specs.fs.metadataPath`, `schemas.fs.path`, `codeRoot`, and all `storage.*.fs.path` values — MUST be resolved relative to the directory containing the active config file. The resolved `SpecdConfig.projectRoot` MUST be set to the config file's parent directory.\n\nWhen `specs.fs.metadataPath` is explicitly declared, the loader MUST resolve it relative to the config directory. When `specs.fs.metadataPath` is absent, auto-derivation of `metadataPath` from the VCS root is a kernel composition responsibility (see `kernel-internals.ts`) and is not performed by `config-loader.load()`."
+        "All relative paths in the parsed config — `specs.fs.path`, `specs.fs.metadataPath`, `schemas.fs.path`, `codeRoot`, and all `storage.*.fs.path` values — MUST be resolved relative to the directory containing the active config file. The resolved `SpecdConfig.projectRoot` MUST be set to the config file's parent directory.\n\nWhen `specs.fs.metadataPath` is explicitly declared, the loader MUST resolve it relative to the config directory and MUST retain the absolute path on the workspace's specs adapter binding in the returned `SpecdConfig` (including for `adapter: fs` normalization). When `specs.fs.metadataPath` is absent, auto-derivation of `metadataPath` from the VCS root is a kernel composition responsibility (see composition-resolver / kernel wiring) and is NOT performed by `config-loader.load()`."
       ]
     },
     {
@@ -81,7 +81,7 @@
     {
       "requirement": "Default values for workspace fields",
       "rules": [
-        "The loader MUST apply the following defaults when workspace fields are omitted:\n\n- **`ownership`**: `'owned'` for the `default` workspace; `'readOnly'` for all other workspaces.\n- **`codeRoot`**: the config file directory for the `default` workspace. For non-default workspaces, `codeRoot` is required — its absence MUST produce `ConfigValidationError`.\n- **`schemasPath`**: for the `default` workspace, when `schemas` is omitted, defaults to `<configDir>/specd/schemas`. For non-default workspaces, when `schemas` is omitted, `schemasPath` MUST be `null`."
+        "The loader MUST apply the following defaults when workspace fields are omitted:\n\n- **`ownership`**: `'owned'` for the `default` workspace; `'readOnly'` for all other workspaces.\n- **`codeRoot`**: the config file directory for the `default` workspace. For non-default workspaces, `codeRoot` is required — its absence MUST produce `ConfigValidationError`.\n- **`schemasPath`**: for the `default` workspace, when `schemas` is omitted, defaults to `<configDir>/.specd/schemas`. For non-default workspaces, when `schemas` is omitted, `schemasPath` MUST be `null`."
       ]
     },
     {
@@ -110,8 +110,8 @@
     }
   ],
   "constraints": [
-    "createConfigLoader is the only public entry point for config loading — FsConfigLoader MUST NOT be exported from @specd/core",
-    "The factory returns a ConfigLoader port interface, not the concrete FsConfigLoader class",
+    "createDefaultConfigLoader is the only public entry point for config loading — FsConfigLoader MUST NOT be exported from @specd/core",
+    "The factory returns a ConfigLoader port (abstract class), not the concrete FsConfigLoader class",
     "Discovery mode resolves a layered active chain rather than selecting specd.local.yaml as an exclusive winner",
     "Forced mode resolves only the selected entrypoint plus its extends chain",
     "Zod validation precedes all path resolution and domain construction for each parsed layer",
@@ -400,7 +400,10 @@
         "the config file is at /repo/specd.yaml and declares specs.fs.metadataPath: .specd/metadata"
       ],
       "when": ["load() is called"],
-      "then": ["the workspace's metadataPath is /repo/.specd/metadata"]
+      "then": [
+        "the default workspace's specs adapter config retains metadataPath as /repo/.specd/metadata",
+        "AND the value is present on the returned SpecdConfig binding (not discarded during fs normalization)"
+      ]
     },
     {
       "requirement": "Path resolution relative to config directory",
@@ -514,7 +517,7 @@
       "name": "Default workspace schemasPath defaults when omitted",
       "given": ["the default workspace omits schemas and the config is at /repo/specd.yaml"],
       "when": ["load() is called"],
-      "then": ["the default workspace's schemasPath is /repo/specd/schemas"]
+      "then": ["the default workspace's schemasPath is /repo/.specd/schemas"]
     },
     {
       "requirement": "Default values for workspace fields",
@@ -629,10 +632,154 @@
       "then": ["the thrown error is ConfigValidationError"]
     }
   ],
-  "implementation": {},
+  "implementation": {
+    "files": [
+      {
+        "specId": "core:config-loader",
+        "file": "core:test/infrastructure/fs/config-loader.spec.ts"
+      }
+    ],
+    "symbols": [
+      {
+        "specId": "core:config-loader",
+        "file": "core:src/infrastructure/fs/config-cascade.ts",
+        "symbol": "LayerExtendsZodSchema"
+      },
+      {
+        "specId": "core:config-loader",
+        "file": "core:src/infrastructure/fs/config-cascade.ts",
+        "symbol": "RemovalMatcherZodSchema"
+      },
+      {
+        "specId": "core:config-loader",
+        "file": "core:src/infrastructure/fs/config-cascade.ts",
+        "symbol": "LayerRemovalZodSchema"
+      },
+      {
+        "specId": "core:config-loader",
+        "file": "core:src/infrastructure/fs/config-cascade.ts",
+        "symbol": "LayerRawZodSchema"
+      },
+      {
+        "specId": "core:config-loader",
+        "file": "core:src/infrastructure/fs/config-cascade.ts",
+        "symbol": "candidateSortKey"
+      },
+      {
+        "specId": "core:config-loader",
+        "file": "core:src/infrastructure/fs/config-cascade.ts",
+        "symbol": "discoverCandidateFiles"
+      },
+      {
+        "specId": "core:config-loader",
+        "file": "core:src/infrastructure/fs/config-cascade.ts",
+        "symbol": "findCandidateDirectory"
+      },
+      {
+        "specId": "core:config-loader",
+        "file": "core:src/infrastructure/fs/config-cascade.ts",
+        "symbol": "determineExtendsMode"
+      },
+      {
+        "specId": "core:config-loader",
+        "file": "core:src/infrastructure/fs/config-cascade.ts",
+        "symbol": "parseCascadeLayer"
+      },
+      {
+        "specId": "core:config-loader",
+        "file": "core:src/infrastructure/fs/config-cascade.ts",
+        "symbol": "resolveActiveChain"
+      },
+      {
+        "specId": "core:config-loader",
+        "file": "core:src/infrastructure/fs/config-cascade.ts",
+        "symbol": "resolveForcedCascade"
+      },
+      {
+        "specId": "core:config-loader",
+        "file": "core:src/infrastructure/fs/config-cascade.ts",
+        "symbol": "matchesContextEntry"
+      },
+      {
+        "specId": "core:config-loader",
+        "file": "core:src/infrastructure/fs/config-cascade.ts",
+        "symbol": "findContextEntryIndex"
+      },
+      {
+        "specId": "core:config-loader",
+        "file": "core:src/infrastructure/fs/config-cascade.ts",
+        "symbol": "applyRemovals"
+      },
+      {
+        "specId": "core:config-loader",
+        "file": "core:src/infrastructure/fs/config-cascade.ts",
+        "symbol": "mergeActiveLayers"
+      },
+      {
+        "specId": "core:config-loader",
+        "file": "core:src/infrastructure/fs/config-cascade.ts",
+        "symbol": "tryLoadEnvFiles"
+      },
+      {
+        "specId": "core:config-loader",
+        "file": "core:src/infrastructure/fs/config-cascade.ts",
+        "symbol": "applyEnvOverrides"
+      },
+      {
+        "specId": "core:config-loader",
+        "file": "core:src/infrastructure/fs/config-loader.ts",
+        "symbol": "FsConfigLoaderOptions"
+      },
+      {
+        "specId": "core:config-loader",
+        "file": "core:src/infrastructure/fs/config-loader.ts",
+        "symbol": "FsConfigLoader"
+      },
+      {
+        "specId": "core:config-loader",
+        "file": "core:src/infrastructure/fs/config-loader.ts",
+        "symbol": "constructor"
+      },
+      {
+        "specId": "core:config-loader",
+        "file": "core:src/infrastructure/fs/config-loader.ts",
+        "symbol": "load"
+      },
+      {
+        "specId": "core:config-loader",
+        "file": "core:src/infrastructure/fs/config-loader.ts",
+        "symbol": "resolvePath"
+      },
+      {
+        "specId": "core:config-loader",
+        "file": "core:src/infrastructure/fs/config-loader.ts",
+        "symbol": "_resolveCascade"
+      },
+      {
+        "specId": "core:config-loader",
+        "file": "core:src/infrastructure/fs/config-loader.ts",
+        "symbol": "_buildConfig"
+      },
+      {
+        "specId": "core:config-loader",
+        "file": "core:src/infrastructure/fs/config-loader.ts",
+        "symbol": "parseRawAdapter"
+      },
+      {
+        "specId": "core:config-loader",
+        "file": "core:src/infrastructure/fs/config-loader.ts",
+        "symbol": "resolveAdapterBinding"
+      },
+      {
+        "specId": "core:config-loader",
+        "file": "core:src/composition/config-loader.ts",
+        "symbol": "createDefaultConfigLoader"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:b77955ae84b0d0995cd8a4b15ca09dd9658dafdbe7c6e298f575c8c201e70511",
-    "verify.md": "sha256:467137ae1901b71822fceb7ce317ac4adf9cdac56664290d8332b8c75e0ce903"
+    "spec.md": "sha256:8b24bb6410bf4480cb067e8cfd804a0d9c2ac4ac752fb4db5c5469c8b7f6af85",
+    "verify.md": "sha256:91b109afe3245cae87a727ff2374f02162ea53e4ad9581008831d3fb5750ad3c"
   },
   "generatedBy": "core"
 }

@@ -48,6 +48,7 @@ export {
 } from './application/ports/artifact-parser.js'
 export { type SchemaProvider } from './application/ports/schema-provider.js'
 export { type ConfigLoader } from './application/ports/config-loader.js'
+export * from './application/ports/config-schema.js'
 export {
   type LogDestination,
   type LogEntry,

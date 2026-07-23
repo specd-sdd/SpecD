@@ -6,12 +6,38 @@
   "dependsOn": ["core:vcs-adapter-port", "default:_global/architecture"],
   "implementation": [
     {
-      "file": "core:src/application/specd-config.ts",
-      "symbols": ["SpecdConfig"]
+      "file": "core:src/application/ports/config-schema.ts",
+      "symbols": [
+        "SpecdYamlZodSchema",
+        "validateContextPattern",
+        "validateContextPatterns",
+        "PREFIX_SEGMENT_RE",
+        "PrefixZodSchema",
+        "WorkspaceGraphZodSchema",
+        "ProjectGraphZodSchema",
+        "WorkspaceRawZodSchema",
+        "SchemaOverridesZodSchema",
+        "PluginEntryZodSchema",
+        "PluginsZodSchema",
+        "LoggingZodSchema",
+        "isRecord",
+        "formatZodPath",
+        "deepMergeRawConfig"
+      ]
+    },
+    {
+      "file": "core:src/application/ports/index.ts"
+    },
+    {
+      "file": "core:src/ports.ts"
     },
     {
       "file": "core:src/infrastructure/fs/config-loader.ts",
-      "symbols": ["parseRawAdapter"]
+      "symbols": ["resolveAdapterBinding", "_buildConfig"]
+    },
+    {
+      "file": "core:src/composition/composition-resolver.ts",
+      "symbols": ["resolveMetadataPathForWorkspace"]
     }
   ]
 }

@@ -1,0 +1,17 @@
+- op: removed
+  description: 'Remove metadataPath paragraph before rewriting explicit+absent rules'
+  selector:
+    type: paragraph
+    contains: 'specs.adapter.config.metadataPath.*optional for'
+
+- op: added
+  description: 'metadataPath: loader resolves+retains; composition prefers explicit else derives'
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Workspaces'
+    after:
+      type: paragraph
+      contains: 'specs.adapter.config.path.*required for'
+  content: |
+    **`specs.adapter.config.metadataPath`** (optional for `fs` adapter) — directory where `metadata.yaml` files live, mirroring the spec capability path structure. Relative paths are resolved from the directory containing `specd.yaml`. When explicitly declared, the config loader MUST resolve it relative to the config directory and MUST retain the absolute path on the workspace specs adapter binding. Kernel composition MUST prefer that retained value when wiring `SpecRepository`. When absent, auto-derivation of `metadataPath` from the VCS root of `specs.adapter.config.path` + `/.specd/metadata/` (or `.specd/metadata/` relative to the specs path parent when not inside any VCS) is a kernel composition responsibility — it is NOT performed by `config-loader.load()`.

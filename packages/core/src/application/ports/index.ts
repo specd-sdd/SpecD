@@ -39,6 +39,7 @@ export {
   type ValidationCacheLookupResult,
 } from './validation-result-cache.js'
 export { type ConfigLoader } from './config-loader.js'
+export * from './config-schema.js'
 export {
   type LogDestination,
   type LogEntry,

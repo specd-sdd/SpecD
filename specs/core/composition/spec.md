@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Delivery mechanisms must not know how ports, adapters, and use cases are wired together, yet something needs to assemble these pieces. The `composition/` layer in `@specd/core` serves this role as the only layer permitted to import from `infrastructure/`, exposing use-case factories, config I/O factories (`createConfigLoader`, `createConfigWriter`), a kernel that builds domain use cases from a resolved config object, and ports for config read/write. CLI, MCP, and plugin adapters interact exclusively with this layer.
+Delivery mechanisms must not know how ports, adapters, and use cases are wired together, yet something needs to assemble these pieces. The `composition/` layer in `@specd/core` serves this role as the only layer permitted to import from `infrastructure/`, exposing use-case factories, config I/O factories (`createDefaultConfigLoader`, `createConfigWriter`), a kernel that builds domain use cases from a resolved config object, and ports for config read/write. CLI, MCP, and plugin adapters interact exclusively with this layer.
 
 ## Requirements
 
@@ -98,7 +98,13 @@ The builder is part of the public composition surface. It MUST NOT introduce a s
 
 ### Requirement: ConfigLoader is an application port
 
-`ConfigLoader` is defined in `application/ports/config-loader.ts` as an interface. It has a single method `load(): Promise<SpecdConfig>`. The `FsConfigLoader` implementation reads `specd.yaml` and `specd.local.yaml`, with local values taking precedence. Future implementations (`EnvConfigLoader`, `CompositeConfigLoader`) add new config sources without touching the kernel or any delivery layer.
+`ConfigLoader` is defined in `application/ports/config-loader.ts` as an abstract class with shared `rootPath` construction. It exposes `load(): Promise<SpecdConfig>` and `resolvePath(): Promise<string | null>`. The `FsConfigLoader` implementation discovers and resolves layered config candidates (`specd.yaml`, named variants, local variants). Future implementations (`EnvConfigLoader`, `CompositeConfigLoader`) add new config sources without touching the kernel or any delivery layer.
+
+Delivery hosts obtain a wired instance via `createDefaultConfigLoader(options)` — they MUST NOT construct `FsConfigLoader` directly.
+
+### Requirement: Spec repository metadataPath preference
+
+When composition constructs a `SpecRepository` for a workspace, it MUST use an absolute `metadataPath` from the workspace's specs adapter config when that field is present (as retained by `ConfigLoader.load()` after resolving a declared path). When the field is absent, composition MUST derive the metadata root (VCS walk from the specs path, with NullVcs / non-VCS fallback) and MUST NOT invent a path in the config loader.
 
 ### Requirement: ConfigWriter is an application port
 
@@ -140,7 +146,7 @@ The fields `artifactRules` and `workflow` (project-level hook additions) are no 
 
 ### Requirement: @specd/sdk orchestrates cross-package host bootstrap
 
-Delivery hosts (CLI, MCP, API, IPC) MUST bootstrap through `@specd/sdk` (`openSpecdHost`, `createSdkContext`) rather than wiring `createConfigLoader`, `createKernel`, and `createCodeGraphProvider` independently in each adapter.
+Delivery hosts (CLI, MCP, API, IPC) MUST bootstrap through `@specd/sdk` (`openSpecdHost`, `createSdkContext`) rather than wiring `createDefaultConfigLoader`, `createKernel`, and `createCodeGraphProvider` independently in each adapter.
 
 `@specd/core` composition factories remain the underlying building blocks. `@specd/sdk` composes them with `@specd/code-graph` for host-facing lifecycle and orchestration.
 
@@ -200,8 +206,8 @@ Plugin authors implement port contracts from `./ports`, expose a `*StorageFactor
 - `composition/` is the only directory in `@specd/core` permitted to import from `infrastructure/`
 - Concrete adapter classes (`FsSpecRepository`, `NodeHookRunner`, `GitVcsAdapter`, `FsFileReader`, `FsSchemaRegistry`, etc.) must not appear on any public entry point (`"."`, `"./ports"`, `"./extensions"`)
 - Repository-level factories (`createSpecRepository`, `createChangeRepository`, `createArchiveRepository`, `createSchemaRepository`, `createSchemaRegistry`) and standalone use-case `createX` factories for kernel-mounted use cases MUST appear on the `"."` public barrel
-- The `"."` barrel exports `createKernel`, `createConfigLoader`, `createConfigWriter`, `createVcsAdapter`, `Kernel`, all kernel-equivalent factories, kernel use-case I/O types, domain entities, and `SpecdError` hierarchy
-- `ConfigLoader` and `ConfigWriter` implementations live in `infrastructure/`; port interfaces live in `application/ports/` and are exported from `"./ports"`
+- The `"."` barrel exports `createKernel`, `createDefaultConfigLoader`, `createConfigWriter`, `createVcsAdapter`, `Kernel`, all kernel-equivalent factories, kernel use-case I/O types, domain entities, and `SpecdError` hierarchy
+- `ConfigLoader` and `ConfigWriter` implementations live in `infrastructure/`; port contracts live in `application/ports/` and are exported from `"./ports"`
 - The kernel groups use cases under domain-area namespaces — use cases are not properties at the top level of the kernel object
 - Symbols only needed by monorepo composition internals (concrete adapters, `kernel-internals`, builtin `FS_*` markers) remain on `"./internal"` only
 

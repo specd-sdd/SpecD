@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'Architecture verify scenarios do not name createConfigLoader; naming drift is corrected in spec.md only.'

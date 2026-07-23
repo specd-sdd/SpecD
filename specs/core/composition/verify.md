@@ -16,7 +16,7 @@
 
 #### Scenario: Config I/O factories return ports directly
 
-- **WHEN** `createConfigLoader()` or `createConfigWriter()` is called
+- **WHEN** `createDefaultConfigLoader()` or `createConfigWriter()` is called
 - **THEN** each returns a port instance (`ConfigLoader` or `ConfigWriter`)
 - **AND** neither wraps the port in a pass-through use-case class
 
@@ -147,6 +147,34 @@
 
 - **WHEN** both `specd.yaml` and `specd.local.yaml` are present
 - **THEN** values in `specd.local.yaml` take precedence over values in `specd.yaml`
+
+#### Scenario: ConfigLoader exposes resolvePath
+
+- **WHEN** the `ConfigLoader` port contract is inspected
+- **THEN** it is an abstract class with shared `rootPath` construction
+- **AND** it exposes `resolvePath(): Promise<string | null>` in addition to `load()`
+
+#### Scenario: Hosts use createDefaultConfigLoader
+
+- **WHEN** a delivery host needs a config loader
+- **THEN** it calls `createDefaultConfigLoader(options)`
+- **AND** it does not construct `FsConfigLoader` directly
+
+### Requirement: Spec repository metadataPath preference
+
+#### Scenario: Explicit metadataPath preferred over derivation
+
+- **GIVEN** `ConfigLoader.load()` returned a workspace specs adapter config with absolute `metadataPath: /custom/meta`
+- **WHEN** composition constructs the workspace `SpecRepository`
+- **THEN** the repository is wired with `metadataPath` `/custom/meta`
+- **AND** VCS-based derivation is not used for that workspace
+
+#### Scenario: Absent metadataPath still derived by composition
+
+- **GIVEN** the loaded specs adapter config has no `metadataPath`
+- **AND** the specs path is inside a git repo rooted at `/repo`
+- **WHEN** composition constructs the workspace `SpecRepository`
+- **THEN** the repository `metadataPath` is derived as `/repo/.specd/metadata`
 
 ### Requirement: ConfigWriter is an application port
 

@@ -276,6 +276,17 @@ function resolveMetadataPathForWorkspace(
   config: SpecdConfig,
   workspace: SpecdWorkspaceConfig,
 ): string {
+  const explicit = workspace.specsAdapter.config.metadataPath
+  if (typeof explicit === 'string' && explicit.length > 0) {
+    const metadataPath = path.isAbsolute(explicit)
+      ? explicit
+      : path.resolve(config.projectRoot, explicit)
+    if (!fs.existsSync(metadataPath)) {
+      fs.mkdirSync(metadataPath, { recursive: true })
+    }
+    return metadataPath
+  }
+
   const specdPath = config.specdPath ?? '.specd'
   let metadataPath: string
   if (workspace.specsAdapter.adapter !== 'fs') {

@@ -12,10 +12,19 @@
   ],
   "implementation": [
     {
-      "file": "core:src/composition/use-cases/get-project-summary.ts"
+      "file": "core:src/composition/config-loader.ts",
+      "symbols": ["createDefaultConfigLoader"]
     },
     {
-      "file": "core:src/composition/use-cases/list-specs.ts"
+      "file": "core:src/application/ports/config-loader.ts",
+      "symbols": ["ConfigLoader"]
+    },
+    {
+      "file": "core:src/composition/composition-resolver.ts",
+      "symbols": ["resolveMetadataPathForWorkspace"]
+    },
+    {
+      "file": "core:test/composition/composition-resolver.spec.ts"
     }
   ]
 }

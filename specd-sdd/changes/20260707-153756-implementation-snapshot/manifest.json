@@ -1903,6 +1903,35 @@
           "files": ["tasks"]
         }
       ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-23T10:28:25.259Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'extract-fs-config-loader' was archived with overlapping specs: core:composition",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
     }
   ]
 }

@@ -1335,6 +1335,22 @@ storage:
     })
   })
 
+  describe('Requirement: Explicit metadataPath retained on fs binding', () => {
+    it('retains absolute metadataPath on the specs adapter binding after load', async () => {
+      const configPath = await writeConfig(
+        minimalYaml().replace('path: specs', 'path: specs\n        metadataPath: custom-meta'),
+      )
+      await fs.mkdir(path.join(tmpDir, 'specs'), { recursive: true })
+
+      const loader = createLoader({ configPath })
+      const config = await loader.load()
+
+      const defaultWs = config.workspaces.find((ws) => ws.name === 'default')
+      expect(defaultWs).toBeDefined()
+      expect(defaultWs!.specsAdapter.config.metadataPath).toBe(path.join(tmpDir, 'custom-meta'))
+    })
+  })
+
   // ---------------------------------------------------------------------------
   // Requirement: Workspace graph config
   // ---------------------------------------------------------------------------

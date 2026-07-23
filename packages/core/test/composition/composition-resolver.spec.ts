@@ -84,4 +84,42 @@ describe('createCompositionResolver', () => {
     expect(a.getChangeRepository()).not.toBe(b.getChangeRepository())
     expect(a.getSchemaProvider()).not.toBe(b.getSchemaProvider())
   })
+
+  it('prefers explicit specsAdapter metadataPath over VCS derivation', async () => {
+    const config = await makeConfig()
+    if (tmpDir === undefined) throw new Error('tmpDir missing')
+    const customMeta = path.join(tmpDir, 'custom-meta')
+    await fs.mkdir(path.join(tmpDir, '.git'), { recursive: true })
+    const workspace = config.workspaces[0]
+    if (workspace === undefined) throw new Error('workspace missing')
+    const withExplicit: SpecdConfig = {
+      ...config,
+      workspaces: [
+        {
+          ...workspace,
+          specsAdapter: {
+            adapter: 'fs',
+            config: { path: workspace.specsPath, metadataPath: customMeta },
+          },
+        },
+      ],
+    }
+
+    createCompositionResolver(withExplicit).getSpecRepositories()
+
+    await expect(fs.stat(customMeta)).resolves.toBeDefined()
+    const derived = path.join(tmpDir, '.specd', 'metadata')
+    await expect(fs.stat(derived)).rejects.toMatchObject({ code: 'ENOENT' })
+  })
+
+  it('derives metadataPath under VCS root when absent from adapter config', async () => {
+    const config = await makeConfig()
+    if (tmpDir === undefined) throw new Error('tmpDir missing')
+    await fs.mkdir(path.join(tmpDir, '.git'), { recursive: true })
+
+    createCompositionResolver(config).getSpecRepositories()
+
+    const derived = path.join(tmpDir, '.specd', 'metadata')
+    await expect(fs.stat(derived)).resolves.toBeDefined()
+  })
 })
