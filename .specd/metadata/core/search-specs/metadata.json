@@ -149,10 +149,11 @@
     }
   ],
   "implementation": {
-    "files": [
+    "symbols": [
       {
         "specId": "core:search-specs",
-        "file": "core:src/composition/use-cases/search-specs.ts"
+        "file": "core:src/application/use-cases/search-specs.ts",
+        "symbol": "SearchSpecs"
       }
     ]
   },

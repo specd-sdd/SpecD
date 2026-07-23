@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { makeSpec } from '../../../helpers/make-spec.js'
 import { Spec } from '../../../../src/domain/entities/spec.js'
 import { SpecArtifact } from '../../../../src/domain/value-objects/spec-artifact.js'
 import { SpecPath } from '../../../../src/domain/value-objects/spec-path.js'
@@ -32,7 +33,7 @@ class FakeSpecRepository extends SpecRepository {
   override async get(name: SpecPath): Promise<Spec | null> {
     const key = name.toString()
     if (!this._knownSpecs.has(key)) return null
-    return new Spec(this.workspace(), SpecPath.parse(key), [])
+    return makeSpec({ workspace: this.workspace(), name: key, filenames: [] })
   }
 
   override async list(_prefix?: SpecPath) {
@@ -45,8 +46,12 @@ class FakeSpecRepository extends SpecRepository {
     return this._knownSpecs.size
   }
 
-  override async specHash(_spec: Spec): Promise<string | null> {
+  override async persistedStateHash(_spec: Spec): Promise<string | null> {
     return null
+  }
+
+  override async specFingerprint(_spec: Spec): Promise<string> {
+    return 'sha256:test-spec-fingerprint'
   }
 
   override async metadata(_spec: Spec): Promise<PersistedSpecMetadata | null> {

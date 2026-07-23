@@ -36,6 +36,17 @@ The file's absence is not an error — a spec with no `metadata.json` is treated
 
 The metadata generation process SHALL obtain persisted schema, dependencies, and implementation links through the `SpecRepository` semantic operations. It MUST NOT read the underlying sidecar files directly.
 
+### Requirement: Spec.generatedMetadataStamp is a stamp only
+
+`Spec.generatedMetadataStamp` returned by `SpecRepository.get()` MUST expose only
+`{ present, lastModified }` for the generated `metadata.json` file. It MUST NOT be
+treated as authored spec content and MUST NOT replace `metadata()`.
+
+Parsed metadata content, structural validation, freshness classification
+(`fresh` / `stale` via contentHashes and dependency projection), and overwrite
+protection remain available only through `metadata()` / `saveMetadata()` and the
+generation/save use cases defined by this spec and related ports.
+
 ### Requirement: File format
 
 `metadata.json` is a JSON file (per ADR-0019: machine-generated files use JSON). All fields are optional — an empty object or absent file is valid:

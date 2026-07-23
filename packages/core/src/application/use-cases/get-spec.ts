@@ -56,10 +56,10 @@ export class GetSpec {
     }
 
     const artifacts = new Map<string, SpecArtifact>()
-    for (const filename of spec.filenames) {
-      const artifact = await repo.artifact(spec, filename)
-      if (artifact !== null) {
-        artifacts.set(filename, artifact)
+    for (const entry of spec.artifacts) {
+      const loaded = await repo.artifact(spec, entry.filename)
+      if (loaded !== null) {
+        artifacts.set(entry.filename, loaded)
       }
     }
 

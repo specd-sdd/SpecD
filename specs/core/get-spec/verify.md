@@ -21,13 +21,15 @@
 
 #### Scenario: All artifacts loaded successfully
 
-- **GIVEN** a spec with filenames `['spec.md', 'verify.md', '.specd-metadata.yaml']` and all exist on disk
+- **GIVEN** a spec whose `artifacts` list includes `spec.md`, `verify.md`, and
+  `.specd-metadata.yaml` and all exist on disk
 - **WHEN** `execute(input)` is called
 - **THEN** the result `artifacts` map contains entries for all three filenames
 
 #### Scenario: Some artifacts missing on disk
 
-- **GIVEN** a spec with filenames `['spec.md', 'verify.md']` where `repo.artifact` returns `null` for `verify.md`
+- **GIVEN** a spec whose `artifacts` list includes `spec.md` and `verify.md` where
+  `repo.artifact` returns `null` for `verify.md`
 - **WHEN** `execute(input)` is called
 - **THEN** the result `artifacts` map contains only `'spec.md'`
 - **AND** no error is thrown

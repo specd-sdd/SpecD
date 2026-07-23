@@ -79,18 +79,21 @@
 
 #### Scenario: Repository list does not load content
 
-- **WHEN** `SpecRepository.list()` is called
-- **THEN** it returns `Spec` objects with filenames but no artifact content; no file reads beyond directory listing occur
+- **WHEN** a repository `list()` (or equivalent collection method) is called
+- **THEN** it returns metadata/reference rows without embedded file content
+- **AND** no content reads beyond what the list/index path requires occur
 
 #### Scenario: SchemaRegistry list does not parse schemas
 
 - **WHEN** `SchemaRegistry.list()` is called
-- **THEN** it returns `SchemaEntry` objects without reading or validating any `schema.yaml` file
+- **THEN** it returns `SchemaEntry` objects without reading or validating any
+  `schema.yaml` file
 
 #### Scenario: Full resource loaded on demand
 
-- **WHEN** a caller needs the content of a specific artifact
-- **THEN** it calls `SpecRepository.artifact(spec, filename)` explicitly, not `list()`
+- **WHEN** a caller needs the full content of a tracked resource
+- **THEN** it uses an explicit load method on the port — not the collection `list()`
+  result alone
 
 ### Requirement: Immutability preference
 

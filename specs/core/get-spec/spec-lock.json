@@ -11,7 +11,8 @@
   ],
   "implementation": [
     {
-      "file": "core:src/composition/use-cases/get-spec.ts"
+      "file": "core:src/application/use-cases/get-spec.ts",
+      "symbols": ["GetSpec"]
     }
   ]
 }

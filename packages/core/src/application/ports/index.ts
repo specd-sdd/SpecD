@@ -33,6 +33,11 @@ export {
   type ArtifactParserRegistry,
 } from './artifact-parser.js'
 export { type SchemaProvider } from './schema-provider.js'
+export {
+  ValidationResultCache,
+  type SpecValidationEntry,
+  type ValidationCacheLookupResult,
+} from './validation-result-cache.js'
 export { type ConfigLoader } from './config-loader.js'
 export {
   type LogDestination,

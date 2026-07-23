@@ -1,18 +1,19 @@
 import { describe, it, expect } from 'vitest'
+import { makeSpec as buildSpec } from '../../../helpers/make-spec.js'
 import { listMatchingSpecs } from '../../../../src/application/use-cases/_shared/spec-pattern-matching.js'
 import { type ContextWarning } from '../../../../src/application/use-cases/_shared/context-warning.js'
 import { makeSpecRepository, makeWorkspaceMap } from '../helpers.js'
 import { Spec } from '../../../../src/domain/entities/spec.js'
 import { SpecPath } from '../../../../src/domain/value-objects/spec-path.js'
 
-function makeSpec(capPath: string): Spec {
-  return new Spec('default', SpecPath.parse(capPath), [])
+function makePatternSpec(capPath: string): Spec {
+  return buildSpec({ name: capPath, filenames: [] })
 }
 
 describe('listMatchingSpecs', () => {
   it('bare * with allWorkspacesOnBareStar matches all workspaces', async () => {
-    const repo1 = makeSpecRepository({ specs: [makeSpec('auth/login')] })
-    const repo2 = makeSpecRepository({ specs: [makeSpec('billing/plan')] })
+    const repo1 = makeSpecRepository({ specs: [makePatternSpec('auth/login')] })
+    const repo2 = makeSpecRepository({ specs: [makePatternSpec('billing/plan')] })
     const specs = new Map([
       ['default', repo1],
       ['billing', repo2],
@@ -29,8 +30,8 @@ describe('listMatchingSpecs', () => {
   })
 
   it('bare * without allWorkspacesOnBareStar matches only default workspace', async () => {
-    const repo1 = makeSpecRepository({ specs: [makeSpec('auth/login')] })
-    const repo2 = makeSpecRepository({ specs: [makeSpec('billing/plan')] })
+    const repo1 = makeSpecRepository({ specs: [makePatternSpec('auth/login')] })
+    const repo2 = makeSpecRepository({ specs: [makePatternSpec('billing/plan')] })
     const specs = new Map([
       ['default', repo1],
       ['billing', repo2],
@@ -45,8 +46,8 @@ describe('listMatchingSpecs', () => {
   })
 
   it('workspace:* matches only named workspace', async () => {
-    const repo1 = makeSpecRepository({ specs: [makeSpec('auth/login')] })
-    const repo2 = makeSpecRepository({ specs: [makeSpec('billing/plan')] })
+    const repo1 = makeSpecRepository({ specs: [makePatternSpec('auth/login')] })
+    const repo2 = makeSpecRepository({ specs: [makePatternSpec('billing/plan')] })
     const specs = new Map([
       ['default', repo1],
       ['billing', repo2],
@@ -61,7 +62,11 @@ describe('listMatchingSpecs', () => {
 
   it('prefix/* matches specs under prefix', async () => {
     const repo = makeSpecRepository({
-      specs: [makeSpec('auth/login'), makeSpec('auth/signup'), makeSpec('billing/plan')],
+      specs: [
+        makePatternSpec('auth/login'),
+        makePatternSpec('auth/signup'),
+        makePatternSpec('billing/plan'),
+      ],
     })
     const specs = new Map([['default', repo]])
     const workspaces = await makeWorkspaceMap(specs)
@@ -76,7 +81,7 @@ describe('listMatchingSpecs', () => {
 
   it('exact path matches a single spec', async () => {
     const repo = makeSpecRepository({
-      specs: [makeSpec('auth/login'), makeSpec('auth/signup')],
+      specs: [makePatternSpec('auth/login'), makePatternSpec('auth/signup')],
     })
     const specs = new Map([['default', repo]])
     const workspaces = await makeWorkspaceMap(specs)

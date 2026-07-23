@@ -1,0 +1,67 @@
+- op: modified
+  description: 'Clarify list-index buckets remain separate from validate-specs bucket'
+  selector:
+    type: section
+    matches: 'Requirement: Filesystem list index cache layout'
+  content: |
+    #### Scenario: List indexes stored under fs-cache buckets
+
+    - **GIVEN** an fs-backed project with active changes, drafts, discarded changes, archive entries, and workspace specs
+    - **WHEN** list/count operations populate derived indexes
+    - **THEN** index files exist under `{configPath}/tmp/fs-cache/` in bucket directories `changes/`, `drafts/`, `discarded/`, `archive/`, and `specs/<workspace>/`
+    - **AND** each of those list-index buckets contains `.specd-index.jsonl` and `.specd-index-meta.json`
+    - **AND** those list/count operations do not require writing `validate-specs/<workspace>/`
+
+    #### Scenario: Index meta exposes totalCount for count operations
+
+    - **GIVEN** a populated fs-cache bucket with `totalCount: 5` in meta
+    - **WHEN** the corresponding repository `count()` is called with a fresh index
+    - **THEN** the returned count is `5` without materializing full list entries
+
+    #### Scenario: Validate-specs bucket is sibling not owned by SpecRepository helpers
+
+    - **WHEN** `FsSpecRepository` list/count helpers run
+    - **THEN** they MUST NOT own or mutate `{configPath}/tmp/fs-cache/validate-specs/<workspace>/`
+    - **AND** that bucket remains owned by the `ValidationResultCache` filesystem adapter
+
+- op: added
+  description: 'Verify validate-specs result cache bucket layout'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Filesystem list index cache layout'
+  content: |
+    ### Requirement: Validation result cache bucket layout
+
+    #### Scenario: Bucket files live under validate-specs workspace path
+
+    - **GIVEN** a filesystem `ValidationResultCache` adapter for workspace `core`
+    - **WHEN** it upserts a validation result row
+    - **THEN** files are written under `{configPath}/tmp/fs-cache/validate-specs/core/`
+    - **AND** the directory contains `.specd-index-meta.json` and `.specd-index.jsonl`
+
+    #### Scenario: Meta extends IndexMeta with schema and engine fields
+
+    - **WHEN** validate-bucket meta is written
+    - **THEN** it includes `totalCount`, `generatedAt`, and `isInvalidated`
+    - **AND** it includes `schemaFingerprint` and `engineVersion`
+    - **AND** shared list-index buckets are not required to include those two extra fields
+
+    #### Scenario: Rows carry entry stamps and cache fingerprint
+
+    - **WHEN** a JSONL row is written for a validated spec
+    - **THEN** the row includes `entry`, `stamps`, and `cacheFingerprint`
+    - **AND** `stamps` includes `artifacts` (`SpecArtifactEntry` lastModified values),
+      `persistedStateStamp`, and `generatedMetadataStamp` (with explicit absence when
+      sidecars are missing)
+    - **AND** `cacheFingerprint` follows
+      [`core:validation-result-cache-port`](../validation-result-cache-port/spec.md)
+
+    #### Scenario: Hosts gain no validate-cache-specific reindex surface
+
+    - **WHEN** host storage reindex commands are considered for this change
+    - **THEN** they MUST NOT gain a validate-cache-only argument or documentation
+      requirement solely to manage this bucket

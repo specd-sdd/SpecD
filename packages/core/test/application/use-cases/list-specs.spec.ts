@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
+import { makeSpec } from '../../helpers/make-spec.js'
 import { ListSpecs } from '../../../src/application/use-cases/list-specs.js'
 import { Spec } from '../../../src/domain/entities/spec.js'
 import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
@@ -6,8 +7,12 @@ import { makeSpecRepository, makeListWorkspaces } from './helpers.js'
 
 describe('ListSpecs', () => {
   it('lists specs from all workspaces', async () => {
-    const spec1 = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
-    const spec2 = new Spec('billing', SpecPath.parse('payments/stripe'), ['spec.md'])
+    const spec1 = makeSpec({ workspace: 'default', name: 'auth/login', filenames: ['spec.md'] })
+    const spec2 = makeSpec({
+      workspace: 'billing',
+      name: 'payments/stripe',
+      filenames: ['spec.md'],
+    })
 
     const repo1 = makeSpecRepository({ specs: [spec1] })
     const repo2 = makeSpecRepository({ specs: [spec2] })
@@ -40,7 +45,7 @@ describe('ListSpecs', () => {
   })
 
   it('includes workspace name in entries', async () => {
-    const spec = new Spec('billing', SpecPath.parse('invoices'), ['spec.md'])
+    const spec = makeSpec({ workspace: 'billing', name: 'invoices', filenames: ['spec.md'] })
     const repo = makeSpecRepository({ specs: [spec] })
     const specRepos = new Map([['billing', repo]])
 
@@ -52,7 +57,7 @@ describe('ListSpecs', () => {
   })
 
   it('uses repository-provided title from list entries', async () => {
-    const spec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+    const spec = makeSpec({ workspace: 'default', name: 'auth/login', filenames: ['spec.md'] })
     const repo = makeSpecRepository({ specs: [spec] })
     const specRepos = new Map([['default', repo]])
 
@@ -63,7 +68,7 @@ describe('ListSpecs', () => {
   })
 
   it('forwards includeMetadataStatus to repositories', async () => {
-    const spec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+    const spec = makeSpec({ workspace: 'default', name: 'auth/login', filenames: ['spec.md'] })
     const repo = makeSpecRepository({ specs: [spec] })
     const specRepos = new Map([['default', repo]])
 
@@ -74,7 +79,7 @@ describe('ListSpecs', () => {
   })
 
   it('forwards list options without inventing a default limit', async () => {
-    const spec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+    const spec = makeSpec({ workspace: 'default', name: 'auth/login', filenames: ['spec.md'] })
     const repo = makeSpecRepository({ specs: [spec] })
     const listSpy = vi.spyOn(repo, 'list')
     const specRepos = new Map([['default', repo]])
@@ -87,8 +92,8 @@ describe('ListSpecs', () => {
 
   describe('workspace filtering', () => {
     it('filters to a single workspace', async () => {
-      const spec1 = new Spec('alpha', SpecPath.parse('auth/login'), ['spec.md'])
-      const spec2 = new Spec('beta', SpecPath.parse('billing/pay'), ['spec.md'])
+      const spec1 = makeSpec({ workspace: 'alpha', name: 'auth/login', filenames: ['spec.md'] })
+      const spec2 = makeSpec({ workspace: 'beta', name: 'billing/pay', filenames: ['spec.md'] })
 
       const repo1 = makeSpecRepository({ specs: [spec1], workspace: 'alpha' })
       const repo2 = makeSpecRepository({ specs: [spec2], workspace: 'beta' })
@@ -107,9 +112,9 @@ describe('ListSpecs', () => {
     })
 
     it('filters to multiple workspaces', async () => {
-      const spec1 = new Spec('alpha', SpecPath.parse('auth/login'), ['spec.md'])
-      const spec2 = new Spec('beta', SpecPath.parse('billing/pay'), ['spec.md'])
-      const spec3 = new Spec('gamma', SpecPath.parse('search/index'), ['spec.md'])
+      const spec1 = makeSpec({ workspace: 'alpha', name: 'auth/login', filenames: ['spec.md'] })
+      const spec2 = makeSpec({ workspace: 'beta', name: 'billing/pay', filenames: ['spec.md'] })
+      const spec3 = makeSpec({ workspace: 'gamma', name: 'search/index', filenames: ['spec.md'] })
 
       const repo1 = makeSpecRepository({ specs: [spec1], workspace: 'alpha' })
       const repo2 = makeSpecRepository({ specs: [spec2], workspace: 'beta' })
@@ -129,7 +134,7 @@ describe('ListSpecs', () => {
     })
 
     it('returns empty when workspace does not exist', async () => {
-      const spec = new Spec('alpha', SpecPath.parse('auth/login'), ['spec.md'])
+      const spec = makeSpec({ workspace: 'alpha', name: 'auth/login', filenames: ['spec.md'] })
       const repo = makeSpecRepository({ specs: [spec], workspace: 'alpha' })
 
       const specRepos = new Map([['alpha', repo]])
@@ -140,8 +145,8 @@ describe('ListSpecs', () => {
     })
 
     it('returns all workspaces when filter is empty array', async () => {
-      const spec1 = new Spec('alpha', SpecPath.parse('auth/login'), ['spec.md'])
-      const spec2 = new Spec('beta', SpecPath.parse('billing/pay'), ['spec.md'])
+      const spec1 = makeSpec({ workspace: 'alpha', name: 'auth/login', filenames: ['spec.md'] })
+      const spec2 = makeSpec({ workspace: 'beta', name: 'billing/pay', filenames: ['spec.md'] })
 
       const repo1 = makeSpecRepository({ specs: [spec1], workspace: 'alpha' })
       const repo2 = makeSpecRepository({ specs: [spec2], workspace: 'beta' })

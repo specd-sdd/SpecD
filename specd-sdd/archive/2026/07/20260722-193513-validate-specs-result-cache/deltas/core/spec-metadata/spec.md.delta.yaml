@@ -1,0 +1,20 @@
+- op: added
+  description: 'Clarify generatedMetadataStamp on Spec vs metadata() parse surface'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Sidecar separation'
+  content: |
+    ### Requirement: Spec.generatedMetadataStamp is a stamp only
+
+    `Spec.generatedMetadataStamp` returned by `SpecRepository.get()` MUST expose only
+    `{ present, lastModified }` for the generated `metadata.json` file. It MUST NOT be
+    treated as authored spec content and MUST NOT replace `metadata()`.
+
+    Parsed metadata content, structural validation, freshness classification
+    (`fresh` / `stale` via contentHashes and dependency projection), and overwrite
+    protection remain available only through `metadata()` / `saveMetadata()` and the
+    generation/save use cases defined by this spec and related ports.

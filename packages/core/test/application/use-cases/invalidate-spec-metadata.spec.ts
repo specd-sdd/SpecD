@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { makeSpec } from '../../helpers/make-spec.js'
 import { InvalidateSpecMetadata } from '../../../src/application/use-cases/invalidate-spec-metadata.js'
 import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
 import { makeSpecRepository } from './helpers.js'
@@ -7,7 +8,7 @@ import { WorkspaceNotFoundError } from '../../../src/application/errors/workspac
 import { SpecNotFoundError } from '../../../src/application/errors/spec-not-found-error.js'
 
 const specPath = SpecPath.parse('auth/login')
-const spec = new Spec('default', specPath, ['spec.md'])
+const spec = makeSpec({ workspace: 'default', name: specPath, filenames: ['spec.md'] })
 
 const METADATA_WITH_HASHES = JSON.stringify({
   title: 'Auth Login',

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
+import { makeSpec as buildSpecEntity } from '../../helpers/make-spec.js'
 import {
   PreviewSpec,
   type PreviewSpecInput,
@@ -70,8 +71,8 @@ function makeSpecArtifact(
 }
 
 /** Creates a Spec entity for the given workspace and capPath. */
-function makeSpec(workspace: string, capPath: string): Spec {
-  return new Spec(workspace, SpecPath.parse(capPath), ['spec.md'])
+function makePreviewSpec(workspace: string, capPath: string): Spec {
+  return buildSpecEntity({ workspace: workspace, name: capPath, filenames: ['spec.md'] })
 }
 
 /** Creates a stub diff generator for `PreviewSpec` tests. */
@@ -195,7 +196,7 @@ describe('PreviewSpec', () => {
         ['markdown', mdParser],
       ])
 
-      const spec = makeSpec('core', 'core/config')
+      const spec = makePreviewSpec('core', 'core/config')
       const specRepo = makeSpecRepository({
         specs: [spec],
         artifacts: { 'core/config/spec.md': baseContent },
@@ -245,7 +246,7 @@ describe('PreviewSpec', () => {
         ['markdown', makeParser()],
       ])
 
-      const spec = makeSpec('core', 'core/config')
+      const spec = makePreviewSpec('core', 'core/config')
       const specRepo = makeSpecRepository({
         specs: [spec],
         artifacts: { 'core/config/spec.md': baseContent },
@@ -341,7 +342,7 @@ describe('PreviewSpec', () => {
         ['markdown', mdParser],
       ])
 
-      const spec = makeSpec('core', 'core/config')
+      const spec = makePreviewSpec('core', 'core/config')
       const specRepo = makeSpecRepository({
         specs: [spec],
         artifacts: { 'core/config/spec.md': baseContent },
@@ -421,7 +422,7 @@ describe('PreviewSpec', () => {
         ['markdown', mdParser],
       ])
 
-      const spec = makeSpec('core', 'core/config')
+      const spec = makePreviewSpec('core', 'core/config')
       const specRepo = makeSpecRepository({
         specs: [spec],
         artifacts: {

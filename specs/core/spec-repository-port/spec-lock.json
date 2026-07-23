@@ -18,8 +18,16 @@
   ],
   "implementation": [
     {
-      "file": "core:src/infrastructure/fs/spec-repository.ts",
-      "symbols": ["FsSpecRepository"]
+      "file": "core:src/domain/entities/spec.ts",
+      "symbols": [
+        "Spec,SpecArtifactEntry,SpecSidecarStamp,ABSENT_SPEC_SIDECAR",
+        "Spec",
+        "SpecArtifactEntry",
+        "SpecSidecarStamp",
+        "hasArtifact",
+        "persistedStateStamp",
+        "generatedMetadataStamp"
+      ]
     }
   ]
 }

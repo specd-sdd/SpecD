@@ -4,14 +4,5 @@
     "version": 1
   },
   "dependsOn": ["core:spec-id-format", "core:storage"],
-  "implementation": [
-    {
-      "file": "core:src/infrastructure/fs/spec-repository.ts",
-      "symbols": ["FsSpecRepository", "filterFiles", "allowedSpecArtifactFilenames"]
-    },
-    {
-      "file": "core:src/application/use-cases/generate-spec-metadata.ts",
-      "symbols": ["GenerateSpecMetadata", "projectImplementationMetadata"]
-    }
-  ]
+  "implementation": []
 }

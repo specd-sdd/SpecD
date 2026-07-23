@@ -1,0 +1,37 @@
+- op: added
+  description: 'Tie lock sidecar bytes to SpecRepository.persistedStateHash'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Sidecar is the durable source of truth'
+  content: |
+    ### Requirement: Repository hash of persisted lock state
+
+    The SHA-256 of the durable lock sidecar bytes MUST be the value returned by
+    `SpecRepository.persistedStateHash(spec)` (formerly named `specHash`). Application
+    callers MUST obtain that digest only through the repository port — not by reading
+    `spec-lock.json` directly.
+
+    Presence and last-modified of the lock sidecar for cheap freshness MUST surface on
+    `Spec.persistedStateStamp` from `get()`, not as schema artifact filenames.
+
+- op: modified
+  description: 'Sidecar exclusion uses Spec.artifacts instead of Spec.filenames'
+  selector:
+    type: section
+    matches: 'Requirement: Sidecar is not a schema artifact'
+  content: |
+    `spec-lock.json` is a persisted semantic sidecar, not a schema-declared spec artifact.
+
+    As a consequence:
+
+    - it MUST NOT appear in `Spec.artifacts`
+    - it MUST NOT be accepted by the generic `SpecRepository.artifact()` / `save()` API
+    - it is read and written only through the repository's persisted-state semantic operations
+
+    This keeps the schema artifact surface stable across single-file and multi-file spec
+    schemas while still allowing persisted dependency and implementation state to exist
+    next to canonical spec artifacts.

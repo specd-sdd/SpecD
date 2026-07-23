@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { makeSpec } from '../../helpers/make-spec.js'
 import { GetSpecContext } from '../../../src/application/use-cases/get-spec-context.js'
 import { Spec } from '../../../src/domain/entities/spec.js'
 import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
@@ -31,10 +32,11 @@ describe('GetSpecContext', () => {
       contentHashes: { 'spec.md': contentHash },
     })
 
-    const spec = new Spec('default', SpecPath.parse('auth/login'), [
-      'spec.md',
-      '.specd-metadata.yaml',
-    ])
+    const spec = makeSpec({
+      workspace: 'default',
+      name: 'auth/login',
+      filenames: ['spec.md', '.specd-metadata.yaml'],
+    })
     const repo = makeSpecRepository({
       specs: [spec],
       artifacts: {
@@ -89,10 +91,11 @@ describe('GetSpecContext', () => {
       contentHashes: { 'spec.md': 'sha256:stale-hash-that-does-not-match' },
     })
 
-    const spec = new Spec('default', SpecPath.parse('auth/login'), [
-      'spec.md',
-      '.specd-metadata.yaml',
-    ])
+    const spec = makeSpec({
+      workspace: 'default',
+      name: 'auth/login',
+      filenames: ['spec.md', '.specd-metadata.yaml'],
+    })
     const repo = makeSpecRepository({
       specs: [spec],
       artifacts: {
@@ -130,8 +133,16 @@ describe('GetSpecContext', () => {
 
     const repo = makeSpecRepository({
       specs: [
-        new Spec('default', SpecPath.parse('auth/login'), ['spec.md', '.specd-metadata.yaml']),
-        new Spec('default', SpecPath.parse('auth/shared'), ['spec.md', '.specd-metadata.yaml']),
+        makeSpec({
+          workspace: 'default',
+          name: 'auth/login',
+          filenames: ['spec.md', '.specd-metadata.yaml'],
+        }),
+        makeSpec({
+          workspace: 'default',
+          name: 'auth/shared',
+          filenames: ['spec.md', '.specd-metadata.yaml'],
+        }),
       ],
       artifacts: {
         'auth/login/spec.md': loginContent,
@@ -185,8 +196,12 @@ describe('GetSpecContext', () => {
     })
     const repo = makeSpecRepository({
       specs: [
-        new Spec('default', SpecPath.parse('auth/login'), ['spec.md']),
-        new Spec('default', SpecPath.parse('auth/shared'), ['spec.md', '.specd-metadata.yaml']),
+        makeSpec({ workspace: 'default', name: 'auth/login', filenames: ['spec.md'] }),
+        makeSpec({
+          workspace: 'default',
+          name: 'auth/shared',
+          filenames: ['spec.md', '.specd-metadata.yaml'],
+        }),
       ],
       artifacts: {
         'auth/login/spec.md':

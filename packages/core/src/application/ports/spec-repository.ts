@@ -234,7 +234,16 @@ export abstract class SpecRepository extends Repository {
    *
    * @param spec - The spec whose stable hash to compute
    */
-  abstract specHash(spec: Spec): Promise<string | null>
+  abstract persistedStateHash(spec: Spec): Promise<string | null>
+
+  /**
+   * Returns a content fingerprint for authored artifacts and persisted state.
+   *
+   * Generated metadata MUST NOT be included.
+   *
+   * @param spec - The spec whose fingerprint to compute
+   */
+  abstract specFingerprint(spec: Spec): Promise<string>
 
   /**
    * Updates the persisted schema identity for the given spec.

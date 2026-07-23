@@ -3,7 +3,7 @@ import {
   projectMetadataSchema,
   type ProjectMetadata,
 } from '../../../domain/services/project-metadata.js'
-import { Spec } from '../../../domain/entities/spec.js'
+import { Spec, ABSENT_SPEC_SIDECAR } from '../../../domain/entities/spec.js'
 import { SpecPath } from '../../../domain/value-objects/spec-path.js'
 import { type CompileContextConfig } from '../compile-context.js'
 import { type ContentHasher } from '../../ports/content-hasher.js'
@@ -159,7 +159,13 @@ export async function checkProjectMetadataFreshness(
         }
       }
       const metadata = await repo.metadata(
-        new Spec(spec.workspace, SpecPath.parse(spec.capPath), []),
+        new Spec(
+          spec.workspace,
+          SpecPath.parse(spec.capPath),
+          [],
+          ABSENT_SPEC_SIDECAR,
+          ABSENT_SPEC_SIDECAR,
+        ),
       )
       if (!metadata?.contentHashes) {
         return {

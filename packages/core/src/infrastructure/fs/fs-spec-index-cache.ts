@@ -216,7 +216,7 @@ async function materializeSpecEntry(
     }
   }
 
-  if (summary === undefined && spec.filenames.includes('spec.md')) {
+  if (summary === undefined && spec.hasArtifact('spec.md')) {
     try {
       const artifact = await source.artifact(spec, 'spec.md')
       if (artifact !== null) {

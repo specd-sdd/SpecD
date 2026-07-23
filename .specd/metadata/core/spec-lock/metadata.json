@@ -41,6 +41,12 @@
       "rules": [
         "`spec-lock.json` MUST be the durable archived source of truth for implementation traceability.\n\n`metadata.json` MAY project or cache this information for faster consumption, but metadata regeneration MUST NOT invent, mutate, or delete implementation links independently of the sidecar."
       ]
+    },
+    {
+      "requirement": "Repository hash of persisted lock state",
+      "rules": [
+        "The SHA-256 of the durable lock sidecar bytes MUST be the value returned by\n`SpecRepository.persistedStateHash(spec)` (formerly named `specHash`). Application\ncallers MUST obtain that digest only through the repository port — not by reading\n`spec-lock.json` directly.\n\nPresence and last-modified of the lock sidecar for cheap freshness MUST surface on\n`Spec.persistedStateStamp` from `get()`, not as schema artifact filenames."
+      ]
     }
   ],
   "constraints": [
@@ -130,12 +136,29 @@
       ]
     },
     {
+      "requirement": "Repository hash of persisted lock state",
+      "name": "persistedStateHash matches lock sidecar bytes",
+      "given": ["a durable spec-lock.json with known content"],
+      "when": ["SpecRepository.persistedStateHash(spec) is called"],
+      "then": ["the returned digest is the SHA-256 of those sidecar bytes"]
+    },
+    {
+      "requirement": "Repository hash of persisted lock state",
+      "name": "Presence stamps do not expose lock as an artifact",
+      "given": ["a lock sidecar present on disk"],
+      "when": ["get() returns the Spec"],
+      "then": [
+        "Spec.persistedStateStamp.present is true",
+        "AND spec-lock.json does not appear in Spec.artifacts"
+      ]
+    },
+    {
       "requirement": "Sidecar is not a schema artifact",
       "name": "Sidecar is omitted from generic artifact metadata",
-      "given": ["an archived spec persisted with spec.md, verify.md, and spec-lock.json"],
+      "given": ["an archived spec persisted with spec.md, verify.md, and"],
       "when": ["the repository returns the spec's normal artifact metadata"],
       "then": [
-        "Spec.filenames includes only schema-declared artifacts",
+        "Spec.artifacts includes only schema-declared artifacts",
         "AND spec-lock.json is not exposed as a normal artifact filename"
       ]
     },
@@ -143,49 +166,17 @@
       "requirement": "Sidecar is not a schema artifact",
       "name": "Generic artifact reads reject the sidecar",
       "given": ["an archived spec persisted with spec-lock.json"],
-      "when": [
-        "application logic attempts to load spec-lock.json through the generic artifact API"
-      ],
+      "when": ["application logic attempts to load spec-lock.json through the generic"],
       "then": [
         "the repository rejects the request",
         "AND callers must use persisted-state semantic operations instead"
       ]
     }
   ],
-  "implementation": {
-    "symbols": [
-      {
-        "specId": "core:spec-lock",
-        "file": "core:src/infrastructure/fs/spec-repository.ts",
-        "symbol": "FsSpecRepository"
-      },
-      {
-        "specId": "core:spec-lock",
-        "file": "core:src/infrastructure/fs/spec-repository.ts",
-        "symbol": "filterFiles"
-      },
-      {
-        "specId": "core:spec-lock",
-        "file": "core:src/infrastructure/fs/spec-repository.ts",
-        "symbol": "allowedSpecArtifactFilenames"
-      },
-      {
-        "specId": "core:spec-lock",
-        "file": "core:src/application/use-cases/generate-spec-metadata.ts",
-        "symbol": "GenerateSpecMetadata"
-      },
-      {
-        "specId": "core:spec-lock",
-        "file": "core:src/application/use-cases/generate-spec-metadata.ts",
-        "symbol": "projectImplementationMetadata"
-      }
-    ]
-  },
+  "implementation": {},
   "contentHashes": {
-    "spec.md": "sha256:53cb1c9dc46a3864fab85de9120632932d6f61462e6199c33b7558476a450a51",
-    "verify.md": "sha256:0eb33dc8f9b31cee792b95a3b44b98fced90e514b902527e0770165a2cf01040"
+    "spec.md": "sha256:0f547ef93c90743745be66f258c6e50b600c6e618a8458d63091b935e1d3df1c",
+    "verify.md": "sha256:945d93a42e81025573bd1750aad87d0953b9395602e664e9efe5b276db2d9c41"
   },
-  "generatedBy": "agent",
-  "optimizedDescription": "Archived specs need durable sidecar preserves spec identity, persisted dependencies, implementation traceability independently metadata regeneration…",
-  "optimizedContext": "# core:spec-lock\n\n## Rules\n- Sidecar location and naming: sidecar SHALL file named spec-lock. json located canonical persisted spec directory next spec's archived artifacts.\n- Durable schema identity: spec-lock. json MUST store spec schema identity under schema. - schema. name required. - schema. version required. Once recorded persisted spec, schema identity MUST remain immutable unless spec explicitly migrated through future schema-migration capability.\n- Persistent dependencies: spec-lock. json MUST store final persisted dependsOn list archived spec canonical spec IDs. sidecar list durable archived dependency record. Archive-time metadata generation later metadata regeneration flows SHALL treat authoritative persisted dependency state when projecting canonical metadata. json. dependsOn, including schemas do not declare dependency extraction spec artifacts.\n- Archived implementation links: spec-lock. json MUST store archived implementation traceability under implementation array. Each entry MUST contain: - file — canonical implementation file identity workspace: path form, where workspace workspace specId path relative workspace codeRoot Each entry MAY additionally contain: - symbols — non-empty array symbol names when archived link symbol-level When symbols absent, entry represents file-level implementation link. When symbols present, entry represents symbol-level implementation traceability file.\n- Archive-time materialization: spec-lock. json SHALL written updated only archive-time materialization explicit integrity-maintenance flows. Archive-time materialization MUST: - read raw project-relative implementation paths active change state - validate each linked file belongs workspace implied archived specId - ignore entries whose raw file path falls under workspace's graph. excludePaths - discard entries cannot normalized valid workspace: path identity - fail archive when confirmed link points outside workspace codeRoot implied specId\n- Sidecar is the durable source of truth: spec-lock. json MUST durable archived source truth implementation traceability. metadata. json MAY project cache information faster consumption, but metadata regeneration MUST NOT invent, mutate, delete implementation links independently sidecar."
+  "generatedBy": "core"
 }

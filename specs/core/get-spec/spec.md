@@ -16,7 +16,13 @@ The use case SHALL call `repo.get(specPath)` to load the spec metadata. If the s
 
 ### Requirement: Load all artifact files
 
-When the spec exists, the use case SHALL iterate over `spec.filenames` and load each artifact via `repo.artifact(spec, filename)`. Only artifacts that return non-null are included in the result map. The result `artifacts` map MUST be keyed by filename.
+When the spec exists, the use case SHALL iterate over `spec.artifacts` and load each
+present artifact via `repo.artifact(spec, entry.filename)`. Only artifacts that return
+non-null are included in the result map. The result `artifacts` map MUST be keyed by
+filename.
+
+The result map values remain content-bearing `SpecArtifact` instances from
+`artifact()`, not `SpecArtifactEntry` presence rows from `get()`.
 
 ### Requirement: Return spec and artifacts
 

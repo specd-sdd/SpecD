@@ -84,3 +84,35 @@
 - **WHEN** `list({ includeSummary: false, includeMetadataStatus: false })` is called
 - **THEN** returned items omit `summary` and `metadataStatus`
 - **AND** no supplementary metadata or spec.md reads occur at list time
+
+### Requirement: Spec stamp population on get
+
+#### Scenario: get populates artifact and sidecar stamps without content reads
+
+- **GIVEN** a spec directory with `spec.md`, a lock sidecar, and generated metadata
+- **WHEN** `FsSpecRepository.get()` is called
+- **THEN** `Spec.artifacts` includes `spec.md` with a `lastModified` stamp
+- **AND** `persistedStateStamp.present` and `generatedMetadataStamp.present` are `true`
+- **AND** artifact file contents are not read to build those stamps
+
+#### Scenario: get exposes derived filenames for artifact presence
+
+- **GIVEN** a spec with only `spec.md` present
+- **WHEN** `get()` returns the `Spec`
+- **THEN** `Spec.filenames` includes `spec.md`
+- **AND** `Spec.hasArtifact('spec.md')` is `true`
+
+### Requirement: persistedStateHash and specFingerprint on FS
+
+#### Scenario: persistedStateHash hashes lock bytes
+
+- **GIVEN** a lock sidecar with known content
+- **WHEN** `persistedStateHash(spec)` is called
+- **THEN** the digest equals SHA-256 of those bytes
+
+#### Scenario: specFingerprint excludes generated metadata
+
+- **GIVEN** a spec whose artifact contents and lock state are unchanged while
+  `metadata.json` content changes
+- **WHEN** `specFingerprint(spec)` is computed before and after the metadata change
+- **THEN** both digests are equal

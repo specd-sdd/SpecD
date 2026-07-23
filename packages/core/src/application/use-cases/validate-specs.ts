@@ -22,6 +22,14 @@ import {
 import { type ExtractorTransformRegistry } from '../../domain/services/extract-metadata.js'
 import { type SpecWorkspaceRoute } from './_shared/spec-reference-resolver.js'
 import { type Schema } from '../../domain/value-objects/schema.js'
+import {
+  ValidationResultCache,
+  type SpecValidationEntry,
+} from '../ports/validation-result-cache.js'
+import {
+  VALIDATE_SPECS_ENGINE_VERSION,
+  computeSchemaFingerprintFromSchema,
+} from './_shared/validate-specs-cache-fingerprints.js'
 
 /** Input for the {@link ValidateSpecs} use case. */
 export interface ValidateSpecsInput {
@@ -32,16 +40,7 @@ export interface ValidateSpecsInput {
 }
 
 /** Validation result for a single spec. */
-export interface SpecValidationEntry {
-  /** Qualified label `workspace:path`. */
-  readonly spec: string
-  /** `true` if all artifacts pass validation. */
-  readonly passed: boolean
-  /** All validation failures for this spec. */
-  readonly failures: ValidationFailure[]
-  /** All validation warnings for this spec. */
-  readonly warnings: ValidationWarning[]
-}
+export type { SpecValidationEntry } from '../ports/validation-result-cache.js'
 
 /** Aggregated result of validating one or more specs. */
 export interface ValidateSpecsResult {
@@ -69,6 +68,7 @@ export class ValidateSpecs {
   private readonly _hasher: ContentHasher
   private readonly _extractorTransforms: ExtractorTransformRegistry
   private readonly _workspaceRoutes: readonly SpecWorkspaceRoute[]
+  private readonly _validationResultCaches: ReadonlyMap<string, ValidationResultCache>
 
   /**
    * Creates a new `ValidateSpecs` use case instance.
@@ -79,6 +79,7 @@ export class ValidateSpecs {
    * @param hasher - Content hasher for metadata freshness validation
    * @param extractorTransforms - Shared extractor transform registry
    * @param workspaceRoutes - Workspace routing metadata for cross-workspace resolution
+   * @param validationResultCaches - Validation result caches keyed by workspace name
    */
   constructor(
     specs: ReadonlyMap<string, SpecRepository>,
@@ -87,6 +88,7 @@ export class ValidateSpecs {
     hasher?: ContentHasher,
     extractorTransforms: ExtractorTransformRegistry = new Map(),
     workspaceRoutes: readonly SpecWorkspaceRoute[] = [],
+    validationResultCaches: ReadonlyMap<string, ValidationResultCache> = new Map(),
   ) {
     this._specs = specs
     this._schemaProvider = schemaProvider
@@ -98,6 +100,7 @@ export class ValidateSpecs {
     }
     this._extractorTransforms = extractorTransforms
     this._workspaceRoutes = workspaceRoutes
+    this._validationResultCaches = validationResultCaches
   }
 
   /**
@@ -112,6 +115,8 @@ export class ValidateSpecs {
     const crossRules = schema.crossArtifactValidations().filter((rule) => rule.scope === 'spec')
 
     const specArtifactTypes = schema.artifacts().filter((a) => a.scope === 'spec')
+    const schemaFingerprint = computeSchemaFingerprintFromSchema(schema, this._hasher)
+    const engineVersion = VALIDATE_SPECS_ENGINE_VERSION
     const entries: SpecValidationEntry[] = []
 
     if (input.specPath !== undefined) {
@@ -125,15 +130,17 @@ export class ValidateSpecs {
       if (spec === null) {
         throw new SpecNotFoundError(input.specPath)
       }
-      const entry = await this._validateSpec(
+      const entry = await this._validateSpecWithCache({
         specRepo,
-        spec.workspace,
+        spec,
+        workspace,
         capabilityPath,
-        spec.filenames,
         specArtifactTypes,
         crossRules,
         schema,
-      )
+        schemaFingerprint,
+        engineVersion,
+      })
       entries.push(entry)
     } else if (input.workspace !== undefined) {
       const specRepo = this._specs.get(input.workspace)
@@ -144,15 +151,17 @@ export class ValidateSpecs {
       for (const entry of listed.items) {
         const spec = await specRepo.get(SpecPath.parse(entry.path))
         if (spec === null) continue
-        const entryResult = await this._validateSpec(
+        const entryResult = await this._validateSpecWithCache({
           specRepo,
-          spec.workspace,
-          spec.name.toFsPath('/'),
-          spec.filenames,
+          spec,
+          workspace: spec.workspace,
+          capabilityPath: spec.name.toFsPath('/'),
           specArtifactTypes,
           crossRules,
           schema,
-        )
+          schemaFingerprint,
+          engineVersion,
+        })
         entries.push(entryResult)
       }
     } else {
@@ -161,15 +170,17 @@ export class ValidateSpecs {
         for (const row of listed.items) {
           const spec = await specRepo.get(SpecPath.parse(row.path))
           if (spec === null) continue
-          const entryResult = await this._validateSpec(
+          const entryResult = await this._validateSpecWithCache({
             specRepo,
-            spec.workspace,
-            spec.name.toFsPath('/'),
-            spec.filenames,
+            spec,
+            workspace: spec.workspace,
+            capabilityPath: spec.name.toFsPath('/'),
             specArtifactTypes,
             crossRules,
             schema,
-          )
+            schemaFingerprint,
+            engineVersion,
+          })
           entries.push(entryResult)
         }
       }
@@ -185,12 +196,108 @@ export class ValidateSpecs {
   }
 
   /**
+   * Validates one spec using the result cache when configured for its workspace.
+   *
+   * @param args - Per-spec validation and cache context
+   * @param args.specRepo - Repository owning the spec
+   * @param args.spec - Spec metadata with artifact stamps
+   * @param args.workspace - Workspace name for the spec label
+   * @param args.capabilityPath - Capability path within the workspace
+   * @param args.specArtifactTypes - Spec-scoped artifact types from the active schema
+   * @param args.crossRules - Cross-artifact validation rules scoped to spec artifacts
+   * @param args.schema - Active schema governing extraction and validation behavior
+   * @param args.schemaFingerprint - Active schema validation surface fingerprint
+   * @param args.engineVersion - Active validate-specs engine version
+   * @returns Validation entry for the spec
+   */
+  private async _validateSpecWithCache(args: {
+    readonly specRepo: SpecRepository
+    readonly spec: import('../../domain/entities/spec.js').Spec
+    readonly workspace: string
+    readonly capabilityPath: string
+    readonly specArtifactTypes: readonly ArtifactType[]
+    readonly crossRules: readonly CrossArtifactValidationRule[]
+    readonly schema: Schema
+    readonly schemaFingerprint: string
+    readonly engineVersion: number
+  }): Promise<SpecValidationEntry> {
+    const cache = this._validationResultCaches.get(args.workspace)
+    if (cache === undefined) {
+      return this._validateSpec(
+        args.specRepo,
+        args.spec,
+        args.workspace,
+        args.capabilityPath,
+        args.specArtifactTypes,
+        args.crossRules,
+        args.schema,
+      )
+    }
+
+    const lookup = await cache.lookup({
+      spec: args.spec,
+      schemaFingerprint: args.schemaFingerprint,
+      engineVersion: args.engineVersion,
+    })
+    if (lookup.kind === 'hit') {
+      return this._fromCacheEntry(lookup.entry)
+    }
+
+    const entry = await this._validateSpec(
+      args.specRepo,
+      args.spec,
+      args.workspace,
+      args.capabilityPath,
+      args.specArtifactTypes,
+      args.crossRules,
+      args.schema,
+    )
+    await cache.upsert({
+      entry: this._toCacheEntry(entry),
+      spec: args.spec,
+      schemaFingerprint: args.schemaFingerprint,
+      engineVersion: args.engineVersion,
+    })
+    return entry
+  }
+
+  /**
+   * Converts a cached entry into the public validation result shape.
+   *
+   * @param entry - Cached validation entry
+   * @returns Public validation entry
+   */
+  private _fromCacheEntry(entry: SpecValidationEntry): SpecValidationEntry {
+    return {
+      spec: entry.spec,
+      passed: entry.passed,
+      failures: [...entry.failures],
+      warnings: [...entry.warnings],
+    }
+  }
+
+  /**
+   * Converts a validation result into the cache entry shape.
+   *
+   * @param entry - Public validation entry
+   * @returns Cache entry payload
+   */
+  private _toCacheEntry(entry: SpecValidationEntry): SpecValidationEntry {
+    return {
+      spec: entry.spec,
+      passed: entry.passed,
+      failures: entry.failures,
+      warnings: entry.warnings,
+    }
+  }
+
+  /**
    * Validates all spec-scoped artifacts for a single spec.
    *
    * @param specRepo - Repository to read artifacts from
+   * @param spec - Spec metadata with artifact stamps
    * @param workspace - Workspace name for the spec label
    * @param capabilityPath - Capability path within the workspace
-   * @param filenames - Filenames present in the spec directory
    * @param specArtifactTypes - Spec-scoped artifact types from the active schema
    * @param crossRules - Cross-artifact validation rules scoped to spec artifacts
    * @param schema - Active schema governing extraction and validation behavior
@@ -198,9 +305,9 @@ export class ValidateSpecs {
    */
   private async _validateSpec(
     specRepo: SpecRepository,
+    spec: import('../../domain/entities/spec.js').Spec,
     workspace: string,
     capabilityPath: string,
-    filenames: readonly string[],
     specArtifactTypes: readonly ArtifactType[],
     crossRules: readonly CrossArtifactValidationRule[],
     schema: Schema,
@@ -208,13 +315,11 @@ export class ValidateSpecs {
     const label = `${workspace}:${capabilityPath}`
     const failures: ValidationFailure[] = []
     const warnings: ValidationWarning[] = []
-    const specPath = SpecPath.parse(capabilityPath)
-    const spec = await specRepo.get(specPath)
     const readyParticipants = new Map<string, ReadyArtifactParticipant>()
 
     for (const artifactType of specArtifactTypes) {
       const filename = path.basename(artifactType.output)
-      const hasFile = filenames.includes(filename)
+      const hasFile = spec.hasArtifact(filename)
 
       if (!hasFile) {
         if (!artifactType.optional) {
@@ -225,7 +330,6 @@ export class ValidateSpecs {
         }
         continue
       }
-      if (spec === null) continue
 
       const artifact = await specRepo.artifact(spec, filename)
       if (artifact === null) continue
@@ -292,16 +396,14 @@ export class ValidateSpecs {
       )
     }
 
-    if (spec !== null) {
-      await this._validateMetadataConsistency({
-        specRepo,
-        spec,
-        label,
-        schema,
-        specArtifactTypes,
-        failures,
-      })
-    }
+    await this._validateMetadataConsistency({
+      specRepo,
+      spec,
+      label,
+      schema,
+      specArtifactTypes,
+      failures,
+    })
 
     return {
       spec: label,

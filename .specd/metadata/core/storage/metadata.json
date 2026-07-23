@@ -116,7 +116,13 @@
     {
       "requirement": "Filesystem list index cache layout",
       "rules": [
-        "Fs-backed list/count implementations MUST store derived list indexes under:\n\n```text\n{configPath}/tmp/fs-cache/\n  archive/\n  changes/\n  drafts/\n  discarded/\n  specs/<workspace>/\n```\n\nEach bucket directory contains `.specd-index.jsonl` and `.specd-index-meta.json` as defined in the archive index requirement. Change buckets store `sourceMtime` from `manifest.json`. Spec buckets store `sourceFiles` with per-file mtimes used for freshness.\n\nRepositories MUST NOT read or write these cache files directly except through dedicated index helper classes (`FsChangeIndexCache`, `FsSpecIndexCache`). Helpers own canonical sort, pagination, freshness, regeneration, and per-bucket locking.\n\nIndex entries store the full CLI-usable list-entry payload; port `include*` flags are response projection only."
+        "Fs-backed list/count implementations MUST store derived list indexes under:\n\n```text\n{configPath}/tmp/fs-cache/\n  archive/\n  changes/\n  drafts/\n  discarded/\n  specs/<workspace>/\n  validate-specs/<workspace>/\n```\n\nEach list-index bucket directory contains `.specd-index.jsonl` and\n`.specd-index-meta.json` as defined in the archive index requirement. Change buckets\nstore `sourceMtime` from `manifest.json`. Spec buckets store `sourceFiles` with\nper-file mtimes used for freshness.\n\nRepositories MUST NOT read or write these list-index cache files directly except\nthrough dedicated index helper classes (`FsChangeIndexCache`, `FsSpecIndexCache`).\nHelpers own canonical sort, pagination, freshness, regeneration, and per-bucket\nlocking.\n\nIndex entries store the full CLI-usable list-entry payload; port `include*` flags are\nresponse projection only.\n\nThe `validate-specs/<workspace>/` bucket is owned by the filesystem adapter of\n[`core:validation-result-cache-port`](../validation-result-cache-port/spec.md), not by\n`FsSpecRepository` list/count helpers. Its normative meta and row shapes are defined\nin Requirement: Validation result cache bucket layout."
+      ]
+    },
+    {
+      "requirement": "Validation result cache bucket layout",
+      "rules": [
+        "The filesystem adapter for `ValidationResultCache` MUST persist one bucket per\nworkspace at `{configPath}/tmp/fs-cache/validate-specs/<workspace>/` containing:\n\n- `.specd-index-meta.json` — validate-bucket meta that **extends** the shared list-index\n  meta shape `{ totalCount, generatedAt, isInvalidated }` with:\n  - `schemaFingerprint` (string)\n  - `engineVersion` (non-negative integer)\n- `.specd-index.jsonl` — one JSON object per line with wire shape\n  `{ entry, stamps, cacheFingerprint }` where:\n  - `entry` is the cached `SpecValidationEntry` (or equivalent)\n  - `stamps` records freshness from `Spec` (`SpecArtifactEntry` lastModified values,\n    `persistedStateStamp`, and `generatedMetadataStamp`, with absence represented explicitly)\n  - `cacheFingerprint` is\n    `hash(sortedKeyJson({ specFingerprint, metadataContentHash | \"__absent__\" }))`\n    per [`core:validation-result-cache-port`](../validation-result-cache-port/spec.md)\n\nShared list-index buckets MUST NOT be required to carry `schemaFingerprint` or\n`engineVersion`. Those fields are validate-bucket-specific extensions.\n\nDelivery hosts MUST NOT be required to know this bucket exists. `specd storage reindex`\nand other host commands MUST NOT gain validate-cache-specific surfaces solely for this\nbucket."
       ]
     },
     {
@@ -482,7 +488,8 @@
       "when": ["list/count operations populate derived indexes"],
       "then": [
         "index files exist under {configPath}/tmp/fs-cache/ in bucket directories changes/, drafts/, discarded/, archive/, and specs/<workspace>/",
-        "AND each bucket contains .specd-index.jsonl and .specd-index-meta.json"
+        "AND each of those list-index buckets contains .specd-index.jsonl and .specd-index-meta.json",
+        "AND those list/count operations do not require writing validate-specs/<workspace>/"
       ]
     },
     {
@@ -491,6 +498,51 @@
       "given": ["a populated fs-cache bucket with totalCount: 5 in meta"],
       "when": ["the corresponding repository count() is called with a fresh index"],
       "then": ["the returned count is 5 without materializing full list entries"]
+    },
+    {
+      "requirement": "Filesystem list index cache layout",
+      "name": "Validate-specs bucket is sibling not owned by SpecRepository helpers",
+      "when": ["FsSpecRepository list/count helpers run"],
+      "then": [
+        "they MUST NOT own or mutate {configPath}/tmp/fs-cache/validate-specs/<workspace>/",
+        "AND that bucket remains owned by the ValidationResultCache filesystem adapter"
+      ]
+    },
+    {
+      "requirement": "Validation result cache bucket layout",
+      "name": "Bucket files live under validate-specs workspace path",
+      "given": ["a filesystem ValidationResultCache adapter for workspace core"],
+      "when": ["it upserts a validation result row"],
+      "then": [
+        "files are written under {configPath}/tmp/fs-cache/validate-specs/core/",
+        "AND the directory contains .specd-index-meta.json and .specd-index.jsonl"
+      ]
+    },
+    {
+      "requirement": "Validation result cache bucket layout",
+      "name": "Meta extends IndexMeta with schema and engine fields",
+      "when": ["validate-bucket meta is written"],
+      "then": [
+        "it includes totalCount, generatedAt, and isInvalidated",
+        "AND it includes schemaFingerprint and engineVersion",
+        "AND shared list-index buckets are not required to include those two extra fields"
+      ]
+    },
+    {
+      "requirement": "Validation result cache bucket layout",
+      "name": "Rows carry entry stamps and cache fingerprint",
+      "when": ["a JSONL row is written for a validated spec"],
+      "then": [
+        "the row includes entry, stamps, and cacheFingerprint",
+        "AND stamps includes artifacts (SpecArtifactEntry lastModified values),\npersistedStateStamp, and generatedMetadataStamp (with explicit absence when\nsidecars are missing)",
+        "AND cacheFingerprint follows\n[core:validation-result-cache-port](../validation-result-cache-port/spec.md)"
+      ]
+    },
+    {
+      "requirement": "Validation result cache bucket layout",
+      "name": "Hosts gain no validate-cache-specific reindex surface",
+      "when": ["host storage reindex commands are considered for this change"],
+      "then": ["they MUST NOT gain a validate-cache-only argument or documentation"]
     },
     {
       "requirement": "configPath tmp gitignore",
@@ -513,14 +565,14 @@
     "symbols": [
       {
         "specId": "core:storage",
-        "file": "core:src/infrastructure/fs/archive-repository.ts",
-        "symbol": "FsArchiveRepository"
+        "file": "core:src/infrastructure/fs/fs-validation-result-cache.ts",
+        "symbol": "FsValidationResultCache"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:0edcf1399481eee00d7aa7204273fbfeaf23fbb1c1401580bb1dcdbfe3773b40",
-    "verify.md": "sha256:5020c3081ba25c82c241e9160d8ac5c90cde7268f06fb0b117e5f27b242900ff"
+    "spec.md": "sha256:23cdac37abf9959dd2ee9f0905da6f7b8c50fe05699a02aaed8de536f8c61bc1",
+    "verify.md": "sha256:3b4f5e4a624158b300dcae0e8da6a23976b8383d98976b6c34330e82ae100137"
   },
   "generatedBy": "core"
 }

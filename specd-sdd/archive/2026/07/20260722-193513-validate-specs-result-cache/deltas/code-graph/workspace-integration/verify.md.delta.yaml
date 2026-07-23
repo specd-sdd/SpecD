@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'No verify scenarios mention Spec.filenames; indexer presence migration is covered by the specs delta'

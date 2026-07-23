@@ -136,13 +136,51 @@ Fs-backed list/count implementations MUST store derived list indexes under:
   drafts/
   discarded/
   specs/<workspace>/
+  validate-specs/<workspace>/
 ```
 
-Each bucket directory contains `.specd-index.jsonl` and `.specd-index-meta.json` as defined in the archive index requirement. Change buckets store `sourceMtime` from `manifest.json`. Spec buckets store `sourceFiles` with per-file mtimes used for freshness.
+Each list-index bucket directory contains `.specd-index.jsonl` and
+`.specd-index-meta.json` as defined in the archive index requirement. Change buckets
+store `sourceMtime` from `manifest.json`. Spec buckets store `sourceFiles` with
+per-file mtimes used for freshness.
 
-Repositories MUST NOT read or write these cache files directly except through dedicated index helper classes (`FsChangeIndexCache`, `FsSpecIndexCache`). Helpers own canonical sort, pagination, freshness, regeneration, and per-bucket locking.
+Repositories MUST NOT read or write these list-index cache files directly except
+through dedicated index helper classes (`FsChangeIndexCache`, `FsSpecIndexCache`).
+Helpers own canonical sort, pagination, freshness, regeneration, and per-bucket
+locking.
 
-Index entries store the full CLI-usable list-entry payload; port `include*` flags are response projection only.
+Index entries store the full CLI-usable list-entry payload; port `include*` flags are
+response projection only.
+
+The `validate-specs/<workspace>/` bucket is owned by the filesystem adapter of
+[`core:validation-result-cache-port`](../validation-result-cache-port/spec.md), not by
+`FsSpecRepository` list/count helpers. Its normative meta and row shapes are defined
+in Requirement: Validation result cache bucket layout.
+
+### Requirement: Validation result cache bucket layout
+
+The filesystem adapter for `ValidationResultCache` MUST persist one bucket per
+workspace at `{configPath}/tmp/fs-cache/validate-specs/<workspace>/` containing:
+
+- `.specd-index-meta.json` — validate-bucket meta that **extends** the shared list-index
+  meta shape `{ totalCount, generatedAt, isInvalidated }` with:
+  - `schemaFingerprint` (string)
+  - `engineVersion` (non-negative integer)
+- `.specd-index.jsonl` — one JSON object per line with wire shape
+  `{ entry, stamps, cacheFingerprint }` where:
+  - `entry` is the cached `SpecValidationEntry` (or equivalent)
+  - `stamps` records freshness from `Spec` (`SpecArtifactEntry` lastModified values,
+    `persistedStateStamp`, and `generatedMetadataStamp`, with absence represented explicitly)
+  - `cacheFingerprint` is
+    `hash(sortedKeyJson({ specFingerprint, metadataContentHash | "__absent__" }))`
+    per [`core:validation-result-cache-port`](../validation-result-cache-port/spec.md)
+
+Shared list-index buckets MUST NOT be required to carry `schemaFingerprint` or
+`engineVersion`. Those fields are validate-bucket-specific extensions.
+
+Delivery hosts MUST NOT be required to know this bucket exists. `specd storage reindex`
+and other host commands MUST NOT gain validate-cache-specific surfaces solely for this
+bucket.
 
 ### Requirement: configPath tmp gitignore
 

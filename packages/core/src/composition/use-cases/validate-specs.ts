@@ -2,6 +2,7 @@ import { type ArtifactParserRegistry } from '../../application/ports/artifact-pa
 import { type ContentHasher } from '../../application/ports/content-hasher.js'
 import { type SchemaProvider } from '../../application/ports/schema-provider.js'
 import { type SpecRepository } from '../../application/ports/spec-repository.js'
+import { type ValidationResultCache } from '../../application/ports/validation-result-cache.js'
 import { ValidateSpecs } from '../../application/use-cases/validate-specs.js'
 import { type SpecdConfig } from '../../application/specd-config.js'
 import { type ExtractorTransformRegistry } from '../../domain/services/content-extraction.js'
@@ -23,6 +24,7 @@ export interface ValidateSpecsDeps {
   readonly contentHasher: ContentHasher
   readonly extractorTransforms: ExtractorTransformRegistry
   readonly workspaceRoutes: readonly SpecWorkspaceRoute[]
+  readonly validationResultCaches: ReadonlyMap<string, ValidationResultCache>
 }
 
 /**
@@ -39,6 +41,7 @@ export function resolveValidateSpecsDeps(resolver: CompositionResolver): Validat
     contentHasher: resolver.getContentHasher(),
     extractorTransforms: resolver.getExtractorTransforms(),
     workspaceRoutes: resolver.getSpecWorkspaceRoutes(),
+    validationResultCaches: resolver.getValidationResultCaches(),
   }
 }
 
@@ -90,8 +93,15 @@ function createValidateSpecsFromNormalized(
   input: FactoryInput<ValidateSpecsDeps, CompositionResolutionOptions>,
 ): ValidateSpecs {
   if (input.kind === 'deps') {
-    const { specs, schemaProvider, parsers, contentHasher, extractorTransforms, workspaceRoutes } =
-      input.deps
+    const {
+      specs,
+      schemaProvider,
+      parsers,
+      contentHasher,
+      extractorTransforms,
+      workspaceRoutes,
+      validationResultCaches,
+    } = input.deps
     return new ValidateSpecs(
       specs,
       schemaProvider,
@@ -99,6 +109,7 @@ function createValidateSpecsFromNormalized(
       contentHasher,
       extractorTransforms,
       workspaceRoutes,
+      validationResultCaches,
     )
   }
 
@@ -119,6 +130,7 @@ function isValidateSpecsDeps(value: ValidateSpecsDeps | SpecdConfig): value is V
     'parsers' in value &&
     'contentHasher' in value &&
     'extractorTransforms' in value &&
-    'workspaceRoutes' in value
+    'workspaceRoutes' in value &&
+    'validationResultCaches' in value
   )
 }

@@ -12,7 +12,8 @@
   ],
   "implementation": [
     {
-      "file": "core:src/composition/use-cases/search-specs.ts"
+      "file": "core:src/application/use-cases/search-specs.ts",
+      "symbols": ["SearchSpecs"]
     }
   ]
 }

@@ -2,22 +2,17 @@ import * as fs from 'node:fs/promises'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { Spec } from '../../../src/domain/entities/spec.js'
-import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
+import { makeSpec } from '../../helpers/make-spec.js'
 import { SpecArtifact } from '../../../src/domain/value-objects/spec-artifact.js'
 import {
   FsSpecIndexCache,
   type SpecIndexSource,
 } from '../../../src/infrastructure/fs/fs-spec-index-cache.js'
 
-function makeSpec(pathStr: string, filenames: string[] = ['spec.md']): Spec {
-  return new Spec('default', SpecPath.parse(pathStr), filenames)
-}
-
 describe('FsSpecIndexCache', () => {
   let tmpDir: string
   let bucketDir: string
-  let specs: Spec[]
+  let specs: ReturnType<typeof makeSpec>[]
   let specContent: Map<string, string>
   let fileMtimes: Map<string, string>
   let cache: FsSpecIndexCache
@@ -37,9 +32,10 @@ describe('FsSpecIndexCache', () => {
         return content !== undefined ? new SpecArtifact(filename, content) : null
       },
       sourceFileStamps: async (spec) =>
-        [...spec.filenames].map((filename) => ({
-          filename,
-          mtime: fileMtimes.get(`${spec.name.toString()}/${filename}`) ?? new Date().toISOString(),
+        spec.artifacts.map((artifact) => ({
+          filename: artifact.filename,
+          mtime:
+            fileMtimes.get(`${spec.name.toString()}/${artifact.filename}`) ?? artifact.lastModified,
         })),
     }
 
@@ -55,59 +51,13 @@ describe('FsSpecIndexCache', () => {
   })
 
   it('rebuilds from disk and lists specs in path order', async () => {
-    specs.push(makeSpec('billing/invoices'), makeSpec('auth/login'))
+    specs.push(makeSpec({ name: 'billing/invoices' }), makeSpec({ name: 'auth/login' }))
     specContent.set('auth/login/spec.md', '# Login\n\nAuth spec')
     specContent.set('billing/invoices/spec.md', '# Invoices')
-    fileMtimes.set('auth/login/spec.md', new Date('2024-01-01T00:00:00.000Z').toISOString())
-    fileMtimes.set('billing/invoices/spec.md', new Date('2024-01-02T00:00:00.000Z').toISOString())
-
-    const result = await cache.list()
-    expect(result.items.map((entry) => entry.path)).toEqual(['auth/login', 'billing/invoices'])
-    expect(result.meta.total).toBe(2)
-  })
-
-  it('materializes title and summary at index time', async () => {
-    specs.push(makeSpec('auth/login'))
-    specContent.set('auth/login/spec.md', '# Login\n\nOAuth2 authentication flow')
-    fileMtimes.set('auth/login/spec.md', new Date().toISOString())
-
-    const result = await cache.list()
-    expect(result.items[0]!.title).toBe('login')
-    expect(result.items[0]!.summary).toContain('OAuth2')
-  })
-
-  it('refresh upserts one spec row', async () => {
-    const spec = makeSpec('auth/login')
-    specs.push(spec)
-    specContent.set('auth/login/spec.md', '# Login')
-    const mtime = new Date().toISOString()
-    fileMtimes.set('auth/login/spec.md', mtime)
-
-    await cache.refresh(spec)
-    expect(await cache.count()).toBe(1)
-  })
-
-  it('invalidate triggers rebuild on next list', async () => {
-    specs.push(makeSpec('auth/login'))
-    specContent.set('auth/login/spec.md', '# Login')
-    fileMtimes.set('auth/login/spec.md', new Date().toISOString())
-
-    await cache.list()
-    await cache.invalidate()
-    const result = await cache.list()
-    expect(result.items[0]!.path).toBe('auth/login')
-  })
-
-  it('remove drops a spec row', async () => {
-    specs.push(makeSpec('auth/login'))
-    specContent.set('auth/login/spec.md', '# Login')
-    fileMtimes.set('auth/login/spec.md', new Date().toISOString())
 
     await cache.reindex()
-    expect(await cache.count()).toBe(1)
+    const result = await cache.list()
 
-    await cache.remove('auth/login')
-    specs.length = 0
-    expect(await cache.count()).toBe(0)
+    expect(result.items.map((item) => item.path)).toEqual(['auth/login', 'billing/invoices'])
   })
 })

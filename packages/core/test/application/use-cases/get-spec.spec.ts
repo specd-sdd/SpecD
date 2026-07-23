@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { makeSpec } from '../../helpers/make-spec.js'
 import { GetSpec } from '../../../src/application/use-cases/get-spec.js'
 import { Spec } from '../../../src/domain/entities/spec.js'
 import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
@@ -10,7 +11,11 @@ describe('GetSpec', () => {
   describe('when the spec exists', () => {
     it('returns spec with artifacts', async () => {
       const specPath = SpecPath.parse('auth/oauth')
-      const spec = new Spec('default', specPath, ['spec.md', 'verify.md'])
+      const spec = makeSpec({
+        workspace: 'default',
+        name: specPath,
+        filenames: ['spec.md', 'verify.md'],
+      })
       const repo = makeSpecRepository({
         specs: [spec],
         artifacts: {
@@ -32,7 +37,11 @@ describe('GetSpec', () => {
 
     it('only includes artifacts that exist on disk', async () => {
       const specPath = SpecPath.parse('auth/oauth')
-      const spec = new Spec('default', specPath, ['spec.md', 'missing.md'])
+      const spec = makeSpec({
+        workspace: 'default',
+        name: specPath,
+        filenames: ['spec.md', 'missing.md'],
+      })
       const repo = makeSpecRepository({
         specs: [spec],
         artifacts: {

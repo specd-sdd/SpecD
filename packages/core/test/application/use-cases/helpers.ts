@@ -317,8 +317,12 @@ export class StubSpecRepository extends SpecRepository {
 
   override async reindex(): Promise<void> {}
 
-  override async specHash(): Promise<string | null> {
+  override async persistedStateHash(): Promise<string | null> {
     return 'sha256:test'
+  }
+
+  override async specFingerprint(_spec: Spec): Promise<string> {
+    return 'sha256:test-spec-fingerprint'
   }
 
   override async artifact(_spec: Spec, filename: string): Promise<SpecArtifact | null> {

@@ -11,8 +11,12 @@
   ],
   "implementation": [
     {
-      "file": "core:src/infrastructure/fs/fs-index-cache-base.ts",
-      "symbols": ["FsIndexCache", "_ensureFresh"]
+      "file": "core:src/infrastructure/fs/spec-repository.ts",
+      "symbols": [
+        "FsSpecRepository,persistedStateHash,specFingerprint,_buildSpec",
+        "specFingerprint",
+        "persistedStateHash"
+      ]
     }
   ]
 }

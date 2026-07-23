@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
+import { makeSpec } from '../../helpers/make-spec.js'
 import { ChangeAlreadyExistsError } from '../../../src/application/errors/change-already-exists-error.js'
 import { InvalidCreateChangeInputError } from '../../../src/application/errors/invalid-create-change-input-error.js'
 import { SchemaNotFoundError } from '../../../src/application/errors/schema-not-found-error.js'
@@ -132,7 +133,7 @@ describe('CreateChange', () => {
     it('loads and seeds persisted dependencies for existing specs', async () => {
       const repo = makeChangeRepository()
       const specRepo = makeSpecRepository({
-        specs: [new Spec('default', SpecPath.parse('auth/login'), [])],
+        specs: [makeSpec({ workspace: 'default', name: 'auth/login', filenames: [] })],
         artifacts: {
           'auth/login/spec-lock.json': JSON.stringify({
             dependsOn: ['default:shared/auth'],
@@ -154,7 +155,7 @@ describe('CreateChange', () => {
     it('falls back to metadata for dependencies when sidecar is absent', async () => {
       const repo = makeChangeRepository()
       const specRepo = makeSpecRepository({
-        specs: [new Spec('default', SpecPath.parse('auth/login'), [])],
+        specs: [makeSpec({ workspace: 'default', name: 'auth/login', filenames: [] })],
         artifacts: {
           'auth/login/metadata.json': JSON.stringify({
             dependsOn: ['default:shared/auth'],
@@ -176,7 +177,7 @@ describe('CreateChange', () => {
     it('still falls back to stale metadata for dependencies when sidecar is absent', async () => {
       const repo = makeChangeRepository()
       const specRepo = makeSpecRepository({
-        specs: [new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])],
+        specs: [makeSpec({ workspace: 'default', name: 'auth/login', filenames: ['spec.md'] })],
         artifacts: {
           'auth/login/spec.md': '# Login flow',
           'auth/login/metadata.json': JSON.stringify({
@@ -200,7 +201,7 @@ describe('CreateChange', () => {
     it('prefers persisted dependencies over metadata fallback when both exist', async () => {
       const repo = makeChangeRepository()
       const specRepo = makeSpecRepository({
-        specs: [new Spec('default', SpecPath.parse('auth/login'), [])],
+        specs: [makeSpec({ workspace: 'default', name: 'auth/login', filenames: [] })],
         artifacts: {
           'auth/login/spec-lock.json': JSON.stringify({
             dependsOn: ['default:shared/persisted'],

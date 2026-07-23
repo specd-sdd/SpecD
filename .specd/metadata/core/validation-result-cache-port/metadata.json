@@ -1,0 +1,370 @@
+{
+  "title": "Validation Result Cache Port",
+  "description": "`ValidateSpecs` needs to memoize per-spec validation outcomes across runs without forcing\ndelivery hosts to know that a cache exists. `ValidationResultCache` is a\n**ValidateSpecs-specific** application port: it owns the freshness cascade for that use\ncase (including lazy I/O against `SpecRepository`) so adapters can persist outcomes under\na swappable storage backend while the public validate API stays unchanged.",
+  "dependsOn": ["default:_global/architecture", "core:spec-repository-port"],
+  "context": [
+    "`ValidateSpecs` needs to memoize per-spec validation outcomes across runs without forcing\ndelivery hosts to know that a cache exists. `ValidationResultCache` is a\n**ValidateSpecs-specific** application port: it owns the freshness cascade for that use\ncase (including lazy I/O against `SpecRepository`) so adapters can persist outcomes under\na swappable storage backend while the public validate API stays unchanged."
+  ],
+  "rules": [
+    {
+      "requirement": "Abstract port shape",
+      "rules": [
+        "The port MUST be declared as a TypeScript `abstract class` named `ValidationResultCache` in\n`application/ports/`. Concrete behaviour SHALL live only in infrastructure adapters."
+      ]
+    },
+    {
+      "requirement": "Workspace-scoped instances",
+      "rules": [
+        "Each port instance MUST be bound to a single workspace identity for the lifetime of the\ninstance. Use cases that validate multiple workspaces MUST receive one instance per\nworkspace (or an equivalent workspace-keyed registry resolved by composition)."
+      ]
+    },
+    {
+      "requirement": "SpecRepository injected at construction",
+      "rules": [
+        "Because this port owns the ValidateSpecs freshness cascade, each instance MUST receive\nthe workspace `SpecRepository` (same workspace identity) at **construction time** via\ncomposition. The repository MUST NOT be passed on every `lookup` / `upsert` call.\n\nConstruction contract:\n\n- The abstract port (or its concrete adapters) MUST accept `SpecRepository` as a\n  constructor dependency (directly or via a narrow deps object that includes it).\n- The injected repository's `workspace()` MUST match the cache instance's workspace.\n- Adapters MAY also receive storage/path deps (e.g. `configPath`) in the same\n  constructor; those remain infrastructure concerns.\n- `lookup` / `upsert` method signatures MUST NOT take a `SpecRepository` parameter.\n\nThe injected repository is how the cache loads cheap `Spec` stamps (`get()`), computes\n`specFingerprint()`, and hashes raw metadata bytes for `cacheFingerprint`. The cache\nMUST NOT invent SpecRepository stamp helpers (`validationSourceStamps`,\n`readValidationSidecar`); it MUST use the contractual repository APIs above."
+      ]
+    },
+    {
+      "requirement": "Cached entry payload",
+      "rules": [
+        "A cached entry MUST be a `SpecValidationEntry` (or an equivalent structural alias):\n\n- `spec` — qualified label `workspace:capabilityPath`\n- `passed` — `true` when `failures` is empty\n- `failures` — array of validation failure records\n- `warnings` — array of validation warning records\n\nAdapters MUST persist pass and fail outcomes alike. Omitting failures or warnings from a\ncompleted validation MUST NOT be permitted."
+      ]
+    },
+    {
+      "requirement": "Bucket validity inputs",
+      "rules": [
+        "Before serving any row, adapters MUST evaluate bucket-level validity using:\n\n- `schemaFingerprint` — opaque string identifying the active schema validation surface\n- `engineVersion` — non-negative integer identifying the evaluation engine revision\n- an invalidation flag equivalent to list-index `isInvalidated`\n\nWhen bucket validity fails, every lookup for that workspace MUST miss until the bucket is\nrebuilt or rewritten with matching validity inputs.\n\n`schemaFingerprint` and `engineVersion` are supplied by `ValidateSpecs` / composition for\nthe active schema and evaluation engine. Their construction rules for ValidateSpecs live\nin [`core:validate-specs`](../validate-specs/spec.md)."
+      ]
+    },
+    {
+      "requirement": "Stored freshness fields",
+      "rules": [
+        "Each stored row MUST retain:\n\n- stamps derived from `Spec` via `get()` — `SpecArtifactEntry.lastModified` for each\n  present artifact, `persistedStateStamp.{present,lastModified}`, and\n  `generatedMetadataStamp.{present,lastModified}`\n- `cacheFingerprint` — opaque digest computed by this port (not by ValidateSpecs)"
+      ]
+    },
+    {
+      "requirement": "cacheFingerprint canonical form",
+      "rules": [
+        "`cacheFingerprint` MUST be the content hash of sorted-key JSON with exactly:\n\n```text\n{\n  specFingerprint: <digest from SpecRepository.specFingerprint(spec)>,\n  metadataContentHash: <digest of raw metadata.json bytes> | \"__absent__\"\n}\n```\n\nRules:\n\n- `specFingerprint` MUST come from `SpecRepository.specFingerprint(spec)` (artifacts +\n  `persistedStateHash`; never includes metadata).\n- `metadataContentHash` MUST hash the **raw** generated metadata file bytes when\n  present. It MUST NOT require calling `metadata()` (no JSON parse / freshness\n  classification on this path).\n- When the metadata file is absent, `metadataContentHash` MUST be the literal\n  `\"__absent__\"`.\n- Adapters MUST NOT invent a third flat fingerprint that re-lists artifact\n  filenames + lock + metadata into one payload; composition of the two digests above\n  is the contract."
+      ]
+    },
+    {
+      "requirement": "Lookup cascade owned by the cache",
+      "rules": [
+        "`lookup` MUST own freshness evaluation for one spec. ValidateSpecs MUST NOT precompute\nstamps or fingerprints for the cascade and MUST NOT drive soft-hit persistence.\n\nFor each lookup the cache MUST:\n\n1. If bucket validity fails → return miss.\n2. Load current stamps via `SpecRepository.get()` (no artifact content reads).\n3. If stored stamps match current stamps → **hard hit**: return `{ kind: 'hit', entry }`\n   without computing `cacheFingerprint` or revalidating.\n4. If stamps differ → compute `cacheFingerprint` lazily using the canonical form in\n   this spec. If it matches the stored fingerprint → **soft hit**: persist refreshed\n   stamps without changing `cacheFingerprint` or `entry`, then return\n   `{ kind: 'hit', entry }`.\n5. Otherwise → return `{ kind: 'miss' }`."
+      ]
+    },
+    {
+      "requirement": "Lookup result shape",
+      "rules": [
+        "`lookup` MUST return only:\n\n- `{ kind: 'hit', entry: SpecValidationEntry }` — hard or soft hit\n- `{ kind: 'miss' }`\n\nSoft-hit stamp refresh MUST NOT be exposed to callers (no `refreshStamps` flag or\nequivalent)."
+      ]
+    },
+    {
+      "requirement": "Method signatures",
+      "rules": [
+        "The port MUST expose:\n\n- `workspace(): string`\n- \\`lookup(input: {\n  spec: Spec\n  schemaFingerprint: string\n  engineVersion: number\n  }): Promise<\n  | { kind: 'hit'; entry: SpecValidationEntry }\n  | { kind: 'miss' }\n- `upsert(input: {\n    entry: SpecValidationEntry\n    spec: Spec\n    schemaFingerprint: string\n    engineVersion: number\n  }): Promise<void>`\n\n`schemaFingerprint` / `engineVersion` on `lookup` are bucket-validity inputs only.\n`lookup` / `upsert` receive `Spec` so the cache knows which row to touch; freshness\nI/O (stamps, `specFingerprint`, raw metadata hash) still goes through the\n**constructor-injected** `SpecRepository`. They MUST NOT accept stamps,\n`cacheFingerprint`, `refreshStamps`, or a repository argument."
+      ]
+    },
+    {
+      "requirement": "Upsert inputs",
+      "rules": [
+        "After a full validation miss, `ValidateSpecs` MUST call `upsert` with:\n\n- `entry` — the completed `SpecValidationEntry`\n- `spec` — the `Spec` for the validated row\n- `schemaFingerprint` and `engineVersion` for bucket validity\n\nThe use case MUST NOT pass stamps or `cacheFingerprint`. The cache MUST materialize\ncurrent stamps and `cacheFingerprint` via its injected `SpecRepository` the same way\n`lookup` does, then persist the row and update bucket meta."
+      ]
+    },
+    {
+      "requirement": "Host opacity",
+      "rules": [
+        "Delivery hosts (CLI, MCP, plugins, and other adapters) MUST NOT depend on this port.\nComposition MAY wire the port into `ValidateSpecs` only. Public host APIs MUST NOT expose\ncache controls, cache paths, or cache-specific flags."
+      ]
+    },
+    {
+      "requirement": "No side-channel through SpecRepository list cache",
+      "rules": [
+        "This port MUST NOT be implemented as a hidden concern inside `SpecRepository` list/count\nindex helpers or `FsSpecIndexCache`. List-index caches remain separate from\nvalidation-result persistence. Persistence of validation outcomes MUST go through\n`ValidationResultCache` only."
+      ]
+    }
+  ],
+  "constraints": [
+    "The port lives in application/ports/ per hexagonal architecture rules.",
+    "The port contract MUST be exported from the curated @specd/core/ports public barrel\n(packages/core/src/ports.ts), consistent with other application ports.",
+    "Adapters MUST treat cache storage as runtime state, not as committed project content.",
+    "Port methods MUST NOT perform schema rule evaluation; they store and retrieve outcomes\nand evaluate freshness only.",
+    "The port is ValidateSpecs-specific; it MUST NOT be treated as a general-purpose cache\nthat is forbidden from knowing ValidateSpecs’ freshness model."
+  ],
+  "scenarios": [
+    {
+      "requirement": "Abstract port shape",
+      "name": "Port cannot be instantiated directly",
+      "when": ["code attempts to instantiate ValidationResultCache directly"],
+      "then": ["it fails because ValidationResultCache is abstract"]
+    },
+    {
+      "requirement": "Workspace-scoped instances",
+      "name": "Multi-workspace validation uses distinct cache instances",
+      "given": ["two workspaces core and cli"],
+      "when": ["composition wires ValidateSpecs"],
+      "then": [
+        "each workspace has its own ValidationResultCache instance",
+        "AND a cache write for core MUST NOT appear in the cli bucket"
+      ]
+    },
+    {
+      "requirement": "SpecRepository injected at construction",
+      "name": "Repository is a constructor dependency",
+      "given": ["composition creates a ValidationResultCache for workspace core"],
+      "when": ["the instance is constructed"],
+      "then": [
+        "it receives the core SpecRepository (or deps that include it) at",
+        "AND lookup / upsert signatures do not accept a SpecRepository argument"
+      ]
+    },
+    {
+      "requirement": "SpecRepository injected at construction",
+      "name": "Cache uses contractual SpecRepository APIs only",
+      "given": ["a wired ValidationResultCache instance"],
+      "when": ["it evaluates freshness for lookup or upsert"],
+      "then": [
+        "it loads stamps via the injected repository's get() and fingerprint pieces",
+        "AND it MUST NOT require inventing SpecRepository helpers such as\nvalidationSourceStamps or readValidationSidecar"
+      ]
+    },
+    {
+      "requirement": "Cached entry payload",
+      "name": "Failed validation is persisted with failures and warnings",
+      "given": ["a completed validation whose passed is false and that includes failures"],
+      "when": ["the outcome is upserted through the port"],
+      "then": [
+        "a subsequent hard hit returns the same failures and warnings",
+        "AND MUST NOT drop either array"
+      ]
+    },
+    {
+      "requirement": "Bucket validity inputs",
+      "name": "Schema fingerprint mismatch forces miss",
+      "given": ["a stored bucket whose schemaFingerprint differs from the current schema"],
+      "when": ["a lookup is attempted for any spec in that workspace"],
+      "then": ["the lookup misses", "AND full validation MUST run before any new upsert"]
+    },
+    {
+      "requirement": "Bucket validity inputs",
+      "name": "Engine version mismatch forces miss",
+      "given": ["a stored bucket whose engineVersion differs from the current engine version"],
+      "when": ["a lookup is attempted"],
+      "then": ["the lookup misses"]
+    },
+    {
+      "requirement": "Stored freshness fields",
+      "name": "Stored stamps cover artifacts and sidecars via Spec shape",
+      "given": ["a spec with artifact files, generated metadata, and persisted lock state"],
+      "when": ["a row is upserted"],
+      "then": [
+        "stored stamps include SpecArtifactEntry.lastModified values,",
+        "AND a cacheFingerprint is stored alongside those stamps"
+      ]
+    },
+    {
+      "requirement": "Stored freshness fields",
+      "name": "Absent sidecars are encoded explicitly",
+      "given": ["a spec that has no generated metadata and no persisted lock state"],
+      "when": ["a row is upserted"],
+      "then": [
+        "stamps and cacheFingerprint encode explicit absence for those sidecars",
+        "AND MUST NOT treat missing sidecars as identical to present empty files unless the\nadapter defines that equivalence"
+      ]
+    },
+    {
+      "requirement": "cacheFingerprint canonical form",
+      "name": "cacheFingerprint nests specFingerprint and metadata hash",
+      "given": ["a spec with known specFingerprint and raw metadata.json bytes"],
+      "when": ["cacheFingerprint is computed"],
+      "then": [
+        "it equals the content hash of sorted-key JSON",
+        "AND it MUST NOT re-flatten artifact filenames + lock + metadata into one payload"
+      ]
+    },
+    {
+      "requirement": "cacheFingerprint canonical form",
+      "name": "Absent metadata uses absent sentinel",
+      "given": ["a spec with no generated metadata file"],
+      "when": ["cacheFingerprint is computed"],
+      "then": ["metadataContentHash is the literal \"__absent__\""]
+    },
+    {
+      "requirement": "cacheFingerprint canonical form",
+      "name": "Metadata content change changes cacheFingerprint only",
+      "given": [
+        "unchanged authored artifacts and persisted lock state",
+        "AND a change to raw metadata.json bytes"
+      ],
+      "when": ["specFingerprint and cacheFingerprint are recomputed"],
+      "then": ["specFingerprint is unchanged", "AND cacheFingerprint differs"]
+    },
+    {
+      "requirement": "Lookup cascade owned by the cache",
+      "name": "Matching stamps produce a hard hit",
+      "given": ["a stored row whose stamps match current get() stamps and whose bucket is"],
+      "when": ["a lookup runs"],
+      "then": [
+        "the result is { kind: 'hit', entry }",
+        "AND cacheFingerprint is not recomputed as a requirement of the hit path"
+      ]
+    },
+    {
+      "requirement": "Lookup cascade owned by the cache",
+      "name": "Soft hit refreshes stamps inside the cache",
+      "given": ["a stored row whose stamps differ but whose cacheFingerprint still matches"],
+      "when": ["a lookup runs"],
+      "then": [
+        "the result is { kind: 'hit', entry }",
+        "AND the cache persists refreshed stamps without changing cacheFingerprint or\nentry",
+        "AND the caller does not receive a soft-hit / refresh protocol flag"
+      ]
+    },
+    {
+      "requirement": "Lookup cascade owned by the cache",
+      "name": "Fingerprint miss requires full validation upsert",
+      "given": ["a stored row whose stamps and cacheFingerprint both differ from current"],
+      "when": ["a lookup runs"],
+      "then": [
+        "the result is { kind: 'miss' }",
+        "AND after full validation an upsert stores the new entry, stamps, and fingerprint"
+      ]
+    },
+    {
+      "requirement": "Lookup result shape",
+      "name": "Lookup returns only hit or miss",
+      "when": ["lookup completes for any freshness outcome"],
+      "then": [
+        "the result is exactly { kind: 'hit', entry } or { kind: 'miss' }",
+        "AND MUST NOT expose refreshStamps or equivalent soft-hit signalling"
+      ]
+    },
+    {
+      "requirement": "Method signatures",
+      "name": "lookup is hit or miss only",
+      "when": ["lookup({ spec, schemaFingerprint, engineVersion }) completes"],
+      "then": [
+        "the result is { kind: 'hit', entry } or { kind: 'miss' }",
+        "AND the call does not accept stamps, cacheFingerprint, or a repository argument"
+      ]
+    },
+    {
+      "requirement": "Method signatures",
+      "name": "upsert input is entry-centric",
+      "when": ["upsert is invoked after a miss"],
+      "then": [
+        "its input includes entry, spec, schemaFingerprint, and engineVersion",
+        "AND MUST NOT include stamps, cacheFingerprint, or SpecRepository"
+      ]
+    },
+    {
+      "requirement": "Upsert inputs",
+      "name": "Upsert materializes stamps and fingerprint itself",
+      "given": ["a cache miss for a selected spec"],
+      "when": ["full validation completes and upsert is called with entry, spec,"],
+      "then": [
+        "the cache materializes current stamps and cacheFingerprint via its",
+        "AND the use case MUST NOT pass stamps or cacheFingerprint"
+      ]
+    },
+    {
+      "requirement": "Host opacity",
+      "name": "Host APIs do not expose cache controls",
+      "when": ["delivery hosts invoke spec validation through their public commands or APIs"],
+      "then": [
+        "those surfaces MUST NOT require cache-specific flags, paths, or options",
+        "AND observable inputs and outputs match a cache-unaware caller"
+      ]
+    },
+    {
+      "requirement": "No side-channel through SpecRepository list cache",
+      "name": "SpecRepository list cache remains separate",
+      "when": ["SpecRepository.list or count runs"],
+      "then": [
+        "it MUST NOT read or write validate-specs/<workspace>/ validation-result rows",
+        "AND validation-result persistence MUST go through ValidationResultCache only"
+      ]
+    }
+  ],
+  "implementation": {
+    "files": [
+      {
+        "specId": "core:validation-result-cache-port",
+        "file": "core:src/ports.ts"
+      }
+    ],
+    "symbols": [
+      {
+        "specId": "core:validation-result-cache-port",
+        "file": "core:src/application/ports/validation-result-cache.ts",
+        "symbol": "ValidationResultCache"
+      },
+      {
+        "specId": "core:validation-result-cache-port",
+        "file": "core:src/application/ports/validation-result-cache.ts",
+        "symbol": "ValidationCacheEntry"
+      },
+      {
+        "specId": "core:validation-result-cache-port",
+        "file": "core:src/application/ports/validation-result-cache.ts",
+        "symbol": "ValidationSourceStamp"
+      },
+      {
+        "specId": "core:validation-result-cache-port",
+        "file": "core:src/application/ports/validation-result-cache.ts",
+        "symbol": "ValidationCacheLookupInput"
+      },
+      {
+        "specId": "core:validation-result-cache-port",
+        "file": "core:src/application/ports/validation-result-cache.ts",
+        "symbol": "ValidationCacheLookupResult"
+      },
+      {
+        "specId": "core:validation-result-cache-port",
+        "file": "core:src/application/ports/validation-result-cache.ts",
+        "symbol": "ValidationCacheUpsertInput"
+      },
+      {
+        "specId": "core:validation-result-cache-port",
+        "file": "core:src/application/ports/validation-result-cache.ts",
+        "symbol": "ValidationResultCache,SpecValidationEntry,ValidationCacheLookupResult"
+      },
+      {
+        "specId": "core:validation-result-cache-port",
+        "file": "core:src/infrastructure/fs/fs-validation-result-cache.ts",
+        "symbol": "FsValidationResultCache"
+      },
+      {
+        "specId": "core:validation-result-cache-port",
+        "file": "core:src/infrastructure/fs/fs-validation-result-cache.ts",
+        "symbol": "collectValidationSourceStamps"
+      },
+      {
+        "specId": "core:validation-result-cache-port",
+        "file": "core:src/infrastructure/fs/fs-validation-result-cache.ts",
+        "symbol": "ValidationIndexMeta"
+      },
+      {
+        "specId": "core:validation-result-cache-port",
+        "file": "core:src/infrastructure/fs/fs-validation-result-cache.ts",
+        "symbol": "FsValidationResultCache,stampsFromSpec,ValidationStoredStamps"
+      },
+      {
+        "specId": "core:validation-result-cache-port",
+        "file": "core:src/infrastructure/fs/fs-validation-result-cache.ts",
+        "symbol": "stampsFromSpec"
+      },
+      {
+        "specId": "core:validation-result-cache-port",
+        "file": "core:src/infrastructure/fs/fs-validation-result-cache.ts",
+        "symbol": "ValidationStoredStamps"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:49e945d53781a9e3d338c880c13f932ac3bdae9b04c7106e66d853b0596dc452",
+    "verify.md": "sha256:794ea67a5b41e81a1649c6b2e364642e7b781848996202e709964b329aac93ad"
+  },
+  "generatedBy": "core"
+}

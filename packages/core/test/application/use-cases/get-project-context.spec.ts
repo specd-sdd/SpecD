@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { makeSpec } from '../../helpers/make-spec.js'
 import {
   GetProjectContext,
   type GetProjectContextInput,
@@ -130,7 +131,7 @@ describe('GetProjectContext', () => {
     })
     const schema = makeSchema([specType])
 
-    const spec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+    const spec = makeSpec({ workspace: 'default', name: 'auth/login', filenames: ['spec.md'] })
     const repo = makeSpecRepository({
       specs: [spec],
       artifacts: { 'auth/login/spec.md': '# Auth Login' },
@@ -165,7 +166,7 @@ describe('GetProjectContext', () => {
     })
     const schema = makeSchema([specType])
 
-    const spec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+    const spec = makeSpec({ workspace: 'default', name: 'auth/login', filenames: ['spec.md'] })
     const specContent = '# Auth Login'
     const repo = makeSpecRepository({
       specs: [spec],
@@ -207,8 +208,12 @@ describe('GetProjectContext', () => {
     })
     const schema = makeSchema([specType])
 
-    const spec1 = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
-    const spec2 = new Spec('default', SpecPath.parse('billing/payments'), ['spec.md'])
+    const spec1 = makeSpec({ workspace: 'default', name: 'auth/login', filenames: ['spec.md'] })
+    const spec2 = makeSpec({
+      workspace: 'default',
+      name: 'billing/payments',
+      filenames: ['spec.md'],
+    })
     const repo = makeSpecRepository({
       specs: [spec1, spec2],
       artifacts: {
@@ -259,8 +264,8 @@ describe('GetProjectContext', () => {
       },
     })
 
-    const login = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
-    const shared = new Spec('default', SpecPath.parse('auth/shared'), ['spec.md'])
+    const login = makeSpec({ workspace: 'default', name: 'auth/login', filenames: ['spec.md'] })
+    const shared = makeSpec({ workspace: 'default', name: 'auth/shared', filenames: ['spec.md'] })
     const sharedContent = '# Shared'
     const repo = makeSpecRepository({
       specs: [login, shared],
@@ -325,8 +330,8 @@ describe('GetProjectContext', () => {
     const sharedContent = '# Shared\n'
     const repo = makeSpecRepository({
       specs: [
-        new Spec('default', SpecPath.parse('auth/login'), ['spec.md']),
-        new Spec('default', SpecPath.parse('auth/shared'), ['spec.md']),
+        makeSpec({ workspace: 'default', name: 'auth/login', filenames: ['spec.md'] }),
+        makeSpec({ workspace: 'default', name: 'auth/shared', filenames: ['spec.md'] }),
       ],
       artifacts: {
         'auth/login/spec.md': loginContent,
@@ -384,12 +389,16 @@ describe('GetProjectContext', () => {
       },
     })
 
-    const actorResolverSpec = new Spec('core', SpecPath.parse('core/actor-resolver-port'), [
-      'spec.md',
-    ])
-    const architectureSpec = new Spec('default', SpecPath.parse('_global/architecture'), [
-      'spec.md',
-    ])
+    const actorResolverSpec = makeSpec({
+      workspace: 'core',
+      name: 'core/actor-resolver-port',
+      filenames: ['spec.md'],
+    })
+    const architectureSpec = makeSpec({
+      workspace: 'default',
+      name: '_global/architecture',
+      filenames: ['spec.md'],
+    })
     const architectureContent = '# Architecture'
     const coreRepo = makeSpecRepository({
       workspace: 'core',
@@ -494,8 +503,8 @@ describe('GetProjectContext', () => {
       },
     })
 
-    const login = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
-    const shared = new Spec('default', SpecPath.parse('auth/shared'), ['spec.md'])
+    const login = makeSpec({ workspace: 'default', name: 'auth/login', filenames: ['spec.md'] })
+    const shared = makeSpec({ workspace: 'default', name: 'auth/shared', filenames: ['spec.md'] })
     const repo = makeSpecRepository({
       specs: [login, shared],
       artifacts: {
@@ -689,7 +698,7 @@ describe('GetProjectContext', () => {
       const schema = makeSchema([specType])
       const hasher = makeContentHasher()
 
-      const spec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+      const spec = makeSpec({ workspace: 'default', name: 'auth/login', filenames: ['spec.md'] })
       const repo = makeSpecRepository({
         specs: [spec],
         artifacts: {
@@ -750,7 +759,7 @@ describe('GetProjectContext', () => {
       const schema = makeSchema([specType])
       const hasher = makeContentHasher()
 
-      const spec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+      const spec = makeSpec({ workspace: 'default', name: 'auth/login', filenames: ['spec.md'] })
       const repo = makeSpecRepository({
         specs: [spec],
         artifacts: {

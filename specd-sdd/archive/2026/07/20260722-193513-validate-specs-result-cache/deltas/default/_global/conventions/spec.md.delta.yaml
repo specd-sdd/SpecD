@@ -1,0 +1,28 @@
+- op: modified
+  description: 'Lazy-loading requirement stays domain-agnostic'
+  selector:
+    type: section
+    matches: 'Requirement: Lazy loading — metadata before content'
+  content: |
+    When a collection of resources must be loaded, the initial load returns lightweight
+    metadata objects (references, identifiers, display fields) without reading file content
+    or parsing heavy structures. Full content is fetched explicitly and on demand.
+
+    This pattern applies across the codebase:
+
+    - **Repositories** — `list()` (or equivalent collection methods) return lightweight
+      metadata rows without embedded file content. Full payloads are loaded only through
+      explicit methods on the same port (for example `get()`, `artifact()`, or
+      domain-specific loaders). Domain entity shape belongs in the owning port spec, not
+      here.
+    - **`SchemaRegistry`** — `list()` returns `SchemaEntry` objects (ref, name, source)
+      without parsing `schema.yaml`; the full `Schema` is loaded via `resolve()`.
+    - **Any future collection port** — `list()` or `search()` returns a
+      reference/metadata type; a `get()` or `load()` call fetches the full resource.
+
+    The metadata type must carry enough information to be useful standalone (for display,
+    filtering, selection) and must include the reference or identifier needed to fetch the
+    full resource.
+
+    Content is never pre-loaded speculatively. If a use case needs the full resource, it
+    calls the explicit load method.

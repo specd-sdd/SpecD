@@ -9,11 +9,39 @@
     "core:storage",
     "core:workspace",
     "core:spec-id-format",
-    "core:composition-resolver"
+    "core:composition-resolver",
+    "core:validation-result-cache-port",
+    "core:spec-lock",
+    "core:spec-repository-port"
   ],
   "implementation": [
     {
-      "file": "core:src/composition/use-cases/validate-specs.ts"
+      "file": "core:src/application/use-cases/_shared/validate-specs-cache-fingerprints.ts",
+      "symbols": [
+        "VALIDATE_SPECS_ENGINE_VERSION",
+        "computeSchemaFingerprint",
+        "computeInputFingerprint",
+        "computeSchemaFingerprintFromSchema",
+        "computeCacheFingerprint,VALIDATE_SPECS_ENGINE_VERSION"
+      ]
+    },
+    {
+      "file": "core:src/application/use-cases/validate-specs.ts",
+      "symbols": ["ValidateSpecs"]
+    },
+    {
+      "file": "core:src/composition/use-cases/validate-specs.ts",
+      "symbols": [
+        "ValidateSpecsDeps",
+        "resolveValidateSpecsDeps",
+        "createValidateSpecs",
+        "createValidateSpecsFromNormalized",
+        "isValidateSpecsDeps"
+      ]
+    },
+    {
+      "file": "core:src/composition/composition-resolver.ts",
+      "symbols": ["getValidationResultCaches"]
     }
   ]
 }

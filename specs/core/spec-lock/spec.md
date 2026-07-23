@@ -57,6 +57,16 @@ Archive-time materialization MUST:
 
 `metadata.json` MAY project or cache this information for faster consumption, but metadata regeneration MUST NOT invent, mutate, or delete implementation links independently of the sidecar.
 
+### Requirement: Repository hash of persisted lock state
+
+The SHA-256 of the durable lock sidecar bytes MUST be the value returned by
+`SpecRepository.persistedStateHash(spec)` (formerly named `specHash`). Application
+callers MUST obtain that digest only through the repository port — not by reading
+`spec-lock.json` directly.
+
+Presence and last-modified of the lock sidecar for cheap freshness MUST surface on
+`Spec.persistedStateStamp` from `get()`, not as schema artifact filenames.
+
 ## Constraints
 
 - `spec-lock.json` MUST be valid JSON.
@@ -75,8 +85,10 @@ Archive-time materialization MUST:
 
 As a consequence:
 
-- it MUST NOT appear in `Spec.filenames`
+- it MUST NOT appear in `Spec.artifacts`
 - it MUST NOT be accepted by the generic `SpecRepository.artifact()` / `save()` API
 - it is read and written only through the repository's persisted-state semantic operations
 
-This keeps the schema artifact surface stable across single-file and multi-file spec schemas while still allowing persisted dependency and implementation state to exist next to canonical spec artifacts.
+This keeps the schema artifact surface stable across single-file and multi-file spec
+schemas while still allowing persisted dependency and implementation state to exist
+next to canonical spec artifacts.

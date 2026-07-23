@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'No verify-text change; Spec.filenames call-site migration is covered by core:spec-repository-port'

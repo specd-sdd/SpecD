@@ -7,7 +7,10 @@
     "core:storage",
     "core:workspace",
     "core:spec-id-format",
-    "core:composition-resolver"
+    "core:composition-resolver",
+    "core:validation-result-cache-port",
+    "core:spec-lock",
+    "core:spec-repository-port"
   ],
   "context": [
     "Spec artifacts can drift from the schema's structural expectations over time, and there is no other mechanism to catch these violations before they cause downstream failures. The `ValidateSpecs` use case validates spec artifacts against the active schema's structural rules, supporting three scoping modes: a single spec by qualified path, all specs in a workspace, or all specs across all workspaces. Only spec-scoped artifact types from the schema are validated; change-scoped artifacts are excluded."
@@ -74,9 +77,15 @@
       ]
     },
     {
+      "requirement": "Transparent validation result cache",
+      "rules": [
+        "`ValidateSpecs` MUST use a workspace `ValidationResultCache` for each selected spec\nbefore running full per-spec validation, and MUST upsert after a completed full\nvalidation on cache miss.\n\nBehaviour:\n\n1. Compute the active `schemaFingerprint` and `engineVersion` for the resolved schema\n   and evaluation engine (see fingerprint rules below).\n2. For each selected spec, call cache `lookup({ spec, schemaFingerprint, engineVersion })`.\n   The cache owns the freshness cascade (via its constructor-injected\n   `SpecRepository`) defined by\n   [`core:validation-result-cache-port`](../validation-result-cache-port/spec.md).\n3. On hit, use the returned `SpecValidationEntry` as the outcome for that spec\n   without re-running artifact parse, local rules, cross-artifact rules, or\n   metadata consistency checks.\n4. On miss, perform the existing full per-spec validation path, then\n   `upsert({ entry, spec, schemaFingerprint, engineVersion })` only — not stamps\n   or fingerprints.\n\n`ValidateSpecs` MUST NOT precompute cache stamps or `cacheFingerprint`, and MUST NOT\nimplement soft-hit stamp refresh. Soft-hit persistence is invisible to this use case.\n\nBucket fingerprint inputs (supplied by ValidateSpecs / composition):\n\n- `schemaFingerprint` MUST cover schema identity plus all `scope: 'spec'` artifact\n  validations and `scope: 'spec'` cross-artifact rules, and MUST reflect whether\n  `metadataExtraction.dependsOn` is declared.\n- `engineVersion` MUST change when evaluation logic changes independently of schema\n  YAML.\n\nHost opacity: `ValidateSpecs` MUST remain the only consumer of the cache port for this\nbehaviour. Delivery hosts MUST observe identical public inputs and outputs whether a\ncache hit or miss occurred.\n\nComposition vs direct construction:\n\n- When `validationResultCaches` has no entry for the target workspace, `ValidateSpecs`\n  MUST skip cache lookup and upsert and perform full validation. This degraded path\n  exists for unit tests and direct `new ValidateSpecs(...)` construction only.\n- `resolveValidateSpecsDeps` and config-based `createValidateSpecs` MUST register one\n  `ValidationResultCache` per configured workspace so CLI and kernel paths never hit\n  the skip path during normal operation."
+      ]
+    },
+    {
       "requirement": "Config-based factory delegates through resolveValidateSpecsDeps",
       "rules": [
-        "The config-based `createValidateSpecs(config, options?)` form MUST derive `ValidateSpecsDeps` through `resolveValidateSpecsDeps(resolver)` and then delegate to canonical `createValidateSpecs(deps)`.\n\n`resolveValidateSpecsDeps(resolver)` MUST resolve:\n\n- `specs: ReadonlyMap<string, SpecRepository>`\n- `schemaProvider: SchemaProvider`\n- `parsers: ArtifactParserRegistry`\n- `hasher?: ContentHasher`\n- `extractorTransforms: ExtractorTransformRegistry`\n- `workspaceRoutes: readonly SpecWorkspaceRoute[]`\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
+        "The config-based `createValidateSpecs(config, options?)` form MUST derive\n`ValidateSpecsDeps` through `resolveValidateSpecsDeps(resolver)` and then delegate to\ncanonical `createValidateSpecs(deps)`.\n\n`resolveValidateSpecsDeps(resolver)` MUST resolve:\n\n- `specs: ReadonlyMap<string, SpecRepository>`\n- `schemaProvider: SchemaProvider`\n- `parsers: ArtifactParserRegistry`\n- `contentHasher: ContentHasher`\n- `extractorTransforms: ExtractorTransformRegistry`\n- `workspaceRoutes: readonly SpecWorkspaceRoute[]`\n- `validationResultCaches: ReadonlyMap<string, ValidationResultCache>` (one port\n  instance per workspace, wired with that workspace's `SpecRepository`)\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap.\nThe factory MUST NOT reconstruct fs-shaped wiring inline, including filesystem paths\nfor the validation result cache."
       ]
     }
   ],
@@ -294,6 +303,74 @@
       "then": ["no dependency-projection failure is recorded for that check"]
     },
     {
+      "requirement": "Transparent validation result cache",
+      "name": "Hard hit skips full validation work",
+      "given": ["a valid cache row for a spec whose stamps still match"],
+      "when": ["ValidateSpecs validates that spec via"],
+      "then": [
+        "the cached SpecValidationEntry is returned for that spec",
+        "AND artifact parse, rule evaluation, cross-artifact evaluation, and metadata\nconsistency checks are not re-run for that spec"
+      ]
+    },
+    {
+      "requirement": "Transparent validation result cache",
+      "name": "Soft hit is invisible to ValidateSpecs",
+      "given": ["a cache row whose stamps changed but whose cacheFingerprint still matches"],
+      "when": ["ValidateSpecs validates that spec"],
+      "then": [
+        "the result is a hit with the cached entry",
+        "AND ValidateSpecs does not receive a soft-hit / refreshStamps signal",
+        "AND full validation is not re-run"
+      ]
+    },
+    {
+      "requirement": "Transparent validation result cache",
+      "name": "Miss runs full validation and upserts including failures",
+      "given": ["no usable cache row for a spec (bucket invalid, stamp+fingerprint miss, or"],
+      "when": ["ValidateSpecs validates that spec and records failures and warnings"],
+      "then": [
+        "the full validation path runs",
+        "AND upsert({ entry, spec, schemaFingerprint, engineVersion }) is called",
+        "AND ValidateSpecs does not pass stamps or cacheFingerprint"
+      ]
+    },
+    {
+      "requirement": "Transparent validation result cache",
+      "name": "Lock content change forces miss via cacheFingerprint",
+      "given": ["two otherwise identical specs whose persisted lock sidecar contents differ"],
+      "when": ["each is validated after an initial cached pass"],
+      "then": ["the second validation cannot hard/soft-hit on the first row's fingerprint"]
+    },
+    {
+      "requirement": "Transparent validation result cache",
+      "name": "Hosts observe identical public behaviour on hit or miss",
+      "when": ["a host invokes validation with the same public inputs"],
+      "then": [
+        "returned ValidateSpecsResult shape and fields are unchanged by whether a",
+        "AND the host is not required to pass cache-specific options"
+      ]
+    },
+    {
+      "requirement": "Transparent validation result cache",
+      "name": "resolveValidateSpecsDeps wires caches with SpecRepository",
+      "when": ["resolveValidateSpecsDeps(resolver) runs for config-based"],
+      "then": [
+        "the resolved deps include",
+        "AND each cache instance is constructed with that workspace's SpecRepository",
+        "AND the factory does not construct filesystem validate-cache paths inline"
+      ]
+    },
+    {
+      "requirement": "Transparent validation result cache",
+      "name": "Composition registers a cache for every configured workspace",
+      "given": ["a project with multiple configured workspaces"],
+      "when": ["resolveValidateSpecsDeps(resolver) runs"],
+      "then": [
+        "validationResultCaches contains one entry per workspace name",
+        "AND validating any spec through config-based createValidateSpecs consults\nthe cache for that spec's workspace"
+      ]
+    },
+    {
       "requirement": "Config-based factory delegates through resolveValidateSpecsDeps",
       "name": "createValidateSpecs config form derives ValidateSpecsDeps through resolveValidateSpecsDeps",
       "when": ["createValidateSpecs(config, options?) is invoked"],
@@ -306,16 +383,72 @@
     }
   ],
   "implementation": {
-    "files": [
+    "symbols": [
       {
         "specId": "core:validate-specs",
-        "file": "core:src/composition/use-cases/validate-specs.ts"
+        "file": "core:src/application/use-cases/_shared/validate-specs-cache-fingerprints.ts",
+        "symbol": "VALIDATE_SPECS_ENGINE_VERSION"
+      },
+      {
+        "specId": "core:validate-specs",
+        "file": "core:src/application/use-cases/_shared/validate-specs-cache-fingerprints.ts",
+        "symbol": "computeSchemaFingerprint"
+      },
+      {
+        "specId": "core:validate-specs",
+        "file": "core:src/application/use-cases/_shared/validate-specs-cache-fingerprints.ts",
+        "symbol": "computeInputFingerprint"
+      },
+      {
+        "specId": "core:validate-specs",
+        "file": "core:src/application/use-cases/_shared/validate-specs-cache-fingerprints.ts",
+        "symbol": "computeSchemaFingerprintFromSchema"
+      },
+      {
+        "specId": "core:validate-specs",
+        "file": "core:src/application/use-cases/_shared/validate-specs-cache-fingerprints.ts",
+        "symbol": "computeCacheFingerprint,VALIDATE_SPECS_ENGINE_VERSION"
+      },
+      {
+        "specId": "core:validate-specs",
+        "file": "core:src/application/use-cases/validate-specs.ts",
+        "symbol": "ValidateSpecs"
+      },
+      {
+        "specId": "core:validate-specs",
+        "file": "core:src/composition/use-cases/validate-specs.ts",
+        "symbol": "ValidateSpecsDeps"
+      },
+      {
+        "specId": "core:validate-specs",
+        "file": "core:src/composition/use-cases/validate-specs.ts",
+        "symbol": "resolveValidateSpecsDeps"
+      },
+      {
+        "specId": "core:validate-specs",
+        "file": "core:src/composition/use-cases/validate-specs.ts",
+        "symbol": "createValidateSpecs"
+      },
+      {
+        "specId": "core:validate-specs",
+        "file": "core:src/composition/use-cases/validate-specs.ts",
+        "symbol": "createValidateSpecsFromNormalized"
+      },
+      {
+        "specId": "core:validate-specs",
+        "file": "core:src/composition/use-cases/validate-specs.ts",
+        "symbol": "isValidateSpecsDeps"
+      },
+      {
+        "specId": "core:validate-specs",
+        "file": "core:src/composition/composition-resolver.ts",
+        "symbol": "getValidationResultCaches"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:c1d89aaa38003ad89430a507c44bc8276e85da378d92ff1c06c8d735c4dc5553",
-    "verify.md": "sha256:e5ad18afae1212419c01b41f999b0eb80708c03a12039c49df01ba5252da55c7"
+    "spec.md": "sha256:393321257209fe240f2e3da4816a24c8e05b16293b36e4cc2c58fc5ce3f3d531",
+    "verify.md": "sha256:22ebc132714fa9e23e3b35ac60301b68fcb0cfdc8b32d7059fd1c8c1c6eeeae6"
   },
   "generatedBy": "core"
 }

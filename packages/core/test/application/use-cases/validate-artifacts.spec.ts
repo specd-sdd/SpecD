@@ -1,5 +1,6 @@
 import { createHash } from 'crypto'
 import { describe, it, expect, vi } from 'vitest'
+import { makeSpec } from '../../helpers/make-spec.js'
 import { ValidateArtifacts } from '../../../src/application/use-cases/validate-artifacts.js'
 import { ChangeNotFoundError } from '../../../src/application/errors/change-not-found-error.js'
 import { SchemaNotFoundError } from '../../../src/application/errors/schema-not-found-error.js'
@@ -1173,7 +1174,7 @@ describe('ValidateArtifacts', () => {
       })
 
       const specsRepo = makeSpecRepository({
-        specs: [new Spec('default', SpecPath.parse('auth'), ['spec.md'])],
+        specs: [makeSpec({ workspace: 'default', name: 'auth', filenames: ['spec.md'] })],
         artifacts: { 'auth/spec.md': 'base content' },
       })
 
@@ -1252,7 +1253,7 @@ describe('ValidateArtifacts', () => {
       })
 
       const specsRepo = makeSpecRepository({
-        specs: [new Spec('default', SpecPath.parse('auth'), [])],
+        specs: [makeSpec({ workspace: 'default', name: 'auth', filenames: [] })],
         artifacts: { 'auth/spec.md': 'base content' },
       })
 
@@ -1408,7 +1409,7 @@ describe('ValidateArtifacts', () => {
             [
               'default',
               makeSpecRepository({
-                specs: [new Spec('default', SpecPath.parse('auth'), ['spec.md'])],
+                specs: [makeSpec({ workspace: 'default', name: 'auth', filenames: ['spec.md'] })],
               }),
             ],
           ]),
@@ -1463,7 +1464,7 @@ describe('ValidateArtifacts', () => {
 
       // Create a spec repo that would fail if accessed (proving no base spec is loaded)
       const specRepo = makeSpecRepository({
-        specs: [new Spec('default', SpecPath.parse('auth'), ['spec.md'])],
+        specs: [makeSpec({ workspace: 'default', name: 'auth', filenames: ['spec.md'] })],
       })
       const specRepoSpy = vi.spyOn(specRepo, 'get')
 
@@ -1529,7 +1530,7 @@ describe('ValidateArtifacts', () => {
             [
               'default',
               makeSpecRepository({
-                specs: [new Spec('default', SpecPath.parse('auth'), ['spec.md'])],
+                specs: [makeSpec({ workspace: 'default', name: 'auth', filenames: ['spec.md'] })],
               }),
             ],
           ]),
@@ -1589,7 +1590,7 @@ describe('ValidateArtifacts', () => {
             [
               'default',
               makeSpecRepository({
-                specs: [new Spec('default', SpecPath.parse('auth'), ['spec.md'])],
+                specs: [makeSpec({ workspace: 'default', name: 'auth', filenames: ['spec.md'] })],
               }),
             ],
           ]),
@@ -2318,7 +2319,9 @@ describe('ValidateArtifacts', () => {
 
       const coreRepo = makeSpecRepository({
         workspace: 'core',
-        specs: [new Spec('core', SpecPath.parse('core/actor-resolver-port'), ['spec.md'])],
+        specs: [
+          makeSpec({ workspace: 'core', name: 'core/actor-resolver-port', filenames: ['spec.md'] }),
+        ],
         resolveFromPath: async (inputPath) => {
           if (inputPath !== '../../_global/architecture/spec.md') return null
           return { crossWorkspaceHint: ['_global', 'architecture'] }
@@ -2326,7 +2329,9 @@ describe('ValidateArtifacts', () => {
       })
       const defaultRepo = makeSpecRepository({
         workspace: 'default',
-        specs: [new Spec('default', SpecPath.parse('_global/architecture'), ['spec.md'])],
+        specs: [
+          makeSpec({ workspace: 'default', name: '_global/architecture', filenames: ['spec.md'] }),
+        ],
       })
 
       const markdownParser = makeParser({
@@ -2437,8 +2442,8 @@ describe('ValidateArtifacts', () => {
 
       const specRepo = makeSpecRepository({
         specs: [
-          new Spec('default', SpecPath.parse('auth/login'), ['spec.md']),
-          new Spec('default', SpecPath.parse('auth/shared'), ['spec.md']),
+          makeSpec({ workspace: 'default', name: 'auth/login', filenames: ['spec.md'] }),
+          makeSpec({ workspace: 'default', name: 'auth/shared', filenames: ['spec.md'] }),
         ],
         artifacts: {
           'auth/login/spec-lock.json': JSON.stringify({
@@ -3330,7 +3335,7 @@ describe('ValidateArtifacts', () => {
         })
 
         const specRepo = makeSpecRepository({
-          specs: [new Spec('default', SpecPath.parse('auth'), [])],
+          specs: [makeSpec({ workspace: 'default', name: 'auth', filenames: [] })],
           artifacts: {
             'auth/spec.md': baseSpecContent,
             'auth/verify.md': baseVerifyContent,

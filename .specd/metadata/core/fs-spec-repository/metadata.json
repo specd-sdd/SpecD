@@ -32,7 +32,19 @@
     {
       "requirement": "SpecListEntry materialization in index",
       "rules": [
-        "When building or refreshing index rows, `FsSpecIndexCache` MUST materialize the full CLI-usable `SpecListEntry` payload:\n\n- **Always:** `workspace`, `path`, `title` — title resolution order: (1) non-empty trimmed metadata `title`; (2) last segment of `path`.\n- **Stored for projection:** `summary` and `metadataStatus` using the same resolution rules as [`core:spec-repository-port`](../spec-repository-port/spec.md) / [`core:list-specs`](../list-specs/spec.md).\n\nErrors while resolving title, summary, or status for an individual spec MUST be swallowed; the entry still appears with title fallback.\n\nPort `includeSummary` / `includeMetadataStatus` flags MUST project cached fields only — no extra file reads at list time.\n\nSpec create/delete/publish and content/metadata/lock changes that affect cached fields MUST refresh via upsert or bucket invalidation according to helper rules."
+        "When building or refreshing index rows, `FsSpecIndexCache` MUST materialize the full\nCLI-usable `SpecListEntry` payload:\n\n- **Always:** `workspace`, `path`, `title` — title resolution order: (1) non-empty\n  trimmed metadata `title`; (2) last segment of `path`.\n- **Stored for projection:** `summary` and `metadataStatus` using the same resolution\n  rules as [`core:spec-repository-port`](../spec-repository-port/spec.md) /\n  [`core:list-specs`](../list-specs/spec.md).\n\nWhen inspecting whether `spec.md` exists for summary fallback, implementations MUST\nuse `Spec.artifacts` (presence of an entry whose `filename` is `spec.md`).\n\nErrors while resolving title, summary, or status for an individual spec MUST be\nswallowed; the entry still appears with title fallback.\n\nPort `includeSummary` / `includeMetadataStatus` flags MUST project cached fields only —\nno extra file reads at list time.\n\nSpec create/delete/publish and content/metadata/lock changes that affect cached fields\nMUST refresh via upsert or bucket invalidation according to helper rules."
+      ]
+    },
+    {
+      "requirement": "Spec stamp population on get",
+      "rules": [
+        "`FsSpecRepository.get()` MUST populate the contractual `Spec` stamp fields using\nfilesystem metadata without reading artifact contents:\n\n- For each allowed schema artifact file present in the spec directory, emit a\n  `SpecArtifactEntry` with `filename` and `lastModified` from `stat` (ISO-8601 from\n  `mtime`, consistent within the FS adapter family).\n- Set `persistedStateStamp` from the lock sidecar path: `present` / `lastModified` via\n  `stat`, or `present: false` and `lastModified: null` when absent.\n- Set `generatedMetadataStamp` from the configured metadata file path the same way.\n\n`get` MUST NOT read file contents to build these stamps. Content reads remain the\nresponsibility of `artifact()`, `metadata()`, `persistedStateHash()`, and\n`specFingerprint()`."
+      ]
+    },
+    {
+      "requirement": "persistedStateHash and specFingerprint on FS",
+      "rules": [
+        "`FsSpecRepository` MUST implement:\n\n- `persistedStateHash(spec)` as the SHA-256 of the raw lock sidecar bytes, or `null`\n  when the sidecar is absent (formerly exposed as `specHash`).\n- `specFingerprint(spec)` per\n  [`core:spec-repository-port`](../spec-repository-port/spec.md): per-artifact content\n  hashes bound to filenames, ordered by filename alphabetically, combined with\n  `persistedStateHash` or an absent sentinel, then hashed. Generated metadata MUST NOT\n  be included.\n\nThe repository MUST NOT own or write\n`{configPath}/tmp/fs-cache/validate-specs/<workspace>/` rows; that bucket belongs to\nthe `ValidationResultCache` filesystem adapter."
       ]
     }
   ],
@@ -145,25 +157,62 @@
         "returned items omit summary and metadataStatus",
         "AND no supplementary metadata or spec.md reads occur at list time"
       ]
+    },
+    {
+      "requirement": "Spec stamp population on get",
+      "name": "get populates artifact and sidecar stamps without content reads",
+      "given": ["a spec directory with spec.md, a lock sidecar, and generated metadata"],
+      "when": ["FsSpecRepository.get() is called"],
+      "then": [
+        "Spec.artifacts includes spec.md with a lastModified stamp",
+        "AND persistedStateStamp.present and generatedMetadataStamp.present are true",
+        "AND artifact file contents are not read to build those stamps"
+      ]
+    },
+    {
+      "requirement": "Spec stamp population on get",
+      "name": "get exposes derived filenames for artifact presence",
+      "given": ["a spec with only spec.md present"],
+      "when": ["get() returns the Spec"],
+      "then": ["Spec.filenames includes spec.md", "AND Spec.hasArtifact('spec.md') is true"]
+    },
+    {
+      "requirement": "persistedStateHash and specFingerprint on FS",
+      "name": "persistedStateHash hashes lock bytes",
+      "given": ["a lock sidecar with known content"],
+      "when": ["persistedStateHash(spec) is called"],
+      "then": ["the digest equals SHA-256 of those bytes"]
+    },
+    {
+      "requirement": "persistedStateHash and specFingerprint on FS",
+      "name": "specFingerprint excludes generated metadata",
+      "given": ["a spec whose artifact contents and lock state are unchanged while"],
+      "when": ["specFingerprint(spec) is computed before and after the metadata change"],
+      "then": ["both digests are equal"]
     }
   ],
   "implementation": {
     "symbols": [
       {
         "specId": "core:fs-spec-repository",
-        "file": "core:src/infrastructure/fs/fs-index-cache-base.ts",
-        "symbol": "FsIndexCache"
+        "file": "core:src/infrastructure/fs/spec-repository.ts",
+        "symbol": "FsSpecRepository,persistedStateHash,specFingerprint,_buildSpec"
       },
       {
         "specId": "core:fs-spec-repository",
-        "file": "core:src/infrastructure/fs/fs-index-cache-base.ts",
-        "symbol": "_ensureFresh"
+        "file": "core:src/infrastructure/fs/spec-repository.ts",
+        "symbol": "specFingerprint"
+      },
+      {
+        "specId": "core:fs-spec-repository",
+        "file": "core:src/infrastructure/fs/spec-repository.ts",
+        "symbol": "persistedStateHash"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:e92150dbcf7ebc4157b6aaedf3b95ae7bab7439ac4f8bbd027fb085ec8112a39",
-    "verify.md": "sha256:5eea4d481a0ca21fe647946a22986eb0f450c0dd0bbe9fe94dc9a1f9560de51d"
+    "spec.md": "sha256:2ba4ba9c1d8c809e9955dc46dea454e070aa6a5135c23626e3fc6e0d27a453ce",
+    "verify.md": "sha256:f06427d1c7092543a33145e3a1390d3f9111c83365e325a407d585b2ee38cf27"
   },
   "generatedBy": "core"
 }

@@ -96,20 +96,71 @@ Validation rules:
 
 These checks validate canonical metadata as a cache of persisted spec semantics without treating `spec-lock.json` as a normal schema artifact.
 
+### Requirement: Transparent validation result cache
+
+`ValidateSpecs` MUST use a workspace `ValidationResultCache` for each selected spec
+before running full per-spec validation, and MUST upsert after a completed full
+validation on cache miss.
+
+Behaviour:
+
+1. Compute the active `schemaFingerprint` and `engineVersion` for the resolved schema
+   and evaluation engine (see fingerprint rules below).
+2. For each selected spec, call cache `lookup({ spec, schemaFingerprint, engineVersion })`.
+   The cache owns the freshness cascade (via its constructor-injected
+   `SpecRepository`) defined by
+   [`core:validation-result-cache-port`](../validation-result-cache-port/spec.md).
+3. On hit, use the returned `SpecValidationEntry` as the outcome for that spec
+   without re-running artifact parse, local rules, cross-artifact rules, or
+   metadata consistency checks.
+4. On miss, perform the existing full per-spec validation path, then
+   `upsert({ entry, spec, schemaFingerprint, engineVersion })` only — not stamps
+   or fingerprints.
+
+`ValidateSpecs` MUST NOT precompute cache stamps or `cacheFingerprint`, and MUST NOT
+implement soft-hit stamp refresh. Soft-hit persistence is invisible to this use case.
+
+Bucket fingerprint inputs (supplied by ValidateSpecs / composition):
+
+- `schemaFingerprint` MUST cover schema identity plus all `scope: 'spec'` artifact
+  validations and `scope: 'spec'` cross-artifact rules, and MUST reflect whether
+  `metadataExtraction.dependsOn` is declared.
+- `engineVersion` MUST change when evaluation logic changes independently of schema
+  YAML.
+
+Host opacity: `ValidateSpecs` MUST remain the only consumer of the cache port for this
+behaviour. Delivery hosts MUST observe identical public inputs and outputs whether a
+cache hit or miss occurred.
+
+Composition vs direct construction:
+
+- When `validationResultCaches` has no entry for the target workspace, `ValidateSpecs`
+  MUST skip cache lookup and upsert and perform full validation. This degraded path
+  exists for unit tests and direct `new ValidateSpecs(...)` construction only.
+- `resolveValidateSpecsDeps` and config-based `createValidateSpecs` MUST register one
+  `ValidationResultCache` per configured workspace so CLI and kernel paths never hit
+  the skip path during normal operation.
+
 ### Requirement: Config-based factory delegates through resolveValidateSpecsDeps
 
-The config-based `createValidateSpecs(config, options?)` form MUST derive `ValidateSpecsDeps` through `resolveValidateSpecsDeps(resolver)` and then delegate to canonical `createValidateSpecs(deps)`.
+The config-based `createValidateSpecs(config, options?)` form MUST derive
+`ValidateSpecsDeps` through `resolveValidateSpecsDeps(resolver)` and then delegate to
+canonical `createValidateSpecs(deps)`.
 
 `resolveValidateSpecsDeps(resolver)` MUST resolve:
 
 - `specs: ReadonlyMap<string, SpecRepository>`
 - `schemaProvider: SchemaProvider`
 - `parsers: ArtifactParserRegistry`
-- `hasher?: ContentHasher`
+- `contentHasher: ContentHasher`
 - `extractorTransforms: ExtractorTransformRegistry`
 - `workspaceRoutes: readonly SpecWorkspaceRoute[]`
+- `validationResultCaches: ReadonlyMap<string, ValidationResultCache>` (one port
+  instance per workspace, wired with that workspace's `SpecRepository`)
 
-The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+The helper is the only use-case-specific composition entry for config-based bootstrap.
+The factory MUST NOT reconstruct fs-shaped wiring inline, including filesystem paths
+for the validation result cache.
 
 ## Constraints
 
@@ -126,3 +177,6 @@ The helper is the only use-case-specific composition entry for config-based boot
 - [`core:workspace`](../workspace/spec.md)
 - [`core:spec-id-format`](../spec-id-format/spec.md)
 - [`core:composition-resolver`](../composition-resolver/spec.md)
+- [`core:validation-result-cache-port`](../validation-result-cache-port/spec.md) — transparent result memoization
+- [`core:spec-repository-port`](../spec-repository-port/spec.md) — Spec stamps and fingerprint APIs used by the cache
+- [`core:spec-lock`](../spec-lock/spec.md) — persisted semantic state contributes to freshness

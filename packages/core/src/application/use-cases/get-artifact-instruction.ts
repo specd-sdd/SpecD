@@ -8,7 +8,7 @@ import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
 import { SchemaMismatchError } from '../errors/schema-mismatch-error.js'
 import { ArtifactNotFoundError } from '../errors/artifact-not-found-error.js'
 import { ParserNotRegisteredError } from '../errors/parser-not-registered-error.js'
-import { Spec } from '../../domain/entities/spec.js'
+import { Spec, ABSENT_SPEC_SIDECAR } from '../../domain/entities/spec.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
 import { parseSpecId } from '../../domain/services/parse-spec-id.js'
 import { inferFormat } from '../../domain/services/format-inference.js'
@@ -163,7 +163,13 @@ export class GetArtifactInstruction {
         const specRepo = this._specs.get(specWorkspace)
         if (specRepo === undefined) continue
 
-        const spec = new Spec(specWorkspace, SpecPath.parse(capPath), [])
+        const spec = new Spec(
+          specWorkspace,
+          SpecPath.parse(capPath),
+          [],
+          ABSENT_SPEC_SIDECAR,
+          ABSENT_SPEC_SIDECAR,
+        )
         const artifact = await specRepo.artifact(spec, outputBasename)
         if (artifact === null) continue
         availableOutlines.push(specId)

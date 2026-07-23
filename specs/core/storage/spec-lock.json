@@ -11,8 +11,8 @@
   ],
   "implementation": [
     {
-      "file": "core:src/infrastructure/fs/archive-repository.ts",
-      "symbols": ["FsArchiveRepository"]
+      "file": "core:src/infrastructure/fs/fs-validation-result-cache.ts",
+      "symbols": ["FsValidationResultCache"]
     }
   ]
 }

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
+import { makeSpec } from '../../helpers/make-spec.js'
 import { SearchSpecs } from '../../../src/application/use-cases/search-specs.js'
 import { Spec } from '../../../src/domain/entities/spec.js'
 import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
@@ -17,16 +18,24 @@ function makeYamlSerializer(): YamlSerializer {
 describe('SearchSpecs', () => {
   it('returns results across all workspaces', async () => {
     const repoA = makeSpecRepository({
-      specs: [new Spec('a', SpecPath.parse('foo'), ['spec.md'])],
+      specs: [makeSpec({ workspace: 'a', name: 'foo', filenames: ['spec.md'] })],
     })
     const repoB = makeSpecRepository({
-      specs: [new Spec('b', SpecPath.parse('bar'), ['spec.md'])],
+      specs: [makeSpec({ workspace: 'b', name: 'bar', filenames: ['spec.md'] })],
     })
     repoA.search = async () => [
-      { spec: new Spec('a', SpecPath.parse('foo'), ['spec.md']), score: 1, matches: [] },
+      {
+        spec: makeSpec({ workspace: 'a', name: 'foo', filenames: ['spec.md'] }),
+        score: 1,
+        matches: [],
+      },
     ]
     repoB.search = async () => [
-      { spec: new Spec('b', SpecPath.parse('bar'), ['spec.md']), score: 2, matches: [] },
+      {
+        spec: makeSpec({ workspace: 'b', name: 'bar', filenames: ['spec.md'] }),
+        score: 2,
+        matches: [],
+      },
     ]
 
     const specRepos = new Map([
@@ -50,10 +59,10 @@ describe('SearchSpecs', () => {
     const repoA = makeSpecRepository()
     const repoB = makeSpecRepository()
     repoA.search = async () => [
-      { spec: new Spec('a', SpecPath.parse('foo'), []), score: 1, matches: [] },
+      { spec: makeSpec({ workspace: 'a', name: 'foo', filenames: [] }), score: 1, matches: [] },
     ]
     repoB.search = async () => [
-      { spec: new Spec('b', SpecPath.parse('bar'), []), score: 1, matches: [] },
+      { spec: makeSpec({ workspace: 'b', name: 'bar', filenames: [] }), score: 1, matches: [] },
     ]
 
     const specRepos = new Map([
@@ -75,9 +84,9 @@ describe('SearchSpecs', () => {
   it('limits results when limit is provided', async () => {
     const repo = makeSpecRepository()
     repo.search = async () => [
-      { spec: new Spec('default', SpecPath.parse('a'), []), score: 3, matches: [] },
-      { spec: new Spec('default', SpecPath.parse('b'), []), score: 2, matches: [] },
-      { spec: new Spec('default', SpecPath.parse('c'), []), score: 1, matches: [] },
+      { spec: makeSpec({ workspace: 'default', name: 'a', filenames: [] }), score: 3, matches: [] },
+      { spec: makeSpec({ workspace: 'default', name: 'b', filenames: [] }), score: 2, matches: [] },
+      { spec: makeSpec({ workspace: 'default', name: 'c', filenames: [] }), score: 1, matches: [] },
     ]
 
     const specRepos = new Map([['default', repo]])
@@ -96,13 +105,17 @@ describe('SearchSpecs', () => {
 
   it('includes summaries when requested', async () => {
     const repo = makeSpecRepository({
-      specs: [new Spec('default', SpecPath.parse('foo'), ['spec.md'])],
+      specs: [makeSpec({ workspace: 'default', name: 'foo', filenames: ['spec.md'] })],
       artifacts: {
         'foo/spec.md': '# Title\n\nThis is a summary.',
       },
     })
     repo.search = async () => [
-      { spec: new Spec('default', SpecPath.parse('foo'), ['spec.md']), score: 1, matches: [] },
+      {
+        spec: makeSpec({ workspace: 'default', name: 'foo', filenames: ['spec.md'] }),
+        score: 1,
+        matches: [],
+      },
     ]
 
     const specRepos = new Map([['default', repo]])
@@ -119,14 +132,20 @@ describe('SearchSpecs', () => {
 
   it('resolves title from metadata first', async () => {
     const repo = makeSpecRepository({
-      specs: [new Spec('default', SpecPath.parse('foo'), ['spec.md', 'metadata.json'])],
+      specs: [
+        makeSpec({ workspace: 'default', name: 'foo', filenames: ['spec.md', 'metadata.json'] }),
+      ],
       artifacts: {
         'foo/metadata.json': JSON.stringify({ title: 'Metadata Title' }),
         'foo/spec.md': '# Header Title',
       },
     })
     repo.search = async () => [
-      { spec: new Spec('default', SpecPath.parse('foo'), ['spec.md']), score: 1, matches: [] },
+      {
+        spec: makeSpec({ workspace: 'default', name: 'foo', filenames: ['spec.md'] }),
+        score: 1,
+        matches: [],
+      },
     ]
 
     const specRepos = new Map([['default', repo]])
@@ -143,13 +162,17 @@ describe('SearchSpecs', () => {
 
   it('falls back to H1 header for title when metadata lacks it', async () => {
     const repo = makeSpecRepository({
-      specs: [new Spec('default', SpecPath.parse('foo'), ['spec.md'])],
+      specs: [makeSpec({ workspace: 'default', name: 'foo', filenames: ['spec.md'] })],
       artifacts: {
         'foo/spec.md': '# Header Title',
       },
     })
     repo.search = async () => [
-      { spec: new Spec('default', SpecPath.parse('foo'), ['spec.md']), score: 1, matches: [] },
+      {
+        spec: makeSpec({ workspace: 'default', name: 'foo', filenames: ['spec.md'] }),
+        score: 1,
+        matches: [],
+      },
     ]
 
     const specRepos = new Map([['default', repo]])
@@ -166,10 +189,14 @@ describe('SearchSpecs', () => {
 
   it('falls back to spec path for title when neither exists', async () => {
     const repo = makeSpecRepository({
-      specs: [new Spec('default', SpecPath.parse('foo/bar'), [])],
+      specs: [makeSpec({ workspace: 'default', name: 'foo/bar', filenames: [] })],
     })
     repo.search = async () => [
-      { spec: new Spec('default', SpecPath.parse('foo/bar'), []), score: 1, matches: [] },
+      {
+        spec: makeSpec({ workspace: 'default', name: 'foo/bar', filenames: [] }),
+        score: 1,
+        matches: [],
+      },
     ]
 
     const specRepos = new Map([['default', repo]])

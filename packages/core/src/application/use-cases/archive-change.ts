@@ -15,7 +15,7 @@ import { type ArchivedChange } from '../../domain/entities/archived-change.js'
 import { type ActorIdentity, type Change } from '../../domain/entities/change.js'
 import { SYSTEM_ACTOR } from '../../domain/entities/change.js'
 import { type Schema } from '../../domain/value-objects/schema.js'
-import { Spec } from '../../domain/entities/spec.js'
+import { Spec, ABSENT_SPEC_SIDECAR } from '../../domain/entities/spec.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
 import { parseSpecId } from '../../domain/services/parse-spec-id.js'
 import { detectSpecOverlap } from '../../domain/services/detect-spec-overlap.js'
@@ -638,7 +638,13 @@ export class ArchiveChange {
       if (ws === undefined) continue
 
       const specRepo = ws.specRepo
-      const spec = new Spec(workspace, SpecPath.parse(capabilityPath), [])
+      const spec = new Spec(
+        workspace,
+        SpecPath.parse(capabilityPath),
+        [],
+        ABSENT_SPEC_SIDECAR,
+        ABSENT_SPEC_SIDECAR,
+      )
 
       const writes = writesBySpecId.get(specId) ?? []
 
@@ -758,7 +764,13 @@ export class ArchiveChange {
       }
       publications.push({
         specId,
-        spec: new Spec(workspace, SpecPath.parse(capabilityPath), []),
+        spec: new Spec(
+          workspace,
+          SpecPath.parse(capabilityPath),
+          [],
+          ABSENT_SPEC_SIDECAR,
+          ABSENT_SPEC_SIDECAR,
+        ),
         specRepo: ws.specRepo,
         writes,
       })

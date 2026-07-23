@@ -1,4 +1,8 @@
 import { describe, it, expect } from 'vitest'
+import { makeSpec } from '../../helpers/make-spec.js'
+import * as fs from 'node:fs/promises'
+import * as os from 'node:os'
+import * as path from 'node:path'
 import { createBuiltinExtractorTransforms } from '../../../src/composition/extractor-transforms/index.js'
 import { ValidateSpecs } from '../../../src/application/use-cases/validate-specs.js'
 import { SchemaNotFoundError } from '../../../src/application/errors/schema-not-found-error.js'
@@ -15,6 +19,118 @@ import {
   makeParser,
   makeContentHasher,
 } from './helpers.js'
+import {
+  ValidationResultCache,
+  type SpecValidationEntry,
+  type ValidationCacheLookupResult,
+} from '../../../src/application/ports/validation-result-cache.js'
+import { type SpecRepository } from '../../../src/application/ports/spec-repository.js'
+import {
+  stampsFromSpec,
+  type ValidationStoredStamps,
+} from '../../../src/infrastructure/fs/fs-validation-result-cache.js'
+import {
+  computeSchemaFingerprintFromSchema,
+  computeCacheFingerprint,
+  VALIDATE_SPECS_ENGINE_VERSION,
+} from '../../../src/application/use-cases/_shared/validate-specs-cache-fingerprints.js'
+import { createCompositionResolver } from '../../../src/composition/composition-resolver.js'
+import { resolveValidateSpecsDeps } from '../../../src/composition/use-cases/validate-specs.js'
+import { type SpecdConfig } from '../../../src/application/specd-config.js'
+
+class InMemoryValidationResultCache extends ValidationResultCache {
+  readonly upserts: Array<{
+    readonly entry: SpecValidationEntry
+    readonly spec: Spec
+    readonly schemaFingerprint: string
+    readonly engineVersion: number
+  }> = []
+  private readonly _rows = new Map<
+    string,
+    {
+      readonly entry: SpecValidationEntry
+      readonly stamps: ValidationStoredStamps
+      readonly cacheFingerprint: string
+    }
+  >()
+  private readonly _schemaFingerprint: string
+  private readonly _engineVersion: number
+  private readonly _hasher: (content: string) => string
+
+  constructor(
+    specRepository: SpecRepository,
+    schemaFingerprint: string,
+    engineVersion: number,
+    hasher: (content: string) => string,
+  ) {
+    super(specRepository)
+    this._schemaFingerprint = schemaFingerprint
+    this._engineVersion = engineVersion
+    this._hasher = hasher
+  }
+
+  workspace(): string {
+    return this.specRepository.workspace()
+  }
+
+  seed(
+    specId: string,
+    entry: SpecValidationEntry,
+    stamps: ValidationStoredStamps,
+    cacheFingerprint: string,
+  ): void {
+    this._rows.set(specId, { entry, stamps, cacheFingerprint })
+  }
+
+  async lookup(input: {
+    readonly spec: Spec
+    readonly schemaFingerprint: string
+    readonly engineVersion: number
+  }): Promise<ValidationCacheLookupResult> {
+    if (
+      input.schemaFingerprint !== this._schemaFingerprint ||
+      input.engineVersion !== this._engineVersion
+    ) {
+      return { kind: 'miss' }
+    }
+    const specId = `${input.spec.workspace}:${input.spec.name.toFsPath('/')}`
+    const row = this._rows.get(specId)
+    if (row === undefined) return { kind: 'miss' }
+
+    const currentStamps = stampsFromSpec(input.spec)
+    if (JSON.stringify(row.stamps) === JSON.stringify(currentStamps)) {
+      return { kind: 'hit', entry: row.entry }
+    }
+
+    const cacheFingerprint = await this._computeCacheFingerprint(input.spec)
+    if (row.cacheFingerprint === cacheFingerprint) {
+      this._rows.set(specId, { ...row, stamps: currentStamps })
+      return { kind: 'hit', entry: row.entry }
+    }
+
+    return { kind: 'miss' }
+  }
+
+  async upsert(input: {
+    readonly entry: SpecValidationEntry
+    readonly spec: Spec
+    readonly schemaFingerprint: string
+    readonly engineVersion: number
+  }): Promise<void> {
+    const cacheFingerprint = await this._computeCacheFingerprint(input.spec)
+    this._rows.set(input.entry.spec, {
+      entry: input.entry,
+      stamps: stampsFromSpec(input.spec),
+      cacheFingerprint,
+    })
+    this.upserts.push(input)
+  }
+
+  private async _computeCacheFingerprint(spec: Spec): Promise<string> {
+    const specFingerprint = await this.specRepository.specFingerprint(spec)
+    return computeCacheFingerprint({ specFingerprint, metadataContentHash: null }, this._hasher)
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -25,8 +141,8 @@ describe('ValidateSpecs', () => {
     const specType = makeArtifactType('specs', { scope: 'spec', output: 'spec.md' })
     const schema = makeSchema([specType])
 
-    const spec1 = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
-    const spec2 = new Spec('billing', SpecPath.parse('payments'), ['spec.md'])
+    const spec1 = makeSpec({ workspace: 'default', name: 'auth/login', filenames: ['spec.md'] })
+    const spec2 = makeSpec({ workspace: 'billing', name: 'payments', filenames: ['spec.md'] })
 
     const repo1 = makeSpecRepository({
       specs: [spec1],
@@ -63,7 +179,7 @@ describe('ValidateSpecs', () => {
     const specType = makeArtifactType('specs', { scope: 'spec', output: 'spec.md' })
     const schema = makeSchema([specType])
 
-    const spec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+    const spec = makeSpec({ workspace: 'default', name: 'auth/login', filenames: ['spec.md'] })
     const repo = makeSpecRepository({
       specs: [spec],
       artifacts: { 'auth/login/spec.md': '# Auth Login Spec' },
@@ -83,7 +199,7 @@ describe('ValidateSpecs', () => {
     const schema = makeSchema([specType])
 
     // Spec directory exists but does NOT contain spec.md
-    const spec = new Spec('default', SpecPath.parse('auth/login'), ['readme.md'])
+    const spec = makeSpec({ workspace: 'default', name: 'auth/login', filenames: ['readme.md'] })
     const repo = makeSpecRepository({ specs: [spec] })
     const specRepos = new Map([['default', repo]])
 
@@ -140,7 +256,11 @@ describe('ValidateSpecs', () => {
       ],
     })
 
-    const spec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md', 'verify.md'])
+    const spec = makeSpec({
+      workspace: 'default',
+      name: 'auth/login',
+      filenames: ['spec.md', 'verify.md'],
+    })
     const repo = makeSpecRepository({
       specs: [spec],
       artifacts: {
@@ -214,7 +334,11 @@ describe('ValidateSpecs', () => {
       ],
     })
 
-    const spec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md', 'verify.md'])
+    const spec = makeSpec({
+      workspace: 'default',
+      name: 'auth/login',
+      filenames: ['spec.md', 'verify.md'],
+    })
     const repo = makeSpecRepository({
       specs: [spec],
       artifacts: {
@@ -254,7 +378,7 @@ describe('ValidateSpecs', () => {
     const specType = makeArtifactType('specs', { scope: 'spec', output: 'spec.md' })
     const schema = makeSchema([specType])
 
-    const spec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+    const spec = makeSpec({ workspace: 'default', name: 'auth/login', filenames: ['spec.md'] })
     const repo = makeSpecRepository({
       specs: [spec],
       artifacts: { 'auth/login/spec.md': '# Auth Login' },
@@ -294,7 +418,7 @@ describe('ValidateSpecs', () => {
     const changeType = makeArtifactType('design', { scope: 'change', output: 'design.md' })
     const schema = makeSchema([specType, changeType])
 
-    const spec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+    const spec = makeSpec({ workspace: 'default', name: 'auth/login', filenames: ['spec.md'] })
     const repo = makeSpecRepository({
       specs: [spec],
       artifacts: { 'auth/login/spec.md': '# Auth Login' },
@@ -317,7 +441,7 @@ describe('ValidateSpecs', () => {
     })
     const schema = makeSchema([requiredType, optionalType])
 
-    const spec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+    const spec = makeSpec({ workspace: 'default', name: 'auth/login', filenames: ['spec.md'] })
     const repo = makeSpecRepository({
       specs: [spec],
       artifacts: { 'auth/login/spec.md': '# Auth Login' },
@@ -335,8 +459,8 @@ describe('ValidateSpecs', () => {
     const specType = makeArtifactType('specs', { scope: 'spec', output: 'spec.md' })
     const schema = makeSchema([specType])
 
-    const spec1 = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
-    const spec2 = new Spec('default', SpecPath.parse('auth/logout'), ['spec.md'])
+    const spec1 = makeSpec({ workspace: 'default', name: 'auth/login', filenames: ['spec.md'] })
+    const spec2 = makeSpec({ workspace: 'default', name: 'auth/logout', filenames: ['spec.md'] })
     const repo = makeSpecRepository({
       specs: [spec1, spec2],
       artifacts: {
@@ -358,8 +482,12 @@ describe('ValidateSpecs', () => {
     const specType = makeArtifactType('specs', { scope: 'spec', output: 'spec.md' })
     const schema = makeSchema([specType])
 
-    const goodSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
-    const badSpec = new Spec('default', SpecPath.parse('auth/missing'), ['other.md'])
+    const goodSpec = makeSpec({ workspace: 'default', name: 'auth/login', filenames: ['spec.md'] })
+    const badSpec = makeSpec({
+      workspace: 'default',
+      name: 'auth/missing',
+      filenames: ['other.md'],
+    })
     const repo = makeSpecRepository({
       specs: [goodSpec, badSpec],
       artifacts: { 'auth/login/spec.md': '# Auth Login' },
@@ -383,7 +511,7 @@ describe('ValidateSpecs', () => {
     })
     const schema = makeSchema([specType])
 
-    const spec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+    const spec = makeSpec({ workspace: 'default', name: 'auth/login', filenames: ['spec.md'] })
     const repo = makeSpecRepository({
       specs: [spec],
       artifacts: { 'auth/login/spec.md': '# Auth Login' },
@@ -404,7 +532,7 @@ describe('ValidateSpecs', () => {
     })
     const schema = makeSchema([specType])
 
-    const spec = new Spec('default', SpecPath.parse('auth/login'), ['spec.yaml'])
+    const spec = makeSpec({ workspace: 'default', name: 'auth/login', filenames: ['spec.yaml'] })
     const repo = makeSpecRepository({
       specs: [spec],
       artifacts: { 'auth/login/spec.yaml': 'key: value' },
@@ -426,7 +554,7 @@ describe('ValidateSpecs', () => {
 
   it('fails when metadata content hashes are stale', async () => {
     const schema = makeSchema([makeArtifactType('specs', { scope: 'spec', output: 'spec.md' })])
-    const spec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+    const spec = makeSpec({ workspace: 'default', name: 'auth/login', filenames: ['spec.md'] })
     const repo = makeSpecRepository({
       specs: [spec],
       artifacts: {
@@ -457,7 +585,7 @@ describe('ValidateSpecs', () => {
     const hasher = makeContentHasher()
     const specContent = '# Auth Login\n'
     const schema = makeSchema([makeArtifactType('specs', { scope: 'spec', output: 'spec.md' })])
-    const spec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+    const spec = makeSpec({ workspace: 'default', name: 'auth/login', filenames: ['spec.md'] })
     const repo = makeSpecRepository({
       specs: [spec],
       artifacts: {
@@ -513,7 +641,7 @@ describe('ValidateSpecs', () => {
     })
     const specContent =
       '# Auth Login\n\n## Spec Dependencies\n\n- [`default:auth/extracted`](../extracted/spec.md)\n'
-    const spec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+    const spec = makeSpec({ workspace: 'default', name: 'auth/login', filenames: ['spec.md'] })
     const repo = makeSpecRepository({
       specs: [spec],
       artifacts: {
@@ -576,7 +704,7 @@ describe('ValidateSpecs', () => {
       artifacts: [makeArtifactType('specs', { scope: 'spec', output: 'spec.md' })],
       metadataExtraction: {},
     })
-    const spec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+    const spec = makeSpec({ workspace: 'default', name: 'auth/login', filenames: ['spec.md'] })
     const repo = makeSpecRepository({
       specs: [spec],
       artifacts: {
@@ -601,5 +729,260 @@ describe('ValidateSpecs', () => {
 
     expect(result.failed).toBe(0)
     expect(result.passed).toBe(1)
+  })
+
+  it('skips full validation on cache soft hit without ValidateSpecs upsert', async () => {
+    const specType = makeArtifactType('specs', { scope: 'spec', output: 'spec.md' })
+    const schema = makeSchema([specType])
+    const hasher = makeContentHasher()
+    const spec = makeSpec({ workspace: 'default', name: 'auth/login', filenames: ['spec.md'] })
+    const repo = makeSpecRepository({
+      specs: [spec],
+      artifacts: { 'auth/login/spec.md': '# Auth Login Spec' },
+    })
+    const parseSpy = makeParsers()
+    const originalGet = parseSpy.get.bind(parseSpy)
+    let parseCount = 0
+    parseSpy.get = (format: string) => {
+      const parser = originalGet(format)
+      if (parser === undefined) return undefined
+      return {
+        ...parser,
+        parse(content: string) {
+          parseCount += 1
+          return parser.parse(content)
+        },
+      }
+    }
+
+    const schemaFingerprint = computeSchemaFingerprintFromSchema(schema, hasher)
+    const cache = new InMemoryValidationResultCache(
+      repo,
+      schemaFingerprint,
+      VALIDATE_SPECS_ENGINE_VERSION,
+      (content) => hasher.hash(content),
+    )
+    const currentStamps = stampsFromSpec(spec)
+    const storedStamps = {
+      ...currentStamps,
+      artifacts: [{ filename: 'spec.md', lastModified: '2024-01-01T00:00:00.000Z' }],
+    }
+    const cacheFingerprint = computeCacheFingerprint(
+      {
+        specFingerprint: await repo.specFingerprint(spec),
+        metadataContentHash: null,
+      },
+      (content) => hasher.hash(content),
+    )
+    cache.seed(
+      'default:auth/login',
+      {
+        spec: 'default:auth/login',
+        passed: true,
+        failures: [],
+        warnings: [],
+      },
+      storedStamps,
+      cacheFingerprint,
+    )
+
+    const uc = new ValidateSpecs(
+      new Map([['default', repo]]),
+      makeSchemaProvider(schema),
+      parseSpy,
+      hasher,
+      new Map(),
+      [],
+      new Map([['default', cache]]),
+    )
+
+    const result = await uc.execute({ specPath: 'default:auth/login' })
+    expect(result.entries[0]!.passed).toBe(true)
+    expect(parseCount).toBe(0)
+    expect(cache.upserts).toHaveLength(0)
+  })
+
+  it('upserts failures and warnings on cache miss', async () => {
+    const specType = makeArtifactType('specs', { scope: 'spec', output: 'spec.md' })
+    const schema = makeSchema([specType])
+    const hasher = makeContentHasher()
+    const spec = makeSpec({ workspace: 'default', name: 'auth/login', filenames: ['readme.md'] })
+    const repo = makeSpecRepository({ specs: [spec] })
+    const parseSpy = makeParsers()
+    const originalGet = parseSpy.get.bind(parseSpy)
+    let parseCount = 0
+    parseSpy.get = (format: string) => {
+      const parser = originalGet(format)
+      if (parser === undefined) return undefined
+      return {
+        ...parser,
+        parse(content: string) {
+          parseCount += 1
+          return parser.parse(content)
+        },
+      }
+    }
+
+    const schemaFingerprint = computeSchemaFingerprintFromSchema(schema, hasher)
+    const cache = new InMemoryValidationResultCache(
+      repo,
+      schemaFingerprint,
+      VALIDATE_SPECS_ENGINE_VERSION,
+      (content) => hasher.hash(content),
+    )
+
+    const uc = new ValidateSpecs(
+      new Map([['default', repo]]),
+      makeSchemaProvider(schema),
+      parseSpy,
+      hasher,
+      new Map(),
+      [],
+      new Map([['default', cache]]),
+    )
+
+    const result = await uc.execute({ specPath: 'default:auth/login' })
+    expect(result.entries[0]!.passed).toBe(false)
+    expect(result.entries[0]!.failures).toHaveLength(1)
+    expect(result.entries[0]!.warnings).toEqual([])
+    expect(parseCount).toBe(0)
+    expect(cache.upserts).toHaveLength(1)
+    expect(cache.upserts[0]!.entry.passed).toBe(false)
+    expect(cache.upserts[0]!.entry.failures).toEqual(result.entries[0]!.failures)
+    expect(cache.upserts[0]!.entry.warnings).toEqual(result.entries[0]!.warnings)
+  })
+
+  it('skips full validation on cache hard hit', async () => {
+    const specType = makeArtifactType('specs', { scope: 'spec', output: 'spec.md' })
+    const schema = makeSchema([specType])
+    const hasher = makeContentHasher()
+    const spec = makeSpec({ workspace: 'default', name: 'auth/login', filenames: ['spec.md'] })
+    const repo = makeSpecRepository({
+      specs: [spec],
+      artifacts: { 'auth/login/spec.md': '# Auth Login Spec' },
+    })
+    const parseSpy = makeParsers()
+    const originalGet = parseSpy.get.bind(parseSpy)
+    let parseCount = 0
+    parseSpy.get = (format: string) => {
+      const parser = originalGet(format)
+      if (parser === undefined) return undefined
+      return {
+        ...parser,
+        parse(content: string) {
+          parseCount += 1
+          return parser.parse(content)
+        },
+      }
+    }
+
+    const schemaFingerprint = computeSchemaFingerprintFromSchema(schema, hasher)
+    const cache = new InMemoryValidationResultCache(
+      repo,
+      schemaFingerprint,
+      VALIDATE_SPECS_ENGINE_VERSION,
+      (content) => hasher.hash(content),
+    )
+    const cacheFingerprint = await repo
+      .specFingerprint(spec)
+      .then((fp) =>
+        computeCacheFingerprint({ specFingerprint: fp, metadataContentHash: null }, (content) =>
+          hasher.hash(content),
+        ),
+      )
+    cache.seed(
+      'default:auth/login',
+      {
+        spec: 'default:auth/login',
+        passed: true,
+        failures: [],
+        warnings: [],
+      },
+      stampsFromSpec(spec),
+      cacheFingerprint,
+    )
+
+    const uc = new ValidateSpecs(
+      new Map([['default', repo]]),
+      makeSchemaProvider(schema),
+      parseSpy,
+      hasher,
+      new Map(),
+      [],
+      new Map([['default', cache]]),
+    )
+
+    const result = await uc.execute({ specPath: 'default:auth/login' })
+    expect(result.entries[0]!.passed).toBe(true)
+    expect(parseCount).toBe(0)
+  })
+
+  it('resolveValidateSpecsDeps includes validationResultCaches', async () => {
+    const tmp = await fs.mkdtemp(path.join(os.tmpdir(), 'specd-validate-deps-'))
+    try {
+      const defaultSpecsPath = path.join(tmp, 'specs', 'default')
+      const coreSpecsPath = path.join(tmp, 'specs', 'core')
+      await Promise.all([
+        fs.mkdir(defaultSpecsPath, { recursive: true }),
+        fs.mkdir(coreSpecsPath, { recursive: true }),
+      ])
+      const config = {
+        projectRoot: tmp,
+        configPath: path.join(tmp, 'specd.yaml'),
+        schemaRef: '@specd/schema-std',
+        workspaces: [
+          {
+            name: 'default',
+            specsPath: defaultSpecsPath,
+            specsAdapter: { adapter: 'fs', config: { path: defaultSpecsPath } },
+            schemasPath: null,
+            schemasAdapter: null,
+            codeRoot: tmp,
+            ownership: 'owned' as const,
+            isExternal: false,
+          },
+          {
+            name: 'core',
+            specsPath: coreSpecsPath,
+            specsAdapter: { adapter: 'fs', config: { path: coreSpecsPath } },
+            schemasPath: null,
+            schemasAdapter: null,
+            codeRoot: tmp,
+            ownership: 'owned' as const,
+            isExternal: false,
+          },
+        ],
+        storage: {
+          changesPath: path.join(tmp, '.specd', 'changes'),
+          changesAdapter: {
+            adapter: 'fs',
+            config: { path: path.join(tmp, '.specd', 'changes') },
+          },
+          draftsPath: path.join(tmp, '.specd', 'drafts'),
+          draftsAdapter: {
+            adapter: 'fs',
+            config: { path: path.join(tmp, '.specd', 'drafts') },
+          },
+          discardedPath: path.join(tmp, '.specd', 'discarded'),
+          discardedAdapter: {
+            adapter: 'fs',
+            config: { path: path.join(tmp, '.specd', 'discarded') },
+          },
+          archivePath: path.join(tmp, '.specd', 'archive'),
+          archiveAdapter: {
+            adapter: 'fs',
+            config: { path: path.join(tmp, '.specd', 'archive') },
+          },
+        },
+        approvals: { spec: false, signoff: false },
+      } as SpecdConfig
+      const resolver = createCompositionResolver(config)
+      const deps = resolveValidateSpecsDeps(resolver)
+      expect(deps.validationResultCaches.get('default')?.workspace()).toBe('default')
+      expect(deps.validationResultCaches.get('core')?.workspace()).toBe('core')
+      expect([...deps.validationResultCaches.keys()].sort()).toEqual(['core', 'default'])
+    } finally {
+      await fs.rm(tmp, { recursive: true, force: true })
+    }
   })
 })

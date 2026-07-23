@@ -5,7 +5,7 @@ import { type SchemaProvider } from '../ports/schema-provider.js'
 import { type FileReader } from '../ports/file-reader.js'
 import { type ArtifactParserRegistry } from '../ports/artifact-parser.js'
 import { type ExtractorTransformRegistry } from '../../domain/services/content-extraction.js'
-import { Spec } from '../../domain/entities/spec.js'
+import { Spec, ABSENT_SPEC_SIDECAR } from '../../domain/entities/spec.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
 import { Schema } from '../../domain/value-objects/schema.js'
 import { inferFormat } from '../../domain/services/format-inference.js'
@@ -256,7 +256,7 @@ export class GetProjectContext {
         continue
       }
 
-      const spec = new Spec(workspace, specPathObj, [])
+      const spec = new Spec(workspace, specPathObj, [], ABSENT_SPEC_SIDECAR, ABSENT_SPEC_SIDECAR)
       const metadata = await specRepo.metadata(spec)
       const specId = `${workspace}:${capPath}`
       const title = metadata?.title ?? ''

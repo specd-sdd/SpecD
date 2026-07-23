@@ -26,7 +26,7 @@
     {
       "requirement": "Load all artifact files",
       "rules": [
-        "When the spec exists, the use case SHALL iterate over `spec.filenames` and load each artifact via `repo.artifact(spec, filename)`. Only artifacts that return non-null are included in the result map. The result `artifacts` map MUST be keyed by filename."
+        "When the spec exists, the use case SHALL iterate over `spec.artifacts` and load each\npresent artifact via `repo.artifact(spec, entry.filename)`. Only artifacts that return\nnon-null are included in the result map. The result `artifacts` map MUST be keyed by\nfilename.\n\nThe result map values remain content-bearing `SpecArtifact` instances from\n`artifact()`, not `SpecArtifactEntry` presence rows from `get()`."
       ]
     },
     {
@@ -72,18 +72,14 @@
     {
       "requirement": "Load all artifact files",
       "name": "All artifacts loaded successfully",
-      "given": [
-        "a spec with filenames ['spec.md', 'verify.md', '.specd-metadata.yaml'] and all exist on disk"
-      ],
+      "given": ["a spec whose artifacts list includes spec.md, verify.md, and"],
       "when": ["execute(input) is called"],
       "then": ["the result artifacts map contains entries for all three filenames"]
     },
     {
       "requirement": "Load all artifact files",
       "name": "Some artifacts missing on disk",
-      "given": [
-        "a spec with filenames ['spec.md', 'verify.md'] where repo.artifact returns null for verify.md"
-      ],
+      "given": ["a spec whose artifacts list includes spec.md and verify.md where"],
       "when": ["execute(input) is called"],
       "then": ["the result artifacts map contains only 'spec.md'", "AND no error is thrown"]
     },
@@ -116,16 +112,17 @@
     }
   ],
   "implementation": {
-    "files": [
+    "symbols": [
       {
         "specId": "core:get-spec",
-        "file": "core:src/composition/use-cases/get-spec.ts"
+        "file": "core:src/application/use-cases/get-spec.ts",
+        "symbol": "GetSpec"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:96278ca8545ae6689c5d710cc7148de75b6288a0542b5e41f60871fd5d998104",
-    "verify.md": "sha256:ea80a18b6ff3aba59587fd1a67c0ae949dbd57950c730260cb2d97eec031e786"
+    "spec.md": "sha256:39dd47c607fa990e5cbbdda8eeae323705db3527d6d253b9474248b73522f60d",
+    "verify.md": "sha256:f25419edbc96b7454387b22ab75fff443fb872c28edb78e6c2f8d765f2ff73eb"
   },
   "generatedBy": "core"
 }

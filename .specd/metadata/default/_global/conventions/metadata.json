@@ -57,7 +57,7 @@
     {
       "requirement": "Lazy loading — metadata before content",
       "rules": [
-        "When a collection of resources must be loaded, the initial load returns lightweight metadata objects (references, identifiers, display fields) without reading file content or parsing heavy structures. Full content is fetched explicitly and on demand.\n\nThis pattern applies across the codebase:\n\n- **Repositories** — `list()` returns metadata objects (`Spec`, `Change`, `ArchivedChange`) without artifact file content; content is loaded via a separate `artifact()` call.\n- **`SchemaRegistry`** — `list()` returns `SchemaEntry` objects (ref, name, source) without parsing `schema.yaml`; the full `Schema` is loaded via `resolve()`.\n- **Any future collection port** — `list()` or `search()` returns a reference/metadata type; a `get()` or `load()` call fetches the full resource.\n\nThe metadata type must carry enough information to be useful standalone (for display, filtering, selection) and must include the reference or identifier needed to fetch the full resource.\n\nContent is never pre-loaded speculatively. If a use case needs the full resource, it calls the explicit load method."
+        "When a collection of resources must be loaded, the initial load returns lightweight\nmetadata objects (references, identifiers, display fields) without reading file content\nor parsing heavy structures. Full content is fetched explicitly and on demand.\n\nThis pattern applies across the codebase:\n\n- **Repositories** — `list()` (or equivalent collection methods) return lightweight\n  metadata rows without embedded file content. Full payloads are loaded only through\n  explicit methods on the same port (for example `get()`, `artifact()`, or\n  domain-specific loaders). Domain entity shape belongs in the owning port spec, not\n  here.\n- **`SchemaRegistry`** — `list()` returns `SchemaEntry` objects (ref, name, source)\n  without parsing `schema.yaml`; the full `Schema` is loaded via `resolve()`.\n- **Any future collection port** — `list()` or `search()` returns a\n  reference/metadata type; a `get()` or `load()` call fetches the full resource.\n\nThe metadata type must carry enough information to be useful standalone (for display,\nfiltering, selection) and must include the reference or identifier needed to fetch the\nfull resource.\n\nContent is never pre-loaded speculatively. If a use case needs the full resource, it\ncalls the explicit load method."
       ]
     },
     {
@@ -150,22 +150,23 @@
     {
       "requirement": "Lazy loading — metadata before content",
       "name": "Repository list does not load content",
-      "when": ["SpecRepository.list() is called"],
+      "when": ["a repository list() (or equivalent collection method) is called"],
       "then": [
-        "it returns Spec objects with filenames but no artifact content; no file reads beyond directory listing occur"
+        "it returns metadata/reference rows without embedded file content",
+        "AND no content reads beyond what the list/index path requires occur"
       ]
     },
     {
       "requirement": "Lazy loading — metadata before content",
       "name": "SchemaRegistry list does not parse schemas",
       "when": ["SchemaRegistry.list() is called"],
-      "then": ["it returns SchemaEntry objects without reading or validating any schema.yaml file"]
+      "then": ["it returns SchemaEntry objects without reading or validating any"]
     },
     {
       "requirement": "Lazy loading — metadata before content",
       "name": "Full resource loaded on demand",
-      "when": ["a caller needs the content of a specific artifact"],
-      "then": ["it calls SpecRepository.artifact(spec, filename) explicitly, not list()"]
+      "when": ["a caller needs the full content of a tracked resource"],
+      "then": ["it uses an explicit load method on the port — not the collection list()"]
     },
     {
       "requirement": "Immutability preference",
@@ -176,10 +177,8 @@
   ],
   "implementation": {},
   "contentHashes": {
-    "spec.md": "sha256:63e29def48b8d6733110c8d7f8bcde5f272a39607cda24e51717c767f693dd8f",
-    "verify.md": "sha256:79310e52c401071cd52164ab363fa1ff87137b846c5db339aeb9ed4918051a88"
+    "spec.md": "sha256:3cdf0f80c512c98c736fe52c18b80fbab72d0a07df314a331148ff792d3fcba5",
+    "verify.md": "sha256:8f11fa700ad83e665ab4b522fda41b1757d44b31471150ca7b010e00f99cd26d"
   },
-  "generatedBy": "agent",
-  "optimizedDescription": "TypeScript conventions for specd monorepo: strict mode, ESM-only, named exports, kebab-case, error types, and lazy loading.",
-  "optimizedContext": "# Coding Conventions\n\n## Rules\n\n- All packages compile with `strict: true`, `noUncheckedIndexedAccess: true`, `exactOptionalPropertyTypes: true`. No `@ts-ignore` or `@ts-expect-error` without co-located explanation.\n- All packages use `\"type\": \"module\"` and `NodeNext`. No CommonJS. No `.cjs` output unless documented.\n- No default exports. All named exports.\n- Source files: `kebab-case.ts`. Test files: `.spec.ts` suffix, in `test/` mirroring `src/`. No `index.ts` barrels except `src/index.ts`. Layer-level barrels permitted in packages >50 modules.\n- `any` forbidden. Use `unknown` + type guards. Wrap third-party `any` in typed adapter.\n- Exported functions/class methods: explicit return type annotations. Internal may rely on inference when type obvious.\n- User-facing errors MUST extend `SpecdError`. Provide machine-readable `code`. Follow Actionable Messaging from `default:_global/error-handling-conventions`.\n- Private backing fields use `_` prefix (e.g. `_name` for `get name()`). Avoids infinite recursion.\n- Collection loading: `list()` returns lightweight metadata (refs, identifiers, display). Full content via explicit `artifact()`, `resolve()`, or `get()`. No speculative pre-loading.\n- Prefer `readonly` arrays/properties on domain value objects. Use `as const` for literal config.\n\n## Constraints\n\n- `strict: true` in every package's tsconfig.json via tsconfig.base.json\n- Default exports forbidden\n- `any` type forbidden — use `unknown` and narrow\n- All source files MUST be `kebab-case.ts`\n- Domain/application errors MUST extend `SpecdError`\n- Public API functions MUST have explicit return type annotations\n- Collection methods return metadata/reference types only — content fetched via explicit get/artifact/resolve calls"
+  "generatedBy": "core"
 }

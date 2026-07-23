@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'No requirement-text change; call sites that used Spec.filenames migrate to Spec.artifacts (covered by core:spec-repository-port)'

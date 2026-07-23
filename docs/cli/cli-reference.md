@@ -983,7 +983,9 @@ specd specs generate-metadata --all --status missing --write
 
 ## storage
 
-Commands for maintaining derived filesystem list indexes. List indexes are stored under `{configPath}/tmp/fs-cache/` (for example `changes/`, `drafts/`, `discarded/`, `specs/<workspace>/`, and `archive/`). The `{configPath}/tmp/` directory is gitignored via `tmp/.gitignore` (`*` with `!.gitignore`).
+Commands for maintaining derived filesystem list indexes. List indexes are stored under `{configPath}/tmp/fs-cache/` (for example `changes/`, `drafts/`, `discarded/`, `specs/<workspace>/`, `validate-specs/<workspace>/`, and `archive/`). The `{configPath}/tmp/` directory is gitignored via `tmp/.gitignore` (`*` with `!.gitignore`).
+
+The `validate-specs/<workspace>/` buckets are adapter-owned runtime caches used internally by `ValidateSpecs`. They are not exposed through CLI or MCP commands.
 
 ### storage reindex
 

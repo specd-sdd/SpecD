@@ -5,20 +5,9 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { type SpecRepository } from '@specd/core'
 import { IndexProjectGraph } from '../../../src/application/use-cases/index-project-graph.js'
 import { createCodeGraphProvider } from '../../../src/composition/create-code-graph-provider.js'
+import { makeMockSpecRepository } from '../../helpers/make-mock-spec-repository.js'
 
-const makeMockRepo = (): SpecRepository =>
-  ({
-    get specsPath() {
-      return undefined
-    },
-    list: async () => ({ items: [], meta: { total: 0, count: 0, limit: 0 } }),
-    count: async () => 0,
-    specHash: async () => null,
-    metadata: async () => null,
-    readPersistedDependsOn: async () => [],
-    readPersistedImplementation: async () => [],
-    artifact: async () => null,
-  }) as unknown as SpecRepository
+const makeMockRepo = makeMockSpecRepository
 
 describe('IndexProjectGraph integration', () => {
   let tempDir: string

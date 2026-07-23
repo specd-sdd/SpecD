@@ -143,7 +143,7 @@ export class SearchSpecs {
       // fall through
     }
 
-    if (spec.filenames.includes('spec.md')) {
+    if (spec.hasArtifact('spec.md')) {
       try {
         const specArtifact = await repo.artifact(spec, 'spec.md')
         if (specArtifact !== null) {
@@ -177,7 +177,7 @@ export class SearchSpecs {
       // fall through
     }
 
-    if (spec.filenames.includes('spec.md')) {
+    if (spec.hasArtifact('spec.md')) {
       try {
         const specArtifact = await repo.artifact(spec, 'spec.md')
         if (specArtifact !== null) {

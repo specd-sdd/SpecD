@@ -1,0 +1,13 @@
+- op: modified
+  description: 'Iterate Spec artifacts via SpecArtifactEntry list only'
+  selector:
+    type: section
+    matches: 'Requirement: Load all artifact files'
+  content: |
+    When the spec exists, the use case SHALL iterate over `spec.artifacts` and load each
+    present artifact via `repo.artifact(spec, entry.filename)`. Only artifacts that return
+    non-null are included in the result map. The result `artifacts` map MUST be keyed by
+    filename.
+
+    The result map values remain content-bearing `SpecArtifact` instances from
+    `artifact()`, not `SpecArtifactEntry` presence rows from `get()`.

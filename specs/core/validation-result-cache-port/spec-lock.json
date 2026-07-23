@@ -1,0 +1,35 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["default:_global/architecture", "core:spec-repository-port"],
+  "implementation": [
+    {
+      "file": "core:src/application/ports/validation-result-cache.ts",
+      "symbols": [
+        "ValidationResultCache",
+        "ValidationCacheEntry",
+        "ValidationSourceStamp",
+        "ValidationCacheLookupInput",
+        "ValidationCacheLookupResult",
+        "ValidationCacheUpsertInput",
+        "ValidationResultCache,SpecValidationEntry,ValidationCacheLookupResult"
+      ]
+    },
+    {
+      "file": "core:src/infrastructure/fs/fs-validation-result-cache.ts",
+      "symbols": [
+        "FsValidationResultCache",
+        "collectValidationSourceStamps",
+        "ValidationIndexMeta",
+        "FsValidationResultCache,stampsFromSpec,ValidationStoredStamps",
+        "stampsFromSpec",
+        "ValidationStoredStamps"
+      ]
+    },
+    {
+      "file": "core:src/ports.ts"
+    }
+  ]
+}

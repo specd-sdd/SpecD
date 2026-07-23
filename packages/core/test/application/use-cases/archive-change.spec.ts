@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
+import { makeSpec } from '../../helpers/make-spec.js'
 import { ArchiveChange } from '../../../src/application/use-cases/archive-change.js'
 import { ChangeNotFoundError } from '../../../src/application/errors/change-not-found-error.js'
 import { SchemaNotFoundError } from '../../../src/application/errors/schema-not-found-error.js'
@@ -323,7 +324,7 @@ describe('ArchiveChange', () => {
       const artifactType = makeArtifactType('spec', { delta: false, scope: 'spec' })
       const schema = makeSchema([artifactType])
       const specRepo = makeSpecRepository({
-        specs: [new Spec('default', SpecPath.parse('auth/oauth'), ['spec.md'])],
+        specs: [makeSpec({ workspace: 'default', name: 'auth/oauth', filenames: ['spec.md'] })],
         artifacts: { 'auth/oauth/spec.md': '# Spec' },
       })
 
@@ -373,7 +374,7 @@ describe('ArchiveChange', () => {
       const artifactType = makeArtifactType('spec', { delta: false, scope: 'spec' })
       const schema = makeSchema([artifactType])
       const specRepo = makeSpecRepository({
-        specs: [new Spec('default', SpecPath.parse('auth/oauth'), ['spec.md'])],
+        specs: [makeSpec({ workspace: 'default', name: 'auth/oauth', filenames: ['spec.md'] })],
         artifacts: { 'auth/oauth/spec.md': '# Spec' },
       })
       const generateMetadata = {
@@ -437,7 +438,7 @@ describe('ArchiveChange', () => {
       const artifactType = makeArtifactType('spec', { delta: false, scope: 'spec' })
       const schema = makeSchema([artifactType])
       const specRepo = makeSpecRepository({
-        specs: [new Spec('default', SpecPath.parse('auth/oauth'), ['spec.md'])],
+        specs: [makeSpec({ workspace: 'default', name: 'auth/oauth', filenames: ['spec.md'] })],
         artifacts: {
           'auth/oauth/spec.md': '# Spec',
           'auth/oauth/spec-lock.json': JSON.stringify({
@@ -518,7 +519,7 @@ describe('ArchiveChange', () => {
         },
       })
       const specRepo = makeSpecRepository({
-        specs: [new Spec('default', SpecPath.parse('auth/oauth'), ['spec.md'])],
+        specs: [makeSpec({ workspace: 'default', name: 'auth/oauth', filenames: ['spec.md'] })],
         artifacts: { 'auth/oauth/spec.md': '# Spec' },
       })
       const markdownParser = makeParser({
@@ -622,8 +623,8 @@ describe('ArchiveChange', () => {
       const publishCalls: string[] = []
       const specRepo = makeSpecRepository({
         specs: [
-          new Spec('default', SpecPath.parse('auth/oauth'), ['spec.md']),
-          new Spec('default', SpecPath.parse('auth/shared'), ['spec.md']),
+          makeSpec({ workspace: 'default', name: 'auth/oauth', filenames: ['spec.md'] }),
+          makeSpec({ workspace: 'default', name: 'auth/shared', filenames: ['spec.md'] }),
         ],
         artifacts: {
           'auth/oauth/spec.md': '# OAuth',
@@ -754,8 +755,8 @@ describe('ArchiveChange', () => {
       })
       const specRepo = makeSpecRepository({
         specs: [
-          new Spec('default', SpecPath.parse('auth/oauth'), ['spec.md']),
-          new Spec('default', SpecPath.parse('auth/shared'), ['spec.md']),
+          makeSpec({ workspace: 'default', name: 'auth/oauth', filenames: ['spec.md'] }),
+          makeSpec({ workspace: 'default', name: 'auth/shared', filenames: ['spec.md'] }),
         ],
         artifacts: {
           'auth/oauth/spec.md': '# OAuth',
@@ -840,7 +841,7 @@ describe('ArchiveChange', () => {
       const artifactType = makeArtifactType('spec', { delta: false, scope: 'spec' })
       const schema = makeSchema([artifactType])
       const specRepo = makeSpecRepository({
-        specs: [new Spec('default', SpecPath.parse('auth/oauth'), ['spec.md'])],
+        specs: [makeSpec({ workspace: 'default', name: 'auth/oauth', filenames: ['spec.md'] })],
         artifacts: {
           'auth/oauth/spec.md': '# Spec',
           'auth/oauth/spec-lock.json': JSON.stringify({
@@ -915,7 +916,7 @@ describe('ArchiveChange', () => {
       })
       const schema = makeSchema([artifactType])
       const specRepo = makeSpecRepository({
-        specs: [new Spec('default', SpecPath.parse('auth/oauth'), ['spec.md'])],
+        specs: [makeSpec({ workspace: 'default', name: 'auth/oauth', filenames: ['spec.md'] })],
         artifacts: {
           'auth/oauth/spec.md': '# Spec',
           'auth/oauth/.specd-metadata.yaml': JSON.stringify({
@@ -1013,7 +1014,7 @@ describe('ArchiveChange', () => {
       const archiveRepo = makeArchiveRepository()
       const archiveSpy = vi.spyOn(archiveRepo, 'archive')
       const specRepo = makeSpecRepository({
-        specs: [new Spec('default', SpecPath.parse('auth/oauth'), ['spec.md'])],
+        specs: [makeSpec({ workspace: 'default', name: 'auth/oauth', filenames: ['spec.md'] })],
         artifacts: { 'auth/oauth/spec.md': '# Old' },
       })
       vi.spyOn(specRepo, 'publish').mockImplementation(async (): Promise<void> => {
@@ -2916,8 +2917,8 @@ describe('ArchiveChange', () => {
               'default',
               makeSpecRepository({
                 specs: [
-                  new Spec('default', SpecPath.parse('auth/oauth'), ['spec.md']),
-                  new Spec('default', SpecPath.parse('auth/shared'), ['spec.md']),
+                  makeSpec({ workspace: 'default', name: 'auth/oauth', filenames: ['spec.md'] }),
+                  makeSpec({ workspace: 'default', name: 'auth/shared', filenames: ['spec.md'] }),
                 ],
               }),
             ],
@@ -2953,8 +2954,8 @@ describe('ArchiveChange', () => {
 
       const specRepo = makeSpecRepository({
         specs: [
-          new Spec('default', SpecPath.parse('auth/oauth'), ['spec.md']),
-          new Spec('default', SpecPath.parse('auth/shared'), ['spec.md']),
+          makeSpec({ workspace: 'default', name: 'auth/oauth', filenames: ['spec.md'] }),
+          makeSpec({ workspace: 'default', name: 'auth/shared', filenames: ['spec.md'] }),
         ],
       })
       const uc = new ArchiveChange(

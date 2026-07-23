@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
+import { makeSpec } from '../../helpers/make-spec.js'
 import { GetSpecOutline } from '../../../src/application/use-cases/get-spec-outline.js'
 import { Spec } from '../../../src/domain/entities/spec.js'
 import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
@@ -24,7 +25,9 @@ function setup(
   } = {},
 ) {
   const specPath = SpecPath.parse('auth/oauth')
-  const spec = opts.specs?.[0] ?? new Spec('default', specPath, ['spec.md', 'verify.md'])
+  const spec =
+    opts.specs?.[0] ??
+    makeSpec({ workspace: 'default', name: specPath, filenames: ['spec.md', 'verify.md'] })
   const repo = makeSpecRepository({
     specs: [spec],
     artifacts: opts.artifacts ?? {
@@ -178,7 +181,7 @@ describe('GetSpecOutline', () => {
 
     it('throws when file extension is unrecognised', async () => {
       const specPath = SpecPath.parse('auth/oauth')
-      const spec = new Spec('default', specPath, ['data.xyz'])
+      const spec = makeSpec({ workspace: 'default', name: specPath, filenames: ['data.xyz'] })
       const repo = makeSpecRepository({
         specs: [spec],
         artifacts: { 'auth/oauth/data.xyz': 'content' },

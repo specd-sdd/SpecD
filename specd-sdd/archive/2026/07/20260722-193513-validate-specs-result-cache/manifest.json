@@ -1,0 +1,2528 @@
+{
+  "name": "validate-specs-result-cache",
+  "createdAt": "2026-07-22T19:35:13.330Z",
+  "description": "Cache ValidateSpecs results under fs-cache with mtime+fingerprint freshness to skip expensive revalidation on spec validate --all",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "core:validate-specs",
+    "core:storage",
+    "core:validation-result-cache-port",
+    "core:spec-repository-port",
+    "core:fs-spec-repository",
+    "core:get-spec",
+    "core:search-specs",
+    "core:spec-lock",
+    "core:spec-metadata",
+    "code-graph:workspace-integration",
+    "default:_global/conventions"
+  ],
+  "specDependsOn": {
+    "core:validate-specs": [
+      "core:validate-artifacts",
+      "core:schema-format",
+      "core:storage",
+      "core:workspace",
+      "core:spec-id-format",
+      "core:composition-resolver",
+      "core:validation-result-cache-port",
+      "core:spec-lock",
+      "core:spec-repository-port"
+    ],
+    "core:storage": [
+      "default:_global/architecture",
+      "core:change",
+      "core:change-manifest",
+      "default:_global/logging"
+    ],
+    "core:validation-result-cache-port": [
+      "default:_global/architecture",
+      "core:spec-repository-port"
+    ],
+    "core:spec-repository-port": [
+      "core:repository-port",
+      "default:_global/architecture",
+      "core:change",
+      "core:storage",
+      "core:workspace",
+      "core:spec-id-format",
+      "core:spec-metadata",
+      "core:content-extraction",
+      "core:search-specs",
+      "default:_global/logging",
+      "core:spec-lock"
+    ],
+    "core:fs-spec-repository": [
+      "default:_global/architecture",
+      "core:composition",
+      "core:storage",
+      "core:spec-repository-port"
+    ],
+    "core:get-spec": [
+      "core:storage",
+      "core:workspace",
+      "core:spec-id-format",
+      "core:composition-resolver"
+    ],
+    "core:search-specs": [
+      "core:spec-repository-port",
+      "core:list-specs",
+      "core:workspace",
+      "core:list-workspaces",
+      "core:composition-resolver"
+    ],
+    "core:spec-lock": ["core:spec-id-format", "core:storage"],
+    "core:spec-metadata": [
+      "core:config",
+      "core:change",
+      "core:schema-format",
+      "core:content-extraction",
+      "core:spec-repository-port",
+      "core:spec-lock"
+    ],
+    "code-graph:workspace-integration": ["core:config"],
+    "default:_global/conventions": ["default:_global/error-handling-conventions"]
+  },
+  "invalidationPolicy": "downstream",
+  "trackedImplementationFiles": [
+    {
+      "file": ".specd/metadata/core/change/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/default/_global/docs/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": "EXPLORATION_EVENT_BUS.md",
+      "state": "ignored"
+    },
+    {
+      "file": "EXPLORATION_SPECD_BRANCH_MERGE_SKILL.md",
+      "state": "ignored"
+    },
+    {
+      "file": "EXPLORATION_STORAGE_ABSTRACTION.md",
+      "state": "ignored"
+    },
+    {
+      "file": "assets/specd-changes-hooks.svg",
+      "state": "ignored"
+    },
+    {
+      "file": "assets/specd-changes-status.svg",
+      "state": "ignored"
+    },
+    {
+      "file": "assets/specd-changes-validate.svg",
+      "state": "ignored"
+    },
+    {
+      "file": "assets/specd-specs-lists.svg",
+      "state": "ignored"
+    },
+    {
+      "file": "assets/specd.svg",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/ports/validation-result-cache.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/infrastructure/fs/fs-validation-result-cache.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/_shared/validate-specs-cache-fingerprints.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/validate-specs.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/validate-specs.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/composition-resolver.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/cli/cli-reference.md",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/ports/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/ports/spec-repository.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/infrastructure/fs/spec-repository.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/helpers.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/validate-specs.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/_shared/validate-specs-cache-fingerprints.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/infrastructure/fs/fs-validation-result-cache.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/ports.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/entities/spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/get-spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/search-specs.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/use-cases/index-code-graph.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/index-project-graph-integration.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/workspace-indexing.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/composition/code-graph-provider.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/_shared/depends-on-traversal.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/_shared/project-metadata-freshness.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/archive-change.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/compile-context.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/get-artifact-instruction.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/get-project-context.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/update-project-metadata.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/infrastructure/fs/fs-spec-index-cache.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/_shared/depends-on-traversal.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/_shared/spec-pattern-matching.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/_shared/spec-reference-resolver.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/archive-change-batch-restore.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/archive-change.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/compile-context.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/create-change.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/edit-change.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/generate-spec-metadata.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/get-project-context.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/get-spec-context.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/get-spec-outline.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/get-spec.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/invalidate-spec-metadata.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/list-specs.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/preview-spec.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/save-spec-metadata.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/search-specs.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/validate-artifacts.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/domain/entities/spec.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/infrastructure/fs/fs-spec-index-cache.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/infrastructure/fs/spec-repository.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/helpers/make-spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/helpers/make-spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/helpers/make-mock-spec-repository.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/_global/conventions/.specd-archive-backup/manifest.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/_global/conventions/.specd-archive-backup/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/_global/conventions/.specd-archive-backup/spec.md",
+      "state": "open"
+    },
+    {
+      "file": "specs/_global/conventions/.specd-archive-backup/verify.md",
+      "state": "open"
+    },
+    {
+      "file": "specs/code-graph/workspace-integration/.specd-archive-backup/manifest.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/code-graph/workspace-integration/.specd-archive-backup/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/code-graph/workspace-integration/.specd-archive-backup/spec.md",
+      "state": "open"
+    },
+    {
+      "file": "specs/code-graph/workspace-integration/.specd-archive-backup/verify.md",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/fs-spec-repository/.specd-archive-backup/manifest.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/fs-spec-repository/.specd-archive-backup/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/fs-spec-repository/.specd-archive-backup/spec.md",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/fs-spec-repository/.specd-archive-backup/verify.md",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/get-spec/.specd-archive-backup/manifest.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/get-spec/.specd-archive-backup/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/get-spec/.specd-archive-backup/spec.md",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/get-spec/.specd-archive-backup/verify.md",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/search-specs/.specd-archive-backup/manifest.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/search-specs/.specd-archive-backup/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/search-specs/.specd-archive-backup/spec.md",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/search-specs/.specd-archive-backup/verify.md",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/spec-lock/.specd-archive-backup/manifest.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/spec-lock/.specd-archive-backup/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/spec-lock/.specd-archive-backup/spec.md",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/spec-lock/.specd-archive-backup/verify.md",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/spec-metadata/.specd-archive-backup/manifest.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/spec-metadata/.specd-archive-backup/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/spec-metadata/.specd-archive-backup/spec.md",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/spec-metadata/.specd-archive-backup/verify.md",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/spec-repository-port/.specd-archive-backup/manifest.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/spec-repository-port/.specd-archive-backup/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/spec-repository-port/.specd-archive-backup/spec.md",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/spec-repository-port/.specd-archive-backup/verify.md",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/storage/.specd-archive-backup/manifest.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/storage/.specd-archive-backup/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/storage/.specd-archive-backup/spec.md",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/storage/.specd-archive-backup/verify.md",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/validate-specs/.specd-archive-backup/manifest.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/validate-specs/.specd-archive-backup/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/validate-specs/.specd-archive-backup/spec.md",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/validate-specs/.specd-archive-backup/verify.md",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/validation-result-cache-port/.specd-archive-backup/manifest.json",
+      "state": "open"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "core:validation-result-cache-port",
+      "file": "packages/core/src/application/ports/validation-result-cache.ts",
+      "fileLinkExplicit": false,
+      "symbols": [
+        "ValidationResultCache",
+        "ValidationCacheEntry",
+        "ValidationSourceStamp",
+        "ValidationCacheLookupInput",
+        "ValidationCacheLookupResult",
+        "ValidationCacheUpsertInput",
+        "ValidationResultCache,SpecValidationEntry,ValidationCacheLookupResult"
+      ]
+    },
+    {
+      "specId": "core:validation-result-cache-port",
+      "file": "packages/core/src/infrastructure/fs/fs-validation-result-cache.ts",
+      "fileLinkExplicit": false,
+      "symbols": [
+        "FsValidationResultCache",
+        "collectValidationSourceStamps",
+        "ValidationIndexMeta",
+        "FsValidationResultCache,stampsFromSpec,ValidationStoredStamps",
+        "stampsFromSpec",
+        "ValidationStoredStamps"
+      ]
+    },
+    {
+      "specId": "core:validate-specs",
+      "file": "packages/core/src/application/use-cases/_shared/validate-specs-cache-fingerprints.ts",
+      "fileLinkExplicit": false,
+      "symbols": [
+        "VALIDATE_SPECS_ENGINE_VERSION",
+        "computeSchemaFingerprint",
+        "computeInputFingerprint",
+        "computeSchemaFingerprintFromSchema",
+        "computeCacheFingerprint,VALIDATE_SPECS_ENGINE_VERSION"
+      ]
+    },
+    {
+      "specId": "core:validate-specs",
+      "file": "packages/core/src/application/use-cases/validate-specs.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["ValidateSpecs"]
+    },
+    {
+      "specId": "core:validate-specs",
+      "file": "packages/core/src/composition/use-cases/validate-specs.ts",
+      "fileLinkExplicit": false,
+      "symbols": [
+        "ValidateSpecsDeps",
+        "resolveValidateSpecsDeps",
+        "createValidateSpecs",
+        "createValidateSpecsFromNormalized",
+        "isValidateSpecsDeps"
+      ]
+    },
+    {
+      "specId": "core:validate-specs",
+      "file": "packages/core/src/composition/composition-resolver.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["getValidationResultCaches"]
+    },
+    {
+      "specId": "core:storage",
+      "file": "packages/core/src/infrastructure/fs/fs-validation-result-cache.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["FsValidationResultCache"]
+    },
+    {
+      "specId": "core:validation-result-cache-port",
+      "file": "packages/core/src/ports.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:spec-repository-port",
+      "file": "packages/core/src/domain/entities/spec.ts",
+      "fileLinkExplicit": false,
+      "symbols": [
+        "Spec,SpecArtifactEntry,SpecSidecarStamp,ABSENT_SPEC_SIDECAR",
+        "Spec",
+        "SpecArtifactEntry",
+        "SpecSidecarStamp",
+        "hasArtifact",
+        "persistedStateStamp",
+        "generatedMetadataStamp"
+      ]
+    },
+    {
+      "specId": "core:fs-spec-repository",
+      "file": "packages/core/src/infrastructure/fs/spec-repository.ts",
+      "fileLinkExplicit": false,
+      "symbols": [
+        "FsSpecRepository,persistedStateHash,specFingerprint,_buildSpec",
+        "specFingerprint",
+        "persistedStateHash"
+      ]
+    },
+    {
+      "specId": "core:get-spec",
+      "file": "packages/core/src/application/use-cases/get-spec.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["GetSpec"]
+    },
+    {
+      "specId": "core:search-specs",
+      "file": "packages/core/src/application/use-cases/search-specs.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["SearchSpecs"]
+    },
+    {
+      "specId": "code-graph:workspace-integration",
+      "file": "packages/code-graph/src/application/use-cases/index-code-graph.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["IndexCodeGraph"]
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:624914415bc83393dd248dcf36124a33d278969b2e15dcdbcc889a0d77278faf"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:validate-specs",
+          "filename": "deltas/core/validate-specs/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:e1d8d76cd96f0c3bd2fe9788f8e7f329170714928ada9c9d82da6bfa91f23af0"
+        },
+        {
+          "key": "core:storage",
+          "filename": "deltas/core/storage/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:3a08b957f839f00cf6f7795a128e7f67c8b1e0b4a3ebbfb8305c4cc91a5c5adb"
+        },
+        {
+          "key": "core:validation-result-cache-port",
+          "filename": "specs/core/validation-result-cache-port/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:49e945d53781a9e3d338c880c13f932ac3bdae9b04c7106e66d853b0596dc452"
+        },
+        {
+          "key": "core:spec-repository-port",
+          "filename": "deltas/core/spec-repository-port/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:7863491c9d9b85512e7b6ed44929054ade7506b6f227129f79541b04b176cdc1"
+        },
+        {
+          "key": "core:fs-spec-repository",
+          "filename": "deltas/core/fs-spec-repository/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:6c93172b3d828fcad649913f2e1095012c4ce599d2e055d42360bf49a8ba8285"
+        },
+        {
+          "key": "core:get-spec",
+          "filename": "deltas/core/get-spec/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:4a42c3c3f74e2ec51a8513321b68fc9dc2fb758965f4b8d6653812b9ea75b197"
+        },
+        {
+          "key": "core:search-specs",
+          "filename": "deltas/core/search-specs/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:25a9335945b67959dbcbd93d7790586ab0e9b0dae796334c87e02330e8f7600d"
+        },
+        {
+          "key": "core:spec-lock",
+          "filename": "deltas/core/spec-lock/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:07bdb6114a5b90f1773f48b873e2b67e67dc3c4c5a0403ea35f72d1d900f00d8"
+        },
+        {
+          "key": "core:spec-metadata",
+          "filename": "deltas/core/spec-metadata/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:7be7abba30e496f9d0972a7a34245b8f89cd0bec538eb5045d68f1083946b4fd"
+        },
+        {
+          "key": "code-graph:workspace-integration",
+          "filename": "deltas/code-graph/workspace-integration/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:141d45282a78b3792ffcf6f389b24e32ba350e6781251580042110a20a449ffb"
+        },
+        {
+          "key": "default:_global/conventions",
+          "filename": "deltas/default/_global/conventions/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:de05a3c859593f466b31683141236cecbad117f567af3c50d49ce5adb56592a2"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:validate-specs",
+          "filename": "deltas/core/validate-specs/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:ee8f4653acef30d0057e5a9b2aa087c3b613bc673f73510a4cc628bff2fa6b9c"
+        },
+        {
+          "key": "core:storage",
+          "filename": "deltas/core/storage/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:286e38b2fea98357634e6ffba6f7cc232590dca2519b89d9d33653a00062a806"
+        },
+        {
+          "key": "core:validation-result-cache-port",
+          "filename": "specs/core/validation-result-cache-port/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:794ea67a5b41e81a1649c6b2e364642e7b781848996202e709964b329aac93ad"
+        },
+        {
+          "key": "core:spec-repository-port",
+          "filename": "deltas/core/spec-repository-port/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:658ee1bb923692668c551b19b007651e69992eca05f7b7eb88e62eb2a02c9e5d"
+        },
+        {
+          "key": "core:fs-spec-repository",
+          "filename": "deltas/core/fs-spec-repository/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:65144f3a6a3f800d0e79ed52343cd856a84b7b8e2cf508fb7246417b5b8ed6b4"
+        },
+        {
+          "key": "core:get-spec",
+          "filename": "deltas/core/get-spec/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:da0f3e79fa110c277d9dbb18f7941f6b38645afaf6c338e7cac32289d3c403ee"
+        },
+        {
+          "key": "core:search-specs",
+          "filename": "deltas/core/search-specs/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:dac4a6d05896d9dcf612b02728a0e49b103f283853face6506aa20a3c3dc5e87"
+        },
+        {
+          "key": "core:spec-lock",
+          "filename": "deltas/core/spec-lock/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:c85dd2f8b6143b4d4fdeea23d9debcf4614b4fd8dc928d95847dea7a7f07dd19"
+        },
+        {
+          "key": "core:spec-metadata",
+          "filename": "deltas/core/spec-metadata/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:a2b3e836a196e12bca39e75fc8cce658cafe8cedc9cb5b72b95fed05664a743b"
+        },
+        {
+          "key": "code-graph:workspace-integration",
+          "filename": "deltas/code-graph/workspace-integration/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b02a7de9929e63b6d7a84d30ebbbad6eaddf06bd84ada8ccdf9db55f69d877da"
+        },
+        {
+          "key": "default:_global/conventions",
+          "filename": "deltas/default/_global/conventions/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:96066c0c4bf7b719138f7251e62fa94236ba92b6ff8d73a05db1b0488cb9f38d"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:b6c6224b25e356df860b324a7908f3acae5cea62d647e52e140b35f31132b633"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:03fd85aeabab74c09ea0b1cc261ed502a8f1e4695598a71283096e0da7101cd2"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-07-22T19:35:13.330Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": [
+        "core:validate-specs",
+        "core:storage",
+        "cli:storage-reindex",
+        "cli:spec-validate"
+      ],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-22T19:35:13.345Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "core:validate-specs"
+        },
+        {
+          "type": "specs",
+          "key": "core:storage"
+        },
+        {
+          "type": "specs",
+          "key": "cli:storage-reindex"
+        },
+        {
+          "type": "specs",
+          "key": "cli:spec-validate"
+        },
+        {
+          "type": "verify",
+          "key": "core:validate-specs"
+        },
+        {
+          "type": "verify",
+          "key": "core:storage"
+        },
+        {
+          "type": "verify",
+          "key": "cli:storage-reindex"
+        },
+        {
+          "type": "verify",
+          "key": "cli:spec-validate"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-22T19:36:34.787Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-22T19:38:42.262Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:validate-specs",
+            "core:storage",
+            "cli:storage-reindex",
+            "cli:spec-validate"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:validate-specs",
+            "core:storage",
+            "cli:storage-reindex",
+            "cli:spec-validate"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-22T19:38:42.262Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [],
+      "filesRemoved": [
+        {
+          "type": "specs",
+          "key": "cli:storage-reindex"
+        },
+        {
+          "type": "specs",
+          "key": "cli:spec-validate"
+        },
+        {
+          "type": "verify",
+          "key": "cli:storage-reindex"
+        },
+        {
+          "type": "verify",
+          "key": "cli:spec-validate"
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-22T19:46:15.490Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["core:validate-specs", "core:storage"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:validate-specs", "core:storage"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-22T19:46:15.553Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["core:validate-specs", "core:storage"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:validate-specs", "core:storage"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-22T19:46:15.554Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:validation-result-cache-port"
+        },
+        {
+          "type": "verify",
+          "key": "core:validation-result-cache-port"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-22T19:50:32.112Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["core:validate-specs", "core:storage", "core:validation-result-cache-port"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:validate-specs", "core:storage", "core:validation-result-cache-port"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-22T19:55:38.258Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-22T19:59:13.619Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-22T20:12:29.200Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-22T20:22:21.926Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["core:validate-specs", "core:storage", "core:validation-result-cache-port"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:validate-specs", "core:storage", "core:validation-result-cache-port"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-22T20:22:21.926Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-22T20:28:19.823Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-22T20:29:18.159Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-22T20:34:22.180Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-22T21:57:06.041Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["core:validate-specs", "core:storage", "core:validation-result-cache-port"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:validate-specs", "core:storage", "core:validation-result-cache-port"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-22T21:57:06.041Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-22T22:20:15.040Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["core:validate-specs", "core:storage", "core:validation-result-cache-port"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:validate-specs", "core:storage", "core:validation-result-cache-port"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-22T22:20:15.046Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:spec-repository-port"
+        },
+        {
+          "type": "specs",
+          "key": "core:fs-spec-repository"
+        },
+        {
+          "type": "specs",
+          "key": "core:get-spec"
+        },
+        {
+          "type": "specs",
+          "key": "core:search-specs"
+        },
+        {
+          "type": "specs",
+          "key": "core:spec-lock"
+        },
+        {
+          "type": "specs",
+          "key": "core:spec-metadata"
+        },
+        {
+          "type": "verify",
+          "key": "core:spec-repository-port"
+        },
+        {
+          "type": "verify",
+          "key": "core:fs-spec-repository"
+        },
+        {
+          "type": "verify",
+          "key": "core:get-spec"
+        },
+        {
+          "type": "verify",
+          "key": "core:search-specs"
+        },
+        {
+          "type": "verify",
+          "key": "core:spec-lock"
+        },
+        {
+          "type": "verify",
+          "key": "core:spec-metadata"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-22T22:23:54.850Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:validate-specs",
+            "core:storage",
+            "core:validation-result-cache-port",
+            "core:spec-repository-port",
+            "core:fs-spec-repository",
+            "core:get-spec",
+            "core:search-specs",
+            "core:spec-lock",
+            "core:spec-metadata"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:validate-specs",
+            "core:storage",
+            "core:validation-result-cache-port",
+            "core:spec-repository-port",
+            "core:fs-spec-repository",
+            "core:get-spec",
+            "core:search-specs",
+            "core:spec-lock",
+            "core:spec-metadata"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-22T22:27:03.748Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:validate-specs",
+            "core:storage",
+            "core:validation-result-cache-port",
+            "core:spec-repository-port",
+            "core:fs-spec-repository",
+            "core:get-spec",
+            "core:search-specs",
+            "core:spec-lock",
+            "core:spec-metadata"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:validate-specs",
+            "core:storage",
+            "core:validation-result-cache-port",
+            "core:spec-repository-port",
+            "core:fs-spec-repository",
+            "core:get-spec",
+            "core:search-specs",
+            "core:spec-lock",
+            "core:spec-metadata"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-22T22:33:34.835Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:validate-specs",
+            "core:storage",
+            "core:validation-result-cache-port",
+            "core:spec-repository-port",
+            "core:fs-spec-repository",
+            "core:get-spec",
+            "core:search-specs",
+            "core:spec-lock",
+            "core:spec-metadata"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:validate-specs",
+            "core:storage",
+            "core:validation-result-cache-port",
+            "core:spec-repository-port",
+            "core:fs-spec-repository",
+            "core:get-spec",
+            "core:search-specs",
+            "core:spec-lock",
+            "core:spec-metadata"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-22T22:36:14.954Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:validate-specs",
+            "core:storage",
+            "core:validation-result-cache-port",
+            "core:spec-repository-port",
+            "core:fs-spec-repository",
+            "core:get-spec",
+            "core:search-specs",
+            "core:spec-lock",
+            "core:spec-metadata"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:validate-specs",
+            "core:storage",
+            "core:validation-result-cache-port",
+            "core:spec-repository-port",
+            "core:fs-spec-repository",
+            "core:get-spec",
+            "core:search-specs",
+            "core:spec-lock",
+            "core:spec-metadata"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-22T22:37:32.465Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:validate-specs",
+            "core:storage",
+            "core:validation-result-cache-port",
+            "core:spec-repository-port",
+            "core:fs-spec-repository",
+            "core:get-spec",
+            "core:search-specs",
+            "core:spec-lock",
+            "core:spec-metadata"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:validate-specs",
+            "core:storage",
+            "core:validation-result-cache-port",
+            "core:spec-repository-port",
+            "core:fs-spec-repository",
+            "core:get-spec",
+            "core:search-specs",
+            "core:spec-lock",
+            "core:spec-metadata"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-22T22:40:25.950Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:validate-specs",
+            "core:storage",
+            "core:validation-result-cache-port",
+            "core:spec-repository-port",
+            "core:fs-spec-repository",
+            "core:get-spec",
+            "core:search-specs",
+            "core:spec-lock",
+            "core:spec-metadata"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:validate-specs",
+            "core:storage",
+            "core:validation-result-cache-port",
+            "core:spec-repository-port",
+            "core:fs-spec-repository",
+            "core:get-spec",
+            "core:search-specs",
+            "core:spec-lock",
+            "core:spec-metadata"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-22T22:44:47.292Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]; specs [core:spec-repository-port]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["core:spec-repository-port"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:validate-specs",
+            "core:storage",
+            "core:validation-result-cache-port",
+            "core:spec-repository-port",
+            "core:fs-spec-repository",
+            "core:get-spec",
+            "core:search-specs",
+            "core:spec-lock",
+            "core:spec-metadata"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-22T22:46:35.851Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]; specs [core:fs-spec-repository, core:get-spec, core:search-specs, core:spec-lock, core:spec-repository-port]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:fs-spec-repository",
+            "core:get-spec",
+            "core:search-specs",
+            "core:spec-lock",
+            "core:spec-repository-port"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:validate-specs",
+            "core:storage",
+            "core:validation-result-cache-port",
+            "core:spec-repository-port",
+            "core:fs-spec-repository",
+            "core:get-spec",
+            "core:search-specs",
+            "core:spec-lock",
+            "core:spec-metadata"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-22T22:46:35.936Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:validate-specs",
+            "core:storage",
+            "core:validation-result-cache-port",
+            "core:spec-repository-port",
+            "core:fs-spec-repository",
+            "core:get-spec",
+            "core:search-specs",
+            "core:spec-lock",
+            "core:spec-metadata"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:validate-specs",
+            "core:storage",
+            "core:validation-result-cache-port",
+            "core:spec-repository-port",
+            "core:fs-spec-repository",
+            "core:get-spec",
+            "core:search-specs",
+            "core:spec-lock",
+            "core:spec-metadata"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-22T22:46:35.945Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "code-graph:workspace-integration"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:workspace-integration"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-22T22:46:36.554Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:validate-specs",
+            "core:storage",
+            "core:validation-result-cache-port",
+            "core:spec-repository-port",
+            "core:fs-spec-repository",
+            "core:get-spec",
+            "core:search-specs",
+            "core:spec-lock",
+            "core:spec-metadata",
+            "code-graph:workspace-integration"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:validate-specs",
+            "core:storage",
+            "core:validation-result-cache-port",
+            "core:spec-repository-port",
+            "core:fs-spec-repository",
+            "core:get-spec",
+            "core:search-specs",
+            "core:spec-lock",
+            "core:spec-metadata",
+            "code-graph:workspace-integration"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-22T22:46:36.557Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "default:_global/conventions"
+        },
+        {
+          "type": "verify",
+          "key": "default:_global/conventions"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-22T22:48:48.897Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [core:spec-lock, core:spec-repository-port, core:validation-result-cache-port]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": [
+            "core:spec-lock",
+            "core:spec-repository-port",
+            "core:validation-result-cache-port"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-22T22:49:05.033Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [core:spec-repository-port]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["core:spec-repository-port"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-22T22:49:21.056Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [core:fs-spec-repository, core:spec-metadata]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["core:fs-spec-repository", "core:spec-metadata"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-22T22:50:04.630Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]; specs [core:spec-repository-port, core:storage, core:validation-result-cache-port]; verify [core:validation-result-cache-port]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:spec-repository-port",
+            "core:storage",
+            "core:validation-result-cache-port"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": ["core:validation-result-cache-port"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-22T22:52:06.388Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]; specs [core:validation-result-cache-port]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["core:validation-result-cache-port"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:validate-specs",
+            "core:storage",
+            "core:validation-result-cache-port",
+            "core:spec-repository-port",
+            "core:fs-spec-repository",
+            "core:get-spec",
+            "core:search-specs",
+            "core:spec-lock",
+            "core:spec-metadata",
+            "code-graph:workspace-integration",
+            "default:_global/conventions"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-22T22:54:08.231Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]; specs [core:validate-specs]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["core:validate-specs"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:validate-specs",
+            "core:storage",
+            "core:validation-result-cache-port",
+            "core:spec-repository-port",
+            "core:fs-spec-repository",
+            "core:get-spec",
+            "core:search-specs",
+            "core:spec-lock",
+            "core:spec-metadata",
+            "code-graph:workspace-integration",
+            "default:_global/conventions"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-22T22:57:02.370Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-22T23:05:55.400Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-22T23:05:55.400Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-22T23:06:04.927Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-22T23:07:10.475Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-22T23:45:52.559Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]; specs [core:fs-spec-repository, core:spec-lock, core:spec-metadata, core:spec-repository-port, core:storage, core:validation-result-cache-port]; verify [core:fs-spec-repository, core:spec-lock, core:spec-metadata, core:spec-repository-port, core:validation-result-cache-port]; design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:fs-spec-repository",
+            "core:spec-lock",
+            "core:spec-metadata",
+            "core:spec-repository-port",
+            "core:storage",
+            "core:validation-result-cache-port"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:fs-spec-repository",
+            "core:spec-lock",
+            "core:spec-metadata",
+            "core:spec-repository-port",
+            "core:validation-result-cache-port"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-22T23:45:52.559Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-22T23:47:55.783Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [core:storage]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["core:storage"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-22T23:48:37.761Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-22T23:49:13.719Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-22T23:57:44.971Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-23T00:02:07.201Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-23T00:03:36.486Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:validate-specs",
+            "core:storage",
+            "core:validation-result-cache-port",
+            "core:spec-repository-port",
+            "core:fs-spec-repository",
+            "core:get-spec",
+            "core:search-specs",
+            "core:spec-lock",
+            "core:spec-metadata",
+            "code-graph:workspace-integration",
+            "default:_global/conventions"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:validate-specs",
+            "core:storage",
+            "core:validation-result-cache-port",
+            "core:spec-repository-port",
+            "core:fs-spec-repository",
+            "core:get-spec",
+            "core:search-specs",
+            "core:spec-lock",
+            "core:spec-metadata",
+            "code-graph:workspace-integration",
+            "default:_global/conventions"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-23T00:03:36.486Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-23T00:07:56.031Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-23T00:08:07.695Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-23T00:24:25.220Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [default:_global/conventions]; verify [default:_global/conventions]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["default:_global/conventions"]
+        },
+        {
+          "type": "verify",
+          "files": ["default:_global/conventions"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-23T00:24:25.220Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-23T00:25:19.507Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-23T00:25:20.677Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-23T00:29:32.897Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-23T00:32:53.843Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-23T00:32:58.258Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-07-23T00:34:44.873Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Implementation link \"core:storage\" points outside workspace \"core\" codeRoot.",
+      "commitStarted": false
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-23T00:34:57.014Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-07-23T00:34:57.332Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

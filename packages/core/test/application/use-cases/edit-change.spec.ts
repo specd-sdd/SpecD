@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { makeSpec } from '../../helpers/make-spec.js'
 import { EditChange } from '../../../src/application/use-cases/edit-change.js'
 import { ChangeNotFoundError } from '../../../src/application/errors/change-not-found-error.js'
 import { SpecNotInChangeError } from '../../../src/application/errors/spec-not-in-change-error.js'
@@ -90,7 +91,7 @@ describe('EditChange', () => {
         [
           'default',
           makeSpecRepository({
-            specs: [new Spec('default', SpecPath.parse('auth/logout'), [])],
+            specs: [makeSpec({ workspace: 'default', name: 'auth/logout', filenames: [] })],
             artifacts: {
               'auth/logout/spec-lock.json': JSON.stringify({
                 dependsOn: ['default:shared/persisted'],
@@ -121,7 +122,9 @@ describe('EditChange', () => {
         [
           'default',
           makeSpecRepository({
-            specs: [new Spec('default', SpecPath.parse('auth/logout'), ['spec.md'])],
+            specs: [
+              makeSpec({ workspace: 'default', name: 'auth/logout', filenames: ['spec.md'] }),
+            ],
             artifacts: {
               'auth/logout/spec.md': '# Logout flow',
               'auth/logout/metadata.json': JSON.stringify({

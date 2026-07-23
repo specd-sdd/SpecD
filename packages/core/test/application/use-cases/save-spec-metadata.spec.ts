@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { makeSpec } from '../../helpers/make-spec.js'
 import { SaveSpecMetadata } from '../../../src/application/use-cases/save-spec-metadata.js'
 import { MetadataValidationError } from '../../../src/domain/errors/metadata-validation-error.js'
 import { DependsOnOverwriteError } from '../../../src/domain/errors/depends-on-overwrite-error.js'
@@ -22,7 +23,7 @@ function makeUseCase(specs: Spec[] = [], artifacts: Record<string, string | null
 }
 
 const specPath = SpecPath.parse('auth/login')
-const spec = new Spec('default', specPath, ['spec.md'])
+const spec = makeSpec({ workspace: 'default', name: specPath, filenames: ['spec.md'] })
 
 describe('SaveSpecMetadata — write-time validation', () => {
   it('accepts valid metadata', async () => {

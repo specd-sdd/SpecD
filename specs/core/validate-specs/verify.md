@@ -177,6 +177,65 @@
 - **WHEN** `ValidateSpecs` validates that spec
 - **THEN** no dependency-projection failure is recorded for that check
 
+### Requirement: Transparent validation result cache
+
+#### Scenario: Hard hit skips full validation work
+
+- **GIVEN** a valid cache row for a spec whose stamps still match
+- **WHEN** `ValidateSpecs` validates that spec via
+  `lookup({ spec, schemaFingerprint, engineVersion })`
+- **THEN** the cached `SpecValidationEntry` is returned for that spec
+- **AND** artifact parse, rule evaluation, cross-artifact evaluation, and metadata
+  consistency checks are not re-run for that spec
+
+#### Scenario: Soft hit is invisible to ValidateSpecs
+
+- **GIVEN** a cache row whose stamps changed but whose `cacheFingerprint` still matches
+- **WHEN** `ValidateSpecs` validates that spec
+- **THEN** the result is a hit with the cached entry
+- **AND** ValidateSpecs does not receive a soft-hit / `refreshStamps` signal
+- **AND** full validation is not re-run
+
+#### Scenario: Miss runs full validation and upserts including failures
+
+- **GIVEN** no usable cache row for a spec (bucket invalid, stamp+fingerprint miss, or
+  absent)
+- **WHEN** `ValidateSpecs` validates that spec and records failures and warnings
+- **THEN** the full validation path runs
+- **AND** `upsert({ entry, spec, schemaFingerprint, engineVersion })` is called
+- **AND** ValidateSpecs does not pass stamps or `cacheFingerprint`
+
+#### Scenario: Lock content change forces miss via cacheFingerprint
+
+- **GIVEN** two otherwise identical specs whose persisted lock sidecar contents differ
+- **WHEN** each is validated after an initial cached pass
+- **THEN** the second validation cannot hard/soft-hit on the first row's fingerprint
+  path (lock feeds `persistedStateHash` inside `specFingerprint`)
+
+#### Scenario: Hosts observe identical public behaviour on hit or miss
+
+- **WHEN** a host invokes validation with the same public inputs
+- **THEN** returned `ValidateSpecsResult` shape and fields are unchanged by whether a
+  cache hit occurred
+- **AND** the host is not required to pass cache-specific options
+
+#### Scenario: resolveValidateSpecsDeps wires caches with SpecRepository
+
+- **WHEN** `resolveValidateSpecsDeps(resolver)` runs for config-based
+  `createValidateSpecs`
+- **THEN** the resolved deps include
+  `validationResultCaches: ReadonlyMap<string, ValidationResultCache>`
+- **AND** each cache instance is constructed with that workspace's `SpecRepository`
+- **AND** the factory does not construct filesystem validate-cache paths inline
+
+#### Scenario: Composition registers a cache for every configured workspace
+
+- **GIVEN** a project with multiple configured workspaces
+- **WHEN** `resolveValidateSpecsDeps(resolver)` runs
+- **THEN** `validationResultCaches` contains one entry per workspace name
+- **AND** validating any spec through config-based `createValidateSpecs` consults
+  the cache for that spec's workspace
+
 ### Requirement: Config-based factory delegates through resolveValidateSpecsDeps
 
 #### Scenario: createValidateSpecs config form derives ValidateSpecsDeps through resolveValidateSpecsDeps
@@ -185,10 +244,11 @@
 - **THEN** it creates a composition resolver for that composition session
 - **AND** it derives `ValidateSpecsDeps` through `resolveValidateSpecsDeps(resolver)`
 - **AND** `resolveValidateSpecsDeps(resolver)` resolves:
-- `specs: ReadonlyMap<string, SpecRepository>`
-- `schemaProvider: SchemaProvider`
-- `parsers: ArtifactParserRegistry`
-- `hasher?: ContentHasher`
-- `extractorTransforms: ExtractorTransformRegistry`
-- `workspaceRoutes: readonly SpecWorkspaceRoute[]`
+  - `specs: ReadonlyMap<string, SpecRepository>`
+  - `schemaProvider: SchemaProvider`
+  - `parsers: ArtifactParserRegistry`
+  - `contentHasher: ContentHasher`
+  - `extractorTransforms: ExtractorTransformRegistry`
+  - `workspaceRoutes: readonly SpecWorkspaceRoute[]`
+  - `validationResultCaches: ReadonlyMap<string, ValidationResultCache>`
 - **AND** the factory delegates to canonical `createValidateSpecs(deps)`

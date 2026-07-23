@@ -4,7 +4,7 @@ import * as path from 'node:path'
 import { z } from 'zod'
 import { StorageDirectoryNotFoundError } from '../../domain/errors/index.js'
 import { randomUUID } from 'node:crypto'
-import { Spec } from '../../domain/entities/spec.js'
+import { Spec, type SpecArtifactEntry, type SpecSidecarStamp } from '../../domain/entities/spec.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
 import { SpecArtifact } from '../../domain/value-objects/spec-artifact.js'
 import { ArtifactConflictError } from '../../domain/errors/artifact-conflict-error.js'
@@ -191,9 +191,9 @@ export class FsSpecRepository extends SpecRepository {
    */
   private async _computeSourceFileStamps(spec: Spec): Promise<readonly SourceFileStamp[]> {
     const candidates: Array<{ filename: string; absPath: string }> = [
-      ...spec.filenames.map((filename) => ({
-        filename,
-        absPath: path.join(this._specDir(spec.name), filename),
+      ...spec.artifacts.map((artifact) => ({
+        filename: artifact.filename,
+        absPath: path.join(this._specDir(spec.name), artifact.filename),
       })),
       { filename: 'metadata.json', absPath: this._metadataFilePath(spec.name) },
       { filename: SPEC_LOCK_FILENAME, absPath: this._specLockFilePath(spec.name) },
@@ -241,7 +241,7 @@ export class FsSpecRepository extends SpecRepository {
     }
 
     const filenames = await filterFiles(dir, entries)
-    return new Spec(this.workspace(), name, filenames)
+    return this._buildSpec(name, dir, filenames)
   }
 
   /**
@@ -624,7 +624,7 @@ export class FsSpecRepository extends SpecRepository {
    * @param spec - The spec whose stable hash to compute
    * @returns The stable hash, or `null` if absent
    */
-  override async specHash(spec: Spec): Promise<string | null> {
+  override async persistedStateHash(spec: Spec): Promise<string | null> {
     const filePath = this._specLockFilePath(spec.name)
     try {
       const content = await fs.readFile(filePath, 'utf8')
@@ -633,6 +633,24 @@ export class FsSpecRepository extends SpecRepository {
       if (isEnoent(err)) return null
       throw err
     }
+  }
+
+  /** @inheritdoc */
+  override async specFingerprint(spec: Spec): Promise<string> {
+    const persistedStateHash = await this.persistedStateHash(spec)
+    const sortedArtifacts = [...spec.artifacts].sort((a, b) => a.filename.localeCompare(b.filename))
+    const artifactEntries: Array<{ filename: string; contentHash: string }> = []
+    for (const entry of sortedArtifacts) {
+      const artifact = await this.artifact(spec, entry.filename)
+      if (artifact !== null) {
+        artifactEntries.push({ filename: entry.filename, contentHash: sha256(artifact.content) })
+      }
+    }
+    const canonical = sortFingerprintKeys({
+      artifacts: artifactEntries,
+      persistedStateHash: persistedStateHash ?? '__absent__',
+    })
+    return sha256(JSON.stringify(canonical))
   }
 
   /**
@@ -901,11 +919,12 @@ export class FsSpecRepository extends SpecRepository {
       let score = 0
       const matches: SpecSearchMatch[] = []
 
-      for (const filename of spec.filenames) {
-        const artifact = await this.artifact(spec, filename)
-        if (artifact === null) continue
+      for (const artifact of spec.artifacts) {
+        const filename = artifact.filename
+        const loaded = await this.artifact(spec, filename)
+        if (loaded === null) continue
 
-        const content = artifact.content
+        const content = loaded.content
         const lowerContent = content.toLowerCase()
         let searchOffset = 0
 
@@ -1031,6 +1050,46 @@ export class FsSpecRepository extends SpecRepository {
   }
 
   /**
+   * Builds a {@link Spec} with artifact and sidecar stamps from a spec directory.
+   *
+   * @param name - Logical spec path
+   * @param dir - Absolute spec directory path
+   * @param filenames - Artifact basenames in the directory
+   * @returns Spec metadata with stamps
+   */
+  private async _buildSpec(
+    name: SpecPath,
+    dir: string,
+    filenames: readonly string[],
+  ): Promise<Spec> {
+    const artifacts: SpecArtifactEntry[] = await Promise.all(
+      filenames.map(async (filename) => {
+        const stat = await fs.stat(path.join(dir, filename))
+        return { filename, lastModified: stat.mtime.toISOString() }
+      }),
+    )
+    const persistedStateStamp = await this._statSidecar(this._specLockFilePath(name))
+    const generatedMetadataStamp = await this._statSidecar(this._metadataFilePath(name))
+    return new Spec(this.workspace(), name, artifacts, persistedStateStamp, generatedMetadataStamp)
+  }
+
+  /**
+   * Returns presence and mtime for one sidecar path.
+   *
+   * @param absPath - Absolute sidecar file path
+   * @returns Sidecar stamp; absent files encode `present: false`
+   */
+  private async _statSidecar(absPath: string): Promise<SpecSidecarStamp> {
+    try {
+      const stat = await fs.stat(absPath)
+      return { present: true, lastModified: stat.mtime.toISOString() }
+    } catch (err) {
+      if (isEnoent(err)) return { present: false, lastModified: null }
+      throw err
+    }
+  }
+
+  /**
    * Returns the absolute path to `spec-lock.json` for the given spec name.
    *
    * @param name - Logical spec path
@@ -1101,7 +1160,7 @@ export class FsSpecRepository extends SpecRepository {
       if (segments.length > 0) {
         const prefixed = [...this._prefixSegments, ...segments]
         const specPath = SpecPath.fromSegments(prefixed)
-        results.push(new Spec(this.workspace(), specPath, files))
+        results.push(await this._buildSpec(specPath, dir, files))
       }
     }
 
@@ -1165,8 +1224,8 @@ async function filterFiles(dir: string, entries: string[]): Promise<string[]> {
  */
 function allowedSpecArtifactFilenames(spec: Spec): ReadonlySet<string> {
   const allowed = new Set<string>(['spec.md', 'verify.md'])
-  for (const filename of spec.filenames) {
-    const normalized = normalizeRelativePath(filename)
+  for (const artifact of spec.artifacts) {
+    const normalized = normalizeRelativePath(artifact.filename)
     if (normalized === SPEC_LOCK_FILENAME) continue
     allowed.add(normalized)
   }
@@ -1202,4 +1261,25 @@ function sameStringSet(left: readonly string[], right: readonly string[]): boole
   const sortedLeft = [...left].sort()
   const sortedRight = [...right].sort()
   return sortedLeft.every((entry, index) => entry === sortedRight[index])
+}
+
+/**
+ * Recursively sorts object keys for stable spec fingerprint JSON.
+ *
+ * @param value - Value to canonicalize
+ * @returns Canonicalized value with sorted object keys
+ */
+function sortFingerprintKeys(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map((entry) => sortFingerprintKeys(entry))
+  }
+  if (value !== null && typeof value === 'object') {
+    const record = value as Record<string, unknown>
+    const sorted: Record<string, unknown> = {}
+    for (const key of Object.keys(record).sort()) {
+      sorted[key] = sortFingerprintKeys(record[key])
+    }
+    return sorted
+  }
+  return value
 }

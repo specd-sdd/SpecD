@@ -2,7 +2,7 @@ import { type SpecRepository } from '../../ports/spec-repository.js'
 import { type ArtifactParserRegistry } from '../../ports/artifact-parser.js'
 import { type ArtifactType } from '../../../domain/value-objects/artifact-type.js'
 import { type MetadataExtraction } from '../../../domain/value-objects/metadata-extraction.js'
-import { Spec } from '../../../domain/entities/spec.js'
+import { Spec, ABSENT_SPEC_SIDECAR } from '../../../domain/entities/spec.js'
 import { parseSpecId } from '../../../domain/services/parse-spec-id.js'
 import { inferFormat } from '../../../domain/services/format-inference.js'
 import { SpecPath } from '../../../domain/value-objects/spec-path.js'
@@ -97,7 +97,7 @@ export async function traverseDependsOn(
     return
   }
 
-  const spec = new Spec(workspace, specPathObj, [])
+  const spec = new Spec(workspace, specPathObj, [], ABSENT_SPEC_SIDECAR, ABSENT_SPEC_SIDECAR)
   const metadata = await specRepo.metadata(spec)
 
   let dependsOn: string[] | undefined

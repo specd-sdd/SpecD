@@ -18,6 +18,7 @@ import { type SchemaProvider } from '../application/ports/schema-provider.js'
 import { type SchemaRegistry } from '../application/ports/schema-registry.js'
 import { type SchemaRepository } from '../application/ports/schema-repository.js'
 import { type SpecRepository } from '../application/ports/spec-repository.js'
+import { type ValidationResultCache } from '../application/ports/validation-result-cache.js'
 import { type VcsAdapter } from '../application/ports/vcs-adapter.js'
 import { type YamlSerializer } from '../application/ports/yaml-serializer.js'
 import { type SpecdConfig, type SpecdWorkspaceConfig } from '../application/specd-config.js'
@@ -54,6 +55,7 @@ import { PrivacyActorResolver } from './privacy-actor-resolver.js'
 import { createSchemaRegistry } from './schema-registry.js'
 import { createSpecWorkspaceRoutes } from './spec-workspace-routes.js'
 import { createVcsAdapter } from './vcs-adapter.js'
+import { FsValidationResultCache } from '../infrastructure/fs/fs-validation-result-cache.js'
 
 /**
  * Additive composition options shared by standalone factories and kernel construction.
@@ -254,6 +256,13 @@ export interface CompositionResolver {
    * @returns Workspace routing data for spec-aware use cases
    */
   getSpecWorkspaceRoutes(): ReturnType<typeof createSpecWorkspaceRoutes>
+
+  /**
+   * Returns validation result caches keyed by workspace name.
+   *
+   * @returns Workspace-keyed validation result cache instances
+   */
+  getValidationResultCaches(): ReadonlyMap<string, ValidationResultCache>
 }
 
 /**
@@ -367,6 +376,7 @@ export function createCompositionResolver(
   let refreshImplementationTracking: RefreshImplementationTracking | undefined
   let compileContextConfig: ReturnType<typeof buildCompileContextConfig> | undefined
   let workspaceRoutes: ReturnType<typeof createSpecWorkspaceRoutes> | undefined
+  let validationResultCaches: ReadonlyMap<string, ValidationResultCache> | undefined
 
   const resolver: CompositionResolver = {
     config,
@@ -660,6 +670,26 @@ export function createCompositionResolver(
       if (workspaceRoutes !== undefined) return workspaceRoutes
       workspaceRoutes = createSpecWorkspaceRoutes(config.workspaces)
       return workspaceRoutes
+    },
+
+    getValidationResultCaches(): ReadonlyMap<string, ValidationResultCache> {
+      if (validationResultCaches !== undefined) return validationResultCaches
+      const specs = resolver.getSpecRepositories()
+      const caches = new Map<string, ValidationResultCache>()
+      for (const workspace of config.workspaces) {
+        const specRepo = specs.get(workspace.name)
+        if (specRepo === undefined) continue
+        caches.set(
+          workspace.name,
+          new FsValidationResultCache({
+            specRepository: specRepo,
+            configPath: config.configPath,
+            metadataPath: resolveMetadataPathForWorkspace(config, workspace),
+          }),
+        )
+      }
+      validationResultCaches = caches
+      return validationResultCaches
     },
   }
 

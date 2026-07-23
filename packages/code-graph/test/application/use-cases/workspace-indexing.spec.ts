@@ -1,4 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { makeSpec } from '../../helpers/make-spec.js'
+import { makeListResult, makeMockSpecRepository } from '../../helpers/make-mock-spec-repository.js'
+
+const makeMockRepo = makeMockSpecRepository
 import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { tmpdir } from 'node:os'
@@ -14,50 +18,6 @@ import {
   buildExpectedFingerprintMap,
   expectStoredFingerprintMap,
 } from '../../helpers/expected-fingerprint-map.js'
-
-/**
- * Builds a paginated list envelope for mock spec repositories.
- *
- * @param specs - Spec entities to expose as list entries
- * @returns List result matching {@link SpecRepository.list}
- */
-function makeListResult(specs: Spec[]) {
-  const items = specs.map((spec) => ({
-    workspace: spec.workspace,
-    path: spec.name.toFsPath('/'),
-    title: spec.name.toString().split('/').at(-1) ?? spec.name.toString(),
-  }))
-  return {
-    items,
-    meta: { total: items.length, count: items.length, limit: items.length },
-  }
-}
-
-/**
- * Creates a mock spec repository.
- * @param specs - List of specs to return.
- * @param metadataMap - Optional map of specId to metadata.
- * @returns A mock SpecRepository instance.
- */
-function makeMockRepo(
-  specs: Spec[] = [],
-  metadataMap: Map<string, Record<string, unknown>> = new Map(),
-): SpecRepository {
-  return {
-    get specsPath() {
-      return undefined
-    },
-    list: async () => makeListResult(specs),
-    count: async () => specs.length,
-    specHash: async () => 'sha256:test',
-    metadata: async (s: Spec) =>
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-      (metadataMap.get(s.name.toString()) as any) ?? { title: s.name.toString() },
-    readPersistedDependsOn: async () => [],
-    readPersistedImplementation: async () => [],
-    artifact: async () => ({ content: '# Spec Content' }),
-  } as unknown as SpecRepository
-}
 
 /**
  * Creates a temporary workspace directory with TypeScript source files.
@@ -110,8 +70,8 @@ describe('Workspace indexing', () => {
       'src/utils.ts': 'export interface Foo { value: number }',
     })
 
-    const spec1 = new Spec('ws1', SpecPath.parse('spec1'), [])
-    const spec2 = new Spec('ws2', SpecPath.parse('spec2'), [])
+    const spec1 = makeSpec({ workspace: 'ws1', name: 'spec1', filenames: [] })
+    const spec2 = makeSpec({ workspace: 'ws2', name: 'spec2', filenames: [] })
 
     const uc = new IndexCodeGraph(store, registry)
     const result = await uc.execute({
@@ -158,7 +118,7 @@ describe('Workspace indexing', () => {
       'src/a.ts': 'export const a = 1;',
     })
 
-    const spec1 = new Spec('ws1', SpecPath.parse('auth/login'), [])
+    const spec1 = makeSpec({ workspace: 'ws1', name: 'auth/login', filenames: [] })
 
     const uc = new IndexCodeGraph(store, registry)
     await uc.execute({
@@ -282,8 +242,8 @@ describe('Workspace indexing', () => {
     const ws1Dir = createWorkspaceDir(tempDir, 'ws1', { 'f.ts': '' })
     const ws2Dir = createWorkspaceDir(tempDir, 'ws2', { 'f.ts': '' })
 
-    const spec1 = new Spec('ws1', SpecPath.parse('common'), [])
-    const spec2 = new Spec('ws2', SpecPath.parse('common'), [])
+    const spec1 = makeSpec({ workspace: 'ws1', name: 'common', filenames: [] })
+    const spec2 = makeSpec({ workspace: 'ws2', name: 'common', filenames: [] })
 
     const uc = new IndexCodeGraph(store, registry)
     await uc.execute({
@@ -360,7 +320,8 @@ describe('Workspace indexing', () => {
       },
       list: async () => makeListResult([]),
       count: async () => 0,
-      specHash: async () => 'sha256:test',
+      get: async () => null,
+      persistedStateHash: async () => 'sha256:test',
       metadata: async () => null,
       readPersistedDependsOn: async () => [],
       readPersistedImplementation: async () => [],
@@ -396,7 +357,7 @@ describe('Workspace indexing', () => {
       'src/a.ts': 'export const a = 1;',
     })
 
-    const spec1 = new Spec('ws1', SpecPath.parse('test'), [])
+    const spec1 = makeSpec({ workspace: 'ws1', name: 'test', filenames: [] })
     const metadata = new Map([
       ['test', { title: 'Test', description: 'Original', optimizedDescription: 'AI summary' }],
     ])
@@ -429,12 +390,11 @@ describe('Workspace indexing', () => {
     const ws1Dir = createWorkspaceDir(tempDir, 'ws1', {})
 
     // Spec with multiple artifacts including sidecars
-    const spec1 = new Spec('ws1', SpecPath.parse('test'), [
-      'verify.md',
-      'spec.md',
-      'spec-lock.json',
-      'metadata.json',
-    ])
+    const spec1 = makeSpec({
+      workspace: 'ws1',
+      name: 'test',
+      filenames: ['verify.md', 'spec.md', 'spec-lock.json', 'metadata.json'],
+    })
 
     const artifactMap = new Map<string, Record<string, string>>([
       [
@@ -451,7 +411,9 @@ describe('Workspace indexing', () => {
     const repo = {
       list: async () => makeListResult([spec1]),
       count: async () => 1,
-      specHash: async () => 'sha256:sidecar-hash',
+      get: async (specPath: import('@specd/core').SpecPath) =>
+        specPath.toFsPath('/') === spec1.name.toFsPath('/') ? spec1 : null,
+      persistedStateHash: async () => 'sha256:sidecar-hash',
       metadata: async () => ({ title: 'Test' }),
       readPersistedDependsOn: async () => [],
       readPersistedImplementation: async () => [],

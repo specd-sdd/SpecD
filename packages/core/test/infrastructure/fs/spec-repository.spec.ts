@@ -3,6 +3,7 @@ import * as os from 'node:os'
 import * as path from 'node:path'
 import assert from 'node:assert/strict'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { makeSpec as buildTestSpec } from '../../helpers/make-spec.js'
 import { Spec } from '../../../src/domain/entities/spec.js'
 import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
 import { SpecArtifact } from '../../../src/domain/value-objects/spec-artifact.js'
@@ -68,8 +69,18 @@ async function readSpecFile(ctx: RepoContext, specStr: string, filename: string)
   return fs.readFile(path.join(dir, filename), 'utf8')
 }
 
-function makeSpec(ctx: RepoContext, specStr: string, filenames: string[]): Spec {
-  return new Spec('default', SpecPath.parse(specStr), filenames)
+async function writeMetadataFile(
+  ctx: RepoContext,
+  specStr: string,
+  content: string,
+): Promise<void> {
+  const dir = path.join(ctx.tmpDir, '.specd', 'metadata', 'default', ...specStr.split('/'))
+  await fs.mkdir(dir, { recursive: true })
+  await fs.writeFile(path.join(dir, 'metadata.json'), content, 'utf8')
+}
+
+function artifactNames(spec: Spec): readonly string[] {
+  return spec.filenames
 }
 
 // ---- Tests ----
@@ -101,7 +112,7 @@ describe('FsSpecRepository', () => {
       expect(result).not.toBeNull()
       expect(result!.name.toString()).toBe('auth/login')
       expect(result!.workspace).toBe('default')
-      expect(result!.filenames).toContain('spec.md')
+      expect(artifactNames(result!)).toContain('spec.md')
     })
 
     it('excludes spec-lock.json from filenames', async () => {
@@ -116,7 +127,7 @@ describe('FsSpecRepository', () => {
       const result = await ctx.repo.get(SpecPath.parse('auth/login'))
 
       expect(result).not.toBeNull()
-      expect(result!.filenames).toEqual(['spec.md'])
+      expect(artifactNames(result!)).toEqual(['spec.md'])
     })
 
     it('lists only files (not subdirectories) in filenames', async () => {
@@ -127,9 +138,9 @@ describe('FsSpecRepository', () => {
 
       const result = await ctx.repo.get(SpecPath.parse('auth/login'))
 
-      expect(result!.filenames).toContain('spec.md')
-      expect(result!.filenames).toContain('proposal.md')
-      expect(result!.filenames).not.toContain('subdir')
+      expect(artifactNames(result!)).toContain('spec.md')
+      expect(artifactNames(result!)).toContain('proposal.md')
+      expect(artifactNames(result!)).not.toContain('subdir')
     })
 
     it('returns spec with multiple artifact files', async () => {
@@ -138,9 +149,9 @@ describe('FsSpecRepository', () => {
 
       const result = await ctx.repo.get(SpecPath.parse('billing/invoices'))
 
-      expect(result!.filenames).toHaveLength(2)
-      expect(result!.filenames).toContain('spec.md')
-      expect(result!.filenames).toContain('verify.md')
+      expect(artifactNames(result!)).toHaveLength(2)
+      expect(artifactNames(result!)).toContain('spec.md')
+      expect(artifactNames(result!)).toContain('verify.md')
     })
 
     it('handles deep nested spec paths', async () => {
@@ -150,6 +161,42 @@ describe('FsSpecRepository', () => {
 
       expect(result).not.toBeNull()
       expect(result!.name.toString()).toBe('a/b/c/d')
+    })
+
+    it('populates artifact and sidecar stamps on get', async () => {
+      await writeSpecFile(ctx, 'auth/login', 'spec.md', '# Login spec')
+      await writeSpecFile(
+        ctx,
+        'auth/login',
+        'spec-lock.json',
+        JSON.stringify({ schema: { name: 'schema-std', version: 1 }, dependsOn: [] }, null, 2),
+      )
+      await writeMetadataFile(
+        ctx,
+        'auth/login',
+        JSON.stringify({ title: 'Login', description: 'Auth', contentHashes: {} }),
+      )
+
+      const result = await ctx.repo.get(SpecPath.parse('auth/login'))
+
+      expect(result).not.toBeNull()
+      expect(result!.artifacts).toHaveLength(1)
+      expect(result!.artifacts[0]!.filename).toBe('spec.md')
+      expect(result!.artifacts[0]!.lastModified).toMatch(/^\d{4}-/)
+      expect(result!.persistedStateStamp.present).toBe(true)
+      expect(result!.persistedStateStamp.lastModified).toMatch(/^\d{4}-/)
+      expect(result!.generatedMetadataStamp.present).toBe(true)
+      expect(result!.generatedMetadataStamp.lastModified).toMatch(/^\d{4}-/)
+    })
+
+    it('exposes derived filenames and hasArtifact from artifacts', async () => {
+      await writeSpecFile(ctx, 'auth/login', 'spec.md', '# Login spec')
+
+      const result = await ctx.repo.get(SpecPath.parse('auth/login'))
+
+      expect(result!.filenames).toEqual(['spec.md'])
+      expect(result!.hasArtifact('spec.md')).toBe(true)
+      expect(result!.hasArtifact('missing.md')).toBe(false)
     })
   })
 
@@ -218,8 +265,8 @@ describe('FsSpecRepository', () => {
       const results = await ctx.repo.list()
       const spec = await ctx.repo.get(SpecPath.parse(results.items[0]!.path))
 
-      expect(spec!.filenames).toContain('spec.md')
-      expect(spec!.filenames).toContain('verify.md')
+      expect(artifactNames(spec!)).toContain('spec.md')
+      expect(artifactNames(spec!)).toContain('verify.md')
     })
 
     it('does not surface spec-lock.json in list() filenames', async () => {
@@ -235,7 +282,7 @@ describe('FsSpecRepository', () => {
       const spec = await ctx.repo.get(SpecPath.parse(results.items[0]!.path))
 
       expect(results.items).toHaveLength(1)
-      expect(spec!.filenames).toEqual(['spec.md'])
+      expect(artifactNames(spec!)).toEqual(['spec.md'])
     })
   })
 
@@ -243,7 +290,7 @@ describe('FsSpecRepository', () => {
 
   describe('artifact', () => {
     it('returns null when file does not exist', async () => {
-      const spec = makeSpec(ctx, 'auth/login', [])
+      const spec = buildTestSpec({ workspace: 'default', name: 'auth/login', filenames: [] })
 
       const result = await ctx.repo.artifact(spec, 'spec.md')
 
@@ -253,7 +300,11 @@ describe('FsSpecRepository', () => {
     it('returns artifact with content and originalHash', async () => {
       const content = '# Login spec\n\nContent here.'
       await writeSpecFile(ctx, 'auth/login', 'spec.md', content)
-      const spec = makeSpec(ctx, 'auth/login', ['spec.md'])
+      const spec = buildTestSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md'],
+      })
 
       const result = await ctx.repo.artifact(spec, 'spec.md')
 
@@ -266,7 +317,11 @@ describe('FsSpecRepository', () => {
     it('loads the correct file when multiple artifacts exist', async () => {
       await writeSpecFile(ctx, 'auth/login', 'spec.md', 'spec content')
       await writeSpecFile(ctx, 'auth/login', 'verify.md', 'verify content')
-      const spec = makeSpec(ctx, 'auth/login', ['spec.md', 'verify.md'])
+      const spec = buildTestSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md', 'verify.md'],
+      })
 
       const result = await ctx.repo.artifact(spec, 'verify.md')
 
@@ -278,7 +333,11 @@ describe('FsSpecRepository', () => {
 
   describe('metadata', () => {
     it('returns null when metadata.json does not exist', async () => {
-      const spec = makeSpec(ctx, 'auth/login', ['spec.md'])
+      const spec = buildTestSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md'],
+      })
       await writeSpecFile(ctx, 'auth/login', 'spec.md', '# Login spec')
 
       const result = await ctx.repo.metadata(spec)
@@ -287,7 +346,11 @@ describe('FsSpecRepository', () => {
     })
 
     it('returns fresh metadata with originalHash when content hashes and sidecar agree', async () => {
-      const spec = makeSpec(ctx, 'auth/login', ['spec.md'])
+      const spec = buildTestSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md'],
+      })
       const specContent = '# Login spec'
       await writeSpecFile(ctx, 'auth/login', 'spec.md', specContent)
       await writeSpecFile(
@@ -327,7 +390,11 @@ describe('FsSpecRepository', () => {
     })
 
     it('returns stale metadata instead of null when hashes are outdated', async () => {
-      const spec = makeSpec(ctx, 'auth/login', ['spec.md'])
+      const spec = buildTestSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md'],
+      })
       await writeSpecFile(ctx, 'auth/login', 'spec.md', '# Updated spec')
       await ctx.repo.saveMetadata(
         spec,
@@ -346,7 +413,11 @@ describe('FsSpecRepository', () => {
     })
 
     it('returns stale metadata when dependsOn drifts from spec-lock.json', async () => {
-      const spec = makeSpec(ctx, 'auth/login', ['spec.md'])
+      const spec = buildTestSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md'],
+      })
       const specContent = '# Login spec'
       await writeSpecFile(ctx, 'auth/login', 'spec.md', specContent)
       await writeSpecFile(
@@ -380,7 +451,7 @@ describe('FsSpecRepository', () => {
 
   describe('save', () => {
     it('creates the spec directory and writes the file', async () => {
-      const spec = makeSpec(ctx, 'auth/login', [])
+      const spec = buildTestSpec({ workspace: 'default', name: 'auth/login', filenames: [] })
       const artifact = new SpecArtifact('spec.md', '# Login')
 
       await ctx.repo.save(spec, artifact)
@@ -391,7 +462,11 @@ describe('FsSpecRepository', () => {
 
     it('overwrites existing file without conflict check when no originalHash', async () => {
       await writeSpecFile(ctx, 'auth/login', 'spec.md', 'original')
-      const spec = makeSpec(ctx, 'auth/login', ['spec.md'])
+      const spec = buildTestSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md'],
+      })
       const artifact = new SpecArtifact('spec.md', 'updated')
 
       await ctx.repo.save(spec, artifact)
@@ -403,7 +478,11 @@ describe('FsSpecRepository', () => {
     it('saves successfully when file matches originalHash', async () => {
       const original = 'original content'
       await writeSpecFile(ctx, 'auth/login', 'spec.md', original)
-      const spec = makeSpec(ctx, 'auth/login', ['spec.md'])
+      const spec = buildTestSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md'],
+      })
       const artifact = new SpecArtifact('spec.md', 'updated content', sha256(original))
 
       await ctx.repo.save(spec, artifact)
@@ -414,7 +493,11 @@ describe('FsSpecRepository', () => {
 
     it('throws ArtifactConflictError when file was modified since load', async () => {
       await writeSpecFile(ctx, 'auth/login', 'spec.md', 'modified by someone else')
-      const spec = makeSpec(ctx, 'auth/login', ['spec.md'])
+      const spec = buildTestSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md'],
+      })
       // originalHash was computed against the old content
       const artifact = new SpecArtifact('spec.md', 'my update', sha256('old content'))
 
@@ -423,7 +506,11 @@ describe('FsSpecRepository', () => {
 
     it('overwrites despite hash mismatch when force is true', async () => {
       await writeSpecFile(ctx, 'auth/login', 'spec.md', 'modified by someone else')
-      const spec = makeSpec(ctx, 'auth/login', ['spec.md'])
+      const spec = buildTestSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md'],
+      })
       const artifact = new SpecArtifact('spec.md', 'forced update', sha256('old content'))
 
       await ctx.repo.save(spec, artifact, { force: true })
@@ -435,7 +522,7 @@ describe('FsSpecRepository', () => {
     it('treats missing file as empty string for conflict check', async () => {
       // The spec dir exists but the file does not — originalHash of '' should match
       await fs.mkdir(path.join(ctx.specsPath, 'auth', 'login'), { recursive: true })
-      const spec = makeSpec(ctx, 'auth/login', [])
+      const spec = buildTestSpec({ workspace: 'default', name: 'auth/login', filenames: [] })
       const artifact = new SpecArtifact('spec.md', 'new file', sha256(''))
 
       await ctx.repo.save(spec, artifact)
@@ -446,7 +533,7 @@ describe('FsSpecRepository', () => {
 
     it('rejects new file creation when originalHash is set and does not match empty', async () => {
       await fs.mkdir(path.join(ctx.specsPath, 'auth', 'login'), { recursive: true })
-      const spec = makeSpec(ctx, 'auth/login', [])
+      const spec = buildTestSpec({ workspace: 'default', name: 'auth/login', filenames: [] })
       // originalHash is of some non-empty content, but file doesn't exist
       const artifact = new SpecArtifact('spec.md', 'content', sha256('something else'))
 
@@ -458,7 +545,11 @@ describe('FsSpecRepository', () => {
     it('publishes multiple canonical artifacts through one staged swap', async () => {
       await writeSpecFile(ctx, 'auth/login', 'spec.md', '# Old')
       await writeSpecFile(ctx, 'auth/login', 'verify.md', 'old verify')
-      const spec = makeSpec(ctx, 'auth/login', ['spec.md', 'verify.md'])
+      const spec = buildTestSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md', 'verify.md'],
+      })
 
       await ctx.repo.publish(spec, {
         artifacts: [
@@ -473,7 +564,11 @@ describe('FsSpecRepository', () => {
 
     it('preserves canonical files when staged publication fails', async () => {
       await writeSpecFile(ctx, 'auth/login', 'spec.md', '# Stable')
-      const spec = makeSpec(ctx, 'auth/login', ['spec.md'])
+      const spec = buildTestSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md'],
+      })
 
       await expect(
         ctx.repo.publish(spec, {
@@ -537,13 +632,17 @@ describe('FsSpecRepository', () => {
 
       expect(result).not.toBeNull()
       expect(result!.name.toString()).toBe('_global/architecture')
-      expect(result!.filenames).toContain('spec.md')
+      expect(artifactNames(result!)).toContain('spec.md')
     })
 
     it('artifact() strips prefix for fs lookup', async () => {
       const content = '# Architecture spec'
       await writeSpecFile(prefixCtx, 'architecture', 'spec.md', content)
-      const spec = new Spec('default', SpecPath.parse('_global/architecture'), ['spec.md'])
+      const spec = buildTestSpec({
+        workspace: 'default',
+        name: '_global/architecture',
+        filenames: ['spec.md'],
+      })
 
       const result = await prefixCtx.repo.artifact(spec, 'spec.md')
 
@@ -552,7 +651,7 @@ describe('FsSpecRepository', () => {
     })
 
     it('save() strips prefix for fs write', async () => {
-      const spec = new Spec('default', SpecPath.parse('_global/testing'), [])
+      const spec = buildTestSpec({ workspace: 'default', name: '_global/testing', filenames: [] })
       const artifact = new SpecArtifact('spec.md', '# Testing')
 
       await prefixCtx.repo.save(spec, artifact)
@@ -563,7 +662,11 @@ describe('FsSpecRepository', () => {
 
     it('delete() strips prefix for fs removal', async () => {
       await writeSpecFile(prefixCtx, 'testing', 'spec.md', 'content')
-      const spec = new Spec('default', SpecPath.parse('_global/testing'), ['spec.md'])
+      const spec = buildTestSpec({
+        workspace: 'default',
+        name: '_global/testing',
+        filenames: ['spec.md'],
+      })
 
       await prefixCtx.repo.delete(spec)
 
@@ -611,7 +714,7 @@ describe('FsSpecRepository', () => {
 
         const spec = await repo.get(SpecPath.parse('team_1/shared/auth/login'))
         expect(spec).not.toBeNull()
-        expect(spec!.filenames).toContain('spec.md')
+        expect(artifactNames(spec!)).toContain('spec.md')
       } finally {
         await cleanupRepo(multiCtx)
       }
@@ -784,7 +887,11 @@ describe('FsSpecRepository', () => {
     it('removes the spec directory and all its files', async () => {
       await writeSpecFile(ctx, 'auth/login', 'spec.md', 'content')
       await writeSpecFile(ctx, 'auth/login', 'verify.md', 'content')
-      const spec = makeSpec(ctx, 'auth/login', ['spec.md', 'verify.md'])
+      const spec = buildTestSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md', 'verify.md'],
+      })
 
       await ctx.repo.delete(spec)
 
@@ -796,7 +903,7 @@ describe('FsSpecRepository', () => {
     })
 
     it('no-ops silently when spec directory does not exist', async () => {
-      const spec = makeSpec(ctx, 'nonexistent/spec', [])
+      const spec = buildTestSpec({ workspace: 'default', name: 'nonexistent/spec', filenames: [] })
 
       await expect(ctx.repo.delete(spec)).resolves.toBeUndefined()
     })
@@ -804,7 +911,11 @@ describe('FsSpecRepository', () => {
     it('leaves sibling specs untouched', async () => {
       await writeSpecFile(ctx, 'auth/login', 'spec.md', 'content')
       await writeSpecFile(ctx, 'auth/oauth', 'spec.md', 'content')
-      const loginSpec = makeSpec(ctx, 'auth/login', ['spec.md'])
+      const loginSpec = buildTestSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md'],
+      })
 
       await ctx.repo.delete(loginSpec)
 
@@ -850,7 +961,11 @@ describe('FsSpecRepository', () => {
     it('save() throws ReadOnlyWorkspaceError', async () => {
       const { ReadOnlyWorkspaceError } =
         await import('../../../src/domain/errors/read-only-workspace-error.js')
-      const spec = makeSpec(roCtx, 'auth/tokens', ['spec.md'])
+      const spec = buildTestSpec({
+        workspace: 'default',
+        name: 'auth/tokens',
+        filenames: ['spec.md'],
+      })
       const artifact = new SpecArtifact('spec.md', '# Updated')
 
       await expect(roCtx.repo.save(spec, artifact)).rejects.toThrow(ReadOnlyWorkspaceError)
@@ -859,7 +974,11 @@ describe('FsSpecRepository', () => {
     it('saveMetadata() throws ReadOnlyWorkspaceError', async () => {
       const { ReadOnlyWorkspaceError } =
         await import('../../../src/domain/errors/read-only-workspace-error.js')
-      const spec = makeSpec(roCtx, 'auth/tokens', ['spec.md'])
+      const spec = buildTestSpec({
+        workspace: 'default',
+        name: 'auth/tokens',
+        filenames: ['spec.md'],
+      })
 
       await expect(roCtx.repo.saveMetadata(spec, '{"title":"Tokens"}')).rejects.toThrow(
         ReadOnlyWorkspaceError,
@@ -869,7 +988,11 @@ describe('FsSpecRepository', () => {
     it('updatePersistedSchema() throws ReadOnlyWorkspaceError', async () => {
       const { ReadOnlyWorkspaceError } =
         await import('../../../src/domain/errors/read-only-workspace-error.js')
-      const spec = makeSpec(roCtx, 'auth/tokens', ['spec.md'])
+      const spec = buildTestSpec({
+        workspace: 'default',
+        name: 'auth/tokens',
+        filenames: ['spec.md'],
+      })
 
       await expect(
         roCtx.repo.updatePersistedSchema(spec, { name: 'schema-std', version: 1 }),
@@ -888,7 +1011,11 @@ describe('FsSpecRepository', () => {
     })
 
     it('artifact() still works on readOnly workspace', async () => {
-      const spec = makeSpec(roCtx, 'auth/tokens', ['spec.md'])
+      const spec = buildTestSpec({
+        workspace: 'default',
+        name: 'auth/tokens',
+        filenames: ['spec.md'],
+      })
       const result = await roCtx.repo.artifact(spec, 'spec.md')
       expect(result).not.toBeNull()
       expect(result!.content).toBe('# Tokens spec')
@@ -993,13 +1120,21 @@ describe('FsSpecRepository', () => {
 
   describe('persisted spec state', () => {
     it('readPersistedSchema() returns null when absent', async () => {
-      const spec = makeSpec(ctx, 'auth/login', ['spec.md'])
+      const spec = buildTestSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md'],
+      })
 
       await expect(ctx.repo.readPersistedSchema(spec)).resolves.toBeNull()
     })
 
     it('updatePersistedDependsOn() persists and readPersistedDependsOn() returns content', async () => {
-      const spec = makeSpec(ctx, 'auth/login', ['spec.md'])
+      const spec = buildTestSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md'],
+      })
 
       await ctx.repo.updatePersistedDependsOn(spec, [
         'core:storage',
@@ -1011,10 +1146,14 @@ describe('FsSpecRepository', () => {
     })
 
     it('updatePersistedSchema() enforces conflict detection', async () => {
-      const spec = makeSpec(ctx, 'auth/login', ['spec.md'])
+      const spec = buildTestSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md'],
+      })
 
       await ctx.repo.updatePersistedSchema(spec, { name: 'schema-std', version: 1 })
-      const originalHash = await ctx.repo.specHash(spec)
+      const originalHash = await ctx.repo.persistedStateHash(spec)
       expect(originalHash).not.toBeNull()
 
       await writeSpecFile(
@@ -1041,7 +1180,11 @@ describe('FsSpecRepository', () => {
     })
 
     it('updatePersistedSchema() force overwrites on hash mismatch', async () => {
-      const spec = makeSpec(ctx, 'auth/login', ['spec.md'])
+      const spec = buildTestSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md'],
+      })
 
       await ctx.repo.updatePersistedSchema(spec, { name: 'schema-std', version: 1 })
       await writeSpecFile(
@@ -1068,13 +1211,59 @@ describe('FsSpecRepository', () => {
       expect(result!.version).toBe(2)
     })
 
-    it('specHash() returns null when no sidecar exists', async () => {
-      const spec = makeSpec(ctx, 'auth/login', ['spec.md'])
-      await expect(ctx.repo.specHash(spec)).resolves.toBeNull()
+    it('persistedStateHash() returns null when no sidecar exists', async () => {
+      const spec = buildTestSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md'],
+      })
+      await expect(ctx.repo.persistedStateHash(spec)).resolves.toBeNull()
+    })
+
+    it('persistedStateHash() returns SHA-256 of lock sidecar bytes', async () => {
+      const lockContent =
+        JSON.stringify({ schema: { name: 'schema-std', version: 1 }, dependsOn: [] }, null, 2) +
+        '\n'
+      await writeSpecFile(ctx, 'auth/login', 'spec.md', '# Login')
+      await writeSpecFile(ctx, 'auth/login', 'spec-lock.json', lockContent)
+
+      const spec = (await ctx.repo.get(SpecPath.parse('auth/login')))!
+      await expect(ctx.repo.persistedStateHash(spec)).resolves.toBe(sha256(lockContent))
+    })
+
+    it('specFingerprint() is unchanged when only generated metadata changes', async () => {
+      await writeSpecFile(ctx, 'auth/login', 'spec.md', '# Login spec')
+      await writeSpecFile(
+        ctx,
+        'auth/login',
+        'spec-lock.json',
+        JSON.stringify({ schema: { name: 'schema-std', version: 1 }, dependsOn: [] }, null, 2),
+      )
+      await writeMetadataFile(
+        ctx,
+        'auth/login',
+        JSON.stringify({ title: 'Login v1', description: 'Auth', contentHashes: {} }),
+      )
+
+      const spec = (await ctx.repo.get(SpecPath.parse('auth/login')))!
+      const before = await ctx.repo.specFingerprint(spec)
+
+      await writeMetadataFile(
+        ctx,
+        'auth/login',
+        JSON.stringify({ title: 'Login v2', description: 'Auth updated', contentHashes: {} }),
+      )
+
+      const after = await ctx.repo.specFingerprint(spec)
+      expect(after).toBe(before)
     })
 
     it('artifact() rejects spec-lock.json through the normal artifact API', async () => {
-      const spec = makeSpec(ctx, 'auth/login', ['spec.md'])
+      const spec = buildTestSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md'],
+      })
 
       await expect(ctx.repo.artifact(spec, 'spec-lock.json')).rejects.toThrow()
     })
@@ -1094,7 +1283,11 @@ describe('FsSpecRepository', () => {
           2,
         ) + '\n',
       )
-      const spec = makeSpec(ctx, 'auth/login', ['spec.md'])
+      const spec = buildTestSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md'],
+      })
 
       const result = await ctx.repo.readPersistedDependsOn(spec)
 
@@ -1206,7 +1399,7 @@ describe('FsSpecRepository', () => {
     })
 
     it('upserts index entry on save', async () => {
-      const spec = makeSpec(ctx, 'auth/login', [])
+      const spec = buildTestSpec({ workspace: 'default', name: 'auth/login', filenames: [] })
       const artifact = new SpecArtifact('spec.md', '# Login')
 
       await ctx.repo.save(spec, artifact)

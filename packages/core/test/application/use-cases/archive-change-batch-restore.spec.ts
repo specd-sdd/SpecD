@@ -2,6 +2,7 @@ import * as fs from 'node:fs/promises'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { makeSpec } from '../../helpers/make-spec.js'
 import { ArchiveChange } from '../../../src/application/use-cases/archive-change.js'
 import { GenerateSpecMetadata } from '../../../src/application/use-cases/generate-spec-metadata.js'
 import { SaveSpecMetadata } from '../../../src/application/use-cases/save-spec-metadata.js'
@@ -456,7 +457,7 @@ describe('ArchiveChange batch snapshot integration', () => {
 
     const schema = makeSchema([makeArtifactType('spec', { delta: false, scope: 'spec' })])
     const specRepo = makeSpecRepository({
-      specs: [new Spec('default', SpecPath.parse('auth/oauth'), ['spec.md'])],
+      specs: [makeSpec({ workspace: 'default', name: 'auth/oauth', filenames: ['spec.md'] })],
       artifacts: { 'auth/oauth/spec.md': '# Old' },
     })
     vi.spyOn(specRepo, 'publish').mockImplementation(async (): Promise<void> => {
@@ -598,7 +599,7 @@ describe('ArchiveChange batch snapshot integration', () => {
 
     const schema = makeSchema([makeArtifactType('spec', { delta: false, scope: 'spec' })])
     const specRepo = makeSpecRepository({
-      specs: [new Spec('default', SpecPath.parse('auth/oauth'), ['spec.md'])],
+      specs: [makeSpec({ workspace: 'default', name: 'auth/oauth', filenames: ['spec.md'] })],
       artifacts: { 'auth/oauth/spec.md': '# Old' },
     })
     const change = makeArchivableChange('my-change', { specIds: ['default:auth/oauth'] })

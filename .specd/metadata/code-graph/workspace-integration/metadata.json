@@ -39,7 +39,7 @@
     {
       "requirement": "Spec resolution via SpecRepository",
       "rules": [
-        "The indexer SHALL resolve specs by directly consuming the `SpecRepository` instance from each orchestrated workspace. For each spec:\n\n1. Enumerate identities via `repo.list()`.\n2. Check freshness via `repo.specHash()`.\n3. Load content by concatenating artifacts from `repo.artifact()`. Artifact filenames come from `spec.filenames` and no longer include metadata files. Concatenate artifact contents for hashing: `spec.md` first (if present), then the remaining artifacts in alphabetical order.\n4. Load metadata via `repo.metadata()` to extract `title` and `description`. If metadata is absent (`null`), `title` defaults to the `specId`, `description` to `''`, and `dependsOn` to `[]`. There is no fallback to parsing headings or sections from `spec.md`.\n5. Load `dependsOn` via `repo.readPersistedDependsOn()`.\n6. Load coverage links via `repo.readPersistedImplementation()`.\n\nThe indexer SHALL NOT rely on the CLI to precompute these semantics or provide callbacks. This decouples the indexer from spec storage and respects workspace prefixes, ownership, and locality as configured in `specd.yaml`."
+        "The indexer SHALL resolve specs by directly consuming the `SpecRepository` instance from\neach orchestrated workspace. For each spec:\n\n1. Enumerate identities via `repo.list()`.\n2. Check freshness via `repo.persistedStateHash()` (formerly `specHash`).\n3. Load content by concatenating artifacts from `repo.artifact()`. Artifact filenames\n   come from `spec.artifacts[].filename` and MUST NOT include metadata or lock\n   sidecars. Concatenate artifact contents for hashing: `spec.md` first (if present\n   in `artifacts`), then the remaining artifacts in alphabetical order by filename.\n4. Load metadata via `repo.metadata()` to extract `title` and `description`. If\n   metadata is absent (`null`), `title` defaults to the `specId`, `description` to\n   `''`, and `dependsOn` to `[]`. There is no fallback to parsing headings or sections\n   from `spec.md`.\n5. Load `dependsOn` via `repo.readPersistedDependsOn()`.\n6. Load coverage links via `repo.readPersistedImplementation()`.\n\nThe indexer SHALL NOT rely on the CLI to precompute these semantics or provide\ncallbacks. This decouples the indexer from spec storage and respects workspace\nprefixes, ownership, and locality as configured in `specd.yaml`."
       ]
     },
     {
@@ -282,13 +282,13 @@
     "symbols": [
       {
         "specId": "code-graph:workspace-integration",
-        "file": "code-graph:src/application/use-cases/index-project-graph.ts",
-        "symbol": "indexProjectGraph"
+        "file": "code-graph:src/application/use-cases/index-code-graph.ts",
+        "symbol": "IndexCodeGraph"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:373f45bab5892c462c083b13b1ca9b5cfb57aee82b31c84f3ce3aa1122e648c0",
+    "spec.md": "sha256:136d5c15c32a721fca02733c38bdf3d397d05bde8171412efdac7b02d69ef384",
     "verify.md": "sha256:f637ae8331d07a7bbd073990099a9515844adfc710cf386dad66f7740c15b0e9"
   },
   "generatedBy": "core"

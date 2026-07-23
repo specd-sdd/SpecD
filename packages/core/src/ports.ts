@@ -61,3 +61,8 @@ export {
   type InitProjectResult,
 } from './application/ports/config-writer.js'
 export { YamlSerializer } from './application/ports/yaml-serializer.js'
+export {
+  ValidationResultCache,
+  type SpecValidationEntry,
+  type ValidationCacheLookupResult,
+} from './application/ports/validation-result-cache.js'

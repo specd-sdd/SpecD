@@ -6,8 +6,8 @@
   "dependsOn": ["core:config"],
   "implementation": [
     {
-      "file": "code-graph:src/application/use-cases/index-project-graph.ts",
-      "symbols": ["indexProjectGraph"]
+      "file": "code-graph:src/application/use-cases/index-code-graph.ts",
+      "symbols": ["IndexCodeGraph"]
     }
   ]
 }

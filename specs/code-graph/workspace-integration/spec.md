@@ -60,16 +60,25 @@ This lookup is in addition to canonical workspace-prefixed graph identity; it do
 
 ### Requirement: Spec resolution via SpecRepository
 
-The indexer SHALL resolve specs by directly consuming the `SpecRepository` instance from each orchestrated workspace. For each spec:
+The indexer SHALL resolve specs by directly consuming the `SpecRepository` instance from
+each orchestrated workspace. For each spec:
 
 1. Enumerate identities via `repo.list()`.
-2. Check freshness via `repo.specHash()`.
-3. Load content by concatenating artifacts from `repo.artifact()`. Artifact filenames come from `spec.filenames` and no longer include metadata files. Concatenate artifact contents for hashing: `spec.md` first (if present), then the remaining artifacts in alphabetical order.
-4. Load metadata via `repo.metadata()` to extract `title` and `description`. If metadata is absent (`null`), `title` defaults to the `specId`, `description` to `''`, and `dependsOn` to `[]`. There is no fallback to parsing headings or sections from `spec.md`.
+2. Check freshness via `repo.persistedStateHash()` (formerly `specHash`).
+3. Load content by concatenating artifacts from `repo.artifact()`. Artifact filenames
+   come from `spec.artifacts[].filename` and MUST NOT include metadata or lock
+   sidecars. Concatenate artifact contents for hashing: `spec.md` first (if present
+   in `artifacts`), then the remaining artifacts in alphabetical order by filename.
+4. Load metadata via `repo.metadata()` to extract `title` and `description`. If
+   metadata is absent (`null`), `title` defaults to the `specId`, `description` to
+   `''`, and `dependsOn` to `[]`. There is no fallback to parsing headings or sections
+   from `spec.md`.
 5. Load `dependsOn` via `repo.readPersistedDependsOn()`.
 6. Load coverage links via `repo.readPersistedImplementation()`.
 
-The indexer SHALL NOT rely on the CLI to precompute these semantics or provide callbacks. This decouples the indexer from spec storage and respects workspace prefixes, ownership, and locality as configured in `specd.yaml`.
+The indexer SHALL NOT rely on the CLI to precompute these semantics or provide
+callbacks. This decouples the indexer from spec storage and respects workspace
+prefixes, ownership, and locality as configured in `specd.yaml`.
 
 ### Requirement: Cross-workspace import resolution
 

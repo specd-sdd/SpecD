@@ -72,8 +72,12 @@
 
 #### Scenario: Spec exists
 
-- **WHEN** `get(SpecPath.parse("auth/oauth"))` is called and the spec exists in this workspace
-- **THEN** a `Spec` is returned with workspace, name, and filenames populated
+- **WHEN** `get(SpecPath.parse("auth/oauth"))` is called and the spec exists in this
+  workspace
+- **THEN** a `Spec` is returned with `workspace`, `name`, `artifacts`
+  (`SpecArtifactEntry` with `filename` + `lastModified`), `persistedStateStamp`, and
+  `generatedMetadataStamp` populated
+- **AND** derived `filenames` and `hasArtifact(filename)` reflect the same presence set
 - **AND** no artifact content is loaded
 
 #### Scenario: Spec does not exist
@@ -147,15 +151,17 @@
 
 #### Scenario: Unexpected extra file is rejected
 
-- **GIVEN** an extra file exists in the spec directory but is not a valid artifact or adapter-owned metadata file
-- **WHEN** `artifact(spec, "<extra-file>")` or `save(spec, artifact("<extra-file>"))` is called
+- **GIVEN** an extra file exists in the spec directory but is not a valid artifact or
+  adapter-owned metadata file
+- **WHEN** `artifact(spec, "<extra-file>")` or `save(spec, artifact("<extra-file>"))`
+  is called
 - **THEN** the repository rejects the operation
 
 #### Scenario: spec-lock is not exposed as a normal artifact
 
 - **GIVEN** a persisted spec directory contains `spec-lock.json`
 - **WHEN** `get()` or `list()` returns the spec metadata
-- **THEN** `spec-lock.json` does not appear in `Spec.filenames`
+- **THEN** `spec-lock.json` does not appear in `Spec.artifacts`
 - **AND** `artifact(spec, "spec-lock.json")` is rejected
 
 ### Requirement: Spec artifact path confinement
@@ -296,26 +302,36 @@
 - **WHEN** `search("invoice")` is called
 - **THEN** only specs within the `billing` workspace are returned
 
-### Requirement: persisted spec semantics and stable spec hash
+### Requirement: persisted spec semantics, persistedStateHash, and specFingerprint
 
-#### Scenario: specHash remains stable when state is unchanged
+#### Scenario: persistedStateHash remains stable when state is unchanged
 
-- **GIVEN** a persisted spec with unchanged artifacts, persisted dependencies, and implementation links
-- **WHEN** the repository is asked for its stable spec hash twice
+- **GIVEN** a persisted spec with unchanged persisted lock state
+- **WHEN** the repository is asked for `persistedStateHash` twice
 - **THEN** both calls return the same hash
 
-#### Scenario: specHash changes when state is modified
+#### Scenario: persistedStateHash changes when lock state is modified
 
-- **GIVEN** a persisted spec with an initial stable spec hash
-- **WHEN** the repository updates persisted dependencies or implementation state for that spec
+- **GIVEN** a persisted spec with an initial `persistedStateHash`
+- **WHEN** the repository updates persisted dependencies or implementation state for
+  that spec
 - **THEN** the returned hash differs from the previous value
+
+#### Scenario: specFingerprint orders artifact hashes by filename
+
+- **GIVEN** a spec with multiple present artifacts whose contents are unchanged
+- **WHEN** `specFingerprint` is computed twice
+- **THEN** both calls return the same digest
+- **AND** the digest incorporates per-artifact content hashes ordered by filename
+  alphabetically plus `persistedStateHash` (or an absent sentinel)
 
 #### Scenario: persisted dependency state is read semantically
 
 - **GIVEN** a persisted spec with archived dependency state
 - **WHEN** application logic needs the canonical persisted `dependsOn` list
 - **THEN** it reads that value through `readPersistedDependsOn(spec)`
-- **AND** it does not need `Spec.filenames` or generic artifact reads to discover the sidecar
+- **AND** it does not need `Spec.artifacts` or generic artifact reads to discover the
+  sidecar
 
 ### Requirement: Filesystem-backed specs capability
 

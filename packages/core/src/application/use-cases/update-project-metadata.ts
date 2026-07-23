@@ -4,7 +4,7 @@ import {
   type ProjectMetadata,
   type UpdateProjectMetadataPayload,
 } from '../../domain/services/project-metadata.js'
-import { Spec } from '../../domain/entities/spec.js'
+import { Spec, ABSENT_SPEC_SIDECAR } from '../../domain/entities/spec.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
 import { type SpecdConfig } from '../specd-config.js'
 import { type SpecRepository } from '../ports/spec-repository.js'
@@ -114,7 +114,13 @@ export class UpdateProjectMetadata {
       const repo = this._specRepos.get(spec.workspace)
       if (repo) {
         const metadata = await repo.metadata(
-          new Spec(spec.workspace, SpecPath.parse(spec.capPath), []),
+          new Spec(
+            spec.workspace,
+            SpecPath.parse(spec.capPath),
+            [],
+            ABSENT_SPEC_SIDECAR,
+            ABSENT_SPEC_SIDECAR,
+          ),
         )
         if (metadata?.contentHashes) {
           // Use the combined hash of spec files as the spec's metadata hash

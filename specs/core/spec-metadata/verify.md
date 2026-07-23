@@ -298,6 +298,22 @@
 - **WHEN** tooling reads its metadata state
 - **THEN** missing `spec-lock.json` is tolerated until opportunistic backfill creates it
 
+### Requirement: Spec.generatedMetadataStamp is a stamp only
+
+#### Scenario: get stamp does not replace metadata()
+
+- **GIVEN** a spec with generated `metadata.json` on disk
+- **WHEN** a caller uses `Spec.generatedMetadataStamp` from `get()`
+- **THEN** only `present` and `lastModified` are available
+- **AND** parsed metadata content is obtained only via `metadata()`
+
+#### Scenario: Stamp absence does not imply empty metadata document
+
+- **GIVEN** a spec with no generated metadata file
+- **WHEN** `get()` returns `generatedMetadataStamp.present === false`
+- **THEN** callers MUST treat that as absence of the sidecar
+- **AND** MUST NOT interpret it as an empty parsed metadata document
+
 ### Requirement: Implementation projection
 
 #### Scenario: Metadata projects archived implementation links from spec-lock

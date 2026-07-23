@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import { describe, it, expect, vi } from 'vitest'
+import { makeSpec } from '../../helpers/make-spec.js'
 import {
   CompileContext,
   type CompileContextConfig,
@@ -533,8 +534,8 @@ describe('CompileContext', () => {
         },
       })
 
-      const login = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
-      const shared = new Spec('default', SpecPath.parse('auth/shared'), ['spec.md'])
+      const login = makeSpec({ workspace: 'default', name: 'auth/login', filenames: ['spec.md'] })
+      const shared = makeSpec({ workspace: 'default', name: 'auth/shared', filenames: ['spec.md'] })
       const sharedContent = '# Shared'
       const repos = new Map([
         [
@@ -610,8 +611,8 @@ describe('CompileContext', () => {
         },
       })
 
-      const login = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
-      const shared = new Spec('default', SpecPath.parse('auth/shared'), ['spec.md'])
+      const login = makeSpec({ workspace: 'default', name: 'auth/login', filenames: ['spec.md'] })
+      const shared = makeSpec({ workspace: 'default', name: 'auth/shared', filenames: ['spec.md'] })
       const repos = new Map([
         [
           'default',
@@ -679,12 +680,16 @@ describe('CompileContext', () => {
         },
       })
 
-      const actorResolverSpec = new Spec('core', SpecPath.parse('core/actor-resolver-port'), [
-        'spec.md',
-      ])
-      const architectureSpec = new Spec('default', SpecPath.parse('_global/architecture'), [
-        'spec.md',
-      ])
+      const actorResolverSpec = makeSpec({
+        workspace: 'core',
+        name: 'core/actor-resolver-port',
+        filenames: ['spec.md'],
+      })
+      const architectureSpec = makeSpec({
+        workspace: 'default',
+        name: '_global/architecture',
+        filenames: ['spec.md'],
+      })
       const architectureContent = '# Architecture'
       const coreRepo = makeSpecRepository({
         workspace: 'core',
@@ -761,7 +766,11 @@ describe('CompileContext', () => {
   describe('Requirement: Context spec collection', () => {
     it('applies project-level include patterns regardless of active workspace', async () => {
       // Change has no _global specs, but project-level include covers them
-      const globalSpec = new Spec('default', SpecPath.parse('_global/commits'), ['spec.md'])
+      const globalSpec = makeSpec({
+        workspace: 'default',
+        name: '_global/commits',
+        filenames: ['spec.md'],
+      })
       const specRepo = makeSpecRepo([globalSpec])
       const change = makeChange('my-change', { specIds: ['default:auth/login'] })
       const schema = makeSchema()
@@ -785,12 +794,20 @@ describe('CompileContext', () => {
 
     it('does not apply workspace-level include for inactive workspaces', async () => {
       // billing workspace is not active (no billing spec in change.specIds)
-      const billingSpec = new Spec('billing', SpecPath.parse('payments'), ['spec.md'])
+      const billingSpec = makeSpec({
+        workspace: 'billing',
+        name: 'payments',
+        filenames: ['spec.md'],
+      })
       const billingRepo = makeSpecRepo([billingSpec])
       const change = makeChange('my-change', { specIds: ['default:auth/login'] })
       const schema = makeSchema()
 
-      const defaultSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+      const defaultSpec = makeSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md'],
+      })
       const defaultRepo = makeSpecRepo([defaultSpec])
 
       const { sut } = makeSut({
@@ -820,8 +837,16 @@ describe('CompileContext', () => {
     })
 
     it('applies project-level exclude before workspace-level patterns', async () => {
-      const draftSpec = new Spec('default', SpecPath.parse('drafts/old-spec'), ['spec.md'])
-      const otherSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+      const draftSpec = makeSpec({
+        workspace: 'default',
+        name: 'drafts/old-spec',
+        filenames: ['spec.md'],
+      })
+      const otherSpec = makeSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md'],
+      })
       const specRepo = makeSpecRepo([draftSpec, otherSpec])
       const change = makeChange('my-change', { specIds: ['default:auth/login'] })
       const schema = makeSchema({ artifacts: [makeArtifactType('spec')] })
@@ -842,8 +867,16 @@ describe('CompileContext', () => {
     })
 
     it('applies workspace-level exclude after workspace-level include', async () => {
-      const internalSpec = new Spec('default', SpecPath.parse('internal/notes'), ['spec.md'])
-      const authSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+      const internalSpec = makeSpec({
+        workspace: 'default',
+        name: 'internal/notes',
+        filenames: ['spec.md'],
+      })
+      const authSpec = makeSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md'],
+      })
       const specRepo = makeSpecRepo([internalSpec, authSpec])
       const change = makeChange('my-change', { specIds: ['default:auth/login'] })
       const schema = makeSchema({ artifacts: [makeArtifactType('spec')] })
@@ -870,7 +903,11 @@ describe('CompileContext', () => {
     })
 
     it('change specId survives matching exclude rules', async () => {
-      const loginSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+      const loginSpec = makeSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md'],
+      })
       const loginContent = '# Login\n'
       const metadata = freshMetadata(loginContent, { description: 'Login spec.' })
       const specRepo = makeSpecRepo([loginSpec], {
@@ -897,7 +934,11 @@ describe('CompileContext', () => {
     })
 
     it('includeChangeSpecs false skips direct change spec seed', async () => {
-      const loginSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+      const loginSpec = makeSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md'],
+      })
       const loginContent = '# Login\n'
       const loginMetadata = freshMetadata(loginContent, { description: 'Login spec.' })
       const specRepo = makeSpecRepo([loginSpec], {
@@ -919,7 +960,11 @@ describe('CompileContext', () => {
     })
 
     it('includeChangeSpecs false allows reinjection through include patterns', async () => {
-      const loginSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+      const loginSpec = makeSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md'],
+      })
       const loginContent = '# Login\n'
       const loginMetadata = freshMetadata(loginContent, { description: 'Login spec.' })
       const specRepo = makeSpecRepo([loginSpec], {
@@ -944,8 +989,16 @@ describe('CompileContext', () => {
     })
 
     it('includeChangeSpecs false allows reinjection through dependsOn traversal', async () => {
-      const startSpec = new Spec('default', SpecPath.parse('auth/start'), ['spec.md'])
-      const loginSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+      const startSpec = makeSpec({
+        workspace: 'default',
+        name: 'auth/start',
+        filenames: ['spec.md'],
+      })
+      const loginSpec = makeSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md'],
+      })
       const startContent = '# Start\n'
       const loginContent = '# Login\n'
       const startMetadata = freshMetadata(startContent, {
@@ -975,8 +1028,16 @@ describe('CompileContext', () => {
     })
 
     it('specDependsOn value is seeded even without pattern matches', async () => {
-      const loginSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
-      const sharedSpec = new Spec('default', SpecPath.parse('auth/shared'), ['spec.md'])
+      const loginSpec = makeSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md'],
+      })
+      const sharedSpec = makeSpec({
+        workspace: 'default',
+        name: 'auth/shared',
+        filenames: ['spec.md'],
+      })
       const loginContent = '# Login\n'
       const sharedContent = '# Shared\n'
       const loginMetadata = freshMetadata(loginContent, { description: 'Login spec.' })
@@ -1006,8 +1067,12 @@ describe('CompileContext', () => {
     })
 
     it('dependsOn traversal adds specs not matched by include patterns', async () => {
-      const jwtSpec = new Spec('default', SpecPath.parse('auth/jwt'), ['spec.md'])
-      const loginSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+      const jwtSpec = makeSpec({ workspace: 'default', name: 'auth/jwt', filenames: ['spec.md'] })
+      const loginSpec = makeSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md'],
+      })
 
       const loginContent = '# Auth Login\n'
       const jwtContent = '# Auth JWT\n'
@@ -1043,8 +1108,16 @@ describe('CompileContext', () => {
     })
 
     it('uses metadata dependsOn even when schema omits dependency extraction', async () => {
-      const loginSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
-      const sharedSpec = new Spec('default', SpecPath.parse('auth/shared'), ['spec.md'])
+      const loginSpec = makeSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md'],
+      })
+      const sharedSpec = makeSpec({
+        workspace: 'default',
+        name: 'auth/shared',
+        filenames: ['spec.md'],
+      })
       const loginContent = '# Auth Login\n'
       const sharedContent = '# Shared\n'
       const loginMetadata = freshMetadata(loginContent, { dependsOn: ['default:auth/shared'] })
@@ -1076,8 +1149,12 @@ describe('CompileContext', () => {
     })
 
     it('dependsOn specs are NOT removed by exclude rules', async () => {
-      const jwtSpec = new Spec('default', SpecPath.parse('auth/jwt'), ['spec.md'])
-      const loginSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+      const jwtSpec = makeSpec({ workspace: 'default', name: 'auth/jwt', filenames: ['spec.md'] })
+      const loginSpec = makeSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md'],
+      })
 
       const loginContent = '# Auth Login\n'
       const jwtContent = '# Auth JWT\n'
@@ -1113,8 +1190,16 @@ describe('CompileContext', () => {
     })
 
     it('spec appears only once even if seeded, matched, and discovered again later', async () => {
-      const loginSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
-      const sharedSpec = new Spec('default', SpecPath.parse('auth/shared'), ['spec.md'])
+      const loginSpec = makeSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md'],
+      })
+      const sharedSpec = makeSpec({
+        workspace: 'default',
+        name: 'auth/shared',
+        filenames: ['spec.md'],
+      })
       const loginContent = '# Login\n'
       const sharedContent = '# Shared\n'
       const loginMetadata = freshMetadata(loginContent, {
@@ -1152,8 +1237,12 @@ describe('CompileContext', () => {
 
   describe('Requirement: Cycle detection during dependsOn traversal', () => {
     it('breaks cycle quietly and includes both specs', async () => {
-      const loginSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
-      const jwtSpec = new Spec('default', SpecPath.parse('auth/jwt'), ['spec.md'])
+      const loginSpec = makeSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md'],
+      })
+      const jwtSpec = makeSpec({ workspace: 'default', name: 'auth/jwt', filenames: ['spec.md'] })
 
       const loginContent = '# Login\n'
       const jwtContent = '# JWT\n'
@@ -1194,8 +1283,12 @@ describe('CompileContext', () => {
 
   describe('Requirement: Staleness detection and content fallback', () => {
     it('emits staleness warning when contentHash does not match current file', async () => {
-      const loginSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
-      const jwtSpec = new Spec('default', SpecPath.parse('auth/jwt'), ['spec.md'])
+      const loginSpec = makeSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md'],
+      })
+      const jwtSpec = makeSpec({ workspace: 'default', name: 'auth/jwt', filenames: ['spec.md'] })
       const loginContent = '# Login\n'
       const jwtContent = '# JWT\n'
       const loginMetadata = freshMetadata(loginContent, { dependsOn: ['auth/jwt'] })
@@ -1234,8 +1327,12 @@ describe('CompileContext', () => {
     })
 
     it('emits no staleness warning when all contentHashes match', async () => {
-      const loginSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
-      const jwtSpec = new Spec('default', SpecPath.parse('auth/jwt'), ['spec.md'])
+      const loginSpec = makeSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md'],
+      })
+      const jwtSpec = makeSpec({ workspace: 'default', name: 'auth/jwt', filenames: ['spec.md'] })
       const loginContent = '# Login\n'
       const jwtContent = '# JWT\n'
       const loginMetadata = freshMetadata(loginContent, { dependsOn: ['auth/jwt'] })
@@ -1440,7 +1537,11 @@ describe('CompileContext', () => {
     })
 
     it('injects spec description from fresh metadata into spec content', async () => {
-      const loginSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+      const loginSpec = makeSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md'],
+      })
       const loginContent = '# Login\n'
       const metadata = freshMetadata(loginContent, {
         description: 'Handles user authentication flows.',
@@ -1470,7 +1571,11 @@ describe('CompileContext', () => {
     })
 
     it('falls back to metadataExtraction when metadata is absent', async () => {
-      const loginSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+      const loginSpec = makeSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md'],
+      })
       const loginContent = '# Login\n\n## Requirements\n\nSome requirements.\n'
 
       const specRepo = makeSpecRepo([loginSpec], {
@@ -1659,7 +1764,11 @@ describe('CompileContext', () => {
     it('uses change.workspaces to determine active workspaces, not specIds prefixes', async () => {
       // The billing workspace is not in change.workspaces even though the
       // change has a specId whose first segment could be misread as a workspace.
-      const billingSpec = new Spec('billing', SpecPath.parse('payments'), ['spec.md'])
+      const billingSpec = makeSpec({
+        workspace: 'billing',
+        name: 'payments',
+        filenames: ['spec.md'],
+      })
       const billingRepo = makeSpecRepo([billingSpec])
       const defaultRepo = makeSpecRepo([])
 
@@ -1717,7 +1826,11 @@ describe('CompileContext', () => {
 
   describe('Requirement: metadataExtraction fallback with glob output pattern', () => {
     it('resolves glob-style output to the base filename for specRepo.artifact', async () => {
-      const loginSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+      const loginSpec = makeSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md'],
+      })
       const loginContent = '# Login\n\n## Requirements\n\nSome requirements.\n'
 
       const specRepo = makeSpecRepo([loginSpec], {
@@ -1790,7 +1903,7 @@ describe('CompileContext', () => {
 
   describe('Requirement: sections filter', () => {
     const specContent = '# Login\n'
-    const loginSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+    const loginSpec = makeSpec({ workspace: 'default', name: 'auth/login', filenames: ['spec.md'] })
 
     function metadataWithAllSections(content: string = specContent): string {
       return freshMetadata(content, {
@@ -2003,10 +2116,10 @@ describe('CompileContext', () => {
   describe('Requirement: depth limiting', () => {
     it('depth 1 includes direct deps only, not transitive deps', async () => {
       // Chain: A → B → C → D. A is in specIds, so traversal starts from B.
-      const specA = new Spec('default', SpecPath.parse('a'), ['spec.md'])
-      const specB = new Spec('default', SpecPath.parse('b'), ['spec.md'])
-      const specC = new Spec('default', SpecPath.parse('c'), ['spec.md'])
-      const specD = new Spec('default', SpecPath.parse('d'), ['spec.md'])
+      const specA = makeSpec({ workspace: 'default', name: 'a', filenames: ['spec.md'] })
+      const specB = makeSpec({ workspace: 'default', name: 'b', filenames: ['spec.md'] })
+      const specC = makeSpec({ workspace: 'default', name: 'c', filenames: ['spec.md'] })
+      const specD = makeSpec({ workspace: 'default', name: 'd', filenames: ['spec.md'] })
 
       const contentA = '# A\n'
       const contentB = '# B\n'
@@ -2054,9 +2167,9 @@ describe('CompileContext', () => {
     })
 
     it('unlimited depth includes all transitive deps', async () => {
-      const specA = new Spec('default', SpecPath.parse('a'), ['spec.md'])
-      const specB = new Spec('default', SpecPath.parse('b'), ['spec.md'])
-      const specC = new Spec('default', SpecPath.parse('c'), ['spec.md'])
+      const specA = makeSpec({ workspace: 'default', name: 'a', filenames: ['spec.md'] })
+      const specB = makeSpec({ workspace: 'default', name: 'b', filenames: ['spec.md'] })
+      const specC = makeSpec({ workspace: 'default', name: 'c', filenames: ['spec.md'] })
 
       const contentA = '# A\n'
       const contentB = '# B\n'
@@ -2097,8 +2210,8 @@ describe('CompileContext', () => {
     })
 
     it('followDeps false skips traversal even with specIds that have dependsOn', async () => {
-      const specA = new Spec('default', SpecPath.parse('a'), ['spec.md'])
-      const specB = new Spec('default', SpecPath.parse('b'), ['spec.md'])
+      const specA = makeSpec({ workspace: 'default', name: 'a', filenames: ['spec.md'] })
+      const specB = makeSpec({ workspace: 'default', name: 'b', filenames: ['spec.md'] })
 
       const contentA = '# A\n'
       const contentB = '# B\n'
@@ -2135,12 +2248,22 @@ describe('CompileContext', () => {
 
   describe('Requirement: Structured result assembly', () => {
     it('preserves change-scoped seed ordering ahead of include matches and traversal discoveries', async () => {
-      const loginSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
-      const sharedSpec = new Spec('default', SpecPath.parse('auth/shared'), ['spec.md'])
-      const architectureSpec = new Spec('default', SpecPath.parse('_global/architecture'), [
-        'spec.md',
-      ])
-      const jwtSpec = new Spec('default', SpecPath.parse('auth/jwt'), ['spec.md'])
+      const loginSpec = makeSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md'],
+      })
+      const sharedSpec = makeSpec({
+        workspace: 'default',
+        name: 'auth/shared',
+        filenames: ['spec.md'],
+      })
+      const architectureSpec = makeSpec({
+        workspace: 'default',
+        name: '_global/architecture',
+        filenames: ['spec.md'],
+      })
+      const jwtSpec = makeSpec({ workspace: 'default', name: 'auth/jwt', filenames: ['spec.md'] })
 
       const loginContent = '# Login\n'
       const sharedContent = '# Shared\n'
@@ -2201,8 +2324,16 @@ describe('CompileContext', () => {
 
   describe('context display modes', () => {
     it('summary mode is default when contextMode is omitted', async () => {
-      const loginSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
-      const otherSpec = new Spec('default', SpecPath.parse('auth/other'), ['spec.md'])
+      const loginSpec = makeSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md'],
+      })
+      const otherSpec = makeSpec({
+        workspace: 'default',
+        name: 'auth/other',
+        filenames: ['spec.md'],
+      })
       const loginContent = '# Login\n'
       const otherContent = '# Other\n'
       const loginMetadata = freshMetadata(loginContent, { description: 'Login spec.' })
@@ -2230,7 +2361,11 @@ describe('CompileContext', () => {
     })
 
     it('list mode emits list-only entries', async () => {
-      const loginSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+      const loginSpec = makeSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md'],
+      })
       const loginContent = '# Login\n'
       const metadata = freshMetadata(loginContent, { description: 'Login spec.' })
 
@@ -2260,8 +2395,16 @@ describe('CompileContext', () => {
     })
 
     it('full mode renders all collected entries as full', async () => {
-      const loginSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
-      const otherSpec = new Spec('default', SpecPath.parse('auth/other'), ['spec.md'])
+      const loginSpec = makeSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md'],
+      })
+      const otherSpec = makeSpec({
+        workspace: 'default',
+        name: 'auth/other',
+        filenames: ['spec.md'],
+      })
       const loginContent = '# Login\n'
       const otherContent = '# Other\n'
       const loginMetadata = freshMetadata(loginContent, { description: 'Login spec.' })
@@ -2292,8 +2435,16 @@ describe('CompileContext', () => {
     })
 
     it('hybrid mode renders direct change specs in full and others as summary', async () => {
-      const loginSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
-      const otherSpec = new Spec('default', SpecPath.parse('auth/other'), ['spec.md'])
+      const loginSpec = makeSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md'],
+      })
+      const otherSpec = makeSpec({
+        workspace: 'default',
+        name: 'auth/other',
+        filenames: ['spec.md'],
+      })
       const loginContent = '# Login\n'
       const otherContent = '# Other\n'
       const loginMetadata = freshMetadata(loginContent, { description: 'Login spec.' })
@@ -2326,7 +2477,11 @@ describe('CompileContext', () => {
     })
 
     it('section flags do not change list and summary entry shapes', async () => {
-      const loginSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+      const loginSpec = makeSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md'],
+      })
       const loginContent = '# Login\n'
       const loginMetadata = freshMetadata(loginContent, {
         description: 'Login spec.',
@@ -2370,7 +2525,11 @@ describe('CompileContext', () => {
 
   describe('source tracking', () => {
     it('specIds source assigned correctly', async () => {
-      const loginSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+      const loginSpec = makeSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md'],
+      })
       const loginContent = '# Login\n'
       const metadata = freshMetadata(loginContent, { description: 'Login spec.' })
 
@@ -2398,7 +2557,11 @@ describe('CompileContext', () => {
     })
 
     it('includePattern source assigned correctly', async () => {
-      const otherSpec = new Spec('default', SpecPath.parse('auth/other'), ['spec.md'])
+      const otherSpec = makeSpec({
+        workspace: 'default',
+        name: 'auth/other',
+        filenames: ['spec.md'],
+      })
       const otherContent = '# Other\n'
       const metadata = freshMetadata(otherContent, { description: 'Other auth spec.' })
 
@@ -2427,8 +2590,16 @@ describe('CompileContext', () => {
     })
 
     it('source priority — specDependsOn wins over dependsOnTraversal', async () => {
-      const loginSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
-      const sharedSpec = new Spec('default', SpecPath.parse('auth/shared'), ['spec.md'])
+      const loginSpec = makeSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md'],
+      })
+      const sharedSpec = makeSpec({
+        workspace: 'default',
+        name: 'auth/shared',
+        filenames: ['spec.md'],
+      })
       const loginContent = '# Login\n'
       const sharedContent = '# Shared Auth\n'
       const loginMetadata = freshMetadata(loginContent, {
@@ -2466,7 +2637,11 @@ describe('CompileContext', () => {
     })
 
     it('source priority — specIds wins over includePattern', async () => {
-      const loginSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+      const loginSpec = makeSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md'],
+      })
       const loginContent = '# Login\n'
       const metadata = freshMetadata(loginContent, { description: 'Login spec.' })
 
@@ -2497,7 +2672,11 @@ describe('CompileContext', () => {
 
   describe('Requirement: Materialized delta view via PreviewSpec', () => {
     it('uses merged content from PreviewSpec for specs in specIds', async () => {
-      const loginSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+      const loginSpec = makeSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md'],
+      })
       const loginContent = '# Login\n'
       const mergedContent = '# Login (merged)\n\nNew merged content.'
       const metadata = freshMetadata(loginContent, {
@@ -2544,7 +2723,11 @@ describe('CompileContext', () => {
     })
 
     it('falls back to metadata when PreviewSpec returns empty files', async () => {
-      const loginSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+      const loginSpec = makeSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md'],
+      })
       const loginContent = '# Login\n'
       const metadata = freshMetadata(loginContent, {
         description: 'Login fallback spec.',
@@ -2590,7 +2773,11 @@ describe('CompileContext', () => {
     })
 
     it('falls back with warning when PreviewSpec throws', async () => {
-      const loginSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+      const loginSpec = makeSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md'],
+      })
       const loginContent = '# Login\n'
       const metadata = freshMetadata(loginContent, {
         description: 'Login throw-fallback spec.',
@@ -2635,8 +2822,16 @@ describe('CompileContext', () => {
     })
 
     it('does not call PreviewSpec for non-specIds specs', async () => {
-      const loginSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
-      const otherSpec = new Spec('default', SpecPath.parse('auth/other'), ['spec.md'])
+      const loginSpec = makeSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md'],
+      })
+      const otherSpec = makeSpec({
+        workspace: 'default',
+        name: 'auth/other',
+        filenames: ['spec.md'],
+      })
       const loginContent = '# Login\n'
       const otherContent = '# Other\n'
       const loginMetadata = freshMetadata(loginContent, { description: 'Login spec.' })
@@ -2686,8 +2881,16 @@ describe('CompileContext', () => {
     })
 
     it('does not call PreviewSpec for summary-mode specs', async () => {
-      const loginSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
-      const otherSpec = new Spec('default', SpecPath.parse('auth/other'), ['spec.md'])
+      const loginSpec = makeSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md'],
+      })
+      const otherSpec = makeSpec({
+        workspace: 'default',
+        name: 'auth/other',
+        filenames: ['spec.md'],
+      })
       const loginContent = '# Login\n'
       const otherContent = '# Other\n'
       const loginMetadata = freshMetadata(loginContent, { description: 'Login spec.' })
@@ -2736,11 +2939,11 @@ describe('CompileContext', () => {
     })
 
     it('renders default sections in stable order when sections is undefined', async () => {
-      const loginSpec = new Spec('default', SpecPath.parse('auth/login'), [
-        'spec.md',
-        'verify.md',
-        'examples.md',
-      ])
+      const loginSpec = makeSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md', 'verify.md', 'examples.md'],
+      })
       const metadata = freshMetadata('# Login\n', {
         description: 'Stable order spec.',
         rules: [{ requirement: 'Auth', rules: ['Rule 1'] }],
@@ -2780,10 +2983,11 @@ describe('CompileContext', () => {
     })
 
     it('renders files alphabetically when spec.md does not exist', async () => {
-      const loginSpec = new Spec('default', SpecPath.parse('auth/login'), [
-        'verify.md',
-        'examples.md',
-      ])
+      const loginSpec = makeSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['verify.md', 'examples.md'],
+      })
       const metadata = freshMetadata('', {
         description: 'Alpha order spec.',
         rules: [{ requirement: 'Alpha', rules: ['Alpha rule'] }],
@@ -2822,11 +3026,11 @@ describe('CompileContext', () => {
     })
 
     it('uses merged preview files while keeping unchanged base files in display order', async () => {
-      const loginSpec = new Spec('default', SpecPath.parse('auth/login'), [
-        'spec.md',
-        'verify.md',
-        'examples.md',
-      ])
+      const loginSpec = makeSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md', 'verify.md', 'examples.md'],
+      })
       const metadata = freshMetadata('# Login\n', {
         description: 'Merged preview spec.',
         rules: [{ requirement: 'Auth', rules: ['Base rule'] }],
@@ -2879,7 +3083,11 @@ describe('CompileContext', () => {
     })
 
     it('derives section-filtered content from merged preview artifacts', async () => {
-      const loginSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md', 'verify.md'])
+      const loginSpec = makeSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md', 'verify.md'],
+      })
       const metadata = freshMetadata('# Login\n', { description: 'Base login spec.' })
       const specRepo = makeSpecRepo([loginSpec], {
         'auth/login/.specd-metadata.yaml': metadata,
@@ -2988,7 +3196,11 @@ describe('CompileContext', () => {
 
   describe('Requirement: Context fingerprint', () => {
     it('returns unchanged when the provided fingerprint matches the assembled output', async () => {
-      const loginSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+      const loginSpec = makeSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md'],
+      })
       const loginContent = '# Login\n'
       const metadata = freshMetadata(loginContent, { description: 'Login spec.' })
 
@@ -3020,8 +3232,16 @@ describe('CompileContext', () => {
     })
 
     it('changes when specDependsOn changes the emitted specs', async () => {
-      const loginSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
-      const sharedSpec = new Spec('default', SpecPath.parse('auth/shared'), ['spec.md'])
+      const loginSpec = makeSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md'],
+      })
+      const sharedSpec = makeSpec({
+        workspace: 'default',
+        name: 'auth/shared',
+        filenames: ['spec.md'],
+      })
       const loginContent = '# Login\n'
       const sharedContent = '# Shared\n'
       const loginMetadata = freshMetadata(loginContent, { description: 'Login spec.' })
@@ -3065,7 +3285,11 @@ describe('CompileContext', () => {
     })
 
     it('changes when warnings change', async () => {
-      const loginSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+      const loginSpec = makeSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md'],
+      })
       const loginContent = '# Login\n'
       const fresh = freshMetadata(loginContent, { description: 'Login spec.' })
       const stale = JSON.stringify({
@@ -3107,7 +3331,11 @@ describe('CompileContext', () => {
     })
 
     it('remains equal when only lifecycle state or blockers change', async () => {
-      const loginSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+      const loginSpec = makeSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md'],
+      })
       const loginContent = '# Login\n'
       const metadata = freshMetadata(loginContent, { description: 'Login spec.' })
       const specRepo = makeSpecRepo([loginSpec], {
@@ -3170,8 +3398,12 @@ describe('CompileContext', () => {
     })
 
     it('changes when result-shaping flags change the emitted context', async () => {
-      const loginSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
-      const jwtSpec = new Spec('default', SpecPath.parse('auth/jwt'), ['spec.md'])
+      const loginSpec = makeSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md'],
+      })
+      const jwtSpec = makeSpec({ workspace: 'default', name: 'auth/jwt', filenames: ['spec.md'] })
       const loginContent = '# Login\n'
       const jwtContent = '# JWT\n'
       const loginMetadata = freshMetadata(loginContent, {
@@ -3216,7 +3448,11 @@ describe('CompileContext', () => {
     })
 
     it('keeps the same fingerprint when section flags are ignored in summary/list modes', async () => {
-      const loginSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+      const loginSpec = makeSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md'],
+      })
       const loginContent = '# Login\n'
       const loginMetadata = freshMetadata(loginContent, {
         description: 'Login spec.',
@@ -3262,7 +3498,11 @@ describe('CompileContext', () => {
 
   describe('LLM-optimized context', () => {
     it('prefers optimizedContext when llmOptimizedContext is true', async () => {
-      const loginSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+      const loginSpec = makeSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md'],
+      })
       const loginContent = '# Login\n'
       const metadataObj = {
         title: 'Login',
@@ -3295,7 +3535,11 @@ describe('CompileContext', () => {
     })
 
     it('emits stale-optimization warning when optimizedContext is missing and llmOptimizedContext is true', async () => {
-      const loginSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+      const loginSpec = makeSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md'],
+      })
       const loginContent = '# Login\n'
       const metadataObj = {
         title: 'Login',
@@ -3323,7 +3567,11 @@ describe('CompileContext', () => {
     })
 
     it('bypasses optimizedContext when specific sections are requested that exclude rules or constraints', async () => {
-      const loginSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+      const loginSpec = makeSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md'],
+      })
       const loginContent = '# Login\n'
       const metadataObj = {
         title: 'Login',
@@ -3374,7 +3622,11 @@ describe('CompileContext', () => {
     })
 
     it('appends scenarios to optimizedContext when both are requested', async () => {
-      const loginSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+      const loginSpec = makeSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md'],
+      })
       const loginContent = '# Login\n'
       const metadataObj = {
         title: 'Login',
@@ -3418,7 +3670,11 @@ describe('CompileContext', () => {
 
   describe('Requirement: Baked default configuration merge', () => {
     it('runtime contextMode overrides baked default without per-call config', async () => {
-      const loginSpec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+      const loginSpec = makeSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md'],
+      })
       const loginContent = '# Login\n\nBody.'
       const metadata = freshMetadata(loginContent, { description: 'Login spec.' })
 

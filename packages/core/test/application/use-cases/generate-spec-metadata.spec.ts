@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { makeSpec } from '../../helpers/make-spec.js'
 import { GenerateSpecMetadata } from '../../../src/application/use-cases/generate-spec-metadata.js'
 import { Spec } from '../../../src/domain/entities/spec.js'
 import { ExtractorTransformError } from '../../../src/domain/errors/extractor-transform-error.js'
@@ -39,7 +40,7 @@ describe('GenerateSpecMetadata', () => {
       },
     })
 
-    const spec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
+    const spec = makeSpec({ workspace: 'default', name: 'auth/login', filenames: ['spec.md'] })
     const repo = makeSpecRepository({
       specs: [spec],
       artifacts: {
@@ -109,8 +110,8 @@ describe('GenerateSpecMetadata', () => {
       },
     })
 
-    const spec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
-    const shared = new Spec('default', SpecPath.parse('auth/shared'), ['spec.md'])
+    const spec = makeSpec({ workspace: 'default', name: 'auth/login', filenames: ['spec.md'] })
+    const shared = makeSpec({ workspace: 'default', name: 'auth/shared', filenames: ['spec.md'] })
     const repo = makeSpecRepository({
       specs: [spec, shared],
       artifacts: {
@@ -187,10 +188,16 @@ describe('GenerateSpecMetadata', () => {
       },
     })
 
-    const coreSpec = new Spec('core', SpecPath.parse('core/actor-resolver-port'), ['spec.md'])
-    const globalArchitecture = new Spec('default', SpecPath.parse('_global/architecture'), [
-      'spec.md',
-    ])
+    const coreSpec = makeSpec({
+      workspace: 'core',
+      name: 'core/actor-resolver-port',
+      filenames: ['spec.md'],
+    })
+    const globalArchitecture = makeSpec({
+      workspace: 'default',
+      name: '_global/architecture',
+      filenames: ['spec.md'],
+    })
     const coreRepo = makeSpecRepository({
       specs: [coreSpec],
       artifacts: {
@@ -267,7 +274,7 @@ describe('GenerateSpecMetadata', () => {
       metadataExtraction: {},
     })
 
-    const spec = new Spec('core', SpecPath.parse('change'), ['spec.md'])
+    const spec = makeSpec({ workspace: 'core', name: 'change', filenames: ['spec.md'] })
     const repo = makeSpecRepository({
       workspace: 'core',
       specs: [spec],
@@ -326,7 +333,7 @@ describe('GenerateSpecMetadata', () => {
       metadataExtraction: {},
     })
 
-    const spec = new Spec('core', SpecPath.parse('change'), ['spec.md'])
+    const spec = makeSpec({ workspace: 'core', name: 'change', filenames: ['spec.md'] })
     const repo = makeSpecRepository({
       workspace: 'core',
       specs: [spec],
@@ -381,8 +388,8 @@ describe('GenerateSpecMetadata', () => {
       },
     })
 
-    const spec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
-    const shared = new Spec('default', SpecPath.parse('auth/shared'), ['spec.md'])
+    const spec = makeSpec({ workspace: 'default', name: 'auth/login', filenames: ['spec.md'] })
+    const shared = makeSpec({ workspace: 'default', name: 'auth/shared', filenames: ['spec.md'] })
     const repo = makeSpecRepository({
       specs: [spec, shared],
       artifacts: {
@@ -457,8 +464,8 @@ describe('GenerateSpecMetadata', () => {
       },
     })
 
-    const spec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
-    const shared = new Spec('default', SpecPath.parse('auth/shared'), ['spec.md'])
+    const spec = makeSpec({ workspace: 'default', name: 'auth/login', filenames: ['spec.md'] })
+    const shared = makeSpec({ workspace: 'default', name: 'auth/shared', filenames: ['spec.md'] })
     const repo = makeSpecRepository({
       specs: [spec, shared],
       artifacts: {
@@ -528,8 +535,8 @@ describe('GenerateSpecMetadata', () => {
       },
     })
 
-    const spec = new Spec('default', SpecPath.parse('auth/login'), ['spec.md'])
-    const shared = new Spec('default', SpecPath.parse('auth/shared'), ['spec.md'])
+    const spec = makeSpec({ workspace: 'default', name: 'auth/login', filenames: ['spec.md'] })
+    const shared = makeSpec({ workspace: 'default', name: 'auth/shared', filenames: ['spec.md'] })
     const repo = makeSpecRepository({
       specs: [spec, shared],
       artifacts: {

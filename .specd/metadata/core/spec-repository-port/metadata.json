@@ -33,7 +33,7 @@
     {
       "requirement": "get returns a Spec or null",
       "rules": [
-        "`get(name)` MUST accept a `SpecPath` and return the `Spec` metadata for that name within this workspace, or `null` if no such spec exists. The returned `Spec` contains only metadata (workspace, name, filenames) — no artifact content is loaded."
+        "`get(name)` MUST accept a `SpecPath` and return the `Spec` metadata for that name within\nthis workspace, or `null` if no such spec exists. Artifact **content** MUST NOT be\nloaded by `get`.\n\nThe returned `Spec` MUST include:\n\n- `workspace` — workspace name bound to the repository instance\n- `name` — `SpecPath` identity within the workspace\n- `artifacts` — ordered list of `SpecArtifactEntry` values for schema artifacts present\n  in the spec directory. Each entry MUST include:\n  - `filename` — artifact basename\n  - `lastModified` — contractual last-modified stamp for that file (ISO-8601 string or\n    an equivalent stable string representation defined by the adapter family)\n- `persistedStateStamp` — `{ present: boolean, lastModified: string | null }` for the\n  persisted semantic lock sidecar (`present: false` and `lastModified: null` when\n  absent)\n- `generatedMetadataStamp` — `{ present: boolean, lastModified: string | null }` for the\n  generated `metadata.json` sidecar. This stamp is **not** authored spec content; it\n  exists so consumers can hard-gate caches without calling `metadata()` (which parses\n  JSON and may re-hash artifacts for freshness).\n\n`SpecArtifactEntry` MUST NOT be confused with the content-bearing `SpecArtifact` value\nobject returned by `artifact()`.\n\n`Spec` MUST expose derived `filenames` and `hasArtifact(filename)` helpers computed from\n`artifacts` (e.g. `artifacts[].filename`). These preserve the prior presence API; stamp\nmetadata remains on `SpecArtifactEntry` entries only.\n\n`get` MUST NOT return content hashes, `persistedStateHash`, or `specFingerprint`."
       ]
     },
     {
@@ -57,7 +57,7 @@
     {
       "requirement": "Spec artifact access is limited to expected artifact files",
       "rules": [
-        "`artifact(spec, filename)` and `save(spec, artifact, options?)` MUST operate only on artifact filenames that are valid for that spec under the active schema.\n\nAdapter-owned metadata sidecars are outside that generic artifact surface. In particular:\n\n- `spec-lock.json` MUST NOT be exposed through `Spec.filenames`\n- `spec-lock.json` MUST NOT be readable or writable through `artifact()` / `save()`\n- sidecar persistence MUST instead flow through the repository's semantic persisted-state operations\n\nThe repository MUST NOT treat the spec directory as a general-purpose file container for arbitrary extra filenames when serving the normal artifact API."
+        "`artifact(spec, filename)` and `save(spec, artifact, options?)` MUST operate only on\nartifact filenames that are valid for that spec under the active schema.\n\nAdapter-owned metadata sidecars are outside that generic artifact surface. In particular:\n\n- `spec-lock.json` MUST NOT appear in `Spec.artifacts`\n- `spec-lock.json` MUST NOT be readable or writable through `artifact()` / `save()`\n- sidecar persistence MUST instead flow through the repository's semantic persisted-state\n  operations\n\nThe repository MUST NOT treat the spec directory as a general-purpose file container for\narbitrary extra filenames when serving the normal artifact API."
       ]
     },
     {
@@ -101,9 +101,9 @@
       ]
     },
     {
-      "requirement": "persisted spec semantics and stable spec hash",
+      "requirement": "persisted spec semantics, persistedStateHash, and specFingerprint",
       "rules": [
-        "`SpecRepository` MUST NOT expose raw sidecar filesystem shapes (like `SpecLockData`) to use cases. Instead, it MUST provide semantic operations for reading and writing persisted spec state:\n\n1. `readPersistedSchema(spec)` — returns the schema identity `{ name, version }` stored with the spec, or `null`.\n2. `readPersistedDependsOn(spec)` — returns the dependency list `string[]` stored with the spec, or `null`.\n3. `readPersistedImplementation(spec)` — returns implementation links stored with the spec, or `null`.\n4. `updatePersistedState(spec, patch, options?)` — updates one or more persisted semantics atomically with conflict detection.\n5. `specHash(spec)` — returns a stable SHA-256 hash representing the spec's persisted semantic state.\n\nThese methods are the only application-facing API for persisted sidecar state. Callers MUST NOT depend on sidecar filenames, spec-directory scans, or `Spec.filenames` entries to discover or mutate persisted semantics."
+        "`SpecRepository` MUST NOT expose raw sidecar filesystem shapes (like `SpecLockData`) to\nuse cases. Instead, it MUST provide semantic operations for reading and writing\npersisted spec state:\n\n1. `readPersistedSchema(spec)` — returns the schema identity `{ name, version }` stored\n   with the spec, or `null`.\n2. `readPersistedDependsOn(spec)` — returns the dependency list `string[]` stored with\n   the spec, or `null`.\n3. `readPersistedImplementation(spec)` — returns implementation links stored with the\n   spec, or `null`.\n4. `updatePersistedState(spec, patch, options?)` — updates one or more persisted\n   semantics atomically with conflict detection.\n5. `persistedStateHash(spec)` — returns a stable SHA-256 hash of the spec's **persisted\n   semantic lock state** (the lock sidecar content), or `null` when that state is\n   absent. This replaces the former `specHash` name, which MUST NOT remain as the\n   public method name.\n6. `specFingerprint(spec)` — returns a stable digest of the authored/persisted Spec\n   inputs. The canonical payload MUST be sorted-key JSON of: Construction rules:\n   1. Presence set MUST be the current `Spec.artifacts` entries (present schema\n      artifacts only — not a derived `filenames` list and not schema-wide missing\n      slots).\n   2. For each entry, `contentHash` MUST be the content hash of that artifact's\n      bytes.\n   3. `artifacts` MUST be sorted by `filename` ascending before serialization.\n   4. `persistedStateHash` MUST be `persistedStateHash(spec)`, or the literal\n      `\"__absent__\"` when that API returns `null`.\n   5. `specFingerprint` MUST be the content hash of that canonical JSON string.\n\nGenerated `metadata.json` MUST NOT be an input to `specFingerprint`.\n\nThese methods are the only application-facing API for persisted sidecar state and Spec\ncontent fingerprinting at the repository boundary. Callers MUST NOT depend on sidecar\nfilenames, spec-directory scans, or invent validate-cache stamp helpers on this port\nto discover or mutate persisted semantics."
       ]
     },
     {
@@ -139,7 +139,7 @@
   ],
   "constraints": [
     "Each instance is bound to a single workspace; workspace is immutable after construction",
-    "get returns lightweight Spec metadata — artifact content is never loaded by get",
+    "get returns lightweight Spec metadata including SpecArtifactEntry lastModified\nstamps, persistedStateStamp, and generatedMetadataStamp — artifact content is never\nloaded by get",
     "list returns ListResult<SpecListEntry> rows with host-controlled pagination (no default limit); artifact content is never loaded by list",
     "search loads artifact content as needed to perform matching — it is more expensive than list",
     "save creates the spec directory if it does not already exist",
@@ -148,12 +148,15 @@
     "originalHash on loaded artifacts MUST use sha256 of the file content as read from disk",
     "metadata and saveMetadata operate on a storage location determined by the adapter — callers MUST NOT assume metadata lives alongside spec content",
     "metadata returns parsed content; artifact returns raw content — they are not interchangeable",
+    "generatedMetadataStamp on Spec is a lastModified/presence stamp only — it is not the parsed metadata document",
     "save, saveMetadata, and semantic update operations MUST throw ReadOnlyWorkspaceError before any I/O when ownership is readOnly",
-    "Read operations (get, list, count, artifact, metadata, resolveFromPath, search, specHash, and semantic read operations) are not affected by ownership — readOnly workspaces can always be read",
+    "Read operations (get, list, count, artifact, metadata, resolveFromPath, search, persistedStateHash, specFingerprint, and semantic read operations) are not affected by ownership — readOnly workspaces can always be read",
     "Use cases MUST interact with specs through semantic repository operations only.",
     "Sidecar files (like spec-lock.json) are an implementation detail of the repository adapter and MUST NOT be accessed directly by application logic.",
-    "The specHash() MUST be stable and deterministic across multiple calls for the same spec state.",
-    "specsPath is a repository capability for filesystem-backed adapters only; consumers MUST NOT assume it exists for every SpecRepository"
+    "persistedStateHash() MUST be stable and deterministic across multiple calls for the same persisted semantic state.",
+    "specFingerprint() MUST be stable and deterministic across multiple calls for the same artifact contents and persisted semantic state.",
+    "specsPath is a repository capability for filesystem-backed adapters only; consumers MUST NOT assume it exists for every SpecRepository",
+    "This port MUST NOT grow validate-cache-specific helpers such as validationSourceStamps or readValidationSidecar"
   ],
   "scenarios": [
     {
@@ -233,11 +236,10 @@
     {
       "requirement": "get returns a Spec or null",
       "name": "Spec exists",
-      "when": [
-        "get(SpecPath.parse(\"auth/oauth\")) is called and the spec exists in this workspace"
-      ],
+      "when": ["get(SpecPath.parse(\"auth/oauth\")) is called and the spec exists in this"],
       "then": [
-        "a Spec is returned with workspace, name, and filenames populated",
+        "a Spec is returned with workspace, name, artifacts",
+        "AND derived filenames and hasArtifact(filename) reflect the same presence set",
         "AND no artifact content is loaded"
       ]
     },
@@ -325,12 +327,8 @@
     {
       "requirement": "Spec artifact access is limited to expected artifact files",
       "name": "Unexpected extra file is rejected",
-      "given": [
-        "an extra file exists in the spec directory but is not a valid artifact or adapter-owned metadata file"
-      ],
-      "when": [
-        "artifact(spec, \"<extra-file>\") or save(spec, artifact(\"<extra-file>\")) is called"
-      ],
+      "given": ["an extra file exists in the spec directory but is not a valid artifact or"],
+      "when": ["artifact(spec, \"<extra-file>\") or save(spec, artifact(\"<extra-file>\"))"],
       "then": ["the repository rejects the operation"]
     },
     {
@@ -339,7 +337,7 @@
       "given": ["a persisted spec directory contains spec-lock.json"],
       "when": ["get() or list() returns the spec metadata"],
       "then": [
-        "spec-lock.json does not appear in Spec.filenames",
+        "spec-lock.json does not appear in Spec.artifacts",
         "AND artifact(spec, \"spec-lock.json\") is rejected"
       ]
     },
@@ -502,31 +500,37 @@
       "then": ["only specs within the billing workspace are returned"]
     },
     {
-      "requirement": "persisted spec semantics and stable spec hash",
-      "name": "specHash remains stable when state is unchanged",
-      "given": [
-        "a persisted spec with unchanged artifacts, persisted dependencies, and implementation links"
-      ],
-      "when": ["the repository is asked for its stable spec hash twice"],
+      "requirement": "persisted spec semantics, persistedStateHash, and specFingerprint",
+      "name": "persistedStateHash remains stable when state is unchanged",
+      "given": ["a persisted spec with unchanged persisted lock state"],
+      "when": ["the repository is asked for persistedStateHash twice"],
       "then": ["both calls return the same hash"]
     },
     {
-      "requirement": "persisted spec semantics and stable spec hash",
-      "name": "specHash changes when state is modified",
-      "given": ["a persisted spec with an initial stable spec hash"],
-      "when": [
-        "the repository updates persisted dependencies or implementation state for that spec"
-      ],
+      "requirement": "persisted spec semantics, persistedStateHash, and specFingerprint",
+      "name": "persistedStateHash changes when lock state is modified",
+      "given": ["a persisted spec with an initial persistedStateHash"],
+      "when": ["the repository updates persisted dependencies or implementation state for"],
       "then": ["the returned hash differs from the previous value"]
     },
     {
-      "requirement": "persisted spec semantics and stable spec hash",
+      "requirement": "persisted spec semantics, persistedStateHash, and specFingerprint",
+      "name": "specFingerprint orders artifact hashes by filename",
+      "given": ["a spec with multiple present artifacts whose contents are unchanged"],
+      "when": ["specFingerprint is computed twice"],
+      "then": [
+        "both calls return the same digest",
+        "AND the digest incorporates per-artifact content hashes ordered by filename\nalphabetically plus persistedStateHash (or an absent sentinel)"
+      ]
+    },
+    {
+      "requirement": "persisted spec semantics, persistedStateHash, and specFingerprint",
       "name": "persisted dependency state is read semantically",
       "given": ["a persisted spec with archived dependency state"],
       "when": ["application logic needs the canonical persisted dependsOn list"],
       "then": [
         "it reads that value through readPersistedDependsOn(spec)",
-        "AND it does not need Spec.filenames or generic artifact reads to discover the sidecar"
+        "AND it does not need Spec.artifacts or generic artifact reads to discover the\nsidecar"
       ]
     },
     {
@@ -559,14 +563,44 @@
     "symbols": [
       {
         "specId": "core:spec-repository-port",
-        "file": "core:src/infrastructure/fs/spec-repository.ts",
-        "symbol": "FsSpecRepository"
+        "file": "core:src/domain/entities/spec.ts",
+        "symbol": "Spec,SpecArtifactEntry,SpecSidecarStamp,ABSENT_SPEC_SIDECAR"
+      },
+      {
+        "specId": "core:spec-repository-port",
+        "file": "core:src/domain/entities/spec.ts",
+        "symbol": "Spec"
+      },
+      {
+        "specId": "core:spec-repository-port",
+        "file": "core:src/domain/entities/spec.ts",
+        "symbol": "SpecArtifactEntry"
+      },
+      {
+        "specId": "core:spec-repository-port",
+        "file": "core:src/domain/entities/spec.ts",
+        "symbol": "SpecSidecarStamp"
+      },
+      {
+        "specId": "core:spec-repository-port",
+        "file": "core:src/domain/entities/spec.ts",
+        "symbol": "hasArtifact"
+      },
+      {
+        "specId": "core:spec-repository-port",
+        "file": "core:src/domain/entities/spec.ts",
+        "symbol": "persistedStateStamp"
+      },
+      {
+        "specId": "core:spec-repository-port",
+        "file": "core:src/domain/entities/spec.ts",
+        "symbol": "generatedMetadataStamp"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:71633d5f2405155a04b56be1c6e3520fdf4d5be2ac9ab32571a0f90e64d34559",
-    "verify.md": "sha256:6387c4558ca3fc461ef91e859a9ee7b4a7d903c64b97787236cfd105bb3bca53"
+    "spec.md": "sha256:021b7d88ba4b9c5aa4096b648606c9bd4e6bec4dd1abc174c1f42b4458a9eeb7",
+    "verify.md": "sha256:92561ac2e1c44a354f0d5ed70e6be92f95db1a45cab8fdd5c58267e162f7af85"
   },
   "generatedBy": "core"
 }
