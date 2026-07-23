@@ -666,6 +666,52 @@ interface SpecValidationEntry {
 
 ---
 
+### GetSpecsHealth
+
+Aggregates overall health statistics of the project specifications and lists only the specs that did not validate cleanly. It invokes `ValidateSpecs.execute()` internally, calculates mutually exclusive health counters (passed cleanly, failed, and warned), and returns detailed diagnostics consolidated in a single `issues` list, omitting successful specs to optimize payload size.
+
+**Constructor:**
+
+```typescript
+new GetSpecsHealth(validateSpecs: ValidateSpecs)
+```
+
+**Input:**
+
+| Field       | Type     | Required | Description                                                   |
+| ----------- | -------- | -------- | ------------------------------------------------------------- |
+| `workspace` | `string` | no       | Aggregate health statistics for specs in this workspace only. |
+
+When `workspace` is absent, all specs across all workspaces are validated.
+
+**Returns:** `Promise<GetSpecsHealthResult>`
+
+```typescript
+interface GetSpecsHealthResult {
+  readonly totalSpecs: number
+  readonly passed: number
+  readonly failed: number
+  readonly warned: number
+  readonly issues: readonly SpecHealthIssue[]
+}
+
+interface SpecHealthIssue {
+  readonly spec: string // qualified label 'workspace:path'
+  readonly passed: boolean // false if the spec has failures, true if it only has warnings
+  readonly failures: readonly ValidationFailure[]
+  readonly warnings: readonly ValidationWarning[]
+}
+```
+
+**Throws:**
+
+| Error                    | Condition                                |
+| ------------------------ | ---------------------------------------- |
+| `SchemaNotFoundError`    | The schema reference cannot be resolved. |
+| `WorkspaceNotFoundError` | The given workspace does not exist.      |
+
+---
+
 ### ValidateSchema
 
 Validates a schema file via one of three modes. Returns structured results rather than throwing for validation failures.

@@ -158,6 +158,11 @@ export {
   type SpecValidationEntry,
 } from './validate-specs.js'
 export {
+  type GetSpecsHealth,
+  type GetSpecsHealthInput,
+  type GetSpecsHealthResult,
+} from './get-specs-health.js'
+export {
   type RunStepHooks,
   type RunStepHooksInput,
   type RunStepHooksResult,

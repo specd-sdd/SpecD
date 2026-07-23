@@ -6,12 +6,6 @@
   "dependsOn": ["default:_global/conventions"],
   "implementation": [
     {
-      "file": "default:docs/config/config-reference.md"
-    },
-    {
-      "file": "default:docs/guide/workspaces.md"
-    },
-    {
       "file": "default:docs/core/use-cases.md"
     }
   ]

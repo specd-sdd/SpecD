@@ -1,0 +1,29 @@
+- op: modified
+  description: 'Add getHealth use case to kernel.specs table'
+  selector:
+    type: section
+    matches: '^kernel.specs$'
+  content: |
+    | Kernel path                | Use case class                        | Spec                                                                 | Description                                                 |
+    | -------------------------- | ------------------------------------- | -------------------------------------------------------------------- | ----------------------------------------------------------- |
+    | `specs.repos`              | `ReadonlyMap<string, SpecRepository>` | —                                                                    | Spec repositories keyed by workspace name                   |
+    | `specs.list`               | `ListSpecs`                           | [core:list-specs](../list-specs/spec.md)                             | Lists all specs across all workspaces                       |
+    | `specs.search`             | `SearchSpecs`                         | [core:search-specs](../search-specs/spec.md)                         | Searches spec content across all workspaces                 |
+    | `specs.get`                | `GetSpec`                             | [core:get-spec](../get-spec/spec.md)                                 | Loads a spec and all artifact files                         |
+    | `specs.saveMetadata`       | `SaveSpecMetadata`                    | [core:save-spec-metadata](../save-spec-metadata/spec.md)             | Writes a `.specd-metadata.yaml` file                        |
+    | `specs.invalidateMetadata` | `InvalidateSpecMetadata`              | [core:invalidate-spec-metadata](../invalidate-spec-metadata/spec.md) | Invalidates a spec's metadata                               |
+    | `specs.getActiveSchema`    | `GetActiveSchema`                     | [core:get-active-schema](../get-active-schema/spec.md)               | Resolves and returns the active schema                      |
+    | `specs.validate`           | `ValidateSpecs`                       | [core:validate-specs](../validate-specs/spec.md)                     | Validates spec artifacts against schema rules               |
+    | `specs.generateMetadata`   | `GenerateSpecMetadata`                | [core:generate-metadata](../generate-metadata/spec.md)               | Generates deterministic metadata from extraction rules      |
+    | `specs.getContext`         | `GetSpecContext`                      | [core:get-spec-context](../get-spec-context/spec.md)                 | Builds structured context entries with dependency traversal |
+    | `specs.resolveSchema`      | `ResolveSchema`                       | [core:resolve-schema](../resolve-schema/spec.md)                     | Resolves base schema with extends, plugins, and overrides   |
+    | `specs.getHealth`          | `GetSpecsHealth`                      | [core:get-specs-health](../get-specs-health/spec.md)                 | Provides validation health summary of specs                 |
+
+- op: added
+  description: 'Add core:get-specs-health to Spec Dependencies list'
+  position:
+    parent:
+      type: section
+      matches: '^Spec Dependencies$'
+  content: |
+    - [`core:get-specs-health`](../get-specs-health/spec.md)

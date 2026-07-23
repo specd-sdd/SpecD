@@ -24,6 +24,7 @@ import { type GetProjectSummary } from '../application/use-cases/get-project-sum
 import { type GetSpec } from '../application/use-cases/get-spec.js'
 import { type GetSpecContext } from '../application/use-cases/get-spec-context.js'
 import { type GetSpecOutline } from '../application/use-cases/get-spec-outline.js'
+import { type GetSpecsHealth } from '../application/use-cases/get-specs-health.js'
 import { type GetStatus } from '../application/use-cases/get-status.js'
 import { type InvalidateChange } from '../application/use-cases/invalidate-change.js'
 import { type InvalidateSpecMetadata } from '../application/use-cases/invalidate-spec-metadata.js'
@@ -106,6 +107,7 @@ import {
 import { createGetSpec, resolveGetSpecDeps } from './use-cases/get-spec.js'
 import { createGetSpecContext, resolveGetSpecContextDeps } from './use-cases/get-spec-context.js'
 import { createGetSpecOutline, resolveGetSpecOutlineDeps } from './use-cases/get-spec-outline.js'
+import { createGetSpecsHealth } from './use-cases/get-specs-health.js'
 import { createGetStatus, resolveGetStatusDeps } from './use-cases/get-status.js'
 import {
   createInvalidateChange,
@@ -206,6 +208,7 @@ export interface Kernel {
     resolve: ResolveSchema
     validateSchema: ValidateSchema
     validate: ValidateSpecs
+    getHealth: GetSpecsHealth
     generateMetadata: GenerateSpecMetadata
     updateMetadata: UpdateSpecMetadata
     getContext: GetSpecContext
@@ -308,6 +311,7 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
   )
   const validateSchema = createValidateSchema(resolveValidateSchemaDeps(resolver))
   const validateSpecs = createValidateSpecs(resolveValidateSpecsDeps(resolver))
+  const getHealth = createGetSpecsHealth({ validateSpecs })
   const updateMetadata = createUpdateSpecMetadata({
     generateMetadata: resolveGenerateSpecMetadataDeps(resolver),
     saveMetadata: resolveSaveSpecMetadataDeps(resolver),
@@ -379,6 +383,7 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
       resolve: resolveSchema,
       validateSchema,
       validate: validateSpecs,
+      getHealth,
       generateMetadata,
       updateMetadata,
       getContext,

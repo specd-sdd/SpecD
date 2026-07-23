@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'Generic kernel verification scenarios remain valid for the new getHealth entry — no changes needed'

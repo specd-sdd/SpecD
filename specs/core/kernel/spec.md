@@ -165,6 +165,7 @@ The following table is the exhaustive mapping between kernel paths and use case 
 | `specs.generateMetadata`   | `GenerateSpecMetadata`                | [core:generate-metadata](../generate-metadata/spec.md)               | Generates deterministic metadata from extraction rules      |
 | `specs.getContext`         | `GetSpecContext`                      | [core:get-spec-context](../get-spec-context/spec.md)                 | Builds structured context entries with dependency traversal |
 | `specs.resolveSchema`      | `ResolveSchema`                       | [core:resolve-schema](../resolve-schema/spec.md)                     | Resolves base schema with extends, plugins, and overrides   |
+| `specs.getHealth`          | `GetSpecsHealth`                      | [core:get-specs-health](../get-specs-health/spec.md)                 | Provides validation health summary of specs                 |
 
 #### kernel.project
 
@@ -309,3 +310,4 @@ await writer.initProject({
 - [`core:update-project-metadata`](../update-project-metadata/spec.md)
 - [`core:resolve-schema`](../resolve-schema/spec.md)
 - [`core:spec-overlap`](../spec-overlap/spec.md)
+- [`core:get-specs-health`](../get-specs-health/spec.md)

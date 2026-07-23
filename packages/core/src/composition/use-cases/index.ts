@@ -30,6 +30,7 @@ export { createArchiveChange, type ArchiveChangeDeps } from './archive-change.js
 export { createValidateArtifacts, type ValidateArtifactsDeps } from './validate-artifacts.js'
 export { createCompileContext, type CompileContextDeps } from './compile-context.js'
 export { createValidateSpecs, type ValidateSpecsDeps } from './validate-specs.js'
+export { createGetSpecsHealth, type GetSpecsHealthDeps } from './get-specs-health.js'
 export { createGetSpecContext, type GetSpecContextDeps } from './get-spec-context.js'
 export { createDetectOverlap, type DetectOverlapDeps } from './detect-overlap.js'
 export { createPreviewSpec, type PreviewSpecDeps } from './preview-spec.js'

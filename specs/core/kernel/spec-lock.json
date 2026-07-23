@@ -43,12 +43,20 @@
     "core:project-metadata",
     "core:update-project-metadata",
     "core:resolve-schema",
-    "core:spec-overlap"
+    "core:spec-overlap",
+    "core:get-specs-health"
   ],
   "implementation": [
     {
+      "file": "core:src/composition/use-cases/get-specs-health.ts",
+      "symbols": ["createGetSpecsHealth", "resolveGetSpecsHealthDeps", "GetSpecsHealthDeps"]
+    },
+    {
       "file": "core:src/composition/kernel.ts",
-      "symbols": ["createKernel"]
+      "symbols": ["Kernel", "createKernel"]
+    },
+    {
+      "file": "core:test/composition/kernel.spec.ts"
     }
   ]
 }

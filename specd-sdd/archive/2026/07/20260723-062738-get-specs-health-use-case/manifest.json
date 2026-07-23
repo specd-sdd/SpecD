@@ -1,0 +1,671 @@
+{
+  "name": "get-specs-health-use-case",
+  "createdAt": "2026-07-23T06:27:38.252Z",
+  "description": "Add GetSpecsHealth use case to aggregate and summarize spec validation results without full details",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": ["core:get-specs-health", "core:kernel", "default:_global/docs"],
+  "specDependsOn": {
+    "core:kernel": [
+      "default:_global/architecture",
+      "core:composition",
+      "core:create-change",
+      "core:get-status",
+      "core:transition-change",
+      "core:draft-change",
+      "core:restore-change",
+      "core:discard-change",
+      "core:archive-change",
+      "core:validate-artifacts",
+      "core:compile-context",
+      "core:list-changes",
+      "core:list-drafts",
+      "core:list-discarded",
+      "core:edit-change",
+      "core:skip-artifact",
+      "core:update-spec-deps",
+      "core:list-archived",
+      "core:get-archived-change",
+      "core:run-step-hooks",
+      "core:get-hook-instructions",
+      "core:get-artifact-instruction",
+      "core:approve-spec",
+      "core:approve-signoff",
+      "core:list-specs",
+      "core:get-spec",
+      "core:save-spec-metadata",
+      "core:invalidate-spec-metadata",
+      "core:get-active-schema",
+      "core:validate-specs",
+      "core:generate-metadata",
+      "core:get-spec-context",
+      "core:config-writer-port",
+      "core:list-workspaces",
+      "core:get-project-context",
+      "core:get-config",
+      "core:project-metadata",
+      "core:update-project-metadata",
+      "core:resolve-schema",
+      "core:spec-overlap",
+      "core:get-specs-health"
+    ],
+    "core:get-specs-health": ["core:validate-specs"],
+    "default:_global/docs": ["default:_global/conventions"]
+  },
+  "invalidationPolicy": "downstream",
+  "trackedImplementationFiles": [
+    {
+      "file": ".specd/metadata/core/change/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/storage/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/validation-result-cache-port/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/default/_global/docs/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": "EXPLORATION_EVENT_BUS.md",
+      "state": "ignored"
+    },
+    {
+      "file": "EXPLORATION_SPECD_BRANCH_MERGE_SKILL.md",
+      "state": "ignored"
+    },
+    {
+      "file": "EXPLORATION_STORAGE_ABSTRACTION.md",
+      "state": "ignored"
+    },
+    {
+      "file": "assets/specd-changes-hooks.svg",
+      "state": "ignored"
+    },
+    {
+      "file": "assets/specd-changes-status.svg",
+      "state": "ignored"
+    },
+    {
+      "file": "assets/specd-changes-validate.svg",
+      "state": "ignored"
+    },
+    {
+      "file": "assets/specd-specs-lists.svg",
+      "state": "ignored"
+    },
+    {
+      "file": "assets/specd.svg",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/get-specs-health.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/get-specs-health.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/core/use-cases.md",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/get-specs-health.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/kernel.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/composition/kernel.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "/Users/monki/.gemini/antigravity-cli/brain/7f5063a2-c68b-40e5-a7a6-2ff5c73faa29/scratch/test-health.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/public.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/barrel-kernel-coverage.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "EXPLORATION_LIFECYCLE_TRANSITIONS_UX.md",
+      "state": "ignored"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "core:get-specs-health",
+      "file": "packages/core/src/application/use-cases/get-specs-health.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["GetSpecsHealth", "GetSpecsHealthInput", "GetSpecsHealthResult"]
+    },
+    {
+      "specId": "core:get-specs-health",
+      "file": "packages/core/test/application/use-cases/get-specs-health.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "default:_global/docs",
+      "file": "docs/core/use-cases.md",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:kernel",
+      "file": "packages/core/src/composition/use-cases/get-specs-health.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["createGetSpecsHealth", "resolveGetSpecsHealthDeps", "GetSpecsHealthDeps"]
+    },
+    {
+      "specId": "core:kernel",
+      "file": "packages/core/src/composition/kernel.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["Kernel", "createKernel"]
+    },
+    {
+      "specId": "core:kernel",
+      "file": "packages/core/test/composition/kernel.spec.ts",
+      "fileLinkExplicit": true
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:83d140e3d7a552689a0f01330256b857bbb1211aee8bd3edeba72000ff2c4085"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:get-specs-health",
+          "filename": "specs/core/get-specs-health/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:016a2336926d934343b5dfa0866cefffbc9850cd94cb741a885ace094bf01726"
+        },
+        {
+          "key": "core:kernel",
+          "filename": "deltas/core/kernel/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:79fca62f02ca2c66ebd146ff96c2b13f370a1db3f89a216f6320c1e7d2972702"
+        },
+        {
+          "key": "default:_global/docs",
+          "filename": "deltas/default/_global/docs/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:42418e2cfddb2ecdf15a41b4bd42b672b28b827ac188a5a798eecde3ab519f1d"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:get-specs-health",
+          "filename": "specs/core/get-specs-health/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:d51b1b2caa9501a8dea30ff986044681423abbbb4fa9cd33fb8054c7353ae20a"
+        },
+        {
+          "key": "core:kernel",
+          "filename": "deltas/core/kernel/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:7bd0b576169f176e248c8fc59625567daf8cb39d1f6ee7538abd5f27ec1664ad"
+        },
+        {
+          "key": "default:_global/docs",
+          "filename": "deltas/default/_global/docs/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:bc50e72eb2bac84ecc743a6dc412579db211cc52c5fd30b6c5dd5d4941dc6deb"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:1348aa6d2580957529f6832dc298f44c8ef6ff8d5eb2d91e08b3243fda07bd43"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:8568d745cc90074c479475a16c1d1187c2818d364d18a31da90a414a5d351b0c"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-07-23T06:27:38.252Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": ["core:get-specs-health"],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-23T06:27:38.264Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "core:get-specs-health"
+        },
+        {
+          "type": "verify",
+          "key": "core:get-specs-health"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-23T06:35:56.335Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-23T06:43:27.775Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["core:get-specs-health"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:get-specs-health"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-23T06:44:12.714Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["core:get-specs-health"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:get-specs-health"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-23T06:46:15.138Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["core:get-specs-health"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:get-specs-health"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-23T06:49:25.606Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["core:get-specs-health"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:get-specs-health"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-23T06:55:43.122Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["core:get-specs-health"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:get-specs-health"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-23T06:55:43.125Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:kernel"
+        },
+        {
+          "type": "verify",
+          "key": "core:kernel"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-23T06:58:19.401Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["core:get-specs-health", "core:kernel"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:get-specs-health", "core:kernel"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-23T06:58:19.404Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "default:_global/docs"
+        },
+        {
+          "type": "verify",
+          "key": "default:_global/docs"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-23T07:00:30.406Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-23T07:02:26.850Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-23T07:20:29.357Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-23T07:27:08.343Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-23T07:27:15.390Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-07-23T07:28:41.278Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Implementation link \"core:get-specs-health\" points outside workspace \"core\" codeRoot.",
+      "commitStarted": false
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-23T07:28:57.537Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-07-23T07:28:57.675Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

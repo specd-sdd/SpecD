@@ -51,6 +51,7 @@ const KERNEL_ASSEMBLY_EXPORTS: Record<string, string> = {
   'specs.resolve': 'createResolveSchema',
   'specs.validateSchema': 'createValidateSchema',
   'specs.validate': 'createValidateSpecs',
+  'specs.getHealth': 'createGetSpecsHealth',
   'specs.generateMetadata': 'createGenerateSpecMetadata',
   'specs.updateMetadata': 'createUpdateSpecMetadata',
   'specs.getContext': 'createGetSpecContext',
