@@ -340,7 +340,7 @@
     @apply list-decimal;
   }
 
-  .studio-markdown-preview code {
+  .studio-markdown-preview :not(pre) > code {
     @apply rounded bg-background/80 px-1 py-0.5 font-mono text-[11px] text-foreground;
   }
 
@@ -349,7 +349,49 @@
   }
 
   .studio-markdown-preview pre code {
-    @apply bg-transparent p-0;
+    @apply bg-transparent p-0 font-mono text-[11px];
+  }
+
+  .studio-markdown-preview ul.contains-task-list {
+    @apply my-2 list-none space-y-1 pl-0;
+  }
+
+  .studio-markdown-preview li.task-list-item {
+    @apply list-none break-words;
+    display: block;
+  }
+
+  .studio-markdown-preview li.task-list-item > p {
+    @apply mb-0 inline;
+  }
+
+  .studio-markdown-preview li.task-list-item > input[type='checkbox'] {
+    @apply sr-only;
+  }
+
+  .studio-markdown-preview li.task-list-item [role='checkbox'] {
+    @apply mr-1.5 inline-block align-text-top;
+  }
+
+  .studio-markdown-preview .studio-mermaid-block {
+    @apply relative mb-2 rounded border border-border bg-background/40 p-3;
+  }
+
+  .studio-markdown-preview .studio-mermaid-block--ready {
+    @apply min-h-[8rem] overflow-hidden p-2 pt-9;
+  }
+
+  .studio-markdown-preview .studio-mermaid-viewport {
+    @apply min-h-[6rem] w-full touch-none select-none;
+  }
+
+  .studio-markdown-preview .studio-mermaid-canvas {
+    @apply flex w-full items-center justify-center;
+  }
+
+  .studio-markdown-preview .studio-mermaid-canvas svg {
+    @apply mx-auto block;
+    max-width: none;
   }
 
   .studio-markdown-preview a {
@@ -364,4 +406,190 @@
   .studio-markdown-preview td {
     @apply border border-border px-2 py-1 text-left;
   }
+}
+
+/* GitHub Dark / Light highlight.js themes (scoped). Kept inlined because
+   Tailwind CLI does not resolve nested @import without postcss-import. */
+.studio-markdown-preview--dark .hljs {
+  color: #c9d1d9;
+  background: transparent;
+}
+
+.studio-markdown-preview--dark .hljs-doctag,
+.studio-markdown-preview--dark .hljs-keyword,
+.studio-markdown-preview--dark .hljs-meta .hljs-keyword,
+.studio-markdown-preview--dark .hljs-template-tag,
+.studio-markdown-preview--dark .hljs-template-variable,
+.studio-markdown-preview--dark .hljs-type,
+.studio-markdown-preview--dark .hljs-variable.language_ {
+  color: #ff7b72;
+}
+
+.studio-markdown-preview--dark .hljs-title,
+.studio-markdown-preview--dark .hljs-title.class_,
+.studio-markdown-preview--dark .hljs-title.class_.inherited__,
+.studio-markdown-preview--dark .hljs-title.function_ {
+  color: #d2a8ff;
+}
+
+.studio-markdown-preview--dark .hljs-attr,
+.studio-markdown-preview--dark .hljs-attribute,
+.studio-markdown-preview--dark .hljs-literal,
+.studio-markdown-preview--dark .hljs-meta,
+.studio-markdown-preview--dark .hljs-number,
+.studio-markdown-preview--dark .hljs-operator,
+.studio-markdown-preview--dark .hljs-variable,
+.studio-markdown-preview--dark .hljs-selector-attr,
+.studio-markdown-preview--dark .hljs-selector-class,
+.studio-markdown-preview--dark .hljs-selector-id {
+  color: #79c0ff;
+}
+
+.studio-markdown-preview--dark .hljs-regexp,
+.studio-markdown-preview--dark .hljs-string,
+.studio-markdown-preview--dark .hljs-meta .hljs-string {
+  color: #a5d6ff;
+}
+
+.studio-markdown-preview--dark .hljs-built_in,
+.studio-markdown-preview--dark .hljs-symbol {
+  color: #ffa657;
+}
+
+.studio-markdown-preview--dark .hljs-comment,
+.studio-markdown-preview--dark .hljs-code,
+.studio-markdown-preview--dark .hljs-formula {
+  color: #8b949e;
+}
+
+.studio-markdown-preview--dark .hljs-name,
+.studio-markdown-preview--dark .hljs-quote,
+.studio-markdown-preview--dark .hljs-selector-tag,
+.studio-markdown-preview--dark .hljs-selector-pseudo {
+  color: #7ee787;
+}
+
+.studio-markdown-preview--dark .hljs-subst {
+  color: #c9d1d9;
+}
+
+.studio-markdown-preview--dark .hljs-section {
+  color: #1f6feb;
+  font-weight: bold;
+}
+
+.studio-markdown-preview--dark .hljs-bullet {
+  color: #f2cc60;
+}
+
+.studio-markdown-preview--dark .hljs-emphasis {
+  color: #c9d1d9;
+  font-style: italic;
+}
+
+.studio-markdown-preview--dark .hljs-strong {
+  color: #c9d1d9;
+  font-weight: bold;
+}
+
+.studio-markdown-preview--dark .hljs-addition {
+  color: #aff5b4;
+  background-color: #033a16;
+}
+
+.studio-markdown-preview--dark .hljs-deletion {
+  color: #ffdcd7;
+  background-color: #67060c;
+}
+
+.studio-markdown-preview--light .hljs {
+  color: #24292e;
+  background: transparent;
+}
+
+.studio-markdown-preview--light .hljs-doctag,
+.studio-markdown-preview--light .hljs-keyword,
+.studio-markdown-preview--light .hljs-meta .hljs-keyword,
+.studio-markdown-preview--light .hljs-template-tag,
+.studio-markdown-preview--light .hljs-template-variable,
+.studio-markdown-preview--light .hljs-type,
+.studio-markdown-preview--light .hljs-variable.language_ {
+  color: #d73a49;
+}
+
+.studio-markdown-preview--light .hljs-title,
+.studio-markdown-preview--light .hljs-title.class_,
+.studio-markdown-preview--light .hljs-title.class_.inherited__,
+.studio-markdown-preview--light .hljs-title.function_ {
+  color: #6f42c1;
+}
+
+.studio-markdown-preview--light .hljs-attr,
+.studio-markdown-preview--light .hljs-attribute,
+.studio-markdown-preview--light .hljs-literal,
+.studio-markdown-preview--light .hljs-meta,
+.studio-markdown-preview--light .hljs-number,
+.studio-markdown-preview--light .hljs-operator,
+.studio-markdown-preview--light .hljs-variable,
+.studio-markdown-preview--light .hljs-selector-attr,
+.studio-markdown-preview--light .hljs-selector-class,
+.studio-markdown-preview--light .hljs-selector-id {
+  color: #005cc5;
+}
+
+.studio-markdown-preview--light .hljs-regexp,
+.studio-markdown-preview--light .hljs-string,
+.studio-markdown-preview--light .hljs-meta .hljs-string {
+  color: #032f62;
+}
+
+.studio-markdown-preview--light .hljs-built_in,
+.studio-markdown-preview--light .hljs-symbol {
+  color: #e36209;
+}
+
+.studio-markdown-preview--light .hljs-comment,
+.studio-markdown-preview--light .hljs-code,
+.studio-markdown-preview--light .hljs-formula {
+  color: #6a737d;
+}
+
+.studio-markdown-preview--light .hljs-name,
+.studio-markdown-preview--light .hljs-quote,
+.studio-markdown-preview--light .hljs-selector-tag,
+.studio-markdown-preview--light .hljs-selector-pseudo {
+  color: #22863a;
+}
+
+.studio-markdown-preview--light .hljs-subst {
+  color: #24292e;
+}
+
+.studio-markdown-preview--light .hljs-section {
+  color: #005cc5;
+  font-weight: bold;
+}
+
+.studio-markdown-preview--light .hljs-bullet {
+  color: #735c0f;
+}
+
+.studio-markdown-preview--light .hljs-emphasis {
+  color: #24292e;
+  font-style: italic;
+}
+
+.studio-markdown-preview--light .hljs-strong {
+  color: #24292e;
+  font-weight: bold;
+}
+
+.studio-markdown-preview--light .hljs-addition {
+  color: #22863a;
+  background-color: #f0fff4;
+}
+
+.studio-markdown-preview--light .hljs-deletion {
+  color: #b31d28;
+  background-color: #ffeef0;
 }

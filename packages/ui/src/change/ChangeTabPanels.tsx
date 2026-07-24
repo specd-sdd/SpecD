@@ -30,8 +30,7 @@ import { useTabScopedPollKey } from '../hooks/use-tab-scoped-poll-key.js'
 import { useChangeArtifactList } from '../hooks/use-change-artifact-list.js'
 import { buildImpactViewModel, type ImpactSpecTracked } from './merge-impact-view.js'
 import { isMarkdownArtifactFilename } from '../lib/artifact-filename.js'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
+import { StudioMarkdownPreview } from '../editor/StudioMarkdownPreview.js'
 
 function formatHistoryActor(by: ChangeHistoryEventDto['by']): string {
   if (by === undefined) return ''
@@ -294,9 +293,7 @@ export function ChangeTasksTab({
               </CardHeader>
               <CardContent>
                 {isMarkdownArtifactFilename(artifact.filename) ? (
-                  <div className="studio-markdown-preview max-w-none text-sm text-foreground">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{artifact.content}</ReactMarkdown>
-                  </div>
+                  <StudioMarkdownPreview content={artifact.content} />
                 ) : (
                   <pre className="overflow-auto whitespace-pre-wrap font-mono text-xs text-foreground/90">
                     {artifact.content}

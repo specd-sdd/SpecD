@@ -1,0 +1,42 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["ui:design-system"],
+  "implementation": [
+    {
+      "file": "ui:package.json"
+    },
+    {
+      "file": "ui:src/styles/globals.css"
+    },
+    {
+      "file": "ui:src/editor/studio-markdown-theme.ts",
+      "symbols": ["useStudioDocumentTheme"]
+    },
+    {
+      "file": "ui:src/editor/MermaidBlock.tsx",
+      "symbols": ["MermaidBlock"]
+    },
+    {
+      "file": "ui:src/editor/StudioMarkdownPreview.tsx",
+      "symbols": ["StudioMarkdownPreview", "MarkdownTaskCheckbox"]
+    },
+    {
+      "file": "ui:src/editor/ArtifactMarkdownPreview.tsx",
+      "symbols": ["ArtifactMarkdownPreview"]
+    },
+    {
+      "file": "ui:src/spec/SpecMainView.tsx",
+      "symbols": ["MarkdownSection"]
+    },
+    {
+      "file": "ui:src/change/ChangeTabPanels.tsx",
+      "symbols": ["ChangeTasksTab"]
+    },
+    {
+      "file": "ui:test/studio-markdown-preview.spec.tsx"
+    }
+  ]
+}

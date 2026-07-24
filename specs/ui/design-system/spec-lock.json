@@ -6,8 +6,7 @@
   "dependsOn": [],
   "implementation": [
     {
-      "file": "ui:src/shell/StudioTopBar.tsx",
-      "symbols": ["StudioTopBar"]
+      "file": "ui:src/styles/globals.css"
     }
   ]
 }

@@ -1,0 +1,238 @@
+{
+  "title": "Markdown Preview",
+  "description": "Studio renders the same markdown in inspector Preview, Spec context panels, and change Tasks. Without a shared contract, syntax colors, task checkboxes, and Mermaid diagrams drift or look broken (flat code color, gray disabled checkboxes, raw `mermaid` fences, or static diagrams that cannot be inspected at scale). This spec defines the shared Studio markdown preview renderer for those surfaces.",
+  "dependsOn": ["ui:design-system"],
+  "context": [
+    "Studio renders the same markdown in inspector Preview, Spec context panels, and change Tasks. Without a shared contract, syntax colors, task checkboxes, and Mermaid diagrams drift or look broken (flat code color, gray disabled checkboxes, raw `mermaid` fences, or static diagrams that cannot be inspected at scale). This spec defines the shared Studio markdown preview renderer for those surfaces."
+  ],
+  "rules": [
+    {
+      "requirement": "shared preview renderer owns Studio markdown chrome",
+      "rules": [
+        "`@specd/ui` MUST expose a single shared markdown preview renderer used by inspector Preview, Spec context markdown sections, and change Tasks markdown. Call sites MUST NOT reimplement divergent `react-markdown` stacks for those surfaces. The renderer MUST use `react-markdown` with GFM enabled (`remark-gfm` or equivalent) and MUST apply the shared `.studio-markdown-preview` (or successor) chrome styles."
+      ]
+    },
+    {
+      "requirement": "fenced code uses theme-aware syntax highlighting",
+      "rules": [
+        "Fenced code blocks that are not Mermaid MUST render with syntax highlighting so tokens use distinct colors from body text in both Studio dark and light themes. Highlighting MUST use `rehype-highlight` with highlight.js (or an equivalent approved stack that preserves this contract). Dark mode MUST use a GitHub Dark–aligned highlight theme; light mode MUST use a GitHub Light–aligned highlight theme. Highlight theme CSS MUST ship in the built `@specd/ui` stylesheet so hosts that consume `@specd/ui/styles.css` receive token colors without separate highlight CSS wiring. Inline `code` MAY remain unhighlighted but MUST remain visually distinct from surrounding prose."
+      ]
+    },
+    {
+      "requirement": "checked task checkboxes use success green without disabled greying",
+      "rules": [
+        "GFM task-list items MUST present checked and unchecked states visually. Checked items MUST use the Studio success color (`semantic.success` / `--studio-success` / `text-studio-success`). The preview MUST NOT rely on styling a native `input[type=checkbox]:disabled` (or otherwise browser-disabled checkbox) for the checked color—browsers wash those controls gray. The renderer MUST use a custom read-only presentation (Lucide `Square` / `SquareCheck` or equivalent) with appropriate read-only accessibility (`role=\"checkbox\"` and `aria-checked`; not a focusable toggle control). Unchecked items MUST remain neutrally styled. Task checkboxes MUST NOT be interactive toggles in preview."
+      ]
+    },
+    {
+      "requirement": "mermaid fences render as diagrams with lazy load and fallback",
+      "rules": [
+        "Fenced code blocks with language `mermaid` MUST render as read-only Mermaid diagrams. The `mermaid` library MUST be loaded lazily (dynamic import) so the rest of the document remains usable while the module loads. Diagram theme MUST follow the active Studio theme (dark vs light). When Mermaid fails to parse or render, the preview MUST show the original fenced source plus a short human-readable error and MUST NOT blank the rest of the markdown document. Preview MUST NOT provide live Mermaid editing, PNG/SVG export, or other diagram languages."
+      ]
+    },
+    {
+      "requirement": "mermaid diagrams expose icon zoom and pan chrome",
+      "rules": [
+        "When a Mermaid diagram renders successfully, the preview MUST provide compact IDE-grade chrome with icon controls for zoom in, zoom out, and reset view, and MUST allow panning the diagram (pointer drag or equivalent). Zoom/pan chrome MUST NOT appear on loading or failure fallback states. Controls MUST use the shared Lucide (or equivalent outline) icon stack and MUST remain visually secondary to the diagram (no floating promo badges or marketing stickers)."
+      ]
+    },
+    {
+      "requirement": "empty content shows an empty state",
+      "rules": [
+        "When markdown content is empty or whitespace-only, the preview MUST show a compact empty-state indicator and MUST NOT throw."
+      ]
+    }
+  ],
+  "constraints": [
+    "Monaco raw edit mode is out of scope; this spec covers rendered preview only.",
+    "Feature code MUST consume Studio theme tokens for success color; MUST NOT hard-code ad hoc greens for checked tasks.",
+    "Mermaid and highlight dependencies MAY be added to @specd/ui; hosts MUST continue to build without requiring separate Mermaid wiring.",
+    "Zoom/pan is limited to read-only inspection chrome; it MUST NOT become a Mermaid authoring surface."
+  ],
+  "scenarios": [
+    {
+      "requirement": "shared preview renderer owns Studio markdown chrome",
+      "name": "Inspector Spec context and Tasks share one renderer",
+      "given": ["markdown content is shown in inspector Preview, Spec context, and change Tasks"],
+      "when": ["each surface renders markdown"],
+      "then": [
+        "they use the shared Studio markdown preview renderer",
+        "AND they do not each mount a divergent ad-hoc react-markdown stack"
+      ]
+    },
+    {
+      "requirement": "fenced code uses theme-aware syntax highlighting",
+      "name": "Fenced typescript has token colors in dark mode",
+      "given": [
+        "Studio is in dark theme",
+        "AND markdown contains a fenced typescript (or other non-mermaid) code block"
+      ],
+      "when": ["the preview renders"],
+      "then": [
+        "code tokens use distinct highlight colors from body text",
+        "AND the highlight theme is GitHub Dark–aligned"
+      ]
+    },
+    {
+      "requirement": "fenced code uses theme-aware syntax highlighting",
+      "name": "Fenced code uses GitHub Light in light mode",
+      "given": [
+        "Studio is in light theme",
+        "AND markdown contains a fenced non-mermaid code block"
+      ],
+      "when": ["the preview renders"],
+      "then": [
+        "tokens use a GitHub Light–aligned highlight theme",
+        "AND tokens remain visually distinct from prose"
+      ]
+    },
+    {
+      "requirement": "fenced code uses theme-aware syntax highlighting",
+      "name": "Highlight styles ship in the UI stylesheet",
+      "given": ["a host consumes @specd/ui/styles.css (or the package built stylesheet)"],
+      "when": ["fenced code renders with hljs token classes"],
+      "then": [
+        "token color rules are present in that stylesheet",
+        "AND hosts do not need a separate highlight.js CSS import for preview colors"
+      ]
+    },
+    {
+      "requirement": "checked task checkboxes use success green without disabled greying",
+      "name": "Checked task uses success color without disabled input",
+      "given": ["markdown contains a GFM task list with a checked item"],
+      "when": ["the preview renders"],
+      "then": [
+        "the checked indicator uses Studio success color (text-studio-success / --studio-success)",
+        "AND the checked appearance is not a browser-disabled native checkbox washed gray"
+      ]
+    },
+    {
+      "requirement": "checked task checkboxes use success green without disabled greying",
+      "name": "Task checks are read-only",
+      "given": ["a rendered task list in preview"],
+      "when": ["the user attempts to toggle a checkbox control"],
+      "then": [
+        "the check state does not change via an interactive toggle",
+        "AND accessibility exposes checked state without requiring a focusable form control"
+      ]
+    },
+    {
+      "requirement": "mermaid fences render as diagrams with lazy load and fallback",
+      "name": "Valid mermaid fence renders a diagram",
+      "given": ["markdown contains a fenced mermaid block with valid diagram source"],
+      "when": ["the preview renders and Mermaid finishes loading"],
+      "then": [
+        "a diagram is shown instead of only plain highlighted code",
+        "AND Mermaid was loaded via lazy/dynamic import"
+      ]
+    },
+    {
+      "requirement": "mermaid fences render as diagrams with lazy load and fallback",
+      "name": "Invalid mermaid shows source and error without blanking preview",
+      "given": ["markdown contains an invalid mermaid fence plus surrounding prose"],
+      "when": ["Mermaid fails to parse or render"],
+      "then": [
+        "the preview shows the original fenced source and a short error message",
+        "AND surrounding markdown content remains visible"
+      ]
+    },
+    {
+      "requirement": "mermaid diagrams expose icon zoom and pan chrome",
+      "name": "Successful diagram exposes zoom controls",
+      "given": ["a valid Mermaid fence has finished rendering"],
+      "when": ["the diagram is shown"],
+      "then": [
+        "icon controls for zoom in, zoom out, and reset view are available",
+        "AND activating zoom in increases the diagram scale relative to the prior view"
+      ]
+    },
+    {
+      "requirement": "mermaid diagrams expose icon zoom and pan chrome",
+      "name": "User can pan a zoomed diagram",
+      "given": ["a successfully rendered Mermaid diagram"],
+      "when": ["the user pans via pointer drag (or equivalent)"],
+      "then": [
+        "the diagram viewport translates",
+        "AND the diagram remains visible within the preview container"
+      ]
+    },
+    {
+      "requirement": "mermaid diagrams expose icon zoom and pan chrome",
+      "name": "Loading and error states omit zoom chrome",
+      "given": ["a Mermaid fence is loading or has failed to render"],
+      "when": ["those states are shown"],
+      "then": [
+        "zoom/pan icon chrome is not presented",
+        "AND the loading or source+error fallback remains usable"
+      ]
+    },
+    {
+      "requirement": "empty content shows an empty state",
+      "name": "Empty buffer shows empty indicator",
+      "given": ["markdown content is empty or whitespace-only"],
+      "when": ["the preview mounts"],
+      "then": [
+        "a compact empty-state indicator is shown",
+        "AND no render exception escapes to the host"
+      ]
+    }
+  ],
+  "implementation": {
+    "files": [
+      {
+        "specId": "ui:markdown-preview",
+        "file": "ui:package.json"
+      },
+      {
+        "specId": "ui:markdown-preview",
+        "file": "ui:src/styles/globals.css"
+      },
+      {
+        "specId": "ui:markdown-preview",
+        "file": "ui:test/studio-markdown-preview.spec.tsx"
+      }
+    ],
+    "symbols": [
+      {
+        "specId": "ui:markdown-preview",
+        "file": "ui:src/editor/studio-markdown-theme.ts",
+        "symbol": "useStudioDocumentTheme"
+      },
+      {
+        "specId": "ui:markdown-preview",
+        "file": "ui:src/editor/MermaidBlock.tsx",
+        "symbol": "MermaidBlock"
+      },
+      {
+        "specId": "ui:markdown-preview",
+        "file": "ui:src/editor/StudioMarkdownPreview.tsx",
+        "symbol": "StudioMarkdownPreview"
+      },
+      {
+        "specId": "ui:markdown-preview",
+        "file": "ui:src/editor/StudioMarkdownPreview.tsx",
+        "symbol": "MarkdownTaskCheckbox"
+      },
+      {
+        "specId": "ui:markdown-preview",
+        "file": "ui:src/editor/ArtifactMarkdownPreview.tsx",
+        "symbol": "ArtifactMarkdownPreview"
+      },
+      {
+        "specId": "ui:markdown-preview",
+        "file": "ui:src/spec/SpecMainView.tsx",
+        "symbol": "MarkdownSection"
+      },
+      {
+        "specId": "ui:markdown-preview",
+        "file": "ui:src/change/ChangeTabPanels.tsx",
+        "symbol": "ChangeTasksTab"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:39b9b6076feeb1b5f76ee0b37795139ebe5d55afb8c4b4dd0b497d1bb63953b5",
+    "verify.md": "sha256:3a429d5e94353d53ed5df40dc60c056fdcde25ea8d66e8893fdd691ad9010907"
+  },
+  "generatedBy": "core"
+}

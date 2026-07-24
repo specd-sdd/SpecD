@@ -9,8 +9,6 @@ import type {
 } from '@specd/client'
 import { FileText } from 'lucide-react'
 import * as React from 'react'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
 import {
   Alert,
   AlertDescription,
@@ -22,6 +20,7 @@ import { useSpecImpact } from '../hooks/use-spec-impact.js'
 import { useSpecGraphView } from '../hooks/use-spec-graph-view.js'
 import { useTabScopedPollKey } from '../hooks/use-tab-scoped-poll-key.js'
 import { cn } from '../lib/utils.js'
+import { StudioMarkdownPreview } from '../editor/StudioMarkdownPreview.js'
 import {
   Accordion,
   AccordionContent,
@@ -402,16 +401,7 @@ function MarkdownSection({
   content: string
   compact?: boolean
 }): React.ReactElement {
-  return (
-    <article
-      className={cn(
-        'studio-markdown-preview max-w-none text-foreground',
-        compact ? 'text-[11px]' : 'text-xs',
-      )}
-    >
-      <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
-    </article>
-  )
+  return <StudioMarkdownPreview content={content} compact={compact} />
 }
 
 /**

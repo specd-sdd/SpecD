@@ -86,7 +86,7 @@
     {
       "requirement": "artifact and inspector surfaces feel like code tooling",
       "rules": [
-        "Artifact and inspector panes MUST feel like a code editor / inspector: **`@monaco-editor/react`** for raw editing (`#0D1117` / `#111827`), GitHub-dark markdown preview for rendered markdown, and Git-style split diff for delta diff mode. These surfaces MUST NOT look like rich-text blog editors."
+        "Artifact and inspector panes MUST feel like a code editor / inspector: **`@monaco-editor/react`** for raw editing (`#0D1117` / `#111827`), GitHub-aligned markdown preview for rendered markdown (GitHub Dark / GitHub Light syntax highlighting for fenced code, success-green checked GFM task indicators that are not washed out by disabled native checkboxes, and theme-aware Mermaid diagrams for fenced `mermaid` blocks with compact icon zoom/pan chrome), and Git-style split diff for delta diff mode. These surfaces MUST NOT look like rich-text blog editors. Detailed preview renderer behaviour lives in the markdown-preview capability spec."
       ]
     },
     {
@@ -435,9 +435,35 @@
     },
     {
       "requirement": "artifact and inspector surfaces feel like code tooling",
-      "name": "Markdown preview uses GitHub dark styling",
+      "name": "Markdown preview uses GitHub aligned styling",
+      "when": ["markdown preview renders in dark or light theme"],
+      "then": [
+        "prose and code chrome match GitHub-aligned markdown aesthetic for that theme",
+        "AND not a bright blog theme"
+      ]
+    },
+    {
+      "requirement": "artifact and inspector surfaces feel like code tooling",
+      "name": "Markdown preview highlights fenced code and success-green checks",
+      "given": [
+        "preview markdown includes a fenced non-mermaid code block and a checked GFM task item"
+      ],
       "when": ["markdown preview renders"],
-      "then": ["prose colors match GitHub dark markdown aesthetic", "AND not a bright blog theme"]
+      "then": [
+        "fenced code tokens use distinct syntax colors",
+        "AND the checked task indicator uses success green without relying on a disabled native checkbox washout"
+      ]
+    },
+    {
+      "requirement": "artifact and inspector surfaces feel like code tooling",
+      "name": "Markdown preview renders mermaid fences as diagrams with zoom chrome",
+      "given": ["preview markdown includes a valid fenced mermaid block"],
+      "when": ["markdown preview renders after Mermaid loads"],
+      "then": [
+        "a diagram is shown for that fence",
+        "AND compact icon zoom/pan chrome is available for inspecting the diagram",
+        "AND Mermaid is not eagerly required for the rest of the Studio shell bundle path beyond lazy import"
+      ]
     },
     {
       "requirement": "artifact and inspector surfaces feel like code tooling",
@@ -644,19 +670,18 @@
       ]
     }
   ],
+  "dependsOn": [],
   "implementation": {
-    "symbols": [
+    "files": [
       {
         "specId": "ui:design-system",
-        "file": "ui:src/shell/StudioTopBar.tsx",
-        "symbol": "StudioTopBar"
+        "file": "ui:src/styles/globals.css"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:a9ed0290f72af8438ec5020c9ad5335c3c2c22453d399d2406c722e2944b95a3",
-    "verify.md": "sha256:e11e9753e3dd54978606c096b20bfdd7df0f2e5519c0a1e7baf7b962a535c576"
+    "spec.md": "sha256:4ebda0e098c586ed41dea7b298a8df1ae085a3367d20585cc9800fb23b88aaee",
+    "verify.md": "sha256:b0b28709ba2c81e08581739061f2c54333d4077e4418d47f2715fcf9abbfbc37"
   },
-  "generatedBy": "core",
-  "dependsOn": []
+  "generatedBy": "core"
 }

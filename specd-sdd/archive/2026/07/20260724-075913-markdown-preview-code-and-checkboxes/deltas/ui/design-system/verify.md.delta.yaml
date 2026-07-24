@@ -1,0 +1,38 @@
+- op: modified
+  description: 'Extend markdown preview scenarios for syntax highlight, success-green checks, Mermaid zoom/pan'
+  selector:
+    type: section
+    matches: 'Requirement: artifact and inspector surfaces feel like code tooling'
+  content: |
+    #### Scenario: Raw editor uses dark code background
+
+    - **WHEN** artifact opens in raw mode
+    - **THEN** editor background is `#0D1117` or `#111827`
+    - **AND** Monaco-like chrome is used
+
+    #### Scenario: Markdown preview uses GitHub aligned styling
+
+    - **WHEN** markdown preview renders in dark or light theme
+    - **THEN** prose and code chrome match GitHub-aligned markdown aesthetic for that theme
+    - **AND** not a bright blog theme
+
+    #### Scenario: Markdown preview highlights fenced code and success-green checks
+
+    - **GIVEN** preview markdown includes a fenced non-mermaid code block and a checked GFM task item
+    - **WHEN** markdown preview renders
+    - **THEN** fenced code tokens use distinct syntax colors
+    - **AND** the checked task indicator uses success green without relying on a disabled native checkbox washout
+
+    #### Scenario: Markdown preview renders mermaid fences as diagrams with zoom chrome
+
+    - **GIVEN** preview markdown includes a valid fenced `mermaid` block
+    - **WHEN** markdown preview renders after Mermaid loads
+    - **THEN** a diagram is shown for that fence
+    - **AND** compact icon zoom/pan chrome is available for inspecting the diagram
+    - **AND** Mermaid is not eagerly required for the rest of the Studio shell bundle path beyond lazy import
+
+    #### Scenario: Diff mode uses split diff layout
+
+    - **WHEN** delta full diff is shown
+    - **THEN** split diff presentation is available
+    - **AND** aligns with Git diff visual language

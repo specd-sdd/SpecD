@@ -263,11 +263,26 @@
 - **THEN** editor background is `#0D1117` or `#111827`
 - **AND** Monaco-like chrome is used
 
-#### Scenario: Markdown preview uses GitHub dark styling
+#### Scenario: Markdown preview uses GitHub aligned styling
 
-- **WHEN** markdown preview renders
-- **THEN** prose colors match GitHub dark markdown aesthetic
+- **WHEN** markdown preview renders in dark or light theme
+- **THEN** prose and code chrome match GitHub-aligned markdown aesthetic for that theme
 - **AND** not a bright blog theme
+
+#### Scenario: Markdown preview highlights fenced code and success-green checks
+
+- **GIVEN** preview markdown includes a fenced non-mermaid code block and a checked GFM task item
+- **WHEN** markdown preview renders
+- **THEN** fenced code tokens use distinct syntax colors
+- **AND** the checked task indicator uses success green without relying on a disabled native checkbox washout
+
+#### Scenario: Markdown preview renders mermaid fences as diagrams with zoom chrome
+
+- **GIVEN** preview markdown includes a valid fenced `mermaid` block
+- **WHEN** markdown preview renders after Mermaid loads
+- **THEN** a diagram is shown for that fence
+- **AND** compact icon zoom/pan chrome is available for inspecting the diagram
+- **AND** Mermaid is not eagerly required for the rest of the Studio shell bundle path beyond lazy import
 
 #### Scenario: Diff mode uses split diff layout
 

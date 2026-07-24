@@ -1,0 +1,7 @@
+- op: modified
+  description: 'Clarify markdown preview chrome — GitHub syntax themes, success-green task checks, Mermaid diagrams with zoom/pan'
+  selector:
+    type: section
+    matches: 'Requirement: artifact and inspector surfaces feel like code tooling'
+  content: |
+    Artifact and inspector panes MUST feel like a code editor / inspector: **`@monaco-editor/react`** for raw editing (`#0D1117` / `#111827`), GitHub-aligned markdown preview for rendered markdown (GitHub Dark / GitHub Light syntax highlighting for fenced code, success-green checked GFM task indicators that are not washed out by disabled native checkboxes, and theme-aware Mermaid diagrams for fenced `mermaid` blocks with compact icon zoom/pan chrome), and Git-style split diff for delta diff mode. These surfaces MUST NOT look like rich-text blog editors. Detailed preview renderer behaviour lives in the markdown-preview capability spec.
