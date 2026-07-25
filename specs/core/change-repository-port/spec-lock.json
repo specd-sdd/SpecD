@@ -18,8 +18,48 @@
   ],
   "implementation": [
     {
-      "file": "core:src/infrastructure/fs/change-repository.ts",
-      "symbols": ["FsChangeRepository"]
+      "file": "core:src/application/ports/change-repository.ts",
+      "symbols": ["MutateResult", "ChangeRepository"]
+    },
+    {
+      "file": "core:src/domain/errors/change-mutation-required-error.ts",
+      "symbols": ["ChangeMutationRequiredError"]
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Global ChangeRepository port: active/draft/discard storage, mutate locks, list indexes, artifact I/O, drift auto-invalidate.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:72ddcb320702f92cd5f79f0cb43f51a282abd7ec2f39e4b87c6ef140740f14f9",
+          "lastModified": "2026-07-22T19:10:28.295Z"
+        },
+        "verify.md": {
+          "hash": "sha256:c12dd080b2ff511352e53f54f58daae3994ffc74aca26449bb7e7c69dede61d4",
+          "lastModified": "2026-07-22T19:10:28.296Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# ChangeRepository Port\n\n## Rules\n- Extends `Repository`; inherited workspace accessors present but unused (global storage).\n- `get(name)` active `changes/` only → `Change|null`; may auto-invalidate+persist drift under lock; not RMW primitive — use `mutate`. Missing state defaults `missing`.\n- `getDraft`/`getDiscarded` bucket-only → views; no auto-invalidate.\n- `mutate(name,fn)`: exclusive per-name lock; reload fresh (skip nested write/auto-invalidate); `fn` on non-drafted; persist on success; throw `ChangeNotFoundError` if missing/draft-only. Different names MAY concurrent.\n- `mutateDraft`: same for drafts; only RestoreChange/DiscardChange (+ internals) in prod; may move dirs.\n- Auto-invalidate on get when validatedHash mismatches cleaned hash (if artifact types resolved): lock → reload → collect ALL drifted keys → drifted-pending-review → invalidate designing → persist. Cause `artifact-drift`; actor `SYSTEM_ACTOR`. Lifecycle-independent.\n- `list` → `ActiveChangeListEntry` sort createdAt asc; `listDrafts` draftedAt desc; `listDiscarded` discardedAt desc. include* projection only. No full aggregates/history/content.\n- `count`/`countDrafts`/`countDiscarded` = list totals from index. `reindex`/`reindexActive`/`reindexDrafts`/`reindexDiscarded` rebuild `{configPath}/tmp/fs-cache/`.\n- `save` manifest only (atomic); drafted → `DraftedChangeReadOnlyError` outside mutateDraft. `delete` removes dir.\n- `artifact` loads tracked files + `originalHash` sha256; `saveArtifact` conflict check / `force`; drafted blocked; after write reset status in-progress (caller save). `artifactExists`/`deltaExists` presence only.\n- `changePath` active under changes/; `draftChangePath` under drafts/. `internalPaths()`: abs paths or undefined (not empty array for N/A); Fs includes changes/drafts/discarded.\n- `scaffold`/`unscaffold` for specs/deltas dirs (idempotent unscaffold).\n- Abstract class; all storage ops abstract. Artifact API confined to tracked files + change dir.\n\n## Constraints\n- Global not per-workspace.\n- get may auto-invalidate under lock when drift + (beyond designing OR active approvals) per Fs impl.\n- list* lightweight; get* for detail.\n- No default list limit (full bucket when omitted).\n- save vs saveArtifact separated; ArtifactConflictError sole concurrency error; force bypasses; originalHash=sha256; atomic manifest writes.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:72ddcb320702f92cd5f79f0cb43f51a282abd7ec2f39e4b87c6ef140740f14f9",
+          "lastModified": "2026-07-22T19:10:28.295Z"
+        },
+        "verify.md": {
+          "hash": "sha256:c12dd080b2ff511352e53f54f58daae3994ffc74aca26449bb7e7c69dede61d4",
+          "lastModified": "2026-07-22T19:10:28.296Z"
+        }
+      }
+    }
+  }
 }

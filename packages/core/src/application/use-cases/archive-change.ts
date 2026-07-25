@@ -425,13 +425,13 @@ export class ArchiveChange {
       await this._recordArchiveFailure(input.name, 'prepare', _error, archivingActor, false)
       throw _error
     }
-    change = await this._changes.mutate(input.name, (freshChange) => {
+    const { change: transitionedChange } = await this._changes.mutate(input.name, (freshChange) => {
       freshChange.assertArchivable()
       if (freshChange.state !== 'archiving') {
         freshChange.transition('archiving', archivingActor)
       }
-      return freshChange
     })
+    change = transitionedChange
     Logger.debug('ArchiveChange transitioning to archiving', {
       change: change.name,
       actor: archivingActor.name,

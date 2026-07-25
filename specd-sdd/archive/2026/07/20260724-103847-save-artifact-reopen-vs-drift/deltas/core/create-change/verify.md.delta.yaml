@@ -1,0 +1,29 @@
+- op: modified
+  description: 'Persistence scenarios call create instead of save'
+  selector:
+    type: section
+    matches: 'Requirement: Persistence and scaffolding'
+  content: |
+    #### Scenario: Change is created via repository create
+
+    - **WHEN** `CreateChange.execute` completes successfully
+    - **THEN** `ChangeRepository.create` was called with the returned `Change` instance
+
+    #### Scenario: Change is created then scaffolded
+
+    - **WHEN** `CreateChange.execute` completes successfully
+    - **THEN** `ChangeRepository.create` is called before scaffolding
+    - **AND** `ChangeRepository.scaffold` is called after creating
+
+    #### Scenario: Scaffolding uses specExists callback
+
+    - **GIVEN** a `specExists` callback that checks workspace spec maps via `ListWorkspaces`
+    - **WHEN** `CreateChange.execute` completes
+    - **THEN** `ChangeRepository.scaffold` is called with the specExists callback
+
+    #### Scenario: Result includes changePath
+
+    - **GIVEN** no change named `'add-login'` exists
+    - **WHEN** `CreateChange.execute` is called with `name: 'add-login'`
+    - **THEN** the result includes `changePath` as an absolute path to the change directory
+    - **AND** the result includes `change` as the `Change` entity

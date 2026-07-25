@@ -53,14 +53,22 @@ For a given active change name, the repository MUST:
 1. Acquire exclusive mutation access scoped to that persisted change
 2. Reload the freshest persisted `Change` state from active storage after the exclusive access is acquired, ensuring that this load operation does not trigger nested write locks or deadlocks. In filesystem-backed implementations, this reload operation MUST be performed using the internal read helper (e.g. `_getInternal(..., { skipWrite: true })`) to bypass nested locks and auto-invalidation writes, deferring all writes to the final save step.
 3. Invoke `fn(change)` with that fresh `Change` where `change.isDrafted === false`
-4. Persist the updated change manifest if `fn` resolves successfully
-5. Release the exclusive access before returning or throwing
+4. Persist the updated change manifest if `fn` resolves successfully (via the repository's internal manifest-write primitive)
+5. Reconcile by re-reading the change through the same load path used by `get` (including artifact-file drift detection and disk re-derive when artifact types are resolved). If that reconcile requires further manifest persistence, persist again before releasing the lock
+6. Release the exclusive access before returning or throwing
+
+`mutate` MUST return `{ result, change }` where:
+
+- `result` is the value returned by `fn` (including `void` / `undefined`)
+- `change` is the post-reconcile `Change` from step 5 — not the pre-reconcile callback snapshot
+
+Callers that need the durable aggregate MUST use `.change`. The callback `fresh` object is not guaranteed equivalent to a subsequent `get()` after artifact bytes or disk state diverge during the callback.
 
 If no active change with the given name exists, `mutate()` MUST throw `ChangeNotFoundError`.
 
 If `fn` throws, `mutate()` MUST release the exclusive access and MUST NOT persist a partial manifest update produced by the failed callback.
 
-The serialized section MUST cover the full persisted mutation window — fresh load, callback execution, and manifest persistence. Locking only the final manifest write is insufficient.
+The serialized section MUST cover the full persisted mutation window — fresh load, callback execution, manifest persistence, and post-save reconcile. Locking only the final manifest write is insufficient.
 
 Exclusive access is per change name, not global. Mutations targeting different change names MAY proceed concurrently.
 
@@ -72,7 +80,11 @@ Resolution MUST use the same rules as `getDraft(name)` — only `drafts/`. If th
 
 The callback MUST receive a fresh mutable `Change` with `isDrafted === true` before any transforming operation in the callback. Only `RestoreChange` and `DiscardChange` (and repository internals) MAY call `mutateDraft` in production code.
 
-On success, the repository MUST persist the manifest and perform any required directory move (`drafts/` ↔ `changes/` or `drafts/` → `discarded/`).
+On success, the repository MUST:
+
+1. Persist the manifest and perform any required directory move (`drafts/` ↔ `changes/` or `drafts/` → `discarded/`)
+2. Reconcile by re-reading through the load path appropriate to the change's post-persist bucket (including drift detection when applicable)
+3. Return `{ result, change }` with the same semantics as `mutate` — `result` from `fn`, `change` post-reconcile
 
 If `fn` throws, `mutateDraft()` MUST NOT persist partial updates, matching `mutate` failure semantics.
 
@@ -179,13 +191,25 @@ For each change list method, `include*` flags control **response projection only
 
 Implementations and use cases MUST NOT perform extra `get` / manifest reads to satisfy an include flag.
 
-### Requirement: save persists the change manifest only
+### Requirement: create persists a new change; save is internal
 
-`save(change)` MUST persist the change manifest — state, artifact statuses, validated hashes, history events, and approvals. It MUST NOT write artifact file content. Artifact content is written exclusively via `saveArtifact()`. The write MUST be atomic (e.g. temp file + rename) to prevent partial reads.
+**Public first persist — `create`**
 
-If `change.isDrafted === true`, `save(change)` MUST throw `DraftedChangeReadOnlyError` unless the call originates from the serialized `mutateDraft` window for that change name.
+`create(change)` MUST persist a change that does not yet exist under active, drafted, or discarded storage. It MUST write the change manifest atomically (e.g. temp file + rename) and create the change directory. It MUST NOT write artifact file content.
 
-`save()` is a low-level persistence operation. Atomic manifest writing prevents partial-file corruption, but `save()` alone does not serialize a caller's earlier snapshot read. Use cases that mutate an existing active persisted change and need concurrency safety MUST perform that mutation through `mutate(name, fn)`.
+If a change with the same name already exists in any bucket, `create` MUST fail with `ChangeAlreadyExistsError` (or the repository's equivalent conflict error).
+
+`CreateChange` and other first-time constructors MUST call `create`. They MUST NOT call an application-facing `save` API.
+
+**Internal manifest write**
+
+Manifest persistence for an **existing** change (status, validated hashes, history, approvals, directory moves between buckets) MUST occur only inside `mutate` / `mutateDraft` (or equivalent repository-internal paths such as `get` auto-invalidation under lock).
+
+Adapters MAY keep an internal manifest-write helper used by `create`, `mutate`, `mutateDraft`, and locked `get` drift persistence. That helper MUST NOT be part of the application-facing port surface that use cases call. Use cases MUST NOT persist an existing change by writing a caller-held snapshot outside `mutate` / `mutateDraft`.
+
+The internal manifest write MUST NOT write artifact file content. Artifact content is written exclusively via `saveArtifact()`.
+
+If an internal write targets a drafted change, it MUST be rejected with `DraftedChangeReadOnlyError` unless it originates from the serialized `mutateDraft` (or active `mutate`) window for that change name.
 
 ### Requirement: delete removes the entire change directory
 
@@ -197,9 +221,15 @@ If `change.isDrafted === true`, `save(change)` MUST throw `DraftedChangeReadOnly
 
 ### Requirement: saveArtifact with optimistic concurrency
 
-`saveArtifact(change, artifact, options?)` MUST write an artifact file within a change directory. If `change.isDrafted === true`, `saveArtifact` MUST throw `DraftedChangeReadOnlyError` before any filesystem write.
+`saveArtifact(change, artifact, options?)` MUST write an artifact file within a change directory and MUST return `void`.
 
-If `artifact.originalHash` is set, the implementation MUST compare it against the current hash of the file on disk before writing. If the hashes differ, the save MUST be rejected by throwing `ArtifactConflictError` — this prevents silently overwriting concurrent modifications. When `options.force` is `true`, the conflict check MUST be skipped and the file MUST be overwritten unconditionally. After a successful write, the corresponding `ChangeArtifact` status in the change manifest MUST be reset to `in-progress`; the caller is responsible for calling `save(change)` to persist this state change.
+`saveArtifact` MUST run only inside an active `mutate` or `mutateDraft` window for that change name (repository-internal per-name mutation tracking). If no such window is active, `saveArtifact` MUST reject before any filesystem write. Callers do not need a public `isMutating` API.
+
+If `change.isDrafted === true` and the call is outside the drafted mutation window, `saveArtifact` MUST throw `DraftedChangeReadOnlyError` before any filesystem write (same drafted guard as today, subsumed by the mutate-window rule when windows are tracked for all changes).
+
+If `artifact.originalHash` is set, the implementation MUST compare it against the current hash of the file on disk before writing. If the hashes differ, the save MUST be rejected by throwing `ArtifactConflictError` — this prevents silently overwriting concurrent modifications. When `options.force` is `true`, the conflict check MUST be skipped and the file MUST be overwritten unconditionally.
+
+After a successful write, `saveArtifact` MUST NOT mutate the in-memory `Change` aggregate: it MUST NOT change file/artifact status, validated hashes, history, or approvals (including any `setFileStatus` / `in-progress` reopen). Drift classification and status updates are owned by the load/reconcile path used by `get` and by the post-`mutate` / post-`mutateDraft` reconcile step.
 
 ### Requirement: artifactExists checks file presence without loading
 
@@ -256,7 +286,9 @@ along with the directory itself.
 
 ### Requirement: Abstract class with abstract methods
 
-`ChangeRepository` MUST be defined as an `abstract class`, not an `interface`. All storage operations (`get`, `getDraft`, `getDiscarded`, `mutate`, `mutateDraft`, `list`, `listDrafts`, `listDiscarded`, `count`, `countDrafts`, `countDiscarded`, `reindex`, `reindexActive`, `reindexDrafts`, `reindexDiscarded`, `save`, `delete`, `artifact`, `saveArtifact`, `artifactExists`, `deltaExists`, `changePath`, `draftChangePath`, `scaffold`, `unscaffold`) MUST be declared as `abstract` methods. This follows the architecture spec requirement that ports with shared construction are abstract classes.
+`ChangeRepository` MUST be defined as an `abstract class`, not an `interface`. All application-facing storage operations (`get`, `getDraft`, `getDiscarded`, `mutate`, `mutateDraft`, `list`, `listDrafts`, `listDiscarded`, `count`, `countDrafts`, `countDiscarded`, `reindex`, `reindexActive`, `reindexDrafts`, `reindexDiscarded`, `create`, `delete`, `artifact`, `saveArtifact`, `artifactExists`, `deltaExists`, `changePath`, `draftChangePath`, `scaffold`, `unscaffold`) MUST be declared as `abstract` methods. This follows the architecture spec requirement that ports with shared construction are abstract classes.
+
+Internal manifest-write helpers used by adapters are not required to appear as abstract port methods.
 
 ### Requirement: artifact only loads tracked change artifact files
 
@@ -283,11 +315,13 @@ These logs MUST follow the project's global logging conventions.
 - `list`, `listDrafts`, and `listDiscarded` return lightweight list entries with no artifact content, history, or derived artifact state maps
 - `get`, `getDraft`, and `getDiscarded` remain the detail surfaces for full manifest-backed inspection
 - List pagination has no default `limit`; when omitted, `list()` returns the full bucket and `meta.limit` equals `meta.total` per `core:repository-port`
-- `save()` writes the manifest only; `saveArtifact()` writes file content only — these are separate operations
-- `ArtifactConflictError` is the sole error type for concurrent modification detection
+- Application use cases persist new changes via `create` and existing changes via `mutate` / `mutateDraft` only
+- `saveArtifact()` writes file content only and MUST NOT mutate the in-memory `Change`; manifest status updates come from mutate/reconcile/`get`
+- `ArtifactConflictError` is the sole error type for concurrent modification detection on artifact bytes
 - The `force` option on `saveArtifact()` bypasses conflict detection entirely
 - `originalHash` on loaded artifacts MUST use `sha256` of the file content as read from disk
 - Manifest writes MUST be atomic to prevent corruption from partial reads
+- `mutate` / `mutateDraft` return `{ result, change }` where `change` is post-reconcile
 
 ## Spec Dependencies
 

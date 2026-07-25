@@ -69,7 +69,7 @@ export class UpdateSpecDeps {
       }
     }
 
-    return this._changes.mutate(input.name, (change) => {
+    const { result } = await this._changes.mutate(input.name, (change) => {
       if (!change.specIds.includes(input.specId)) {
         throw new InvalidInputError(
           `spec '${input.specId}' is not in change '${input.name}' — specIds: [${change.specIds.join(', ')}]`,
@@ -92,5 +92,6 @@ export class UpdateSpecDeps {
       change.setSpecDependsOn(input.specId, result)
       return { specId: input.specId, dependsOn: result }
     })
+    return result
   }
 }

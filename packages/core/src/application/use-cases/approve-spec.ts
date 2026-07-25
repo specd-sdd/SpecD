@@ -80,12 +80,15 @@ export class ApproveSpec {
       throw new SchemaMismatchError(change.name, change.schemaName, schema.name())
     }
 
-    return this._changes.mutate(input.name, async (freshChange) => {
-      const artifactHashes = await this._computeArtifactHashes(freshChange)
-      freshChange.recordSpecApproval(input.reason, artifactHashes, actor)
-      freshChange.transition('spec-approved', actor)
-      return freshChange
-    })
+    const { change: updatedChange } = await this._changes.mutate(
+      input.name,
+      async (freshChange) => {
+        const artifactHashes = await this._computeArtifactHashes(freshChange)
+        freshChange.recordSpecApproval(input.reason, artifactHashes, actor)
+        freshChange.transition('spec-approved', actor)
+      },
+    )
+    return updatedChange
   }
 
   /**

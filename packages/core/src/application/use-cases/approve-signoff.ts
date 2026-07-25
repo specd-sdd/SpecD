@@ -80,12 +80,15 @@ export class ApproveSignoff {
       throw new SchemaMismatchError(change.name, change.schemaName, schema.name())
     }
 
-    return this._changes.mutate(input.name, async (freshChange) => {
-      const artifactHashes = await this._computeArtifactHashes(freshChange)
-      freshChange.recordSignoff(input.reason, artifactHashes, actor)
-      freshChange.transition('signed-off', actor)
-      return freshChange
-    })
+    const { change: updatedChange } = await this._changes.mutate(
+      input.name,
+      async (freshChange) => {
+        const artifactHashes = await this._computeArtifactHashes(freshChange)
+        freshChange.recordSignoff(input.reason, artifactHashes, actor)
+        freshChange.transition('signed-off', actor)
+      },
+    )
+    return updatedChange
   }
 
   /**

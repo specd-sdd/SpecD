@@ -126,7 +126,22 @@
 - **WHEN** `mutate()` is executing
 - **THEN** the internal load operation within mutate bypasses any intermediate lock acquisition and manifest writes
 - **AND** does not deadlock
-- **AND** the final `save()` persists the correct accumulated changes
+- **AND** the final internal manifest write persists the correct accumulated changes
+
+#### Scenario: mutate returns result and post-reconcile change
+
+- **GIVEN** `fn` returns the value `"ok"`
+- **WHEN** `mutate(name, fn)` completes successfully
+- **THEN** the return value is `{ result: "ok", change }`
+- **AND** `change` is the post-reconcile aggregate, not necessarily the same object identity as the callback `fresh`
+
+#### Scenario: Post-save reconcile detects disk drift from saveArtifact inside callback
+
+- **GIVEN** a validated complete artifact file with a stored `validatedHash`
+- **AND** `mutate` callback calls `saveArtifact` with different content then returns
+- **WHEN** `mutate` completes
+- **THEN** `.change` reflects drift classification from the reconcile load path
+- **AND** the persisted manifest matches that reconciled state
 
 ### Requirement: mutateDraft serializes drafted change updates
 
@@ -152,6 +167,13 @@
 - **GIVEN** `mutateDraft(name, fn)` is invoked for a drafted change
 - **WHEN** the callback runs
 - **THEN** it receives a freshly loaded `Change` with `isDrafted === true`
+
+#### Scenario: mutateDraft returns result and post-reconcile change
+
+- **GIVEN** `fn` returns `undefined`
+- **WHEN** `mutateDraft(name, fn)` completes successfully after a restore transition
+- **THEN** the return value is `{ result: undefined, change }`
+- **AND** `change` is loaded from the post-persist bucket after any directory move
 
 ### Requirement: Auto-invalidation on get when artifact files drift
 
@@ -296,39 +318,38 @@
 - **WHEN** the same list call omits `includeDescription`
 - **THEN** returned items omit `description`
 
-### Requirement: save persists the change manifest only
+### Requirement: create persists a new change; save is internal
 
-#### Scenario: Save does not write artifact content
+#### Scenario: create does not write artifact content
 
-- **GIVEN** a change with modified artifact content
-- **WHEN** `save(change)` is called
-- **THEN** the manifest file is updated with current state, hashes, and history
-- **AND** artifact file content on disk is unchanged
+- **GIVEN** a new `Change` entity that has never been persisted
+- **WHEN** `create(change)` is called
+- **THEN** the change directory and manifest are created
+- **AND** no artifact file content is written by `create`
 
-#### Scenario: Save alone does not serialize an earlier snapshot read
+#### Scenario: create rejects an existing name
 
-- **GIVEN** a caller holds a `Change` loaded earlier via `get()`
-- **WHEN** another caller persists newer manifest state before `save(oldSnapshot)` runs
-- **THEN** `save()` still behaves as a low-level manifest write
-- **AND** callers that need concurrency-safe read-modify-write behavior must use `mutate()`
+- **GIVEN** a change with the same name already exists under `changes/`, `drafts/`, or `discarded/`
+- **WHEN** `create(change)` is called
+- **THEN** `ChangeAlreadyExistsError` (or equivalent) is thrown
 
-#### Scenario: save on drafted change outside mutateDraft throws
+#### Scenario: Use cases cannot persist existing changes via public save
+
+- **GIVEN** an application use case holds a `Change` loaded earlier via `get()`
+- **WHEN** it attempts to persist that snapshot outside `mutate` / `mutateDraft` / `create`
+- **THEN** no application-facing `save` API is available on the port for that purpose
+
+#### Scenario: Internal save on drafted change outside mutateDraft throws
 
 - **GIVEN** a persisted change with `isDrafted === true`
-- **WHEN** `save(change)` is called outside an active `mutateDraft` window
+- **WHEN** an internal manifest write is attempted outside an active `mutateDraft` / `mutate` window
 - **THEN** `DraftedChangeReadOnlyError` is thrown
 
-#### Scenario: save inside mutateDraft succeeds
+#### Scenario: Internal save inside mutateDraft succeeds
 
 - **GIVEN** `mutateDraft(name, fn)` is executing for a drafted change
-- **WHEN** the callback triggers an internal `save(change)` for that same name
+- **WHEN** the repository performs its internal manifest write for that same name
 - **THEN** `DraftedChangeReadOnlyError` is not thrown
-
-#### Scenario: save on active change is unchanged
-
-- **GIVEN** a change exists under `changes/` with `isDrafted === false`
-- **WHEN** `save(change)` is called outside `mutate`
-- **THEN** persistence proceeds per existing optimistic concurrency rules
 
 ### Requirement: artifact loads content with originalHash
 
@@ -381,45 +402,47 @@
 
 #### Scenario: No conflict — originalHash matches
 
-- **GIVEN** an artifact loaded with `originalHash` and the file on disk has not changed
+- **GIVEN** an active `mutate` window for the change
+- **AND** an artifact loaded with `originalHash` and the file on disk has not changed
 - **WHEN** `saveArtifact(change, artifact)` is called
 - **THEN** the file is written successfully
+- **AND** the in-memory `Change` status and `validatedHash` are unchanged by `saveArtifact`
 
 #### Scenario: Conflict detected — originalHash mismatch
 
-- **GIVEN** an artifact loaded with `originalHash` and the file on disk was modified by another process
+- **GIVEN** an active `mutate` window for the change
+- **AND** an artifact loaded with `originalHash` and the file on disk was modified by another process
 - **WHEN** `saveArtifact(change, artifact)` is called without `force`
 - **THEN** `ArtifactConflictError` is thrown with `filename`, `incomingContent`, and `currentContent`
 
 #### Scenario: Force bypasses conflict detection
 
-- **GIVEN** an artifact whose `originalHash` does not match the current file on disk
+- **GIVEN** an active `mutate` window for the change
+- **AND** an artifact whose `originalHash` does not match the current file on disk
 - **WHEN** `saveArtifact(change, artifact, { force: true })` is called
 - **THEN** the file is overwritten without error
+- **AND** the in-memory `Change` is still not mutated by `saveArtifact`
 
 #### Scenario: New artifact with no originalHash
 
-- **GIVEN** an artifact with `originalHash` undefined (first write)
+- **GIVEN** an active `mutate` window for the change
+- **AND** an artifact with `originalHash` undefined (first write)
 - **WHEN** `saveArtifact(change, artifact)` is called
 - **THEN** the file is written without conflict check
+- **AND** `saveArtifact` returns `void`
 
-#### Scenario: saveArtifact on drafted change throws
+#### Scenario: saveArtifact outside mutate window is rejected
 
-- **GIVEN** a change with `isDrafted === true`
-- **WHEN** `saveArtifact(change, artifact)` is called outside `mutateDraft`
-- **THEN** `DraftedChangeReadOnlyError` is thrown before any filesystem write
+- **GIVEN** no active `mutate` or `mutateDraft` window for the change name
+- **WHEN** `saveArtifact(change, artifact)` is called
+- **THEN** the call is rejected before any filesystem write
 
 #### Scenario: saveArtifact inside mutateDraft may succeed
 
 - **GIVEN** `mutateDraft(name, fn)` is executing for a drafted change
 - **WHEN** the callback calls `saveArtifact` for that change
-- **THEN** `DraftedChangeReadOnlyError` is not thrown for the drafted guard alone
-
-#### Scenario: saveArtifact on active change is unchanged
-
-- **GIVEN** a change under `changes/` with `isDrafted === false`
-- **WHEN** `saveArtifact(change, artifact)` is called with a valid hash
-- **THEN** existing optimistic concurrency behaviour applies
+- **THEN** the drafted/mutate-window guard allows the write
+- **AND** the in-memory `Change` is not set to `in-progress` by `saveArtifact`
 
 ### Requirement: artifactExists checks file presence without loading
 
@@ -535,7 +558,8 @@
 
 ### Requirement: Abstract class with abstract methods
 
-#### Scenario: ChangeRepository declares abstract methods
+#### Scenario: Abstract surface includes create not public save
 
 - **WHEN** `ChangeRepository` is declared
-- **THEN** it is an abstract class with abstract methods for get, list, save, mutate
+- **THEN** it is an abstract class with abstract methods for get, list, create, mutate, mutateDraft, and saveArtifact
+- **AND** public `save` is not part of the application-facing abstract surface

@@ -12,7 +12,44 @@
   ],
   "implementation": [
     {
-      "file": "core:src/composition/use-cases/create-change.ts"
+      "file": "core:src/application/use-cases/create-change.ts",
+      "symbols": ["CreateChange"]
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "CreateChange: unique named Change, actor+created event, schema resolve, optional overlap, scaffold.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:b541a78c736528e7150ff05fcabeec43f202755f085c87520fb23026c7510d58",
+          "lastModified": "2026-07-06T14:22:54.156Z"
+        },
+        "verify.md": {
+          "hash": "sha256:1a322f8c983feb54906e6a6a3f9b66cae036b9e4b0bdf15205dd13d6c1a45dbb",
+          "lastModified": "2026-07-06T14:22:54.157Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# CreateChange\n\n## Rules\n- Input: `name` (kebab slug), optional `description`, `specIds`, optional `schemaName`+`schemaVersion` (both or neither), optional `invalidationPolicy` (`none|surgical|downstream|global`), optional `includeOverlapCheck`.\n- Both schema fields absent → `GetActiveSchema.execute()` → `name()`/`version()`. One only → validation error. Errors from GetActiveSchema propagate.\n- `includeOverlapCheck` + non-empty `specIds` → after persist/scaffold `DetectOverlap.execute({ name })`; success → `overlapReport`; throw → omit, creation still succeeds. Else no DetectOverlap.\n- Name exists → `ChangeAlreadyExistsError`. Actor via `ActorResolver` on `created` event.\n- History: exactly one `created` (`type`, `at`, `by`, `specIds`, `schemaName`, `schemaVersion`). `createdAt` same Date as event `at`.\n- Seed `specDependsOn`: `readPersistedDependsOn` → else `metadata.json.dependsOn` → else `[]`; skip non-existent specs.\n- Persist `ChangeRepository.save` → `scaffold(change, specExists)` via `ListWorkspaces`. Result: `{ change, changePath, overlapReport? }`.\n- Deps: ChangeRepository, ListWorkspaces, ActorResolver, GetActiveSchema, DetectOverlap. Config factory via `resolveCreateChangeDeps` only.\n\n## Constraints\n- No state transitions (starts drafting). Scaffold dirs only — no artifact file R/W. Same Date for createdAt + event.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:b541a78c736528e7150ff05fcabeec43f202755f085c87520fb23026c7510d58",
+          "lastModified": "2026-07-06T14:22:54.156Z"
+        },
+        "verify.md": {
+          "hash": "sha256:1a322f8c983feb54906e6a6a3f9b66cae036b9e4b0bdf15205dd13d6c1a45dbb",
+          "lastModified": "2026-07-06T14:22:54.157Z"
+        }
+      }
+    }
+  }
 }

@@ -293,7 +293,7 @@ export class TransitionChange {
       await this._executeHooks(input.name, effectiveTarget, 'pre', onProgress)
     }
 
-    const persistedChange = await this._changes.mutate(input.name, (freshChange) => {
+    const { change: persistedChange } = await this._changes.mutate(input.name, (freshChange) => {
       let invalidated = false
 
       if (
@@ -317,8 +317,6 @@ export class TransitionChange {
       if (!invalidated) {
         freshChange.transition(effectiveTarget, actor)
       }
-
-      return freshChange
     })
 
     onProgress?.({ type: 'transitioned', from: fromState, to: effectiveTarget })

@@ -45,13 +45,13 @@
     {
       "requirement": "mutate serializes persisted change updates",
       "rules": [
-        "`mutate(name, fn)` MUST provide serialized read-modify-write semantics for one existing **active** persisted change.\n\nResolution MUST use the same rules as `get(name)` — only `changes/`. If the name exists only under `drafts/`, `mutate()` MUST throw `ChangeNotFoundError`.\n\nFor a given active change name, the repository MUST:\n\n1. Acquire exclusive mutation access scoped to that persisted change\n2. Reload the freshest persisted `Change` state from active storage after the exclusive access is acquired, ensuring that this load operation does not trigger nested write locks or deadlocks. In filesystem-backed implementations, this reload operation MUST be performed using the internal read helper (e.g. `_getInternal(..., { skipWrite: true })`) to bypass nested locks and auto-invalidation writes, deferring all writes to the final save step.\n3. Invoke `fn(change)` with that fresh `Change` where `change.isDrafted === false`\n4. Persist the updated change manifest if `fn` resolves successfully\n5. Release the exclusive access before returning or throwing\n\nIf no active change with the given name exists, `mutate()` MUST throw `ChangeNotFoundError`.\n\nIf `fn` throws, `mutate()` MUST release the exclusive access and MUST NOT persist a partial manifest update produced by the failed callback.\n\nThe serialized section MUST cover the full persisted mutation window — fresh load, callback execution, and manifest persistence. Locking only the final manifest write is insufficient.\n\nExclusive access is per change name, not global. Mutations targeting different change names MAY proceed concurrently."
+        "`mutate(name, fn)` MUST provide serialized read-modify-write semantics for one existing **active** persisted change.\n\nResolution MUST use the same rules as `get(name)` — only `changes/`. If the name exists only under `drafts/`, `mutate()` MUST throw `ChangeNotFoundError`.\n\nFor a given active change name, the repository MUST:\n\n1. Acquire exclusive mutation access scoped to that persisted change\n2. Reload the freshest persisted `Change` state from active storage after the exclusive access is acquired, ensuring that this load operation does not trigger nested write locks or deadlocks. In filesystem-backed implementations, this reload operation MUST be performed using the internal read helper (e.g. `_getInternal(..., { skipWrite: true })`) to bypass nested locks and auto-invalidation writes, deferring all writes to the final save step.\n3. Invoke `fn(change)` with that fresh `Change` where `change.isDrafted === false`\n4. Persist the updated change manifest if `fn` resolves successfully (via the repository's internal manifest-write primitive)\n5. Reconcile by re-reading the change through the same load path used by `get` (including artifact-file drift detection and disk re-derive when artifact types are resolved). If that reconcile requires further manifest persistence, persist again before releasing the lock\n6. Release the exclusive access before returning or throwing\n\n`mutate` MUST return `{ result, change }` where:\n\n- `result` is the value returned by `fn` (including `void` / `undefined`)\n- `change` is the post-reconcile `Change` from step 5 — not the pre-reconcile callback snapshot\n\nCallers that need the durable aggregate MUST use `.change`. The callback `fresh` object is not guaranteed equivalent to a subsequent `get()` after artifact bytes or disk state diverge during the callback.\n\nIf no active change with the given name exists, `mutate()` MUST throw `ChangeNotFoundError`.\n\nIf `fn` throws, `mutate()` MUST release the exclusive access and MUST NOT persist a partial manifest update produced by the failed callback.\n\nThe serialized section MUST cover the full persisted mutation window — fresh load, callback execution, manifest persistence, and post-save reconcile. Locking only the final manifest write is insufficient.\n\nExclusive access is per change name, not global. Mutations targeting different change names MAY proceed concurrently."
       ]
     },
     {
       "requirement": "mutateDraft serializes drafted change updates",
       "rules": [
-        "`mutateDraft(name, fn)` MUST provide serialized read-modify-write semantics for one existing **drafted** persisted change.\n\nResolution MUST use the same rules as `getDraft(name)` — only `drafts/`. If the name exists only under active storage, `mutateDraft()` MUST throw `ChangeNotFoundError`.\n\nThe callback MUST receive a fresh mutable `Change` with `isDrafted === true` before any transforming operation in the callback. Only `RestoreChange` and `DiscardChange` (and repository internals) MAY call `mutateDraft` in production code.\n\nOn success, the repository MUST persist the manifest and perform any required directory move (`drafts/` ↔ `changes/` or `drafts/` → `discarded/`).\n\nIf `fn` throws, `mutateDraft()` MUST NOT persist partial updates, matching `mutate` failure semantics."
+        "`mutateDraft(name, fn)` MUST provide serialized read-modify-write semantics for one existing **drafted** persisted change.\n\nResolution MUST use the same rules as `getDraft(name)` — only `drafts/`. If the name exists only under active storage, `mutateDraft()` MUST throw `ChangeNotFoundError`.\n\nThe callback MUST receive a fresh mutable `Change` with `isDrafted === true` before any transforming operation in the callback. Only `RestoreChange` and `DiscardChange` (and repository internals) MAY call `mutateDraft` in production code.\n\nOn success, the repository MUST:\n\n1. Persist the manifest and perform any required directory move (`drafts/` ↔ `changes/` or `drafts/` → `discarded/`)\n2. Reconcile by re-reading through the load path appropriate to the change's post-persist bucket (including drift detection when applicable)\n3. Return `{ result, change }` with the same semantics as `mutate` — `result` from `fn`, `change` post-reconcile\n\nIf `fn` throws, `mutateDraft()` MUST NOT persist partial updates, matching `mutate` failure semantics."
       ]
     },
     {
@@ -97,9 +97,9 @@
       ]
     },
     {
-      "requirement": "save persists the change manifest only",
+      "requirement": "create persists a new change; save is internal",
       "rules": [
-        "`save(change)` MUST persist the change manifest — state, artifact statuses, validated hashes, history events, and approvals. It MUST NOT write artifact file content. Artifact content is written exclusively via `saveArtifact()`. The write MUST be atomic (e.g. temp file + rename) to prevent partial reads.\n\nIf `change.isDrafted === true`, `save(change)` MUST throw `DraftedChangeReadOnlyError` unless the call originates from the serialized `mutateDraft` window for that change name.\n\n`save()` is a low-level persistence operation. Atomic manifest writing prevents partial-file corruption, but `save()` alone does not serialize a caller's earlier snapshot read. Use cases that mutate an existing active persisted change and need concurrency safety MUST perform that mutation through `mutate(name, fn)`."
+        "**Public first persist — `create`**\n\n`create(change)` MUST persist a change that does not yet exist under active, drafted, or discarded storage. It MUST write the change manifest atomically (e.g. temp file + rename) and create the change directory. It MUST NOT write artifact file content.\n\nIf a change with the same name already exists in any bucket, `create` MUST fail with `ChangeAlreadyExistsError` (or the repository's equivalent conflict error).\n\n`CreateChange` and other first-time constructors MUST call `create`. They MUST NOT call an application-facing `save` API.\n\n**Internal manifest write**\n\nManifest persistence for an **existing** change (status, validated hashes, history, approvals, directory moves between buckets) MUST occur only inside `mutate` / `mutateDraft` (or equivalent repository-internal paths such as `get` auto-invalidation under lock).\n\nAdapters MAY keep an internal manifest-write helper used by `create`, `mutate`, `mutateDraft`, and locked `get` drift persistence. That helper MUST NOT be part of the application-facing port surface that use cases call. Use cases MUST NOT persist an existing change by writing a caller-held snapshot outside `mutate` / `mutateDraft`.\n\nThe internal manifest write MUST NOT write artifact file content. Artifact content is written exclusively via `saveArtifact()`.\n\nIf an internal write targets a drafted change, it MUST be rejected with `DraftedChangeReadOnlyError` unless it originates from the serialized `mutateDraft` (or active `mutate`) window for that change name."
       ]
     },
     {
@@ -117,7 +117,7 @@
     {
       "requirement": "saveArtifact with optimistic concurrency",
       "rules": [
-        "`saveArtifact(change, artifact, options?)` MUST write an artifact file within a change directory. If `change.isDrafted === true`, `saveArtifact` MUST throw `DraftedChangeReadOnlyError` before any filesystem write.\n\nIf `artifact.originalHash` is set, the implementation MUST compare it against the current hash of the file on disk before writing. If the hashes differ, the save MUST be rejected by throwing `ArtifactConflictError` — this prevents silently overwriting concurrent modifications. When `options.force` is `true`, the conflict check MUST be skipped and the file MUST be overwritten unconditionally. After a successful write, the corresponding `ChangeArtifact` status in the change manifest MUST be reset to `in-progress`; the caller is responsible for calling `save(change)` to persist this state change."
+        "`saveArtifact(change, artifact, options?)` MUST write an artifact file within a change directory and MUST return `void`.\n\n`saveArtifact` MUST run only inside an active `mutate` or `mutateDraft` window for that change name (repository-internal per-name mutation tracking). If no such window is active, `saveArtifact` MUST reject before any filesystem write. Callers do not need a public `isMutating` API.\n\nIf `change.isDrafted === true` and the call is outside the drafted mutation window, `saveArtifact` MUST throw `DraftedChangeReadOnlyError` before any filesystem write (same drafted guard as today, subsumed by the mutate-window rule when windows are tracked for all changes).\n\nIf `artifact.originalHash` is set, the implementation MUST compare it against the current hash of the file on disk before writing. If the hashes differ, the save MUST be rejected by throwing `ArtifactConflictError` — this prevents silently overwriting concurrent modifications. When `options.force` is `true`, the conflict check MUST be skipped and the file MUST be overwritten unconditionally.\n\nAfter a successful write, `saveArtifact` MUST NOT mutate the in-memory `Change` aggregate: it MUST NOT change file/artifact status, validated hashes, history, or approvals (including any `setFileStatus` / `in-progress` reopen). Drift classification and status updates are owned by the load/reconcile path used by `get` and by the post-`mutate` / post-`mutateDraft` reconcile step."
       ]
     },
     {
@@ -165,7 +165,7 @@
     {
       "requirement": "Abstract class with abstract methods",
       "rules": [
-        "`ChangeRepository` MUST be defined as an `abstract class`, not an `interface`. All storage operations (`get`, `getDraft`, `getDiscarded`, `mutate`, `mutateDraft`, `list`, `listDrafts`, `listDiscarded`, `count`, `countDrafts`, `countDiscarded`, `reindex`, `reindexActive`, `reindexDrafts`, `reindexDiscarded`, `save`, `delete`, `artifact`, `saveArtifact`, `artifactExists`, `deltaExists`, `changePath`, `draftChangePath`, `scaffold`, `unscaffold`) MUST be declared as `abstract` methods. This follows the architecture spec requirement that ports with shared construction are abstract classes."
+        "`ChangeRepository` MUST be defined as an `abstract class`, not an `interface`. All application-facing storage operations (`get`, `getDraft`, `getDiscarded`, `mutate`, `mutateDraft`, `list`, `listDrafts`, `listDiscarded`, `count`, `countDrafts`, `countDiscarded`, `reindex`, `reindexActive`, `reindexDrafts`, `reindexDiscarded`, `create`, `delete`, `artifact`, `saveArtifact`, `artifactExists`, `deltaExists`, `changePath`, `draftChangePath`, `scaffold`, `unscaffold`) MUST be declared as `abstract` methods. This follows the architecture spec requirement that ports with shared construction are abstract classes.\n\nInternal manifest-write helpers used by adapters are not required to appear as abstract port methods."
       ]
     },
     {
@@ -193,11 +193,13 @@
     "list, listDrafts, and listDiscarded return lightweight list entries with no artifact content, history, or derived artifact state maps",
     "get, getDraft, and getDiscarded remain the detail surfaces for full manifest-backed inspection",
     "List pagination has no default limit; when omitted, list() returns the full bucket and meta.limit equals meta.total per core:repository-port",
-    "save() writes the manifest only; saveArtifact() writes file content only — these are separate operations",
-    "ArtifactConflictError is the sole error type for concurrent modification detection",
+    "Application use cases persist new changes via create and existing changes via mutate / mutateDraft only",
+    "saveArtifact() writes file content only and MUST NOT mutate the in-memory Change; manifest status updates come from mutate/reconcile/get",
+    "ArtifactConflictError is the sole error type for concurrent modification detection on artifact bytes",
     "The force option on saveArtifact() bypasses conflict detection entirely",
     "originalHash on loaded artifacts MUST use sha256 of the file content as read from disk",
-    "Manifest writes MUST be atomic to prevent corruption from partial reads"
+    "Manifest writes MUST be atomic to prevent corruption from partial reads",
+    "mutate / mutateDraft return { result, change } where change is post-reconcile"
   ],
   "scenarios": [
     {
@@ -351,7 +353,30 @@
       "then": [
         "the internal load operation within mutate bypasses any intermediate lock acquisition and manifest writes",
         "AND does not deadlock",
-        "AND the final save() persists the correct accumulated changes"
+        "AND the final internal manifest write persists the correct accumulated changes"
+      ]
+    },
+    {
+      "requirement": "mutate serializes persisted change updates",
+      "name": "mutate returns result and post-reconcile change",
+      "given": ["fn returns the value \"ok\""],
+      "when": ["mutate(name, fn) completes successfully"],
+      "then": [
+        "the return value is { result: \"ok\", change }",
+        "AND change is the post-reconcile aggregate, not necessarily the same object identity as the callback fresh"
+      ]
+    },
+    {
+      "requirement": "mutate serializes persisted change updates",
+      "name": "Post-save reconcile detects disk drift from saveArtifact inside callback",
+      "given": [
+        "a validated complete artifact file with a stored validatedHash",
+        "AND mutate callback calls saveArtifact with different content then returns"
+      ],
+      "when": ["mutate completes"],
+      "then": [
+        ".change reflects drift classification from the reconcile load path",
+        "AND the persisted manifest matches that reconciled state"
       ]
     },
     {
@@ -380,6 +405,16 @@
       "given": ["mutateDraft(name, fn) is invoked for a drafted change"],
       "when": ["the callback runs"],
       "then": ["it receives a freshly loaded Change with isDrafted === true"]
+    },
+    {
+      "requirement": "mutateDraft serializes drafted change updates",
+      "name": "mutateDraft returns result and post-reconcile change",
+      "given": ["fn returns undefined"],
+      "when": ["mutateDraft(name, fn) completes successfully after a restore transition"],
+      "then": [
+        "the return value is { result: undefined, change }",
+        "AND change is loaded from the post-persist bucket after any directory move"
+      ]
     },
     {
       "requirement": "Auto-invalidation on get when artifact files drift",
@@ -566,45 +601,46 @@
       ]
     },
     {
-      "requirement": "save persists the change manifest only",
-      "name": "Save does not write artifact content",
-      "given": ["a change with modified artifact content"],
-      "when": ["save(change) is called"],
+      "requirement": "create persists a new change; save is internal",
+      "name": "create does not write artifact content",
+      "given": ["a new Change entity that has never been persisted"],
+      "when": ["create(change) is called"],
       "then": [
-        "the manifest file is updated with current state, hashes, and history",
-        "AND artifact file content on disk is unchanged"
+        "the change directory and manifest are created",
+        "AND no artifact file content is written by create"
       ]
     },
     {
-      "requirement": "save persists the change manifest only",
-      "name": "Save alone does not serialize an earlier snapshot read",
-      "given": ["a caller holds a Change loaded earlier via get()"],
-      "when": ["another caller persists newer manifest state before save(oldSnapshot) runs"],
-      "then": [
-        "save() still behaves as a low-level manifest write",
-        "AND callers that need concurrency-safe read-modify-write behavior must use mutate()"
-      ]
+      "requirement": "create persists a new change; save is internal",
+      "name": "create rejects an existing name",
+      "given": [
+        "a change with the same name already exists under changes/, drafts/, or discarded/"
+      ],
+      "when": ["create(change) is called"],
+      "then": ["ChangeAlreadyExistsError (or equivalent) is thrown"]
     },
     {
-      "requirement": "save persists the change manifest only",
-      "name": "save on drafted change outside mutateDraft throws",
+      "requirement": "create persists a new change; save is internal",
+      "name": "Use cases cannot persist existing changes via public save",
+      "given": ["an application use case holds a Change loaded earlier via get()"],
+      "when": ["it attempts to persist that snapshot outside mutate / mutateDraft / create"],
+      "then": ["no application-facing save API is available on the port for that purpose"]
+    },
+    {
+      "requirement": "create persists a new change; save is internal",
+      "name": "Internal save on drafted change outside mutateDraft throws",
       "given": ["a persisted change with isDrafted === true"],
-      "when": ["save(change) is called outside an active mutateDraft window"],
+      "when": [
+        "an internal manifest write is attempted outside an active mutateDraft / mutate window"
+      ],
       "then": ["DraftedChangeReadOnlyError is thrown"]
     },
     {
-      "requirement": "save persists the change manifest only",
-      "name": "save inside mutateDraft succeeds",
+      "requirement": "create persists a new change; save is internal",
+      "name": "Internal save inside mutateDraft succeeds",
       "given": ["mutateDraft(name, fn) is executing for a drafted change"],
-      "when": ["the callback triggers an internal save(change) for that same name"],
+      "when": ["the repository performs its internal manifest write for that same name"],
       "then": ["DraftedChangeReadOnlyError is not thrown"]
-    },
-    {
-      "requirement": "save persists the change manifest only",
-      "name": "save on active change is unchanged",
-      "given": ["a change exists under changes/ with isDrafted === false"],
-      "when": ["save(change) is called outside mutate"],
-      "then": ["persistence proceeds per existing optimistic concurrency rules"]
     },
     {
       "requirement": "artifact loads content with originalHash",
@@ -663,15 +699,22 @@
     {
       "requirement": "saveArtifact with optimistic concurrency",
       "name": "No conflict — originalHash matches",
-      "given": ["an artifact loaded with originalHash and the file on disk has not changed"],
+      "given": [
+        "an active mutate window for the change",
+        "AND an artifact loaded with originalHash and the file on disk has not changed"
+      ],
       "when": ["saveArtifact(change, artifact) is called"],
-      "then": ["the file is written successfully"]
+      "then": [
+        "the file is written successfully",
+        "AND the in-memory Change status and validatedHash are unchanged by saveArtifact"
+      ]
     },
     {
       "requirement": "saveArtifact with optimistic concurrency",
       "name": "Conflict detected — originalHash mismatch",
       "given": [
-        "an artifact loaded with originalHash and the file on disk was modified by another process"
+        "an active mutate window for the change",
+        "AND an artifact loaded with originalHash and the file on disk was modified by another process"
       ],
       "when": ["saveArtifact(change, artifact) is called without force"],
       "then": ["ArtifactConflictError is thrown with filename, incomingContent, and currentContent"]
@@ -679,37 +722,42 @@
     {
       "requirement": "saveArtifact with optimistic concurrency",
       "name": "Force bypasses conflict detection",
-      "given": ["an artifact whose originalHash does not match the current file on disk"],
+      "given": [
+        "an active mutate window for the change",
+        "AND an artifact whose originalHash does not match the current file on disk"
+      ],
       "when": ["saveArtifact(change, artifact, { force: true }) is called"],
-      "then": ["the file is overwritten without error"]
+      "then": [
+        "the file is overwritten without error",
+        "AND the in-memory Change is still not mutated by saveArtifact"
+      ]
     },
     {
       "requirement": "saveArtifact with optimistic concurrency",
       "name": "New artifact with no originalHash",
-      "given": ["an artifact with originalHash undefined (first write)"],
+      "given": [
+        "an active mutate window for the change",
+        "AND an artifact with originalHash undefined (first write)"
+      ],
       "when": ["saveArtifact(change, artifact) is called"],
-      "then": ["the file is written without conflict check"]
+      "then": ["the file is written without conflict check", "AND saveArtifact returns void"]
     },
     {
       "requirement": "saveArtifact with optimistic concurrency",
-      "name": "saveArtifact on drafted change throws",
-      "given": ["a change with isDrafted === true"],
-      "when": ["saveArtifact(change, artifact) is called outside mutateDraft"],
-      "then": ["DraftedChangeReadOnlyError is thrown before any filesystem write"]
+      "name": "saveArtifact outside mutate window is rejected",
+      "given": ["no active mutate or mutateDraft window for the change name"],
+      "when": ["saveArtifact(change, artifact) is called"],
+      "then": ["the call is rejected before any filesystem write"]
     },
     {
       "requirement": "saveArtifact with optimistic concurrency",
       "name": "saveArtifact inside mutateDraft may succeed",
       "given": ["mutateDraft(name, fn) is executing for a drafted change"],
       "when": ["the callback calls saveArtifact for that change"],
-      "then": ["DraftedChangeReadOnlyError is not thrown for the drafted guard alone"]
-    },
-    {
-      "requirement": "saveArtifact with optimistic concurrency",
-      "name": "saveArtifact on active change is unchanged",
-      "given": ["a change under changes/ with isDrafted === false"],
-      "when": ["saveArtifact(change, artifact) is called with a valid hash"],
-      "then": ["existing optimistic concurrency behaviour applies"]
+      "then": [
+        "the drafted/mutate-window guard allows the write",
+        "AND the in-memory Change is not set to in-progress by saveArtifact"
+      ]
     },
     {
       "requirement": "artifactExists checks file presence without loading",
@@ -828,36 +876,49 @@
     },
     {
       "requirement": "Abstract class with abstract methods",
-      "name": "ChangeRepository declares abstract methods",
+      "name": "Abstract surface includes create not public save",
       "when": ["ChangeRepository is declared"],
-      "then": ["it is an abstract class with abstract methods for get, list, save, mutate"]
+      "then": [
+        "it is an abstract class with abstract methods for get, list, create, mutate, mutateDraft, and saveArtifact",
+        "AND public save is not part of the application-facing abstract surface"
+      ]
     }
   ],
   "implementation": {
     "symbols": [
       {
         "specId": "core:change-repository-port",
-        "file": "core:src/infrastructure/fs/change-repository.ts",
-        "symbol": "FsChangeRepository"
+        "file": "core:src/application/ports/change-repository.ts",
+        "symbol": "MutateResult"
+      },
+      {
+        "specId": "core:change-repository-port",
+        "file": "core:src/application/ports/change-repository.ts",
+        "symbol": "ChangeRepository"
+      },
+      {
+        "specId": "core:change-repository-port",
+        "file": "core:src/domain/errors/change-mutation-required-error.ts",
+        "symbol": "ChangeMutationRequiredError"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:72ddcb320702f92cd5f79f0cb43f51a282abd7ec2f39e4b87c6ef140740f14f9",
-    "verify.md": "sha256:c12dd080b2ff511352e53f54f58daae3994ffc74aca26449bb7e7c69dede61d4"
+    "spec.md": "sha256:1f2d3bc80a8298b62e25dfd3dc354db6653083230d47a417d13b5b75038ec0d4",
+    "verify.md": "sha256:72954ef0f28d47a2a8efad4d52511b3578dc566b21dc00fec69c96e135a0c3ea"
   },
   "provenance": {
     "artifacts": {
       "spec.md": {
-        "hash": "sha256:72ddcb320702f92cd5f79f0cb43f51a282abd7ec2f39e4b87c6ef140740f14f9",
-        "lastModified": "2026-07-22T19:10:28.295Z"
+        "hash": "sha256:1f2d3bc80a8298b62e25dfd3dc354db6653083230d47a417d13b5b75038ec0d4",
+        "lastModified": "2026-07-25T14:42:08.390Z"
       },
       "verify.md": {
-        "hash": "sha256:c12dd080b2ff511352e53f54f58daae3994ffc74aca26449bb7e7c69dede61d4",
-        "lastModified": "2026-07-22T19:10:28.296Z"
+        "hash": "sha256:72954ef0f28d47a2a8efad4d52511b3578dc566b21dc00fec69c96e135a0c3ea",
+        "lastModified": "2026-07-25T14:42:08.391Z"
       }
     },
-    "persistedStateHash": "sha256:12ef2e72cdba5793c5d587a3d2cc024f4b7bb23ccd2ea5e36b9fdee6f0f5582f",
+    "persistedStateHash": "sha256:f6b74f273840c404c4aa41477ec3b11207b3abc17549af9149c5125dc2fa0521",
     "schema": {
       "name": "schema-std",
       "version": 1

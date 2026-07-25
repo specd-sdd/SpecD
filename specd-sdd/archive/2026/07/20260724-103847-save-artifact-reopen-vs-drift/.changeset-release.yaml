@@ -1,0 +1,4 @@
+releases:
+  core:core/change-repository-port: minor
+  core:core/fs-change-repository: minor
+  core:core/create-change: patch

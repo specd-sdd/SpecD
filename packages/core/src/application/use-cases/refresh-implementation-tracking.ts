@@ -81,7 +81,7 @@ export class RefreshImplementationTracking {
   async execute(
     input: RefreshImplementationTrackingInput,
   ): Promise<RefreshImplementationTrackingResult> {
-    const implementationTracking = await this._changes.mutate(input.name, async (freshChange) => {
+    const { result } = await this._changes.mutate(input.name, async (freshChange) => {
       if (freshChange.getHistoricalImplementationAt() !== null) {
         const excludePaths = this._collectExclusions()
         const detected = await this._implementationDetector.detectModifiedFiles(freshChange, {
@@ -90,8 +90,10 @@ export class RefreshImplementationTracking {
         this._mergeCandidates(freshChange, detected)
         await this._existenceSweep(freshChange)
       }
-      return projectImplementationTracking(freshChange)
+      return { implementationTracking: projectImplementationTracking(freshChange) }
     })
+
+    const implementationTracking = result.implementationTracking
 
     if (implementationTracking === null) {
       throw new ChangeNotFoundError(input.name)

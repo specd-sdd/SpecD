@@ -103,25 +103,61 @@
 
 ### Requirement: Write-path index maintenance
 
-#### Scenario: save upserts when projected list entry changes
+#### Scenario: create upserts when projected list entry is new
 
-- **GIVEN** an active change whose projected `ActiveChangeListEntry` differs after `save(manifest)`
-- **WHEN** the save completes in the same bucket
-- **THEN** the changes bucket helper upserts the row without a full rebuild
+- **WHEN** `create(change)` persists a new active change
+- **THEN** the active list-index row is inserted (or the bucket invalidated) accordingly
 
-#### Scenario: save skips index write when projection unchanged
+#### Scenario: mutate persist upserts when projected list entry changes
 
-- **GIVEN** a save that does not change the projected list entry (including history-derived fields)
-- **WHEN** `save(manifest)` completes
-- **THEN** the bucket index files are not rewritten for that row
+- **GIVEN** an internal manifest write from `mutate` changes history-derived list fields
+- **WHEN** the write completes
+- **THEN** the bucket helper upserts the projected row
+
+#### Scenario: mutate persist skips index write when projection unchanged
+
+- **GIVEN** an internal manifest write whose projected list entry equals the cached row
+- **WHEN** the write completes
+- **THEN** no list-index file write occurs
 
 #### Scenario: Move between buckets updates both indexes
 
-- **WHEN** a change moves from `changes/` to `drafts/`
-- **THEN** the active bucket row is removed or invalidated
-- **AND** the drafts bucket row is upserted or the bucket is invalidated
+- **WHEN** a change moves between `changes` ↔ `drafts` ↔ `discarded` during `mutate` / `mutateDraft`
+- **THEN** both affected bucket indexes are updated or invalidated
 
 #### Scenario: saveArtifact does not update list indexes
 
-- **WHEN** `saveArtifact()` completes without changing list-entry fields
-- **THEN** no list-index upsert is required for that operation
+- **WHEN** `saveArtifact` writes artifact file content inside a mutate window
+- **THEN** list-index files are not updated for that write alone
+
+### Requirement: create delegates to internal first persist
+
+#### Scenario: create refuses colliding names across buckets
+
+- **GIVEN** a change name already present under `drafts/`
+- **WHEN** `create(change)` is called with that name
+- **THEN** the operation fails without creating a second directory
+
+### Requirement: mutate and mutateDraft reconcile after persist
+
+#### Scenario: mutate .change matches a following get after in-callback file write
+
+- **GIVEN** `mutate` writes different artifact bytes via `saveArtifact` then finishes
+- **WHEN** the caller inspects `.change` and then calls `get(name)`
+- **THEN** artifact/file statuses on `.change` match the `get` result regarding drift classification
+
+### Requirement: saveArtifact requires mutate window and does not touch Change
+
+#### Scenario: Outside mutate window saveArtifact does not write
+
+- **GIVEN** no mutation-in-progress entry for the change name
+- **WHEN** `saveArtifact` is invoked
+- **THEN** no artifact file is written
+- **AND** the call is rejected
+
+#### Scenario: Inside mutate window bytes are written without setFileStatus
+
+- **GIVEN** an active `mutate` window and a complete tracked file
+- **WHEN** `saveArtifact` overwrites the file
+- **THEN** disk content changes
+- **AND** the supplied `Change` object's file status is unchanged by `saveArtifact`

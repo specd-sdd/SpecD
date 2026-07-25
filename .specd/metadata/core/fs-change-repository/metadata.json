@@ -45,13 +45,31 @@
     {
       "requirement": "Write-path index maintenance",
       "rules": [
-        "After `save(manifest)` in the same bucket, `FsChangeRepository` MUST project the new list entry (including history-derived fields) and compare to the cached entry. If equal → no index write. If different → upsert that row via the bucket helper (update `totalCount` as needed).\n\n- **create / delete:** update or remove the row (and `totalCount`) or invalidate the bucket.\n- **Moves** between `changes` ↔ `drafts` ↔ `discarded`: update/invalidate **both** affected buckets.\n- **`saveArtifact()` / skip / non-listing history:** MUST NOT require list-index updates.\n\n`reindex()`, `reindexActive()`, `reindexDrafts()`, and `reindexDiscarded()` MUST delegate to the corresponding helper full rebuild."
+        "After an internal manifest write (`create` or the helper used by `mutate` / `mutateDraft` / locked `get` drift persistence) in the same bucket, `FsChangeRepository` MUST project the new list entry (including history-derived fields) and compare to the cached entry. If equal → no index write. If different → upsert that row via the bucket helper (update `totalCount` as needed).\n\n- **create / delete:** update or remove the row (and `totalCount`) or invalidate the bucket.\n- **Moves** between `changes` ↔ `drafts` ↔ `discarded`: update/invalidate **both** affected buckets.\n- **`saveArtifact()` / skip / non-listing history:** MUST NOT require list-index updates.\n\n`reindex()`, `reindexActive()`, `reindexDrafts()`, and `reindexDiscarded()` MUST delegate to the corresponding helper full rebuild."
+      ]
+    },
+    {
+      "requirement": "create delegates to internal first persist",
+      "rules": [
+        "`FsChangeRepository.create(change)` MUST perform the first-time directory creation and atomic manifest write for a new change name. It MUST refuse when a directory for that name already exists in `changes/`, `drafts/`, or `discarded/`. It MUST update the corresponding list-index bucket the same way a first `save` of a new active change does today."
+      ]
+    },
+    {
+      "requirement": "mutate and mutateDraft reconcile after persist",
+      "rules": [
+        "After the successful internal manifest write inside `mutate` or `mutateDraft`, `FsChangeRepository` MUST re-enter the same load/reconcile path used by `get` / `_manifestToChange` (with artifact types resolved when available) for the change's post-write storage bucket. If that path marks the in-memory manifest as needing persistence (including `artifact-drift` invalidation), the repository MUST persist again before releasing the change lock and MUST return that reconciled `Change` as `.change` in `{ result, change }`."
+      ]
+    },
+    {
+      "requirement": "saveArtifact requires mutate window and does not touch Change",
+      "rules": [
+        "`FsChangeRepository.saveArtifact` MUST verify the change name is present in the repository's active or draft mutation-in-progress tracking sets. If not, it MUST reject without writing.\n\nOn success it MUST write file bytes only (honouring `originalHash` / `force`). It MUST NOT call `setFileStatus`, MUST NOT alter validated hashes or history on the supplied `Change`, and MUST NOT write `manifest.json`."
       ]
     }
   ],
   "constraints": [
     "FsChangeRepository is infrastructure-level and lives in infrastructure/fs/",
-    "It MUST implement the ChangeRepository abstract port class"
+    "It MUST implement the ChangeRepository abstract port class, including create, { result, change } mutate returns, post-mutate reconcile, and mutate-window-scoped byte-only saveArtifact"
   ],
   "scenarios": [
     {
@@ -181,74 +199,105 @@
     },
     {
       "requirement": "Write-path index maintenance",
-      "name": "save upserts when projected list entry changes",
-      "given": [
-        "an active change whose projected ActiveChangeListEntry differs after save(manifest)"
-      ],
-      "when": ["the save completes in the same bucket"],
-      "then": ["the changes bucket helper upserts the row without a full rebuild"]
+      "name": "create upserts when projected list entry is new",
+      "when": ["create(change) persists a new active change"],
+      "then": ["the active list-index row is inserted (or the bucket invalidated) accordingly"]
     },
     {
       "requirement": "Write-path index maintenance",
-      "name": "save skips index write when projection unchanged",
-      "given": [
-        "a save that does not change the projected list entry (including history-derived fields)"
-      ],
-      "when": ["save(manifest) completes"],
-      "then": ["the bucket index files are not rewritten for that row"]
+      "name": "mutate persist upserts when projected list entry changes",
+      "given": ["an internal manifest write from mutate changes history-derived list fields"],
+      "when": ["the write completes"],
+      "then": ["the bucket helper upserts the projected row"]
+    },
+    {
+      "requirement": "Write-path index maintenance",
+      "name": "mutate persist skips index write when projection unchanged",
+      "given": ["an internal manifest write whose projected list entry equals the cached row"],
+      "when": ["the write completes"],
+      "then": ["no list-index file write occurs"]
     },
     {
       "requirement": "Write-path index maintenance",
       "name": "Move between buckets updates both indexes",
-      "when": ["a change moves from changes/ to drafts/"],
-      "then": [
-        "the active bucket row is removed or invalidated",
-        "AND the drafts bucket row is upserted or the bucket is invalidated"
-      ]
+      "when": ["a change moves between changes ↔ drafts ↔ discarded during mutate / mutateDraft"],
+      "then": ["both affected bucket indexes are updated or invalidated"]
     },
     {
       "requirement": "Write-path index maintenance",
       "name": "saveArtifact does not update list indexes",
-      "when": ["saveArtifact() completes without changing list-entry fields"],
-      "then": ["no list-index upsert is required for that operation"]
+      "when": ["saveArtifact writes artifact file content inside a mutate window"],
+      "then": ["list-index files are not updated for that write alone"]
+    },
+    {
+      "requirement": "create delegates to internal first persist",
+      "name": "create refuses colliding names across buckets",
+      "given": ["a change name already present under drafts/"],
+      "when": ["create(change) is called with that name"],
+      "then": ["the operation fails without creating a second directory"]
+    },
+    {
+      "requirement": "mutate and mutateDraft reconcile after persist",
+      "name": "mutate .change matches a following get after in-callback file write",
+      "given": ["mutate writes different artifact bytes via saveArtifact then finishes"],
+      "when": ["the caller inspects .change and then calls get(name)"],
+      "then": [
+        "artifact/file statuses on .change match the get result regarding drift classification"
+      ]
+    },
+    {
+      "requirement": "saveArtifact requires mutate window and does not touch Change",
+      "name": "Outside mutate window saveArtifact does not write",
+      "given": ["no mutation-in-progress entry for the change name"],
+      "when": ["saveArtifact is invoked"],
+      "then": ["no artifact file is written", "AND the call is rejected"]
+    },
+    {
+      "requirement": "saveArtifact requires mutate window and does not touch Change",
+      "name": "Inside mutate window bytes are written without setFileStatus",
+      "given": ["an active mutate window and a complete tracked file"],
+      "when": ["saveArtifact overwrites the file"],
+      "then": [
+        "disk content changes",
+        "AND the supplied Change object's file status is unchanged by saveArtifact"
+      ]
     }
   ],
   "implementation": {
-    "files": [
-      {
-        "specId": "core:fs-change-repository",
-        "file": "core:test/infrastructure/fs/fs-index-cache-base.spec.ts"
-      }
-    ],
     "symbols": [
       {
         "specId": "core:fs-change-repository",
-        "file": "core:src/infrastructure/fs/fs-index-cache-base.ts",
-        "symbol": "FsIndexCache"
+        "file": "core:src/infrastructure/fs/change-repository.ts",
+        "symbol": "FsChangeRepository"
       },
       {
         "specId": "core:fs-change-repository",
-        "file": "core:src/infrastructure/fs/fs-index-cache-base.ts",
-        "symbol": "_ensureFresh"
+        "file": "core:src/infrastructure/fs/change-repository.ts",
+        "symbol": "_persistManifest"
+      },
+      {
+        "specId": "core:fs-change-repository",
+        "file": "core:src/infrastructure/fs/change-repository.ts",
+        "symbol": "_reconcileChangeUnderLock"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:8aa2dea13f56817a1b328022eebf365c20f3f35d6babc954d5d994cafa8b1f78",
-    "verify.md": "sha256:c92a087d52737207ae055524da3d66a83e5e3bb1b9482323e36d09e77714291c"
+    "spec.md": "sha256:d496eee518d218330ce7a931d5c36a1a55954ed11f60a360272a6ce222ba83b2",
+    "verify.md": "sha256:14defbb8b36bd9664f0584b1ad4a57b9bfb97f0e49465277a869b4d288c3e2c7"
   },
   "provenance": {
     "artifacts": {
       "spec.md": {
-        "hash": "sha256:8aa2dea13f56817a1b328022eebf365c20f3f35d6babc954d5d994cafa8b1f78",
-        "lastModified": "2026-07-22T17:25:45.343Z"
+        "hash": "sha256:d496eee518d218330ce7a931d5c36a1a55954ed11f60a360272a6ce222ba83b2",
+        "lastModified": "2026-07-25T14:42:08.543Z"
       },
       "verify.md": {
-        "hash": "sha256:c92a087d52737207ae055524da3d66a83e5e3bb1b9482323e36d09e77714291c",
-        "lastModified": "2026-07-22T17:25:45.345Z"
+        "hash": "sha256:14defbb8b36bd9664f0584b1ad4a57b9bfb97f0e49465277a869b4d288c3e2c7",
+        "lastModified": "2026-07-25T14:42:08.543Z"
       }
     },
-    "persistedStateHash": "sha256:d378989219df8f83da16a3ac0dae89cc8ec4c6d157ff086a8b7fb1eb8a2c9294",
+    "persistedStateHash": "sha256:455446e620261fdfb224c2e00f8d78b96937ff2bb2ef7e2c517b997fd5430b4a",
     "schema": {
       "name": "schema-std",
       "version": 1

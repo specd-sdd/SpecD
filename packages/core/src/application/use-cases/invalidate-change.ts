@@ -91,7 +91,7 @@ export class InvalidateChange {
     const schema = await this._schemaProvider.get()
 
     if (effectivePolicy === 'none') {
-      const persisted = await this._changes.mutate(input.name, (freshChange) => {
+      const { change: persisted } = await this._changes.mutate(input.name, (freshChange) => {
         freshChange.invalidate(
           'artifact-review-required',
           actor,
@@ -99,7 +99,6 @@ export class InvalidateChange {
           [],
           schema.artifactDag(),
         )
-        return freshChange
       })
 
       return { change: persisted, effectivePolicy, affected: [] }
@@ -111,7 +110,7 @@ export class InvalidateChange {
       files: [t.key],
     }))
 
-    const persisted = await this._changes.mutate(input.name, (freshChange) => {
+    const { change: persisted } = await this._changes.mutate(input.name, (freshChange) => {
       freshChange.invalidate(
         'artifact-review-required',
         actor,
@@ -120,7 +119,6 @@ export class InvalidateChange {
         schema.artifactDag(),
         effectivePolicy,
       )
-      return freshChange
     })
 
     const expanded = expandAffectedSet(

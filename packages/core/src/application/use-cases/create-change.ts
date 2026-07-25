@@ -144,7 +144,7 @@ export class CreateChange {
         : {}),
     })
 
-    await this._changes.save(change)
+    await this._changes.create(change)
     await this._changes.scaffold(change, (specId) => this._specExists(workspaceMap, specId))
     const changePath = this._changes.changePath(change)
 

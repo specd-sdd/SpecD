@@ -46,7 +46,7 @@ export class SkipArtifact {
    */
   async execute(input: SkipArtifactInput): Promise<Change> {
     const actor = await this._actor.identity()
-    return this._changes.mutate(input.name, (change) => {
+    const { change } = await this._changes.mutate(input.name, (change) => {
       const artifact = change.getArtifact(input.artifactId)
       if (artifact === null) {
         throw new ArtifactNotFoundError(input.artifactId, input.name)
@@ -58,7 +58,7 @@ export class SkipArtifact {
 
       change.recordArtifactSkipped(input.artifactId, actor, input.reason)
       artifact.markSkipped()
-      return change
     })
+    return change
   }
 }

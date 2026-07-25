@@ -12,11 +12,44 @@
   ],
   "implementation": [
     {
-      "file": "core:src/infrastructure/fs/fs-index-cache-base.ts",
-      "symbols": ["FsIndexCache", "_ensureFresh"]
-    },
-    {
-      "file": "core:test/infrastructure/fs/fs-index-cache-base.spec.ts"
+      "file": "core:src/infrastructure/fs/change-repository.ts",
+      "symbols": ["FsChangeRepository", "_persistManifest", "_reconcileChangeUnderLock"]
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Fs filesystem ChangeRepository: Zod-validated path config, three-bucket FsChangeIndexCache, atomic mutate locks.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:8aa2dea13f56817a1b328022eebf365c20f3f35d6babc954d5d994cafa8b1f78",
+          "lastModified": "2026-07-22T17:25:45.343Z"
+        },
+        "verify.md": {
+          "hash": "sha256:c92a087d52737207ae055524da3d66a83e5e3bb1b9482323e36d09e77714291c",
+          "lastModified": "2026-07-22T17:25:45.345Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# FsChangeRepository\n\n## Rules\n- Ctor: `context: ChangeRepositoryConfig` (workspace meta, callbacks, `draftsPath`/`discardedPath`) + `config: FsChangeRepositoryConfig` (`path` only; Zod from `specd.yaml` — no runtime deps).\n- Missing active/drafts/discarded dirs → `StorageDirectoryNotFoundError`.\n- `createFsChangeStorageFactory()` → `ChangeStorageFactory`; `create(context, config)` forwards without merge.\n- List/count/reindex → one `FsChangeIndexCache` per bucket under `{configPath}/tmp/fs-cache/{changes,drafts,discarded}/`. No direct `.specd-index.jsonl` / `.specd-index-meta.json` I/O.\n- Sort: Active `createdAt` oldest→newest; Drafts `draftedAt` newest→oldest; Discarded `discardedAt` newest→oldest.\n- Index writes only via `mutate(fn)`: per-bucket lock (waiters block, no contention fail); temp+rename atomic publish (meta-only; jsonl then meta; both → jsonl first). Fail mid-flight → discard temps. `list`/`count` unlocked.\n- Freshness (no VCS): `isInvalidated` → rebuild; else mtime vs `sourceMtime` → rebuild; else serve. `invalidateCache()` marks all three. Rebuild: scan → stream JSONL → atomic rename + meta.\n- After `save(manifest)`: upsert list row if changed. create/delete update/remove/invalidate. Moves update both buckets. `saveArtifact`/skip/non-listing history: no list update. `reindex*` → helper full rebuild.\n\n## Constraints\n- Lives `infrastructure/fs/`; MUST implement `ChangeRepository` abstract port.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:8aa2dea13f56817a1b328022eebf365c20f3f35d6babc954d5d994cafa8b1f78",
+          "lastModified": "2026-07-22T17:25:45.343Z"
+        },
+        "verify.md": {
+          "hash": "sha256:c92a087d52737207ae055524da3d66a83e5e3bb1b9482323e36d09e77714291c",
+          "lastModified": "2026-07-22T17:25:45.345Z"
+        }
+      }
+    }
+  }
 }

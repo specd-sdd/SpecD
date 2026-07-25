@@ -184,26 +184,6 @@ export class ChangeArtifact {
   }
 
   /**
-   * Materializes an unvalidated file state discovered from the filesystem.
-   *
-   * Intended for repository hydration of `missing` / `in-progress` entries whose
-   * file presence changed outside explicit validation flows.
-   *
-   * @param key - File key to update
-   * @param status - Newly observed state
-   */
-  setFileStatus(key: string, status: Extract<ArtifactStatus, 'missing' | 'in-progress'>): void {
-    const file = this._files.get(key)
-    if (file === undefined) return
-    if (status === 'in-progress') {
-      file.markInProgress()
-    } else {
-      file.markMissing()
-    }
-    this._recomputeStatus()
-  }
-
-  /**
    * Recomputes the aggregate artifact status from the tracked file states.
    * Public so that callers that mutate individual files can recompute after.
    */

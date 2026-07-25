@@ -160,16 +160,16 @@
 
 ### Requirement: Persistence and scaffolding
 
-#### Scenario: Change is saved to repository
+#### Scenario: Change is created via repository create
 
 - **WHEN** `CreateChange.execute` completes successfully
-- **THEN** `ChangeRepository.save` was called with the returned `Change` instance
+- **THEN** `ChangeRepository.create` was called with the returned `Change` instance
 
-#### Scenario: Change is saved then scaffolded
+#### Scenario: Change is created then scaffolded
 
 - **WHEN** `CreateChange.execute` completes successfully
-- **THEN** `ChangeRepository.save` is called before scaffolding
-- **AND** `ChangeRepository.scaffold` is called after saving
+- **THEN** `ChangeRepository.create` is called before scaffolding
+- **AND** `ChangeRepository.scaffold` is called after creating
 
 #### Scenario: Scaffolding uses specExists callback
 

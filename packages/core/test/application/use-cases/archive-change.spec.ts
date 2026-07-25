@@ -2573,9 +2573,10 @@ describe('ArchiveChange', () => {
 
       expect(mutateSpy.mock.calls.some((call) => call[0] === 'my-change')).toBe(true)
       const archivingMutate = mutateSpy.mock.calls.find((call) => {
+        if (call[0] !== 'my-change') return false
         const draft = makeArchivableChange('my-change')
-        const updated = (call[1] as (c: Change) => Change)(draft)
-        return updated.state === 'archiving'
+        ;(call[1] as (c: Change) => void)(draft)
+        return draft.state === 'archiving'
       })
       expect(archivingMutate).toBeDefined()
     })

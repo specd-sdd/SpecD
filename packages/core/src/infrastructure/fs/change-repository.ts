@@ -14,6 +14,7 @@ import { type ChangeState, VALID_TRANSITIONS } from '../../domain/value-objects/
 import { SpecArtifact } from '../../domain/value-objects/spec-artifact.js'
 import { ArtifactConflictError } from '../../domain/errors/artifact-conflict-error.js'
 import { DraftedChangeReadOnlyError } from '../../domain/errors/drafted-change-read-only-error.js'
+import { ChangeMutationRequiredError } from '../../domain/errors/change-mutation-required-error.js'
 import { InvalidChangeError } from '../../domain/errors/invalid-change-error.js'
 import {
   toDiscardedChangeView,
@@ -31,6 +32,7 @@ import {
   type ActiveChangeListOptions,
   type DiscardedChangeListOptions,
   type DraftedChangeListOptions,
+  type MutateResult,
 } from '../../application/ports/change-repository.js'
 import { type ListResult } from '../../application/ports/repository.js'
 import {
@@ -338,7 +340,10 @@ export class FsChangeRepository extends ChangeRepository {
    * @returns The callback result after the manifest has been persisted
    * @throws {ChangeNotFoundError} If no change with the given name exists
    */
-  override async mutate<T>(name: string, fn: (change: Change) => Promise<T> | T): Promise<T> {
+  override async mutate<T>(
+    name: string,
+    fn: (change: Change) => Promise<T> | T,
+  ): Promise<MutateResult<T>> {
     return this._withChangeLock(name, async () => {
       const change = await this._getInternal(name, { skipWrite: true })
       if (change === null) {
@@ -348,8 +353,9 @@ export class FsChangeRepository extends ChangeRepository {
       this._activeMutationInProgress.add(name)
       try {
         const result = await fn(change)
-        await this.save(change)
-        return result
+        await this._persistManifest(change)
+        const reconciled = await this._reconcileChangeUnderLock(name)
+        return { result, change: reconciled }
       } finally {
         this._activeMutationInProgress.delete(name)
       }
@@ -445,6 +451,33 @@ export class FsChangeRepository extends ChangeRepository {
   }
 
   /**
+   * Reloads a change from disk under an existing lock and persists drift detected
+   * during manifest hydration.
+   *
+   * @param name - Change slug name
+   * @returns Post-reconcile domain entity
+   * @throws {ChangeNotFoundError} When the change directory no longer exists
+   */
+  private async _reconcileChangeUnderLock(name: string): Promise<Change> {
+    const dir = await this._resolveDir(name)
+    if (dir === null) {
+      throw new ChangeNotFoundError(name)
+    }
+
+    const manifest = await this._loadManifest(dir)
+    const { change, hasChangesToPersist } = await this._manifestToChange(manifest, dir)
+
+    if (hasChangesToPersist && this._artifactTypesResolved) {
+      await this._writeManifestAtomic(dir, changeToManifest(change))
+      const freshManifest = await this._loadManifest(dir)
+      const { change: reconciled } = await this._manifestToChange(freshManifest, dir)
+      return reconciled
+    }
+
+    return change
+  }
+
+  /**
    * Returns a drafted change view from `drafts/` only.
    *
    * @param name - The change slug name to look up
@@ -482,7 +515,10 @@ export class FsChangeRepository extends ChangeRepository {
    * @returns The callback result after the manifest has been persisted
    * @throws {ChangeNotFoundError} If no drafted change with the given name exists
    */
-  override async mutateDraft<T>(name: string, fn: (change: Change) => Promise<T> | T): Promise<T> {
+  override async mutateDraft<T>(
+    name: string,
+    fn: (change: Change) => Promise<T> | T,
+  ): Promise<MutateResult<T>> {
     return this._withChangeLock(name, async () => {
       const dir = await this._resolveDraftDir(name)
       if (dir === null) {
@@ -494,8 +530,9 @@ export class FsChangeRepository extends ChangeRepository {
       this._draftMutationInProgress.add(name)
       try {
         const result = await fn(change)
-        await this.save(change)
-        return result
+        await this._persistManifest(change)
+        const reconciled = await this._reconcileChangeUnderLock(name)
+        return { result, change: reconciled }
       } finally {
         this._draftMutationInProgress.delete(name)
       }
@@ -612,12 +649,26 @@ export class FsChangeRepository extends ChangeRepository {
   }
 
   /**
+   * Persists a new change for the first time.
+   *
+   * @param change - The new change to persist
+   * @throws {ChangeAlreadyExistsError} When the name collides across buckets
+   */
+  override async create(change: Change): Promise<void> {
+    const existing = await this._resolveDir(change.name)
+    if (existing !== null) {
+      throw new ChangeAlreadyExistsError(change.name)
+    }
+    await this._persistManifest(change)
+  }
+
+  /**
    * Persists the change manifest, moving the change directory between
    * `changes/`, `drafts/`, or `discarded/` as the lifecycle state requires.
    *
    * @param change - The change whose manifest should be persisted
    */
-  override async save(change: Change): Promise<void> {
+  private async _persistManifest(change: Change): Promise<void> {
     if (
       change.isDrafted &&
       !this._draftMutationInProgress.has(change.name) &&
@@ -728,11 +779,13 @@ export class FsChangeRepository extends ChangeRepository {
     options?: { force?: boolean },
   ): Promise<void> {
     if (
-      change.isDrafted &&
-      !this._draftMutationInProgress.has(change.name) &&
-      !this._activeMutationInProgress.has(change.name)
+      !this._activeMutationInProgress.has(change.name) &&
+      !this._draftMutationInProgress.has(change.name)
     ) {
-      throw new DraftedChangeReadOnlyError(change.name, 'saveArtifact')
+      if (change.isDrafted) {
+        throw new DraftedChangeReadOnlyError(change.name, 'saveArtifact')
+      }
+      throw new ChangeMutationRequiredError(change.name, 'saveArtifact')
     }
 
     const dir = await this._resolveDir(change.name)
@@ -765,11 +818,6 @@ export class FsChangeRepository extends ChangeRepository {
     }
 
     await fs.writeFile(filePath, artifact.content, 'utf8')
-
-    const target = trackedArtifactFile(change, artifact.filename)
-    if (target !== null) {
-      target.artifact.setFileStatus(target.file.key, 'in-progress')
-    }
   }
 
   /**
@@ -1924,28 +1972,6 @@ function trackedArtifactFilenames(change: Change): ReadonlySet<string> | undefin
     }
   }
   return allowed.size > 0 ? allowed : undefined
-}
-
-/**
- * Finds the tracked artifact file entry for a normalized change filename.
- *
- * @param change - Change whose tracked artifacts should be searched
- * @param filename - Raw change-directory filename
- * @returns The matching artifact and file, or `null` when not tracked
- */
-function trackedArtifactFile(
-  change: Change,
-  filename: string,
-): { artifact: ChangeArtifact; file: ArtifactFile } | null {
-  const normalized = normalizeRelativePath(filename)
-  for (const artifact of change.artifacts.values()) {
-    for (const file of artifact.files.values()) {
-      if (normalizeRelativePath(file.filename) === normalized) {
-        return { artifact, file }
-      }
-    }
-  }
-  return null
 }
 
 /**

@@ -45,9 +45,9 @@ export class RestoreChange {
     }
 
     const actor = await this._actor.identity()
-    return this._changes.mutateDraft(input.name, (change) => {
+    const { change } = await this._changes.mutateDraft(input.name, (change) => {
       change.restore(actor)
-      return change
     })
+    return change
   }
 }

@@ -81,7 +81,7 @@ export class UpdateImplementationTracking {
   async execute(
     input: UpdateImplementationTrackingInput,
   ): Promise<UpdateImplementationTrackingResult> {
-    const implementationTracking = await this._changes.mutate(input.name, async (change) => {
+    const { result } = await this._changes.mutate(input.name, async (change) => {
       switch (input.action) {
         case 'add':
           await this._applyAdd(change, input)
@@ -100,10 +100,10 @@ export class UpdateImplementationTracking {
           break
       }
 
-      return projectImplementationTracking(change)
+      return { implementationTracking: projectImplementationTracking(change) }
     })
 
-    return { implementationTracking }
+    return { implementationTracking: result.implementationTracking }
   }
 
   /**

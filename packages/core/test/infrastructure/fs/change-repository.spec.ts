@@ -9,6 +9,9 @@ import { type ActorIdentity } from '../../../src/domain/entities/change.js'
 import { SpecArtifact } from '../../../src/domain/value-objects/spec-artifact.js'
 import { ArtifactConflictError } from '../../../src/domain/errors/artifact-conflict-error.js'
 import { ChangeNotFoundError } from '../../../src/application/errors/change-not-found-error.js'
+import { ChangeAlreadyExistsError } from '../../../src/application/errors/change-already-exists-error.js'
+import { ChangeMutationRequiredError } from '../../../src/domain/errors/change-mutation-required-error.js'
+import { DraftedChangeReadOnlyError } from '../../../src/domain/errors/drafted-change-read-only-error.js'
 import { SchemaMismatchError } from '../../../src/application/errors/schema-mismatch-error.js'
 import { Logger } from '../../../src/application/logger.js'
 import { FsChangeRepository } from '../../../src/infrastructure/fs/change-repository.js'
@@ -16,6 +19,27 @@ import { vi } from 'vitest'
 import { sha256 } from '../../../src/infrastructure/fs/hash.js'
 import { artifactDagFromChangeArtifacts } from '../../../src/domain/value-objects/artifact-dag.js'
 import { ArtifactType } from '../../../src/domain/value-objects/artifact-type.js'
+
+async function persistChange(repo: FsChangeRepository, change: Change): Promise<void> {
+  const active = await repo.get(change.name)
+  const draft = active === null ? await repo.getDraft(change.name) : null
+  if (active === null && draft === null) {
+    await repo.create(change)
+    return
+  }
+  await (repo as unknown as { _persistManifest(c: Change): Promise<void> })._persistManifest(change)
+}
+
+async function saveArtifactInMutate(
+  repo: FsChangeRepository,
+  change: Change,
+  artifact: SpecArtifact,
+  options?: { force?: boolean },
+): Promise<void> {
+  await repo.mutate(change.name, async (loaded) => {
+    await repo.saveArtifact(loaded, artifact, options)
+  })
+}
 
 const actor: ActorIdentity = { name: 'Alice', email: 'alice@example.com' }
 
@@ -94,10 +118,38 @@ describe('FsChangeRepository', () => {
     await cleanupRepo(ctx)
   })
 
+  describe('create()', () => {
+    it('given a new change, when create is called, then a timestamped directory is created', async () => {
+      const change = makeChange('add-auth', new Date('2024-03-15T10:00:00.000Z'))
+      await ctx.repo.create(change)
+
+      const entries = await fs.readdir(ctx.changesPath)
+      expect(entries).toHaveLength(1)
+      expect(entries[0]).toBe('20240315-100000-add-auth')
+    })
+
+    it('given an existing change name in any bucket, when create is called, then ChangeAlreadyExistsError is thrown', async () => {
+      const change = makeChange('add-auth')
+      await ctx.repo.create(change)
+      const duplicate = makeChange('add-auth')
+
+      await expect(ctx.repo.create(duplicate)).rejects.toBeInstanceOf(ChangeAlreadyExistsError)
+    })
+
+    it('given a new change, when create is called, then only the manifest is written (no artifact content)', async () => {
+      const change = makeChange('add-auth', new Date('2024-03-15T10:00:00.000Z'))
+      await ctx.repo.create(change)
+
+      const dir = path.join(ctx.changesPath, '20240315-100000-add-auth')
+      const entries = await fs.readdir(dir)
+      expect(entries).toEqual(['manifest.json'])
+    })
+  })
+
   describe('save and get — round-trip', () => {
     it('given a new change, when save is called, then a timestamped directory is created under changes/', async () => {
       const change = makeChange('add-auth', new Date('2024-03-15T10:00:00.000Z'))
-      await ctx.repo.save(change)
+      await persistChange(ctx.repo, change)
 
       const entries = await fs.readdir(ctx.changesPath)
       expect(entries).toHaveLength(1)
@@ -106,7 +158,7 @@ describe('FsChangeRepository', () => {
 
     it('given a saved change, when get is called with the name, then the change is returned with correct fields', async () => {
       const change = makeChange('add-auth')
-      await ctx.repo.save(change)
+      await persistChange(ctx.repo, change)
 
       const loaded = await ctx.repo.get('add-auth')
 
@@ -127,7 +179,7 @@ describe('FsChangeRepository', () => {
       const change = makeChange('add-auth')
       change.transition('designing', actor)
       change.transition('ready', actor)
-      await ctx.repo.save(change)
+      await persistChange(ctx.repo, change)
 
       const loaded = await ctx.repo.get('add-auth')
       expect(loaded?.history).toHaveLength(3)
@@ -143,7 +195,7 @@ describe('FsChangeRepository', () => {
         [{ type: 'proposal', files: ['proposal'] }],
         artifactDagFromChangeArtifacts([{ type: 'proposal', requires: [] }]),
       )
-      await ctx.repo.save(change)
+      await persistChange(ctx.repo, change)
 
       const manifestPath = path.join(
         ctx.changesPath,
@@ -171,10 +223,10 @@ describe('FsChangeRepository', () => {
 
     it('given a saved change, when save is called again with updated history, then the manifest is updated', async () => {
       const change = makeChange('add-auth')
-      await ctx.repo.save(change)
+      await persistChange(ctx.repo, change)
 
       change.transition('designing', actor)
-      await ctx.repo.save(change)
+      await persistChange(ctx.repo, change)
 
       const loaded = await ctx.repo.get('add-auth')
       expect(loaded?.state).toBe('designing')
@@ -190,7 +242,7 @@ describe('FsChangeRepository', () => {
         symbols: ['login', 'logout'],
       })
 
-      await ctx.repo.save(change)
+      await persistChange(ctx.repo, change)
       const loaded = await ctx.repo.get('add-auth')
 
       expect(loaded?.trackedImplementationFiles).toEqual([
@@ -218,9 +270,9 @@ describe('FsChangeRepository', () => {
 
     it('given the callback succeeds, when mutate is called, then the callback result is returned and the manifest is persisted', async () => {
       const change = makeChange('add-auth')
-      await ctx.repo.save(change)
+      await persistChange(ctx.repo, change)
 
-      const result = await ctx.repo.mutate('add-auth', (loaded) => {
+      const { result } = await ctx.repo.mutate('add-auth', (loaded) => {
         loaded.transition('designing', actor)
         return loaded.state
       })
@@ -231,7 +283,7 @@ describe('FsChangeRepository', () => {
 
     it('given the callback throws, when mutate is called, then partial manifest changes are not persisted', async () => {
       const change = makeChange('add-auth')
-      await ctx.repo.save(change)
+      await persistChange(ctx.repo, change)
 
       await expect(
         ctx.repo.mutate('add-auth', (loaded) => {
@@ -245,7 +297,7 @@ describe('FsChangeRepository', () => {
 
     it('given two concurrent mutations for the same change, when mutate is called twice, then the second waits and reloads fresh state', async () => {
       const change = makeChange('add-auth')
-      await ctx.repo.save(change)
+      await persistChange(ctx.repo, change)
 
       let releaseFirst: (() => void) | undefined
       const firstCanFinish = new Promise<void>((resolve) => {
@@ -284,8 +336,8 @@ describe('FsChangeRepository', () => {
 
       releaseFirst?.()
 
-      await expect(first).resolves.toBe('designing')
-      await expect(second).resolves.toBe('ready')
+      await expect(first).resolves.toMatchObject({ result: 'designing' })
+      await expect(second).resolves.toMatchObject({ result: 'ready' })
       expect((await ctx.repo.get('add-auth'))?.state).toBe('ready')
       expect(order).toEqual(['first-start', 'first-end', 'second-start', 'second-end'])
     })
@@ -293,8 +345,8 @@ describe('FsChangeRepository', () => {
     it('given concurrent mutations for different changes, when mutate is called, then unrelated changes do not block each other', async () => {
       const alpha = makeChange('alpha')
       const beta = makeChange('beta')
-      await ctx.repo.save(alpha)
-      await ctx.repo.save(beta)
+      await persistChange(ctx.repo, alpha)
+      await persistChange(ctx.repo, beta)
 
       let releaseAlpha: (() => void) | undefined
       const alphaCanFinish = new Promise<void>((resolve) => {
@@ -319,15 +371,15 @@ describe('FsChangeRepository', () => {
 
       releaseAlpha?.()
 
-      await expect(mutateAlpha).resolves.toBe('designing')
-      await expect(mutateBeta).resolves.toBe('designing')
+      await expect(mutateAlpha).resolves.toMatchObject({ result: 'designing' })
+      await expect(mutateBeta).resolves.toMatchObject({ result: 'designing' })
       expect((await ctx.repo.get('alpha'))?.state).toBe('designing')
       expect((await ctx.repo.get('beta'))?.state).toBe('designing')
     })
 
     it('given a stale lock owned by a dead pid, when mutate is called, then the lock is reaped and the mutation succeeds', async () => {
       const change = makeChange('add-auth')
-      await ctx.repo.save(change)
+      await persistChange(ctx.repo, change)
 
       const lockDir = path.join(ctx.configPath, 'tmp', 'change-locks', 'add-auth.lock')
       await fs.mkdir(lockDir, { recursive: true })
@@ -409,7 +461,7 @@ describe('FsChangeRepository', () => {
           ],
         ]),
       })
-      await repoWithTypes.save(change)
+      await persistChange(repoWithTypes, change)
 
       // Write proposal.md so validatedHash matches — no drift on first load
       const dir = path.join(ctx.changesPath, '20240115-100000-add-auth')
@@ -444,7 +496,7 @@ describe('FsChangeRepository', () => {
   describe('save — directory movement', () => {
     it('given a change in changes/, when drafted via mutate, then directory is moved to drafts/', async () => {
       const change = makeChange('add-auth')
-      await ctx.repo.save(change)
+      await persistChange(ctx.repo, change)
 
       await ctx.repo.mutate('add-auth', (loaded) => {
         loaded.draft(actor, 'parking for now')
@@ -459,7 +511,7 @@ describe('FsChangeRepository', () => {
 
     it('given a drafted change, when restored via mutateDraft, then directory is moved back to changes/', async () => {
       const change = makeChange('add-auth')
-      await ctx.repo.save(change)
+      await persistChange(ctx.repo, change)
       await ctx.repo.mutate('add-auth', (loaded) => {
         loaded.draft(actor)
         return loaded
@@ -478,9 +530,9 @@ describe('FsChangeRepository', () => {
 
     it('given an active change, when discarded and saved, then directory is moved to discarded/', async () => {
       const change = makeChange('add-auth')
-      await ctx.repo.save(change)
+      await persistChange(ctx.repo, change)
       change.discard('superseded', actor)
-      await ctx.repo.save(change)
+      await persistChange(ctx.repo, change)
 
       const changesEntries = await fs.readdir(ctx.changesPath)
       const discardedEntries = await fs.readdir(ctx.discardedPath)
@@ -492,7 +544,7 @@ describe('FsChangeRepository', () => {
   describe('get vs getDraft — drafted storage', () => {
     it('given a drafted change, when getDraft is called, then a drafted view is returned', async () => {
       const change = makeChange('add-auth')
-      await ctx.repo.save(change)
+      await persistChange(ctx.repo, change)
       await ctx.repo.mutate('add-auth', (loaded) => {
         loaded.draft(actor)
         return loaded
@@ -505,7 +557,7 @@ describe('FsChangeRepository', () => {
 
     it('given a drafted change, when get is called, then null is returned', async () => {
       const change = makeChange('add-auth')
-      await ctx.repo.save(change)
+      await persistChange(ctx.repo, change)
       await ctx.repo.mutate('add-auth', (loaded) => {
         loaded.draft(actor)
         return loaded
@@ -520,9 +572,9 @@ describe('FsChangeRepository', () => {
       const c1 = makeChange('alpha', new Date('2024-01-01T00:00:00.000Z'))
       const c2 = makeChange('beta', new Date('2024-02-01T00:00:00.000Z'))
       const c3 = makeChange('gamma', new Date('2024-03-01T00:00:00.000Z'))
-      await ctx.repo.save(c1)
-      await ctx.repo.save(c2)
-      await ctx.repo.save(c3)
+      await persistChange(ctx.repo, c1)
+      await persistChange(ctx.repo, c2)
+      await persistChange(ctx.repo, c3)
 
       const changes = await ctx.repo.list()
       expect(changes.items.map((c) => c.name)).toEqual(['alpha', 'beta', 'gamma'])
@@ -531,8 +583,8 @@ describe('FsChangeRepository', () => {
     it('given a drafted change and an active change, when list is called, then only the active change is returned', async () => {
       const active = makeChange('active', new Date('2024-01-01T00:00:00.000Z'))
       const drafted = makeChange('drafted', new Date('2024-02-01T00:00:00.000Z'))
-      await ctx.repo.save(active)
-      await ctx.repo.save(drafted)
+      await persistChange(ctx.repo, active)
+      await persistChange(ctx.repo, drafted)
       await ctx.repo.mutate('drafted', (loaded) => {
         loaded.draft(actor)
         return loaded
@@ -552,7 +604,7 @@ describe('FsChangeRepository', () => {
   describe('delete()', () => {
     it('given a saved change, when delete is called, then the directory is removed', async () => {
       const change = makeChange('add-auth')
-      await ctx.repo.save(change)
+      await persistChange(ctx.repo, change)
 
       await ctx.repo.delete(change)
 
@@ -610,7 +662,7 @@ describe('FsChangeRepository', () => {
 
     it('given validatedHash is null and no file on disk, when get is called, then artifact status is missing', async () => {
       const change = makeChangeWithArtifact('c1', null)
-      await ctx.repo.save(change)
+      await persistChange(ctx.repo, change)
 
       const loaded = await ctx.repo.get('c1')
       expect(loaded?.getArtifact('proposal')?.status).toBe('missing')
@@ -618,7 +670,7 @@ describe('FsChangeRepository', () => {
 
     it('given validatedHash is null and a file exists on disk, when get is called, then artifact status is in-progress', async () => {
       const change = makeChangeWithArtifact('c1', null)
-      await ctx.repo.save(change)
+      await persistChange(ctx.repo, change)
       // Write the artifact file manually
       const dir = path.join(ctx.changesPath, '20240115-100000-c1')
       await fs.writeFile(path.join(dir, 'proposal.md'), '# Proposal\n', 'utf8')
@@ -631,7 +683,7 @@ describe('FsChangeRepository', () => {
       const content = '# Proposal\n'
       const hash = sha256(content)
       const change = makeChangeWithArtifact('c1', hash)
-      await ctx.repo.save(change)
+      await persistChange(ctx.repo, change)
       const dir = path.join(ctx.changesPath, '20240115-100000-c1')
       await fs.writeFile(path.join(dir, 'proposal.md'), content, 'utf8')
 
@@ -641,7 +693,7 @@ describe('FsChangeRepository', () => {
 
     it('given validatedHash does not match the file on disk, when get is called, then artifact status is drifted-pending-review', async () => {
       const change = makeChangeWithArtifact('c1', sha256('original content'))
-      await ctx.repo.save(change)
+      await persistChange(ctx.repo, change)
       const dir = path.join(ctx.changesPath, '20240115-100000-c1')
       await fs.writeFile(path.join(dir, 'proposal.md'), 'modified content', 'utf8')
 
@@ -659,7 +711,7 @@ describe('FsChangeRepository', () => {
       const updatedContent = 'modified content'
       const updatedHash = sha256(updatedContent)
       const change = makeChangeWithArtifact('c1', sha256('original content'))
-      await ctx.repo.save(change)
+      await persistChange(ctx.repo, change)
       const dir = path.join(ctx.changesPath, '20240115-100000-c1')
       await fs.writeFile(path.join(dir, 'proposal.md'), updatedContent, 'utf8')
 
@@ -670,7 +722,7 @@ describe('FsChangeRepository', () => {
 
       expect(drifted).not.toBeNull()
       drifted!.getArtifact('proposal')?.markComplete('proposal', updatedHash)
-      await ctx.repo.save(drifted!)
+      await persistChange(ctx.repo, drifted!)
 
       const reloaded = await ctx.repo.get('c1')
       expect(reloaded?.state).toBe('designing')
@@ -700,7 +752,7 @@ describe('FsChangeRepository', () => {
           ]),
         }),
       )
-      await ctx.repo.save(change)
+      await persistChange(ctx.repo, change)
 
       const loaded = await ctx.repo.get('c1')
       expect(loaded?.getArtifact('proposal')?.status).toBe('skipped')
@@ -708,7 +760,7 @@ describe('FsChangeRepository', () => {
 
     it('given validatedHash is __skipped__ but not optional, when get is called, then artifact status is in-progress', async () => {
       const change = makeChangeWithArtifact('c1', '__skipped__')
-      await ctx.repo.save(change)
+      await persistChange(ctx.repo, change)
 
       const loaded = await ctx.repo.get('c1')
       expect(loaded?.getArtifact('proposal')?.status).toBe('in-progress')
@@ -769,7 +821,7 @@ describe('FsChangeRepository', () => {
         }),
       )
 
-      await repoWithResolver.save(change)
+      await persistChange(repoWithResolver, change)
 
       const dir = path.join(ctx.changesPath, '20240115-100000-c1')
       await fs.writeFile(path.join(dir, 'tasks.md'), '- [x] Task 1\n', 'utf8')
@@ -782,7 +834,7 @@ describe('FsChangeRepository', () => {
   describe('artifact()', () => {
     it('given a file present in the change directory, when artifact is called, then the content and originalHash are returned', async () => {
       const change = makeChange('add-auth')
-      await ctx.repo.save(change)
+      await persistChange(ctx.repo, change)
       const dir = path.join(ctx.changesPath, '20240115-100000-add-auth')
       const content = '# Proposal content\n'
       await fs.writeFile(path.join(dir, 'proposal.md'), content, 'utf8')
@@ -795,7 +847,7 @@ describe('FsChangeRepository', () => {
 
     it('given a file absent, when artifact is called, then null is returned', async () => {
       const change = makeChange('add-auth')
-      await ctx.repo.save(change)
+      await persistChange(ctx.repo, change)
 
       const result = await ctx.repo.artifact(change, 'nonexistent.md')
       expect(result).toBeNull()
@@ -809,7 +861,7 @@ describe('FsChangeRepository', () => {
 
     it('given a file present, when artifact is called, then originalHash equals sha256 of file content', async () => {
       const change = makeChange('add-auth')
-      await ctx.repo.save(change)
+      await persistChange(ctx.repo, change)
       const dir = path.join(ctx.changesPath, '20240115-100000-add-auth')
       const content = 'Hello world'
       await fs.writeFile(path.join(dir, 'spec.md'), content, 'utf8')
@@ -822,14 +874,14 @@ describe('FsChangeRepository', () => {
   describe('saveArtifact()', () => {
     it('given an artifact loaded via artifact(), when the file has not changed, then saveArtifact succeeds', async () => {
       const change = makeChange('add-auth')
-      await ctx.repo.save(change)
+      await persistChange(ctx.repo, change)
       const dir = path.join(ctx.changesPath, '20240115-100000-add-auth')
       const content = '# Original\n'
       await fs.writeFile(path.join(dir, 'proposal.md'), content, 'utf8')
 
       const loaded = await ctx.repo.artifact(change, 'proposal.md')
       const updated = new SpecArtifact('proposal.md', '# Updated\n', loaded?.originalHash)
-      await expect(ctx.repo.saveArtifact(change, updated)).resolves.not.toThrow()
+      await expect(saveArtifactInMutate(ctx.repo, change, updated)).resolves.not.toThrow()
 
       const written = await fs.readFile(path.join(dir, 'proposal.md'), 'utf8')
       expect(written).toBe('# Updated\n')
@@ -837,7 +889,7 @@ describe('FsChangeRepository', () => {
 
     it('given a concurrent write changed the file on disk, when saveArtifact is called, then ArtifactConflictError is thrown', async () => {
       const change = makeChange('add-auth')
-      await ctx.repo.save(change)
+      await persistChange(ctx.repo, change)
       const dir = path.join(ctx.changesPath, '20240115-100000-add-auth')
       await fs.writeFile(path.join(dir, 'proposal.md'), '# Original\n', 'utf8')
 
@@ -848,12 +900,14 @@ describe('FsChangeRepository', () => {
       await fs.writeFile(path.join(dir, 'proposal.md'), '# Concurrent write\n', 'utf8')
 
       const updated = new SpecArtifact('proposal.md', '# My changes\n', loaded?.originalHash)
-      await expect(ctx.repo.saveArtifact(change, updated)).rejects.toThrow(ArtifactConflictError)
+      await expect(saveArtifactInMutate(ctx.repo, change, updated)).rejects.toThrow(
+        ArtifactConflictError,
+      )
     })
 
     it('given an outdated originalHash and force is true, when saveArtifact is called, then the file is overwritten', async () => {
       const change = makeChange('add-auth')
-      await ctx.repo.save(change)
+      await persistChange(ctx.repo, change)
       const dir = path.join(ctx.changesPath, '20240115-100000-add-auth')
       await fs.writeFile(path.join(dir, 'proposal.md'), '# Original\n', 'utf8')
 
@@ -862,7 +916,9 @@ describe('FsChangeRepository', () => {
       await fs.writeFile(path.join(dir, 'proposal.md'), '# Concurrent\n', 'utf8')
 
       const updated = new SpecArtifact('proposal.md', '# Forced write\n', loaded?.originalHash)
-      await expect(ctx.repo.saveArtifact(change, updated, { force: true })).resolves.not.toThrow()
+      await expect(
+        saveArtifactInMutate(ctx.repo, change, updated, { force: true }),
+      ).resolves.not.toThrow()
 
       const written = await fs.readFile(path.join(dir, 'proposal.md'), 'utf8')
       expect(written).toBe('# Forced write\n')
@@ -870,17 +926,48 @@ describe('FsChangeRepository', () => {
 
     it('given a brand-new artifact with no originalHash, when saveArtifact is called, then it writes without conflict checking', async () => {
       const change = makeChange('add-auth')
-      await ctx.repo.save(change)
+      await persistChange(ctx.repo, change)
 
       const artifact = new SpecArtifact('proposal.md', '# New content\n')
-      await expect(ctx.repo.saveArtifact(change, artifact)).resolves.not.toThrow()
+      await expect(saveArtifactInMutate(ctx.repo, change, artifact)).resolves.not.toThrow()
 
       const dir = path.join(ctx.changesPath, '20240115-100000-add-auth')
       const written = await fs.readFile(path.join(dir, 'proposal.md'), 'utf8')
       expect(written).toBe('# New content\n')
     })
 
-    it('given a tracked artifact file marked complete, when saveArtifact is called, then the in-memory artifact resets to in-progress', async () => {
+    it('given saveArtifact outside mutate, when called, then ChangeMutationRequiredError is thrown', async () => {
+      const change = makeChange('add-auth')
+      await persistChange(ctx.repo, change)
+      const artifact = new SpecArtifact('proposal.md', '# Content\n')
+
+      await expect(ctx.repo.saveArtifact(change, artifact)).rejects.toBeInstanceOf(
+        ChangeMutationRequiredError,
+      )
+    })
+
+    it('given a complete artifact changed inside mutate, when mutate returns, then .change reflects drift without saveArtifact forcing in-progress', async () => {
+      const repoWithTypes = new FsChangeRepository({
+        workspace: 'default',
+        ownership: 'owned',
+        isExternal: false,
+        configPath: ctx.configPath,
+        changesPath: ctx.changesPath,
+        draftsPath: ctx.draftsPath,
+        discardedPath: ctx.discardedPath,
+        artifactTypes: [
+          new ArtifactType({
+            id: 'proposal',
+            scope: 'change',
+            output: 'proposal.md',
+            requires: [],
+            validations: [],
+            deltaValidations: [],
+            preHashCleanup: [],
+          }),
+        ],
+      })
+
       const content = '# Original\n'
       const hash = sha256(content)
       const change = makeChange('save-artifact-status')
@@ -902,31 +989,134 @@ describe('FsChangeRepository', () => {
           ]),
         }),
       )
-      await ctx.repo.save(change)
+      await persistChange(repoWithTypes, change)
       const dir = path.join(ctx.changesPath, '20240115-100000-save-artifact-status')
       await fs.writeFile(path.join(dir, 'proposal.md'), content, 'utf8')
 
-      const loaded = await ctx.repo.artifact(change, 'proposal.md')
-      const updated = new SpecArtifact('proposal.md', '# Updated\n', loaded?.originalHash)
-      await ctx.repo.saveArtifact(change, updated)
+      let statusImmediatelyAfterWrite: string | undefined
+      let hashImmediatelyAfterWrite: string | null | undefined
 
-      expect(change.getArtifact('proposal')?.status).toBe('in-progress')
-      expect(change.getArtifact('proposal')?.getFile('proposal')?.status).toBe('in-progress')
+      const { change: reconciled } = await repoWithTypes.mutate(
+        'save-artifact-status',
+        async (loaded) => {
+          const before = loaded.getArtifact('proposal')?.getFile('proposal')
+          expect(before?.status).toBe('complete')
+          expect(before?.validatedHash).toBe(hash)
+
+          const loadedArt = await repoWithTypes.artifact(loaded, 'proposal.md')
+          await repoWithTypes.saveArtifact(
+            loaded,
+            new SpecArtifact('proposal.md', '# Updated\n', loadedArt?.originalHash),
+          )
+
+          const after = loaded.getArtifact('proposal')?.getFile('proposal')
+          statusImmediatelyAfterWrite = after?.status
+          hashImmediatelyAfterWrite = after?.validatedHash
+        },
+      )
+
+      // saveArtifact must not mutate the in-callback Change aggregate
+      expect(statusImmediatelyAfterWrite).toBe('complete')
+      expect(hashImmediatelyAfterWrite).toBe(hash)
+
+      expect(reconciled.getArtifact('proposal')?.getFile('proposal')?.status).not.toBe(
+        'in-progress',
+      )
+      const invalidated = reconciled.history.filter((event) => event.type === 'invalidated')
+      expect(invalidated.length).toBeGreaterThan(0)
+
+      // post-reconcile .change matches a following get()
+      const reloaded = await repoWithTypes.get('save-artifact-status')
+      expect(reloaded).not.toBeNull()
+      expect(reloaded?.getArtifact('proposal')?.getFile('proposal')?.status).toBe(
+        reconciled.getArtifact('proposal')?.getFile('proposal')?.status,
+      )
+      expect(reloaded?.state).toBe(reconciled.state)
     })
 
-    it('given no change directory exists, when saveArtifact is called, then an error is thrown', async () => {
+    it('given no change directory exists, when saveArtifact is called outside mutate, then ChangeMutationRequiredError is thrown', async () => {
       const change = makeChange('ghost')
       const artifact = new SpecArtifact('proposal.md', '# Content\n')
       await expect(ctx.repo.saveArtifact(change, artifact)).rejects.toBeInstanceOf(
-        ChangeNotFoundError,
+        ChangeMutationRequiredError,
       )
+    })
+
+    it('given a drafted change outside mutateDraft, when saveArtifact is called, then DraftedChangeReadOnlyError is thrown', async () => {
+      const change = makeChange('add-auth')
+      await persistChange(ctx.repo, change)
+      await ctx.repo.mutate('add-auth', (loaded) => {
+        loaded.draft(actor)
+      })
+
+      const drafted = await ctx.repo.getDraft('add-auth')
+      expect(drafted).not.toBeNull()
+
+      // Reconstruct a drafted Change via mutateDraft snapshot semantics is heavy;
+      // call saveArtifact with a drafted Change loaded through an internal path:
+      // getDraft returns a view — use mutateDraft only to capture the entity, then call outside.
+      let draftedChange: Change | undefined
+      await ctx.repo.mutateDraft('add-auth', (loaded) => {
+        draftedChange = loaded
+      })
+      expect(draftedChange?.isDrafted).toBe(true)
+
+      await expect(
+        ctx.repo.saveArtifact(draftedChange!, new SpecArtifact('proposal.md', '# x\n')),
+      ).rejects.toBeInstanceOf(DraftedChangeReadOnlyError)
+    })
+
+    it('given mutateDraft is active, when saveArtifact is called, then bytes are written without reopening status', async () => {
+      const change = makeChange('add-auth')
+      await persistChange(ctx.repo, change)
+      const dirActive = path.join(ctx.changesPath, '20240115-100000-add-auth')
+      await fs.writeFile(path.join(dirActive, 'proposal.md'), '# Original\n', 'utf8')
+
+      await ctx.repo.mutate('add-auth', (loaded) => {
+        loaded.draft(actor)
+      })
+
+      await ctx.repo.mutateDraft('add-auth', async (loaded) => {
+        const before = loaded.getArtifact('proposal')?.getFile('proposal')?.status
+        const art = await ctx.repo.artifact(loaded, 'proposal.md')
+        await ctx.repo.saveArtifact(
+          loaded,
+          new SpecArtifact('proposal.md', '# Drafted edit\n', art?.originalHash),
+        )
+        expect(loaded.getArtifact('proposal')?.getFile('proposal')?.status).toBe(before)
+      })
+
+      const draftedDir = path.join(ctx.draftsPath, '20240115-100000-add-auth')
+      const written = await fs.readFile(path.join(draftedDir, 'proposal.md'), 'utf8')
+      expect(written).toBe('# Drafted edit\n')
+    })
+
+    it('given mutateDraft restores a draft, when it completes, then result and post-reconcile change are returned', async () => {
+      const change = makeChange('add-auth')
+      await persistChange(ctx.repo, change)
+      await ctx.repo.mutate('add-auth', (loaded) => {
+        loaded.draft(actor)
+      })
+
+      const { result, change: restored } = await ctx.repo.mutateDraft('add-auth', (loaded) => {
+        expect(loaded.isDrafted).toBe(true)
+        loaded.restore(actor)
+        return 'restored'
+      })
+
+      expect(result).toBe('restored')
+      expect(restored.isDrafted).toBe(false)
+      const fromGet = await ctx.repo.get('add-auth')
+      expect(fromGet).not.toBeNull()
+      expect(fromGet?.isDrafted).toBe(false)
+      expect(fromGet?.state).toBe(restored.state)
     })
   })
 
   describe('atomic write', () => {
     it('given a valid change, when save is called, then no temp files remain in the directory', async () => {
       const change = makeChange('add-auth')
-      await ctx.repo.save(change)
+      await persistChange(ctx.repo, change)
 
       const dir = path.join(ctx.changesPath, '20240115-100000-add-auth')
       const entries = await fs.readdir(dir)
@@ -938,7 +1128,7 @@ describe('FsChangeRepository', () => {
     it('given a valid change, when save is called, then manifest.json contains valid JSON', async () => {
       const change = makeChange('add-auth')
       change.transition('designing', actor)
-      await ctx.repo.save(change)
+      await persistChange(ctx.repo, change)
 
       const dir = path.join(ctx.changesPath, '20240115-100000-add-auth')
       const raw = await fs.readFile(path.join(dir, 'manifest.json'), 'utf8')
@@ -956,7 +1146,7 @@ describe('FsChangeRepository', () => {
   describe('artifactExists', () => {
     it('given a saved change with an artifact file, returns true', async () => {
       const change = makeChange('add-auth')
-      await ctx.repo.save(change)
+      await persistChange(ctx.repo, change)
 
       // Write a file directly to simulate an artifact
       const dir = path.join(ctx.changesPath, '20240115-100000-add-auth')
@@ -967,7 +1157,7 @@ describe('FsChangeRepository', () => {
 
     it('given a saved change without the artifact file, returns false', async () => {
       const change = makeChange('add-auth')
-      await ctx.repo.save(change)
+      await persistChange(ctx.repo, change)
 
       expect(await ctx.repo.artifactExists(change, 'spec.md')).toBe(false)
     })
@@ -989,7 +1179,7 @@ describe('FsChangeRepository', () => {
           ]),
         }),
       )
-      await ctx.repo.save(change)
+      await persistChange(ctx.repo, change)
 
       await expect(ctx.repo.artifactExists(change, 'spec.md')).rejects.toThrow()
     })
@@ -998,7 +1188,7 @@ describe('FsChangeRepository', () => {
   describe('deltaExists', () => {
     it('given a saved change with a delta file, returns true', async () => {
       const change = makeChange('add-auth')
-      await ctx.repo.save(change)
+      await persistChange(ctx.repo, change)
 
       const dir = path.join(ctx.changesPath, '20240115-100000-add-auth')
       const deltaDir = path.join(dir, 'deltas', 'auth/login')
@@ -1010,7 +1200,7 @@ describe('FsChangeRepository', () => {
 
     it('given a saved change without the delta file, returns false', async () => {
       const change = makeChange('add-auth')
-      await ctx.repo.save(change)
+      await persistChange(ctx.repo, change)
 
       expect(await ctx.repo.deltaExists(change, 'auth/login', 'spec.delta.yaml')).toBe(false)
     })
@@ -1025,7 +1215,7 @@ describe('FsChangeRepository', () => {
     it('given a change with specDependsOn, when saved and loaded, then specDependsOn is preserved', async () => {
       const change = makeChange('add-auth')
       change.setSpecDependsOn('auth/login', ['auth/shared', 'auth/jwt'])
-      await ctx.repo.save(change)
+      await persistChange(ctx.repo, change)
 
       const loaded = await ctx.repo.get('add-auth')
       expect(loaded).not.toBeNull()
@@ -1036,7 +1226,7 @@ describe('FsChangeRepository', () => {
 
     it('given a change without specDependsOn, when saved and loaded, then specDependsOn is empty', async () => {
       const change = makeChange('add-auth')
-      await ctx.repo.save(change)
+      await persistChange(ctx.repo, change)
 
       const loaded = await ctx.repo.get('add-auth')
       expect(loaded).not.toBeNull()
@@ -1045,7 +1235,7 @@ describe('FsChangeRepository', () => {
 
     it('given a change with specDependsOn, when saved, then manifest.json omits specDependsOn when empty', async () => {
       const change = makeChange('add-auth')
-      await ctx.repo.save(change)
+      await persistChange(ctx.repo, change)
 
       const dir = path.join(ctx.changesPath, '20240115-100000-add-auth')
       const raw = await fs.readFile(path.join(dir, 'manifest.json'), 'utf8')
@@ -1056,7 +1246,7 @@ describe('FsChangeRepository', () => {
     it('given a change with specDependsOn, when saved, then manifest.json includes specDependsOn as a record', async () => {
       const change = makeChange('add-auth')
       change.setSpecDependsOn('auth/login', ['auth/shared'])
-      await ctx.repo.save(change)
+      await persistChange(ctx.repo, change)
 
       const dir = path.join(ctx.changesPath, '20240115-100000-add-auth')
       const raw = await fs.readFile(path.join(dir, 'manifest.json'), 'utf8')
@@ -1071,7 +1261,7 @@ describe('FsChangeRepository', () => {
       change.draft(actor, 'parking for now')
       change.restore(actor)
       change.discard('superseded', actor, ['new-auth'])
-      await ctx.repo.save(change)
+      await persistChange(ctx.repo, change)
 
       const loaded = await ctx.repo.getDiscarded('add-auth')
       expect(loaded).toBeDefined()
@@ -1093,7 +1283,7 @@ describe('FsChangeRepository', () => {
         }),
       )
       change.recordArtifactSkipped('design', actor, 'not needed')
-      await ctx.repo.save(change)
+      await persistChange(ctx.repo, change)
 
       const loaded = await ctx.repo.get('add-auth')
       const evt = loaded?.history.find((e) => e.type === 'artifact-skipped')
@@ -1155,7 +1345,7 @@ describe('FsChangeRepository', () => {
       const repo = makeRepoWithArtifactSync(async (specId) => specId === 'default:auth/login')
       const change = makeScopedChange('existing-spec', ['default:auth/login'])
 
-      await repo.save(change)
+      await persistChange(repo, change)
 
       const manifestPath = path.join(
         ctx.changesPath,
@@ -1173,7 +1363,7 @@ describe('FsChangeRepository', () => {
       const repo = makeRepoWithArtifactSync(async () => true)
       const change = makeScopedChange('legacy-stale', ['default:auth/login'])
 
-      await repo.save(change)
+      await persistChange(repo, change)
 
       const manifestPath = path.join(
         ctx.changesPath,
@@ -1211,7 +1401,7 @@ describe('FsChangeRepository', () => {
         'default:auth/register',
       ])
 
-      await repo.save(change)
+      await persistChange(repo, change)
       await repo.scaffold(change, async (specId) => specId === 'default:auth/login')
 
       const baseDir = path.join(ctx.changesPath, '20240115-100000-scaffold-expected')
@@ -1311,7 +1501,7 @@ describe('FsChangeRepository', () => {
 
       const repo = makeRepoWithArtifactTypes(ctx.tmpDir, [makeArtifactTypeWithCleanup()])
       const change = makeChangeWithTasks('c1', cleanedHash)
-      await repo.save(change)
+      await persistChange(repo, change)
 
       // Edit file to mark checkbox — cleanup normalizes [x] → [ ]
       const dir = path.join(ctx.changesPath, '20240115-100000-c1')
@@ -1327,7 +1517,7 @@ describe('FsChangeRepository', () => {
 
       const repo = makeRepoWithArtifactTypes(ctx.tmpDir, [makeArtifactTypeWithCleanup()])
       const change = makeChangeWithTasks('c1', cleanedHash)
-      await repo.save(change)
+      await persistChange(repo, change)
 
       // Edit file with actual content change — cleanup can't normalize this
       const dir = path.join(ctx.changesPath, '20240115-100000-c1')
@@ -1344,7 +1534,7 @@ describe('FsChangeRepository', () => {
 
       const repo = makeRepoWithArtifactTypes(ctx.tmpDir, [makeArtifactTypeNoCleanup()])
       const change = makeChangeWithTasks('c1', rawHash)
-      await repo.save(change)
+      await persistChange(repo, change)
 
       const dir = path.join(ctx.changesPath, '20240115-100000-c1')
       await fs.writeFile(path.join(dir, 'tasks.md'), content, 'utf8')
@@ -1485,7 +1675,7 @@ describe('FsChangeRepository', () => {
       })
 
       const repo = makeRepoWithTypes(ctx.tmpDir, makeArtifactTypes())
-      await repo.save(change)
+      await persistChange(repo, change)
 
       // Write original content for proposal and design (no drift)
       const dir = path.join(ctx.changesPath, '20240115-100000-c1')
@@ -1588,7 +1778,7 @@ describe('FsChangeRepository', () => {
       })
 
       const repo = makeRepoWithTypes(ctx.tmpDir, makeArtifactTypes())
-      await repo.save(change)
+      await persistChange(repo, change)
 
       const dir = path.join(ctx.changesPath, '20240115-100000-c2')
       await fs.writeFile(path.join(dir, 'proposal.md'), proposalContent, 'utf8')
@@ -1651,7 +1841,7 @@ describe('FsChangeRepository', () => {
       })
 
       const repo = makeRepoWithTypes(ctx.tmpDir, [makeArtifactTypes()[0]!])
-      await repo.save(change)
+      await persistChange(repo, change)
 
       const dir = path.join(ctx.changesPath, '20240115-100000-c3')
       await fs.writeFile(path.join(dir, 'proposal.md'), proposalContent, 'utf8')
@@ -1706,7 +1896,7 @@ describe('FsChangeRepository', () => {
       })
 
       const repo = makeRepoWithTypes(ctx.tmpDir, makeArtifactTypes())
-      await repo.save(change)
+      await persistChange(repo, change)
 
       // Drift the file after saving — mismatches the stored hash
       const dir = path.join(ctx.changesPath, '20240115-100000-drift-lock-test')
@@ -1742,7 +1932,7 @@ describe('FsChangeRepository', () => {
   describe('unscaffold', () => {
     it('removes specs/ and deltas/ directories for a spec', async () => {
       const change = makeChange('remove-test')
-      await ctx.repo.save(change)
+      await persistChange(ctx.repo, change)
 
       const dir = path.join(ctx.changesPath, '20240115-100000-remove-test')
       await fs.mkdir(path.join(dir, 'specs', 'default', 'auth', 'login'), { recursive: true })
@@ -1758,14 +1948,14 @@ describe('FsChangeRepository', () => {
 
     it('is idempotent when directory does not exist', async () => {
       const change = makeChange('remove-test')
-      await ctx.repo.save(change)
+      await persistChange(ctx.repo, change)
 
       await expect(ctx.repo.unscaffold(change, ['default:auth/login'])).resolves.toBeUndefined()
     })
 
     it('removes directories containing files', async () => {
       const change = makeChange('remove-test')
-      await ctx.repo.save(change)
+      await persistChange(ctx.repo, change)
 
       const dir = path.join(ctx.changesPath, '20240115-100000-remove-test')
       const specsDir = path.join(dir, 'specs', 'default', 'auth', 'login')
@@ -1780,7 +1970,7 @@ describe('FsChangeRepository', () => {
 
     it('removes empty parent directories up to the change root', async () => {
       const change = makeChange('remove-test')
-      await ctx.repo.save(change)
+      await persistChange(ctx.repo, change)
 
       const dir = path.join(ctx.changesPath, '20240115-100000-remove-test')
       await fs.mkdir(path.join(dir, 'specs', 'default', 'core', 'compile-context'), {
@@ -1803,7 +1993,7 @@ describe('FsChangeRepository', () => {
 
     it('preserves non-empty parent directories', async () => {
       const change = makeChange('remove-test')
-      await ctx.repo.save(change)
+      await persistChange(ctx.repo, change)
 
       const dir = path.join(ctx.changesPath, '20240115-100000-remove-test')
       await fs.mkdir(path.join(dir, 'specs', 'default', 'core', 'compile-context'), {
@@ -1826,7 +2016,7 @@ describe('FsChangeRepository', () => {
 
     it('never removes the change directory itself', async () => {
       const change = makeChange('remove-test')
-      await ctx.repo.save(change)
+      await persistChange(ctx.repo, change)
 
       const dir = path.join(ctx.changesPath, '20240115-100000-remove-test')
       await fs.mkdir(path.join(dir, 'specs', 'default'), { recursive: true })
@@ -1840,7 +2030,7 @@ describe('FsChangeRepository', () => {
   describe('invalidationPolicy round-trip', () => {
     it('persists default downstream when not set', async () => {
       const change = makeChange('c1')
-      await ctx.repo.save(change)
+      await persistChange(ctx.repo, change)
 
       const loaded = await ctx.repo.get('c1')
       expect(loaded?.invalidationPolicy).toBe('downstream')
@@ -1864,7 +2054,7 @@ describe('FsChangeRepository', () => {
         artifacts: new Map(),
         invalidationPolicy: 'surgical',
       })
-      await ctx.repo.save(change)
+      await persistChange(ctx.repo, change)
 
       const loaded = await ctx.repo.get('c1')
       expect(loaded?.invalidationPolicy).toBe('surgical')
@@ -1888,7 +2078,7 @@ describe('FsChangeRepository', () => {
         artifacts: new Map(),
         invalidationPolicy: 'none',
       })
-      await ctx.repo.save(change)
+      await persistChange(ctx.repo, change)
 
       const loaded = await ctx.repo.get('c1')
       expect(loaded?.invalidationPolicy).toBe('none')
@@ -1912,7 +2102,7 @@ describe('FsChangeRepository', () => {
         artifacts: new Map(),
         invalidationPolicy: 'global',
       })
-      await ctx.repo.save(change)
+      await persistChange(ctx.repo, change)
 
       const loaded = await ctx.repo.get('c1')
       expect(loaded?.invalidationPolicy).toBe('global')
@@ -1940,7 +2130,7 @@ describe('FsChangeRepository', () => {
           ]),
         }),
       )
-      await ctx.repo.save(change)
+      await persistChange(ctx.repo, change)
 
       const loaded = await ctx.repo.get('c1')
       const file = loaded?.getArtifact('proposal')?.getFile('proposal')
@@ -1967,7 +2157,7 @@ describe('FsChangeRepository', () => {
           ]),
         }),
       )
-      await ctx.repo.save(change)
+      await persistChange(ctx.repo, change)
 
       const dir = path.join(ctx.changesPath, '20240115-100000-c1')
       const raw = JSON.parse(await fs.readFile(path.join(dir, 'manifest.json'), 'utf8'))
@@ -2062,7 +2252,7 @@ describe('FsChangeRepository', () => {
         invalidationPolicy: 'none',
       })
       const repo = makeRepoWithChain(ctx.tmpDir)
-      await repo.save(change)
+      await persistChange(repo, change)
 
       const dir = path.join(ctx.changesPath, '20240115-100000-c1')
       await fs.writeFile(path.join(dir, 'proposal.md'), 'MODIFIED', 'utf8')
@@ -2135,7 +2325,7 @@ describe('FsChangeRepository', () => {
         invalidationPolicy: 'surgical',
       })
       const repo = makeRepoWithChain(ctx.tmpDir)
-      await repo.save(change)
+      await persistChange(repo, change)
 
       const dir = path.join(ctx.changesPath, '20240115-100000-c2')
       await fs.writeFile(path.join(dir, 'proposal.md'), proposalContent, 'utf8')
@@ -2209,7 +2399,7 @@ describe('FsChangeRepository', () => {
         invalidationPolicy: 'global',
       })
       const repo = makeRepoWithChain(ctx.tmpDir)
-      await repo.save(change)
+      await persistChange(repo, change)
 
       const dir = path.join(ctx.changesPath, '20240115-100000-c3')
       await fs.writeFile(path.join(dir, 'proposal.md'), proposalContent, 'utf8')
@@ -2296,7 +2486,7 @@ describe('FsChangeRepository', () => {
           }),
         ],
       })
-      await initRepo.save(change)
+      await persistChange(initRepo, change)
 
       const dir = path.join(ctx.changesPath, '20240115-100000-uninit-drift-test')
 
@@ -2321,7 +2511,7 @@ describe('FsChangeRepository', () => {
   describe('compliance validations', () => {
     it('throws SchemaMismatchError when schema name differs from active schema', async () => {
       const change = makeChange('c-schema-mismatch')
-      await ctx.repo.save(change)
+      await persistChange(ctx.repo, change)
 
       const repo = new FsChangeRepository({
         workspace: 'default',
@@ -2339,7 +2529,7 @@ describe('FsChangeRepository', () => {
 
     it('logs a warning when schema version differs from active schema', async () => {
       const change = makeChange('c-version-mismatch')
-      await ctx.repo.save(change)
+      await persistChange(ctx.repo, change)
 
       const repo = new FsChangeRepository({
         workspace: 'default',
@@ -2423,7 +2613,7 @@ describe('FsChangeRepository', () => {
         ]),
       })
 
-      await repo.save(change)
+      await persistChange(repo, change)
 
       const loaded = await repo.get('c-normalization')
       const file = loaded?.getArtifact('specs')?.getFile('core:auth')
@@ -2436,7 +2626,7 @@ describe('FsChangeRepository', () => {
 
   describe('fs-cache index', () => {
     it('creates index under configPath/tmp/fs-cache/changes on list', async () => {
-      await ctx.repo.save(makeChange('indexed'))
+      await persistChange(ctx.repo, makeChange('indexed'))
 
       await ctx.repo.list()
 
@@ -2445,13 +2635,34 @@ describe('FsChangeRepository', () => {
     })
 
     it('upserts active index on save', async () => {
-      await ctx.repo.save(makeChange('upserted'))
+      await persistChange(ctx.repo, makeChange('upserted'))
 
       expect(await ctx.repo.count()).toBe(1)
     })
 
+    it('given saveArtifact writes bytes inside mutate, when completed, then list-index files are unchanged', async () => {
+      const change = makeChange('index-skip')
+      await persistChange(ctx.repo, change)
+      await ctx.repo.list()
+
+      const indexPath = path.join(changeCacheDir(ctx.configPath, 'changes'), '.specd-index.jsonl')
+
+      await ctx.repo.mutate('index-skip', async (loaded) => {
+        const before = await fs.readFile(indexPath, 'utf8')
+        const beforeStat = await fs.stat(indexPath)
+
+        await ctx.repo.saveArtifact(loaded, new SpecArtifact('proposal.md', '# Index skip\n'))
+
+        // Index must not change for the saveArtifact write alone (mutate may sync later).
+        const after = await fs.readFile(indexPath, 'utf8')
+        const afterStat = await fs.stat(indexPath)
+        expect(after).toBe(before)
+        expect(afterStat.mtimeMs).toBe(beforeStat.mtimeMs)
+      })
+    })
+
     it('invalidateCache triggers rebuild on next list', async () => {
-      await ctx.repo.save(makeChange('rebuild-me'))
+      await persistChange(ctx.repo, makeChange('rebuild-me'))
       await ctx.repo.list()
 
       await ctx.repo.invalidateCache()

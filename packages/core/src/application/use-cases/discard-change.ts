@@ -52,15 +52,15 @@ export class DiscardChange {
 
     const actor = await this._actor.identity()
     if (active !== null) {
-      return this._changes.mutate(input.name, (change) => {
+      const { change } = await this._changes.mutate(input.name, (change) => {
         change.discard(input.reason, actor, input.supersededBy, input.force)
-        return change
       })
+      return change
     }
 
-    return this._changes.mutateDraft(input.name, (change) => {
+    const { change } = await this._changes.mutateDraft(input.name, (change) => {
       change.discard(input.reason, actor, input.supersededBy, input.force)
-      return change
     })
+    return change
   }
 }

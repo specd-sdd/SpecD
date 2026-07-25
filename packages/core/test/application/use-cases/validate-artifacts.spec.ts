@@ -1636,11 +1636,15 @@ describe('ValidateArtifacts', () => {
       // proposal has file, specs does not → specs fails (missing effect from no file)
       const files = new Map([['proposal.md', content]])
       const repo = makeChangeRepository([change])
-      const saveSpy = vi.fn(async (c: Change) => {
-        repo.store.set(c.name, c)
+      const mutateSpy = vi.fn(async (name: string, fn: (c: Change) => void | Promise<void>) => {
+        const change = repo.store.get(name)
+        if (!change) throw new ChangeNotFoundError(name)
+        const result = await fn(change)
+        repo.store.set(name, change)
+        return { result, change }
       })
       Object.assign(repo, {
-        save: saveSpy,
+        mutate: mutateSpy,
         async artifact(_change: Change, filename: string): Promise<SpecArtifact | null> {
           const c = files.get(filename)
           return c !== undefined ? new SpecArtifact(filename, c) : null
@@ -1661,7 +1665,7 @@ describe('ValidateArtifacts', () => {
         specPath: 'default:auth',
       })
 
-      expect(saveSpy).toHaveBeenCalled()
+      expect(mutateSpy).toHaveBeenCalled()
     })
   })
 

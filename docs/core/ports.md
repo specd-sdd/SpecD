@@ -244,16 +244,18 @@ Returns the change with the given name, or `null` if not found. Loads the manife
 const change = await changeRepo.get('add-oauth-login')
 ```
 
-#### `mutate<T>(name: string, fn: (change: Change) => Promise<T> | T): Promise<T>`
+#### `mutate<T>(name: string, fn: (change: Change) => Promise<T> | T): Promise<MutateResult<T>>`
 
-Runs a serialized persisted mutation for one existing change. The repository acquires exclusive mutation access for the named change, reloads the fresh persisted state, invokes `fn(change)`, persists the manifest on success, and releases the lock.
+Runs a serialized persisted mutation for one existing change. The repository acquires exclusive mutation access for the named change, reloads the fresh persisted state, invokes `fn(change)`, persists the manifest on success, re-reconciles disk drift (including artifact bytes written via `saveArtifact()` inside the callback), and releases the lock.
 
-This is the concurrency-safe path for read-modify-write operations on an existing change. Use cases that update lifecycle state, approvals, artifact completion, or `specDependsOn` should prefer `mutate()` over `get() -> save()`.
+Returns `{ result, change }` where `change` is the post-reconcile durable aggregate. Use `change` for lifecycle-sensitive reads — not the callback's in-memory entity after `saveArtifact()`.
+
+This is the concurrency-safe path for read-modify-write operations on an existing change. Use cases that update lifecycle state, approvals, artifact completion, or `specDependsOn` should prefer `mutate()` over ad-hoc manifest writes.
 
 ```typescript
-const result = await changeRepo.mutate('add-oauth-login', (change) => {
-  change.draft(actor, 'parking until next week')
-  return change.state
+const { result, change } = await changeRepo.mutate('add-oauth-login', (fresh) => {
+  fresh.draft(actor, 'parking until next week')
+  return fresh.state
 })
 ```
 
@@ -269,11 +271,9 @@ Lists all drafted (shelved) changes, sorted by creation order. Returns `Change` 
 
 Lists all discarded changes, sorted by creation order. Returns `Change` objects with artifact state but without content.
 
-#### `save(change: Change): Promise<void>`
+#### `create(change: Change): Promise<void>`
 
-Persists the change manifest — lifecycle state, artifact statuses, validated hashes, approvals, and `specDependsOn`. Does not write artifact file content; use `saveArtifact()` for that.
-
-`save()` is a low-level manifest write. It is appropriate for first persistence of a new change or for repositories that already hold exclusive access. For existing persisted changes, use `mutate()` rather than composing `get()` and `save()` in application code.
+Persists a new change for the first time. Refuses when the name already exists in any storage bucket (`changes/`, `drafts/`, or `discarded/`). Subsequent manifest updates must go through `mutate()` or `mutateDraft()`.
 
 #### `delete(change: Change): Promise<void>`
 
@@ -289,7 +289,9 @@ const artifact = await changeRepo.artifact(change, 'proposal.md')
 
 #### `saveArtifact(change: Change, artifact: SpecArtifact, options?: { force?: boolean }): Promise<void>`
 
-Writes an artifact file within a change directory. If `artifact.originalHash` is set and does not match the current file on disk, the save is rejected with `ArtifactConflictError`. After a successful write, the artifact's status in the in-memory `Change` is reset to `'in-progress'`; callers then persist the manifest separately, usually through `mutate()`.
+Writes artifact file bytes within a change directory. Must be called only inside an active `mutate()` or `mutateDraft()` window for `change.name`. Does not mutate the in-memory `Change` or manifest status — post-save drift is detected when the enclosing mutation returns `MutateResult.change`.
+
+If `artifact.originalHash` is set and does not match the current file on disk, the write is rejected with `ArtifactConflictError`.
 
 **Throws:** `ArtifactConflictError` when a concurrent modification is detected and `force` is not set.
 

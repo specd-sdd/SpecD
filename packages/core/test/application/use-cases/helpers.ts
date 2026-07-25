@@ -22,7 +22,9 @@ import {
   type ActiveChangeListOptions,
   type DiscardedChangeListOptions,
   type DraftedChangeListOptions,
+  type MutateResult,
 } from '../../../src/application/ports/change-repository.js'
+import { ChangeAlreadyExistsError } from '../../../src/application/errors/change-already-exists-error.js'
 import {
   type SpecPublication,
   type SpecListEntry,
@@ -132,6 +134,11 @@ export function makeChange(
 
 /**
  * Stub implementation of `ChangeRepository` for testing.
+ *
+ * `mutate` / `mutateDraft` persist the callback aggregate and return
+ * `{ result, change }` from the in-memory store. They do **not** simulate
+ * filesystem drift reclassification — use `FsChangeRepository` integration
+ * tests for post-reconcile drift semantics.
  */
 export class StubChangeRepository extends ChangeRepository {
   readonly store = new Map<string, Change>()
@@ -161,11 +168,14 @@ export class StubChangeRepository extends ChangeRepository {
     return toDiscardedChangeView(change)
   }
 
-  async save(change: Change): Promise<void> {
+  async create(change: Change): Promise<void> {
+    if (this.store.has(change.name)) {
+      throw new ChangeAlreadyExistsError(change.name)
+    }
     this.store.set(change.name, change)
   }
 
-  async saveDraft(change: Change): Promise<void> {
+  private async _persist(change: Change): Promise<void> {
     this.store.set(change.name, change)
   }
 
@@ -213,24 +223,30 @@ export class StubChangeRepository extends ChangeRepository {
   async reindexDrafts(): Promise<void> {}
   async reindexDiscarded(): Promise<void> {}
 
-  async mutate<T>(name: string, fn: (c: Change) => Promise<T> | T): Promise<T> {
+  async mutate<T>(name: string, fn: (c: Change) => Promise<T> | T): Promise<MutateResult<T>> {
     const change = this.store.get(name)
     if (!change) throw new ChangeNotFoundError(name)
     const result = await fn(change)
-    await this.save(change)
-    return result
+    await this._persist(change)
+    // Re-read from store to mirror MutateResult.change as the post-persist aggregate.
+    // Drift reconcile is out of scope for this in-memory stub.
+    const persisted = this.store.get(name)
+    if (persisted === undefined) throw new ChangeNotFoundError(name)
+    return { result, change: persisted }
   }
 
   override internalPaths(): readonly string[] {
     return ['/test/changes', '/test/drafts', '/test/discarded']
   }
 
-  async mutateDraft<T>(name: string, fn: (c: Change) => Promise<T> | T): Promise<T> {
+  async mutateDraft<T>(name: string, fn: (c: Change) => Promise<T> | T): Promise<MutateResult<T>> {
     const change = this.store.get(name)
     if (!change) throw new ChangeNotFoundError(name)
     const result = await fn(change)
-    await this.save(change)
-    return result
+    await this._persist(change)
+    const persisted = this.store.get(name)
+    if (persisted === undefined) throw new ChangeNotFoundError(name)
+    return { result, change: persisted }
   }
 
   async scaffold(

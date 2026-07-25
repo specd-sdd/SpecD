@@ -69,7 +69,7 @@
     {
       "requirement": "Persistence and scaffolding",
       "rules": [
-        "After construction, the use case MUST persist the change via `ChangeRepository.save`. After saving, it MUST call `ChangeRepository.scaffold(change, specExists)` to create the artifact directory structure. The `specExists` callback checks workspace spec repositories via `ListWorkspaces`.\n\nWhen `includeOverlapCheck` is `true` and `specIds` is non-empty, after scaffolding the use case MUST call `DetectOverlap.execute({ name: input.name })` and include the returned `OverlapReport` on the result. When overlap detection throws, the use case MUST NOT fail creation — it omits `overlapReport` from the result.\n\nFinally, the use case returns an object containing the newly created `Change` instance, the `changePath` (obtained via `ChangeRepository.changePath(change)`), and optionally `overlapReport`.\n\nThe return type is `{ change: Change; changePath: string; overlapReport?: OverlapReport }`."
+        "After construction, the use case MUST persist the change via `ChangeRepository.create`. After creating, it MUST call `ChangeRepository.scaffold(change, specExists)` to create the artifact directory structure. The `specExists` callback checks workspace spec repositories via `ListWorkspaces`.\n\nWhen `includeOverlapCheck` is `true` and `specIds` is non-empty, after scaffolding the use case MUST call `DetectOverlap.execute({ name: input.name })` and include the returned `OverlapReport` on the result. When overlap detection throws, the use case MUST NOT fail creation — it omits `overlapReport` from the result.\n\nFinally, the use case returns an object containing the newly created `Change` instance, the `changePath` (obtained via `ChangeRepository.changePath(change)`), and optionally `overlapReport`.\n\nThe return type is `{ change: Change; changePath: string; overlapReport?: OverlapReport }`."
       ]
     },
     {
@@ -272,17 +272,17 @@
     },
     {
       "requirement": "Persistence and scaffolding",
-      "name": "Change is saved to repository",
+      "name": "Change is created via repository create",
       "when": ["CreateChange.execute completes successfully"],
-      "then": ["ChangeRepository.save was called with the returned Change instance"]
+      "then": ["ChangeRepository.create was called with the returned Change instance"]
     },
     {
       "requirement": "Persistence and scaffolding",
-      "name": "Change is saved then scaffolded",
+      "name": "Change is created then scaffolded",
       "when": ["CreateChange.execute completes successfully"],
       "then": [
-        "ChangeRepository.save is called before scaffolding",
-        "AND ChangeRepository.scaffold is called after saving"
+        "ChangeRepository.create is called before scaffolding",
+        "AND ChangeRepository.scaffold is called after creating"
       ]
     },
     {
@@ -345,29 +345,30 @@
     }
   ],
   "implementation": {
-    "files": [
+    "symbols": [
       {
         "specId": "core:create-change",
-        "file": "core:src/composition/use-cases/create-change.ts"
+        "file": "core:src/application/use-cases/create-change.ts",
+        "symbol": "CreateChange"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:b541a78c736528e7150ff05fcabeec43f202755f085c87520fb23026c7510d58",
-    "verify.md": "sha256:1a322f8c983feb54906e6a6a3f9b66cae036b9e4b0bdf15205dd13d6c1a45dbb"
+    "spec.md": "sha256:ac69280f43c876e95436af994dd3ed39bafa981116910b20b724a1119cfbf12c",
+    "verify.md": "sha256:4336aab73268a58e71123804ef223910233099a4d2a3dae50b77361c438a9f1d"
   },
   "provenance": {
     "artifacts": {
       "spec.md": {
-        "hash": "sha256:b541a78c736528e7150ff05fcabeec43f202755f085c87520fb23026c7510d58",
-        "lastModified": "2026-07-06T14:22:54.156Z"
+        "hash": "sha256:ac69280f43c876e95436af994dd3ed39bafa981116910b20b724a1119cfbf12c",
+        "lastModified": "2026-07-25T14:42:08.587Z"
       },
       "verify.md": {
-        "hash": "sha256:1a322f8c983feb54906e6a6a3f9b66cae036b9e4b0bdf15205dd13d6c1a45dbb",
-        "lastModified": "2026-07-06T14:22:54.157Z"
+        "hash": "sha256:4336aab73268a58e71123804ef223910233099a4d2a3dae50b77361c438a9f1d",
+        "lastModified": "2026-07-25T14:42:08.596Z"
       }
     },
-    "persistedStateHash": "sha256:f95b5090d3058a1dfe8721ce50200554567af3e198db3a15c2eb9a7b2034a46f",
+    "persistedStateHash": "sha256:d4b78902b975e7e56eb57166e714adb68cc05b28629791bfcd836c5c64762c52",
     "schema": {
       "name": "schema-std",
       "version": 1

@@ -94,72 +94,75 @@ export class EditChange {
     const workspaces = await this._listWorkspaces.execute()
     const workspaceMap = new Map(workspaces.map((ws) => [ws.name, ws]))
 
-    const persisted = await this._changes.mutate(input.name, async (freshChange) => {
-      let specIdsChanged = false
-      let removedSpecIds: string[] = []
-      let addedSpecIds: string[] = []
+    const { result: persisted, change: updatedChange } = await this._changes.mutate(
+      input.name,
+      async (freshChange) => {
+        let specIdsChanged = false
+        let removedSpecIds: string[] = []
+        let addedSpecIds: string[] = []
 
-      if (hasSpecChanges) {
-        const specIds = [...freshChange.specIds]
+        if (hasSpecChanges) {
+          const specIds = [...freshChange.specIds]
 
-        if (input.removeSpecIds !== undefined) {
-          for (const id of input.removeSpecIds) {
-            const idx = specIds.indexOf(id)
-            if (idx === -1) {
-              throw new SpecNotInChangeError(id, input.name)
-            }
-            specIds.splice(idx, 1)
-          }
-        }
-
-        if (input.addSpecIds !== undefined) {
-          for (const id of input.addSpecIds) {
-            if (!specIds.includes(id)) {
-              specIds.push(id)
+          if (input.removeSpecIds !== undefined) {
+            for (const id of input.removeSpecIds) {
+              const idx = specIds.indexOf(id)
+              if (idx === -1) {
+                throw new SpecNotInChangeError(id, input.name)
+              }
+              specIds.splice(idx, 1)
             }
           }
-        }
 
-        const currentSpecIds = freshChange.specIds
-        addedSpecIds = specIds.filter((id) => !currentSpecIds.includes(id))
-        specIdsChanged =
-          specIds.length !== currentSpecIds.length ||
-          specIds.some((id, i) => id !== currentSpecIds[i])
+          if (input.addSpecIds !== undefined) {
+            for (const id of input.addSpecIds) {
+              if (!specIds.includes(id)) {
+                specIds.push(id)
+              }
+            }
+          }
 
-        if (specIdsChanged) {
-          removedSpecIds = currentSpecIds.filter((id) => !specIds.includes(id))
-          const schema = await this._schemaProvider.get()
-          freshChange.updateSpecIds(specIds, actor, schema.artifactDag())
-          for (const specId of addedSpecIds) {
-            if (freshChange.specDependsOn.get(specId) !== undefined) continue
-            const persistedDeps = await loadPersistedSpecDependsOn(workspaceMap, specId)
-            freshChange.setSpecDependsOn(specId, persistedDeps.dependsOn)
+          const currentSpecIds = freshChange.specIds
+          addedSpecIds = specIds.filter((id) => !currentSpecIds.includes(id))
+          specIdsChanged =
+            specIds.length !== currentSpecIds.length ||
+            specIds.some((id, i) => id !== currentSpecIds[i])
+
+          if (specIdsChanged) {
+            removedSpecIds = currentSpecIds.filter((id) => !specIds.includes(id))
+            const schema = await this._schemaProvider.get()
+            freshChange.updateSpecIds(specIds, actor, schema.artifactDag())
+            for (const specId of addedSpecIds) {
+              if (freshChange.specDependsOn.get(specId) !== undefined) continue
+              const persistedDeps = await loadPersistedSpecDependsOn(workspaceMap, specId)
+              freshChange.setSpecDependsOn(specId, persistedDeps.dependsOn)
+            }
           }
         }
-      }
 
-      if (hasDescriptionChange) {
-        freshChange.updateDescription(input.description ?? '', actor)
-      }
+        if (hasDescriptionChange) {
+          freshChange.updateDescription(input.description ?? '', actor)
+        }
 
-      if (hasPolicyChange && input.invalidationPolicy !== undefined) {
-        freshChange.invalidationPolicy = input.invalidationPolicy
-      }
+        if (hasPolicyChange && input.invalidationPolicy !== undefined) {
+          freshChange.invalidationPolicy = input.invalidationPolicy
+        }
 
-      return { change: freshChange, invalidated: specIdsChanged, removedSpecIds }
-    })
+        return { invalidated: specIdsChanged, removedSpecIds }
+      },
+    )
 
     if (persisted.invalidated && persisted.removedSpecIds.length > 0) {
-      await this._changes.unscaffold(persisted.change, persisted.removedSpecIds)
+      await this._changes.unscaffold(updatedChange, persisted.removedSpecIds)
     }
 
     if (persisted.invalidated) {
-      await this._changes.scaffold(persisted.change, (specId) =>
+      await this._changes.scaffold(updatedChange, (specId) =>
         this._specExists(workspaceMap, specId),
       )
     }
 
-    return { change: persisted.change, invalidated: persisted.invalidated }
+    return { change: updatedChange, invalidated: persisted.invalidated }
   }
 
   /**

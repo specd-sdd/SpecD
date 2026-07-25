@@ -21,8 +21,10 @@ import {
 
 describe('CreateChange', () => {
   describe('given no existing change with that name', () => {
-    it('creates and saves a change with the given name', async () => {
+    it('creates a change via repository create then scaffold', async () => {
       const repo = makeChangeRepository()
+      const createSpy = vi.spyOn(repo, 'create')
+      const scaffoldSpy = vi.spyOn(repo, 'scaffold')
       const uc = makeCreateChange(repo, makeListWorkspaces(new Map()))
 
       const result = await uc.execute({
@@ -34,6 +36,14 @@ describe('CreateChange', () => {
 
       expect(result.change.name).toBe('add-oauth')
       expect(repo.store.get('add-oauth')).toBeDefined()
+      expect(createSpy).toHaveBeenCalledTimes(1)
+      expect(createSpy).toHaveBeenCalledWith(result.change)
+      expect(scaffoldSpy).toHaveBeenCalledTimes(1)
+      const createOrder = createSpy.mock.invocationCallOrder[0]
+      const scaffoldOrder = scaffoldSpy.mock.invocationCallOrder[0]
+      expect(createOrder).toBeDefined()
+      expect(scaffoldOrder).toBeDefined()
+      expect(createOrder!).toBeLessThan(scaffoldOrder!)
     })
 
     it('scaffolds the change directory', async () => {

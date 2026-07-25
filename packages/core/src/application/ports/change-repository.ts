@@ -20,6 +20,14 @@ import {
 export { type RepositoryConfig as ChangeRepositoryConfig }
 export type { ListOptions, ListResult }
 
+/** Return shape for {@link ChangeRepository.mutate} and {@link ChangeRepository.mutateDraft}. */
+export interface MutateResult<T> {
+  /** Callback return value from the mutation function. */
+  readonly result: T
+  /** Post-reconcile persisted change — authoritative durable aggregate. */
+  readonly change: Change
+}
+
 /** Options for listing active changes. */
 export interface ActiveChangeListOptions extends ListOptions {
   readonly includeDescription?: boolean
@@ -51,8 +59,8 @@ export interface DiscardedChangeListOptions extends ListOptions {
  * `list` and `get` return {@link Change} objects with artifact state
  * (status, validatedHash) but without artifact content. Content is loaded
  * on demand via `artifact()`. The manifest (state, hashes, approvals) is
- * persisted separately from artifact file content via `save()` and
- * `saveArtifact()`.
+ * persisted separately from artifact file content via internal manifest
+ * persistence and `saveArtifact()`.
  */
 export abstract class ChangeRepository extends Repository {
   /**
@@ -69,12 +77,14 @@ export abstract class ChangeRepository extends Repository {
    *
    * Loads the manifest and derives each artifact's status by comparing
    * the current file hash against the `validatedHash` stored at last
-   * validation. A hash mismatch indicates drift and resets the artifact
-   * status to `in-progress`.
+   * validation. A hash mismatch indicates drift: filesystem-backed
+   * implementations auto-invalidate with cause `artifact-drift` and mark
+   * drifted files `drifted-pending-review` (see
+   * {@link ChangeRepository.saveArtifact} — byte writes do not reopen status).
    *
    * This is a snapshot read only. Callers that need a concurrency-safe
    * read-modify-write section for an existing persisted change must use
-   * {@link mutate} instead of pairing `get()` with a later `save()`.
+   * {@link mutate} instead of pairing `get()` with a later manifest write.
    *
    * @param name - The change name (e.g. `"add-oauth-login"`)
    * @returns The change with current artifact state, or `null` if not found in `changes/`
@@ -110,20 +120,23 @@ export abstract class ChangeRepository extends Repository {
    *
    * @param name - The change name to mutate
    * @param fn - Callback that applies the mutation on the fresh persisted change
-   * @returns The callback result after the manifest has been persisted
+   * @returns Callback result plus post-reconcile {@link Change}
    * @throws {ChangeNotFoundError} If no active change with the given name exists
    */
-  abstract mutate<T>(name: string, fn: (change: Change) => Promise<T> | T): Promise<T>
+  abstract mutate<T>(name: string, fn: (change: Change) => Promise<T> | T): Promise<MutateResult<T>>
 
   /**
    * Runs a serialized persisted mutation for one existing drafted change.
    *
    * @param name - The drafted change name to mutate
    * @param fn - Callback that applies the mutation on the fresh persisted drafted `Change`
-   * @returns The callback result after the manifest has been persisted
+   * @returns Callback result plus post-reconcile {@link Change}
    * @throws {ChangeNotFoundError} If no drafted change with the given name exists
    */
-  abstract mutateDraft<T>(name: string, fn: (change: Change) => Promise<T> | T): Promise<T>
+  abstract mutateDraft<T>(
+    name: string,
+    fn: (change: Change) => Promise<T> | T,
+  ): Promise<MutateResult<T>>
 
   /**
    * Lists active (non-drafted, non-discarded) changes in canonical order (`createdAt` asc).
@@ -198,18 +211,16 @@ export abstract class ChangeRepository extends Repository {
   abstract reindexDiscarded(): Promise<void>
 
   /**
-   * Persists the change manifest — state, artifact statuses, validated
-   * hashes, and approvals.
+   * Persists a new change for the first time.
    *
-   * Does not write artifact file content. Use `saveArtifact()` for that.
+   * Refuses when a change with the same name already exists in any storage
+   * bucket. Subsequent manifest updates must go through {@link mutate} or
+   * {@link mutateDraft}.
    *
-   * This is a low-level manifest persistence primitive. Atomic writing prevents
-   * partial-file corruption, but `save()` alone does not serialize a caller's
-   * earlier snapshot read.
-   *
-   * @param change - The change whose manifest should be persisted
+   * @param change - The new change to persist
+   * @throws {ChangeAlreadyExistsError} When the name collides across buckets
    */
-  abstract save(change: Change): Promise<void>
+  abstract create(change: Change): Promise<void>
 
   /**
    * Deletes the entire change directory and all its contents.
@@ -239,9 +250,10 @@ export abstract class ChangeRepository extends Repository {
    * silently overwriting concurrent changes (e.g. those made by an LLM agent).
    * Pass `{ force: true }` to overwrite regardless.
    *
-   * After a successful write the corresponding `ChangeArtifact` status in the
-   * change manifest is reset to `in-progress` — call `save(change)` to persist
-   * that state change.
+   * Must be called only inside an active {@link mutate} or {@link mutateDraft}
+   * window for `change.name`. Writes artifact bytes only — does not mutate the
+   * in-memory {@link Change} or manifest status. Post-save drift is detected
+   * when the enclosing mutation returns {@link MutateResult.change}.
    *
    * @param change - The change to write the artifact into
    * @param artifact - The artifact to save (filename + content)

@@ -9,6 +9,16 @@ import { FsChangeRepository } from '../../../src/infrastructure/fs/change-reposi
 import { FsArchiveRepository } from '../../../src/infrastructure/fs/archive-repository.js'
 import { changeDirName } from '../../../src/infrastructure/fs/dir-name.js'
 
+async function persistChange(repo: FsChangeRepository, change: Change): Promise<void> {
+  const active = await repo.get(change.name)
+  const draft = active === null ? await repo.getDraft(change.name) : null
+  if (active === null && draft === null) {
+    await repo.create(change)
+    return
+  }
+  await (repo as unknown as { _persistManifest(c: Change): Promise<void> })._persistManifest(change)
+}
+
 const actor: ActorIdentity = { name: 'Alice', email: 'alice@example.com' }
 
 interface RepoContext {
@@ -103,7 +113,7 @@ async function makeArchivableChange(
   change.transition('verifying', actor)
   change.transition('done', actor)
   change.transition('archivable', actor)
-  await ctx.changes.save(change)
+  await persistChange(ctx.changes, change)
   return change
 }
 
@@ -236,7 +246,7 @@ describe('FsArchiveRepository', () => {
           },
         ],
       })
-      await ctx.changes.save(change)
+      await persistChange(ctx.changes, change)
 
       await expect(ctx.archive.archive(change)).rejects.toBeInstanceOf(InvalidStateTransitionError)
     })
@@ -258,7 +268,7 @@ describe('FsArchiveRepository', () => {
           },
         ],
       })
-      await ctx.changes.save(change)
+      await persistChange(ctx.changes, change)
 
       const { archivedChange } = await ctx.archive.archive(change, { force: true })
 

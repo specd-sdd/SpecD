@@ -1,0 +1,46 @@
+- op: added
+  description: 'Fs adapter implements create, mutate reconcile, byte-only saveArtifact'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Write-path index maintenance'
+  content: |
+    ### Requirement: create delegates to internal first persist
+
+    `FsChangeRepository.create(change)` MUST perform the first-time directory creation and atomic manifest write for a new change name. It MUST refuse when a directory for that name already exists in `changes/`, `drafts/`, or `discarded/`. It MUST update the corresponding list-index bucket the same way a first `save` of a new active change does today.
+
+    ### Requirement: mutate and mutateDraft reconcile after persist
+
+    After the successful internal manifest write inside `mutate` or `mutateDraft`, `FsChangeRepository` MUST re-enter the same load/reconcile path used by `get` / `_manifestToChange` (with artifact types resolved when available) for the change's post-write storage bucket. If that path marks the in-memory manifest as needing persistence (including `artifact-drift` invalidation), the repository MUST persist again before releasing the change lock and MUST return that reconciled `Change` as `.change` in `{ result, change }`.
+
+    ### Requirement: saveArtifact requires mutate window and does not touch Change
+
+    `FsChangeRepository.saveArtifact` MUST verify the change name is present in the repository's active or draft mutation-in-progress tracking sets. If not, it MUST reject without writing.
+
+    On success it MUST write file bytes only (honouring `originalHash` / `force`). It MUST NOT call `setFileStatus`, MUST NOT alter validated hashes or history on the supplied `Change`, and MUST NOT write `manifest.json`.
+
+- op: modified
+  description: 'Index maintenance refers to create as first persist'
+  selector:
+    type: section
+    matches: 'Requirement: Write-path index maintenance'
+  content: |
+    After an internal manifest write (`create` or the helper used by `mutate` / `mutateDraft` / locked `get` drift persistence) in the same bucket, `FsChangeRepository` MUST project the new list entry (including history-derived fields) and compare to the cached entry. If equal → no index write. If different → upsert that row via the bucket helper (update `totalCount` as needed).
+
+    - **create / delete:** update or remove the row (and `totalCount`) or invalidate the bucket.
+    - **Moves** between `changes` ↔ `drafts` ↔ `discarded`: update/invalidate **both** affected buckets.
+    - **`saveArtifact()` / skip / non-listing history:** MUST NOT require list-index updates.
+
+    `reindex()`, `reindexActive()`, `reindexDrafts()`, and `reindexDiscarded()` MUST delegate to the corresponding helper full rebuild.
+
+- op: modified
+  description: 'Constraints note port contract alignment'
+  selector:
+    type: section
+    matches: 'Constraints'
+  content: |
+    - `FsChangeRepository` is infrastructure-level and lives in `infrastructure/fs/`
+    - It MUST implement the `ChangeRepository` abstract port class, including `create`, `{ result, change }` mutate returns, post-mutate reconcile, and mutate-window-scoped byte-only `saveArtifact`

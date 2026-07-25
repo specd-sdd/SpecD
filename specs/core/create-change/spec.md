@@ -95,7 +95,7 @@ This ensures a change created against existing specs starts from the current per
 
 ### Requirement: Persistence and scaffolding
 
-After construction, the use case MUST persist the change via `ChangeRepository.save`. After saving, it MUST call `ChangeRepository.scaffold(change, specExists)` to create the artifact directory structure. The `specExists` callback checks workspace spec repositories via `ListWorkspaces`.
+After construction, the use case MUST persist the change via `ChangeRepository.create`. After creating, it MUST call `ChangeRepository.scaffold(change, specExists)` to create the artifact directory structure. The `specExists` callback checks workspace spec repositories via `ListWorkspaces`.
 
 When `includeOverlapCheck` is `true` and `specIds` is non-empty, after scaffolding the use case MUST call `DetectOverlap.execute({ name: input.name })` and include the returned `OverlapReport` on the result. When overlap detection throws, the use case MUST NOT fail creation — it omits `overlapReport` from the result.
 
