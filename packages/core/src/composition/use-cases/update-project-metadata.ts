@@ -4,12 +4,15 @@ import { type FileWriter } from '../../application/ports/file-writer.js'
 import { type SpecRepository } from '../../application/ports/spec-repository.js'
 import { type ListWorkspaces } from '../../application/use-cases/list-workspaces.js'
 import { UpdateProjectMetadata } from '../../application/use-cases/update-project-metadata.js'
+import { type GetSpecMetadata } from '../../application/use-cases/get-spec-metadata.js'
 import { type SpecdConfig } from '../../application/specd-config.js'
 import {
   createCompositionResolver,
+  type CompositionResolver,
   type CompositionResolutionOptions,
 } from '../composition-resolver.js'
 import { normalizeCompositionFactoryArgs, type FactoryInput } from '../normalize-factory-args.js'
+import { createGetSpecMetadata, resolveGetSpecMetadataDeps } from './get-spec-metadata.js'
 
 /**
  * Explicit dependencies for {@link createUpdateProjectMetadata}.
@@ -21,6 +24,27 @@ export interface UpdateProjectMetadataDeps {
   readonly fileReader: FileReader
   readonly fileWriter: FileWriter
   readonly contentHasher: ContentHasher
+  readonly getMetadata: GetSpecMetadata
+}
+
+/**
+ * Resolves {@link UpdateProjectMetadataDeps} from the shared composition resolver.
+ *
+ * @param resolver - Shared composition resolver for one composition session
+ * @returns The resolved dependencies for `UpdateProjectMetadata`
+ */
+export function resolveUpdateProjectMetadataDeps(
+  resolver: CompositionResolver,
+): UpdateProjectMetadataDeps {
+  return {
+    config: resolver.config,
+    listWorkspaces: resolver.getListWorkspaces(),
+    specRepositories: resolver.getSpecRepositories(),
+    fileReader: resolver.getFileReader(),
+    fileWriter: resolver.getFileWriter(),
+    contentHasher: resolver.getContentHasher(),
+    getMetadata: createGetSpecMetadata(resolveGetSpecMetadataDeps(resolver)),
+  }
 }
 
 /**
@@ -71,8 +95,15 @@ function createUpdateProjectMetadataFromNormalized(
   input: FactoryInput<UpdateProjectMetadataDeps, CompositionResolutionOptions>,
 ): UpdateProjectMetadata {
   if (input.kind === 'deps') {
-    const { config, listWorkspaces, specRepositories, fileReader, fileWriter, contentHasher } =
-      input.deps
+    const {
+      config,
+      listWorkspaces,
+      specRepositories,
+      fileReader,
+      fileWriter,
+      contentHasher,
+      getMetadata,
+    } = input.deps
     return new UpdateProjectMetadata(
       config,
       listWorkspaces,
@@ -80,17 +111,11 @@ function createUpdateProjectMetadataFromNormalized(
       fileReader,
       fileWriter,
       contentHasher,
+      getMetadata,
     )
   }
   const resolver = createCompositionResolver(input.config, input.options)
-  return new UpdateProjectMetadata(
-    resolver.config,
-    resolver.getListWorkspaces(),
-    resolver.getSpecRepositories(),
-    resolver.getFileReader(),
-    resolver.getFileWriter(),
-    resolver.getContentHasher(),
-  )
+  return createUpdateProjectMetadata(resolveUpdateProjectMetadataDeps(resolver))
 }
 
 /**
@@ -108,6 +133,7 @@ function isUpdateProjectMetadataDeps(
     'specRepositories' in value &&
     'fileReader' in value &&
     'fileWriter' in value &&
-    'contentHasher' in value
+    'contentHasher' in value &&
+    'getMetadata' in value
   )
 }

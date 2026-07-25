@@ -111,7 +111,23 @@
     "spec.md": "sha256:0f582de9b928912a78aa2e5e5ea4048dab178ef40e051e95ee087c8f2dee5611",
     "verify.md": "sha256:ada1cbca83da5c249addd9b5d75b856bcf3412c064c41e7787a7006c08fd6388"
   },
-  "generatedBy": "agent",
-  "optimizedDescription": "Defines pure domain interfaces for Skill and SkillTemplate with lazy template loading and no domain I/O.",
-  "optimizedContext": "# skills:skill\n## Rules\n- `Skill` interface: `name: string`, `description: string`, `kind: \"skill\" | \"agent\"`, `templates: SkillTemplate[]`.\n- `SkillTemplate` interface: `filename: string`, `getContent(): Promise<string>`.\n- Domain no I/O: no fs/network/process in domain; I/O only infrastructure.\n- Template content lazy: load only via `getContent()`, never stored eagerly on `Skill`.\n- Skill domain errors typed: extend package base like `SpecdSkillsError`; base follows Specd Error Contract and extends `SpecdError` from `@specd/core`.\n## Constraints\n- Domain types pure TypeScript interfaces.\n- No deps on `node:fs` or any I/O library."
+  "provenance": {
+    "artifacts": {
+      "spec.md": {
+        "hash": "sha256:0f582de9b928912a78aa2e5e5ea4048dab178ef40e051e95ee087c8f2dee5611",
+        "lastModified": "2026-06-16T14:28:14.913Z"
+      },
+      "verify.md": {
+        "hash": "sha256:ada1cbca83da5c249addd9b5d75b856bcf3412c064c41e7787a7006c08fd6388",
+        "lastModified": "2026-06-16T14:28:14.914Z"
+      }
+    },
+    "persistedStateHash": "sha256:22ea4ebf8472a8887c3a2c2d564fb160a2ee563a86e60e2b1282c6d2675b9d22",
+    "schema": {
+      "name": "schema-std",
+      "version": 1
+    },
+    "projectionVersion": 1,
+    "projectionFingerprint": "sha256:e4a28a2db6a35ed39b8308518337235b1490c2948cd839db25866ad79b22404b"
+  }
 }

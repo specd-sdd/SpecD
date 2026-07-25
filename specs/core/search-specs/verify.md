@@ -40,15 +40,23 @@
 
 #### Scenario: Summary included when requested
 
-- **GIVEN** a matching spec has metadata with `description: "Handles auth"`
+- **GIVEN** a matching spec's metadata materializes successfully with `description: "Handles auth"`
 - **WHEN** `execute("auth", { includeSummary: true })` is called
 - **THEN** the result entry includes `summary: "Handles auth"`
 
 #### Scenario: Summary absent when not requested
 
-- **GIVEN** a matching spec has metadata with a description
+- **GIVEN** a matching spec's metadata would materialize with a description
 - **WHEN** `execute("auth")` is called without `includeSummary`
 - **THEN** the result entry has no `summary` property
+- **AND** `SearchSpecs` does not materialize metadata for that result
+
+#### Scenario: Materialization failure omits summary without failing the search
+
+- **GIVEN** materialization cannot produce a projection for a matched spec
+- **WHEN** `execute("auth", { includeSummary: true })` is called
+- **THEN** that result's `summary` is omitted
+- **AND** the search still returns the result with its other fields
 
 ### Requirement: Result shape
 
@@ -84,6 +92,11 @@
 - **AND** it derives `SearchSpecsDeps` through `resolveSearchSpecsDeps(resolver)`
 - **AND** `resolveSearchSpecsDeps(resolver)` resolves:
 - `listWorkspaces: ListWorkspaces`
-- `hasher: ContentHasher`
-- `yaml: YamlSerializer`
+- `getMetadata: GetSpecMetadata`
 - **AND** the factory delegates to canonical `createSearchSpecs(deps)`
+
+#### Scenario: resolveSearchSpecsDeps does not resolve hasher or yaml serializer
+
+- **WHEN** `resolveSearchSpecsDeps(resolver)` runs
+- **THEN** it does not resolve `hasher: ContentHasher` or `yaml: YamlSerializer`
+- **AND** normalized result fields are obtained through metadata materialization, not through direct repository snapshot reads

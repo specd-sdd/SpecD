@@ -1,0 +1,105 @@
+- op: modified
+  description: Build context entries from self-healing materialized metadata instead of a raw repository read.
+  selector:
+    type: section
+    matches: 'Requirement: Build context entry from metadata'
+  content: |
+    For each resolved spec, the use case SHALL load all artifact files and obtain usable metadata by calling `GetSpecMetadata.execute({ specId })` (default `'if-needed'` policy) rather than reading `SpecRepository.metadata()` directly. The rendered entry shape SHALL be controlled by the resolved `contextMode`:
+
+    - `list` — include only `spec`, `stale`, and mode/source metadata.
+    - `summary` — include `spec`, `stale`, title, and description when available.
+    - `full` — include `spec`, `stale`, title, description, rules, constraints, and scenarios when available.
+    - `hybrid` — equivalent to `full` for a single-spec context command, because there is no change-scoped tier.
+
+    When materialization succeeds, the entry SHALL render from the returned metadata according to that mode, and `stale` SHALL be `false`. In full mode, `rules`, `constraints`, and `scenarios` are included when no section filter is active or when the corresponding section is requested. Any `metadata-cache-write-failed` or generation warning returned by `GetSpecMetadata` SHALL be forwarded into the result's `warnings` array without being logged again by this use case.
+
+- op: modified
+  description: Emit a minimal entry only when materialization cannot produce a usable projection at all.
+  selector:
+    type: section
+    matches: 'Requirement: Stale or absent metadata produces minimal entry'
+  content: |
+    When `GetSpecMetadata.execute({ specId })` cannot produce a valid in-memory projection (for example the schema declares no `metadataExtraction` and generation yields nothing), the use case SHALL emit a stale entry without pretending that full content is available.
+
+    - In `list` mode, the entry contains only `spec`, `stale: true`, and mode/source metadata.
+    - In `summary`, `full`, and `hybrid` modes, the entry contains `spec`, `stale: true`, and any title or description that can be safely extracted without a valid materialized projection.
+
+    No rules, constraints, or scenarios SHALL be included when materialization could not produce a projection. This is a materialization failure, not a raw content-hash staleness check — `GetSpecMetadata` already regenerates a missing or drifted cache internally.
+
+- op: modified
+  description: Surface per-field optimization freshness from lock-owned optimization state.
+  selector:
+    type: section
+    matches: 'Requirement: Prefer LLM-optimized context'
+  content: |
+    If `llmOptimizedContext: true` is active in the project configuration, the use case SHALL prefer `optimizedContext` for the spec if the materialized metadata reports it as present and fresh. If missing, stale, or empty, it SHALL fall back to the standard `context` and SHALL emit a `stale-optimization` warning identifying the spec, with remediation instructions: "Launch specd-spec-context-optimizer agent to refresh".
+
+    Optimization freshness is derived from the per-field artifact and schema baselines recorded on the spec's lock-owned optimization state (see [`core:spec-optimization`](../spec-optimization/spec.md)), not from the metadata document's own freshness.
+
+- op: modified
+  description: Resolve dependsOn through materialized metadata rather than a raw persisted read.
+  selector:
+    type: section
+    matches: 'Requirement: Transitive dependency traversal'
+  content: |
+    When `input.followDeps` is `true`, the use case SHALL traverse dependencies transitively. For each unvisited spec identity:
+
+    1. Resolve the canonical dependency list from the metadata returned by `GetSpecMetadata.execute({ specId })` — this is self-healing, so a missing or stale cache is regenerated rather than treated as a frozen stale snapshot.
+    2. If materialization cannot produce a projection at all, MAY fall back to the schema's `metadataExtraction.dependsOn` declarations when the schema provides them.
+    3. If neither materialized metadata nor extraction yields dependencies, treat the spec as having no outgoing dependencies.
+
+    Traversal SHALL use DFS with cycle detection.
+
+- op: modified
+  description: Reframe traversal warnings around materialization failure and optimization staleness rather than raw metadata staleness.
+  selector:
+    type: section
+    matches: 'Requirement: Warnings for unresolvable dependencies'
+  content: |
+    During dependency traversal, the use case SHALL emit warnings (not throw) for:
+
+    - Materialization unable to produce a usable projection for the current spec during traversal — `type: 'missing-metadata'`.
+    - Unknown workspace referenced in a dependency — `type: 'unknown-workspace'`.
+    - Dependency spec not found in its workspace — `type: 'missing-spec'`.
+    - Stale or missing lock-owned optimization fields on any resolved entry, when `llmOptimizedContext` is active — `type: 'stale-optimization'`.
+
+    Warnings MUST be collected in the result's `warnings` array and MUST NOT interrupt traversal.
+
+    The use case MUST NOT read `spec-lock.json` through generic artifact access in order to continue traversal. Persisted sidecars influence traversal only through `GetSpecMetadata`'s normalized projection.
+
+- op: modified
+  description: Resolve GetSpecMetadata through the shared composition resolver.
+  selector:
+    type: section
+    matches: 'Requirement: Config-based factory delegates through resolveGetSpecContextDeps'
+  content: |
+    The config-based `createGetSpecContext(config, options?)` form MUST derive `GetSpecContextDeps` through `resolveGetSpecContextDeps(resolver)` and then delegate to canonical `createGetSpecContext(deps)`.
+
+    `resolveGetSpecContextDeps(resolver)` MUST resolve:
+
+    - `listWorkspaces: ListWorkspaces`
+    - `hasher: ContentHasher`
+    - `getMetadata: GetSpecMetadata`
+    - `schemaProvider?: SchemaProvider`
+    - `parsers?: ArtifactParserRegistry`
+    - `extractorTransforms: ExtractorTransformRegistry`
+    - `workspaceRoutes: readonly SpecWorkspaceRoute[]`
+
+    The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+
+- op: modified
+  description: Add materialization and optimization spec dependencies.
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`core:config`](../config/spec.md)
+    - [`core:compile-context`](../compile-context/spec.md)
+    - [`core:spec-metadata`](../spec-metadata/spec.md)
+    - [`core:storage`](../storage/spec.md)
+    - [`core:workspace`](../workspace/spec.md)
+    - [`core:spec-id-format`](../spec-id-format/spec.md)
+    - [`core:list-workspaces`](../list-workspaces/spec.md)
+    - [`core:get-spec-metadata`](../get-spec-metadata/spec.md) — self-healing metadata read (`if-needed`) replacing direct repository freshness checks
+    - [`core:spec-optimization`](../spec-optimization/spec.md) — per-field optimization freshness backing stale/missing optimization diagnostics
+    - [`core:composition-resolver`](../composition-resolver/spec.md)

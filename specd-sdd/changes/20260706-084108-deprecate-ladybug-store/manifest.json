@@ -2305,6 +2305,818 @@
           "files": ["tasks"]
         }
       ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:51:17.360Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: sdk:composition",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["sdk:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["sdk:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:51:30.500Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: sdk:composition",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["sdk:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["sdk:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:51:38.612Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: sdk:composition",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["sdk:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["sdk:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:52:09.623Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: sdk:composition",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["sdk:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["sdk:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:52:20.101Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: sdk:composition",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["sdk:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["sdk:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:52:22.344Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: sdk:composition",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["sdk:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["sdk:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:52:24.588Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: sdk:composition",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["sdk:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["sdk:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:52:26.894Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: sdk:composition",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["sdk:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["sdk:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:52:29.137Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: sdk:composition",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["sdk:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["sdk:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:52:31.399Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: sdk:composition",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["sdk:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["sdk:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:52:33.637Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: sdk:composition",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["sdk:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["sdk:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:52:35.891Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: sdk:composition",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["sdk:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["sdk:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:52:38.226Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: sdk:composition",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["sdk:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["sdk:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:52:40.387Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: sdk:composition",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["sdk:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["sdk:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:52:42.634Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: sdk:composition",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["sdk:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["sdk:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:52:44.955Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: sdk:composition",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["sdk:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["sdk:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:52:47.247Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: sdk:composition",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["sdk:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["sdk:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:52:49.429Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: sdk:composition",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["sdk:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["sdk:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:52:51.538Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: sdk:composition",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["sdk:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["sdk:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:52:53.817Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: sdk:composition",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["sdk:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["sdk:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:52:55.837Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: sdk:composition",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["sdk:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["sdk:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:52:58.084Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: sdk:composition",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["sdk:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["sdk:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:53:00.268Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: sdk:composition",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["sdk:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["sdk:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:53:02.543Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: sdk:composition",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["sdk:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["sdk:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:53:16.402Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: sdk:composition",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["sdk:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["sdk:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:53:25.129Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: sdk:composition",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["sdk:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["sdk:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:53:27.374Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: sdk:composition",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["sdk:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["sdk:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:53:29.732Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: sdk:composition",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["sdk:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["sdk:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
     }
   ]
 }

@@ -4,5 +4,18 @@
     "version": 1
   },
   "dependsOn": ["core:spec-id-format", "core:storage"],
-  "implementation": []
+  "implementation": [
+    {
+      "file": "core:src/domain/services/parse-spec-lock.ts",
+      "symbols": ["SpecLockData", "specLockSchema", "parseSpecLock"]
+    },
+    {
+      "file": "core:src/domain/services/apply-persisted-spec-state-patch.ts",
+      "symbols": ["applyPersistedSpecStatePatch", "PersistedSpecState"]
+    },
+    {
+      "file": "core:src/domain/errors/persisted-spec-state-schema-replacement-error.ts",
+      "symbols": ["PersistedSpecStateSchemaReplacementError"]
+    }
+  ]
 }

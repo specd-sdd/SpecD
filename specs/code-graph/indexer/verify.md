@@ -21,6 +21,13 @@
 - **WHEN** indexing completes successfully
 - **THEN** `lastIndexedRef` SHALL not be updated
 
+#### Scenario: Indexer uses GetSpecMetadata instead of raw metadata reads
+
+- **GIVEN** a spec repository capable of returning both a raw metadata snapshot and a materialized `GetSpecMetadata` projection
+- **WHEN** the indexer builds `SpecNode` data for that spec
+- **THEN** it calls Core's `GetSpecMetadata` use case for `title`, `description`, and `metadataFingerprint`
+- **AND** it does not parse raw sidecar metadata files directly
+
 ### Requirement: Incremental indexing
 
 #### Scenario: Unchanged files skipped when fingerprint matches
@@ -298,15 +305,8 @@
 #### Scenario: Indexer pulls spec data from repository
 
 - **WHEN** indexing specs
-- **THEN** the indexer SHALL directly call `repo.list()`, `repo.metadata()`, and `repo.readPersistedDependsOn()`
+- **THEN** the indexer SHALL directly call `repo.list()`, `GetSpecMetadata.execute({ specId })`, and `repo.readPersistedDependsOn()`
 - **AND** it SHALL NOT rely on the CLI to provide pre-resolved spec objects
-
-#### Scenario: Spec contentHash from content artifacts only
-
-- **GIVEN** a spec with artifacts `spec.md`, `verify.md`, and `.specd-metadata.yaml`
-- **WHEN** the indexer builds the `SpecNode`
-- **THEN** `contentHash` is computed from all artifacts EXCEPT `.specd-metadata.yaml`
-- **AND** `spec.md` is ordered first, then the remaining artifacts in alphabetical order
 
 #### Scenario: Spec with metadata indexed
 
@@ -330,10 +330,17 @@
 
 #### Scenario: Incremental spec indexing skips unchanged specs
 
-- **GIVEN** a spec was indexed with `contentHash` `abc`
-- **AND** no artifact has changed
+- **GIVEN** a spec was indexed with `metadataFingerprint` `abc`
+- **AND** `GetSpecMetadata.execute({ specId })` returns the same `metadataFingerprint` `abc`
 - **WHEN** spec indexing runs again
-- **THEN** the spec is skipped because its `contentHash` matches the stored hash
+- **THEN** the spec is skipped because its semantic fingerprint matches the value stored on the `SpecNode`
+
+#### Scenario: Semantic fingerprint change forces reprocessing
+
+- **GIVEN** a spec was indexed with `metadataFingerprint` `abc`
+- **AND** `GetSpecMetadata.execute({ specId })` now returns `metadataFingerprint` `def`
+- **WHEN** spec indexing runs again
+- **THEN** the spec is reprocessed even if the underlying cache file's raw bytes or timestamp did not change
 
 #### Scenario: SpecIds unique across workspaces
 

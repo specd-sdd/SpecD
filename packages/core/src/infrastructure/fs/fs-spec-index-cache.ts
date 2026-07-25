@@ -2,7 +2,7 @@ import { type Spec } from '../../domain/entities/spec.js'
 import { type SpecArtifact } from '../../domain/value-objects/spec-artifact.js'
 import {
   strictSpecMetadataSchema,
-  type PersistedSpecMetadata,
+  type MetadataSnapshot,
 } from '../../domain/services/parse-metadata.js'
 import { extractSpecSummary } from '../../domain/services/spec-summary.js'
 import { type SpecListEntry } from '../../application/ports/spec-repository.js'
@@ -13,6 +13,7 @@ import {
   type SourceFileStamp,
   type SourceStamp,
 } from './fs-index-cache-base.js'
+import { paginateList } from './list-pagination.js'
 
 /**
  * Read-only accessor the {@link FsSpecIndexCache} uses to materialize
@@ -24,8 +25,8 @@ import {
 export interface SpecIndexSource {
   /** Walks all specs in the workspace (directory discovery only, no content reads). */
   walk(): Promise<readonly Spec[]>
-  /** Loads parsed metadata for a spec, or `null` if no `metadata.json` exists. */
-  metadata(spec: Spec): Promise<PersistedSpecMetadata | null>
+  /** Loads the metadata snapshot for a spec. */
+  readMetadataSnapshot(spec: Spec): Promise<MetadataSnapshot>
   /** Loads one artifact's content for a spec, or `null` if the file does not exist. */
   artifact(spec: Spec, filename: string): Promise<SpecArtifact | null>
   /** Returns current mtimes for every file that materialization depends on. */
@@ -45,9 +46,8 @@ export interface FsSpecIndexCacheOptions {
 /**
  * Filesystem-backed list-index cache for one workspace's spec bucket.
  *
- * Materializes the full {@link SpecListEntry} payload (title, summary,
- * metadata status) at index time so repository-level include flags never
- * trigger extra I/O. Wraps {@link FsIndexCache}; `FsSpecRepository` never
+ * Materializes the full {@link SpecListEntry} payload (title, summary)
+ * at index time so repository-level include flags never trigger extra I/O.
  * reads `.specd-index.jsonl` directly.
  */
 export class FsSpecIndexCache {
@@ -87,6 +87,27 @@ export class FsSpecIndexCache {
     filter?: (entry: SpecListEntry) => boolean,
   ): Promise<ListResult<SpecListEntry>> {
     return this._cache.list(options, filter)
+  }
+
+  /**
+   * Lists entries with indexed source-file stamps for Meta projection.
+   *
+   * @param options - Pagination options
+   * @param filter - Optional predicate applied before pagination
+   * @returns Paginated list rows with `sourceFiles` from the index wire line
+   */
+  async listWithSourceFiles(
+    options?: ListOptions,
+    filter?: (entry: SpecListEntry) => boolean,
+  ): Promise<
+    ListResult<{ readonly entry: SpecListEntry; readonly sourceFiles: readonly SourceFileStamp[] }>
+  > {
+    const lines = await this._cache.sortedWireLines(filter)
+    const rows = lines.map((line) => ({
+      entry: line.entry,
+      sourceFiles: line.sourceFiles ?? [],
+    }))
+    return paginateList(rows, options, (row) => ({ key: row.entry.path }))
   }
 
   /**
@@ -174,8 +195,7 @@ export class FsSpecIndexCache {
  * Title resolution: metadata `title` (non-empty trimmed) else the last path
  * segment. Summary resolution order: `optimizedDescription` →
  * `description` → extracted from `spec.md`. Per-spec resolution errors are
- * swallowed with the title fallback; metadata I/O errors resolve to
- * `'stale'` rather than `'missing'`.
+ * swallowed with the title fallback.
  *
  * @param workspace - The workspace name the spec belongs to
  * @param spec - The spec being materialized
@@ -190,29 +210,27 @@ async function materializeSpecEntry(
   const specPath = spec.name.toFsPath('/')
   let title = spec.name.toString().split('/').at(-1) ?? spec.name.toString()
   let summary: string | undefined
-  let metadataStatus: 'missing' | 'invalid' | 'stale' | 'fresh' = 'missing'
 
-  let meta: PersistedSpecMetadata | null = null
+  let snapshot: MetadataSnapshot
   try {
-    meta = await source.metadata(spec)
+    snapshot = await source.readMetadataSnapshot(spec)
   } catch {
-    metadataStatus = 'stale'
+    snapshot = { kind: 'missing', revision: null }
   }
 
-  if (meta !== null) {
-    const { originalHash, freshness, ...persisted } = meta
-    void originalHash
-    const structurallyValid = strictSpecMetadataSchema.safeParse(persisted).success
-    metadataStatus = structurallyValid ? freshness : 'invalid'
+  if (snapshot.kind === 'present') {
+    const meta = snapshot.metadata
+    const structurallyValid = strictSpecMetadataSchema.safeParse(meta).success
+    if (structurallyValid) {
+      if (meta.title !== undefined && meta.title.trim().length > 0) {
+        title = meta.title.trim()
+      }
 
-    if (meta.title !== undefined && meta.title.trim().length > 0) {
-      title = meta.title.trim()
-    }
-
-    if (meta.optimizedDescription !== undefined && meta.optimizedDescription.trim().length > 0) {
-      summary = meta.optimizedDescription.trim()
-    } else if (meta.description !== undefined && meta.description.trim().length > 0) {
-      summary = meta.description.trim()
+      if (meta.optimizedDescription !== undefined && meta.optimizedDescription.trim().length > 0) {
+        summary = meta.optimizedDescription.trim()
+      } else if (meta.description !== undefined && meta.description.trim().length > 0) {
+        summary = meta.description.trim()
+      }
     }
   }
 
@@ -233,6 +251,5 @@ async function materializeSpecEntry(
     path: specPath,
     title,
     ...(summary !== undefined ? { summary } : {}),
-    metadataStatus,
   }
 }

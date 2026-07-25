@@ -1,0 +1,15 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "core:storage",
+    "core:change-manifest",
+    "core:delta-format",
+    "core:schema-format",
+    "core:archive-change",
+    "core:workspace"
+  ],
+  "implementation": []
+}

@@ -1,0 +1,10 @@
+- op: modified
+  description: Verify that optimizer agents replace the legacy standard metadata skill.
+  selector:
+    type: section
+    matches: 'Scenario: Agent availability'
+  content: |
+    - **WHEN** the skills repository is scanned
+    - **THEN** it finds `specd-project-context-optimizer` and `specd-spec-context-optimizer`
+    - **AND** their `kind` is `agent`
+    - **AND** it does not find a standard `specd-metadata` skill

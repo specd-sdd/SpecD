@@ -170,3 +170,29 @@
 - **WHEN** implementation-oriented and archive-oriented workflow templates are inspected
 - **THEN** they mention `specd changes implementation add`
 - **AND** they mention resolving or ignoring tracked implementation files before archive
+
+### Requirement: Metadata self-healing guidance in workflow templates
+
+#### Scenario: Templates do not instruct scanning for metadata-status values
+
+- **WHEN** archive-oriented, commit-oriented, or other metadata-oriented workflow skill templates are inspected
+- **THEN** they do not instruct agents to scan for metadata-status values (`stale`, `missing`, `invalid`) as a normal workflow step
+
+#### Scenario: generate-metadata is presented only as an explicit forced-rebuild tool
+
+- **WHEN** a workflow skill template mentions `specd spec generate-metadata`
+- **THEN** it presents the command as an explicit forced-rebuild, cache-warming, repair, or diagnostic tool
+- **AND** it does not present the command as a required step after a routine spec or lock change
+
+### Requirement: Optimizer agent gating declared in templates
+
+#### Scenario: Optimizer agent templates declare the llmOptimizedContext gate
+
+- **WHEN** the `specd-project-context-optimizer` and `specd-spec-context-optimizer` agent templates are inspected
+- **THEN** each declares that it performs no generation or persistence unless the effective `llmOptimizedContext` project setting is `true`
+
+#### Scenario: Optimizer agent templates direct persistence through lock-owned commands
+
+- **WHEN** the optimizer agent templates describe how to persist generated content
+- **THEN** they direct persistence through the lock-owned persisted-optimization commands (`cli:spec-optimizations`)
+- **AND** neither template instructs invoking spec metadata generation after persisting an optimization

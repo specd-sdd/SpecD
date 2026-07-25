@@ -8,7 +8,7 @@ Once a change has completed its full lifecycle, its spec modifications need to b
 
 ### Requirement: Ports and constructor
 
-`ArchiveChange` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `ArchiveRepository`, `RunStepHooks`, `ActorResolver`, `ArtifactParserRegistry`, `ExtractorTransformRegistry`, `SchemaProvider`, `GenerateSpecMetadata`, `SaveSpecMetadata`, and `SpecWorkspaceRoute[]`.
+`ArchiveChange` receives at construction time: `ChangeRepository`, a map of `SpecRepository` instances (one per configured workspace), `ArchiveRepository`, `RunStepHooks`, `ActorResolver`, `ArtifactParserRegistry`, `ExtractorTransformRegistry`, `SchemaProvider`, `RegenerateSpecMetadata`, and `SpecWorkspaceRoute[]`.
 
 ```typescript
 class ArchiveChange {
@@ -21,8 +21,7 @@ class ArchiveChange {
     parsers: ArtifactParserRegistry,
     extractorTransforms: ExtractorTransformRegistry,
     schemaProvider: SchemaProvider,
-    generateMetadata: GenerateSpecMetadata,
-    saveMetadata: SaveSpecMetadata,
+    regenerateMetadata: RegenerateSpecMetadata,
     workspaceRoutes: readonly SpecWorkspaceRoute[],
   )
 }
@@ -36,11 +35,13 @@ Hook execution is delegated to `RunStepHooks` — `ArchiveChange` does not recei
 
 `ArtifactParserRegistry` is a map from format name (`'markdown'`, `'json'`, `'yaml'`, `'plaintext'`) to the corresponding `ArtifactParser` adapter. `ArchiveChange` uses it to look up the correct adapter when applying delta files to base artifacts. The bootstrap layer constructs it and injects it here — `ArchiveChange` does not instantiate parsers directly.
 
-`ExtractorTransformRegistry` is the shared runtime registry for metadata extraction transforms. `ArchiveChange` uses it during the pre-publication metadata-consistency pass that runs `extractMetadata(...)` over the prepared merged artifact content before canonical publication.
+`ExtractorTransformRegistry` is the shared runtime registry for metadata extraction transforms. `ArchiveChange` uses it during the pre-publication metadata-consistency pass that runs `extractMetadata(...)` over the prepared merged artifact content before canonical publication, and when resolving initial dependencies for a lock-less spec via the shared `resolveInitialPersistedDependsOn()` service (also used by `InitializePersistedSpecState`).
 
 `SpecWorkspaceRoute[]` provides the workspace-routing metadata needed to build transform contexts for extraction operations that resolve spec references across workspace boundaries. `ArchiveChange` receives those routes at construction time so its pre-publication extraction pass uses the same routing model as other metadata-extraction callers.
 
 `ChangeRepository` is used both for loading and persisting the change being archived and for listing all active changes during the overlap check.
+
+`RegenerateSpecMetadata` replaces the previous direct `GenerateSpecMetadata` + `SaveSpecMetadata` pair. `ArchiveChange` no longer generates or persists `metadata.json` itself — it delegates forced, post-commit regeneration to `RegenerateSpecMetadata` (see Requirement: Spec metadata generation).
 
 ### Requirement: Input
 
@@ -301,7 +302,7 @@ When `'all'` or `'post'` is in `skipHookPhases`, post-archive hook execution is 
 
 ### Requirement: Spec metadata generation
 
-`metadata.json` remains a derived archive-time projection. Sidecar consistency MUST still be determined in memory before canonical publication begins for each spec.
+`metadata.json` remains a derived, disposable projection. Sidecar consistency MUST still be determined in memory before canonical publication begins for each spec.
 
 For each modified spec, preflight MUST:
 
@@ -311,49 +312,32 @@ For each modified spec, preflight MUST:
 4. If `metadataExtraction.dependsOn` is present, compare it against the final persisted `dependsOn` set being sealed for that spec.
 5. Abort publication for that spec if the extracted and final persisted `dependsOn` values do not match.
 
-Persisted `metadata.json` generation MUST occur only after `archiveRepository.archive()` succeeds and after all `.specd-archive-backup/` directories for the batch have been deleted.
+Persisted `metadata.json` regeneration MUST occur only after `archiveRepository.archive()` succeeds and after all `.specd-archive-backup/` directories for the batch have been deleted — canonical artifacts and the lock must already be committed.
 
-For each modified spec, `ArchiveChange` MUST then run `GenerateSpecMetadata` against the canonical persisted spec and persist `metadata.json` best-effort. Failures do not abort the archive; affected spec paths are reported in `staleMetadataSpecPaths`.
+For each modified spec, `ArchiveChange` MUST then call `RegenerateSpecMetadata.execute({ specId })` (forced policy) against the canonical persisted spec. This performs deterministic generation and guarded cache persistence in one step; `ArchiveChange` does not call `GenerateSpecMetadata` or write the cache itself. A forced cache-persistence failure for a spec is reported, not silently ignored — affected spec paths are reported in `staleMetadataSpecPaths`; failures do not abort the archive.
 
-Sidecar consistency failures during preflight remain fatal before publication begins. Metadata generation failures after archive completion are non-fatal.
+Sidecar consistency failures during preflight remain fatal before publication begins. Post-commit metadata regeneration failures are non-fatal to the archive outcome.
 
 ### Requirement: spec-lock sidecar persistence
 
-`ArchiveChange` MUST persist a `spec-lock.json` sidecar alongside the canonical `scope: spec` artifacts for each modified spec, using the dedicated `SpecRepository` sidecar API.
+`ArchiveChange` MUST persist a complete `PersistedSpecState` (`spec-lock.json`) alongside the canonical `scope: spec` artifacts for each modified spec, as one staged per-spec publication unit via `SpecRepository.publish({ persistedState, ... })`. It MUST NOT call `writePersistedState()` separately from `publish()`.
 
-The sidecar MUST use this structure:
+For each modified spec, during preflight, `ArchiveChange`:
 
-```json
-{
-  "schema": {
-    "name": "schema-std",
-    "version": 1
-  },
-  "dependsOn": ["core:storage", "core:auth"]
-}
-```
+1. Reads the aggregate persisted-state snapshot (`readPersistedState`), if any, and captures its revision (`originalHash`) for the concurrency guard.
+2. When a lock already exists, builds the base as `{ kind: 'existing', state: <snapshot> }`.
+3. When no lock exists, resolves the initial dependency set through `resolveInitialPersistedDependsOn()` — preferring a complete dependency value supplied by the archive publication plan when one exists — and builds the base as `{ kind: 'initial', schema: <effective schema identity>, dependsOn: <resolved deps> }`.
+4. Calls the shared `applyPersistedSpecStatePatch(base, patch)` helper with the final `dependsOn`, `implementation`, and any confirmed implementation-link changes for this archive attempt as the patch. It does not maintain a second artifact/metadata fallback algorithm for initial dependency resolution.
+5. Copies forward any existing `optimizations` unchanged — archive never authors or clears optimization values. A changed artifact naturally makes the corresponding optimization field stale on the next read; archive does not need to detect that itself.
+6. Passes the complete resulting `PersistedSpecState` to `SpecRepository.publish()` together with the observed `expectedRevision` (`null` when no lock existed).
+
+The revision guard MUST cause publication to fail for that spec if the observed persisted-state revision no longer matches at commit time, preventing archive from silently overwriting dependencies, links, or optimizations changed concurrently after preflight.
 
 Sidecar rules:
 
-- `schema.name` and `schema.version` record the schema identity for the persisted spec.
-- `dependsOn` records the persisted dependency set for that spec.
-- `spec-lock.json` is part of the same staged spec-publication unit as the merged canonical spec artifacts for that spec.
+- `schema` records the schema identity for the persisted spec. Once a lock exists for a spec, its `schema` object is immutable through this path — schema reassignment is the explicit, separate `UpdatePersistedSpecSchema` operation.
+- `dependsOn` records the final persisted dependency set for that archive attempt; on later re-archives it is refreshed from the final `change.specDependsOn` value — it is not a set union and it is not preserved as historical baggage.
 - The final sidecar content MUST be determined before canonical publication begins, so publication can stage and publish the merged spec artifacts plus `spec-lock.json` together.
-- Once a sidecar exists for a spec, its `schema` object is immutable and MUST remain the original recorded schema identity for that spec.
-- On later re-archives of the same spec, `dependsOn` MUST be refreshed from the final `change.specDependsOn` value for that archive attempt; it is not a set union and it is not preserved as historical baggage.
-- If no sidecar exists yet for the spec, archive MUST create one as part of the successful archive.
-
-### Requirement: Opportunistic sidecar backfill
-
-When archiving or regenerating metadata for a persisted spec that does not yet have `spec-lock.json`, the system MAY create the sidecar opportunistically, but only after verifying that the canonical spec is structurally valid under the current schema.
-
-Backfill rules:
-
-- Structural compatibility MUST be checked before any sidecar is created.
-- If the compatibility check fails, the system MUST NOT create `spec-lock.json` implicitly for that spec.
-- If the compatibility check fails, legacy `metadata.json` generation MAY still continue; only sidecar creation is blocked.
-- If the compatibility check passes, the backfilled sidecar MUST copy `dependsOn` from the current persisted dependency view and MUST record the current project schema identity as the initial `schema` object.
-- Backfill is opportunistic; this feature does not require a dedicated whole-repository migration command.
 
 ### Requirement: Result shape
 
@@ -420,8 +404,7 @@ The config-based `createArchiveChange(config, options?)` form MUST derive `Archi
 - `actor: ActorResolver`
 - `parsers: ArtifactParserRegistry`
 - `schemaProvider: SchemaProvider`
-- `generateMetadata: GenerateSpecMetadata`
-- `saveMetadata: SaveSpecMetadata`
+- `regenerateMetadata: RegenerateSpecMetadata`
 - `extractorTransforms: ExtractorTransformRegistry`
 - `workspaceRoutes: readonly SpecWorkspaceRoute[]`
 - `projectRoot: string`
@@ -460,4 +443,7 @@ The helper is the only use-case-specific composition entry for config-based boot
 - [`default:_global/logging`](../../_global/logging/spec.md)
 - [`core:spec-lock`](../spec-lock/spec.md)
 - [`default:_global/error-handling-conventions`](../../_global/error-handling-conventions/spec.md)
+- [`core:regenerate-spec-metadata`](../regenerate-spec-metadata/spec.md) — forced post-commit metadata materialization
+- [`core:spec-optimization`](../spec-optimization/spec.md) — optimization records preserved unchanged during publication
+- [`core:initialize-persisted-spec-state`](../initialize-persisted-spec-state/spec.md) — shared `resolveInitialPersistedDependsOn()` service reused for lock-less specs
 - [`core:composition-resolver`](../composition-resolver/spec.md)

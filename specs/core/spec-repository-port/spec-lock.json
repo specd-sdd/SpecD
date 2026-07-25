@@ -18,15 +18,14 @@
   ],
   "implementation": [
     {
-      "file": "core:src/domain/entities/spec.ts",
+      "file": "core:src/application/ports/spec-repository.ts",
       "symbols": [
-        "Spec,SpecArtifactEntry,SpecSidecarStamp,ABSENT_SPEC_SIDECAR",
-        "Spec",
-        "SpecArtifactEntry",
-        "SpecSidecarStamp",
-        "hasArtifact",
-        "persistedStateStamp",
-        "generatedMetadataStamp"
+        "ArtifactMeta",
+        "PersistedStateMeta",
+        "GeneratedMetadataMeta",
+        "SpecListArtifactMeta",
+        "SpecMetaOptions",
+        "SpecRepository"
       ]
     }
   ]

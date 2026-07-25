@@ -56,7 +56,6 @@ export class ListSpecs {
       ...(options?.page !== undefined ? { page: options.page } : {}),
       ...(options?.after !== undefined ? { after: options.after } : {}),
       ...(options?.includeSummary === true ? { includeSummary: true } : {}),
-      ...(options?.includeMetadataStatus === true ? { includeMetadataStatus: true } : {}),
     }
 
     const byWorkspace: ListSpecsWorkspaceSlice[] = []

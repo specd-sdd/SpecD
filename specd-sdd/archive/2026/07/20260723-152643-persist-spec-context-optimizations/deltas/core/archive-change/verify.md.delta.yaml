@@ -1,0 +1,154 @@
+# verify.md delta paired with archive-change/spec.md.delta.yaml — covers the
+# RegenerateSpecMetadata constructor dependency replacing GenerateSpecMetadata
+# + SaveSpecMetadata, rewrites spec-lock persistence coverage around the
+# shared base/patch construction with revision-guarded publish and preserved
+# optimizations, removes opportunistic-backfill coverage, updates spec
+# metadata generation coverage to the preflight-check + post-commit
+# RegenerateSpecMetadata flow, and updates the config-based factory coverage.
+
+- op: modified
+  description: Cover the RegenerateSpecMetadata constructor dependency replacing the removed GenerateSpecMetadata/SaveSpecMetadata pair.
+  selector:
+    type: section
+    matches: 'Requirement: Ports and constructor'
+  content: |
+    #### Scenario: All dependencies injected via constructor
+
+    - **WHEN** `ArchiveChange` is instantiated
+    - **THEN** all required repositories, services, and registries are provided through the constructor rather than created internally
+
+    #### Scenario: ArchiveChange is constructed with extractor runtime wiring
+
+    - **GIVEN** the archive workflow is composed for runtime use
+    - **WHEN** `ArchiveChange` is instantiated
+    - **THEN** the constructor receives `ArtifactParserRegistry`
+    - **AND** the constructor receives `ExtractorTransformRegistry`
+    - **AND** the constructor receives `SpecWorkspaceRoute[]`
+    - **AND** those dependencies are used for the pre-publication metadata extraction pass over prepared merged artifacts
+
+    #### Scenario: Constructor receives RegenerateSpecMetadata instead of GenerateSpecMetadata and SaveSpecMetadata
+
+    - **GIVEN** the archive workflow is composed for runtime use
+    - **WHEN** `ArchiveChange` is instantiated
+    - **THEN** the constructor receives `RegenerateSpecMetadata`
+    - **AND** it does not receive `GenerateSpecMetadata` or `SaveSpecMetadata` directly
+
+- op: modified
+  description: Rewrite sidecar persistence scenarios around the shared existing/initial base plus patch construction, revision-guarded publish, and preserved optimizations, replacing the obsolete metadata-fallback scenario.
+  selector:
+    type: section
+    matches: 'Requirement: spec-lock sidecar persistence'
+  content: |
+    #### Scenario: First archive creates spec-lock sidecar with schema and dependsOn
+
+    - **GIVEN** a spec has no existing `spec-lock.json`
+    - **AND** archive has determined `change.specDependsOn` for that spec
+    - **WHEN** `ArchiveChange.execute` archives the spec
+    - **THEN** `spec-lock.json` is persisted with `schema.name` and `schema.version` from the active schema
+    - **AND** `dependsOn` is set to the final `change.specDependsOn` value
+
+    #### Scenario: Re-archive preserves immutable schema and refreshes dependsOn
+
+    - **GIVEN** a spec already has `spec-lock.json` with `schema: { name: "schema-std", version: 1 }`
+    - **AND** the current archive changes `specDependsOn` for that spec
+    - **WHEN** `ArchiveChange.execute` archives the spec
+    - **THEN** `spec-lock.json` retains the original `schema` object unchanged
+    - **AND** `dependsOn` is replaced with the new `change.specDependsOn` value
+
+    #### Scenario: No-lock spec resolves initial dependsOn through resolveInitialPersistedDependsOn
+
+    - **GIVEN** a spec has no existing `spec-lock.json`
+    - **WHEN** `ArchiveChange` builds the initial persisted-state base for that spec
+    - **THEN** it resolves the initial dependency set through `resolveInitialPersistedDependsOn()`, preferring a complete dependency value supplied by the archive publication plan when one exists
+    - **AND** it does not maintain a second artifact/metadata fallback algorithm for initial dependency resolution
+
+    #### Scenario: Existing optimizations are copied forward unchanged
+
+    - **GIVEN** a spec's existing `spec-lock.json` has `optimizations.optimizedDescription` set
+    - **WHEN** `ArchiveChange` re-archives that spec with changed artifact content
+    - **THEN** the `optimizations` block is copied forward unchanged
+    - **AND** archive does not clear or mark it stale itself
+
+    #### Scenario: Revision guard rejects a concurrently changed lock at publish time
+
+    - **GIVEN** `ArchiveChange` observed a persisted-state revision during preflight
+    - **AND** that revision has changed by the time `SpecRepository.publish()` is called
+    - **WHEN** `publish()` is invoked with the stale `expectedRevision`
+    - **THEN** publication fails for that spec instead of silently overwriting the concurrent change
+
+    #### Scenario: Publish is the single write path for persisted state
+
+    - **WHEN** `ArchiveChange` writes the final `PersistedSpecState` for a spec
+    - **THEN** it passes `persistedState` to `SpecRepository.publish()`
+    - **AND** it does not call `writePersistedState()` separately from `publish()`
+
+- op: removed
+  description: Superseded — opportunistic backfill during archive/metadata regeneration is removed; ordinary metadata paths never create or backfill authoritative persisted state.
+  selector:
+    type: section
+    matches: 'Requirement: Opportunistic sidecar backfill'
+
+- op: modified
+  description: Update metadata generation coverage to the preflight dependsOn-mismatch check and post-commit RegenerateSpecMetadata delegation.
+  selector:
+    type: section
+    matches: 'Requirement: Spec metadata generation'
+  content: |
+    #### Scenario: Persisted metadata regeneration runs after archive move via RegenerateSpecMetadata
+
+    - **GIVEN** canonical publication and archive move succeed
+    - **WHEN** `ArchiveChange` regenerates persisted `metadata.json`
+    - **THEN** `RegenerateSpecMetadata.execute({ specId })` runs after `archiveRepository.archive()` and after all `.specd-archive-backup/` directories for the batch have been deleted
+
+    #### Scenario: Metadata failure does not roll back archive
+
+    - **GIVEN** archive move succeeds
+    - **AND** persisted metadata generation fails for one spec
+    - **WHEN** `ArchiveChange.execute` completes
+    - **THEN** the change is archived
+    - **AND** the failed spec path is listed in `staleMetadataSpecPaths`
+
+    #### Scenario: Preflight aborts a spec when extracted dependsOn does not match the final persisted dependsOn
+
+    - **GIVEN** `metadataExtraction.dependsOn` is present for a spec
+    - **AND** `extractMetadata(...)` run against the prepared merged artifact content yields a `dependsOn` value different from the final persisted `dependsOn` being sealed for that spec
+    - **WHEN** `ArchiveChange.execute` completes preflight for that spec
+    - **THEN** publication is aborted for that spec before canonical publication begins
+
+    #### Scenario: ArchiveChange does not call GenerateSpecMetadata or write the metadata cache itself
+
+    - **WHEN** `ArchiveChange` regenerates metadata for an archived spec
+    - **THEN** it delegates generation and guarded cache persistence to `RegenerateSpecMetadata.execute({ specId })` with the forced policy
+    - **AND** it does not call `GenerateSpecMetadata` directly or write `metadata.json` itself
+
+- op: modified
+  description: Resolve RegenerateSpecMetadata instead of GenerateSpecMetadata/SaveSpecMetadata.
+  selector:
+    type: section
+    matches: 'Requirement: Config-based factory delegates through resolveArchiveChangeDeps'
+  content: |
+    #### Scenario: createArchiveChange config form derives ArchiveChangeDeps through resolveArchiveChangeDeps
+
+    - **WHEN** `createArchiveChange(config, options?)` is invoked
+    - **THEN** it creates a composition resolver for that composition session
+    - **AND** it derives `ArchiveChangeDeps` through `resolveArchiveChangeDeps(resolver)`
+    - **AND** `resolveArchiveChangeDeps(resolver)` resolves:
+    - `changes: ChangeRepository`
+    - `listWorkspaces: ListWorkspaces`
+    - `archive: ArchiveRepository`
+    - `runStepHooks: RunStepHooks`
+    - `actor: ActorResolver`
+    - `parsers: ArtifactParserRegistry`
+    - `schemaProvider: SchemaProvider`
+    - `regenerateMetadata: RegenerateSpecMetadata`
+    - `extractorTransforms: ExtractorTransformRegistry`
+    - `workspaceRoutes: readonly SpecWorkspaceRoute[]`
+    - `projectRoot: string`
+    - `batchSnapshot: ArchiveBatchSnapshotPort`
+    - **AND** the factory delegates to canonical `createArchiveChange(deps)`
+
+    #### Scenario: resolveArchiveChangeDeps does not resolve GenerateSpecMetadata or SaveSpecMetadata directly
+
+    - **WHEN** `resolveArchiveChangeDeps(resolver)` runs
+    - **THEN** it resolves `regenerateMetadata: RegenerateSpecMetadata`
+    - **AND** it does not resolve `generateMetadata: GenerateSpecMetadata` or `saveMetadata: SaveSpecMetadata` directly

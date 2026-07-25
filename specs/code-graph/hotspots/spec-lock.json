@@ -1,0 +1,8 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["code-graph:symbol-model", "code-graph:graph-store", "code-graph:traversal"],
+  "implementation": []
+}

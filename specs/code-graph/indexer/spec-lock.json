@@ -11,12 +11,8 @@
     "core:config",
     "core:spec-repository-port",
     "core:list-workspaces",
-    "code-graph:document-model"
+    "code-graph:document-model",
+    "core:get-spec-metadata"
   ],
-  "implementation": [
-    {
-      "file": "code-graph:src/application/use-cases/discover-files.ts",
-      "symbols": ["discoverFiles"]
-    }
-  ]
+  "implementation": []
 }

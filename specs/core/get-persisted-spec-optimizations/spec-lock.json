@@ -1,0 +1,13 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["core:spec-optimization", "core:spec-repository-port", "core:spec-id-format"],
+  "implementation": [
+    {
+      "file": "core:src/application/use-cases/get-persisted-spec-optimizations.ts",
+      "symbols": ["GetPersistedSpecOptimizations"]
+    }
+  ]
+}

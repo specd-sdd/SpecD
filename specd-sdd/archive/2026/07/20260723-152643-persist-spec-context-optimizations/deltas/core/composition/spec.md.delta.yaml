@@ -1,0 +1,30 @@
+- op: added
+  description: Require the standard factory pattern for every new spec-optimization/materialization use case and retire obsolete metadata-mutation factories.
+  position:
+    parent:
+      type: section
+      matches: Requirements
+    after:
+      type: section
+      matches: 'Requirement: Kernel-mounted use case surface'
+  content: |
+    ### Requirement: Metadata materialization and persisted-state factories replace obsolete metadata mutation factories
+
+    The composition layer MUST provide the standard `*Deps` interface, `resolve*Deps(resolver)` helper, and overloaded `createX(deps)` / `createX(config, options?)` factory pair for every public use case introduced by spec-lock optimization persistence and self-healing metadata materialization, including at minimum: `MaterializeSpecMetadata`, `GetSpecMetadata`, `RegenerateSpecMetadata`, `InitializePersistedSpecState`, `GetPersistedSpecSchema`, `UpdatePersistedSpecSchema`, `GetPersistedSpecDeps`, `UpdatePersistedSpecDeps`, `GetPersistedSpecImplementation`, `UpdatePersistedSpecImplementation`, `GetPersistedSpecOptimizations`, and `UpdatePersistedSpecOptimizations`.
+
+    The composition layer MUST NOT export `createSaveSpecMetadata`, `createUpdateSpecMetadata`, or `createInvalidateSpecMetadata`, and MUST NOT export the corresponding `SaveSpecMetadata`, `UpdateSpecMetadata`, or `InvalidateSpecMetadata` use-case types from the `"."` public barrel. Those use cases are removed; metadata has no external editor after this change.
+
+    `PersistSpecMetadata` is an internal collaborator of `MaterializeSpecMetadata` only. It MUST NOT have a public `createPersistSpecMetadata` factory, MUST NOT be kernel-mounted, and MUST NOT appear on the `"."`, `"./ports"`, or `"./extensions"` public entry points.
+
+- op: modified
+  description: Add the materialization dependency.
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`default:_global/architecture`](../../_global/architecture/spec.md)
+    - [`core:resolve-schema`](../resolve-schema/spec.md) — `ResolveSchema` use case wiring
+    - [`core:config-writer-port`](../config-writer-port/spec.md) — `createConfigWriter` factory surface
+    - [`core:kernel-builder`](../kernel-builder/spec.md) — aligned full-kernel builder semantics
+    - [`core:composition-resolver`](../composition-resolver/spec.md) — shared config-to-deps resolver contract for public factories
+    - [`core:materialize-spec-metadata`](../materialize-spec-metadata/spec.md) — self-healing materialization factory pattern reused by dependent use cases

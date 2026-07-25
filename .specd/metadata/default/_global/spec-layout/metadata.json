@@ -150,11 +150,29 @@
       ]
     }
   ],
+  "optimizedDescription": "Specs under `specs/`: `_global/` cross-cutting, `<package>/` internal. Each topic dir has paired `spec.md` + `verify.md`.",
+  "optimizedContext": "# Spec Layout\n\n## Rules\n- `_global/<topic>/`: cross-cutting constraints binding all packages\n- `<package>/`: package-internal (short name: core, cli, mcp, skills, schema-std); not binding on other packages\n- Each spec: kebab-case subdir with `spec.md` (requirements) + `verify.md` (WHEN/THEN); always paired; no scenarios in spec.md; no requirement prose in verify.md\n- `spec.md` structure: `# Title`, `## Purpose`, `## Requirements` (`### Requirement: <Name>`), optional `## Constraints`, `## Examples`, `## Spec Dependencies`, `## ADRs`\n- `verify.md`: `# Verification: <Title>`, scenarios under matching `### Requirement: <Name>` with `#### Scenario: <Name>`; GIVEN/WHEN/THEN format\n- `## Spec Dependencies`: required; `_none_` or `_none — this is a global constraint spec_`; canonical label `` `<workspace>:<capability-path>` `` with optional relative link\n\n## Constraints\n- `_global/` cross-cutting only\n- Exactly two authored files per spec subdir: spec.md + verify.md\n- Delta files live in change dirs, never synced to specs/\n- kebab-case subdir names\n- Package specs not binding on other packages",
   "contentHashes": {
     "spec.md": "sha256:64dee3830d5120520694ea893ebf64af031ebad2d87ac360b7dc26d5b633ea7c",
     "verify.md": "sha256:1886469d30e4b6b4e813d3090fa9baf4a1abad7890fe99f3237f4655c9c284b4"
   },
-  "generatedBy": "agent",
-  "optimizedDescription": "Spec layout contract: every spec uses fixed `spec.md`/`verify.md` structure, canonical paths, and explicit dependencies.",
-  "optimizedContext": "# Spec Layout\n\n## Rules\n\n- Cross-cutting constraints live under `specs/_global/<topic>/`. Any spec in `_global/` binds every package in monorepo.\n- Package-internal specs live under `specs/<package>/`, where `<package>` is short workspace name like `core`, `cli`, `mcp`, or `schema-std`. These specs do not bind other packages.\n- Each spec lives in its own kebab-case subdir and contains exactly two authored artifacts: `spec.md` and `verify.md`.\n- `spec.md` defines requirements, constraints, examples, rationale. `verify.md` defines WHEN/THEN verification scenarios. `spec.md` contains no scenarios; `verify.md` contains no requirement prose.\n- Every `spec.md` MUST include `# <Title>`, `## Purpose`, `## Requirements`, and `## Spec Dependencies`. `## Constraints`, `## Examples`, and `## ADRs` are optional.\n- Every `verify.md` MUST include `# Verification: <Title>`, `## Requirements`, `### Requirement: <Name>`, and `#### Scenario: <Name>` blocks with `GIVEN`/`WHEN`/`THEN` bullets as needed.\n- `verify.md` scenarios MUST be grouped under the same `### Requirement: <Name>` headings used in `spec.md` so AST-based delta selectors can target them.\n- Every `spec.md` MUST include `## Spec Dependencies`. Use `_none_` when empty. Global specs with no deps use `_none — this is a global constraint spec_`.\n- Canonical dependency labels use spec IDs such as ``[`core:config`](../config/spec.md)`` when relative link exists, or `` `core:config` `` when listed without link. Visible label is canonical spec ID.\n\n## Constraints\n\n- `specs/_global/` is only for cross-cutting constraints, not single-package implementation detail\n- Package spec dirs use short package names\n- Subdirectory names are kebab-case\n- Delta artifacts like `spec.md.delta.yaml` and `verify.md.delta.yaml` stay in change dirs, never permanent `specs/` dirs\n- A spec in `specs/<package>/` is not binding on other packages"
+  "provenance": {
+    "artifacts": {
+      "spec.md": {
+        "hash": "sha256:64dee3830d5120520694ea893ebf64af031ebad2d87ac360b7dc26d5b633ea7c",
+        "lastModified": "2026-05-25T06:02:58.307Z"
+      },
+      "verify.md": {
+        "hash": "sha256:1886469d30e4b6b4e813d3090fa9baf4a1abad7890fe99f3237f4655c9c284b4",
+        "lastModified": "2026-05-25T06:02:58.307Z"
+      }
+    },
+    "persistedStateHash": "sha256:a05aef159298cc15bb9fd14f5f77b8b9861cd863e66ec4d5ac4381e57feb5a86",
+    "schema": {
+      "name": "schema-std",
+      "version": 1
+    },
+    "projectionVersion": 1,
+    "projectionFingerprint": "sha256:e4a28a2db6a35ed39b8308518337235b1490c2948cd839db25866ad79b22404b"
+  }
 }

@@ -1,0 +1,48 @@
+- op: added
+  description: Verify non-interactive output surfaces the metadata cache path in both text and JSON modes.
+  position:
+    parent:
+      type: section
+      matches: '^Requirement: Non-interactive mode$'
+    after:
+      type: section
+      matches: '^Scenario: JSON output contains plugins install results$'
+  content: |
+    #### Scenario: Text output reports metadata cache path
+
+    - **WHEN** `specd project init --workspace default --workspace-path specs/` is run
+    - **THEN** stdout contains `metadata cache: <metadataCachePath> (ignored in .gitignore)` after the `initialized specd in ...` line
+
+    #### Scenario: JSON output includes metadataCachePath
+
+    - **WHEN** `specd project init --format json` is run
+    - **THEN** stdout is valid JSON with a `metadataCachePath` field set to the project-relative path of the created metadata cache directory
+
+- op: added
+  description: Verify ConfigWriter delegation idempotently creates the metadata cache directory and its rooted .gitignore entry.
+  position:
+    parent:
+      type: section
+      matches: '^Requirement: Delegation to ConfigWriter$'
+    after:
+      type: section
+      matches: '^Scenario: tmp gitignore preserved on re-init with --force$'
+  content: |
+    #### Scenario: Metadata cache directory created idempotently
+
+    - **GIVEN** a clean project root with no existing metadata cache directory
+    - **WHEN** `specd project init --workspace default` completes successfully
+    - **THEN** the default metadata cache directory `.specd/metadata/` exists
+
+    #### Scenario: Metadata cache entry appended to root .gitignore
+
+    - **GIVEN** a project root `.gitignore` without a `/.specd/metadata/` entry
+    - **WHEN** `specd project init --workspace default` completes successfully
+    - **THEN** the root `.gitignore` contains a rooted `/.specd/metadata/` entry
+    - **AND** re-running `specd project init --force --workspace default` does not duplicate that entry
+
+    #### Scenario: CLI surfaces metadataCachePath from the InitProject result rather than re-deriving it
+
+    - **WHEN** `specd project init` completes successfully
+    - **THEN** the `metadataCachePath` shown to the caller is read directly from the `InitProject` result
+    - **AND** the CLI does not independently recompute the metadata cache path

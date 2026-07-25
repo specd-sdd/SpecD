@@ -41,6 +41,13 @@ describe('@specd/sdk barrel', () => {
     expect(typeof sdk.createGetStatus).toBe('function')
     expect(typeof sdk.createSpecRepository).toBe('function')
     expect(typeof sdk.CORE_VERSION).toBe('string')
+    expect(typeof sdk.createMaterializeSpecMetadata).toBe('function')
+    expect(typeof sdk.createGetSpecMetadata).toBe('function')
+    expect(typeof sdk.createInitializePersistedSpecState).toBe('function')
+    expect(typeof sdk.createUpdatePersistedSpecDeps).toBe('function')
+    expect('createSaveSpecMetadata' in sdk).toBe(false)
+    expect('createUpdateSpecMetadata' in sdk).toBe(false)
+    expect('createInvalidateSpecMetadata' in sdk).toBe(false)
   })
 
   it('re-exports host-adapter code-graph symbols', () => {

@@ -1,16 +1,27 @@
 ## Spec metadata
 
-specd extracts structured metadata from your spec files and stores it in `.specd/metadata/`. Each spec gets a `metadata.json` file that captures:
+specd materializes structured metadata from spec artifacts and persisted state into `.specd/metadata/<spec>.json`. The cache is **gitignored** (`/.specd/metadata/` in the root `.gitignore`) and **self-healing**: `specs metadata`, context compilation, and archive read through `MaterializeSpecMetadata` and rebuild stale projections automatically.
 
-- Title and description
-- Rules and constraints (extracted from the spec content)
-- Verification scenarios (extracted from the verify content)
-- `dependsOn` relationships to other specs
+Materialized metadata includes title, description, rules, constraints, scenarios, and projections of lock-owned fields (`dependsOn`, implementation, fresh optimizations).
 
-This metadata is used during context compilation. Rather than reading every spec file in full, specd can serve the metadata summary — which is typically smaller and more focused — when building the agent's context window.
+### Persisted state (`spec-lock.json`)
 
-Metadata is **generated automatically at archive time**. Between archiving runs it can become stale if you edit a spec manually. specd tracks freshness: a stale metadata file is flagged, and the raw spec content is used as a fallback until metadata is regenerated.
+Authoritative semantic state lives beside each spec:
 
-For persisted specs, `dependsOn` is now anchored by a canonical `spec-lock.json` sidecar stored next to the spec artifacts. `metadata.json.dependsOn` remains the consumer-facing field used by context compilation, but archive keeps it aligned with `spec-lock.json` rather than treating extracted `dependsOn` as an independent durable source of truth.
+- `schema` — adopted schema identity (`specs init`, `specs schema`)
+- `dependsOn` — curated dependency links (`specs deps`)
+- `implementation` — tracked code links (`specs implementation`)
+- `optimizations` — LLM optimization baselines (`specs optimizations`)
 
-Older specs may not have a sidecar yet. In that case specd can backfill `spec-lock.json` opportunistically during archive, alongside archive-time metadata regeneration, but only when the canonical spec is structurally compatible with the current schema. Sidecar creation is owned by the archive flow rather than by standalone metadata generation. Until then, existing metadata continues to serve legacy reads.
+Run `specs init` (or `specs init --all`) to create locks for legacy specs. Archive force-materializes metadata after publication; you do not need routine `specs generate-metadata` in normal workflow.
+
+### Migration: stop tracking committed metadata cache
+
+If `.specd/metadata/` was previously committed, untrack it once (specd never runs this automatically):
+
+```bash
+git rm -r --cached .specd/metadata
+git commit -m "chore: stop tracking specd metadata cache"
+```
+
+Fresh `project init` creates the directory and gitignore entry idempotently.

@@ -36,9 +36,11 @@ Construction contract:
   constructor; those remain infrastructure concerns.
 - `lookup` / `upsert` method signatures MUST NOT take a `SpecRepository` parameter.
 
-The injected repository is how the cache loads cheap `Spec` stamps (`get()`), computes
-`specFingerprint()`, and hashes raw metadata bytes for `cacheFingerprint`. The cache
-MUST NOT invent SpecRepository stamp helpers (`validationSourceStamps`,
+The injected repository is how the cache loads cheap stamps when `lookup` does not
+receive optional `stamps`, computes `specFingerprint()`, and hashes raw metadata
+bytes for `cacheFingerprint`. Callers MAY supply stamps projected from
+`list({ includeMeta: true })` or `get()` for hard-hit without a redundant `get()`.
+The cache MUST NOT invent SpecRepository stamp helpers (`validationSourceStamps`,
 `readValidationSidecar`); it MUST use the contractual repository APIs above.
 
 ### Requirement: Cached entry payload
@@ -91,10 +93,10 @@ Each stored row MUST retain:
 Rules:
 
 - `specFingerprint` MUST come from `SpecRepository.specFingerprint(spec)` (artifacts +
-  `persistedStateHash`; never includes metadata).
+  persisted-state hash via `persistedStateMeta({ includeHash: true })`; never includes
+  metadata).
 - `metadataContentHash` MUST hash the **raw** generated metadata file bytes when
-  present. It MUST NOT require calling `metadata()` (no JSON parse / freshness
-  classification on this path).
+  present. It MUST NOT require calling a freshness-classifying metadata API.
 - When the metadata file is absent, `metadataContentHash` MUST be the literal
   `"__absent__"`.
 - Adapters MUST NOT invent a third flat fingerprint that re-lists artifact
@@ -103,20 +105,32 @@ Rules:
 
 ### Requirement: Lookup cascade owned by the cache
 
-`lookup` MUST own freshness evaluation for one spec. ValidateSpecs MUST NOT precompute
-stamps or fingerprints for the cascade and MUST NOT drive soft-hit persistence.
+`lookup` MUST own freshness evaluation for one spec. ValidateSpecs MUST NOT invent
+stamp algorithms or drive soft-hit persistence. ValidateSpecs MAY pass optional
+current stamps already projected by `SpecRepository.list({ includeMeta: true })`
+or equivalent `Spec` stamp fields from `get()`.
 
 For each lookup the cache MUST:
 
 1. If bucket validity fails → return miss.
-2. Load current stamps via `SpecRepository.get()` (no artifact content reads).
+2. Resolve current stamps:
+   - If `input.stamps` is provided, use those stamps for the hard-hit comparison
+     and MUST NOT call `SpecRepository.get()` solely to load stamps.
+   - Otherwise load current stamps via `SpecRepository.get()` (no artifact content
+     reads).
 3. If stored stamps match current stamps → **hard hit**: return `{ kind: 'hit', entry }`
    without computing `cacheFingerprint` or revalidating.
 4. If stamps differ → compute `cacheFingerprint` lazily using the canonical form in
-   this spec. If it matches the stored fingerprint → **soft hit**: persist refreshed
+   this spec (which MAY call `get()` / `specFingerprint` / raw metadata hash as
+   needed). If it matches the stored fingerprint → **soft hit**: persist refreshed
    stamps without changing `cacheFingerprint` or `entry`, then return
    `{ kind: 'hit', entry }`.
 5. Otherwise → return `{ kind: 'miss' }`.
+
+Optional `stamps` MUST be semantically equivalent to the stamp bundle stored from
+`Spec` / list Meta (`artifact lastModified`s, persisted-state and generated-metadata
+presence/`lastModified`). Adapters MUST treat list Meta and `get()` stamps as
+interchangeable for hard-hit comparison.
 
 ### Requirement: Lookup result shape
 
@@ -133,26 +147,29 @@ equivalent).
 The port MUST expose:
 
 - `workspace(): string`
-- `lookup(input: {
+- \`lookup(input: {
   spec: Spec
   schemaFingerprint: string
   engineVersion: number
+  stamps?: ValidationSourceStamps
   }): Promise<
   | { kind: 'hit'; entry: SpecValidationEntry }
   | { kind: 'miss' }
-  > `
 - `upsert(input: {
-  entry: SpecValidationEntry
-  spec: Spec
-  schemaFingerprint: string
-  engineVersion: number
+entry: SpecValidationEntry
+spec: Spec
+schemaFingerprint: string
+engineVersion: number
 }): Promise<void>`
 
 `schemaFingerprint` / `engineVersion` on `lookup` are bucket-validity inputs only.
-`lookup` / `upsert` receive `Spec` so the cache knows which row to touch; freshness
-I/O (stamps, `specFingerprint`, raw metadata hash) still goes through the
-**constructor-injected** `SpecRepository`. They MUST NOT accept stamps,
-`cacheFingerprint`, `refreshStamps`, or a repository argument.
+`lookup` / `upsert` receive `Spec` so the cache knows which row to touch. Optional
+`stamps` on `lookup` are a hard-hit acceleration input equivalent to stamps from
+`get()` or `list({ includeMeta: true })`. Soft-hit / miss I/O
+(`specFingerprint`, raw metadata hash, stamp refresh) still goes through the
+**constructor-injected** `SpecRepository` when needed.
+
+They MUST NOT accept `cacheFingerprint`, `refreshStamps`, or a repository argument.
 
 ### Requirement: Upsert inputs
 

@@ -12,36 +12,18 @@
     "core:composition-resolver",
     "core:validation-result-cache-port",
     "core:spec-lock",
-    "core:spec-repository-port"
+    "core:spec-repository-port",
+    "core:spec-optimization",
+    "core:get-spec-metadata"
   ],
   "implementation": [
     {
-      "file": "core:src/application/use-cases/_shared/validate-specs-cache-fingerprints.ts",
-      "symbols": [
-        "VALIDATE_SPECS_ENGINE_VERSION",
-        "computeSchemaFingerprint",
-        "computeInputFingerprint",
-        "computeSchemaFingerprintFromSchema",
-        "computeCacheFingerprint,VALIDATE_SPECS_ENGINE_VERSION"
-      ]
-    },
-    {
       "file": "core:src/application/use-cases/validate-specs.ts",
-      "symbols": ["ValidateSpecs"]
+      "symbols": ["_validateMetadataConsistency", "ValidateSpecs"]
     },
     {
-      "file": "core:src/composition/use-cases/validate-specs.ts",
-      "symbols": [
-        "ValidateSpecsDeps",
-        "resolveValidateSpecsDeps",
-        "createValidateSpecs",
-        "createValidateSpecsFromNormalized",
-        "isValidateSpecsDeps"
-      ]
-    },
-    {
-      "file": "core:src/composition/composition-resolver.ts",
-      "symbols": ["getValidationResultCaches"]
+      "file": "core:src/application/use-cases/_shared/validation-source-stamps.ts",
+      "symbols": ["stampsFromListEntry", "specFromListEntry", "listEntryHasMeta"]
     }
   ]
 }

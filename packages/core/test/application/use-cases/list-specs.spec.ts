@@ -67,17 +67,6 @@ describe('ListSpecs', () => {
     expect(result.items[0]!.title).toBe('login')
   })
 
-  it('forwards includeMetadataStatus to repositories', async () => {
-    const spec = makeSpec({ workspace: 'default', name: 'auth/login', filenames: ['spec.md'] })
-    const repo = makeSpecRepository({ specs: [spec] })
-    const specRepos = new Map([['default', repo]])
-
-    const uc = new ListSpecs(makeListWorkspaces(specRepos))
-    const result = await uc.execute({ includeMetadataStatus: true })
-
-    expect(result.items[0]!.title).toBe('login')
-  })
-
   it('forwards list options without inventing a default limit', async () => {
     const spec = makeSpec({ workspace: 'default', name: 'auth/login', filenames: ['spec.md'] })
     const repo = makeSpecRepository({ specs: [spec] })

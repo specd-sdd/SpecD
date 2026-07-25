@@ -1,0 +1,36 @@
+- op: modified
+  description: Replace the command-signature scenarios with removal assertions now that the command no longer exists.
+  selector:
+    type: section
+    matches: '^Requirement: Command signature$'
+  rename: 'Requirement: spec invalidate-metadata is removed'
+  content: |
+    #### Scenario: invalidate-metadata command is not registered
+
+    - **WHEN** the CLI `spec` parent command's subcommands are inspected
+    - **THEN** no `invalidate-metadata` command, or any alias of it, is registered
+
+    #### Scenario: Callers needing a guaranteed rebuild use generate-metadata instead
+
+    - **GIVEN** a caller needs a guaranteed metadata rebuild
+    - **WHEN** the caller looks for a supported CLI command
+    - **THEN** it uses `specd spec generate-metadata`
+    - **AND** `specd spec invalidate-metadata` is not available
+
+- op: removed
+  description: Remove the text-output scenario.
+  selector:
+    type: section
+    matches: '^Requirement: Text output$'
+
+- op: removed
+  description: Remove the JSON-output scenario.
+  selector:
+    type: section
+    matches: '^Requirement: JSON output$'
+
+- op: removed
+  description: Remove the spec-not-found-or-no-metadata error scenarios.
+  selector:
+    type: section
+    matches: '^Requirement: Error — spec not found or no metadata$'

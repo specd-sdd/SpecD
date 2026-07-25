@@ -1,0 +1,82 @@
+- op: modified
+  description: Mark the use case as removed — its internal responsibility moves to the internal PersistSpecMetadata collaborator.
+  selector:
+    type: section
+    matches: Purpose
+  content: |
+    **Removed.** `SaveSpecMetadata` validated and persisted arbitrary caller-supplied metadata JSON, including agent-authored optimized fields. Its guarded-persistence responsibility (validate a complete generated projection, then conditionally write) moves to `PersistSpecMetadata`, an internal collaborator used only by `MaterializeSpecMetadata`. Unlike `SaveSpecMetadata`, `PersistSpecMetadata` accepts only a complete generated projection plus an observed revision — it is not a general-purpose metadata-editing operation and is never exposed on Kernel, Core public exports, SDK, CLI, or MCP.
+
+- op: modified
+  description: Replace the input-contract requirement with an explicit removal statement.
+  selector:
+    type: section
+    matches: 'Requirement: Input contract'
+  rename: 'Requirement: SaveSpecMetadata is removed'
+  content: |
+    `SaveSpecMetadata` MUST NOT be exported from `@specd/core`, MUST NOT be mounted on `Kernel`, and MUST NOT have a public `createSaveSpecMetadata` composition factory. Arbitrary metadata persistence is no longer an application operation reachable by any host. The only remaining metadata writer is the internal `PersistSpecMetadata` collaborator invoked by `MaterializeSpecMetadata`, which accepts a complete generated projection and observed `revision` — never a caller-supplied partial or arbitrary JSON payload.
+
+- op: removed
+  description: Remove the output-contract requirement.
+  selector:
+    type: section
+    matches: 'Requirement: Output contract'
+
+- op: removed
+  description: Remove the content-validation requirement.
+  selector:
+    type: section
+    matches: 'Requirement: Content validation before write'
+
+- op: removed
+  description: Remove the workspace-resolution requirement.
+  selector:
+    type: section
+    matches: 'Requirement: Workspace resolution'
+
+- op: removed
+  description: Remove the spec-existence-check requirement.
+  selector:
+    type: section
+    matches: 'Requirement: Spec existence check'
+
+- op: removed
+  description: Remove the conflict-detection requirement.
+  selector:
+    type: section
+    matches: 'Requirement: Conflict detection via originalHash'
+
+- op: removed
+  description: Remove the dependsOn overwrite-protection requirement.
+  selector:
+    type: section
+    matches: 'Requirement: dependsOn overwrite protection'
+
+- op: removed
+  description: Remove the sidecar-ownership-boundary requirement.
+  selector:
+    type: section
+    matches: 'Requirement: Sidecar ownership boundary'
+
+- op: removed
+  description: Remove the artifact-persistence requirement.
+  selector:
+    type: section
+    matches: 'Requirement: Artifact persistence'
+
+- op: removed
+  description: Remove the constructor-dependencies requirement.
+  selector:
+    type: section
+    matches: 'Requirement: Constructor dependencies'
+
+- op: removed
+  description: Remove the obsolete config-based factory contract.
+  selector:
+    type: section
+    matches: 'Requirement: Config-based factory delegates through resolveSaveSpecMetadataDeps'
+
+- op: removed
+  description: Remove constraints that only applied to the removed public writer.
+  selector:
+    type: section
+    matches: Constraints

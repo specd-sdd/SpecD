@@ -1,0 +1,122 @@
+- op: modified
+  description: Inject GetSpecMetadata so CompileContext self-heals metadata for rendered specs instead of reading a possibly-stale cache.
+  selector:
+    type: section
+    matches: 'Requirement: Ports and constructor'
+  content: |
+    `CompileContext` receives at construction time: `ChangeRepository`, `ListWorkspaces`, `SchemaProvider`, `FileReader`, `ArtifactParserRegistry`, `ContentHasher`, `PreviewSpec`, `GetSpecMetadata`, and a yaml-derived `CompileContextConfig` default snapshot.
+
+    ```typescript
+    class CompileContext {
+      constructor(
+        changes: ChangeRepository,
+        listWorkspaces: ListWorkspaces,
+        schemaProvider: SchemaProvider,
+        files: FileReader,
+        parsers: ArtifactParserRegistry,
+        hasher: ContentHasher,
+        previewSpec: PreviewSpec,
+        getMetadata: GetSpecMetadata,
+        defaultConfig: CompileContextConfig,
+      )
+    }
+    ```
+
+    The `defaultConfig` value MUST be produced from the resolved `SpecdConfig` at kernel composition time (via the internal composition helper). It MUST include project-level `context`, `contextIncludeSpecs`, `contextExcludeSpecs`, per-workspace context patterns, `projectRoot`, and `configPath`. It MUST NOT include per-call runtime overrides such as `contextMode` or `llmOptimizedContext` unless those are the yaml defaults.
+
+    `SchemaProvider` is a lazy, caching port that returns the fully-resolved schema (with plugins and overrides applied). It replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple. All are injected at kernel composition time, not passed per invocation.
+
+    `PreviewSpec` is the use case `CompileContext` delegates to when it needs a materialized merged view of a spec with validated deltas applied. `ContentHasher` is used for context fingerprint inputs. `GetSpecMetadata` is the use case `CompileContext` delegates to whenever it needs usable normalized or optimized content for a spec that is actually included in the compiled context — it replaces direct `SpecRepository.metadata()` freshness checks with the shared self-healing materialization contract (`policy: 'if-needed'`).
+
+    `CompileContext` MUST NOT accept `LifecycleEngine` or `ImplementationDetector`, evaluate lifecycle availability, or invoke implementation autodetection. It MUST NOT call `SpecRepository.readMetadataSnapshot()` directly — that method is reserved for materialization and diagnostics.
+
+- op: modified
+  description: Replace manual metadata staleness checks and extraction fallback with GetSpecMetadata self-healing.
+  selector:
+    type: section
+    matches: 'Requirement: Staleness detection and content fallback'
+  content: |
+    Whenever `CompileContext` needs structured metadata-derived content for a spec that is actually included in the compiled context — summary fields (`title`, `description`) or section-filtered full content (`rules`, `constraints`, `scenarios`) — it MUST obtain that content by calling `GetSpecMetadata.execute({ specId })` with the default `'if-needed'` policy rather than reading `SpecRepository.metadata()` and reasoning about freshness itself.
+
+    `CompileContext` only materializes specs it actually renders (it MUST NOT eagerly materialize every collected spec before display-mode classification narrows the set).
+
+    - When materialization returns `source: 'persisted'` with `regenerated: false`, `CompileContext` uses the returned structured content directly.
+    - When materialization regenerates the projection (`regenerated: true`) or falls back after a source-conflict retry, `CompileContext` still uses the returned in-memory projection — it is a valid, current projection by construction — but forwards any `metadata-cache-write-failed` or generation warning returned by `GetSpecMetadata` into its own `warnings` array without logging it again.
+    - When materialization cannot produce a valid projection at all (e.g. the schema has no `metadataExtraction` declarations and generation yields nothing), `CompileContext` emits a `missing-metadata` warning identifying the spec path and renders an empty/minimal entry for that spec rather than throwing.
+
+    For specs in `change.specIds`, when `CompileContext` is rendering section-filtered full content and merged preview artifacts are available from `PreviewSpec`, the same materialization flow MUST operate over the merged artifact set rather than over the base spec files — `GetSpecMetadata` delegates to `MaterializeSpecMetadata`, which accepts the caller-provided merged content for this case so merged previews and non-merged specs stay on the same rendering path for `sections`.
+
+    When `sections` is absent, full-mode spec content is rendered from ordered spec-scoped artifact files rather than from metadata sections. In that case metadata materialization is not required to render the full-content body, though a materialized projection may still supply summary fields.
+
+- op: modified
+  description: Resolve canonical dependsOn through materialized metadata instead of a raw stale-or-fresh repository read.
+  selector:
+    type: section
+    matches: 'Requirement: dependsOn resolution order'
+  content: |
+    For each spec in Step 5, `dependsOn` is resolved using a three-tier fallback:
+
+    1. `change.specDependsOn[specId]` — per-spec dependencies declared in the change manifest (highest priority)
+    2. The canonical normalized dependency projection obtained by calling `GetSpecMetadata.execute({ specId })` — self-healing, so a missing or stale cache is regenerated rather than treated as a frozen stale snapshot
+    3. Schema `metadataExtraction.dependsOn` engine — extracts `dependsOn` from spec content only when materialization cannot produce a projection at all and the schema declares dependency extraction, using the shared extractor-transform registry and caller-owned origin context bag
+
+    The first tier that returns a non-empty result is used. If all tiers return empty, the spec is treated as having no dependencies.
+
+- op: modified
+  description: Tie the stale-optimization warning to per-field freshness owned by spec-lock optimization records.
+  selector:
+    type: section
+    matches: 'Requirement: Optimization warning signal'
+  content: |
+    When `llmOptimizedContext` is enabled, the system MUST emit a `stale-optimization` warning for each spec whose materialized metadata reports a missing or stale `optimizedContext` field, per the per-field freshness recorded on the spec's lock-owned optimization state.
+
+    The warning message MUST include remediation instructions: "Launch specd-spec-context-optimizer agent to refresh".
+
+- op: modified
+  description: Resolve GetSpecMetadata through the shared composition resolver.
+  selector:
+    type: section
+    matches: 'Requirement: Config-based factory delegates through resolveCompileContextDeps'
+  content: |
+    The config-based `createCompileContext(config, options?)` form MUST derive `CompileContextDeps` through `resolveCompileContextDeps(resolver)` and then delegate to canonical `createCompileContext(deps)`.
+
+    `resolveCompileContextDeps(resolver)` MUST resolve:
+
+    - `changes: ChangeRepository`
+    - `listWorkspaces: ListWorkspaces`
+    - `schemaProvider: SchemaProvider`
+    - `files: FileReader`
+    - `parsers: ArtifactParserRegistry`
+    - `hasher: ContentHasher`
+    - `previewSpec: PreviewSpec`
+    - `getMetadata: GetSpecMetadata`
+    - `extractorTransforms: ExtractorTransformRegistry`
+    - `workspaceRoutes: readonly SpecWorkspaceRoute[]`
+    - `defaultConfig: CompileContextConfig`
+
+    It MUST NOT resolve `LifecycleEngine`.
+
+    The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+
+- op: modified
+  description: Fix the malformed project-metadata dependency link and add materialization/optimization dependencies.
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`core:change`](../change/spec.md)
+    - [`core:config`](../config/spec.md)
+    - [`core:spec-metadata`](../spec-metadata/spec.md)
+    - [`core:schema-format`](../schema-format/spec.md)
+    - [`core:delta-format`](../delta-format/spec.md)
+    - [`core:selector-model`](../selector-model/spec.md)
+    - [`core:spec-id-format`](../spec-id-format/spec.md)
+    - [`core:workspace`](../workspace/spec.md)
+    - [`core:get-artifact-instruction`](../get-artifact-instruction/spec.md)
+    - [`core:get-hook-instructions`](../get-hook-instructions/spec.md)
+    - [`core:preview-spec`](../preview-spec/spec.md)
+    - [`core:refresh-implementation-tracking`](../refresh-implementation-tracking/spec.md)
+    - [`core:project-metadata`](../project-metadata/spec.md)
+    - [`core:get-spec-metadata`](../get-spec-metadata/spec.md) — self-healing metadata read (`if-needed`) used instead of direct repository freshness checks
+    - [`core:spec-optimization`](../spec-optimization/spec.md) — per-field optimization freshness backing the stale-optimization warning
+    - [`core:composition-resolver`](../composition-resolver/spec.md)

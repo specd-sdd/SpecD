@@ -1,0 +1,23 @@
+- op: modified
+  description: Track per-spec semantic metadata fingerprints instead of raw cache-file hashes or repository revisions.
+  selector:
+    type: section
+    matches: 'Requirement: Input tracking'
+  content: |
+    The `freshness` block SHALL track:
+
+    - The hash of the `specd.yaml` configuration file
+    - The hashes of any `contextFiles` referenced in the configuration
+    - The semantic `metadataFingerprint` — returned by materializing each included spec's metadata via `MaterializeSpecMetadata` — of all specs included in the project context
+
+    Per-spec entries in `freshness` MUST record the materialized `metadataFingerprint`, not a raw metadata-cache-file hash or a repository storage revision. A `metadataFingerprint` changes only when the spec's semantically meaningful metadata content changes, so freshness comparisons remain storage-adapter-independent.
+
+- op: modified
+  description: Reference the materialization dependency that produces per-spec fingerprints.
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`core:config`](../config/spec.md)
+    - [`core:materialize-spec-metadata`](../materialize-spec-metadata/spec.md) — source of the per-spec `metadataFingerprint` tracked in `freshness`
+    - [`core:composition-resolver`](../composition-resolver/spec.md)

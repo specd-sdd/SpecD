@@ -1,7 +1,12 @@
 import { type Spec } from '../../domain/entities/spec.js'
 import { type SpecPath } from '../../domain/value-objects/spec-path.js'
 import { type SpecArtifact } from '../../domain/value-objects/spec-artifact.js'
-import { type PersistedSpecMetadata } from '../../domain/services/parse-metadata.js'
+import { type MetadataSnapshot, type SpecMetadata } from '../../domain/services/parse-metadata.js'
+import {
+  type PersistedImplementationLink,
+  type PersistedSpecState,
+  type PersistedSpecStateSnapshot,
+} from '../../domain/services/apply-persisted-spec-state-patch.js'
 import {
   Repository,
   type RepositoryConfig,
@@ -11,6 +16,36 @@ import {
 
 export { type RepositoryConfig as SpecRepositoryConfig }
 export type { ListOptions, ListResult }
+export type { PersistedImplementationLink }
+
+/** Physical artifact metadata for one canonical filename. */
+export interface ArtifactMeta {
+  readonly lastModified: string
+  readonly hash?: string
+}
+
+/** Cheap observation of the persisted semantic state sidecar. */
+export interface PersistedStateMeta {
+  readonly lastModified: string
+  readonly hash?: string
+}
+
+/** Cheap observation of the generated metadata cache file. */
+export interface GeneratedMetadataMeta {
+  readonly lastModified: string
+  readonly hash?: string
+}
+
+/** Schema artifact stamp projected onto a list entry when {@link SpecListOptions.includeMeta} is set. */
+export interface SpecListArtifactMeta {
+  readonly filename: string
+  readonly lastModified: string
+}
+
+/** Options for Meta methods that may optionally include content hashes. */
+export interface SpecMetaOptions {
+  readonly includeHash?: boolean
+}
 
 /** Lightweight spec row returned by {@link SpecRepository.list}. */
 export interface SpecListEntry {
@@ -18,13 +53,15 @@ export interface SpecListEntry {
   readonly path: string
   readonly title: string
   readonly summary?: string
-  readonly metadataStatus?: 'missing' | 'invalid' | 'stale' | 'fresh'
+  readonly artifacts?: readonly SpecListArtifactMeta[]
+  readonly persistedStateMeta?: PersistedStateMeta | null
+  readonly generatedMetadataMeta?: GeneratedMetadataMeta | null
 }
 
 /** Options for listing specs within a workspace. */
 export interface SpecListOptions extends ListOptions {
   readonly includeSummary?: boolean
-  readonly includeMetadataStatus?: boolean
+  readonly includeMeta?: boolean
 }
 
 /** A single match location within a spec artifact. */
@@ -45,15 +82,8 @@ export interface SpecSearchResult {
 export interface SpecPublication {
   /** Final artifact files that should become canonical for the spec. */
   readonly artifacts: readonly SpecArtifact[]
-  /** Optional final persisted schema identity staged with the publication. */
-  readonly persistedSchema?: { name: string; version: number }
-  /** Optional final persisted dependencies staged with the publication. */
-  readonly persistedDependsOn?: readonly string[]
-  /** Optional final persisted implementation links staged with the publication. */
-  readonly persistedImplementation?: readonly {
-    readonly file: string
-    readonly symbols?: readonly string[]
-  }[]
+  /** Complete persisted semantic state staged with the publication. */
+  readonly persistedState: PersistedSpecState
 }
 
 /**
@@ -175,66 +205,69 @@ export abstract class SpecRepository extends Repository {
   abstract delete(spec: Spec): Promise<void>
 
   /**
-   * Returns the parsed metadata for the given spec, or `null` if no metadata
-   * file exists.
-   *
-   * The returned object includes an `originalHash` field (SHA-256 of the raw
-   * file content) for use in conflict detection when saving.
-   *
-   * @param spec - The spec whose metadata to load
-   * @returns Parsed metadata with `originalHash`, or `null` if absent
+   * Reads the exact persisted semantic state, or `null` when no lock exists.
    */
-  abstract metadata(spec: Spec): Promise<PersistedSpecMetadata | null>
+  abstract readPersistedState(spec: Spec): Promise<PersistedSpecStateSnapshot | null>
 
   /**
-   * Persists raw JSON metadata content for a spec.
+   * Conditionally replaces the complete persisted state.
    *
-   * Creates the metadata directory if it does not exist. When `originalHash`
-   * is provided and `force` is not `true`, the current file on disk is hashed
-   * and compared — a mismatch causes `ArtifactConflictError`.
-   *
-   * @param spec - The spec to write metadata for
-   * @param content - Raw JSON string to persist
-   * @param options - Save options
-   * @param options.force - Skip conflict detection when `true`
-   * @param options.originalHash - Expected hash of the current file on disk
-   * @throws {ArtifactConflictError} On hash mismatch when `force` is not set
+   * `expectedRevision: null` means the caller observed persisted state as absent
+   * and intends to create it — the write MUST fail if state already exists.
    */
-  abstract saveMetadata(
+  abstract writePersistedState(
     spec: Spec,
-    content: string,
-    options?: { force?: boolean; originalHash?: string },
-  ): Promise<void>
+    state: PersistedSpecState,
+    options: { readonly expectedRevision: string | null },
+  ): Promise<PersistedSpecStateSnapshot>
 
   /**
-   * Returns the persisted schema identity for the given spec, or `null` if absent.
+   * Returns physical artifact metadata for one filename, or `null` when absent.
    *
-   * @param spec - The spec whose persisted schema to load
+   * `hash` is included only when `options.includeHash === true`.
    */
-  abstract readPersistedSchema(spec: Spec): Promise<{ name: string; version: number } | null>
-
-  /**
-   * Returns the persisted dependencies for the given spec, or `null` if absent.
-   *
-   * @param spec - The spec whose persisted dependencies to load
-   */
-  abstract readPersistedDependsOn(spec: Spec): Promise<readonly string[] | null>
-
-  /**
-   * Returns the persisted implementation links for the given spec, or `null` if absent.
-   *
-   * @param spec - The spec whose persisted implementation links to load
-   */
-  abstract readPersistedImplementation(
+  abstract artifactMeta(
     spec: Spec,
-  ): Promise<readonly { readonly file: string; readonly symbols?: readonly string[] }[] | null>
+    filename: string,
+    options?: SpecMetaOptions,
+  ): Promise<ArtifactMeta | null>
 
   /**
-   * Returns a stable hash representing the persisted spec state.
+   * Cheap observation of the persisted semantic state sidecar.
    *
-   * @param spec - The spec whose stable hash to compute
+   * `null` when absent. `hash` only when `options.includeHash === true`.
    */
-  abstract persistedStateHash(spec: Spec): Promise<string | null>
+  abstract persistedStateMeta(
+    spec: Spec,
+    options?: SpecMetaOptions,
+  ): Promise<PersistedStateMeta | null>
+
+  /**
+   * Cheap observation of the generated metadata cache file.
+   *
+   * Same lastModified / optional hash rules as {@link persistedStateMeta}.
+   */
+  abstract generatedMetadataMeta(
+    spec: Spec,
+    options?: SpecMetaOptions,
+  ): Promise<GeneratedMetadataMeta | null>
+
+  /**
+   * Reads the exact persisted metadata observation.
+   */
+  abstract readMetadataSnapshot(spec: Spec): Promise<MetadataSnapshot>
+
+  /**
+   * Writes one complete metadata projection.
+   *
+   * `expectedRevision: null` means metadata must still be absent.
+   * Read-only workspaces still permit metadata cache writes.
+   */
+  abstract writeMetadataSnapshot(
+    spec: Spec,
+    metadata: SpecMetadata,
+    options: { readonly expectedRevision: string | null },
+  ): Promise<MetadataSnapshot>
 
   /**
    * Returns a content fingerprint for authored artifacts and persisted state.
@@ -244,54 +277,6 @@ export abstract class SpecRepository extends Repository {
    * @param spec - The spec whose fingerprint to compute
    */
   abstract specFingerprint(spec: Spec): Promise<string>
-
-  /**
-   * Updates the persisted schema identity for the given spec.
-   *
-   * @param spec - The spec whose persisted schema to update
-   * @param schema - The new schema identity
-   * @param options - Update options
-   * @param options.force - Skip conflict detection when `true`
-   * @param options.originalHash - Expected hash of the persisted spec state
-   * @throws {ArtifactConflictError} On hash mismatch when `force` is not set
-   */
-  abstract updatePersistedSchema(
-    spec: Spec,
-    schema: { name: string; version: number },
-    options?: { force?: boolean; originalHash?: string },
-  ): Promise<void>
-
-  /**
-   * Updates the persisted dependencies for the given spec.
-   *
-   * @param spec - The spec whose persisted dependencies to update
-   * @param dependsOn - The new dependency list
-   * @param options - Update options
-   * @param options.force - Skip conflict detection when `true`
-   * @param options.originalHash - Expected hash of the persisted spec state
-   * @throws {ArtifactConflictError} On hash mismatch when `force` is not set
-   */
-  abstract updatePersistedDependsOn(
-    spec: Spec,
-    dependsOn: readonly string[],
-    options?: { force?: boolean; originalHash?: string },
-  ): Promise<void>
-
-  /**
-   * Updates the persisted implementation links for the given spec.
-   *
-   * @param spec - The spec whose persisted implementation links to update
-   * @param implementation - The new implementation link list
-   * @param options - Update options
-   * @param options.force - Skip conflict detection when `true`
-   * @param options.originalHash - Expected hash of the persisted spec state
-   * @throws {ArtifactConflictError} On hash mismatch when `force` is not set
-   */
-  abstract updatePersistedImplementation(
-    spec: Spec,
-    implementation: readonly { readonly file: string; readonly symbols?: readonly string[] }[],
-    options?: { force?: boolean; originalHash?: string },
-  ): Promise<void>
 
   /**
    * Searches spec artifact content for the given query string.

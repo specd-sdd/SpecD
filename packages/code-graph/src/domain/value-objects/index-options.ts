@@ -1,4 +1,5 @@
 import { type ProjectWorkspace, type SpecMetadata } from '@specd/core'
+import { type GetSpecMetadata } from '@specd/core'
 
 /**
  * Progress callback invoked during indexing to report completion percentage and phase.
@@ -115,6 +116,11 @@ export interface IndexOptions {
    * Whether provider-owned indexing should recreate persisted backend state first.
    */
   readonly force?: boolean
+
+  /**
+   * Materialized spec metadata source used for semantic fingerprinting during spec indexing.
+   */
+  readonly getSpecMetadata?: GetSpecMetadata
 }
 
 /**

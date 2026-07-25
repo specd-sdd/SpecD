@@ -1,7 +1,8 @@
 import * as fs from 'node:fs/promises'
 import * as os from 'node:os'
 import * as path from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { Spec } from '../../../src/domain/entities/spec.js'
 import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
 import { FsSpecRepository } from '../../../src/infrastructure/fs/spec-repository.js'
 import {
@@ -121,6 +122,57 @@ describe('FsValidationResultCache', () => {
 
     const lookup = await cache.lookup({ spec, schemaFingerprint, engineVersion: 1 })
     expect(lookup).toEqual({ kind: 'hit', entry })
+    void cacheFingerprint
+  })
+
+  it('returns hard hit when optional stamps match without loading spec via get', async () => {
+    await writeSpec('auth/login', '# Login')
+    const listed = await repo.list(undefined, { includeMeta: true })
+    const row = listed.items[0]!
+    const stamps = stampsFromSpec((await repo.get(SpecPath.parse('auth/login')))!)
+    const schemaFingerprint = sha256('schema-surface')
+    const entry = {
+      spec: 'default:auth/login',
+      passed: true,
+      failures: [],
+      warnings: [],
+    }
+    const cacheFingerprint = computeCacheFingerprint(
+      {
+        specFingerprint: await repo.specFingerprint(
+          (await repo.get(SpecPath.parse('auth/login')))!,
+        ),
+        metadataContentHash: null,
+      },
+      sha256,
+    )
+
+    await cache.upsert({
+      entry,
+      spec: (await repo.get(SpecPath.parse('auth/login')))!,
+      schemaFingerprint,
+      engineVersion: 1,
+    })
+
+    const getSpy = vi.spyOn(repo, 'get')
+    const lookup = await cache.lookup({
+      spec: new Spec(
+        row.workspace,
+        SpecPath.parse(row.path),
+        row.artifacts ?? [],
+        row.persistedStateMeta === null
+          ? { present: false, lastModified: null }
+          : { present: true, lastModified: row.persistedStateMeta!.lastModified },
+        row.generatedMetadataMeta === null
+          ? { present: false, lastModified: null }
+          : { present: true, lastModified: row.generatedMetadataMeta!.lastModified },
+      ),
+      schemaFingerprint,
+      engineVersion: 1,
+      stamps,
+    })
+    expect(lookup).toEqual({ kind: 'hit', entry })
+    expect(getSpy).not.toHaveBeenCalled()
     void cacheFingerprint
   })
 

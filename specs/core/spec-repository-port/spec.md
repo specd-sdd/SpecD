@@ -55,7 +55,7 @@ When a `SpecPath` prefix is provided, only specs whose capability path starts wi
 `SpecListOptions` extends `ListOptions` with:
 
 - `includeSummary?: boolean` — when `true`, projected entries MAY include `summary`; when `false` or omitted, `summary` MUST NOT appear
-- `includeMetadataStatus?: boolean` — when `true`, projected entries MAY include `metadataStatus`; when `false` or omitted, `metadataStatus` MUST NOT appear
+- `includeMeta?: boolean` — when `true`, projected entries MUST include cheap lastModified Meta fields for present schema artifacts and for the persisted-state / generated-metadata observations; when `false` or omitted, those Meta fields MUST NOT appear. `list` MUST NEVER populate `hash` on any Meta field.
 
 Sort order MUST be canonical: capability path ascending (lexicographic).
 
@@ -81,16 +81,17 @@ When `includeSummary` is set, the entry MAY include `summary` resolved in this f
 2. non-empty trimmed `description` from spec metadata
 3. extract from `spec.md` via the existing core pure helper: (a) first non-empty paragraph after `# H1`; (b) first paragraph of first `## Overview` / `## Summary` / `## Purpose` section
 
-When `includeMetadataStatus` is set, the entry MAY include `metadataStatus`: `'missing' | 'invalid' | 'stale' | 'fresh'` with these semantics:
+When `includeMeta` is set, the entry MUST include:
 
-- `'missing'` — no metadata exists
-- `'invalid'` — metadata exists but fails structural validation
-- `'stale'` — metadata exists and is structurally valid, but content hashes are absent, mismatch, or hashing encountered I/O errors
-- `'fresh'` — metadata exists, is structurally valid, and all content hashes match current files
+- `artifacts` — array of `{ filename, lastModified }` for present schema artifact files only (not sidecars); MUST NOT include `hash`
+- `persistedStateMeta` — `PersistedStateMeta | null` where `null` means the persisted-state observation is absent; MUST NOT include `hash`
+- `generatedMetadataMeta` — `GeneratedMetadataMeta | null` where `null` means the generated metadata cache observation is absent; MUST NOT include `hash`
 
-Errors while resolving title, summary, or status for an individual spec MUST be swallowed; the entry still appears with the title fallback.
+When `includeMeta` is false or omitted, `artifacts`, `persistedStateMeta`, and `generatedMetadataMeta` MUST be omitted (not present as `undefined`/`null` fields).
 
-`include*` flags are response projection only. The filesystem index MUST materialize the full CLI-usable payload; implementations MUST NOT perform extra I/O when a flag is set.
+Errors while resolving title, summary, or Meta fields for an individual spec MUST be swallowed; the entry still appears with the title fallback.
+
+`include*` flags are response projection only. The filesystem index MUST materialize the full CLI-usable payload (including Meta stamps from existing index source stamps); implementations MUST NOT perform extra I/O when a flag is set.
 
 ### Requirement: artifact loads a single artifact file
 
@@ -143,63 +144,105 @@ If the ownership is `owned` or `shared`, `save` proceeds normally: it MUST write
 
 Relative resolution MUST be pure computation (no I/O). Absolute resolution MAY require filesystem access.
 
-### Requirement: metadata returns parsed metadata or null
+### Requirement: readMetadataSnapshot and writeMetadataSnapshot
 
-`metadata(spec)` MUST read the persisted metadata for the given spec and distinguish absence from staleness.
+`SpecRepository` MUST expose storage-only metadata persistence through:
 
-Read rules:
+1. `readMetadataSnapshot(spec)` — returns a `MetadataSnapshot` discriminated by
+   `kind`: `present`, `missing`, and `invalid` are persistence/parse kinds only — they
+   are NOT freshness states. The repository MUST NOT return, infer, or encode
+   `fresh` or `stale` here; it does not own the generator inputs or policy
+   needed to make that determination.
+   - `{ kind: 'missing', revision: null }` when no metadata is persisted for the
+     spec
+   - `{ kind: 'invalid', revision: string, error: SpecMetadataParseError }` when
+     persisted content exists but fails to parse
+   - `{ kind: 'present', metadata: SpecMetadata, revision: string }` when
+     persisted content exists and parses successfully
+2. `writeMetadataSnapshot(spec, metadata, options)` — writes one complete
+   `SpecMetadata` projection, guarded by `options.expectedRevision`.
+   `expectedRevision: null` means the caller observed metadata as absent and
+   intends to create it; a present value means the caller intends to replace
+   exactly that previously observed revision. This method MUST NOT patch or
+   merge individual fields — every write is a complete replacement. It returns
+   the newly persisted `MetadataSnapshot`.
 
-1. If no metadata exists on disk, return `null`.
-2. If metadata exists, return the parsed `SpecMetadata` content together with:
-   - `originalHash` — SHA-256 of the raw stored metadata file for conflict detection
-   - `freshness` — `'fresh'` or `'stale'`
-3. `freshness: 'stale'` means persisted metadata exists but no longer matches the repository's staleness checks defined by the spec-metadata spec.
-4. `metadata()` MUST NOT regenerate metadata, rewrite metadata, or silently replace stale persisted content with reconstructed content.
+`revision` is an adapter-defined concurrency token, deliberately distinct from
+`originalHash`, so that an adapter is not required to version a metadata record
+through raw file bytes. A filesystem adapter MAY serialize stable canonical JSON
+and use the resulting raw-byte SHA-256 as `revision`; a database adapter MAY use
+a row version, transaction revision, or ETag. Serialization is therefore an
+adapter concern — this port accepts a `SpecMetadata` value, never a
+pre-serialized JSON string.
 
-This method remains the canonical persisted metadata read surface. Consumers decide whether stale metadata is acceptable for their use case or whether they must perform deterministic fallback or fail explicitly.
+`readMetadataSnapshot()` and `writeMetadataSnapshot()` replace the former
+`metadata()` and `saveMetadata()` methods. The repository MUST NOT generate
+metadata, classify its freshness, or decide whether a stale-looking snapshot
+should be regenerated — those are application-layer responsibilities.
+`readMetadataSnapshot()` is reserved for materialization and diagnostics that
+intentionally inspect persisted cache state; normal consumers obtain usable
+metadata through Core materialization instead of calling this method directly.
 
-### Requirement: saveMetadata persists metadata with conflict detection
+### Requirement: Aggregate persisted state, Meta observations, and specFingerprint
 
-`saveMetadata(spec, content, options?)` MUST first check `this.ownership()`. If the ownership is `readOnly`, the method MUST throw `ReadOnlyWorkspaceError` with a message indicating the spec ID and workspace name. This check MUST occur before any filesystem operation or conflict detection.
+`SpecRepository` MUST NOT expose raw sidecar filesystem shapes (like
+`SpecLockData`) to use cases. Instead, it MUST provide one aggregate semantic
+operation for reading persisted spec state and one conditional semantic
+operation for writing it, plus a family of cheap physical `*Meta` observations:
 
-If the ownership is `owned` or `shared`, `saveMetadata` proceeds normally: it MUST write the metadata content for the given spec. The `content` parameter is a JSON string. If `originalHash` is set on the content and does not match the current file hash on disk, the save MUST be rejected by throwing `ArtifactConflictError`. When `options.force` is `true`, the conflict check MUST be skipped. If the metadata directory does not exist, it MUST be created. This method replaces the previous pattern of `save(spec, new SpecArtifact('.specd-metadata.yaml', content))` for metadata writes.
-
-### Requirement: persisted spec semantics, persistedStateHash, and specFingerprint
-
-`SpecRepository` MUST NOT expose raw sidecar filesystem shapes (like `SpecLockData`) to
-use cases. Instead, it MUST provide semantic operations for reading and writing
-persisted spec state:
-
-1. `readPersistedSchema(spec)` — returns the schema identity `{ name, version }` stored
-   with the spec, or `null`.
-2. `readPersistedDependsOn(spec)` — returns the dependency list `string[]` stored with
-   the spec, or `null`.
-3. `readPersistedImplementation(spec)` — returns implementation links stored with the
-   spec, or `null`.
-4. `updatePersistedState(spec, patch, options?)` — updates one or more persisted
-   semantics atomically with conflict detection.
-5. `persistedStateHash(spec)` — returns a stable SHA-256 hash of the spec's **persisted
-   semantic lock state** (the lock sidecar content), or `null` when that state is
-   absent. This replaces the former `specHash` name, which MUST NOT remain as the
-   public method name.
-6. `specFingerprint(spec)` — returns a stable digest of the authored/persisted Spec
-   inputs. The canonical payload MUST be sorted-key JSON of: Construction rules:
+1. `readPersistedState(spec)` — returns the complete `PersistedSpecStateSnapshot`
+   for the spec, or `null` when no persisted state exists. The snapshot includes
+   `schema`, `dependsOn`, `implementation`, an optional `optimizations` block,
+   and the sidecar's `originalHash`.
+2. `writePersistedState(spec, state, options)` — conditionally replaces the
+   complete persisted state with `state: PersistedSpecState` in one atomic
+   operation, guarded by `options.expectedRevision`. `expectedRevision: null`
+   means the caller observed persisted state as absent and intends to create it;
+   a present `expectedRevision` means the caller intends to replace exactly that
+   previously observed snapshot. Absence MUST be compared as its own state, not
+   as the hash of an empty document. A mismatch MUST reject with the
+   repository's conflict error rather than silently rebasing the write. The
+   method returns the newly persisted `PersistedSpecStateSnapshot`.
+3. `persistedStateMeta(spec, options?)` — returns `PersistedStateMeta | null`
+   for the persisted semantic state sidecar. `PersistedStateMeta` MUST include
+   `lastModified` and MAY include `hash` only when `options.includeHash === true`.
+   Absence of the sidecar MUST return `null`. There MUST NOT be a separate
+   `persistedStateHash(spec)` method on this port; callers that need the hash
+   MUST use `persistedStateMeta(spec, { includeHash: true })?.hash ?? null`.
+   (The provenance **field** named `persistedStateHash` inside generated
+   metadata is unrelated and MAY remain.)
+4. `generatedMetadataMeta(spec, options?)` — returns `GeneratedMetadataMeta | null`
+   for the generated metadata cache observation (not the snapshot body). Same
+   `lastModified` / optional `hash` rules as `PersistedStateMeta`.
+5. `specFingerprint(spec)` — returns a stable digest of the authored/persisted
+   Spec inputs. The canonical payload MUST be sorted-key JSON of: Construction
+   rules:
    1. Presence set MUST be the current `Spec.artifacts` entries (present schema
-      artifacts only — not a derived `filenames` list and not schema-wide missing
-      slots).
+      artifacts only — not a derived `filenames` list and not schema-wide
+      missing slots).
    2. For each entry, `contentHash` MUST be the content hash of that artifact's
       bytes.
    3. `artifacts` MUST be sorted by `filename` ascending before serialization.
-   4. `persistedStateHash` MUST be `persistedStateHash(spec)`, or the literal
+   4. The fingerprint payload's `persistedStateHash` field MUST be
+      `persistedStateMeta(spec, { includeHash: true })?.hash`, or the literal
       `"__absent__"` when that API returns `null`.
    5. `specFingerprint` MUST be the content hash of that canonical JSON string.
+6. `artifactMeta(spec, filename, options?)` — returns `ArtifactMeta | null`
+   describing the current physical state of one schema-declared artifact,
+   without loading or returning its content. `ArtifactMeta` MUST include
+   `lastModified` and MAY include `hash` only when `options.includeHash === true`.
+   It MUST reuse the same artifact stat/hash path used to populate
+   `SpecArtifactEntry.lastModified` and artifact content hashes elsewhere on
+   this port — it is not a second hashing implementation. A database-backed
+   adapter MAY answer from stored columns without reading artifact content.
 
 Generated `metadata.json` MUST NOT be an input to `specFingerprint`.
 
-These methods are the only application-facing API for persisted sidecar state and Spec
-content fingerprinting at the repository boundary. Callers MUST NOT depend on sidecar
-filenames, spec-directory scans, or invent validate-cache stamp helpers on this port
-to discover or mutate persisted semantics.
+`readPersistedState` and `writePersistedState` are the only application-facing
+API for persisted sidecar state at the repository boundary. Callers MUST NOT
+depend on sidecar filenames, spec-directory scans, field-wise persisted
+read/write methods, or invent validate-cache stamp helpers on this port to
+discover or mutate persisted semantics.
 
 ### Requirement: search returns specs matching a text query
 
@@ -224,7 +267,14 @@ This method is the port-level search primitive — it performs a content scan wi
 
 ### Requirement: Abstract class with abstract methods
 
-`SpecRepository` MUST be defined as an `abstract class`, not an `interface`. All storage operations (`get`, `list`, `count`, `reindex`, `artifact`, `save`, `delete`, `resolveFromPath`, `metadata`, `saveMetadata`, persisted spec semantic read/write operations, stable spec hash lookup, `search`) MUST be declared as `abstract` methods. This follows the architecture spec requirement that ports with shared construction are abstract classes.
+`SpecRepository` MUST be defined as an `abstract class`, not an `interface`. All
+storage operations (`get`, `list`, `count`, `reindex`, `artifact`, `save`,
+`delete`, `resolveFromPath`, `readMetadataSnapshot`, `writeMetadataSnapshot`,
+`readPersistedState`, `writePersistedState`, `artifactMeta`,
+`persistedStateMeta`, `generatedMetadataMeta`, `specFingerprint`, `search`)
+MUST be declared as `abstract` methods. This follows the architecture spec
+requirement that ports with shared construction are abstract classes. There
+MUST NOT be a `persistedStateHash` abstract method.
 
 ### Requirement: Spec counting
 
@@ -251,27 +301,58 @@ When `specsPath` is exposed:
 
 ## Constraints
 
-- Each instance is bound to a single workspace; workspace is immutable after construction
-- `get` returns lightweight `Spec` metadata including `SpecArtifactEntry` lastModified
-  stamps, `persistedStateStamp`, and `generatedMetadataStamp` — artifact **content** is never
-  loaded by `get`
-- `list` returns `ListResult<SpecListEntry>` rows with host-controlled pagination (no default `limit`); artifact content is never loaded by `list`
-- `search` loads artifact content as needed to perform matching — it is more expensive than `list`
+- Each instance is bound to a single workspace; workspace is immutable after
+  construction
+- `get` returns lightweight `Spec` metadata including `SpecArtifactEntry`
+  lastModified stamps, `persistedStateStamp`, and `generatedMetadataStamp` —
+  artifact **content** is never loaded by `get`
+- `list` returns `ListResult<SpecListEntry>` rows with host-controlled
+  pagination (no default `limit`); artifact content is never loaded by `list`
+- `search` loads artifact content as needed to perform matching — it is more
+  expensive than `list`
 - `save` creates the spec directory if it does not already exist
-- `ArtifactConflictError` is the sole error type for concurrent modification detection on `save`, `saveMetadata`, and semantic `update` operations
-- `resolveFromPath` with a relative path and no `from` parameter is invalid and the implementation MUST handle this as an error or return `null`
-- `originalHash` on loaded artifacts MUST use `sha256` of the file content as read from disk
-- `metadata` and `saveMetadata` operate on a storage location determined by the adapter — callers MUST NOT assume metadata lives alongside spec content
-- `metadata` returns parsed content; `artifact` returns raw content — they are not interchangeable
-- `generatedMetadataStamp` on `Spec` is a lastModified/presence stamp only — it is not the parsed metadata document
-- `save`, `saveMetadata`, and semantic `update` operations MUST throw `ReadOnlyWorkspaceError` before any I/O when ownership is `readOnly`
-- Read operations (`get`, `list`, `count`, `artifact`, `metadata`, `resolveFromPath`, `search`, `persistedStateHash`, `specFingerprint`, and semantic `read` operations) are not affected by ownership — readOnly workspaces can always be read
-- Use cases MUST interact with specs through semantic repository operations only.
-- Sidecar files (like `spec-lock.json`) are an implementation detail of the repository adapter and MUST NOT be accessed directly by application logic.
-- `persistedStateHash()` MUST be stable and deterministic across multiple calls for the same persisted semantic state.
-- `specFingerprint()` MUST be stable and deterministic across multiple calls for the same artifact contents and persisted semantic state.
-- `specsPath` is a repository capability for filesystem-backed adapters only; consumers MUST NOT assume it exists for every `SpecRepository`
-- This port MUST NOT grow validate-cache-specific helpers such as `validationSourceStamps` or `readValidationSidecar`
+- `ArtifactConflictError` is the sole error type for concurrent modification
+  detection on `save` and conflicting `writePersistedState`/
+  `writeMetadataSnapshot` calls
+- `resolveFromPath` with a relative path and no `from` parameter is invalid and
+  the implementation MUST handle this as an error or return `null`
+- `originalHash` on loaded artifacts MUST use `sha256` of the file content as
+  read from disk
+- `readMetadataSnapshot` and `writeMetadataSnapshot` operate on a storage
+  location determined by the adapter — callers MUST NOT assume metadata lives
+  alongside spec content
+- `readMetadataSnapshot` returns parsed content plus an adapter-defined
+  `revision`; `artifact` returns raw content — they are not interchangeable
+- `generatedMetadataStamp` on `Spec` is a lastModified/presence stamp only — it
+  is not the parsed metadata document
+- `save` and `writePersistedState` MUST throw `ReadOnlyWorkspaceError` before
+  any I/O when ownership is `readOnly`; a `readOnly` workspace still forbids
+  canonical artifact and persisted-state mutation
+- `writeMetadataSnapshot` is NOT subject to the `readOnly` ownership guard: a
+  `readOnly` source workspace MAY still persist its generated metadata cache,
+  because canonical source ownership and disposable cache ownership are
+  distinct concerns
+- Read operations (`get`, `list`, `count`, `artifact`, `readMetadataSnapshot`,
+  `readPersistedState`, `artifactMeta`, `persistedStateMeta`,
+  `generatedMetadataMeta`, `resolveFromPath`, `search`, `specFingerprint`) are
+  not affected by ownership — readOnly workspaces can always be read
+- Use cases MUST interact with specs through semantic repository operations
+  only.
+- Sidecar files (like `spec-lock.json`) are an implementation detail of the
+  repository adapter and MUST NOT be accessed directly by application logic.
+- `persistedStateMeta({ includeHash: true })?.hash` MUST be stable and
+  deterministic across multiple calls for the same persisted semantic state.
+- `specFingerprint()` MUST be stable and deterministic across multiple calls for
+  the same artifact contents and persisted semantic state.
+- `specsPath` is a repository capability for filesystem-backed adapters only;
+  consumers MUST NOT assume it exists for every `SpecRepository`
+- This port MUST NOT grow validate-cache-specific helpers such as
+  `validationSourceStamps` or `readValidationSidecar`
+- The repository MUST NOT classify metadata freshness (`fresh`/`stale`) or
+  generate metadata content — those are application-layer responsibilities of
+  Core materialization
+- `list({ includeMeta: true })` MUST NEVER compute or return content hashes;
+  hash remains opt-in on the point Meta methods only
 
 ## Spec Dependencies
 

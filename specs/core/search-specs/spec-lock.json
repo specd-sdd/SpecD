@@ -8,12 +8,8 @@
     "core:list-specs",
     "core:workspace",
     "core:list-workspaces",
-    "core:composition-resolver"
+    "core:composition-resolver",
+    "core:get-spec-metadata"
   ],
-  "implementation": [
-    {
-      "file": "core:src/application/use-cases/search-specs.ts",
-      "symbols": ["SearchSpecs"]
-    }
-  ]
+  "implementation": []
 }

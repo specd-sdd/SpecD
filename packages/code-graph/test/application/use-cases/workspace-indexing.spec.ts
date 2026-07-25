@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { makeSpec } from '../../helpers/make-spec.js'
 import { makeListResult, makeMockSpecRepository } from '../../helpers/make-mock-spec-repository.js'
 
@@ -321,7 +321,14 @@ describe('Workspace indexing', () => {
       list: async () => makeListResult([]),
       count: async () => 0,
       get: async () => null,
-      persistedStateHash: async () => 'sha256:test',
+      persistedStateMeta: async (
+        _spec: import('@specd/core').Spec,
+        options?: { readonly includeHash?: boolean },
+      ) =>
+        options?.includeHash === true
+          ? { lastModified: new Date().toISOString(), hash: 'sha256:test' }
+          : { lastModified: new Date().toISOString() },
+      generatedMetadataMeta: async () => null,
       metadata: async () => null,
       readPersistedDependsOn: async () => [],
       readPersistedImplementation: async () => [],
@@ -413,10 +420,17 @@ describe('Workspace indexing', () => {
       count: async () => 1,
       get: async (specPath: import('@specd/core').SpecPath) =>
         specPath.toFsPath('/') === spec1.name.toFsPath('/') ? spec1 : null,
-      persistedStateHash: async () => 'sha256:sidecar-hash',
+      persistedStateMeta: async (
+        _spec: import('@specd/core').Spec,
+        options?: { readonly includeHash?: boolean },
+      ) =>
+        options?.includeHash === true
+          ? { lastModified: new Date().toISOString(), hash: 'sha256:sidecar-hash' }
+          : { lastModified: new Date().toISOString() },
+      generatedMetadataMeta: async () => null,
       metadata: async () => ({ title: 'Test' }),
-      readPersistedDependsOn: async () => [],
-      readPersistedImplementation: async () => [],
+      readMetadataSnapshot: async () => ({ kind: 'missing' as const, revision: null }),
+      readPersistedState: async () => null,
       artifact: async (s: Spec, f: string) => ({
         content: artifactMap.get(s.name.toString())?.[f],
       }),
@@ -527,5 +541,135 @@ describe('Workspace indexing', () => {
       omittedStats.graphFingerprint,
       buildExpectedFingerprintMap(CODE_GRAPH_VERSION, tempDir, [workspace], graphConfig),
     )
+  })
+
+  it('skips spec re-index when materialized metadata fingerprint is unchanged', async () => {
+    const ws1Dir = createWorkspaceDir(tempDir, 'ws1', {})
+    const spec1 = makeSpec({ workspace: 'ws1', name: 'auth/login', filenames: ['spec.md'] })
+    const repo = {
+      ...makeMockRepo([spec1]),
+      readPersistedState: async () => null,
+    } as unknown as SpecRepository
+
+    const getSpecMetadata = {
+      execute: vi.fn(async () => ({
+        metadata: {
+          title: 'Login',
+          description: 'Stable description',
+          provenance: {},
+        },
+        metadataFingerprint: 'fp-stable',
+        source: 'persisted' as const,
+        regenerated: false,
+        warnings: [],
+      })),
+    }
+
+    const uc = new IndexCodeGraph(store, registry)
+    await uc.execute({
+      projectRoot: tempDir,
+      vcsRoot: tempDir,
+      workspaces: [
+        {
+          name: 'ws1',
+          prefix: null,
+          codeRoot: ws1Dir,
+          specRepo: repo,
+          ownership: 'owned',
+          isExternal: false,
+        },
+      ],
+      graphConfig: { includePaths: [], workspaces: new Map() },
+      getSpecMetadata: getSpecMetadata as never,
+    })
+
+    const first = await store.getSpec('ws1:auth/login')
+    expect(first?.contentHash).toBe('fp-stable')
+    expect(getSpecMetadata.execute).toHaveBeenCalledTimes(1)
+
+    await uc.execute({
+      projectRoot: tempDir,
+      vcsRoot: tempDir,
+      workspaces: [
+        {
+          name: 'ws1',
+          prefix: null,
+          codeRoot: ws1Dir,
+          specRepo: repo,
+          ownership: 'owned',
+          isExternal: false,
+        },
+      ],
+      graphConfig: { includePaths: [], workspaces: new Map() },
+      getSpecMetadata: getSpecMetadata as never,
+    })
+
+    expect(getSpecMetadata.execute).toHaveBeenCalledTimes(2)
+    const second = await store.getSpec('ws1:auth/login')
+    expect(second?.contentHash).toBe('fp-stable')
+  })
+
+  it('re-indexes spec when materialized metadata fingerprint changes', async () => {
+    const ws1Dir = createWorkspaceDir(tempDir, 'ws1', {})
+    const spec1 = makeSpec({ workspace: 'ws1', name: 'auth/login', filenames: ['spec.md'] })
+    const repo = {
+      ...makeMockRepo([spec1]),
+      readPersistedState: async () => null,
+    } as unknown as SpecRepository
+
+    let fingerprint = 'fp-v1'
+    const getSpecMetadata = {
+      execute: vi.fn(async () => ({
+        metadata: {
+          title: 'Login',
+          description: fingerprint === 'fp-v1' ? 'Version one' : 'Version two',
+          provenance: {},
+        },
+        metadataFingerprint: fingerprint,
+        source: 'generated' as const,
+        regenerated: true,
+        warnings: [],
+      })),
+    }
+
+    const uc = new IndexCodeGraph(store, registry)
+    await uc.execute({
+      projectRoot: tempDir,
+      vcsRoot: tempDir,
+      workspaces: [
+        {
+          name: 'ws1',
+          prefix: null,
+          codeRoot: ws1Dir,
+          specRepo: repo,
+          ownership: 'owned',
+          isExternal: false,
+        },
+      ],
+      graphConfig: { includePaths: [], workspaces: new Map() },
+      getSpecMetadata: getSpecMetadata as never,
+    })
+
+    fingerprint = 'fp-v2'
+    await uc.execute({
+      projectRoot: tempDir,
+      vcsRoot: tempDir,
+      workspaces: [
+        {
+          name: 'ws1',
+          prefix: null,
+          codeRoot: ws1Dir,
+          specRepo: repo,
+          ownership: 'owned',
+          isExternal: false,
+        },
+      ],
+      graphConfig: { includePaths: [], workspaces: new Map() },
+      getSpecMetadata: getSpecMetadata as never,
+    })
+
+    const node = await store.getSpec('ws1:auth/login')
+    expect(node?.contentHash).toBe('fp-v2')
+    expect(node?.description).toBe('Version two')
   })
 })

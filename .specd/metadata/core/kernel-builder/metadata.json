@@ -5,7 +5,8 @@
     "core:kernel",
     "core:composition",
     "default:_global/architecture",
-    "core:composition-resolver"
+    "core:composition-resolver",
+    "core:materialize-spec-metadata"
   ],
   "context": [
     "Consumers that need to register kernel extensions conditionally or incrementally should not have to assemble a large `KernelOptions` object manually before every kernel construction. The kernel builder provides a fluent composition surface over the same additive registry model as `createKernel(config, options)`, letting callers accumulate registrations ergonomically while preserving the kernel's existing guarantees around manual dependency injection, additive extension, and post-build immutability."
@@ -26,7 +27,7 @@
     {
       "requirement": "Builder builds kernels with createKernel-equivalent semantics",
       "rules": [
-        "Calling `build()` on the builder SHALL produce a kernel with the same semantics as calling `createKernel(config, options)` with the equivalent accumulated registrations.\n\nThis equivalence includes:\n\n- built-in capabilities remain available\n- external registrations extend rather than replace built-ins\n- shared adapters are constructed once\n- the resulting kernel is immutable after construction"
+        "Calling `build()` on the builder SHALL produce a kernel with the same semantics as calling `createKernel(config, options)` with the equivalent accumulated registrations.\n\nThis equivalence includes:\n\n- built-in capabilities remain available\n- external registrations extend rather than replace built-ins\n- shared adapters are constructed once\n- the resulting kernel is immutable after construction\n- `build()` returns the complete `kernel.specs` use-case set defined by [`core:kernel`](../kernel/spec.md) — including `generateMetadata`, `materializeMetadata`, `getMetadata`, `regenerateMetadata`, `initializePersistedState`, persisted schema inspection/reassignment, and persisted dependency/implementation/optimization queries and mutations — for every registry and repository override combination the builder supports. The builder MUST NOT maintain a second, independently-updated use-case list that can drift from `createKernel()`."
       ]
     },
     {
@@ -103,6 +104,18 @@
       ]
     },
     {
+      "requirement": "Builder builds kernels with createKernel-equivalent semantics",
+      "name": "Built kernel exposes the complete kernel.specs materialization and persisted-state surface",
+      "given": [
+        "a kernel built through the builder with any combination of registry and repository overrides"
+      ],
+      "when": ["kernel.specs is inspected"],
+      "then": [
+        "it includes generateMetadata, materializeMetadata, getMetadata, regenerateMetadata, initializePersistedState, persisted schema inspection/reassignment, and persisted dependency/implementation/optimization queries and mutations",
+        "AND the builder does not maintain a second, independently-updated use-case list that could drift from createKernel()"
+      ]
+    },
+    {
       "requirement": "Builder rejects conflicting registrations",
       "name": "Duplicate registration name is rejected",
       "given": ["a builder with a registration for a parser format named toml"],
@@ -143,23 +156,27 @@
       ]
     }
   ],
-  "implementation": {
-    "symbols": [
-      {
-        "specId": "core:kernel-builder",
-        "file": "core:src/composition/kernel-builder.ts",
-        "symbol": "KernelBuilder"
-      },
-      {
-        "specId": "core:kernel-builder",
-        "file": "core:src/composition/kernel-builder.ts",
-        "symbol": "createKernelBuilder"
-      }
-    ]
-  },
   "contentHashes": {
-    "spec.md": "sha256:16d2e303bc2afc2e600ae884f5f9c5db09da4a0e2b283484f849b163785d2201",
-    "verify.md": "sha256:2e12e7c91952f332e92c565cb0c47b1a69da1bbb29824fb9290db862ec30055c"
+    "spec.md": "sha256:bcd53b9153181e9b508d23523bb63f16cea938ae1082027f8d24b7ad3c7ffb06",
+    "verify.md": "sha256:93834e5174ffa9dcf50ddc5b4e4b56ed8686bd025a57c56412728a4baac141b5"
   },
-  "generatedBy": "core"
+  "provenance": {
+    "artifacts": {
+      "spec.md": {
+        "hash": "sha256:bcd53b9153181e9b508d23523bb63f16cea938ae1082027f8d24b7ad3c7ffb06",
+        "lastModified": "2026-07-25T11:53:31.486Z"
+      },
+      "verify.md": {
+        "hash": "sha256:93834e5174ffa9dcf50ddc5b4e4b56ed8686bd025a57c56412728a4baac141b5",
+        "lastModified": "2026-07-25T11:53:31.486Z"
+      }
+    },
+    "persistedStateHash": "sha256:279eab1b69a3f171701f7326fd32d9eab7e9129d85dfe69285f21779e54b12ae",
+    "schema": {
+      "name": "schema-std",
+      "version": 1
+    },
+    "projectionVersion": 1,
+    "projectionFingerprint": "sha256:e4a28a2db6a35ed39b8308518337235b1490c2948cd839db25866ad79b22404b"
+  }
 }

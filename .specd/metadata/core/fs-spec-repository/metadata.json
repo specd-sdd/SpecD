@@ -5,7 +5,10 @@
     "default:_global/architecture",
     "core:composition",
     "core:storage",
-    "core:spec-repository-port"
+    "core:spec-repository-port",
+    "core:spec-lock",
+    "core:spec-metadata",
+    "core:spec-optimization"
   ],
   "context": [
     "`FsSpecRepository` is the filesystem-backed implementation of the `SpecRepository` port. It manages specifications and their associated metadata on the filesystem, validating configuration options strictly against its Zod schema."
@@ -32,19 +35,31 @@
     {
       "requirement": "SpecListEntry materialization in index",
       "rules": [
-        "When building or refreshing index rows, `FsSpecIndexCache` MUST materialize the full\nCLI-usable `SpecListEntry` payload:\n\n- **Always:** `workspace`, `path`, `title` — title resolution order: (1) non-empty\n  trimmed metadata `title`; (2) last segment of `path`.\n- **Stored for projection:** `summary` and `metadataStatus` using the same resolution\n  rules as [`core:spec-repository-port`](../spec-repository-port/spec.md) /\n  [`core:list-specs`](../list-specs/spec.md).\n\nWhen inspecting whether `spec.md` exists for summary fallback, implementations MUST\nuse `Spec.artifacts` (presence of an entry whose `filename` is `spec.md`).\n\nErrors while resolving title, summary, or status for an individual spec MUST be\nswallowed; the entry still appears with title fallback.\n\nPort `includeSummary` / `includeMetadataStatus` flags MUST project cached fields only —\nno extra file reads at list time.\n\nSpec create/delete/publish and content/metadata/lock changes that affect cached fields\nMUST refresh via upsert or bucket invalidation according to helper rules."
+        "When building or refreshing index rows, `FsSpecIndexCache` MUST materialize the\nfull CLI-usable `SpecListEntry` payload:\n\n- **Always:** `workspace`, `path`, `title` — title resolution order: (1) non-empty\n  trimmed metadata `title`; (2) last segment of `path`.\n- **Stored for projection:** `summary` using the same resolution rules as\n  [`core:spec-repository-port`](../spec-repository-port/spec.md) /\n  [`core:list-specs`](../list-specs/spec.md).\n- **Stored for Meta projection:** lastModified stamps for present schema\n  artifacts and for the persisted-state / generated-metadata observations,\n  derived from the existing index `sourceFiles` freshness stamps. The adapter\n  MUST NOT enrich the index wire format solely for Meta — project existing\n  `sourceFiles` into public Meta shapes.\n\nWhen inspecting whether `spec.md` exists for summary fallback, implementations\nMUST use `Spec.artifacts` (presence of an entry whose `filename` is `spec.md`).\n\nErrors while resolving title, summary, or Meta fields for an individual spec\nMUST be swallowed; the entry still appears with title fallback.\n\nPort `includeSummary` / `includeMeta` flags MUST project cached fields only —\nno extra file reads at list time. `includeMeta` MUST NEVER populate `hash` on\nany Meta field. `includeMetadataStatus` MUST NOT exist.\n\nSpec create/delete/publish and content/metadata/lock changes that affect cached\nfields MUST refresh via upsert or bucket invalidation according to helper rules."
       ]
     },
     {
       "requirement": "Spec stamp population on get",
       "rules": [
-        "`FsSpecRepository.get()` MUST populate the contractual `Spec` stamp fields using\nfilesystem metadata without reading artifact contents:\n\n- For each allowed schema artifact file present in the spec directory, emit a\n  `SpecArtifactEntry` with `filename` and `lastModified` from `stat` (ISO-8601 from\n  `mtime`, consistent within the FS adapter family).\n- Set `persistedStateStamp` from the lock sidecar path: `present` / `lastModified` via\n  `stat`, or `present: false` and `lastModified: null` when absent.\n- Set `generatedMetadataStamp` from the configured metadata file path the same way.\n\n`get` MUST NOT read file contents to build these stamps. Content reads remain the\nresponsibility of `artifact()`, `metadata()`, `persistedStateHash()`, and\n`specFingerprint()`."
+        "`FsSpecRepository.get()` MUST populate the contractual `Spec` stamp fields using\nfilesystem metadata without reading artifact contents:\n\n- For each allowed schema artifact file present in the spec directory, emit a\n  `SpecArtifactEntry` with `filename` and `lastModified` from `stat` (ISO-8601 from\n  `mtime`, consistent within the FS adapter family).\n- Set `persistedStateStamp` from the lock sidecar path: `present` / `lastModified` via\n  `stat`, or `present: false` and `lastModified: null` when absent.\n- Set `generatedMetadataStamp` from the configured metadata file path the same way.\n\n`get` MUST NOT read file contents to build these stamps. Content reads remain the\nresponsibility of `artifact()`, `readMetadataSnapshot()`,\n`persistedStateMeta(..., { includeHash: true })`, and `specFingerprint()`."
       ]
     },
     {
-      "requirement": "persistedStateHash and specFingerprint on FS",
+      "requirement": "Aggregate persisted-state operations and canonical lock serialization",
       "rules": [
-        "`FsSpecRepository` MUST implement:\n\n- `persistedStateHash(spec)` as the SHA-256 of the raw lock sidecar bytes, or `null`\n  when the sidecar is absent (formerly exposed as `specHash`).\n- `specFingerprint(spec)` per\n  [`core:spec-repository-port`](../spec-repository-port/spec.md): per-artifact content\n  hashes bound to filenames, ordered by filename alphabetically, combined with\n  `persistedStateHash` or an absent sentinel, then hashed. Generated metadata MUST NOT\n  be included.\n\nThe repository MUST NOT own or write\n`{configPath}/tmp/fs-cache/validate-specs/<workspace>/` rows; that bucket belongs to\nthe `ValidationResultCache` filesystem adapter."
+        "`FsSpecRepository` MUST implement `readPersistedState(spec)` and\n`writePersistedState(spec, state, options)` against `spec-lock.json` using one\ncanonical serializer/writer shared internally with staged `publish()`.\n\nThe canonical serializer/writer MUST:\n\n- validate that `state` is a complete `PersistedSpecState` before serializing\n- emit stable, deterministic JSON\n- write through the existing atomic file writer used elsewhere in this adapter\n- compute the resulting `originalHash` / `persistedStateHash` from the exact\n  serialized bytes it wrote\n\n`FsSpecRepository` MUST NOT choose schema identity, extract dependencies, apply\npatches, or invent default values while serializing; it persists exactly the\ncomplete state it is given. In particular, it MUST NOT construct or emit the\nlegacy fallback `{ schema: { name: 'unknown', version: 0 } }` for a spec with no\nlock — a lock-less spec MUST be represented as `readPersistedState` returning\n`null`, never as a lock containing placeholder schema values.\n\n`writePersistedState` MUST enforce `options.expectedRevision`: `null` requires\nthat no `spec-lock.json` currently exists for the spec, and a present value must\nmatch the current sidecar's hash, or the write MUST fail with the repository's\nconflict error. On success it returns the newly persisted\n`PersistedSpecStateSnapshot`.\n\n`readPersistedState` and `writePersistedState` MUST throw\n`ReadOnlyWorkspaceError` before any I/O when `ownership()` is `readOnly`,\nconsistent with `save()`."
+      ]
+    },
+    {
+      "requirement": "Metadata snapshot persistence",
+      "rules": [
+        "`FsSpecRepository` MUST implement `readMetadataSnapshot(spec)` and\n`writeMetadataSnapshot(spec, metadata, options)` against the configured\nmetadata file location.\n\n`readMetadataSnapshot` MUST return `{ kind: 'missing', revision: null }` when\nthe file does not exist, `{ kind: 'invalid', revision, error }` when the file\nexists but fails to parse, or `{ kind: 'present', metadata, revision }` when it\nparses successfully. `FsSpecRepository` MUST NOT compute or return freshness\nhere.\n\n`FsSpecRepository` MAY use the raw-byte SHA-256 of the serialized metadata JSON\nas `revision`. `writeMetadataSnapshot` MUST enforce `options.expectedRevision`\nthe same way `writePersistedState` enforces its own: `null` requires current\nabsence, a present value must match the current file's revision, and a mismatch\nMUST fail with the repository's conflict error.\n\nUnlike `save()` and `writePersistedState()`, `writeMetadataSnapshot()` MUST NOT\napply the authored-source ownership guard: it MUST NOT throw\n`ReadOnlyWorkspaceError` when `ownership()` is `readOnly`. A `readOnly` source\nworkspace may still persist its generated metadata cache because canonical\nsource ownership and disposable cache ownership are distinct concerns.\n\n`FsSpecRepository` MUST reuse the existing artifact stat/hash path for\n`artifactMeta(spec, filename)` rather than implementing a second hashing\nroutine."
+      ]
+    },
+    {
+      "requirement": "Meta observations and specFingerprint on FS",
+      "rules": [
+        "`FsSpecRepository` MUST implement:\n\n- `persistedStateMeta(spec, options?)` observing the lock sidecar: `lastModified`\n  from `stat`, and `hash` (SHA-256 of the exact bytes written by the canonical\n  lock serializer) only when `options.includeHash === true`. Return `null` when\n  the sidecar is absent. There MUST NOT be a `persistedStateHash(spec)` method.\n- `generatedMetadataMeta(spec, options?)` observing the configured metadata cache\n  file with the same `lastModified` / optional `hash` rules; `null` when absent.\n- `artifactMeta(spec, filename, options?)` by reusing the existing artifact\n  stat/hash path that populates `SpecArtifactEntry.lastModified` and artifact\n  content hashes elsewhere on this adapter — it MUST NOT be a second hashing\n  implementation. `hash` only when `includeHash === true`.\n- `specFingerprint(spec)` per\n  [`core:spec-repository-port`](../spec-repository-port/spec.md): per-artifact\n  content hashes bound to filenames, ordered by filename alphabetically,\n  combined with `persistedStateMeta(spec, { includeHash: true })?.hash` or an\n  absent sentinel, then hashed. Generated metadata MUST NOT be included.\n\nThe repository MUST NOT own or write\n`{configPath}/tmp/fs-cache/validate-specs/<workspace>/` rows; that bucket\nbelongs to the `ValidationResultCache` filesystem adapter."
       ]
     }
   ],
@@ -177,18 +192,146 @@
       "then": ["Spec.filenames includes spec.md", "AND Spec.hasArtifact('spec.md') is true"]
     },
     {
-      "requirement": "persistedStateHash and specFingerprint on FS",
-      "name": "persistedStateHash hashes lock bytes",
+      "requirement": "Aggregate persisted-state operations and canonical lock serialization",
+      "name": "readPersistedState returns null for a lock-less spec without a placeholder schema",
+      "given": ["a spec with no spec-lock.json"],
+      "when": ["readPersistedState(spec) is called"],
+      "then": [
+        "it returns null",
+        "AND it does not construct a placeholder lock with schema: { name: 'unknown', version: 0 }"
+      ]
+    },
+    {
+      "requirement": "Aggregate persisted-state operations and canonical lock serialization",
+      "name": "writePersistedState creates the lock via the canonical serializer",
+      "given": ["no spec-lock.json exists for the spec"],
+      "when": ["writePersistedState(spec, state, { expectedRevision: null }) is called"],
+      "then": [
+        "the canonical serializer validates the complete PersistedSpecState and writes stable, deterministic JSON through the existing atomic file writer"
+      ]
+    },
+    {
+      "requirement": "Aggregate persisted-state operations and canonical lock serialization",
+      "name": "writePersistedState rejects a stale expectedRevision",
+      "given": ["a spec-lock.json exists with a known hash"],
+      "when": [
+        "writePersistedState(spec, state, { expectedRevision: <a different hash> }) is called"
+      ],
+      "then": ["the write fails with the repository's conflict error"]
+    },
+    {
+      "requirement": "Aggregate persisted-state operations and canonical lock serialization",
+      "name": "writePersistedState reuses the same serializer as staged publish",
+      "when": ["writePersistedState and staged publish() both write spec-lock.json"],
+      "then": [
+        "both go through the same canonical serializer/writer, not two independent implementations"
+      ]
+    },
+    {
+      "requirement": "Aggregate persisted-state operations and canonical lock serialization",
+      "name": "readPersistedState and writePersistedState enforce the readOnly guard like save()",
+      "given": ["a FsSpecRepository bound to a workspace with readOnly ownership"],
+      "when": ["readPersistedState(spec) or writePersistedState(spec, state, options) is called"],
+      "then": ["ReadOnlyWorkspaceError is thrown before any I/O, consistent with save()"]
+    },
+    {
+      "requirement": "Metadata snapshot persistence",
+      "name": "readMetadataSnapshot reports missing, invalid, and present persistence kinds only",
+      "given": [
+        "a metadata file that does not exist, one that fails to parse, and one that parses successfully"
+      ],
+      "when": ["readMetadataSnapshot(spec) is called for each"],
+      "then": [
+        "it returns { kind: 'missing', revision: null }, { kind: 'invalid', revision, error }, and { kind: 'present', metadata, revision } respectively",
+        "AND FsSpecRepository does not compute or return freshness"
+      ]
+    },
+    {
+      "requirement": "Metadata snapshot persistence",
+      "name": "revision may be the raw-byte SHA-256 of serialized metadata JSON",
+      "when": ["metadata is written"],
+      "then": [
+        "FsSpecRepository may use the raw-byte SHA-256 of the serialized metadata JSON as revision"
+      ]
+    },
+    {
+      "requirement": "Metadata snapshot persistence",
+      "name": "writeMetadataSnapshot rejects a stale expectedRevision",
+      "given": ["metadata persisted at a known revision"],
+      "when": [
+        "writeMetadataSnapshot(spec, metadata, { expectedRevision: <a different revision> }) is called"
+      ],
+      "then": ["the write fails with the repository's conflict error"]
+    },
+    {
+      "requirement": "Metadata snapshot persistence",
+      "name": "writeMetadataSnapshot is exempt from the readOnly ownership guard",
+      "given": ["a FsSpecRepository bound to a workspace with readOnly ownership"],
+      "when": ["writeMetadataSnapshot(spec, metadata, options) is called"],
+      "then": ["it does not throw ReadOnlyWorkspaceError"]
+    },
+    {
+      "requirement": "Metadata snapshot persistence",
+      "name": "artifactMeta reuses the existing stat/hash path",
+      "when": ["artifactMeta(spec, filename, { includeHash: true }) is called"],
+      "then": [
+        "it reuses the same stat/hash path used elsewhere on this adapter rather than a second hashing routine",
+        "AND without includeHash it returns lastModified only"
+      ]
+    },
+    {
+      "requirement": "Meta observations and specFingerprint on FS",
+      "name": "persistedStateMeta hashes lock bytes when includeHash is set",
       "given": ["a lock sidecar with known content"],
-      "when": ["persistedStateHash(spec) is called"],
+      "when": ["persistedStateMeta(spec, { includeHash: true }) is called"],
       "then": ["the digest equals SHA-256 of those bytes"]
     },
     {
-      "requirement": "persistedStateHash and specFingerprint on FS",
+      "requirement": "Meta observations and specFingerprint on FS",
+      "name": "persistedStateMeta omits hash without includeHash",
+      "given": ["a present lock sidecar"],
+      "when": ["persistedStateMeta(spec) is called without includeHash"],
+      "then": ["the result includes lastModified and does not include hash"]
+    },
+    {
+      "requirement": "Meta observations and specFingerprint on FS",
+      "name": "there is no persistedStateHash method on FsSpecRepository",
+      "when": ["FsSpecRepository is examined"],
+      "then": ["it does not expose persistedStateHash"]
+    },
+    {
+      "requirement": "Meta observations and specFingerprint on FS",
       "name": "specFingerprint excludes generated metadata",
       "given": ["a spec whose artifact contents and lock state are unchanged while"],
       "when": ["specFingerprint(spec) is computed before and after the metadata change"],
       "then": ["both digests are equal"]
+    },
+    {
+      "requirement": "Meta observations and specFingerprint on FS",
+      "name": "persistedStateMeta hash uses the canonical serializer's exact bytes",
+      "when": ["persistedStateMeta(spec, { includeHash: true }) is computed"],
+      "then": [
+        "it is the SHA-256 of the exact bytes written by the canonical lock serializer, not a second independently implemented serialization path"
+      ]
+    },
+    {
+      "requirement": "Meta observations and specFingerprint on FS",
+      "name": "includeMeta projects sourceFiles without extra I/O or hash",
+      "given": ["a fresh list index whose sourceFiles already carry artifact and sidecar mtimes"],
+      "when": ["list(undefined, { includeMeta: true }) is called"],
+      "then": [
+        "Meta fields are projected from those stamps without additional filesystem reads",
+        "AND no Meta field includes hash"
+      ]
+    },
+    {
+      "requirement": "Meta observations and specFingerprint on FS",
+      "name": "FsSpecRepository does not own the validate-specs cache bucket",
+      "when": ["FsSpecRepository operates"],
+      "then": [
+        "it does not read or write {configPath}/tmp/fs-cache/validate-specs/<workspace>/ rows",
+        "AND that bucket remains owned by the ValidationResultCache filesystem adapter"
+      ]
     }
   ],
   "implementation": {
@@ -196,23 +339,46 @@
       {
         "specId": "core:fs-spec-repository",
         "file": "core:src/infrastructure/fs/spec-repository.ts",
-        "symbol": "FsSpecRepository,persistedStateHash,specFingerprint,_buildSpec"
+        "symbol": "FsSpecRepository"
       },
       {
         "specId": "core:fs-spec-repository",
         "file": "core:src/infrastructure/fs/spec-repository.ts",
-        "symbol": "specFingerprint"
+        "symbol": "projectListMetaFromSourceFiles"
       },
       {
         "specId": "core:fs-spec-repository",
-        "file": "core:src/infrastructure/fs/spec-repository.ts",
-        "symbol": "persistedStateHash"
+        "file": "core:src/infrastructure/fs/project-list-meta.ts",
+        "symbol": "projectListMetaFromSourceFiles"
+      },
+      {
+        "specId": "core:fs-spec-repository",
+        "file": "core:src/infrastructure/fs/fs-spec-index-cache.ts",
+        "symbol": "FsSpecIndexCache"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:2ba4ba9c1d8c809e9955dc46dea454e070aa6a5135c23626e3fc6e0d27a453ce",
-    "verify.md": "sha256:f06427d1c7092543a33145e3a1390d3f9111c83365e325a407d585b2ee38cf27"
+    "spec.md": "sha256:490366fad29e1abe2bd739a6c047772336fb23e622ba2a4e757f09d9c8451769",
+    "verify.md": "sha256:9b65fc846934308d205ba08aa3f18b3a55e15665c05e677364a979287d94bc9b"
   },
-  "generatedBy": "core"
+  "provenance": {
+    "artifacts": {
+      "spec.md": {
+        "hash": "sha256:490366fad29e1abe2bd739a6c047772336fb23e622ba2a4e757f09d9c8451769",
+        "lastModified": "2026-07-25T11:53:31.561Z"
+      },
+      "verify.md": {
+        "hash": "sha256:9b65fc846934308d205ba08aa3f18b3a55e15665c05e677364a979287d94bc9b",
+        "lastModified": "2026-07-25T11:53:31.561Z"
+      }
+    },
+    "persistedStateHash": "sha256:0f88d945e8cff075c51e0ffd82dd14a0efd878e63e63acf9055548e5992ded04",
+    "schema": {
+      "name": "schema-std",
+      "version": 1
+    },
+    "projectionVersion": 1,
+    "projectionFingerprint": "sha256:e4a28a2db6a35ed39b8308518337235b1490c2948cd839db25866ad79b22404b"
+  }
 }

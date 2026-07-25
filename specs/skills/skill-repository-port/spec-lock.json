@@ -1,0 +1,8 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["core:config", "skills:skill", "skills:skill-bundle"],
+  "implementation": []
+}

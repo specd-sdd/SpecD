@@ -1,7 +1,7 @@
 {
   "title": "core:update-project-metadata",
   "description": "To maintain an optimized project context, we need a way for agents to save their optimizations while the system ensures the cache remains valid. The `UpdateProjectMetadata` use case accepts an optimized payload, computes the current hashes for all project context inputs, and persists the full `project-metadata.json` structure.",
-  "dependsOn": ["core:project-metadata", "core:composition-resolver"],
+  "dependsOn": ["core:project-metadata", "core:composition-resolver", "core:get-spec-metadata"],
   "context": [
     "To maintain an optimized project context, we need a way for agents to save their optimizations while the system ensures the cache remains valid. The `UpdateProjectMetadata` use case accepts an optimized payload, computes the current hashes for all project context inputs, and persists the full `project-metadata.json` structure."
   ],
@@ -9,7 +9,7 @@
     {
       "requirement": "Hash computation",
       "rules": [
-        "The use case SHALL compute current SHA-256 hashes for:\n\n- The project's `specd.yaml`\n- All `contextFiles` defined in the configuration\n- All spec metadata for specs currently included in the project context"
+        "The use case SHALL compute current SHA-256 hashes for:\n\n- The project's `specd.yaml`\n- All `contextFiles` defined in the configuration\n\nFor every spec currently included in the project context, the use case SHALL call `GetSpecMetadata.execute({ specId })` (default `'if-needed'` policy) and record the returned `metadataFingerprint` in `freshness`, rather than hashing a raw metadata-cache-file snapshot or a repository storage revision. This keeps freshness comparisons storage-adapter-independent and self-healing: a spec whose metadata was missing or stale is regenerated as part of this computation."
       ]
     },
     {
@@ -25,7 +25,7 @@
     {
       "requirement": "Config-based factory delegates through resolveUpdateProjectMetadataDeps",
       "rules": [
-        "The config-based `createUpdateProjectMetadata(config, options?)` form MUST derive `UpdateProjectMetadataDeps` through `resolveUpdateProjectMetadataDeps(resolver)` and then delegate to canonical `createUpdateProjectMetadata(deps)`.\n\n`resolveUpdateProjectMetadataDeps(resolver)` MUST resolve:\n\n- `config: SpecdConfig`\n- `listWorkspaces: ListWorkspaces`\n- `specRepos: ReadonlyMap<string, SpecRepository>`\n- `files: FileReader`\n- `fileWriter: FileWriter`\n- `hasher: ContentHasher`\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
+        "The config-based `createUpdateProjectMetadata(config, options?)` form MUST derive `UpdateProjectMetadataDeps` through `resolveUpdateProjectMetadataDeps(resolver)` and then delegate to canonical `createUpdateProjectMetadata(deps)`.\n\n`resolveUpdateProjectMetadataDeps(resolver)` MUST resolve:\n\n- `config: SpecdConfig`\n- `listWorkspaces: ListWorkspaces`\n- `specRepos: ReadonlyMap<string, SpecRepository>`\n- `getMetadata: GetSpecMetadata`\n- `files: FileReader`\n- `fileWriter: FileWriter`\n- `hasher: ContentHasher`\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
       ]
     }
   ],
@@ -35,7 +35,18 @@
       "name": "Computes all hashes",
       "when": ["UpdateProjectMetadata is executed"],
       "then": [
-        "it uses the ContentHasher to get fresh hashes for specd.yaml, context files, and included spec metadata"
+        "it uses the ContentHasher to get fresh hashes for specd.yaml and context files",
+        "AND it calls GetSpecMetadata.execute({ specId }) for each spec included in the project context and records the returned metadataFingerprint"
+      ]
+    },
+    {
+      "requirement": "Hash computation",
+      "name": "Self-healing fingerprint computation regenerates missing or stale spec metadata",
+      "given": ["an included spec's persisted metadata is missing or stale"],
+      "when": ["UpdateProjectMetadata computes freshness hashes"],
+      "then": [
+        "GetSpecMetadata regenerates that spec's metadata as part of computing its metadataFingerprint",
+        "AND the resulting fingerprint reflects the regenerated projection"
       ]
     },
     {
@@ -64,19 +75,38 @@
         "AND resolveUpdateProjectMetadataDeps(resolver) resolves:",
         "AND the factory delegates to canonical createUpdateProjectMetadata(deps)"
       ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveUpdateProjectMetadataDeps",
+      "name": "resolveUpdateProjectMetadataDeps wires GetSpecMetadata for fingerprint computation",
+      "when": ["resolveUpdateProjectMetadataDeps(resolver) runs"],
+      "then": [
+        "the resolved deps include getMetadata: GetSpecMetadata",
+        "AND it is used to compute per-spec metadataFingerprint values instead of hashing raw metadata content"
+      ]
     }
   ],
-  "implementation": {
-    "files": [
-      {
-        "specId": "core:update-project-metadata",
-        "file": "core:src/composition/use-cases/update-project-metadata.ts"
-      }
-    ]
-  },
   "contentHashes": {
-    "spec.md": "sha256:20c52979a98589548a2fddaf2e68df440c32cbb947ef6ec97933f141b21079ce",
-    "verify.md": "sha256:04d05fed5e80ce86fcac9058461ec356abef7ca056dea2afc2eafac18961e645"
+    "spec.md": "sha256:446c7abffb9e396c9dc00596d5bab197ad072c25fb0406bb2d4e3c3b07edad44",
+    "verify.md": "sha256:3e49d15ee5bc67c39e73d04aaa4d626bc26100358c307c6e73db5d6fb0ac423c"
   },
-  "generatedBy": "core"
+  "provenance": {
+    "artifacts": {
+      "spec.md": {
+        "hash": "sha256:446c7abffb9e396c9dc00596d5bab197ad072c25fb0406bb2d4e3c3b07edad44",
+        "lastModified": "2026-07-25T11:53:31.733Z"
+      },
+      "verify.md": {
+        "hash": "sha256:3e49d15ee5bc67c39e73d04aaa4d626bc26100358c307c6e73db5d6fb0ac423c",
+        "lastModified": "2026-07-25T11:53:31.733Z"
+      }
+    },
+    "persistedStateHash": "sha256:fb0b1afdc2fe6797e15301d860b96ca47e20483eec2a3a51f78f59a6f312d63c",
+    "schema": {
+      "name": "schema-std",
+      "version": 1
+    },
+    "projectionVersion": 1,
+    "projectionFingerprint": "sha256:e4a28a2db6a35ed39b8308518337235b1490c2948cd839db25866ad79b22404b"
+  }
 }

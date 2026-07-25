@@ -25,8 +25,7 @@ import { type ArchiveListEntry } from '../../../src/domain/archived-change-index
 import { SpecPublicationError } from '../../../src/domain/errors/spec-publication-error.js'
 import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
 import { ArtifactFile } from '../../../src/domain/value-objects/artifact-file.js'
-import { type GenerateSpecMetadata } from '../../../src/application/use-cases/generate-spec-metadata.js'
-import { type SaveSpecMetadata } from '../../../src/application/use-cases/save-spec-metadata.js'
+import { type MaterializeSpecMetadata } from '../../../src/application/use-cases/materialize-spec-metadata.js'
 import { MarkdownParser } from '../../../src/infrastructure/artifact-parser/markdown-parser.js'
 import {
   type RunStepHooksInput,
@@ -43,19 +42,22 @@ import {
   makeSchema,
   makeParser,
   makeParsers,
+  makeMaterializeMetadata,
   testActor,
 } from './helpers.js'
 
-function makeGenerateMetadata(): GenerateSpecMetadata {
+function makeMaterializeMetadataMock(
+  metadata: Record<string, unknown> = {},
+): MaterializeSpecMetadata {
   return {
-    execute: vi.fn().mockResolvedValue({ metadata: {}, hasExtraction: false }),
-  } as unknown as GenerateSpecMetadata
-}
-
-function makeSaveMetadata(): SaveSpecMetadata {
-  return {
-    execute: vi.fn().mockResolvedValue({ spec: 'default:test' }),
-  } as unknown as SaveSpecMetadata
+    execute: vi.fn().mockResolvedValue({
+      metadata,
+      metadataFingerprint: 'test-fp',
+      source: 'generated',
+      regenerated: true,
+      warnings: [],
+    }),
+  } as unknown as MaterializeSpecMetadata
 }
 
 // ---------------------------------------------------------------------------
@@ -164,8 +166,7 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(),
         makeSchemaProvider(makeSchema()),
-        makeGenerateMetadata(),
-        makeSaveMetadata(),
+        makeMaterializeMetadata(),
       )
       await expect(uc.execute({ name: 'missing' })).rejects.toThrow(ChangeNotFoundError)
     })
@@ -182,8 +183,7 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(),
         makeSchemaProvider(null),
-        makeGenerateMetadata(),
-        makeSaveMetadata(),
+        makeMaterializeMetadata(),
       )
       await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(SchemaNotFoundError)
     })
@@ -238,8 +238,7 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(),
         makeSchemaProvider(makeSchema()),
-        makeGenerateMetadata(),
-        makeSaveMetadata(),
+        makeMaterializeMetadata(),
       )
       await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(InvalidStateTransitionError)
     })
@@ -256,8 +255,7 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(),
         makeSchemaProvider(makeSchema({ name: 'schema-b' })),
-        makeGenerateMetadata(),
-        makeSaveMetadata(),
+        makeMaterializeMetadata(),
       )
       await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(SchemaMismatchError)
     })
@@ -274,8 +272,7 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(),
         makeSchemaProvider(makeSchema()),
-        makeGenerateMetadata(),
-        makeSaveMetadata(),
+        makeMaterializeMetadata(),
       )
       const result = await uc.execute({ name: 'my-change' })
       expect(result.archivedChange).toBeDefined()
@@ -294,8 +291,7 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(),
         makeSchemaProvider(makeSchema()),
-        makeGenerateMetadata(),
-        makeSaveMetadata(),
+        makeMaterializeMetadata(),
       )
       const result = await uc.execute({ name: 'add-auth-flow' })
 
@@ -311,8 +307,7 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(),
         makeSchemaProvider(makeSchema()),
-        makeGenerateMetadata(),
-        makeSaveMetadata(),
+        makeMaterializeMetadata(),
       )
       const result = await uc.execute({ name: 'my-change' })
 
@@ -359,15 +354,14 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(),
         makeSchemaProvider(schema),
-        makeGenerateMetadata(),
-        makeSaveMetadata(),
+        makeMaterializeMetadata(),
       )
       const result = await uc.execute({ name: 'my-change' })
 
       expect(result.archivedChange.name).toBe('my-change')
       expect(result.archivedChange.archivedName).toBeTruthy()
       expect(result.postHookFailures).toEqual([])
-      expect(result.staleMetadataSpecPaths).toContain('default:auth/oauth')
+      expect(result.staleMetadataSpecPaths).toEqual([])
     })
 
     it('writes spec-lock.json on first archive using final persisted dependsOn', async () => {
@@ -377,17 +371,11 @@ describe('ArchiveChange', () => {
         specs: [makeSpec({ workspace: 'default', name: 'auth/oauth', filenames: ['spec.md'] })],
         artifacts: { 'auth/oauth/spec.md': '# Spec' },
       })
-      const generateMetadata = {
-        execute: vi.fn().mockResolvedValue({
-          hasExtraction: true,
-          metadata: {
-            title: 'OAuth',
-            description: 'desc',
-            contentHashes: { 'spec.md': 'sha256:' + 'a'.repeat(64) },
-          },
-        }),
-      } as unknown as GenerateSpecMetadata
-      const saveMetadata = makeSaveMetadata()
+      const materializeMetadata = makeMaterializeMetadataMock({
+        title: 'OAuth',
+        description: 'desc',
+        contentHashes: { 'spec.md': 'sha256:' + 'a'.repeat(64) },
+      })
 
       const change = makeArchivableChange('my-change', { specIds: ['default:auth/oauth'] })
       change.setSpecDependsOn('default:auth/oauth', ['core:storage'])
@@ -421,8 +409,7 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(),
         makeSchemaProvider(schema),
-        generateMetadata,
-        saveMetadata,
+        materializeMetadata,
       )
 
       await uc.execute({ name: 'my-change' })
@@ -447,17 +434,11 @@ describe('ArchiveChange', () => {
           }),
         },
       })
-      const generateMetadata = {
-        execute: vi.fn().mockResolvedValue({
-          hasExtraction: true,
-          metadata: {
-            title: 'OAuth',
-            description: 'desc',
-            contentHashes: { 'spec.md': 'sha256:' + 'a'.repeat(64) },
-          },
-        }),
-      } as unknown as GenerateSpecMetadata
-
+      const materializeMetadata = makeMaterializeMetadataMock({
+        title: 'OAuth',
+        description: 'desc',
+        contentHashes: { 'spec.md': 'sha256:' + 'a'.repeat(64) },
+      })
       const change = makeArchivableChange('my-change', { specIds: ['default:auth/oauth'] })
       change.setSpecDependsOn('default:auth/oauth', ['core:new'])
       change.setArtifact(
@@ -490,8 +471,7 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(),
         makeSchemaProvider(schema),
-        generateMetadata,
-        makeSaveMetadata(),
+        makeMaterializeMetadata(),
       )
 
       await uc.execute({ name: 'my-change' })
@@ -541,19 +521,12 @@ describe('ArchiveChange', () => {
             .map((child) => ((child as { value?: unknown }).value as string | undefined) ?? '')
             .join('\n'),
       })
-      const generateMetadata = {
-        execute: vi.fn().mockResolvedValue({
-          hasExtraction: true,
-          metadata: {
-            title: 'OAuth',
-            description: 'desc',
-            dependsOn: ['core:extracted'],
-            contentHashes: { 'spec.md': 'sha256:' + 'a'.repeat(64) },
-          },
-        }),
-      } as unknown as GenerateSpecMetadata
-      const saveMetadata = makeSaveMetadata()
-
+      const materializeMetadata = makeMaterializeMetadataMock({
+        title: 'OAuth',
+        description: 'desc',
+        dependsOn: ['core:extracted'],
+        contentHashes: { 'spec.md': 'sha256:' + 'a'.repeat(64) },
+      })
       const change = makeArchivableChange('my-change', { specIds: ['default:auth/oauth'] })
       change.setSpecDependsOn('default:auth/oauth', ['core:manifest'])
       change.setArtifact(
@@ -586,15 +559,14 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(markdownParser),
         makeSchemaProvider(schema),
-        generateMetadata,
-        saveMetadata,
+        materializeMetadata,
       )
 
       await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(
         ArchiveDependencyMismatchError,
       )
       expect(specRepo.saved.has('spec.md')).toBe(false)
-      expect((saveMetadata.execute as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(0)
+      expect((materializeMetadata.execute as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(0)
 
       const persisted = await changeRepo.get('my-change')
       const lastEvent = persisted?.history.at(-1)
@@ -703,8 +675,7 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(markdownParser),
         makeSchemaProvider(schema),
-        makeGenerateMetadata(),
-        makeSaveMetadata(),
+        makeMaterializeMetadata(),
       )
 
       await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(
@@ -816,8 +787,7 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(parser),
         makeSchemaProvider(schema),
-        makeGenerateMetadata(),
-        makeSaveMetadata(),
+        makeMaterializeMetadata(),
       )
 
       await expect(uc.execute({ name: 'my-change' })).resolves.toBeDefined()
@@ -850,17 +820,11 @@ describe('ArchiveChange', () => {
           }),
         },
       })
-      const generateMetadata = {
-        execute: vi.fn().mockResolvedValue({
-          hasExtraction: true,
-          metadata: {
-            title: 'OAuth',
-            description: 'desc',
-            contentHashes: { 'spec.md': 'sha256:' + 'a'.repeat(64) },
-          },
-        }),
-      } as unknown as GenerateSpecMetadata
-      const saveMetadata = makeSaveMetadata()
+      const materializeMetadata = makeMaterializeMetadataMock({
+        title: 'OAuth',
+        description: 'desc',
+        contentHashes: { 'spec.md': 'sha256:' + 'a'.repeat(64) },
+      })
       const change = makeArchivableChange('my-change', { specIds: ['default:auth/oauth'] })
       change.setArtifact(
         new ChangeArtifact({
@@ -892,16 +856,16 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(),
         makeSchemaProvider(schema),
-        generateMetadata,
-        saveMetadata,
+        materializeMetadata,
       )
 
       await uc.execute({ name: 'my-change' })
 
-      expect((saveMetadata.execute as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(1)
-      const savedContent = (saveMetadata.execute as ReturnType<typeof vi.fn>).mock.calls[0]?.[0]
-        ?.content as string
-      expect(JSON.parse(savedContent) as unknown).toMatchObject({
+      expect((materializeMetadata.execute as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(1)
+      const materializeInput = (materializeMetadata.execute as ReturnType<typeof vi.fn>).mock
+        .calls[0]?.[0]
+      expect(materializeInput).toMatchObject({ specId: 'default:auth/oauth', policy: 'force' })
+      expect({
         title: 'OAuth',
         description: 'desc',
         dependsOn: ['core:canonical'],
@@ -927,18 +891,12 @@ describe('ArchiveChange', () => {
           }),
         },
       })
-      const generateMetadata = {
-        execute: vi.fn().mockResolvedValue({
-          hasExtraction: true,
-          metadata: {
-            title: 'OAuth',
-            description: 'desc',
-            dependsOn: ['core:legacy'],
-            contentHashes: { 'spec.md': 'sha256:' + 'a'.repeat(64) },
-          },
-        }),
-      } as unknown as GenerateSpecMetadata
-      const saveMetadata = makeSaveMetadata()
+      const materializeMetadata = makeMaterializeMetadataMock({
+        title: 'OAuth',
+        description: 'desc',
+        dependsOn: ['core:legacy'],
+        contentHashes: { 'spec.md': 'sha256:' + 'a'.repeat(64) },
+      })
       const parser = makeParser({
         parse: () => {
           throw new Error('invalid canonical spec')
@@ -975,13 +933,12 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(parser),
         makeSchemaProvider(schema),
-        generateMetadata,
-        saveMetadata,
+        materializeMetadata,
       )
 
       await expect(uc.execute({ name: 'my-change' })).resolves.toBeDefined()
       expect(specRepo.saved.has('spec-lock.json')).toBe(false)
-      expect((saveMetadata.execute as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(1)
+      expect((materializeMetadata.execute as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(1)
     })
 
     it('fails before archive when actor identity cannot be resolved', async () => {
@@ -1000,8 +957,7 @@ describe('ArchiveChange', () => {
         },
         makeParsers(),
         makeSchemaProvider(makeSchema()),
-        makeGenerateMetadata(),
-        makeSaveMetadata(),
+        makeMaterializeMetadata(),
       )
 
       await expect(uc.execute({ name: 'my-change' })).rejects.toThrow('missing actor identity')
@@ -1056,8 +1012,7 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(),
         makeSchemaProvider(schema),
-        makeGenerateMetadata(),
-        makeSaveMetadata(),
+        makeMaterializeMetadata(),
       )
 
       await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(SpecPublicationError)
@@ -1129,8 +1084,7 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(),
         makeSchemaProvider(schema),
-        makeGenerateMetadata(),
-        makeSaveMetadata(),
+        makeMaterializeMetadata(),
       )
       await uc.execute({ name: 'my-change' })
 
@@ -1180,8 +1134,7 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(),
         makeSchemaProvider(makeSchema()),
-        makeGenerateMetadata(),
-        makeSaveMetadata(),
+        makeMaterializeMetadata(),
       )
 
       await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(HookFailedError)
@@ -1229,8 +1182,7 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(),
         makeSchemaProvider(makeSchema()),
-        makeGenerateMetadata(),
-        makeSaveMetadata(),
+        makeMaterializeMetadata(),
       )
 
       await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(HookFailedError)
@@ -1258,8 +1210,7 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(),
         makeSchemaProvider(makeSchema()),
-        makeGenerateMetadata(),
-        makeSaveMetadata(),
+        makeMaterializeMetadata(),
       )
       await uc.execute({ name: 'my-change' })
 
@@ -1286,8 +1237,7 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(),
         makeSchemaProvider(makeSchema()),
-        makeGenerateMetadata(),
-        makeSaveMetadata(),
+        makeMaterializeMetadata(),
       )
       await uc.execute({ name: 'my-change' })
 
@@ -1334,8 +1284,7 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(),
         makeSchemaProvider(makeSchema()),
-        makeGenerateMetadata(),
-        makeSaveMetadata(),
+        makeMaterializeMetadata(),
       )
 
       await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(HookFailedError)
@@ -1381,8 +1330,7 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(),
         makeSchemaProvider(makeSchema()),
-        makeGenerateMetadata(),
-        makeSaveMetadata(),
+        makeMaterializeMetadata(),
       )
       const result = await uc.execute({ name: 'my-change' })
 
@@ -1402,8 +1350,7 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(),
         makeSchemaProvider(makeSchema()),
-        makeGenerateMetadata(),
-        makeSaveMetadata(),
+        makeMaterializeMetadata(),
       )
       const result = await uc.execute({ name: 'my-change' })
 
@@ -1449,8 +1396,7 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(),
         makeSchemaProvider(schema),
-        makeGenerateMetadata(),
-        makeSaveMetadata(),
+        makeMaterializeMetadata(),
       )
       const result = await uc.execute({ name: 'my-change', skipHookPhases: new Set(['all']) })
 
@@ -1494,8 +1440,7 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(),
         makeSchemaProvider(schema),
-        makeGenerateMetadata(),
-        makeSaveMetadata(),
+        makeMaterializeMetadata(),
       )
       const result = await uc.execute({ name: 'my-change', skipHookPhases: new Set(['all']) })
 
@@ -1543,8 +1488,7 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(),
         makeSchemaProvider(makeSchema()),
-        makeGenerateMetadata(),
-        makeSaveMetadata(),
+        makeMaterializeMetadata(),
       )
       const result = await uc.execute({ name: 'my-change', skipHookPhases: new Set(['all']) })
 
@@ -1569,8 +1513,7 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(),
         makeSchemaProvider(makeSchema()),
-        makeGenerateMetadata(),
-        makeSaveMetadata(),
+        makeMaterializeMetadata(),
       )
       const result = await uc.execute({ name: 'my-change', skipHookPhases: new Set(['all']) })
 
@@ -1597,8 +1540,7 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(),
         makeSchemaProvider(makeSchema()),
-        makeGenerateMetadata(),
-        makeSaveMetadata(),
+        makeMaterializeMetadata(),
       )
       const result = await uc.execute({ name: 'my-change', skipHookPhases: new Set(['pre']) })
 
@@ -1629,8 +1571,7 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(),
         makeSchemaProvider(makeSchema()),
-        makeGenerateMetadata(),
-        makeSaveMetadata(),
+        makeMaterializeMetadata(),
       )
       const result = await uc.execute({ name: 'my-change', skipHookPhases: new Set(['post']) })
 
@@ -1696,8 +1637,7 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(mdParser, yamlParser),
         makeSchemaProvider(schema),
-        makeGenerateMetadata(),
-        makeSaveMetadata(),
+        makeMaterializeMetadata(),
       )
       await uc.execute({ name: 'my-change' })
 
@@ -1757,8 +1697,7 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(mdParser, yamlParser),
         makeSchemaProvider(schema),
-        makeGenerateMetadata(),
-        makeSaveMetadata(),
+        makeMaterializeMetadata(),
       )
 
       await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(DeltaApplicationError)
@@ -1819,8 +1758,7 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(mdParser, yamlParser),
         makeSchemaProvider(schema),
-        makeGenerateMetadata(),
-        makeSaveMetadata(),
+        makeMaterializeMetadata(),
       )
       await uc.execute({ name: 'my-change' })
 
@@ -1884,8 +1822,7 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(mdParser, yamlParser),
         makeSchemaProvider(schema),
-        makeGenerateMetadata(),
-        makeSaveMetadata(),
+        makeMaterializeMetadata(),
       )
       await uc.execute({ name: 'my-change' })
 
@@ -1952,8 +1889,7 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(mdParser, yamlParser),
         makeSchemaProvider(schema),
-        makeGenerateMetadata(),
-        makeSaveMetadata(),
+        makeMaterializeMetadata(),
       )
       await uc.execute({ name: 'my-change' })
 
@@ -2017,8 +1953,7 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(mdParser, yamlParser),
         makeSchemaProvider(schema),
-        makeGenerateMetadata(),
-        makeSaveMetadata(),
+        makeMaterializeMetadata(),
       )
       await uc.execute({ name: 'my-change' })
 
@@ -2082,8 +2017,7 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(mdParser, yamlParser),
         makeSchemaProvider(schema),
-        makeGenerateMetadata(),
-        makeSaveMetadata(),
+        makeMaterializeMetadata(),
       )
       await uc.execute({ name: 'my-change' })
 
@@ -2134,8 +2068,7 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(),
         makeSchemaProvider(schema),
-        makeGenerateMetadata(),
-        makeSaveMetadata(),
+        makeMaterializeMetadata(),
       )
       await uc.execute({ name: 'my-change' })
 
@@ -2188,8 +2121,7 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(),
         makeSchemaProvider(schema),
-        makeGenerateMetadata(),
-        makeSaveMetadata(),
+        makeMaterializeMetadata(),
       )
       await uc.execute({ name: 'my-change' })
 
@@ -2252,8 +2184,7 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(mdParser, yamlParser),
         makeSchemaProvider(schema),
-        makeGenerateMetadata(),
-        makeSaveMetadata(),
+        makeMaterializeMetadata(),
       )
       await uc.execute({ name: 'my-change' })
 
@@ -2278,8 +2209,7 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(),
         makeSchemaProvider(schema),
-        makeGenerateMetadata(),
-        makeSaveMetadata(),
+        makeMaterializeMetadata(),
       )
       await uc.execute({ name: 'my-change' })
 
@@ -2320,8 +2250,7 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(),
         makeSchemaProvider(schema),
-        makeGenerateMetadata(),
-        makeSaveMetadata(),
+        makeMaterializeMetadata(),
       )
       await uc.execute({ name: 'my-change' })
 
@@ -2357,8 +2286,7 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(),
         makeSchemaProvider(makeSchema()),
-        makeGenerateMetadata(),
-        makeSaveMetadata(),
+        makeMaterializeMetadata(),
       )
       await uc.execute({ name: 'my-change' })
 
@@ -2414,8 +2342,7 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(),
         makeSchemaProvider(makeSchema()),
-        makeGenerateMetadata(),
-        makeSaveMetadata(),
+        makeMaterializeMetadata(),
       )
       const result = await uc.execute({ name: 'my-change' })
 
@@ -2442,8 +2369,7 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(),
         makeSchemaProvider(makeSchema()),
-        makeGenerateMetadata(),
-        makeSaveMetadata(),
+        makeMaterializeMetadata(),
       )
       await uc.execute({ name: 'my-change' })
 
@@ -2467,8 +2393,7 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(),
         makeSchemaProvider(makeSchema()),
-        makeGenerateMetadata(),
-        makeSaveMetadata(),
+        makeMaterializeMetadata(),
       )
       await uc.execute({ name: 'my-change' })
 
@@ -2533,8 +2458,7 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(),
         makeSchemaProvider(makeSchema()),
-        makeGenerateMetadata(),
-        makeSaveMetadata(),
+        makeMaterializeMetadata(),
       )
       const result = await uc.execute({ name: 'my-change' })
 
@@ -2592,8 +2516,7 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(),
         makeSchemaProvider(makeSchema()),
-        makeGenerateMetadata(),
-        makeSaveMetadata(),
+        makeMaterializeMetadata(),
       )
 
       await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(HookFailedError)
@@ -2623,8 +2546,7 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(),
         makeSchemaProvider(makeSchema()),
-        makeGenerateMetadata(),
-        makeSaveMetadata(),
+        makeMaterializeMetadata(),
       )
 
       await uc.execute({ name: 'my-change' })
@@ -2644,8 +2566,7 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(),
         makeSchemaProvider(makeSchema()),
-        makeGenerateMetadata(),
-        makeSaveMetadata(),
+        makeMaterializeMetadata(),
       )
 
       await uc.execute({ name: 'my-change' })
@@ -2690,8 +2611,7 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(),
         makeSchemaProvider(makeSchema()),
-        makeGenerateMetadata(),
-        makeSaveMetadata(),
+        makeMaterializeMetadata(),
       )
 
       await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(SpecOverlapError)
@@ -2726,8 +2646,7 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(),
         makeSchemaProvider(makeSchema()),
-        makeGenerateMetadata(),
-        makeSaveMetadata(),
+        makeMaterializeMetadata(),
       )
 
       const result = await uc.execute({ name: 'my-change', allowOverlap: true })
@@ -2786,8 +2705,7 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(),
         makeSchemaProvider(makeSchema()),
-        makeGenerateMetadata(),
-        makeSaveMetadata(),
+        makeMaterializeMetadata(),
       )
 
       const result = await uc.execute({ name: 'my-change', allowOverlap: true })
@@ -2811,8 +2729,7 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(),
         makeSchemaProvider(makeSchema()),
-        makeGenerateMetadata(),
-        makeSaveMetadata(),
+        makeMaterializeMetadata(),
       )
 
       const result = await uc.execute({ name: 'my-change', allowOverlap: true })
@@ -2833,8 +2750,7 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(),
         makeSchemaProvider(makeSchema()),
-        makeGenerateMetadata(),
-        makeSaveMetadata(),
+        makeMaterializeMetadata(),
       )
 
       const result = await uc.execute({ name: 'my-change' })
@@ -2868,8 +2784,7 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(),
         makeSchemaProvider(schema),
-        makeGenerateMetadata(),
-        makeSaveMetadata(),
+        makeMaterializeMetadata(),
       )
 
       await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(ReadOnlyWorkspaceError)
@@ -2889,8 +2804,7 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(),
         makeSchemaProvider(makeSchema()),
-        makeGenerateMetadata(),
-        makeSaveMetadata(),
+        makeMaterializeMetadata(),
       )
 
       await expect(uc.execute({ name: 'my-change' })).rejects.toThrow(
@@ -2929,8 +2843,7 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(),
         makeSchemaProvider(makeSchema()),
-        makeGenerateMetadata(),
-        makeSaveMetadata(),
+        makeMaterializeMetadata(),
         new Map(),
         [],
         '/project',
@@ -2970,8 +2883,7 @@ describe('ArchiveChange', () => {
         makeActorResolver(),
         makeParsers(),
         makeSchemaProvider(makeSchema()),
-        makeGenerateMetadata(),
-        makeSaveMetadata(),
+        makeMaterializeMetadata(),
         new Map(),
         [],
         '/project',

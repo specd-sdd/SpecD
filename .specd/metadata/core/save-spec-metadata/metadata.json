@@ -1,327 +1,63 @@
 {
   "title": "SaveSpecMetadata",
-  "description": "Writing metadata to disk without validation risks corrupting the spec's machine-readable summary, and silently overwriting curated `dependsOn` entries can discard human-verified dependency decisions. `SaveSpecMetadata` guards against both: it validates incoming JSON content against the strict schema, protects curated `dependsOn` from silent overwrite, delegates conflict detection to the repository layer, and persists the metadata via `SpecRepository.saveMetadata()`. It is invoked by `ArchiveChange` during deterministic metadata generation and may also be called directly by tooling (e.g. the LLM refining metadata).",
+  "description": "**Removed.** `SaveSpecMetadata` validated and persisted arbitrary caller-supplied metadata JSON, including agent-authored optimized fields. Its guarded-persistence responsibility (validate a complete generated projection, then conditionally write) moves to `PersistSpecMetadata`, an internal collaborator used only by `MaterializeSpecMetadata`. Unlike `SaveSpecMetadata`, `PersistSpecMetadata` accepts only a complete generated projection plus an observed revision — it is not a general-purpose metadata-editing operation and is never exposed on Kernel, Core public exports, SDK, CLI, or MCP.",
   "dependsOn": ["core:spec-metadata", "default:_global/architecture", "core:composition-resolver"],
   "context": [
-    "Writing metadata to disk without validation risks corrupting the spec's machine-readable summary, and silently overwriting curated `dependsOn` entries can discard human-verified dependency decisions. `SaveSpecMetadata` guards against both: it validates incoming JSON content against the strict schema, protects curated `dependsOn` from silent overwrite, delegates conflict detection to the repository layer, and persists the metadata via `SpecRepository.saveMetadata()`. It is invoked by `ArchiveChange` during deterministic metadata generation and may also be called directly by tooling (e.g. the LLM refining metadata)."
+    "**Removed.** `SaveSpecMetadata` validated and persisted arbitrary caller-supplied metadata JSON, including agent-authored optimized fields. Its guarded-persistence responsibility (validate a complete generated projection, then conditionally write) moves to `PersistSpecMetadata`, an internal collaborator used only by `MaterializeSpecMetadata`. Unlike `SaveSpecMetadata`, `PersistSpecMetadata` accepts only a complete generated projection plus an observed revision — it is not a general-purpose metadata-editing operation and is never exposed on Kernel, Core public exports, SDK, CLI, or MCP."
   ],
   "rules": [
     {
-      "requirement": "Input contract",
+      "requirement": "SaveSpecMetadata is removed",
       "rules": [
-        "`SaveSpecMetadata.execute()` accepts a `SaveSpecMetadataInput` with the following fields:\n\n- `workspace` (string, required) — the workspace name (e.g. `'default'`, `'billing'`)\n- `specPath` (SpecPath, required) — the spec path within the workspace (e.g. `'auth/oauth'`)\n- `content` (string, required) — raw JSON string to write as metadata\n- `force` (boolean, optional) — when `true`, skip conflict detection and `dependsOn` overwrite protection"
-      ]
-    },
-    {
-      "requirement": "Output contract",
-      "rules": [
-        "On success, `execute()` SHALL return a `SaveSpecMetadataResult` containing:\n\n- `spec` (string) — the qualified spec label in the form `workspace:specName` (e.g. `'default:auth/oauth'`)"
-      ]
-    },
-    {
-      "requirement": "Content validation before write",
-      "rules": [
-        "Before writing, the use case parses the input `content` string with `JSON.parse()`. If parsing fails or the result is not an object, a `MetadataValidationError` is thrown with `content must be a JSON object`. The parsed object is validated against `strictSpecMetadataSchema`. If validation fails, a `MetadataValidationError` is thrown listing the Zod issues. This validation uses the strict schema — the read path (`metadata()`) uses the lenient schema."
-      ]
-    },
-    {
-      "requirement": "Workspace resolution",
-      "rules": [
-        "The use case MUST resolve the workspace from the injected `specRepos` map. If the workspace name does not match any entry in the map, the use case SHALL throw `WorkspaceNotFoundError`."
-      ]
-    },
-    {
-      "requirement": "Spec existence check",
-      "rules": [
-        "After resolving the workspace, the use case MUST look up the spec via `SpecRepository.get(specPath)`. If the spec does not exist (returns `null`), the use case SHALL throw `SpecNotFoundError` with the qualified spec identifier (`workspace:specPath`)."
-      ]
-    },
-    {
-      "requirement": "Conflict detection via originalHash",
-      "rules": [
-        "When `force` is not set, the use case MUST load the existing metadata (if any) via `SpecRepository.metadata()` and capture its `originalHash`. This hash is passed to `SpecRepository.saveMetadata()` so that the repository layer can detect concurrent modifications. When `force` is set, this step is skipped entirely — no existing metadata is loaded.\n\nIf `SpecRepository.metadata()` returns persisted metadata with `freshness: 'stale'`, `SaveSpecMetadata` MUST still use its `originalHash` for optimistic concurrency. Staleness does not make the persisted file unreadable for this use case because the purpose of the read is to protect the existing serialized snapshot on disk, not to reconstruct canonical metadata."
-      ]
-    },
-    {
-      "requirement": "dependsOn overwrite protection",
-      "rules": [
-        "When `force` is not set and existing metadata exists on disk, the use case MUST check whether the incoming content would change the `dependsOn` array:\n\n1. Parse the existing metadata content (loaded via `SpecRepository.metadata()` in the conflict detection step) and validate it against `specMetadataSchema` (the lenient schema)\n2. Extract the `dependsOn` arrays from both existing and incoming metadata\n3. Compare the two arrays using `DependsOnOverwriteError.areSame()`, which performs order-independent comparison\n4. If the existing metadata has a non-empty `dependsOn` and the incoming `dependsOn` differs, throw `DependsOnOverwriteError`\n5. If the existing metadata has no `dependsOn` (absent or empty), any incoming `dependsOn` is allowed\n\nIf the existing metadata file is stale, `SaveSpecMetadata` still performs this comparison against the persisted `dependsOn` value currently on disk. The overwrite check protects against silently discarding that persisted snapshot; it does not attempt deterministic metadata regeneration.\n\nWhen `force` is set, this check MUST be skipped entirely."
-      ]
-    },
-    {
-      "requirement": "Sidecar ownership boundary",
-      "rules": [
-        "`SaveSpecMetadata` MUST persist `metadata.json` only. It MUST NOT create, modify, or delete `spec-lock.json`.\n\nFor persisted specs whose durable dependency state is owned by `spec-lock.json`:\n\n- `SaveSpecMetadata` MAY still write `metadata.json.dependsOn` when the caller provides valid content.\n- `SaveSpecMetadata` does not decide whether `metadata.json.dependsOn` is authoritative for archive-time persistence.\n- Archive-time consistency between metadata and sidecar is enforced by `ArchiveChange`, not by `SaveSpecMetadata`.\n\nThis keeps metadata writes focused on validation and optimistic concurrency while leaving durable dependency authority to the archive pipeline."
-      ]
-    },
-    {
-      "requirement": "Artifact persistence",
-      "rules": [
-        "After all validations pass, the use case MUST delegate to `SpecRepository.saveMetadata()` with the raw JSON content, the `originalHash` (if captured), and `{ force: true }` when `force` is set, or with an empty options object otherwise."
-      ]
-    },
-    {
-      "requirement": "Constructor dependencies",
-      "rules": [
-        "The use case receives:\n\n- `specRepos: ReadonlyMap<string, SpecRepository>` — workspace-keyed spec repositories\n\nThe `YamlSerializer` dependency is no longer needed — metadata content is JSON, parsed with `JSON.parse()`."
-      ]
-    },
-    {
-      "requirement": "Config-based factory delegates through resolveSaveSpecMetadataDeps",
-      "rules": [
-        "The config-based `createSaveSpecMetadata(config, options?)` form MUST derive `SaveSpecMetadataDeps` through `resolveSaveSpecMetadataDeps(resolver)` and then delegate to canonical `createSaveSpecMetadata(deps)`.\n\n`resolveSaveSpecMetadataDeps(resolver)` MUST resolve:\n\n- `specRepos: ReadonlyMap<string, SpecRepository>`\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
+        "`SaveSpecMetadata` MUST NOT be exported from `@specd/core`, MUST NOT be mounted on `Kernel`, and MUST NOT have a public `createSaveSpecMetadata` composition factory. Arbitrary metadata persistence is no longer an application operation reachable by any host. The only remaining metadata writer is the internal `PersistSpecMetadata` collaborator invoked by `MaterializeSpecMetadata`, which accepts a complete generated projection and observed `revision` — never a caller-supplied partial or arbitrary JSON payload."
       ]
     }
-  ],
-  "constraints": [
-    "Content validation uses strictSpecMetadataSchema (write-time), not the lenient specMetadataSchema (read-time) — this ensures metadata on disk always meets the strict schema requirements",
-    "The existing metadata is parsed with specMetadataSchema (lenient) for the dependsOn check, because on-disk metadata may predate strict schema requirements",
-    "The use case does not handle ArtifactConflictError — it propagates from the repository layer to the caller",
-    "Validation order is: content schema validation, workspace resolution, spec existence, conflict detection / dependsOn check, then persist",
-    "Metadata is persisted via SpecRepository.saveMetadata(), not via the generic save() method"
   ],
   "scenarios": [
     {
-      "requirement": "Input contract",
-      "name": "execute accepts SaveSpecMetadataInput",
-      "when": ["SaveSpecMetadata.execute is called"],
+      "requirement": "SaveSpecMetadata is removed",
+      "name": "SaveSpecMetadata is not exported",
+      "when": ["@specd/core public exports are inspected"],
+      "then": ["SaveSpecMetadata and createSaveSpecMetadata are not present"]
+    },
+    {
+      "requirement": "SaveSpecMetadata is removed",
+      "name": "Kernel does not mount SaveSpecMetadata",
+      "when": ["createKernel(config) is called"],
+      "then": ["the returned kernel has no saveSpecMetadata entry under kernel.specs"]
+    },
+    {
+      "requirement": "SaveSpecMetadata is removed",
+      "name": "PersistSpecMetadata is the only remaining metadata writer, and only for MaterializeSpecMetadata",
+      "given": ["the internal PersistSpecMetadata collaborator"],
+      "when": ["it is invoked"],
       "then": [
-        "it accepts SaveSpecMetadataInput with workspace (string, required), specPath (SpecPath, required), content (string, required), force (optional)"
-      ]
-    },
-    {
-      "requirement": "Output contract",
-      "name": "Successful write returns spec label",
-      "given": ["valid content, existing workspace, and existing spec"],
-      "when": ["execute() succeeds"],
-      "then": ["the result is SaveSpecMetadataResult containing spec (qualified spec label)"]
-    },
-    {
-      "requirement": "Content validation before write",
-      "name": "Non-object JSON is rejected",
-      "given": ["a valid spec exists"],
-      "when": ["SaveSpecMetadata is called with content: '\"just a string\"'"],
-      "then": [
-        "it throws MetadataValidationError with message containing content must be a JSON object"
-      ]
-    },
-    {
-      "requirement": "Content validation before write",
-      "name": "Invalid JSON content is rejected",
-      "given": ["a valid spec exists"],
-      "when": ["SaveSpecMetadata is called with content: \"not json at all\""],
-      "then": [
-        "it throws MetadataValidationError with message containing content must be a JSON object"
-      ]
-    },
-    {
-      "requirement": "Content validation before write",
-      "name": "Missing required fields rejected by strict schema",
-      "given": ["valid JSON object content that omits title"],
-      "when": ["execute() is called"],
-      "then": ["MetadataValidationError is thrown with a message referencing the missing field"]
-    },
-    {
-      "requirement": "Content validation before write",
-      "name": "Invalid field types rejected by strict schema",
-      "given": ["JSON content where keywords is a string instead of an array"],
-      "when": ["execute() is called"],
-      "then": [
-        "MetadataValidationError is thrown with a message referencing the field and type mismatch"
-      ]
-    },
-    {
-      "requirement": "Content validation before write",
-      "name": "Unknown top-level keys are allowed",
-      "given": ["valid JSON content with all required fields plus an extra key customField: value"],
-      "when": ["execute() is called"],
-      "then": ["the write succeeds and the extra key is preserved"]
-    },
-    {
-      "requirement": "Workspace resolution",
-      "name": "Unknown workspace",
-      "when": ["execute() is called with workspace: 'nonexistent'"],
-      "then": ["WorkspaceNotFoundError is thrown"]
-    },
-    {
-      "requirement": "Spec existence check",
-      "name": "Spec does not exist in workspace",
-      "given": ["the workspace exists but specPath does not match any spec"],
-      "when": ["execute() is called"],
-      "then": [
-        "SpecNotFoundError is thrown with the qualified identifier (e.g. 'default:auth/oauth')"
-      ]
-    },
-    {
-      "requirement": "Conflict detection via originalHash",
-      "name": "Existing metadata hash is captured for conflict detection",
-      "given": ["a spec with existing metadata on disk"],
-      "when": ["execute() is called without force"],
-      "then": [
-        "the existing metadata's originalHash is captured via SpecRepository.metadata()",
-        "AND if the repository detects a hash mismatch, ArtifactConflictError propagates to the caller"
-      ]
-    },
-    {
-      "requirement": "Conflict detection via originalHash",
-      "name": "Force skips existing metadata loading",
-      "when": ["execute() is called with force: true"],
-      "then": [
-        "existing metadata is not loaded",
-        "AND SpecRepository.saveMetadata() is called with { force: true }"
-      ]
-    },
-    {
-      "requirement": "Conflict detection via originalHash",
-      "name": "No existing metadata on disk",
-      "given": ["a spec with no existing metadata"],
-      "when": ["execute() is called without force"],
-      "then": ["originalHash is undefined", "AND the write proceeds normally"]
-    },
-    {
-      "requirement": "dependsOn overwrite protection",
-      "name": "Existing dependsOn would be changed",
-      "given": [
-        "existing metadata has dependsOn: ['core:storage', 'core:config']",
-        "AND incoming content has dependsOn: ['core:storage']"
-      ],
-      "when": ["execute() is called without force"],
-      "then": ["DependsOnOverwriteError is thrown"]
-    },
-    {
-      "requirement": "dependsOn overwrite protection",
-      "name": "Same dependsOn in different order is allowed",
-      "given": [
-        "existing metadata has dependsOn: ['core:config', 'core:storage']",
-        "AND incoming content has dependsOn: ['core:storage', 'core:config']"
-      ],
-      "when": ["execute() is called without force"],
-      "then": ["the write succeeds"]
-    },
-    {
-      "requirement": "dependsOn overwrite protection",
-      "name": "No existing dependsOn allows any incoming",
-      "given": [
-        "existing metadata has no dependsOn field",
-        "AND incoming content has dependsOn: ['core:storage']"
-      ],
-      "when": ["execute() is called without force"],
-      "then": ["the write succeeds"]
-    },
-    {
-      "requirement": "dependsOn overwrite protection",
-      "name": "Empty existing dependsOn allows any incoming",
-      "given": [
-        "existing metadata has dependsOn: []",
-        "AND incoming content has dependsOn: ['core:storage']"
-      ],
-      "when": ["execute() is called without force"],
-      "then": ["the write succeeds"]
-    },
-    {
-      "requirement": "dependsOn overwrite protection",
-      "name": "Force bypasses dependsOn check",
-      "given": [
-        "existing metadata has dependsOn: ['core:storage']",
-        "AND incoming content has dependsOn: ['core:other']"
-      ],
-      "when": ["execute() is called with force: true"],
-      "then": ["the write succeeds"]
-    },
-    {
-      "requirement": "Sidecar ownership boundary",
-      "name": "SaveSpecMetadata writes metadata without touching sidecar",
-      "given": ["a persisted spec already has spec-lock.json"],
-      "when": ["SaveSpecMetadata.execute succeeds"],
-      "then": [
-        "metadata.json is written",
-        "AND spec-lock.json is not created, modified, or deleted by SaveSpecMetadata"
-      ]
-    },
-    {
-      "requirement": "Sidecar ownership boundary",
-      "name": "Sidecar mismatch handling remains an archive concern",
-      "given": [
-        "a caller provides metadata.json.dependsOn",
-        "AND archive-time sidecar consistency would need to be checked"
-      ],
-      "when": ["SaveSpecMetadata.execute runs outside archive"],
-      "then": [
-        "the use case performs its normal validation and overwrite checks only",
-        "AND sidecar consistency is not enforced there"
-      ]
-    },
-    {
-      "requirement": "Artifact persistence",
-      "name": "Metadata is saved via saveMetadata",
-      "when": ["execute() succeeds"],
-      "then": ["SpecRepository.saveMetadata() is called with the raw JSON content"]
-    },
-    {
-      "requirement": "Constructor dependencies",
-      "name": "Use case receives dependencies via constructor",
-      "given": ["a ReadonlyMap<string, SpecRepository> of spec repositories"],
-      "when": ["SaveSpecMetadata is constructed"],
-      "then": ["it accepts the spec repositories map as its only dependency"]
-    },
-    {
-      "requirement": "Constructor dependencies",
-      "name": "Existing stale metadata hash is still captured for conflict detection",
-      "given": [
-        "a spec with existing persisted metadata on disk",
-        "AND SpecRepository.metadata() marks that metadata stale"
-      ],
-      "when": ["execute() is called without force"],
-      "then": [
-        "the existing metadata's originalHash is still captured via SpecRepository.metadata()",
-        "AND that hash is passed to SpecRepository.saveMetadata() for optimistic concurrency"
-      ]
-    },
-    {
-      "requirement": "Constructor dependencies",
-      "name": "Existing stale dependsOn would still be changed",
-      "given": [
-        "existing persisted metadata has dependsOn: ['core:storage', 'core:config']",
-        "AND that metadata file is marked stale",
-        "AND incoming content has dependsOn: ['core:storage']"
-      ],
-      "when": ["execute() is called without force"],
-      "then": ["DependsOnOverwriteError is thrown"]
-    },
-    {
-      "requirement": "Constructor dependencies",
-      "name": "Force still bypasses stale overwrite protection",
-      "given": [
-        "existing persisted metadata has dependsOn: ['core:storage']",
-        "AND that metadata file is marked stale",
-        "AND incoming content has dependsOn: ['core:other']"
-      ],
-      "when": ["execute() is called with force: true"],
-      "then": ["the write succeeds"]
-    },
-    {
-      "requirement": "Config-based factory delegates through resolveSaveSpecMetadataDeps",
-      "name": "createSaveSpecMetadata config form derives SaveSpecMetadataDeps through resolveSaveSpecMetadataDeps",
-      "when": ["createSaveSpecMetadata(config, options?) is invoked"],
-      "then": [
-        "it creates a composition resolver for that composition session",
-        "AND it derives SaveSpecMetadataDeps through resolveSaveSpecMetadataDeps(resolver)",
-        "AND resolveSaveSpecMetadataDeps(resolver) resolves:",
-        "AND the factory delegates to canonical createSaveSpecMetadata(deps)"
+        "it is invoked only by MaterializeSpecMetadata",
+        "AND it accepts only a complete generated projection plus an observed revision — never a caller-supplied partial or arbitrary JSON payload"
       ]
     }
   ],
-  "implementation": {
-    "files": [
-      {
-        "specId": "core:save-spec-metadata",
-        "file": "core:src/composition/use-cases/save-spec-metadata.ts"
-      }
-    ]
-  },
   "contentHashes": {
-    "spec.md": "sha256:fb1f3305e78e9d7ac31157c9fb8ae6f822163c22f21c8a1fa1e4606899f1fc1f",
-    "verify.md": "sha256:9e783c00644b7d9d44d2b158b43fec9e01af157d317b2efbe344159de8761de8"
+    "spec.md": "sha256:d68a2d63dbe421eebb97e5eb84f0e3b4c102f8ecba3be7347f78449d50c7197e",
+    "verify.md": "sha256:3270f9913b4eb736a8070a4be7e90361372ac25af50d5dbd71c19e6129a578e1"
   },
-  "generatedBy": "core"
+  "provenance": {
+    "artifacts": {
+      "spec.md": {
+        "hash": "sha256:d68a2d63dbe421eebb97e5eb84f0e3b4c102f8ecba3be7347f78449d50c7197e",
+        "lastModified": "2026-07-25T11:53:31.451Z"
+      },
+      "verify.md": {
+        "hash": "sha256:3270f9913b4eb736a8070a4be7e90361372ac25af50d5dbd71c19e6129a578e1",
+        "lastModified": "2026-07-25T11:53:31.452Z"
+      }
+    },
+    "persistedStateHash": "sha256:ef36894caae3a26ffc97d7cf8ce817863ebc487d32d4d957a368bc70ce548a51",
+    "schema": {
+      "name": "schema-std",
+      "version": 1
+    },
+    "projectionVersion": 1,
+    "projectionFingerprint": "sha256:e4a28a2db6a35ed39b8308518337235b1490c2948cd839db25866ad79b22404b"
+  }
 }

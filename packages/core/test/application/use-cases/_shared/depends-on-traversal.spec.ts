@@ -12,11 +12,15 @@ import { SpecPath } from '../../../../src/domain/value-objects/spec-path.js'
 import { type MetadataExtraction } from '../../../../src/domain/value-objects/metadata-extraction.js'
 
 function makeTraversalSpec(capPath: string): Spec {
-  return buildSpec({ name: capPath, filenames: ['.specd-metadata.yaml'] })
+  return buildSpec({ name: capPath, filenames: ['spec.md', 'spec-lock.json'] })
 }
 
-function metadataJson(dependsOn: string[]): string {
-  return JSON.stringify({ dependsOn })
+function lockJson(dependsOn: string[]): string {
+  return JSON.stringify({
+    schema: { name: 'specd-std', version: 1 },
+    dependsOn,
+    implementation: [],
+  })
 }
 
 describe('traverseDependsOn', () => {
@@ -24,7 +28,7 @@ describe('traverseDependsOn', () => {
     const repo = makeSpecRepository({
       specs: [makeTraversalSpec('auth/login'), makeTraversalSpec('auth/shared')],
       artifacts: {
-        'auth/login/.specd-metadata.yaml': metadataJson(['auth/shared']),
+        'auth/login/spec-lock.json': lockJson(['default:auth/shared']),
       },
     })
     const specRepos = new Map([['default', repo]])
@@ -59,8 +63,8 @@ describe('traverseDependsOn', () => {
     const repo = makeSpecRepository({
       specs: [makeTraversalSpec('a/one'), makeTraversalSpec('a/two')],
       artifacts: {
-        'a/one/.specd-metadata.yaml': metadataJson(['a/two']),
-        'a/two/.specd-metadata.yaml': metadataJson(['a/one']),
+        'a/one/spec-lock.json': lockJson(['default:a/two']),
+        'a/two/spec-lock.json': lockJson(['default:a/one']),
       },
     })
     const specRepos = new Map([['default', repo]])
@@ -94,8 +98,8 @@ describe('traverseDependsOn', () => {
     const repo = makeSpecRepository({
       specs: [makeTraversalSpec('a/one'), makeTraversalSpec('a/two'), makeTraversalSpec('a/three')],
       artifacts: {
-        'a/one/.specd-metadata.yaml': metadataJson(['a/two']),
-        'a/two/.specd-metadata.yaml': metadataJson(['a/three']),
+        'a/one/spec-lock.json': lockJson(['default:a/two']),
+        'a/two/spec-lock.json': lockJson(['default:a/three']),
       },
     })
     const specRepos = new Map([['default', repo]])
@@ -128,7 +132,7 @@ describe('traverseDependsOn', () => {
     const repo = makeSpecRepository({
       specs: [makeTraversalSpec('auth/login'), makeTraversalSpec('auth/shared')],
       artifacts: {
-        'auth/login/.specd-metadata.yaml': metadataJson(['auth/shared']),
+        'auth/login/spec-lock.json': lockJson(['default:auth/shared']),
       },
     })
     const specRepos = new Map([['default', repo]])
@@ -162,7 +166,7 @@ describe('traverseDependsOn', () => {
     const repo = makeSpecRepository({
       specs: [makeTraversalSpec('auth/login')],
       artifacts: {
-        'auth/login/.specd-metadata.yaml': metadataJson(['unknown:something']),
+        'auth/login/spec-lock.json': lockJson(['unknown:something']),
       },
     })
     const specRepos = new Map([['default', repo]])
@@ -222,11 +226,11 @@ describe('traverseDependsOn', () => {
     expect(warnings[0]!.path).toBe('default:auth/login')
   })
 
-  it('does not warn when metadata exists but dependsOn is absent', async () => {
+  it('does not warn when persisted state exists but dependsOn is empty', async () => {
     const repo = makeSpecRepository({
       specs: [makeTraversalSpec('auth/login')],
       artifacts: {
-        'auth/login/.specd-metadata.yaml': JSON.stringify({ title: 'Login' }),
+        'auth/login/spec-lock.json': lockJson([]),
       },
     })
     const specRepos = new Map([['default', repo]])
@@ -253,27 +257,23 @@ describe('traverseDependsOn', () => {
     expect(warnings).toHaveLength(0)
   })
 
-  it('prefers metadata dependsOn over fallback extraction when metadata exists', async () => {
+  it('prefers persisted dependsOn over fallback extraction when lock exists', async () => {
     const repo = makeSpecRepository({
       specs: [
         buildSpec({
           workspace: 'default',
           name: 'auth/login',
-          filenames: ['spec.md', '.specd-metadata.yaml'],
+          filenames: ['spec.md', 'spec-lock.json'],
         }),
-        buildSpec({
-          workspace: 'default',
-          name: 'auth/shared',
-          filenames: ['.specd-metadata.yaml'],
-        }),
-        buildSpec({ workspace: 'default', name: 'auth/jwt', filenames: ['.specd-metadata.yaml'] }),
+        makeTraversalSpec('auth/shared'),
+        makeTraversalSpec('auth/jwt'),
       ],
       artifacts: {
         'auth/login/spec.md':
           '# Auth Login\n\n## Spec Dependencies\n\n- [`default:auth/jwt`](../jwt/spec.md)\n',
-        'auth/login/.specd-metadata.yaml': metadataJson(['default:auth/shared']),
-        'auth/shared/.specd-metadata.yaml': JSON.stringify({ title: 'Shared' }),
-        'auth/jwt/.specd-metadata.yaml': JSON.stringify({ title: 'JWT' }),
+        'auth/login/spec-lock.json': lockJson(['default:auth/shared']),
+        'auth/shared/spec-lock.json': lockJson([]),
+        'auth/jwt/spec-lock.json': lockJson([]),
       },
     })
     const workspaces = await makeWorkspaceMap(new Map([['default', repo]]))
@@ -330,17 +330,13 @@ describe('traverseDependsOn', () => {
     const repo = makeSpecRepository({
       specs: [
         buildSpec({ workspace: 'default', name: 'auth/login', filenames: ['spec.md'] }),
-        buildSpec({
-          workspace: 'default',
-          name: 'auth/shared',
-          filenames: ['.specd-metadata.yaml'],
-        }),
-        buildSpec({ workspace: 'default', name: 'auth/jwt', filenames: ['.specd-metadata.yaml'] }),
+        buildSpec({ workspace: 'default', name: 'auth/shared', filenames: ['spec.md'] }),
+        buildSpec({ workspace: 'default', name: 'auth/jwt', filenames: ['spec.md'] }),
       ],
       artifacts: {
         'auth/login/spec.md': specContent,
-        'auth/shared/.specd-metadata.yaml': JSON.stringify({ title: 'Shared' }),
-        'auth/jwt/.specd-metadata.yaml': JSON.stringify({ title: 'JWT' }),
+        'auth/shared/spec-lock.json': lockJson([]),
+        'auth/jwt/spec-lock.json': lockJson([]),
       },
     })
     const specs = new Map([['default', repo]])
@@ -407,10 +403,7 @@ describe('traverseDependsOn', () => {
 
     // auth/login itself + any deps discovered via fallback extraction
     expect(added.has('default:auth/login')).toBe(true)
-    // The fallback would only work if the extractMetadata function actually extracts
-    // dependsOn from the mock AST — the mock parser returns a valid AST but
-    // extractMetadata uses selector matching which requires the real engine.
-    // At minimum, the missing-metadata warning should still be emitted.
+    // auth/login has no lock, so missing-metadata warning is emitted before fallback runs
     const metaWarnings = warnings.filter((w) => w.type === 'missing-metadata')
     expect(metaWarnings).toHaveLength(1)
     expect(metaWarnings[0]!.path).toBe('default:auth/login')

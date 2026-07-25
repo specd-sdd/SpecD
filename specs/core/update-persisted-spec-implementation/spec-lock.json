@@ -1,0 +1,15 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "core:spec-repository-port",
+    "core:spec-id-format",
+    "core:update-implementation-tracking",
+    "core:storage",
+    "core:workspace",
+    "core:initialize-persisted-spec-state"
+  ],
+  "implementation": []
+}

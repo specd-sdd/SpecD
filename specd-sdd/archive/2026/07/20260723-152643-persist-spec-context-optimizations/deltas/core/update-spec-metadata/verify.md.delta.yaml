@@ -1,0 +1,41 @@
+- op: modified
+  description: Replace the deterministic-extraction merge scenario with removal assertions now that UpdateSpecMetadata no longer exists.
+  selector:
+    type: section
+    matches: '^Requirement: Deterministic extraction before merge$'
+  rename: 'Requirement: UpdateSpecMetadata is removed'
+  content: |
+    #### Scenario: UpdateSpecMetadata is not exported
+
+    - **WHEN** `@specd/core` public exports are inspected
+    - **THEN** `UpdateSpecMetadata` and `createUpdateSpecMetadata` are not present
+
+    #### Scenario: Kernel does not mount UpdateSpecMetadata
+
+    - **WHEN** `createKernel(config)` is called
+    - **THEN** the returned kernel has no `updateSpecMetadata` entry under `kernel.specs`
+
+    #### Scenario: Callers persist optimized fields through UpdatePersistedSpecOptimizations instead
+
+    - **GIVEN** a caller needs to persist an LLM-optimized description or context field
+    - **WHEN** the caller looks for a supported write path
+    - **THEN** it uses `UpdatePersistedSpecOptimizations` (`specs optimizations set`/`clear`)
+    - **AND** it does not call `UpdateSpecMetadata`
+
+- op: removed
+  description: Remove the merge-fields scenario — there is no metadata-owned optimization merge anymore.
+  selector:
+    type: section
+    matches: '^Requirement: Merging optimized fields$'
+
+- op: removed
+  description: Remove the persistence-via-SaveSpecMetadata scenario — SaveSpecMetadata is removed.
+  selector:
+    type: section
+    matches: '^Requirement: Persistence$'
+
+- op: removed
+  description: Remove the obsolete config-based factory contract scenario.
+  selector:
+    type: section
+    matches: '^Requirement: Config-based factory delegates through resolveUpdateSpecMetadataDeps$'

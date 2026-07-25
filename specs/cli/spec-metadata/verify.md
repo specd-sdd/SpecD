@@ -11,23 +11,24 @@
 
 ### Requirement: Behaviour
 
-#### Scenario: Fresh hash shown as fresh
+#### Scenario: GetSpecMetadata self-heals a stale projection
 
-- **GIVEN** `default:auth/login` has metadata with a `contentHashes` entry for `spec.md` matching the current file on disk
+- **GIVEN** a spec's persisted metadata is stale relative to current source artifacts
 - **WHEN** `specd spec metadata default:auth/login` is run
-- **THEN** the `spec.md` line shows `fresh`
+- **THEN** the command calls `GetSpecMetadata`, which regenerates the projection
+- **AND** the rendered output shows `source: generated` and `regenerated: true`
 
-#### Scenario: Stale hash shown as STALE
+#### Scenario: Fresh persisted projection is reused
 
-- **GIVEN** `default:auth/login` has metadata with a `contentHashes` entry for `spec.md` that does not match the current file
+- **GIVEN** a spec's persisted metadata is fresh relative to current source artifacts
 - **WHEN** `specd spec metadata default:auth/login` is run
-- **THEN** the `spec.md` line shows `STALE`
+- **THEN** the rendered output shows `source: persisted` and `regenerated: false`
 
-#### Scenario: Sections with no content omitted in text mode
+#### Scenario: Command never reads SpecRepository.metadata() directly
 
-- **GIVEN** metadata has no `dependsOn` entries
 - **WHEN** `specd spec metadata default:auth/login` is run
-- **THEN** the `dependsOn:` section is not printed
+- **THEN** the command obtains metadata exclusively through `GetSpecMetadata`
+- **AND** it does not call `SpecRepository.metadata()` or compute per-file content hashes itself
 
 ### Requirement: Output format
 
@@ -37,31 +38,62 @@
 - **WHEN** `specd spec metadata default:auth/login` is run
 - **THEN** stdout shows `rules: 3`, `constraints: 2`, and `scenarios: 5`
 
-#### Scenario: JSON output includes full rules, constraints, scenarios
+#### Scenario: Sections with no content omitted in text mode
+
+- **GIVEN** metadata has no `dependsOn` entries
+- **WHEN** `specd spec metadata default:auth/login` is run
+- **THEN** the `dependsOn:` section is not printed
+
+#### Scenario: Warnings section printed only when GetSpecMetadata returns warnings
+
+- **GIVEN** `GetSpecMetadata` returns at least one warning for the spec
+- **WHEN** `specd spec metadata default:auth/login` is run
+- **THEN** stdout includes a `warnings:` section listing each warning on its own line
+
+#### Scenario: No warnings section when GetSpecMetadata returns none
+
+- **GIVEN** `GetSpecMetadata` returns an empty `warnings` array
+- **WHEN** `specd spec metadata default:auth/login` is run
+- **THEN** stdout has no `warnings:` section
+
+#### Scenario: generatedBy reflects the field's production mechanism
+
+- **GIVEN** a spec whose description was set through a lock-owned optimized field currently fresh enough to be included
+- **WHEN** `specd spec metadata default:auth/login` is run
+- **THEN** stdout shows `generatedBy: agent`
+
+#### Scenario: JSON output includes materialization diagnostics and full arrays
 
 - **GIVEN** metadata has rules, constraints, and scenarios
 - **WHEN** `specd spec metadata default:auth/login --format json` is run
 - **THEN** stdout is valid JSON with `rules`, `constraints`, and `scenarios` as full arrays, not counts
-- **AND** `fresh` at the top level is `true` when all hashes match
+- **AND** it includes `source`, `regenerated`, and `warnings` fields
 - **AND** the process exits with code 0
 
-#### Scenario: JSON fresh field reflects all hashes
+#### Scenario: JSON output has no top-level fresh flag or contentHashes array
 
-- **GIVEN** one of the `contentHashes` entries is stale
 - **WHEN** `specd spec metadata default:auth/login --format json` is run
-- **THEN** `fresh` at the top level is `false`
+- **THEN** the output has no top-level `fresh` field
+- **AND** it has no per-file `contentHashes` array
 
 ### Requirement: Error cases
 
-#### Scenario: Metadata absent
-
-- **GIVEN** `default:auth/login` exists but has no metadata
-- **WHEN** `specd spec metadata default:auth/login` is run
-- **THEN** the command exits with code 1
-- **AND** stderr contains an `error:` message
-
-#### Scenario: Unknown workspace
+#### Scenario: Unknown workspace exits 1
 
 - **WHEN** `specd spec metadata unknown-ws:auth/login` is run
 - **THEN** the command exits with code 1
 - **AND** stderr contains an `error:` message
+
+#### Scenario: Absent metadata self-heals instead of erroring
+
+- **GIVEN** `default:auth/login` exists but has no persisted metadata
+- **WHEN** `specd spec metadata default:auth/login` is run
+- **THEN** `GetSpecMetadata` generates and returns a fresh projection
+- **AND** the command exits with code 0
+
+#### Scenario: Unextractable spec exits 1
+
+- **GIVEN** a spec whose schema has no `metadataExtraction` rules
+- **WHEN** `specd spec metadata` is run for that spec
+- **THEN** `GetSpecMetadata` cannot produce valid metadata
+- **AND** the command exits with code 1 with an `error:` message on stderr

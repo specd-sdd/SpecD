@@ -151,11 +151,28 @@
       "then": ["it must be changed to setext style — ATX headers conflict with git comment markers"]
     }
   ],
+  "dependsOn": [],
   "contentHashes": {
     "spec.md": "sha256:bf1fb24917f07404284859bf6501d003bd550e1637c9866ab8f8dbdd4461b060",
     "verify.md": "sha256:8353f0bd3f445bc84ff816668adc1cacd22bb3d5733060829d73ff848c0980f6"
   },
-  "generatedBy": "agent",
-  "optimizedDescription": "Inconsistent commit messages make changelogs unreliable and automated releases impossible.",
-  "optimizedContext": "# Commit Conventions\n\n## Rules\n- Conventional commit format: All commits follow the format:\n- Allowed types: | Type | When to use | | ---------- | ------------------------------------------------------- | | feat | New feature or capability | | fix | Bug fix | | refactor | Code change…\n- Scope is the package name: Scope must match the short package name (without @specd/ prefix): Use root for changes at the monorepo root.\n- Description in imperative mood: The description uses the imperative mood, present tense: \"add\", \"fix\", \"remove\" — not \"added\", \"fixes\", \"removed\".\n- Commit granularity: Each commit must represent a single coherent change.\n- Breaking changes: Breaking changes are marked with !\n- Automated enforcement: Commit conventions must be automatically enforced by commitlint via a husky commit-msg hook.\n- Commit body format: Commit bodies are optional and used only when the subject line and diff cannot fully explain the change.\n\n## Constraints\n- Every commit message must match: ^(feat | fix | refactor | test | docs | chore | perf | build)(\\(.+\\))?: .+\n- Scope must be present and match a known package name or root / all\n- Description must not end with a period\n- Breaking changes must use the ! marker and include a BREAKING CHANGE: footer\n- No Co-Authored-By footer unless explicitly requested\n"
+  "provenance": {
+    "artifacts": {
+      "spec.md": {
+        "hash": "sha256:bf1fb24917f07404284859bf6501d003bd550e1637c9866ab8f8dbdd4461b060",
+        "lastModified": "2026-05-25T06:02:58.302Z"
+      },
+      "verify.md": {
+        "hash": "sha256:8353f0bd3f445bc84ff816668adc1cacd22bb3d5733060829d73ff848c0980f6",
+        "lastModified": "2026-05-04T16:57:11.630Z"
+      }
+    },
+    "persistedStateHash": "sha256:0114a21e9a9cb1bbdf2b9d331a154e16e375565abc8b3f055c406ebe0bf3eb58",
+    "schema": {
+      "name": "schema-std",
+      "version": 1
+    },
+    "projectionVersion": 1,
+    "projectionFingerprint": "sha256:e4a28a2db6a35ed39b8308518337235b1490c2948cd839db25866ad79b22404b"
+  }
 }

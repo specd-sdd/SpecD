@@ -1,0 +1,44 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["default:_global/architecture", "default:_global/conventions"],
+  "implementation": [],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Vitest strategy: unit tests (domain/application, mocked ports) + integration tests (infrastructure, temp filesystem). No snapshots.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:b95a4fd25c0d9f8e13e83e90892a68f1509dc6f00768c95de228839860715b82",
+          "lastModified": "2026-05-04T16:57:11.686Z"
+        },
+        "verify.md": {
+          "hash": "sha256:7cdbf5af7e93cf8c770b7aed3c03672a2eec07b09e1c0466bd8f5ac3bb63c57e",
+          "lastModified": "2026-05-04T16:57:11.680Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Testing Conventions\n\n## Rules\n- Vitest only; tests in `test/` mirroring `src/`; `change.ts` → `test/.../change.spec.ts`\n- Unit tests: every use case + entity invariant method; mocked ports; no fs/network\n- Port mocks: fully implement interface; no `as unknown as Port`; unused methods throw `new Error('not implemented')`\n- Integration tests: infrastructure adapters against real temp dir (`os.tmpdir()` + unique subfolder); cleanup after each test\n- Naming: `.spec.ts` suffix; descriptions `\"given <state>, when <action>, then <outcome>\"`; helpers `setup<Thing>`/`cleanup<Thing>`\n- No snapshot tests\n\n## Constraints\n- Vitest framework\n- Tests in test/ not co-located\n- `.spec.ts` suffix\n- Unit tests: no fs/network/spawn\n- Full port interface on mocks\n- Integration tests clean temp dirs\n- `toMatchSnapshot`/`toMatchInlineSnapshot` forbidden",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:b95a4fd25c0d9f8e13e83e90892a68f1509dc6f00768c95de228839860715b82",
+          "lastModified": "2026-05-04T16:57:11.686Z"
+        },
+        "verify.md": {
+          "hash": "sha256:7cdbf5af7e93cf8c770b7aed3c03672a2eec07b09e1c0466bd8f5ac3bb63c57e",
+          "lastModified": "2026-05-04T16:57:11.680Z"
+        }
+      }
+    }
+  }
+}

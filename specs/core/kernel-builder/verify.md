@@ -35,6 +35,13 @@
 - **AND** both expose the same merged registry contents
 - **AND** both construct shared adapters once before returning an immutable kernel
 
+#### Scenario: Built kernel exposes the complete kernel.specs materialization and persisted-state surface
+
+- **GIVEN** a kernel built through the builder with any combination of registry and repository overrides
+- **WHEN** `kernel.specs` is inspected
+- **THEN** it includes `generateMetadata`, `materializeMetadata`, `getMetadata`, `regenerateMetadata`, `initializePersistedState`, persisted schema inspection/reassignment, and persisted dependency/implementation/optimization queries and mutations
+- **AND** the builder does not maintain a second, independently-updated use-case list that could drift from `createKernel()`
+
 ### Requirement: Builder rejects conflicting registrations
 
 #### Scenario: Duplicate registration name is rejected

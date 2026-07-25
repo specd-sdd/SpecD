@@ -1,0 +1,15 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "core:spec-repository-port",
+    "core:generate-metadata",
+    "core:persist-spec-metadata",
+    "core:spec-metadata",
+    "core:composition-resolver",
+    "default:_global/logging"
+  ],
+  "implementation": []
+}

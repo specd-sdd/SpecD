@@ -1,0 +1,301 @@
+{
+  "title": "UpdatePersistedSpecSchema",
+  "description": "Repositories occasionally need to rebind a spec's persisted state to a different, compatible schema — for example after adopting an externally authored format — without conflating that explicit decision with initial adoption or accidentally discarding canonical dependencies, implementation links, or optimization history. `UpdatePersistedSpecSchema` is the explicit, guarded reassignment operation: it requires an already-initialized spec, verifies compatibility with the target schema, and never silently fabricates or drops persisted values.",
+  "dependsOn": [
+    "core:spec-repository-port",
+    "core:spec-lock",
+    "core:schema-format",
+    "core:get-active-schema",
+    "core:content-extraction",
+    "core:spec-optimization",
+    "core:spec-id-format",
+    "core:composition-resolver"
+  ],
+  "context": [
+    "Repositories occasionally need to rebind a spec's persisted state to a different, compatible schema — for example after adopting an externally authored format — without conflating that explicit decision with initial adoption or accidentally discarding canonical dependencies, implementation links, or optimization history. `UpdatePersistedSpecSchema` is the explicit, guarded reassignment operation: it requires an already-initialized spec, verifies compatibility with the target schema, and never silently fabricates or drops persisted values."
+  ],
+  "rules": [
+    {
+      "requirement": "Input contract",
+      "rules": [
+        "`UpdatePersistedSpecSchema.execute` SHALL accept an `UpdatePersistedSpecSchemaInput` with:\n\n- `specId` (required, string) — the spec whose persisted schema is being reassigned\n- `schemaRef` (required, string) — a resolvable schema reference for the target schema\n\nUnlike [`core:initialize-persisted-spec-state`](../initialize-persisted-spec-state/spec.md), `schemaRef` has no effective-project-schema fallback: reassignment is always explicit."
+      ]
+    },
+    {
+      "requirement": "Requires an existing lock; never creates one",
+      "rules": [
+        "The use case MUST call `SpecRepository.readPersistedState(spec)` before doing anything else. When it returns `null`, `execute` SHALL throw `SpecNotInitializedError` identifying `specId`. This use case MUST NOT create persisted state and MUST NOT delegate to `InitializePersistedSpecState` or any initial-base construction path."
+      ]
+    },
+    {
+      "requirement": "Unknown spec fails with a typed error",
+      "rules": [
+        "When the spec identity cannot be resolved to an existing spec artifact set in its workspace, `execute` SHALL throw `SpecNotFoundError`. This check MUST occur before the initialization check."
+      ]
+    },
+    {
+      "requirement": "Resolving the target schema",
+      "rules": [
+        "The use case MUST resolve `schemaRef` to a `Schema` through `GetActiveSchema` in `{ mode: 'ref', ref: schemaRef }` mode. It MUST NOT apply project plugins or overrides beyond what `GetActiveSchema` performs for ref-mode resolution."
+      ]
+    },
+    {
+      "requirement": "Loading and parsing declared artifacts under the target schema",
+      "rules": [
+        "The use case MUST load the spec's current schema-declared canonical artifacts and verify that they parse successfully under the resolved target schema, using the same parsing and content-extraction infrastructure used by deterministic metadata projection. A parse failure under the target schema MUST abort the reassignment with a typed error and MUST NOT mutate persisted state."
+      ]
+    },
+    {
+      "requirement": "Selecting the already-persisted schema is a no-op",
+      "rules": [
+        "When the resolved target schema identity equals the spec's currently persisted schema identity, the use case MUST treat the call as a semantic no-op: it MUST NOT perform dependency-conflict validation, MUST NOT write persisted state, and MUST return the unchanged current schema identity with `changed: false`."
+      ]
+    },
+    {
+      "requirement": "Dependency compatibility when the target schema does not extract dependencies",
+      "rules": [
+        "When the resolved target schema does not declare dependency extraction for the spec's artifacts, the use case MUST preserve the spec's current canonical `dependsOn` list unchanged in the reassigned state."
+      ]
+    },
+    {
+      "requirement": "Dependency compatibility when the target schema extracts dependencies",
+      "rules": [
+        "When the resolved target schema declares dependency extraction for the spec's artifacts, the use case MUST extract the dependency list from the current artifacts under the target schema.\n\nWhen the extracted list is not equal to the spec's current canonical `dependsOn` list, the use case MUST throw `PersistedSchemaDependencyConflictError` identifying `specId`, the current dependencies, and the extracted dependencies. It MUST NOT silently adopt the extracted value and MUST NOT mutate persisted state. Users change dependencies explicitly through [`core:update-persisted-spec-deps`](../update-persisted-spec-deps/spec.md), never as a side effect of schema selection.\n\nWhen the extracted list equals the current canonical `dependsOn` list, reassignment proceeds using the current `dependsOn` value unchanged."
+      ]
+    },
+    {
+      "requirement": "Implementation and optimization values are preserved verbatim",
+      "rules": [
+        "Reassignment MUST preserve the spec's current `implementation` links and `optimizations` block unchanged — including each optimization field's recorded `value` and `artifactState` baseline. The use case MUST NOT clear, regenerate, or re-baseline optimizations as part of a schema change.\n\nBecause each optimization field's baseline records the schema identity it was captured under, a successful reassignment makes any existing optimization field stale relative to the new persisted schema; freshness reported by [`core:get-persisted-spec-optimizations`](../get-persisted-spec-optimizations/spec.md) reflects this automatically without any special-casing in this use case."
+      ]
+    },
+    {
+      "requirement": "Constructing and writing the reassigned state",
+      "rules": [
+        "The generic `applyPersistedSpecStatePatch()` helper rejects schema replacement on an existing base. `UpdatePersistedSpecSchema` MUST NOT use that generic path to change `schema`. After the compatibility checks in this spec succeed, it MUST construct the complete resulting `PersistedSpecState` directly — new `schema`, the `dependsOn` value determined above, and the preserved `implementation`/`optimizations` — and pass it to `SpecRepository.writePersistedState()` with `expectedRevision` equal to the `originalHash` observed by the initial `readPersistedState` call.\n\nNo other use case in this change may construct a complete persisted state with a schema different from an existing snapshot's schema."
+      ]
+    },
+    {
+      "requirement": "Conflict handling",
+      "rules": [
+        "When the repository detects that the observed revision no longer matches the persisted state at write time, the use case MUST propagate `ArtifactConflictError` rather than retrying or silently rebasing the reassignment."
+      ]
+    },
+    {
+      "requirement": "Result contract",
+      "rules": [
+        "On success, `execute` SHALL return an `UpdatePersistedSpecSchemaResult` containing:\n\n- `specId` — the fully-qualified spec identity\n- `schema` — the resulting persisted schema identity\n- `dependsOn` — the resulting persisted dependency list\n- `changed` — `false` when the target schema equaled the previously persisted schema, `true` otherwise"
+      ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveUpdatePersistedSpecSchemaDeps",
+      "rules": [
+        "The config-based `createUpdatePersistedSpecSchema(config, options?)` form MUST derive `UpdatePersistedSpecSchemaDeps` through `resolveUpdatePersistedSpecSchemaDeps(resolver)` and then delegate to canonical `createUpdatePersistedSpecSchema(deps)`.\n\n`resolveUpdatePersistedSpecSchemaDeps(resolver)` MUST resolve:\n\n- `specs: ReadonlyMap<string, SpecRepository>` — one repository instance per workspace\n- `getActiveSchema: GetActiveSchema`\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
+      ]
+    }
+  ],
+  "constraints": [
+    "This operation rebinds compatible existing artifacts to a new schema identity; it MUST NOT attempt to transform artifact content between incompatible formats — that remains a separate future migration capability",
+    "readOnly workspace ownership MUST reject the write with ReadOnlyWorkspaceError before any persisted-state I/O",
+    "This use case MUST NOT import dependency values from persisted metadata under any circumstance",
+    "specs init and UpdatePersistedSpecSchema are mutually exclusive entry points: initialization never rewrites an existing lock, and this use case never creates one"
+  ],
+  "scenarios": [
+    {
+      "requirement": "Input contract",
+      "name": "schemaRef is always explicit, unlike initialization",
+      "given": ["a project with an effective project schema configured"],
+      "when": ["execute({ specId, schemaRef: 'other-schema@2' }) is called"],
+      "then": [
+        "the target schema is resolved solely from the given schemaRef",
+        "AND the effective project schema is never consulted as a fallback"
+      ]
+    },
+    {
+      "requirement": "Requires an existing lock; never creates one",
+      "name": "Uninitialized spec throws SpecNotInitializedError",
+      "given": ["a spec with no persisted state"],
+      "when": ["execute({ specId, schemaRef: 'other-schema@2' }) is called"],
+      "then": [
+        "a SpecNotInitializedError identifying specId is thrown",
+        "AND no persisted state is created"
+      ]
+    },
+    {
+      "requirement": "Requires an existing lock; never creates one",
+      "name": "Never delegates to InitializePersistedSpecState or initial-base construction",
+      "given": ["a spec with no persisted state"],
+      "when": ["execute({ specId, schemaRef: 'other-schema@2' }) is called"],
+      "then": [
+        "InitializePersistedSpecState is never invoked",
+        "AND no initial-base derivation occurs"
+      ]
+    },
+    {
+      "requirement": "Unknown spec fails with a typed error",
+      "name": "Unknown spec throws SpecNotFoundError before the initialization check",
+      "when": [
+        "execute({ specId, schemaRef: 'other-schema@2' }) is called for a spec identity with no existing artifact set in its workspace"
+      ],
+      "then": ["a SpecNotFoundError is thrown"]
+    },
+    {
+      "requirement": "Resolving the target schema",
+      "name": "Target schema is resolved in ref mode without project overrides",
+      "given": ["a project with plugins and overrides configured for schema resolution"],
+      "when": ["execute({ specId, schemaRef: 'other-schema@2' }) is called"],
+      "then": [
+        "GetActiveSchema is invoked with { mode: 'ref', ref: schemaRef }",
+        "AND project plugins or overrides beyond ref-mode resolution are not applied"
+      ]
+    },
+    {
+      "requirement": "Loading and parsing declared artifacts under the target schema",
+      "name": "Parse failure under the target schema aborts without mutation",
+      "given": [
+        "the spec's current artifacts do not parse successfully under the resolved target schema"
+      ],
+      "when": ["execute({ specId, schemaRef: 'other-schema@2' }) is called"],
+      "then": ["a typed error is thrown", "AND persisted state is not mutated"]
+    },
+    {
+      "requirement": "Selecting the already-persisted schema is a no-op",
+      "name": "Target schema equals the currently persisted schema",
+      "given": ["persisted state has schema: { name: 'default', version: 1 }"],
+      "when": ["execute({ specId, schemaRef: 'default@1' }) is called"],
+      "then": [
+        "dependency-conflict validation is skipped",
+        "AND writePersistedState is never called",
+        "AND result.changed is false",
+        "AND result.schema equals the unchanged current schema identity"
+      ]
+    },
+    {
+      "requirement": "Dependency compatibility when the target schema does not extract dependencies",
+      "name": "Current dependsOn is preserved unchanged",
+      "given": [
+        "the target schema declares no dependency extraction for the spec's artifacts",
+        "AND persisted dependsOn is ['core:a', 'core:b']"
+      ],
+      "when": ["execute({ specId, schemaRef: 'other-schema@2' }) succeeds"],
+      "then": ["the reassigned state's dependsOn is unchanged (['core:a', 'core:b'])"]
+    },
+    {
+      "requirement": "Dependency compatibility when the target schema extracts dependencies",
+      "name": "Extracted dependencies equal to the current list allow reassignment to proceed",
+      "given": ["the target schema extracts a dependency list equal to the persisted dependsOn"],
+      "when": ["execute({ specId, schemaRef: 'other-schema@2' }) is called"],
+      "then": ["reassignment proceeds using the current dependsOn value unchanged"]
+    },
+    {
+      "requirement": "Dependency compatibility when the target schema extracts dependencies",
+      "name": "Extracted dependencies differing from the current list throw a conflict error",
+      "given": [
+        "the target schema extracts a dependency list different from the persisted dependsOn"
+      ],
+      "when": ["execute({ specId, schemaRef: 'other-schema@2' }) is called"],
+      "then": [
+        "a PersistedSchemaDependencyConflictError identifying specId, the current dependencies, and the extracted dependencies is thrown",
+        "AND persisted state is not mutated",
+        "AND the extracted value is never silently adopted"
+      ]
+    },
+    {
+      "requirement": "Implementation and optimization values are preserved verbatim",
+      "name": "Implementation links and optimizations survive reassignment unchanged",
+      "given": [
+        "persisted state has implementation links and an optimizedDescription field with a recorded baseline"
+      ],
+      "when": ["execute({ specId, schemaRef: 'other-schema@2' }) succeeds"],
+      "then": [
+        "the resulting persisted state has the same implementation links",
+        "AND the same optimizedDescription value and artifactState baseline, unmodified"
+      ]
+    },
+    {
+      "requirement": "Implementation and optimization values are preserved verbatim",
+      "name": "A successful reassignment makes existing optimizations stale via freshness computation, not special-casing",
+      "given": [
+        "persisted state has a fresh optimizedContext field baselined against the old schema"
+      ],
+      "when": ["execute({ specId, schemaRef: 'other-schema@2' }) succeeds with a different schema"],
+      "then": [
+        "a subsequent GetPersistedSpecOptimizations call reports optimizedContext as stale with reason schema-changed",
+        "AND UpdatePersistedSpecSchema itself performs no optimization re-baselining or invalidation logic"
+      ]
+    },
+    {
+      "requirement": "Constructing and writing the reassigned state",
+      "name": "Complete state is constructed directly, bypassing applyPersistedSpecStatePatch for the schema field",
+      "when": ["execute({ specId, schemaRef: 'other-schema@2' }) succeeds with a schema change"],
+      "then": [
+        "the resulting PersistedSpecState is constructed directly with the new schema, the resolved dependsOn, and the preserved implementation/optimizations",
+        "AND the generic applyPersistedSpecStatePatch() helper is not used to change schema"
+      ]
+    },
+    {
+      "requirement": "Constructing and writing the reassigned state",
+      "name": "Write uses the originalHash observed by the initial read as expectedRevision",
+      "given": ["persisted state exists with a known revision hash"],
+      "when": ["execute({ specId, schemaRef: 'other-schema@2' }) succeeds"],
+      "then": [
+        "writePersistedState is called with expectedRevision equal to the originalHash observed by the initial readPersistedState call"
+      ]
+    },
+    {
+      "requirement": "Conflict handling",
+      "name": "Revision mismatch at write time propagates ArtifactConflictError",
+      "given": ["persisted state is modified concurrently between the read and the write"],
+      "when": ["execute({ specId, schemaRef: 'other-schema@2' }) is called"],
+      "then": [
+        "an ArtifactConflictError is thrown",
+        "AND the use case does not retry or silently rebase the reassignment"
+      ]
+    },
+    {
+      "requirement": "Result contract",
+      "name": "Successful reassignment reports changed true with the new schema and dependsOn",
+      "given": ["a schema reassignment that differs from the current schema"],
+      "when": ["execute({ specId, schemaRef: 'other-schema@2' }) succeeds"],
+      "then": [
+        "result.changed is true",
+        "AND result.schema equals the new schema identity",
+        "AND result.dependsOn equals the resolved dependency list"
+      ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveUpdatePersistedSpecSchemaDeps",
+      "name": "createUpdatePersistedSpecSchema config form derives deps through the resolver",
+      "when": ["createUpdatePersistedSpecSchema(config, options?) is invoked"],
+      "then": [
+        "it creates a composition resolver for that composition session",
+        "AND it derives UpdatePersistedSpecSchemaDeps through resolveUpdatePersistedSpecSchemaDeps(resolver)",
+        "AND resolveUpdatePersistedSpecSchemaDeps(resolver) resolves specs: ReadonlyMap<string, SpecRepository> and getActiveSchema: GetActiveSchema",
+        "AND the factory delegates to canonical createUpdatePersistedSpecSchema(deps)"
+      ]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:c13b5076f6f90176ea1cabd6fbbb33369c92ea2ffb9606f90b62cbe988b93d3a",
+    "verify.md": "sha256:5eeacb6729d6e125d125601dc8a59e76f5d74a75a6bd77d9ad62c6abb7e15ccd"
+  },
+  "provenance": {
+    "artifacts": {
+      "spec.md": {
+        "hash": "sha256:c13b5076f6f90176ea1cabd6fbbb33369c92ea2ffb9606f90b62cbe988b93d3a",
+        "lastModified": "2026-07-25T11:53:31.827Z"
+      },
+      "verify.md": {
+        "hash": "sha256:5eeacb6729d6e125d125601dc8a59e76f5d74a75a6bd77d9ad62c6abb7e15ccd",
+        "lastModified": "2026-07-25T11:53:31.827Z"
+      }
+    },
+    "persistedStateHash": "sha256:8f760652154f40ac06c3df2c9745df336d080f0327cdc466952d574c014359a0",
+    "schema": {
+      "name": "schema-std",
+      "version": 1
+    },
+    "projectionVersion": 1,
+    "projectionFingerprint": "sha256:e4a28a2db6a35ed39b8308518337235b1490c2948cd839db25866ad79b22404b"
+  }
+}

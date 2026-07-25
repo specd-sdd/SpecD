@@ -5,6 +5,7 @@ import { type SchemaProvider } from '../../application/ports/schema-provider.js'
 import { type SpecWorkspaceRoute } from '../../application/use-cases/_shared/spec-reference-resolver.js'
 import { type CompileContextConfig } from '../../application/use-cases/compile-context.js'
 import { GetProjectContext } from '../../application/use-cases/get-project-context.js'
+import { type GetSpecMetadata } from '../../application/use-cases/get-spec-metadata.js'
 import { type ListWorkspaces } from '../../application/use-cases/list-workspaces.js'
 import { type SpecdConfig } from '../../application/specd-config.js'
 import { type ExtractorTransformRegistry } from '../../domain/services/content-extraction.js'
@@ -14,6 +15,7 @@ import {
   type CompositionResolutionOptions,
 } from '../composition-resolver.js'
 import { normalizeCompositionFactoryArgs, type FactoryInput } from '../normalize-factory-args.js'
+import { createGetSpecMetadata, resolveGetSpecMetadataDeps } from './get-spec-metadata.js'
 
 /**
  * Explicit dependencies for {@link createGetProjectContext}.
@@ -24,6 +26,7 @@ export interface GetProjectContextDeps {
   readonly fileReader: FileReader
   readonly parsers: ArtifactParserRegistry
   readonly contentHasher: ContentHasher
+  readonly getMetadata: GetSpecMetadata
   readonly extractorTransforms: ExtractorTransformRegistry
   readonly workspaceRoutes: readonly SpecWorkspaceRoute[]
   readonly defaultConfig: CompileContextConfig
@@ -42,6 +45,7 @@ export function resolveGetProjectContextDeps(resolver: CompositionResolver): Get
     fileReader: resolver.getFileReader(),
     parsers: resolver.getArtifactParserRegistry(),
     contentHasher: resolver.getContentHasher(),
+    getMetadata: createGetSpecMetadata(resolveGetSpecMetadataDeps(resolver)),
     extractorTransforms: resolver.getExtractorTransforms(),
     workspaceRoutes: resolver.getSpecWorkspaceRoutes(),
     defaultConfig: resolver.getCompileContextConfig(),
@@ -102,6 +106,7 @@ function createGetProjectContextFromNormalized(
       fileReader,
       parsers,
       contentHasher,
+      getMetadata,
       extractorTransforms,
       workspaceRoutes,
       defaultConfig,
@@ -112,6 +117,7 @@ function createGetProjectContextFromNormalized(
       fileReader,
       parsers,
       contentHasher,
+      getMetadata,
       extractorTransforms,
       workspaceRoutes,
       defaultConfig,
@@ -137,6 +143,7 @@ function isGetProjectContextDeps(
     'fileReader' in value &&
     'parsers' in value &&
     'contentHasher' in value &&
+    'getMetadata' in value &&
     'extractorTransforms' in value &&
     'workspaceRoutes' in value &&
     'defaultConfig' in value

@@ -1,0 +1,123 @@
+# validation-result-cache-port: accept optional current stamps from list Meta /
+# Spec stamps for hard-hit without requiring get() when stamps are already known.
+
+- op: modified
+  description: Allow optional stamps on lookup for hard-hit; get() only when stamps absent or soft-hit/miss needs repository I/O.
+  selector:
+    type: section
+    matches: 'Requirement: Lookup cascade owned by the cache'
+  content: |
+    `lookup` MUST own freshness evaluation for one spec. ValidateSpecs MUST NOT invent
+    stamp algorithms or drive soft-hit persistence. ValidateSpecs MAY pass optional
+    current stamps already projected by `SpecRepository.list({ includeMeta: true })`
+    or equivalent `Spec` stamp fields from `get()`.
+
+    For each lookup the cache MUST:
+
+    1. If bucket validity fails → return miss.
+    2. Resolve current stamps:
+       - If `input.stamps` is provided, use those stamps for the hard-hit comparison
+         and MUST NOT call `SpecRepository.get()` solely to load stamps.
+       - Otherwise load current stamps via `SpecRepository.get()` (no artifact content
+         reads).
+    3. If stored stamps match current stamps → **hard hit**: return `{ kind: 'hit', entry }`
+       without computing `cacheFingerprint` or revalidating.
+    4. If stamps differ → compute `cacheFingerprint` lazily using the canonical form in
+       this spec (which MAY call `get()` / `specFingerprint` / raw metadata hash as
+       needed). If it matches the stored fingerprint → **soft hit**: persist refreshed
+       stamps without changing `cacheFingerprint` or `entry`, then return
+       `{ kind: 'hit', entry }`.
+    5. Otherwise → return `{ kind: 'miss' }`.
+
+    Optional `stamps` MUST be semantically equivalent to the stamp bundle stored from
+    `Spec` / list Meta (`artifact lastModified`s, persisted-state and generated-metadata
+    presence/`lastModified`). Adapters MUST treat list Meta and `get()` stamps as
+    interchangeable for hard-hit comparison.
+
+- op: modified
+  description: lookup accepts optional stamps; still MUST NOT accept cacheFingerprint or repository args.
+  selector:
+    type: section
+    matches: 'Requirement: Method signatures'
+  content: |
+    The port MUST expose:
+
+    - `workspace(): string`
+    - `lookup(input: {
+      spec: Spec
+      schemaFingerprint: string
+      engineVersion: number
+      stamps?: ValidationSourceStamps
+      }): Promise<
+      | { kind: 'hit'; entry: SpecValidationEntry }
+      | { kind: 'miss' }
+      > `
+    - `upsert(input: {
+      entry: SpecValidationEntry
+      spec: Spec
+      schemaFingerprint: string
+      engineVersion: number
+    }): Promise<void>`
+
+    `schemaFingerprint` / `engineVersion` on `lookup` are bucket-validity inputs only.
+    `lookup` / `upsert` receive `Spec` so the cache knows which row to touch. Optional
+    `stamps` on `lookup` are a hard-hit acceleration input equivalent to stamps from
+    `get()` or `list({ includeMeta: true })`. Soft-hit / miss I/O
+    (`specFingerprint`, raw metadata hash, stamp refresh) still goes through the
+    **constructor-injected** `SpecRepository` when needed.
+
+    They MUST NOT accept `cacheFingerprint`, `refreshStamps`, or a repository argument.
+
+- op: modified
+  description: SpecRepository construction note mentions list Meta stamps as an alternative to get() for hard-hit.
+  selector:
+    type: section
+    matches: 'Requirement: SpecRepository injected at construction'
+  content: |
+    Because this port owns the ValidateSpecs freshness cascade, each instance MUST receive
+    the workspace `SpecRepository` (same workspace identity) at **construction time** via
+    composition. The repository MUST NOT be passed on every `lookup` / `upsert` call.
+
+    Construction contract:
+
+    - The abstract port (or its concrete adapters) MUST accept `SpecRepository` as a
+      constructor dependency (directly or via a narrow deps object that includes it).
+    - The injected repository's `workspace()` MUST match the cache instance's workspace.
+    - Adapters MAY also receive storage/path deps (e.g. `configPath`) in the same
+      constructor; those remain infrastructure concerns.
+    - `lookup` / `upsert` method signatures MUST NOT take a `SpecRepository` parameter.
+
+    The injected repository is how the cache loads cheap stamps when `lookup` does not
+    receive optional `stamps`, computes `specFingerprint()`, and hashes raw metadata
+    bytes for `cacheFingerprint`. Callers MAY supply stamps projected from
+    `list({ includeMeta: true })` or `get()` for hard-hit without a redundant `get()`.
+    The cache MUST NOT invent SpecRepository stamp helpers (`validationSourceStamps`,
+    `readValidationSidecar`); it MUST use the contractual repository APIs above.
+
+- op: modified
+  description: cacheFingerprint still uses persistedStateMeta hash semantics via specFingerprint.
+  selector:
+    type: section
+    matches: 'Requirement: cacheFingerprint canonical form'
+  content: |
+    `cacheFingerprint` MUST be the content hash of sorted-key JSON with exactly:
+
+    ```text
+    {
+      specFingerprint: <digest from SpecRepository.specFingerprint(spec)>,
+      metadataContentHash: <digest of raw metadata.json bytes> | "__absent__"
+    }
+    ```
+
+    Rules:
+
+    - `specFingerprint` MUST come from `SpecRepository.specFingerprint(spec)` (artifacts +
+      persisted-state hash via `persistedStateMeta({ includeHash: true })`; never includes
+      metadata).
+    - `metadataContentHash` MUST hash the **raw** generated metadata file bytes when
+      present. It MUST NOT require calling a freshness-classifying metadata API.
+    - When the metadata file is absent, `metadataContentHash` MUST be the literal
+      `"__absent__"`.
+    - Adapters MUST NOT invent a third flat fingerprint that re-lists artifact
+      filenames + lock + metadata into one payload; composition of the two digests above
+      is the contract.

@@ -411,6 +411,818 @@
           "files": ["tasks"]
         }
       ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:51:17.324Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: code-graph:indexer",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:51:30.475Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: code-graph:indexer",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:51:38.591Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: code-graph:indexer",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:52:09.599Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: code-graph:indexer",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:52:20.080Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: code-graph:indexer",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:52:22.321Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: code-graph:indexer",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:52:24.564Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: code-graph:indexer",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:52:26.852Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: code-graph:indexer",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:52:29.116Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: code-graph:indexer",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:52:31.377Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: code-graph:indexer",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:52:33.619Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: code-graph:indexer",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:52:35.869Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: code-graph:indexer",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:52:38.187Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: code-graph:indexer",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:52:40.369Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: code-graph:indexer",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:52:42.616Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: code-graph:indexer",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:52:44.935Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: code-graph:indexer",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:52:47.216Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: code-graph:indexer",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:52:49.370Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: code-graph:indexer",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:52:51.520Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: code-graph:indexer",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:52:53.795Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: code-graph:indexer",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:52:55.815Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: code-graph:indexer",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:52:58.035Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: code-graph:indexer",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:53:00.242Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: code-graph:indexer",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:53:02.507Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: code-graph:indexer",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:53:16.347Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: code-graph:indexer",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:53:25.087Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: code-graph:indexer",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:53:27.347Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: code-graph:indexer",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:53:29.710Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: code-graph:indexer",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
     }
   ]
 }

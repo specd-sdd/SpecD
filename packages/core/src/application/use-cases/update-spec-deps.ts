@@ -1,6 +1,7 @@
 import { type ChangeRepository } from '../ports/change-repository.js'
 import { parseSpecId } from '../../domain/services/parse-spec-id.js'
 import { InvalidInputError } from '../../domain/errors/index.js'
+import { applyDependsOnMutation } from './_shared/apply-depends-on-mutation.js'
 
 /** Input for the {@link UpdateSpecDeps} use case. */
 export interface UpdateSpecDepsInput {
@@ -79,32 +80,13 @@ export class UpdateSpecDeps {
 
       if (input.set !== undefined) {
         validateDepIds(input.set)
-        result = [...input.set]
+        result = [...applyDependsOnMutation([], { set: input.set })]
       } else {
-        const current = [...(change.specDependsOn.get(input.specId) ?? [])]
-
-        if (input.remove !== undefined) {
-          for (const id of input.remove) {
-            const idx = current.indexOf(id)
-            if (idx === -1) {
-              throw new InvalidInputError(
-                `dependency '${id}' not found in current deps for '${input.specId}'`,
-              )
-            }
-            current.splice(idx, 1)
-          }
-        }
-
         if (input.add !== undefined) {
           validateDepIds(input.add)
-          for (const id of input.add) {
-            if (!current.includes(id)) {
-              current.push(id)
-            }
-          }
         }
-
-        result = current
+        const current = [...(change.specDependsOn.get(input.specId) ?? [])]
+        result = [...applyDependsOnMutation(current, input)]
       }
 
       change.setSpecDependsOn(input.specId, result)

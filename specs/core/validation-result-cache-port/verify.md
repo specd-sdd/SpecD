@@ -92,7 +92,7 @@
   those raw bytes
 - **AND** it MUST NOT re-flatten artifact filenames + lock + metadata into one payload
 
-#### Scenario: Absent metadata uses **absent** sentinel
+#### Scenario: Absent metadata uses absent sentinel
 
 - **GIVEN** a spec with no generated metadata file
 - **WHEN** `cacheFingerprint` is computed
@@ -110,28 +110,32 @@
 
 #### Scenario: Matching stamps produce a hard hit
 
-- **GIVEN** a stored row whose stamps match current `get()` stamps and whose bucket is
-  valid
-- **WHEN** a lookup runs
-- **THEN** the result is `{ kind: 'hit', entry }`
-- **AND** `cacheFingerprint` is not recomputed as a requirement of the hit path
+- **GIVEN** a stored row whose stamps match current stamps and whose bucket is valid
+- **WHEN** `lookup` is called
+- **THEN** it returns `{ kind: 'hit', entry }` without computing `cacheFingerprint`
+
+#### Scenario: Optional stamps skip get for hard-hit comparison
+
+- **GIVEN** `lookup` is called with `stamps` derived from `list({ includeMeta: true })`
+  that match the stored stamps
+- **WHEN** the cache evaluates hard-hit
+- **THEN** it does not call `SpecRepository.get()` solely to load stamps
+- **AND** it returns a hard hit
 
 #### Scenario: Soft hit refreshes stamps inside the cache
 
 - **GIVEN** a stored row whose stamps differ but whose `cacheFingerprint` still matches
-- **WHEN** a lookup runs
-- **THEN** the result is `{ kind: 'hit', entry }`
+- **WHEN** `lookup` is called
+- **THEN** the cache may load repository state needed for `cacheFingerprint`
 - **AND** the cache persists refreshed stamps without changing `cacheFingerprint` or
   `entry`
-- **AND** the caller does not receive a soft-hit / refresh protocol flag
+- **AND** it returns `{ kind: 'hit', entry }`
 
-#### Scenario: Fingerprint miss requires full validation upsert
+#### Scenario: Miss when stamps and fingerprint both differ
 
 - **GIVEN** a stored row whose stamps and `cacheFingerprint` both differ from current
-  inputs
-- **WHEN** a lookup runs
-- **THEN** the result is `{ kind: 'miss' }`
-- **AND** after full validation an upsert stores the new entry, stamps, and fingerprint
+- **WHEN** `lookup` is called
+- **THEN** it returns `{ kind: 'miss' }`
 
 ### Requirement: Lookup result shape
 
@@ -143,17 +147,19 @@
 
 ### Requirement: Method signatures
 
-#### Scenario: lookup is hit or miss only
+#### Scenario: lookup accepts optional stamps but not cacheFingerprint or repository
 
-- **WHEN** `lookup({ spec, schemaFingerprint, engineVersion })` completes
-- **THEN** the result is `{ kind: 'hit', entry }` or `{ kind: 'miss' }`
-- **AND** the call does not accept stamps, `cacheFingerprint`, or a repository argument
+- **WHEN** the port method signatures are examined
+- **THEN** `lookup` MAY accept optional `stamps`
+- **AND** MUST NOT accept `cacheFingerprint`, `refreshStamps`, or a `SpecRepository`
+  argument
 
-#### Scenario: upsert input is entry-centric
+#### Scenario: Upsert still materializes stamps itself
 
-- **WHEN** `upsert` is invoked after a miss
-- **THEN** its input includes `entry`, `spec`, `schemaFingerprint`, and `engineVersion`
-- **AND** MUST NOT include stamps, `cacheFingerprint`, or `SpecRepository`
+- **WHEN** `upsert` is called after a full validation miss
+- **THEN** the cache materializes current stamps and `cacheFingerprint` via its
+  injected `SpecRepository`
+- **AND** the use case MUST NOT pass stamps or `cacheFingerprint` on upsert
 
 ### Requirement: Upsert inputs
 

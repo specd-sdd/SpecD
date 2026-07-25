@@ -9,12 +9,5 @@
     "code-graph:composition",
     "cli:host-context"
   ],
-  "implementation": [
-    {
-      "file": "sdk:src/core-reexports.ts"
-    },
-    {
-      "file": "sdk:test/barrel.spec.ts"
-    }
-  ]
+  "implementation": []
 }

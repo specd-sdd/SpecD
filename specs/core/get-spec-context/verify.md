@@ -22,49 +22,64 @@
 
 ### Requirement: Build context entry from metadata
 
-#### Scenario: Full mode produces full entry from fresh metadata
+#### Scenario: Full mode produces full entry when materialization succeeds
 
-- **GIVEN** a spec with fresh metadata containing title, description, rules, constraints, and scenarios
+- **GIVEN** a spec whose materialized metadata contains title, description, rules, constraints, and scenarios
 - **AND** effective context mode is full
 - **WHEN** `execute(input)` is called without section filters
 - **THEN** the entry has `stale: false` and includes `title`, `description`, `rules`, `constraints`, and `scenarios`
 
-#### Scenario: Summary mode produces summary entry from fresh metadata
+#### Scenario: Summary mode produces summary entry when materialization succeeds
 
-- **GIVEN** a spec with fresh metadata containing title and description
+- **GIVEN** a spec whose materialized metadata contains title and description
 - **AND** effective context mode is summary
 - **WHEN** `execute(input)` is called
 - **THEN** the entry includes title and description but no full section arrays
 
-#### Scenario: List mode produces list entry from fresh metadata
+#### Scenario: List mode produces list entry when materialization succeeds
 
-- **GIVEN** a spec with fresh metadata
+- **GIVEN** a spec whose metadata materializes successfully
 - **AND** effective context mode is list
 - **WHEN** `execute(input)` is called
 - **THEN** the entry includes identity/mode fields but no title, description, rules, constraints, or scenarios
 
 #### Scenario: Full mode defaults to Description + Rules + Constraints
 
-- **GIVEN** a spec with fresh metadata
+- **GIVEN** a spec whose metadata materializes successfully
 - **AND** effective context mode is `full`
 - **WHEN** `GetSpecContext.execute` is called without section filters
 - **THEN** the entry includes Title, Description, Rules, and Constraints
 
+#### Scenario: Materialization warnings are forwarded without duplicate logging
+
+- **GIVEN** `GetSpecMetadata` returns a `metadata-cache-write-failed` or generation warning while still producing usable content
+- **WHEN** `GetSpecContext` builds the entry for that spec
+- **THEN** the warning is forwarded into the result's `warnings` array
+- **AND** it is not logged again by this use case
+
 ### Requirement: Stale or absent metadata produces minimal entry
 
-#### Scenario: No metadata yields stale list entry in list mode
+#### Scenario: Materialization failure yields stale list entry in list mode
 
-- **GIVEN** a spec with no metadata
+- **GIVEN** `GetSpecMetadata` cannot produce a valid projection for the spec
 - **AND** effective context mode is list
 - **WHEN** `execute(input)` is called
 - **THEN** the entry is stale and includes only minimal list-shape fields
 
-#### Scenario: Stale hashes yield stale summary/full-compatible entry
+#### Scenario: Materialization failure yields stale summary/full-compatible entry
 
-- **GIVEN** a spec with metadata whose content hashes do not match current files
+- **GIVEN** `GetSpecMetadata` cannot produce a valid projection for the spec
+- **AND** effective context mode is summary, full, or hybrid
 - **WHEN** `execute(input)` is called
-- **THEN** the entry is stale
-- **AND** a warning of type `'stale-metadata'` is emitted
+- **THEN** the entry is `stale: true` and contains only `spec`, `stale`, and any title/description safely extracted without a valid projection
+- **AND** no rules, constraints, or scenarios are included
+
+#### Scenario: Self-healed content-hash drift does not produce a stale entry
+
+- **GIVEN** a spec's persisted metadata content hashes no longer match current files
+- **AND** `GetSpecMetadata` successfully regenerates a fresh projection for it
+- **WHEN** `execute(input)` is called
+- **THEN** the entry is not stale — materialization already self-healed the drifted cache
 
 ### Requirement: Section filtering
 
@@ -87,24 +102,24 @@
 
 #### Scenario: Dependencies resolved recursively
 
-- **GIVEN** spec A depends on spec B, which depends on spec C, all with fresh metadata
+- **GIVEN** spec A depends on spec B, which depends on spec C, all materializing successfully
 - **WHEN** `execute({ ..., followDeps: true })` is called on spec A
 - **THEN** `entries` contains A, B, and C in that order
 
-#### Scenario: Canonical metadata dependsOn works without extraction
+#### Scenario: Materialized metadata dependsOn works without extraction
 
-- **GIVEN** the root spec has fresh `metadata.json.dependsOn: ['default:B']`
+- **GIVEN** the root spec's materialized metadata reports `dependsOn: ['default:B']`
 - **AND** the active schema omits `metadataExtraction.dependsOn`
 - **WHEN** `execute({ ..., followDeps: true })` is called
 - **THEN** dependency traversal still includes spec B
 
-#### Scenario: Stale metadata remains usable for dependency traversal with warning
+#### Scenario: Extraction fallback used only when materialization produces no projection at all
 
-- **GIVEN** the root spec has persisted `metadata.json.dependsOn: ['default:B']`
-- **AND** that metadata is marked stale
+- **GIVEN** the root spec's metadata cannot be materialized at all
+- **AND** the schema declares `metadataExtraction.dependsOn`
 - **WHEN** `execute({ ..., followDeps: true })` is called
-- **THEN** dependency traversal still includes spec B
-- **AND** the result includes a `stale-metadata` warning
+- **THEN** dependency traversal falls back to schema-extracted `dependsOn`
+- **AND** a `missing-metadata` warning is emitted for that spec
 
 #### Scenario: Circular dependency does not cause infinite loop
 
@@ -152,11 +167,25 @@
 - **WHEN** `execute({ ..., followDeps: true })` is called
 - **THEN** `warnings` contains an entry with `type: 'missing-spec'`
 
-#### Scenario: Missing metadata during traversal emits warning
+#### Scenario: Materialization failure during traversal emits warning
 
-- **GIVEN** a dependency spec with no metadata
+- **GIVEN** a dependency spec whose metadata cannot be materialized
 - **WHEN** dependency traversal reaches that spec
 - **THEN** `warnings` contains an entry with `type: 'missing-metadata'`
+
+#### Scenario: Stale or missing optimization on a resolved entry emits warning during traversal
+
+- **GIVEN** `llmOptimizedContext` is active
+- **AND** a resolved entry's lock-owned `optimizedContext` baseline is stale or missing
+- **WHEN** dependency traversal resolves that entry
+- **THEN** `warnings` contains an entry with `type: 'stale-optimization'`
+- **AND** traversal continues
+
+#### Scenario: Traversal never reads spec-lock.json through generic artifact access
+
+- **WHEN** dependency traversal needs persisted sidecar influence
+- **THEN** it obtains that influence only through `GetSpecMetadata`'s normalized projection
+- **AND** it does not read `spec-lock.json` through generic artifact access
 
 ### Requirement: Result shape
 
@@ -170,9 +199,23 @@
 #### Scenario: Uses optimized context for single spec
 
 - **GIVEN** `llmOptimizedContext: true`
-- **AND** the spec has `optimizedContext` populated
+- **AND** the materialized metadata reports `optimizedContext` as present and fresh
 - **WHEN** `GetSpecContext` is executed
 - **THEN** the entry uses the optimized content
+
+#### Scenario: Falls back to standard context and warns when optimization is stale or missing
+
+- **GIVEN** `llmOptimizedContext: true`
+- **AND** the spec's lock-owned `optimizedContext` baseline is stale, missing, or empty
+- **WHEN** `GetSpecContext` is executed
+- **THEN** the entry uses the standard `context`
+- **AND** a `stale-optimization` warning identifying the spec is emitted with remediation instructions mentioning `specd-spec-context-optimizer`
+
+#### Scenario: Optimization freshness is derived from lock-owned baselines, not metadata document freshness
+
+- **GIVEN** a spec's metadata document is otherwise fresh but its lock-owned `optimizedContext` baseline is stale against current artifacts or schema identity
+- **WHEN** `GetSpecContext` evaluates whether to use optimized context
+- **THEN** it treats `optimizedContext` as stale based on the per-field lock-owned baseline, not the metadata document's own freshness
 
 ### Requirement: Config-based factory delegates through resolveGetSpecContextDeps
 
@@ -184,8 +227,15 @@
 - **AND** `resolveGetSpecContextDeps(resolver)` resolves:
 - `listWorkspaces: ListWorkspaces`
 - `hasher: ContentHasher`
+- `getMetadata: GetSpecMetadata`
 - `schemaProvider?: SchemaProvider`
 - `parsers?: ArtifactParserRegistry`
 - `extractorTransforms: ExtractorTransformRegistry`
 - `workspaceRoutes: readonly SpecWorkspaceRoute[]`
 - **AND** the factory delegates to canonical `createGetSpecContext(deps)`
+
+#### Scenario: resolveGetSpecContextDeps wires GetSpecMetadata for self-healing
+
+- **WHEN** `resolveGetSpecContextDeps(resolver)` runs
+- **THEN** the resolved deps include `getMetadata: GetSpecMetadata`
+- **AND** it is used instead of a direct `SpecRepository.metadata()` freshness check

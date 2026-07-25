@@ -2,29 +2,16 @@
 
 ## Requirements
 
-### Requirement: Command signature
+### Requirement: spec update-metadata is removed
 
-#### Scenario: Rejects missing spec ID
+#### Scenario: update-metadata command is not registered
 
-- **WHEN** `specd spec update-metadata` is run without arguments
-- **THEN** it exits with code 1
+- **WHEN** the CLI `spec` parent command's subcommands are inspected
+- **THEN** no `update-metadata` command, or any alias of it, is registered
 
-### Requirement: Partial schema input
+#### Scenario: Agents persist optimized fields through spec optimizations set
 
-#### Scenario: Reads from stdin
-
-- **WHEN** `echo 'optimizedDescription: "test"' | specd spec update-metadata core:config` is run
-- **THEN** it parses the YAML from stdin successfully
-
-#### Scenario: Reads from --file
-
-- **GIVEN** a file `payload.yaml` with `optimizedDescription: "test"`
-- **WHEN** `specd spec update-metadata core:config --file payload.yaml` is run
-- **THEN** it reads the file successfully
-
-### Requirement: Delegation
-
-#### Scenario: Invokes use case
-
-- **WHEN** a valid partial payload is provided
-- **THEN** the command invokes `UpdateSpecMetadata.execute()` with the correct spec ID and payload
+- **GIVEN** an agent needs to persist an LLM-optimized description or context
+- **WHEN** the agent looks for a supported CLI command
+- **THEN** it uses `specd spec optimizations set`
+- **AND** `specd spec update-metadata` is not available

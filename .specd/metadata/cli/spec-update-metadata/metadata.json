@@ -1,74 +1,57 @@
 {
   "title": "cli:spec-update-metadata",
-  "description": "Agents need a CLI command to safely update spec metadata with LLM-optimized fields. The `specd spec update-metadata <workspace:capability-path>` command accepts a partial metadata JSON/YAML and delegates to `UpdateSpecMetadata` to ensure a safe merge with deterministic fields.",
-  "dependsOn": ["core:update-spec-metadata"],
+  "description": "**Removed.** The `specd spec update-metadata <workspace:capability-path>` command accepted a partial metadata JSON/YAML payload and delegated to the (now removed) `UpdateSpecMetadata` use case to merge LLM-optimized fields into generated metadata. Optimized fields are now owned directly by `spec-lock.json` and mutated only through `specs optimizations set`/`clear` (see `cli:spec-optimizations`). There is no `update-metadata` command or alias.",
   "context": [
-    "Agents need a CLI command to safely update spec metadata with LLM-optimized fields. The `specd spec update-metadata <workspace:capability-path>` command accepts a partial metadata JSON/YAML and delegates to `UpdateSpecMetadata` to ensure a safe merge with deterministic fields."
+    "**Removed.** The `specd spec update-metadata <workspace:capability-path>` command accepted a partial metadata JSON/YAML payload and delegated to the (now removed) `UpdateSpecMetadata` use case to merge LLM-optimized fields into generated metadata. Optimized fields are now owned directly by `spec-lock.json` and mutated only through `specs optimizations set`/`clear` (see `cli:spec-optimizations`). There is no `update-metadata` command or alias."
   ],
   "rules": [
     {
-      "requirement": "Command signature",
-      "rules": ["The command SHALL accept a qualified spec ID (`<workspace:capability-path>`)."]
-    },
-    {
-      "requirement": "Partial schema input",
+      "requirement": "spec update-metadata is removed",
       "rules": [
-        "The command SHALL accept a partial metadata payload from stdin or a file via the `--file` flag. This payload SHALL be validated to ensure it only contains allowed fields for an update."
+        "The CLI MUST NOT register an `update-metadata` command, or any alias of it, on the `spec` parent command. Agents that need to persist an LLM-optimized description or context MUST use `specd spec optimizations set` instead."
       ]
-    },
-    {
-      "requirement": "Delegation",
-      "rules": ["The command SHALL delegate to the `UpdateSpecMetadata` use case."]
     }
   ],
   "scenarios": [
     {
-      "requirement": "Command signature",
-      "name": "Rejects missing spec ID",
-      "when": ["specd spec update-metadata is run without arguments"],
-      "then": ["it exits with code 1"]
+      "requirement": "spec update-metadata is removed",
+      "name": "update-metadata command is not registered",
+      "when": ["the CLI spec parent command's subcommands are inspected"],
+      "then": ["no update-metadata command, or any alias of it, is registered"]
     },
     {
-      "requirement": "Partial schema input",
-      "name": "Reads from stdin",
-      "when": [
-        "echo 'optimizedDescription: \"test\"' | specd spec update-metadata core:config is run"
-      ],
-      "then": ["it parses the YAML from stdin successfully"]
-    },
-    {
-      "requirement": "Partial schema input",
-      "name": "Reads from --file",
-      "given": ["a file payload.yaml with optimizedDescription: \"test\""],
-      "when": ["specd spec update-metadata core:config --file payload.yaml is run"],
-      "then": ["it reads the file successfully"]
-    },
-    {
-      "requirement": "Delegation",
-      "name": "Invokes use case",
-      "when": ["a valid partial payload is provided"],
+      "requirement": "spec update-metadata is removed",
+      "name": "Agents persist optimized fields through spec optimizations set",
+      "given": ["an agent needs to persist an LLM-optimized description or context"],
+      "when": ["the agent looks for a supported CLI command"],
       "then": [
-        "the command invokes UpdateSpecMetadata.execute() with the correct spec ID and payload"
+        "it uses specd spec optimizations set",
+        "AND specd spec update-metadata is not available"
       ]
     }
   ],
-  "implementation": {
-    "symbols": [
-      {
-        "specId": "cli:spec-update-metadata",
-        "file": "cli:src/commands/spec/update-metadata.ts",
-        "symbol": "registerSpecUpdateMetadata"
-      },
-      {
-        "specId": "cli:spec-update-metadata",
-        "file": "cli:src/helpers/read-stdin.ts",
-        "symbol": "readStdin"
-      }
-    ]
-  },
+  "dependsOn": [],
   "contentHashes": {
-    "spec.md": "sha256:3d18a631517d7f9e739c0bc20a535b446039c046e025976f3c37e8c3bf05b5b1",
-    "verify.md": "sha256:ba485a836cf9454209b0edc07adec4eb927d60900212df702cc91e260b9596f9"
+    "spec.md": "sha256:4dfd1232517f2e6aa0aef2e166a952ca7ed6464576012753d2e07a0ef4b6bd76",
+    "verify.md": "sha256:0d21d580eb53e69b2475754f6894f139c6faa39dc3fd1ef9301a353a748638a3"
   },
-  "generatedBy": "core"
+  "provenance": {
+    "artifacts": {
+      "spec.md": {
+        "hash": "sha256:4dfd1232517f2e6aa0aef2e166a952ca7ed6464576012753d2e07a0ef4b6bd76",
+        "lastModified": "2026-07-25T11:53:31.207Z"
+      },
+      "verify.md": {
+        "hash": "sha256:0d21d580eb53e69b2475754f6894f139c6faa39dc3fd1ef9301a353a748638a3",
+        "lastModified": "2026-07-25T11:53:31.208Z"
+      }
+    },
+    "persistedStateHash": "sha256:0114a21e9a9cb1bbdf2b9d331a154e16e375565abc8b3f055c406ebe0bf3eb58",
+    "schema": {
+      "name": "schema-std",
+      "version": 1
+    },
+    "projectionVersion": 1,
+    "projectionFingerprint": "sha256:e4a28a2db6a35ed39b8308518337235b1490c2948cd839db25866ad79b22404b"
+  }
 }

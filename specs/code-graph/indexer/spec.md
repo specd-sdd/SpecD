@@ -11,16 +11,16 @@ Source files change constantly and the code graph must be kept in sync without r
 `IndexCodeGraph` SHALL be the primary entry point for building and updating the code graph. It is an application-layer use case that orchestrates:
 
 1. **Discover** — walk the workspace roots AND project-global graph paths to find source files and documents
-2. **Diff** — compare content hashes (or spec hashes) with the store to identify new, changed, and deleted resources
+2. **Diff** — compare content hashes (or spec metadata fingerprints) with the store to identify new, changed, and deleted resources
 3. **Extract** — run the appropriate language adapter on code files, or index textual content as documents
-4. **Spec Indexing** — consume `SpecRepository` from each workspace to extract metadata, dependencies, and coverage links
+4. **Spec Indexing** — consume `SpecRepository` from each workspace plus Core's `GetSpecMetadata` to materialize normalized metadata, dependencies, and coverage links
 5. **Store** — upsert extracted data and relations into the `GraphStore`
 6. **Clean** — remove deleted resources from the store
 7. **Persist VCS ref** — store `lastIndexedRef` after success
 
 Extraction and storage include hierarchy relations (`EXTENDS`, `IMPLEMENTS`, `OVERRIDES`) alongside existing file, symbol, and dependency relations.
 
-The indexer SHALL directly consume `SpecRepository` methods (`list`, `metadata`, `artifact`, `readPersistedImplementation`, `specHash`) to build `SpecNode` and coverage relations. It MUST NOT parse raw sidecar files.
+The indexer SHALL directly consume `SpecRepository` methods (`list`, `artifact`, `readPersistedImplementation`) and Core's `GetSpecMetadata` use case (for title, description, and the semantic `metadataFingerprint`) to build `SpecNode` and coverage relations. It MUST NOT parse raw sidecar files and MUST NOT read a raw metadata snapshot directly when a materialized, self-healing projection is available through `GetSpecMetadata`.
 
 ### Requirement: Incremental indexing
 
@@ -222,12 +222,12 @@ Only infrastructure-level errors (e.g. store connection lost, disk full) may abo
 
 ### Requirement: Spec dependency indexing
 
-The indexer SHALL build `SpecNode` entries and relations by directly consuming the `SpecRepository` instance from each workspace:
+The indexer SHALL build `SpecNode` entries and relations by directly consuming the `SpecRepository` instance from each workspace, together with Core's `GetSpecMetadata` use case:
 
 1. Use `repo.count()` to discover the total spec volume upfront for accurate progress reporting
 2. Use `repo.list()` to enumerate spec identities
-3. For each spec, check `repo.specHash()` against the store to enable incremental skipping
-4. Load `title` and `description` via `repo.metadata()`
+3. For each spec, call `GetSpecMetadata.execute({ specId })` and compare the returned `metadataFingerprint` against the value stored on the corresponding `SpecNode` to enable incremental skipping — a spec is reprocessed only when its semantic fingerprint changed, not merely because a cache file's raw bytes or timestamp changed
+4. Load `title` and `description` from the materialized `GetSpecMetadata` result rather than a raw `repo.metadata()` read
 5. Load `COVERS_FILE` and `COVERS_SYMBOL` relations via `repo.readPersistedImplementation()`
 6. Load `DEPENDS_ON` relations via `repo.readPersistedDependsOn()`
 
@@ -284,3 +284,4 @@ await store.close()
 - [`core:spec-repository-port`](../../core/spec-repository-port/spec.md) — semantic spec repository contract consumed during spec indexing
 - [`core:list-workspaces`](../../core/list-workspaces/spec.md) — orchestrated workspace and repository source for indexing
 - [`code-graph:document-model`](../document-model/spec.md) — document-node identity and textual fallback semantics
+- [`core:get-spec-metadata`](../../core/get-spec-metadata/spec.md) — self-healing metadata materialization and semantic fingerprint for incremental spec indexing

@@ -18,6 +18,13 @@
 - **AND** the constructor receives `SpecWorkspaceRoute[]`
 - **AND** those dependencies are used for the pre-publication metadata extraction pass over prepared merged artifacts
 
+#### Scenario: Constructor receives RegenerateSpecMetadata instead of GenerateSpecMetadata and SaveSpecMetadata
+
+- **GIVEN** the archive workflow is composed for runtime use
+- **WHEN** `ArchiveChange` is instantiated
+- **THEN** the constructor receives `RegenerateSpecMetadata`
+- **AND** it does not receive `GenerateSpecMetadata` or `SaveSpecMetadata` directly
+
 ### Requirement: Input
 
 #### Scenario: Default values for optional fields
@@ -329,11 +336,11 @@
 
 ### Requirement: Spec metadata generation
 
-#### Scenario: Persisted metadata generation runs after archive move
+#### Scenario: Persisted metadata regeneration runs after archive move via RegenerateSpecMetadata
 
 - **GIVEN** canonical publication and archive move succeed
-- **WHEN** `ArchiveChange.execute` generates persisted `metadata.json`
-- **THEN** `GenerateSpecMetadata` runs after `archiveRepository.archive()`
+- **WHEN** `ArchiveChange` regenerates persisted `metadata.json`
+- **THEN** `RegenerateSpecMetadata.execute({ specId })` runs after `archiveRepository.archive()` and after all `.specd-archive-backup/` directories for the batch have been deleted
 
 #### Scenario: Metadata failure does not roll back archive
 
@@ -342,6 +349,19 @@
 - **WHEN** `ArchiveChange.execute` completes
 - **THEN** the change is archived
 - **AND** the failed spec path is listed in `staleMetadataSpecPaths`
+
+#### Scenario: Preflight aborts a spec when extracted dependsOn does not match the final persisted dependsOn
+
+- **GIVEN** `metadataExtraction.dependsOn` is present for a spec
+- **AND** `extractMetadata(...)` run against the prepared merged artifact content yields a `dependsOn` value different from the final persisted `dependsOn` being sealed for that spec
+- **WHEN** `ArchiveChange.execute` completes preflight for that spec
+- **THEN** publication is aborted for that spec before canonical publication begins
+
+#### Scenario: ArchiveChange does not call GenerateSpecMetadata or write the metadata cache itself
+
+- **WHEN** `ArchiveChange` regenerates metadata for an archived spec
+- **THEN** it delegates generation and guarded cache persistence to `RegenerateSpecMetadata.execute({ specId })` with the forced policy
+- **AND** it does not call `GenerateSpecMetadata` directly or write `metadata.json` itself
 
 ### Requirement: Result shape
 
@@ -539,20 +559,32 @@
 - **THEN** `spec-lock.json` retains the original `schema` object unchanged
 - **AND** `dependsOn` is replaced with the new `change.specDependsOn` value
 
-#### Scenario: Mismatch between extracted dependsOn and persisted sidecar fails archive
+#### Scenario: No-lock spec resolves initial dependsOn through resolveInitialPersistedDependsOn
 
-- **GIVEN** a spec has an existing `spec-lock.json` with `dependsOn`
-- **AND** metadata extraction produces a `dependsOn` value that differs from `change.specDependsOn`
-- **WHEN** `ArchiveChange.execute` validates consistency
-- **THEN** archive fails with a mismatch error
-- **AND** no metadata is saved
+- **GIVEN** a spec has no existing `spec-lock.json`
+- **WHEN** `ArchiveChange` builds the initial persisted-state base for that spec
+- **THEN** it resolves the initial dependency set through `resolveInitialPersistedDependsOn()`, preferring a complete dependency value supplied by the archive publication plan when one exists
+- **AND** it does not maintain a second artifact/metadata fallback algorithm for initial dependency resolution
 
-#### Scenario: Sidecar dependsOn used as fallback when extraction omits dependsOn
+#### Scenario: Existing optimizations are copied forward unchanged
 
-- **GIVEN** a spec has an existing `spec-lock.json` with `dependsOn: ["core:canonical"]`
-- **AND** metadata extraction succeeds but does not produce a `dependsOn` value
-- **WHEN** `ArchiveChange.execute` generates metadata
-- **THEN** the metadata `dependsOn` falls back to the sidecar's `dependsOn` value
+- **GIVEN** a spec's existing `spec-lock.json` has `optimizations.optimizedDescription` set
+- **WHEN** `ArchiveChange` re-archives that spec with changed artifact content
+- **THEN** the `optimizations` block is copied forward unchanged
+- **AND** archive does not clear or mark it stale itself
+
+#### Scenario: Revision guard rejects a concurrently changed lock at publish time
+
+- **GIVEN** `ArchiveChange` observed a persisted-state revision during preflight
+- **AND** that revision has changed by the time `SpecRepository.publish()` is called
+- **WHEN** `publish()` is invoked with the stale `expectedRevision`
+- **THEN** publication fails for that spec instead of silently overwriting the concurrent change
+
+#### Scenario: Publish is the single write path for persisted state
+
+- **WHEN** `ArchiveChange` writes the final `PersistedSpecState` for a spec
+- **THEN** it passes `persistedState` to `SpecRepository.publish()`
+- **AND** it does not call `writePersistedState()` separately from `publish()`
 
 ### Requirement: Archive debug logging
 
@@ -579,25 +611,6 @@
 - **WHEN** the failure is reported
 - **THEN** debug logs include the failure step, `commitStarted` when applicable, and the spec ID or artifact being processed
 - **AND** when `commitStarted` is true, debug logs include batch restore outcome and whether lifecycle rolled back to `archivable`
-
-### Requirement: Opportunistic sidecar backfill
-
-#### Scenario: Compatible legacy spec receives sidecar during opportunistic backfill
-
-- **GIVEN** a persisted legacy spec has no `spec-lock.json`
-- **AND** the canonical spec passes structural validation under the current schema
-- **WHEN** archive or metadata regeneration performs opportunistic backfill
-- **THEN** `spec-lock.json` is created
-- **AND** its `dependsOn` comes from the current persisted dependency view
-- **AND** its `schema` records the current project schema identity
-
-#### Scenario: Incompatible legacy spec is left on legacy path
-
-- **GIVEN** a persisted legacy spec has no `spec-lock.json`
-- **AND** the canonical spec fails structural validation under the current schema
-- **WHEN** opportunistic backfill is attempted
-- **THEN** no sidecar is created implicitly
-- **AND** legacy `metadata.json` generation may still continue
 
 ### Requirement: Tracked implementation review guard
 
@@ -680,10 +693,15 @@
 - `actor: ActorResolver`
 - `parsers: ArtifactParserRegistry`
 - `schemaProvider: SchemaProvider`
-- `generateMetadata: GenerateSpecMetadata`
-- `saveMetadata: SaveSpecMetadata`
+- `regenerateMetadata: RegenerateSpecMetadata`
 - `extractorTransforms: ExtractorTransformRegistry`
 - `workspaceRoutes: readonly SpecWorkspaceRoute[]`
 - `projectRoot: string`
 - `batchSnapshot: ArchiveBatchSnapshotPort`
 - **AND** the factory delegates to canonical `createArchiveChange(deps)`
+
+#### Scenario: resolveArchiveChangeDeps does not resolve GenerateSpecMetadata or SaveSpecMetadata directly
+
+- **WHEN** `resolveArchiveChangeDeps(resolver)` runs
+- **THEN** it resolves `regenerateMetadata: RegenerateSpecMetadata`
+- **AND** it does not resolve `generateMetadata: GenerateSpecMetadata` or `saveMetadata: SaveSpecMetadata` directly

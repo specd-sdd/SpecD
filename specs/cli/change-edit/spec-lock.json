@@ -1,0 +1,8 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["cli:entrypoint", "core:change", "cli:change-create", "core:spec-id-format"],
+  "implementation": []
+}

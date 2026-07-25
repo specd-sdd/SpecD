@@ -1,213 +1,67 @@
 {
   "title": "Spec Write-Metadata",
-  "description": "Agents and scripts that produce metadata externally need a safe way to persist it without bypassing validation or conflict detection. The `specd spec write-metadata` command writes metadata for a given spec, accepting YAML content from stdin or a file and persisting it through the `SaveSpecMetadata` use case for conflict detection and atomic writes.",
+  "description": "**Removed.** The `specd spec write-metadata` command accepted arbitrary metadata JSON/YAML from stdin or a file and persisted it through the (now removed) `SaveSpecMetadata` use case. Metadata is now a self-healing materialized cache with no external editor: normalized fields are always derived from current source artifacts by `MaterializeSpecMetadata`, and the only writable persisted state is lock-owned optimized fields, mutated through `specd spec optimizations set`/`clear`.",
   "dependsOn": [
     "default:_global/architecture",
     "default:_global/conventions",
     "core:spec-metadata"
   ],
   "context": [
-    "Agents and scripts that produce metadata externally need a safe way to persist it without bypassing validation or conflict detection. The `specd spec write-metadata` command writes metadata for a given spec, accepting YAML content from stdin or a file and persisting it through the `SaveSpecMetadata` use case for conflict detection and atomic writes."
+    "**Removed.** The `specd spec write-metadata` command accepted arbitrary metadata JSON/YAML from stdin or a file and persisted it through the (now removed) `SaveSpecMetadata` use case. Metadata is now a self-healing materialized cache with no external editor: normalized fields are always derived from current source artifacts by `MaterializeSpecMetadata`, and the only writable persisted state is lock-owned optimized fields, mutated through `specd spec optimizations set`/`clear`."
   ],
   "rules": [
     {
-      "requirement": "Command signature",
+      "requirement": "spec write-metadata is removed",
       "rules": [
-        "The command is registered as `write-metadata <specPath>` on the `spec` parent command. It accepts:\n\n- `--input <file>` — read YAML content from a file path instead of stdin\n- `--force` — skip conflict detection and overwrite unconditionally\n- `--format <fmt>` — output format: `text|json|toon` (default `text`)\n- `--config <path>` — path to `specd.yaml`\n\nThe `<specPath>` argument uses the same `workspace:capability-path` syntax as other `spec` subcommands."
-      ]
-    },
-    {
-      "requirement": "Content source",
-      "rules": [
-        "Content is read from `--input <file>` when provided, otherwise from stdin. The content must be a valid JSON string representing a metadata object."
-      ]
-    },
-    {
-      "requirement": "Error — invalid YAML",
-      "rules": [
-        "If the input content fails YAML parsing, the command writes `error: invalid YAML: <parse error message>` to stderr and exits with code 1."
-      ]
-    },
-    {
-      "requirement": "JSON validation",
-      "rules": [
-        "The command reads content from `--input` file or stdin. Before passing to `SaveSpecMetadata`, it validates the content is valid JSON by calling `JSON.parse()`. If parsing fails, the command writes `error: invalid JSON: <message>` to stderr and exits with code 1."
-      ]
-    },
-    {
-      "requirement": "Text output",
-      "rules": ["On success, text format outputs: `wrote metadata for <workspace:path>`"]
-    },
-    {
-      "requirement": "JSON output",
-      "rules": [
-        "On success, JSON format outputs: `{ \"result\": \"ok\", \"spec\": \"<workspace:path>\" }`"
-      ]
-    },
-    {
-      "requirement": "Error — spec not found",
-      "rules": [
-        "If the spec does not exist in the given workspace, the command writes `error: spec '<specPath>' not found` to stderr and exits with code 1."
-      ]
-    },
-    {
-      "requirement": "Error — invalid JSON",
-      "rules": [
-        "If the input content is not valid JSON (syntax error), the command writes `error: invalid JSON: <parse error message>` to stderr and exits with code 1."
-      ]
-    },
-    {
-      "requirement": "Error — invalid metadata structure",
-      "rules": [
-        "If the use case throws a `MetadataValidationError` (content is valid YAML but fails structural validation), the error propagates through `handleError` which writes `error: <message>` to stderr and exits with code 1."
-      ]
-    },
-    {
-      "requirement": "Error — conflict detected",
-      "rules": [
-        "If `--force` is not set and the repository detects a concurrent modification (hash mismatch), the command writes the conflict error to stderr and exits with code 1."
-      ]
-    },
-    {
-      "requirement": "Error — dependsOn overwrite",
-      "rules": [
-        "If `--force` is not set and the incoming metadata would change existing `dependsOn` entries, `SaveSpecMetadata` throws a `DependsOnOverwriteError`. The error propagates through `handleError` which writes `error: dependsOn would change (...)` to stderr and exits with code 1. Stdout remains empty on error.\n\nWhen `--force` is set, the overwrite check is skipped entirely."
+        "The CLI MUST NOT register a `write-metadata` command, or any alias of it, on the `spec` parent command, and MUST NOT accept arbitrary metadata content from stdin, `--file`, or `--input` for any command. Agents that need to persist an LLM-optimized description or context MUST use `specd spec optimizations set` instead."
       ]
     }
-  ],
-  "constraints": [
-    "The command contains no business logic — all writing is delegated to the SaveSpecMetadata use case",
-    "YAML validation happens at the CLI boundary before the use case is invoked",
-    "The command never reads or writes the filesystem directly for spec content — it uses the kernel"
   ],
   "scenarios": [
     {
-      "requirement": "Content source",
-      "name": "Reads JSON from stdin",
-      "given": ["valid JSON metadata is piped to stdin"],
-      "when": ["specd spec write-metadata auth/login is run"],
-      "then": ["the metadata is written successfully"]
+      "requirement": "spec write-metadata is removed",
+      "name": "write-metadata command is not registered",
+      "when": ["the CLI spec parent command's subcommands are inspected"],
+      "then": ["no write-metadata command, or any alias of it, is registered"]
     },
     {
-      "requirement": "Content source",
-      "name": "Reads JSON from file",
-      "given": ["a file meta.json with valid JSON metadata"],
-      "when": ["specd spec write-metadata auth/login --input meta.json is run"],
-      "then": ["the metadata is written successfully"]
+      "requirement": "spec write-metadata is removed",
+      "name": "No command accepts arbitrary metadata content",
+      "when": ["any spec subcommand is inspected for stdin, --file, or --input handling"],
+      "then": ["none accepts arbitrary metadata content through those channels"]
     },
     {
-      "requirement": "Command signature",
-      "name": "Command accepts specPath as argument",
-      "when": ["specd spec write-metadata auth/login is invoked"],
-      "then": ["<specPath> is accepted as argument"]
-    },
-    {
-      "requirement": "Command signature",
-      "name": "Command supports --format, --input, --force options",
-      "when": [
-        "specd spec write-metadata auth/login --format json --input meta.json --force is run"
-      ],
-      "then": ["all options are accepted"]
-    },
-    {
-      "requirement": "JSON validation",
-      "name": "Rejects invalid JSON",
-      "when": ["specd spec write-metadata auth/login --input bad.txt is run with non-JSON content"],
-      "then": ["stderr contains error: invalid JSON: and exit code is 1"]
-    },
-    {
-      "requirement": "Error — invalid JSON",
-      "name": "Invalid JSON exits 1",
-      "when": ["input content is not valid JSON"],
+      "requirement": "spec write-metadata is removed",
+      "name": "Agents persist optimized fields through spec optimizations set",
+      "given": ["an agent needs to persist an LLM-optimized description or context"],
+      "when": ["the agent looks for a supported CLI command"],
       "then": [
-        "the command writes error: invalid JSON: <message> to stderr",
-        "AND exits with code 1"
+        "it uses specd spec optimizations set",
+        "AND specd spec write-metadata is not available"
       ]
-    },
-    {
-      "requirement": "Error — invalid YAML",
-      "name": "Invalid YAML exits 1",
-      "when": ["input content is not valid YAML"],
-      "then": [
-        "the command writes error: invalid YAML: <message> to stderr",
-        "AND exits with code 1"
-      ]
-    },
-    {
-      "requirement": "Text output",
-      "name": "Successful write in text format",
-      "when": ["the write succeeds and format is text"],
-      "then": ["the command outputs wrote metadata for default:auth/login"]
-    },
-    {
-      "requirement": "JSON output",
-      "name": "Successful write in JSON format",
-      "when": ["the write succeeds and format is json"],
-      "then": ["the command outputs { \"result\": \"ok\", \"spec\": \"default:auth/login\" }"]
-    },
-    {
-      "requirement": "Error — invalid metadata structure",
-      "name": "Structurally invalid metadata exits 1",
-      "given": ["valid YAML content with keywords: [123] (invalid type)"],
-      "when": ["specd spec write-metadata auth/login --input /tmp/bad.yaml is invoked"],
-      "then": [
-        "the command writes error: Metadata validation failed: ... to stderr and exits with code 1"
-      ]
-    },
-    {
-      "requirement": "Error — spec not found",
-      "name": "Unknown spec exits 1",
-      "when": ["the spec does not exist in the workspace"],
-      "then": [
-        "the command writes error: spec '<specPath>' not found to stderr and exits with code 1"
-      ]
-    },
-    {
-      "requirement": "Error — conflict detected",
-      "name": "Conflict without --force exits 1",
-      "given": ["the metadata file was modified since it was last read"],
-      "when": ["specd spec write-metadata auth/login is invoked without --force"],
-      "then": ["the command exits with code 1 and reports the conflict"]
-    },
-    {
-      "requirement": "Error — conflict detected",
-      "name": "Force flag bypasses conflict",
-      "given": ["the metadata file was modified since it was last read"],
-      "when": ["specd spec write-metadata auth/login --force is invoked"],
-      "then": ["the write succeeds and the conflict is ignored"]
-    },
-    {
-      "requirement": "Error — dependsOn overwrite",
-      "name": "dependsOn change without --force exits 1",
-      "given": [
-        "existing metadata has dependsOn: [core:config, core:schema-format]",
-        "AND incoming YAML has dependsOn: [core:change]"
-      ],
-      "when": [
-        "specd spec write-metadata auth/login --input /tmp/metadata.yaml is invoked without --force"
-      ],
-      "then": [
-        "the command writes error: dependsOn would change to stderr",
-        "AND exits with code 1",
-        "AND stdout is empty"
-      ]
-    },
-    {
-      "requirement": "Error — dependsOn overwrite",
-      "name": "--force bypasses dependsOn check",
-      "given": [
-        "existing metadata has dependsOn: [core:config]",
-        "AND incoming YAML has dependsOn: [core:change]"
-      ],
-      "when": [
-        "specd spec write-metadata auth/login --input /tmp/metadata.yaml --force is invoked"
-      ],
-      "then": ["the write succeeds"]
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:66a52fc8e5bc750a2d7c8d0e1e86b2767ce46d2838f84606cb5d3cf251c89678",
-    "verify.md": "sha256:23fe3643b7ea683a06bf7564bb8755bd5f9554a424a3baa71cdf6899f0710070"
+    "spec.md": "sha256:505964ebe1fad245742f3806ce92096f8680503374c1a278c185a671866cad6a",
+    "verify.md": "sha256:03e2a2b0863b90096c8a99895de223ef7e87851778c8147bec2c835d0e668a54"
   },
-  "generatedBy": "core"
+  "provenance": {
+    "artifacts": {
+      "spec.md": {
+        "hash": "sha256:505964ebe1fad245742f3806ce92096f8680503374c1a278c185a671866cad6a",
+        "lastModified": "2026-07-25T11:53:31.286Z"
+      },
+      "verify.md": {
+        "hash": "sha256:03e2a2b0863b90096c8a99895de223ef7e87851778c8147bec2c835d0e668a54",
+        "lastModified": "2026-07-25T11:53:31.287Z"
+      }
+    },
+    "persistedStateHash": "sha256:54e6d8c03eea36774351a31df36d909c93a309e25b85f4725d212bb44245ba72",
+    "schema": {
+      "name": "schema-std",
+      "version": 1
+    },
+    "projectionVersion": 1,
+    "projectionFingerprint": "sha256:e4a28a2db6a35ed39b8308518337235b1490c2948cd839db25866ad79b22404b"
+  }
 }

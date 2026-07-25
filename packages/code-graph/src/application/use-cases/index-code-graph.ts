@@ -1030,28 +1030,50 @@ export class IndexCodeGraph {
               }
             }
 
-            const specHash = computeContentHash(content)
+            const metadataStart = performance.now()
+            let title = repoSpec.name.toString()
+            let description = ''
+            let optimizedDescription: string | undefined
+            let metadataFingerprint = computeContentHash(content)
 
-            if (existing?.contentHash === specHash) {
+            if (options.getSpecMetadata !== undefined) {
+              const materialized = await options.getSpecMetadata.execute({ specId })
+              title = materialized.metadata.title ?? title
+              description =
+                materialized.metadata.optimizedDescription ||
+                materialized.metadata.description ||
+                ''
+              optimizedDescription = materialized.metadata.optimizedDescription
+              metadataFingerprint = materialized.metadataFingerprint
+            } else {
+              const snapshot = await ws.specRepo.readMetadataSnapshot(repoSpec)
+              if (snapshot.kind === 'present') {
+                title = snapshot.metadata.title ?? title
+                description =
+                  snapshot.metadata.optimizedDescription || snapshot.metadata.description || ''
+                optimizedDescription = snapshot.metadata.optimizedDescription
+              }
+            }
+
+            if (existing?.contentHash === metadataFingerprint) {
               if (wsBreakdown) wsBreakdown.specsIndexed++
               continue
             }
 
-            const metadataStart = performance.now()
-            const metadata = await ws.specRepo.metadata(repoSpec)
-            const dependsOn = await ws.specRepo.readPersistedDependsOn(repoSpec)
-            const implementationLinks = await ws.specRepo.readPersistedImplementation(repoSpec)
+            const persisted = await ws.specRepo.readPersistedState(repoSpec)
+            const dependsOn = persisted?.dependsOn
+            const implementationLinks = persisted?.implementation
             specMetadataReadDuration += performance.now() - metadataStart
 
             const specNode = createSpecNode({
               specId,
               path: repoSpec.name.toString(),
-              title: metadata?.title ?? repoSpec.name.toString(),
-              description: metadata?.optimizedDescription || metadata?.description || '',
-              contentHash: specHash,
+              title,
+              description,
+              contentHash: metadataFingerprint,
               content,
               workspace: ws.name,
-              optimizedDescription: metadata?.optimizedDescription,
+              optimizedDescription,
             })
 
             if (existing) {

@@ -1,0 +1,83 @@
+- op: modified
+  description: Replace the input-contract scenario with removal assertions now that SaveSpecMetadata no longer exists.
+  selector:
+    type: section
+    matches: '^Requirement: Input contract$'
+  rename: 'Requirement: SaveSpecMetadata is removed'
+  content: |
+    #### Scenario: SaveSpecMetadata is not exported
+
+    - **WHEN** `@specd/core` public exports are inspected
+    - **THEN** `SaveSpecMetadata` and `createSaveSpecMetadata` are not present
+
+    #### Scenario: Kernel does not mount SaveSpecMetadata
+
+    - **WHEN** `createKernel(config)` is called
+    - **THEN** the returned kernel has no `saveSpecMetadata` entry under `kernel.specs`
+
+    #### Scenario: PersistSpecMetadata is the only remaining metadata writer, and only for MaterializeSpecMetadata
+
+    - **GIVEN** the internal `PersistSpecMetadata` collaborator
+    - **WHEN** it is invoked
+    - **THEN** it is invoked only by `MaterializeSpecMetadata`
+    - **AND** it accepts only a complete generated projection plus an observed `revision` — never a caller-supplied partial or arbitrary JSON payload
+
+- op: removed
+  description: Remove the output-contract scenario.
+  selector:
+    type: section
+    matches: '^Requirement: Output contract$'
+
+- op: removed
+  description: Remove the content-validation scenarios.
+  selector:
+    type: section
+    matches: '^Requirement: Content validation before write$'
+
+- op: removed
+  description: Remove the workspace-resolution scenario.
+  selector:
+    type: section
+    matches: '^Requirement: Workspace resolution$'
+
+- op: removed
+  description: Remove the spec-existence-check scenario.
+  selector:
+    type: section
+    matches: '^Requirement: Spec existence check$'
+
+- op: removed
+  description: Remove the conflict-detection-via-originalHash scenarios.
+  selector:
+    type: section
+    matches: '^Requirement: Conflict detection via originalHash$'
+
+- op: removed
+  description: Remove the dependsOn overwrite-protection scenarios.
+  selector:
+    type: section
+    matches: '^Requirement: dependsOn overwrite protection$'
+
+- op: removed
+  description: Remove the sidecar-ownership-boundary scenarios.
+  selector:
+    type: section
+    matches: '^Requirement: Sidecar ownership boundary$'
+
+- op: removed
+  description: Remove the artifact-persistence scenario.
+  selector:
+    type: section
+    matches: '^Requirement: Artifact persistence$'
+
+- op: removed
+  description: Remove the constructor-dependencies scenarios.
+  selector:
+    type: section
+    matches: '^Requirement: Constructor dependencies$'
+
+- op: removed
+  description: Remove the obsolete config-based factory contract scenario.
+  selector:
+    type: section
+    matches: '^Requirement: Config-based factory delegates through resolveSaveSpecMetadataDeps$'

@@ -1,0 +1,56 @@
+# verify.md delta — optional list/Spec stamps on lookup hard-hit without get().
+
+- op: modified
+  description: Hard hit may use provided stamps without get().
+  selector:
+    type: section
+    matches: 'Requirement: Lookup cascade owned by the cache'
+  content: |
+    #### Scenario: Matching stamps produce a hard hit
+
+    - **GIVEN** a stored row whose stamps match current stamps and whose bucket is valid
+    - **WHEN** `lookup` is called
+    - **THEN** it returns `{ kind: 'hit', entry }` without computing `cacheFingerprint`
+
+    #### Scenario: Optional stamps skip get for hard-hit comparison
+
+    - **GIVEN** `lookup` is called with `stamps` derived from `list({ includeMeta: true })`
+      that match the stored stamps
+    - **WHEN** the cache evaluates hard-hit
+    - **THEN** it does not call `SpecRepository.get()` solely to load stamps
+    - **AND** it returns a hard hit
+
+    #### Scenario: Soft hit refreshes stamps inside the cache
+
+    - **GIVEN** a stored row whose stamps differ but whose `cacheFingerprint` still matches
+    - **WHEN** `lookup` is called
+    - **THEN** the cache may load repository state needed for `cacheFingerprint`
+    - **AND** the cache persists refreshed stamps without changing `cacheFingerprint` or
+      `entry`
+    - **AND** it returns `{ kind: 'hit', entry }`
+
+    #### Scenario: Miss when stamps and fingerprint both differ
+
+    - **GIVEN** a stored row whose stamps and `cacheFingerprint` both differ from current
+    - **WHEN** `lookup` is called
+    - **THEN** it returns `{ kind: 'miss' }`
+
+- op: modified
+  description: Method signatures allow optional stamps.
+  selector:
+    type: section
+    matches: 'Requirement: Method signatures'
+  content: |
+    #### Scenario: lookup accepts optional stamps but not cacheFingerprint or repository
+
+    - **WHEN** the port method signatures are examined
+    - **THEN** `lookup` MAY accept optional `stamps`
+    - **AND** MUST NOT accept `cacheFingerprint`, `refreshStamps`, or a `SpecRepository`
+      argument
+
+    #### Scenario: Upsert still materializes stamps itself
+
+    - **WHEN** `upsert` is called after a full validation miss
+    - **THEN** the cache materializes current stamps and `cacheFingerprint` via its
+      injected `SpecRepository`
+    - **AND** the use case MUST NOT pass stamps or `cacheFingerprint` on upsert

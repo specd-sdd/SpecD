@@ -1,0 +1,71 @@
+# verify.md delta paired with kernel/spec.md.delta.yaml — rewrites the specs
+# group scenario to reflect the removed saveMetadata/invalidateMetadata
+# entries and the full materialization/persisted-state use-case surface, and
+# adds an entry-mapping scenario confirming the same exclusion/inclusion set.
+
+- op: modified
+  description: Rewrite the specs-group scenario to list the current use-case surface, replacing saveMetadata/invalidateMetadata/generateMetadata/getContext-only coverage.
+  selector:
+    type: section
+    matches: 'Requirement: Kernel interface groups use cases by domain area'
+  content: |
+    #### Scenario: Use cases are nested under domain groups
+
+    - **WHEN** `createKernel(config)` is called with a valid `SpecdConfig`
+    - **THEN** the returned object has exactly three top-level keys: `changes`, `specs`, `project`
+    - **AND** each key contains an object with use case entries — not use cases at the root level
+
+    #### Scenario: Changes group contains all change use cases
+
+    - **WHEN** `kernel.changes` is inspected
+    - **THEN** it contains entries for: `create`, `status`, `transition`, `approveSpec`, `approveSignoff`, `draft`, `restore`, `discard`, `archive`, `validate`, `compile`, `list`, `listDrafts`, `listDiscarded`, `edit`, `skipArtifact`, `updateSpecDeps`, `listArchived`, `getArchived`, `detectOverlap`
+    - **AND** it contains `repo` as the underlying `ChangeRepository`
+
+    #### Scenario: Specs group contains all spec use cases
+
+    - **WHEN** `kernel.specs` is inspected
+    - **THEN** it contains entries for: `list`, `search`, `get`, `getActiveSchema`, `validate`, `generateMetadata`, `materializeMetadata`, `getMetadata`, `regenerateMetadata`, `initializePersistedState`, `getPersistedSchema`, `updatePersistedSchema`, `getPersistedDeps`, `updatePersistedDeps`, `getPersistedImplementation`, `updatePersistedImplementation`, `getPersistedOptimizations`, `updatePersistedOptimizations`, `getContext`, `resolveSchema`, `getHealth`
+    - **AND** it does not contain `approveSpec` or `approveSignoff`
+    - **AND** it does not contain `saveMetadata` or `invalidateMetadata`
+    - **AND** it contains `repos` as the `ReadonlyMap<string, SpecRepository>`
+
+    #### Scenario: Project group contains query use cases only
+
+    - **WHEN** `kernel.project` is inspected
+    - **THEN** it contains entries for: `listWorkspaces`, `getProjectContext`, `getConfig`, `getMetadata`, `updateMetadata`
+    - **AND** it does not contain `init`, `addPlugin`, `removePlugin`, `listPlugins`, `recordSkillInstall`, or `getSkillsManifest`
+
+- op: modified
+  description: Add a scenario confirming the entry mapping table excludes saveMetadata/invalidateMetadata and includes the full materialization/persisted-state surface.
+  selector:
+    type: section
+    matches: 'Requirement: Kernel entry mapping'
+  content: |
+    #### Scenario: Every mapped entry exists at the documented path
+
+    - **WHEN** `createKernel(config)` is called with a valid `SpecdConfig`
+    - **THEN** every kernel path listed in the entry mapping table resolves to a non-undefined value
+    - **AND** each value is an instance of the use case class documented in the table
+
+    #### Scenario: No undocumented entries in the kernel
+
+    - **WHEN** the keys of `kernel.changes`, `kernel.specs`, and `kernel.project` are enumerated
+    - **THEN** every key appears in the entry mapping table — there are no undocumented entries
+
+    #### Scenario: Entry added to kernel without updating the mapping table
+
+    - **GIVEN** a new use case is wired into `createKernel` under `kernel.changes.newUseCase`
+    - **WHEN** the kernel spec is reviewed
+    - **THEN** the entry mapping table must include the new path — omitting it is a spec violation
+
+    #### Scenario: getConfig is wired as GetConfig
+
+    - **WHEN** `kernel.project.getConfig` is inspected after `createKernel(config)`
+    - **THEN** it is an instance of `GetConfig`
+    - **AND** `kernel.project.getConfig.execute()` returns a `Readonly<SpecdConfig>`
+
+    #### Scenario: Specs entry mapping excludes saveMetadata/invalidateMetadata and includes the materialization/persisted-state surface
+
+    - **WHEN** the entry mapping table for `kernel.specs` is reviewed
+    - **THEN** it does not include `saveMetadata` or `invalidateMetadata` paths
+    - **AND** it includes `materializeMetadata`, `getMetadata`, `regenerateMetadata`, `initializePersistedState`, `getPersistedSchema`, `updatePersistedSchema`, `getPersistedDeps`, `updatePersistedDeps`, `getPersistedImplementation`, `updatePersistedImplementation`, `getPersistedOptimizations`, `updatePersistedOptimizations`, `search`, and `resolveSchema` paths

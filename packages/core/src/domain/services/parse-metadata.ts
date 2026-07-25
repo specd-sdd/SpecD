@@ -1,4 +1,6 @@
 import { z } from 'zod'
+import { type SpecMetadataParseError } from '../errors/spec-metadata-parse-error.js'
+import { type PersistedSchemaIdentity } from './spec-optimization.js'
 
 /**
  * Workspace name: lowercase, starts with letter, letters/digits/hyphens.
@@ -221,6 +223,17 @@ export const permissiveSpecMetadataSchema = z
   })
   .passthrough()
 
+/** Provenance recorded with a materialized metadata projection. */
+export interface SpecMetadataProvenance {
+  readonly artifacts: Readonly<
+    Record<string, { readonly hash: string; readonly lastModified: string }>
+  >
+  readonly persistedStateHash: string | null
+  readonly schema: PersistedSchemaIdentity
+  readonly projectionVersion: number
+  readonly projectionFingerprint: string
+}
+
 /** Parsed `metadata.json` content. */
 export interface SpecMetadata {
   readonly title?: string
@@ -246,16 +259,21 @@ export interface SpecMetadata {
       readonly symbol: string
     }>
   }
+  /** Leniently readable for legacy documents; never emitted by writers. */
   readonly generatedBy?: 'core' | 'agent'
-  readonly originalHash?: string
+  /** Read-through projection of fresh lock-owned optimization state. */
   readonly optimizedDescription?: string
+  /** Read-through projection of fresh lock-owned optimization state. */
   readonly optimizedContext?: string
+  readonly provenance?: SpecMetadataProvenance
 }
 
-/** Persisted metadata read result returned by repository adapters. */
-export interface PersistedSpecMetadata extends SpecMetadata {
-  /** Hash of the raw persisted `metadata.json` file. */
-  readonly originalHash: string
-  /** Whether the persisted metadata matches repository freshness checks. */
-  readonly freshness: 'fresh' | 'stale'
-}
+/** Repository observation of persisted metadata cache state. */
+export type MetadataSnapshot =
+  | { readonly kind: 'missing'; readonly revision: null }
+  | {
+      readonly kind: 'invalid'
+      readonly revision: string
+      readonly error: SpecMetadataParseError
+    }
+  | { readonly kind: 'present'; readonly metadata: SpecMetadata; readonly revision: string }

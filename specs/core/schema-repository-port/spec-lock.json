@@ -1,0 +1,14 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "core:repository-port",
+    "default:_global/architecture",
+    "core:schema-registry-port",
+    "core:parse-schema-yaml",
+    "core:workspace"
+  ],
+  "implementation": []
+}

@@ -98,5 +98,23 @@
     "spec.md": "sha256:e5299306eb7606261450683ba28637d03be7ac55dba86d3455da0b3e5caf9c96",
     "verify.md": "sha256:d1dfb11cf8fd659665ea22e791adee2f594bb1b56b0e346f2b1ae7a004b3bf79"
   },
-  "generatedBy": "core"
+  "provenance": {
+    "artifacts": {
+      "spec.md": {
+        "hash": "sha256:e5299306eb7606261450683ba28637d03be7ac55dba86d3455da0b3e5caf9c96",
+        "lastModified": "2026-05-25T06:02:58.406Z"
+      },
+      "verify.md": {
+        "hash": "sha256:d1dfb11cf8fd659665ea22e791adee2f594bb1b56b0e346f2b1ae7a004b3bf79",
+        "lastModified": "2026-05-25T06:02:58.406Z"
+      }
+    },
+    "persistedStateHash": "sha256:4d2146fd2c235bb41e518daa3f41247474a6fd10f82fc75db66a0b481ac2d9a7",
+    "schema": {
+      "name": "schema-std",
+      "version": 1
+    },
+    "projectionVersion": 1,
+    "projectionFingerprint": "sha256:e4a28a2db6a35ed39b8308518337235b1490c2948cd839db25866ad79b22404b"
+  }
 }

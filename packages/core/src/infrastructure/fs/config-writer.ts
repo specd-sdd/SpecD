@@ -70,18 +70,24 @@ export class FsConfigWriter implements ConfigWriter {
     await fs.mkdir(path.join(storageBase, 'drafts'), { recursive: true })
     await fs.mkdir(path.join(storageBase, 'discarded'), { recursive: true })
     await fs.mkdir(path.join(storageBase, 'archive'), { recursive: true })
+    await fs.mkdir(path.join(storageBase, 'metadata'), { recursive: true })
 
     // Create workspace specs directory
     await fs.mkdir(path.join(options.projectRoot, options.specsPath), { recursive: true })
 
     // Append specd.local.yaml to .gitignore if not already present
     const gitignorePath = path.join(options.projectRoot, '.gitignore')
-    await appendGitignoreEntries(gitignorePath, ['specd.local.yaml', 'specd.local.*.yaml'])
+    await appendGitignoreEntries(gitignorePath, [
+      'specd.local.yaml',
+      'specd.local.*.yaml',
+      '/.specd/metadata/',
+    ])
 
     return {
       configPath,
       schemaRef: options.schemaRef,
       workspaces: [options.workspaceId],
+      metadataCachePath: '.specd/metadata',
     }
   }
 

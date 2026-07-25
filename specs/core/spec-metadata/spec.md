@@ -49,7 +49,8 @@ generation/save use cases defined by this spec and related ports.
 
 ### Requirement: File format
 
-`metadata.json` is a JSON file (per ADR-0019: machine-generated files use JSON). All fields are optional — an empty object or absent file is valid:
+`metadata.json` is a JSON file (per ADR-0019: machine-generated files use JSON).
+All fields are optional — an empty object or absent file is valid:
 
 ```json
 {
@@ -64,7 +65,16 @@ generation/save use cases defined by this spec and related ports.
   "scenarios": [{ "requirement": "...", "name": "...", "given": [], "when": [], "then": [] }],
   "optimizedDescription": "AI optimized description",
   "optimizedContext": "AI optimized context",
-  "generatedBy": "core"
+  "generatedBy": "core",
+  "provenance": {
+    "artifacts": {
+      "spec.md": { "hash": "sha256:...", "lastModified": "2026-07-24T00:00:00.000Z" }
+    },
+    "persistedStateHash": null,
+    "schema": { "name": "specd/std", "version": 1 },
+    "projectionVersion": 1,
+    "projectionFingerprint": "sha256:..."
+  }
 }
 ```
 
@@ -73,53 +83,84 @@ Fields:
 - `title` — human-readable display title
 - `description` — short summary of the spec's purpose
 - `keywords` — lowercase hyphen-separated discovery tokens
-- `dependsOn` — array of spec IDs this spec depends on
+- `dependsOn` — array of spec IDs this spec depends on; this is a normalized
+  projection of the spec's persisted dependency state, not an independently
+  authored value
 - `contentHashes` — `{ filename: "sha256:<hex>" }` for staleness detection
 - `rules` — extracted requirements grouped by heading
 - `constraints` — extracted constraint bullets
 - `scenarios` — extracted verification scenarios
 - `context` — freeform context strings
-- `optimizedDescription` — optional concise, high-signal description for agents
-- `optimizedContext` — optional optimized representation for agent context injection
-- `generatedBy` — `"core"` for deterministic extraction, `"agent"` for LLM-optimized
+- `optimizedDescription` — a normalized projection of `spec-lock.json`'s
+  `optimizations.optimizedDescription.value`. It is included only when that
+  field's persisted baseline is fresh against the current artifacts and schema
+  identity; it MUST be omitted, not fabricated, when stale or absent.
+- `optimizedContext` — the same projection of
+  `optimizations.optimizedContext.value`, subject to the same freshness gate.
+- `generatedBy` — always `"core"`; metadata content is always produced by
+  deterministic generation. A legacy document with `generatedBy: "agent"` MAY
+  still be read leniently for migration, but no generation path emits that
+  value.
+- `provenance` — the `SpecMetadataProvenance` record described in Requirement:
+  Source provenance, used to determine whether this document is fresh relative
+  to current source state
 
-### Requirement: Write-time structural validation
+### Requirement: Source provenance
 
-The `SaveSpecMetadata` use case validates JSON content against the `strictSpecMetadataSchema` Zod schema before writing. The content must be a JSON object. `title` and `description` are required; other fields are optional but when present must conform to their declared types and formats:
+Generated metadata MUST record a `provenance` object describing the exact
+source state it was produced from:
+
+- `artifacts` — a record keyed by artifact filename, each entry containing the
+  `hash` (content hash) and diagnostic `lastModified` stamp of that artifact at
+  generation time
+- `persistedStateHash` — the lock sidecar's `persistedStateHash` at generation
+  time, or `null` when no persisted lock state exists for the spec
+- `schema` — the `PersistedSchemaIdentity` (`{ name, version }`) in effect at
+  generation time
+- `projectionVersion` — the integer version of the metadata generation/
+  projection contract used
+- `projectionFingerprint` — a hash of the effective `metadataExtraction`
+  configuration, registered extractor transforms, schema extends/plugins/
+  overrides that affect extraction, and the generator algorithm version; it is
+  a hash of the resolved projection contract, not a copy of the resolved schema
+
+`lastModified` values recorded in `provenance.artifacts` are diagnostic only.
+Freshness comparisons MUST use `hash`, `persistedStateHash`, `schema`,
+`projectionVersion`, and `projectionFingerprint` — never `lastModified` alone.
+
+`provenance` is the complete input to freshness comparison. `contentHashes`
+remains present as a simpler consumer-facing convenience field but MUST be
+derivable from `provenance.artifacts` and MUST NOT diverge from it.
+
+### Requirement: Structural validation before persistence
+
+The internal metadata-persistence guard (`PersistSpecMetadata`) validates
+generated JSON content against the `strictSpecMetadataSchema` Zod schema before
+writing. The content must be a JSON object. `title` and `description` are
+required; other fields are optional but when present must conform to their
+declared types and formats:
 
 - `title` (required) must be a non-empty string
 - `description` (required) must be a non-empty string
 - `keywords` must be an array of non-empty lowercase strings
 - `dependsOn` must be an array of strings, each matching a valid spec ID pattern
-- `contentHashes` (required) must be a non-empty record of filename to hash string
+- `contentHashes` (required) must be a non-empty record of filename to hash
+  string
 - `rules` must be an array of objects with `requirement` and `rules`
 - `constraints` must be a non-empty array of non-empty strings
-- `scenarios` must be an array of objects with `requirement`, `name`, `when`, `then`, and `given`
+- `scenarios` must be an array of objects with `requirement`, `name`, `when`,
+  `then`, and `given`
 - `optimizedDescription` must be a non-empty string
 - `optimizedContext` must be a non-empty string
+- `provenance` must conform to `SpecMetadataProvenance`
 
-If validation fails, `SaveSpecMetadata` throws a `MetadataValidationError`. The file is not written.
+If validation fails, persistence is rejected with a typed validation error and
+the file is not written. This guard is not a public editor: it is invoked only
+internally by materialization, never by an external caller supplying arbitrary
+content.
 
-Unknown top-level keys are allowed (`.passthrough()`) to support forward-compatible extensions.
-
-### Requirement: dependsOn overwrite protection
-
-Existing `dependsOn` entries are considered curated — they may have been manually added, verified by a human, or set via `change.specDependsOn`. `SaveSpecMetadata` must prevent silent overwrites:
-
-1. When `force` is not set: before writing, read the existing metadata via `SpecRepository.metadata()` and capture its `originalHash`. This hash is passed to `SpecRepository.saveMetadata()` so that the repository layer can detect concurrent modifications.
-2. Parse both existing and incoming metadata to extract their `dependsOn` arrays
-3. Compare the two arrays **ignoring order** (sorted comparison)
-4. If the existing metadata has `dependsOn` entries and the incoming `dependsOn` differs → throw `DependsOnOverwriteError`
-5. If the existing metadata has no `dependsOn` (absent or empty array) → allow any incoming `dependsOn`
-6. When `force` is set: skip this check entirely
-
-`DependsOnOverwriteError` is a domain error extending `SpecdError` with code `DEPENDS_ON_OVERWRITE`. It exposes:
-
-- `existingDeps: readonly string[]` — the entries currently on disk
-- `incomingDeps: readonly string[]` — the entries in the incoming content
-- A human-readable message listing which entries would be removed and which would be added
-
-A static helper `DependsOnOverwriteError.areSame(a, b)` compares two `dependsOn` arrays for equality ignoring order.
+Unknown top-level keys are allowed (`.passthrough()`) to support
+forward-compatible extensions.
 
 ### Requirement: Deterministic generation at archive time
 
@@ -147,38 +188,68 @@ The archive-owned persisted dependency rules are:
 
 `metadata.json.dependsOn` remains a supported consumer surface, but for persisted specs it is a projection of archive-owned persisted dependency state rather than an independent source of truth.
 
-### Requirement: Staleness detection
+### Requirement: Freshness assessment is application-owned
 
-When specd reads a spec's metadata via `SpecRepository.metadata()`, it iterates over the active schema's `requiredSpecArtifacts`, resolves the concrete filename for each artifact via its `output` field, computes the current SHA-256 hash of that file, and compares it against the entry in `contentHashes` keyed by that filename.
+Metadata freshness MUST be computed only by the pure application/domain
+function `assessMetadataFreshness(persisted: SpecMetadata, current:
+SpecMetadataSourceState): MetadataFreshnessAssessment`. `SpecRepository` MUST
+NOT compute, return, or classify freshness itself; `readMetadataSnapshot()`
+distinguishes only `missing`, `invalid`, and `present` persistence/parse
+states.
 
-Metadata is considered stale when any of the following is true:
+`assessMetadataFreshness` compares:
 
-- any required artifact file hash differs from the recorded value
-- a required resolved filename is missing from `contentHashes`
-- `contentHashes` itself is absent
-- the metadata's projected `dependsOn` value differs from the repository's current persisted dependency state for that spec
+- the exact artifact filename set and per-artifact content hashes in
+  `provenance.artifacts` against the current artifact state
+- `provenance.persistedStateHash` against the spec's current
+  `persistedStateHash(spec)`, including the transition to or from lock absence
+- `provenance.schema` against the spec's current persisted schema identity
+- `provenance.projectionVersion` against the generator's current projection
+  version
+- `provenance.projectionFingerprint` against the current effective projection
+  contract fingerprint
 
-A missing `contentHashes` field is treated as stale — specd emits the same warning.
+Metadata is stale when any of these comparisons differs. `lastModified` values
+are diagnostic only and MUST NOT by themselves make metadata stale when the
+corresponding hash is unchanged.
 
-`SpecRepository.metadata()` returns `null` only when the metadata file does not exist. When the file exists but any staleness condition above is true, the repository returns the parsed persisted metadata with `freshness: 'stale'`.
-
-Staleness is advisory for ordinary metadata reads, but validation workflows MAY elevate stale metadata to a failing validation result so callers know the cache must be rebuilt.
+This comparison is used internally by `MaterializeSpecMetadata` to decide reuse
+versus regeneration. It is not a repository responsibility and MUST NOT be
+reimplemented independently by any repository adapter or by ordinary consumers.
 
 ### Requirement: Use by CompileContext
 
-`CompileContext` and other context-oriented consumers read metadata via `SpecRepository.metadata()` as the canonical normalized representation of persisted specs.
+`CompileContext` and other context-oriented consumers obtain the canonical
+normalized representation of persisted specs through Core metadata
+materialization (`GetSpecMetadata` / `MaterializeSpecMetadata`), never by
+calling `SpecRepository.readMetadataSnapshot()` directly to make a freshness
+decision.
 
-Consumers MUST distinguish three states:
+Materialization guarantees that a consumer requiring the normalized projection
+receives a metadata value that is either confirmed fresh or was just
+regenerated from current source state; consumers MUST NOT implement their own
+missing/stale fallback logic against a raw repository snapshot.
 
-1. **Missing metadata** — `SpecRepository.metadata()` returns `null`. Consumers MAY fall back to the schema's `metadataExtraction` declarations as a best-effort path for specs that do not yet have canonical metadata and MUST emit a `missing-metadata` warning when that fallback matters to the result.
-2. **Fresh metadata** — `SpecRepository.metadata()` returns persisted metadata with `freshness: 'fresh'`. Consumers use its canonical normalized fields directly.
-3. **Stale metadata** — `SpecRepository.metadata()` returns persisted metadata with `freshness: 'stale'`. Consumers MAY still use stale persisted fields when their operation tolerates stale cache data, but any consumer that requires fresh canonical fields for correctness MUST perform deterministic fallback from schema extraction where the schema declares it and MUST emit a `stale-metadata` warning.
-
-Consumers MUST NOT bypass metadata by reading `spec-lock.json` as though it were a normal artifact. Persisted sidecars feed metadata generation through repository semantic operations; metadata is the consumer-facing canonical shape.
+`SpecRepository.readMetadataSnapshot()` remains available for materialization
+internals and diagnostics that intentionally need the raw persisted/parse
+state, but is not the path ordinary consumers use to obtain usable metadata.
 
 ### Requirement: Version control
 
-`metadata.json` files under `.specd/metadata/` must be committed to version control alongside the project. The `.specd/metadata/` directory must not be added to `.gitignore`.
+`metadata.json` is a disposable generated cache, not authored content. New
+projects initialize their metadata cache directory and add
+`/.specd/metadata/` (rooted, so similarly named nested directories are
+unaffected) to the project-root `.gitignore`.
+
+Existing projects that already track generated metadata are not automatically
+untracked — adding an ignore entry does not remove already-tracked files from
+the Git index. Removing previously tracked metadata from version control is an
+explicit one-time repository migration, not something runtime silently
+performs.
+
+When a project configures a custom filesystem `metadataPath`, keeping that path
+out of version control is the operator's responsibility; runtime does not
+rewrite `.gitignore` for arbitrary custom paths outside the default location.
 
 ### Requirement: Implementation projection
 
@@ -195,21 +266,48 @@ If a spec has no persisted implementation links, the `implementation` property S
 
 ## Constraints
 
-- `metadata.json` is not a schema artifact — it is never listed in `requiredSpecArtifacts`, never validated by `ValidateArtifacts`, and never tracked in the change manifest's `artifacts` array
-- Its absence is not an error at any point — all reads of metadata treat a missing file as empty
-- `dependsOn` paths must not form cycles; if a cycle is detected during traversal, specd breaks the cycle and emits a warning
-- Staleness warnings are advisory only — they do not block any operation
-- The LLM must not include the spec itself in its own `dependsOn` list
-- `SaveSpecMetadata` must validate content against `strictSpecMetadataSchema` before writing — structurally invalid content is rejected with `MetadataValidationError`
-- `SaveSpecMetadata` must check for `dependsOn` overwrite before writing — changed `dependsOn` without `force` is rejected with `DependsOnOverwriteError`
-- Reading metadata (`parseMetadata`) remains lenient — it returns `{}` on invalid input so that downstream operations are never blocked by a malformed file on disk
-- Metadata is accessed exclusively via `SpecRepository.metadata()` and `SpecRepository.saveMetadata()` — never via the generic `artifact()` / `save()` methods
+- `metadata.json` is not a schema artifact — it is never listed in
+  `requiredSpecArtifacts`, never validated by `ValidateArtifacts`, and never
+  tracked in the change manifest's `artifacts` array
+- Its absence is not an error at any point — all reads of metadata treat a
+  missing file as empty
+- `dependsOn` paths must not form cycles; if a cycle is detected during
+  traversal, specd breaks the cycle and emits a warning
+- Staleness is an internal materialization decision, not a public status;
+  ordinary consumers self-heal through materialization instead of acting on a
+  raw staleness flag
+- No process may include the spec itself in its own `dependsOn` list
+- The internal metadata-persistence guard must validate content against the
+  structural contract before writing — structurally invalid content is
+  rejected and not written
+- `dependsOn` in generated metadata is never independently authored or subject
+  to overwrite comparison — it is always a direct projection of the spec's
+  current persisted dependency state
+- Reading metadata (`parseMetadata`) remains lenient — it returns `{}` on
+  invalid input so that downstream operations are never blocked by a malformed
+  file on disk
+- Metadata is accessed exclusively via `SpecRepository.readMetadataSnapshot()`
+  and `SpecRepository.writeMetadataSnapshot()` — never via the generic
+  `artifact()` / `save()` methods
+- Metadata content, including `optimizedDescription` and `optimizedContext`, is
+  never a source of truth — `spec-lock.json` owns dependency, implementation,
+  and optimization state; metadata is always a regenerable projection
 
 ## Spec Dependencies
 
-- [`core:config`](../config/spec.md) — context spec selection and resolution order
-- [`core:change`](../change/spec.md) — `specDependsOn` in the change manifest, per-spec declared dependencies
-- [`core:schema-format`](../schema-format/spec.md) — `requiredSpecArtifacts`, used to determine which files to hash for staleness detection
-- [`core:content-extraction`](../content-extraction/spec.md) — the extraction engine used as CompileContext fallback when metadata is stale
-- [`core:spec-repository-port`](../spec-repository-port/spec.md) — `metadata()` and `saveMetadata()` methods used for all metadata access
-- [`core:spec-lock`](../spec-lock/spec.md) — durable archived implementation traceability source
+- [`core:config`](../config/spec.md) — context spec selection and resolution
+  order
+- [`core:change`](../change/spec.md) — `specDependsOn` in the change manifest,
+  per-spec declared dependencies
+- [`core:schema-format`](../schema-format/spec.md) — `requiredSpecArtifacts`,
+  used to determine which files to hash for staleness detection
+- [`core:content-extraction`](../content-extraction/spec.md) — the extraction
+  engine used as CompileContext fallback when metadata is stale
+- [`core:spec-repository-port`](../spec-repository-port/spec.md) —
+  `readMetadataSnapshot()` and `writeMetadataSnapshot()` methods used for all
+  metadata access
+- [`core:spec-lock`](../spec-lock/spec.md) — durable archived dependency,
+  implementation, and optimization source of truth
+- [`core:spec-optimization`](../spec-optimization/spec.md) — the per-field
+  optimization record and freshness reasons projected into
+  `optimizedDescription` / `optimizedContext`

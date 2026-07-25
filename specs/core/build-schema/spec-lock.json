@@ -1,0 +1,14 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "default:_global/architecture",
+    "core:schema-format",
+    "core:content-extraction",
+    "core:selector-model",
+    "core:schema-merge"
+  ],
+  "implementation": []
+}

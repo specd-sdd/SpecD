@@ -11,11 +11,9 @@
     "core:workspace",
     "core:spec-id-format",
     "core:list-workspaces",
-    "core:composition-resolver"
+    "core:composition-resolver",
+    "core:spec-optimization",
+    "core:get-spec-metadata"
   ],
-  "implementation": [
-    {
-      "file": "core:src/composition/use-cases/get-spec-context.ts"
-    }
-  ]
+  "implementation": []
 }

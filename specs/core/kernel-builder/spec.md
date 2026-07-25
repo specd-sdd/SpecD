@@ -44,6 +44,7 @@ This equivalence includes:
 - external registrations extend rather than replace built-ins
 - shared adapters are constructed once
 - the resulting kernel is immutable after construction
+- `build()` returns the complete `kernel.specs` use-case set defined by [`core:kernel`](../kernel/spec.md) — including `generateMetadata`, `materializeMetadata`, `getMetadata`, `regenerateMetadata`, `initializePersistedState`, persisted schema inspection/reassignment, and persisted dependency/implementation/optimization queries and mutations — for every registry and repository override combination the builder supports. The builder MUST NOT maintain a second, independently-updated use-case list that can drift from `createKernel()`.
 
 ### Requirement: Builder rejects conflicting registrations
 
@@ -79,4 +80,5 @@ It MUST NOT introduce a builder-specific registry ownership model beneath its fl
 - [`core:kernel`](../kernel/spec.md) — kernel shape, additive registries, merged registry exposure
 - [`core:composition`](../composition/spec.md) — composition-layer exports and construction responsibilities
 - [`core:composition-resolver`](../composition-resolver/spec.md) — shared config-to-deps resolver path reused by builder and kernel
+- [`core:materialize-spec-metadata`](../materialize-spec-metadata/spec.md) — self-healing materialization use case that must remain present on every built kernel
 - [`default:_global/architecture`](../../_global/architecture/spec.md) — composition-layer boundaries

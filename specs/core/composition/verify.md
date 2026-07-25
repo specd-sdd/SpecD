@@ -273,6 +273,26 @@
 - **WHEN** `createGetStatus(config).execute({ name })` is called
 - **THEN** a `GetStatusResult` is returned without calling `createKernel`
 
+### Requirement: Metadata materialization and persisted-state factories replace obsolete metadata mutation factories
+
+#### Scenario: Standard factory pattern for metadata materialization and persisted-state use cases
+
+- **WHEN** the public composition exports are inspected
+- **THEN** `MaterializeSpecMetadata`, `GetSpecMetadata`, `RegenerateSpecMetadata`, `InitializePersistedSpecState`, `GetPersistedSpecSchema`, `UpdatePersistedSpecSchema`, `GetPersistedSpecDeps`, `UpdatePersistedSpecDeps`, `GetPersistedSpecImplementation`, `UpdatePersistedSpecImplementation`, `GetPersistedSpecOptimizations`, and `UpdatePersistedSpecOptimizations` each have a `create*` factory
+- **AND** each factory supports both `createX(deps)` and `createX(config, options?)` call shapes
+
+#### Scenario: Obsolete metadata mutation factories are removed from composition
+
+- **WHEN** the public composition exports are inspected
+- **THEN** `createSaveSpecMetadata`, `createUpdateSpecMetadata`, and `createInvalidateSpecMetadata` are not present
+- **AND** `SaveSpecMetadata`, `UpdateSpecMetadata`, and `InvalidateSpecMetadata` use-case types are not exported from the `"."` public barrel
+
+#### Scenario: PersistSpecMetadata stays an internal collaborator
+
+- **WHEN** the public entry points `"."`, `"./ports"`, and `"./extensions"` are inspected
+- **THEN** no `createPersistSpecMetadata` factory or `PersistSpecMetadata` type is present
+- **AND** `PersistSpecMetadata` is not kernel-mounted
+
 ### Requirement: Repository factories on public root
 
 #### Scenario: Default spec repository without kernel

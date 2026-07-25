@@ -3,10 +3,6 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": ["core:project-metadata", "core:composition-resolver"],
-  "implementation": [
-    {
-      "file": "core:src/composition/use-cases/update-project-metadata.ts"
-    }
-  ]
+  "dependsOn": ["core:project-metadata", "core:composition-resolver", "core:get-spec-metadata"],
+  "implementation": []
 }

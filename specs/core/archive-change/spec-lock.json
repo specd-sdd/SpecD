@@ -21,11 +21,10 @@
     "default:_global/logging",
     "core:spec-lock",
     "default:_global/error-handling-conventions",
-    "core:composition-resolver"
+    "core:composition-resolver",
+    "core:regenerate-spec-metadata",
+    "core:spec-optimization",
+    "core:initialize-persisted-spec-state"
   ],
-  "implementation": [
-    {
-      "file": "core:src/composition/use-cases/archive-change.ts"
-    }
-  ]
+  "implementation": []
 }

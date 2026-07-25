@@ -1,0 +1,272 @@
+{
+  "title": "UpdatePersistedSpecDeps",
+  "description": "Canonical persisted dependencies must be mutable outside the archive pipeline — for correcting a lock after the fact, or for adopting external dependency knowledge that a schema cannot extract from artifacts. `UpdatePersistedSpecDeps` is the application use case that applies list/add/remove/set/clear mutations directly to a spec's persisted `dependsOn` and conditionally persists the result through the shared semantic patch helper.",
+  "dependsOn": [
+    "core:spec-repository-port",
+    "core:spec-id-format",
+    "core:update-spec-deps",
+    "core:initialize-persisted-spec-state"
+  ],
+  "context": [
+    "Canonical persisted dependencies must be mutable outside the archive pipeline — for correcting a lock after the fact, or for adopting external dependency knowledge that a schema cannot extract from artifacts. `UpdatePersistedSpecDeps` is the application use case that applies list/add/remove/set/clear mutations directly to a spec's persisted `dependsOn` and conditionally persists the result through the shared semantic patch helper."
+  ],
+  "rules": [
+    {
+      "requirement": "Input contract",
+      "rules": [
+        "`UpdatePersistedSpecDeps.execute` SHALL accept an `UpdatePersistedSpecDepsInput` with:\n\n- `specId` (required, string) — the spec whose persisted dependencies are being mutated\n- `add` (optional, readonly string array) — dependency spec IDs to merge with existing dependencies\n- `remove` (optional, readonly string array) — dependency spec IDs to remove from existing dependencies\n- `set` (optional, readonly string array) — replaces the entire persisted dependency list\n- `clear` (optional, boolean) — replaces the persisted dependency list with an empty array"
+      ]
+    },
+    {
+      "requirement": "Mutual exclusivity and minimum operation",
+      "rules": [
+        "`set` and `clear` MUST NOT be combined with each other or with `add`/`remove`. If none of `add`, `remove`, `set`, or `clear` is provided, the use case MUST throw a typed validation error. These rules and the underlying add/remove normalization reuse the mutation semantics extracted from [`core:update-spec-deps`](../update-spec-deps/spec.md), applied to persisted lock state instead of a change's draft `specDependsOn`."
+      ]
+    },
+    {
+      "requirement": "Remove is applied before add",
+      "rules": [
+        "When both `remove` and `add` are provided in the same call, removals MUST be processed against the current persisted list before additions. `add` is idempotent — a dependency spec ID already present after removals is not duplicated."
+      ]
+    },
+    {
+      "requirement": "Reading current persisted state",
+      "rules": [
+        "The use case MUST resolve the spec's workspace repository and call `SpecRepository.readPersistedState(spec)` to obtain the current snapshot, including its `originalHash` for optimistic concurrency."
+      ]
+    },
+    {
+      "requirement": "Set and clear create missing persisted state",
+      "rules": [
+        "When persisted state does not exist and the operation is `set` or `clear`, the use case MUST construct an initial base with the effective project schema and a `dependsOn` value equal to the explicitly supplied `set` list, or `[]` for `clear`. It MUST NOT invoke deterministic artifact-based dependency derivation in this case, because the caller has supplied a complete authoritative value."
+      ]
+    },
+    {
+      "requirement": "Non-empty add creates missing persisted state",
+      "rules": [
+        "When persisted state does not exist and `add` is non-empty, the use case MUST resolve an initial base through the same `resolveInitialPersistedDependsOn()` service used by [`core:initialize-persisted-spec-state`](../initialize-persisted-spec-state/spec.md) — deriving `dependsOn` from the current canonical artifact projection under the effective project schema, or `[]` when that schema cannot extract dependencies — and then apply `add` on top of that initial base."
+      ]
+    },
+    {
+      "requirement": "Remove and empty add against missing state are no-ops",
+      "rules": [
+        "When persisted state does not exist and the requested operation is `remove`, or an `add` whose resulting merge would be empty, the use case MUST NOT create persisted state. It MUST return a result reflecting `dependsOn: []` and `created: false` without calling `writePersistedState`."
+      ]
+    },
+    {
+      "requirement": "Applying the mutation through the shared patch helper",
+      "rules": [
+        "Once the effective base (existing snapshot or initial base) and the target `dependsOn` value are determined, the use case MUST call the shared pure `applyPersistedSpecStatePatch()` service with a patch containing only the updated `dependsOn`, and pass the complete resulting `PersistedSpecState` to `SpecRepository.writePersistedState()`."
+      ]
+    },
+    {
+      "requirement": "Conditional write and concurrency",
+      "rules": [
+        "`writePersistedState` MUST be called with `expectedRevision` equal to the `originalHash` observed by `readPersistedState`, or `null` when persisted state was absent. When the repository detects that the observed revision no longer matches the persisted state at write time, the use case MUST propagate `ArtifactConflictError` rather than retrying or silently rebasing the mutation onto a concurrent winner."
+      ]
+    },
+    {
+      "requirement": "Unknown spec fails with a typed error",
+      "rules": [
+        "When the spec identity cannot be resolved to an existing spec artifact set in its workspace, `execute` SHALL throw `SpecNotFoundError`."
+      ]
+    },
+    {
+      "requirement": "Result contract",
+      "rules": [
+        "On success, `execute` SHALL return an `UpdatePersistedSpecDepsResult` containing:\n\n- `specId` — the fully-qualified spec identity\n- `dependsOn` — the resulting persisted dependency list after the mutation\n- `created` — `true` when persisted state was newly created by this call, `false` otherwise"
+      ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveUpdatePersistedSpecDepsDeps",
+      "rules": [
+        "The config-based `createUpdatePersistedSpecDeps(config, options?)` form MUST derive `UpdatePersistedSpecDepsDeps` through `resolveUpdatePersistedSpecDepsDeps(resolver)` and then delegate to canonical `createUpdatePersistedSpecDeps(deps)`.\n\n`resolveUpdatePersistedSpecDepsDeps(resolver)` MUST resolve:\n\n- `specs: ReadonlyMap<string, SpecRepository>` — one repository instance per workspace\n- `initializePersistedSpecState` collaborator sufficient to invoke `resolveInitialPersistedDependsOn()` for the non-empty-add creation path\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
+      ]
+    }
+  ],
+  "constraints": [
+    "This use case never mutates a change's draft specDependsOn; it mutates only canonical persisted lock state",
+    "This use case MUST NOT import dependency values from persisted metadata under any circumstance",
+    "readOnly workspace ownership MUST reject the write with ReadOnlyWorkspaceError before any persisted-state I/O",
+    "The use case does not resolve actor identity — persisted dependency updates are not recorded as actor-attributed events"
+  ],
+  "scenarios": [
+    {
+      "requirement": "Input contract",
+      "name": "specId is required",
+      "given": ["an UpdatePersistedSpecDepsInput missing specId"],
+      "when": ["execute is called"],
+      "then": ["it is rejected as an invalid input"]
+    },
+    {
+      "requirement": "Mutual exclusivity and minimum operation",
+      "name": "set combined with add is rejected",
+      "given": ["an input providing both set and add"],
+      "when": ["execute validates the input"],
+      "then": ["it throws a typed validation error before reading or writing persisted state"]
+    },
+    {
+      "requirement": "Mutual exclusivity and minimum operation",
+      "name": "clear combined with remove is rejected",
+      "given": ["an input providing both clear and remove"],
+      "when": ["execute validates the input"],
+      "then": ["it throws a typed validation error"]
+    },
+    {
+      "requirement": "Mutual exclusivity and minimum operation",
+      "name": "No operation provided is rejected",
+      "given": ["an input with none of add, remove, set, or clear provided"],
+      "when": ["execute is called"],
+      "then": ["it throws a typed validation error"]
+    },
+    {
+      "requirement": "Remove is applied before add",
+      "name": "A dependency present in both remove and add ends up present without duplication",
+      "given": ["a current persisted dependsOn of [\"core:a\", \"core:b\"]"],
+      "when": ["execute is called with remove: [\"core:a\"] and add: [\"core:a\", \"core:c\"]"],
+      "then": [
+        "removals are applied first, producing [\"core:b\"]",
+        "AND add is then applied idempotently, yielding [\"core:b\", \"core:a\", \"core:c\"] without duplication"
+      ]
+    },
+    {
+      "requirement": "Reading current persisted state",
+      "name": "originalHash from the read snapshot is used for optimistic concurrency",
+      "given": ["an existing persisted state with originalHash: \"h1\""],
+      "when": ["execute reads current state before mutating"],
+      "then": [
+        "the observed originalHash is captured for use as expectedRevision on the later write"
+      ]
+    },
+    {
+      "requirement": "Set and clear create missing persisted state",
+      "name": "set against a lock-less spec creates state with exactly the supplied list",
+      "given": ["a spec with no persisted state"],
+      "when": ["execute is called with set: [\"core:a\"]"],
+      "then": [
+        "persisted state is created with dependsOn: [\"core:a\"]",
+        "AND deterministic artifact-based dependency derivation is not invoked"
+      ]
+    },
+    {
+      "requirement": "Set and clear create missing persisted state",
+      "name": "clear against a lock-less spec creates state with an empty list",
+      "given": ["a spec with no persisted state"],
+      "when": ["execute is called with clear: true"],
+      "then": ["persisted state is created with dependsOn: []", "AND created is true"]
+    },
+    {
+      "requirement": "Non-empty add creates missing persisted state",
+      "name": "add against a lock-less spec derives an initial base before adding",
+      "given": [
+        "a spec with no persisted state and current canonical artifacts from which the effective schema can extract dependencies"
+      ],
+      "when": ["execute is called with add: [\"core:x\"]"],
+      "then": [
+        "resolveInitialPersistedDependsOn() is used to derive the initial base from current artifacts",
+        "AND core:x is added on top of that initial base"
+      ]
+    },
+    {
+      "requirement": "Non-empty add creates missing persisted state",
+      "name": "add against a lock-less spec falls back to an empty base when the schema cannot extract dependencies",
+      "given": [
+        "a spec with no persisted state whose effective schema cannot extract dependsOn from current artifacts"
+      ],
+      "when": ["execute is called with add: [\"core:x\"]"],
+      "then": ["the initial base is []", "AND the result is [\"core:x\"]"]
+    },
+    {
+      "requirement": "Remove and empty add against missing state are no-ops",
+      "name": "remove against a lock-less spec does not create state",
+      "given": ["a spec with no persisted state"],
+      "when": ["execute is called with remove: [\"core:a\"]"],
+      "then": [
+        "the result reflects dependsOn: [] and created: false",
+        "AND writePersistedState is never called"
+      ]
+    },
+    {
+      "requirement": "Remove and empty add against missing state are no-ops",
+      "name": "add whose resulting merge would be empty against missing state does not create state",
+      "given": ["a spec with no persisted state and a schema unable to extract dependencies"],
+      "when": ["execute is called with add: []"],
+      "then": [
+        "the result reflects dependsOn: [] and created: false",
+        "AND writePersistedState is never called"
+      ]
+    },
+    {
+      "requirement": "Applying the mutation through the shared patch helper",
+      "name": "Only dependsOn is included in the patch",
+      "given": ["an effective base and a resolved target dependsOn value"],
+      "when": ["execute applies the mutation"],
+      "then": [
+        "it calls applyPersistedSpecStatePatch() with a patch containing only the updated dependsOn",
+        "AND other fields of the base, such as schema, implementation, and optimizations, are carried through unchanged"
+      ]
+    },
+    {
+      "requirement": "Conditional write and concurrency",
+      "name": "Stale expectedRevision produces ArtifactConflictError without retry",
+      "given": [
+        "readPersistedState observed originalHash: \"h1\" but the persisted state was replaced by another writer before this write"
+      ],
+      "when": ["execute calls writePersistedState with expectedRevision: \"h1\""],
+      "then": [
+        "it propagates ArtifactConflictError",
+        "AND it does not retry or silently rebase the mutation onto the concurrent winner"
+      ]
+    },
+    {
+      "requirement": "Unknown spec fails with a typed error",
+      "name": "Unresolvable spec identity throws SpecNotFoundError",
+      "given": ["a specId that does not resolve to an existing spec artifact set"],
+      "when": ["execute is called"],
+      "then": ["it throws SpecNotFoundError"]
+    },
+    {
+      "requirement": "Result contract",
+      "name": "created is false when mutating existing persisted state",
+      "given": ["a spec with existing persisted state"],
+      "when": ["execute successfully applies add"],
+      "then": [
+        "the result's created field is false",
+        "AND dependsOn reflects the resulting list after the mutation"
+      ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveUpdatePersistedSpecDepsDeps",
+      "name": "Config-based factory resolves the initializePersistedSpecState collaborator",
+      "given": ["a SpecdConfig and no explicit deps"],
+      "when": ["createUpdatePersistedSpecDeps(config, options?) is called"],
+      "then": [
+        "UpdatePersistedSpecDepsDeps is derived through resolveUpdatePersistedSpecDepsDeps(resolver), including a repository per workspace and an initializePersistedSpecState collaborator",
+        "AND the factory does not reconstruct fs-shaped wiring inline"
+      ]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:2d0742a4ef476b5e012a54e443370d73f78ccc75ba2eec408ca22d83614b2065",
+    "verify.md": "sha256:e7dcb9421c0d6dd961071ea45974fb3cb67f63116e792a452a0d52779ec679a2"
+  },
+  "provenance": {
+    "artifacts": {
+      "spec.md": {
+        "hash": "sha256:2d0742a4ef476b5e012a54e443370d73f78ccc75ba2eec408ca22d83614b2065",
+        "lastModified": "2026-07-25T11:53:31.272Z"
+      },
+      "verify.md": {
+        "hash": "sha256:e7dcb9421c0d6dd961071ea45974fb3cb67f63116e792a452a0d52779ec679a2",
+        "lastModified": "2026-07-25T11:53:31.272Z"
+      }
+    },
+    "persistedStateHash": "sha256:284ea431c90b492635295b74602e72c40fbc00e9cf761a20aed7d04d1b57fdeb",
+    "schema": {
+      "name": "schema-std",
+      "version": 1
+    },
+    "projectionVersion": 1,
+    "projectionFingerprint": "sha256:e4a28a2db6a35ed39b8308518337235b1490c2948cd839db25866ad79b22404b"
+  }
+}

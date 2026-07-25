@@ -8,7 +8,18 @@ Metadata must be producible deterministically from spec content so that every pr
 
 ### Requirement: Input and output
 
-The use case takes a `specId` string (e.g. `'core/change'` or `'billing:invoices/create'`). It returns `{ metadata: SpecMetadata, hasExtraction: boolean }`. `metadata` contains the extracted fields plus content hashes and a `generatedBy` marker. `hasExtraction` indicates whether the active schema declares any `metadataExtraction` rules.
+The use case takes a `specId` string (e.g. `'core/change'` or
+`'billing:invoices/create'`). It returns `{ metadata: SpecMetadata,
+hasExtraction: boolean }`. `metadata` contains the extracted fields, content
+hashes, canonical `dependsOn`, and a `provenance` record capturing the exact
+artifact hashes/lastModified, `persistedStateHash`, schema identity, projection
+version, and projection fingerprint used to produce this result. `hasExtraction`
+indicates whether the active schema declares any `metadataExtraction` rules.
+
+The returned `provenance` MUST reflect the exact loaded artifact set and lock
+snapshot used during this call — not a subsequently re-read state — so that
+callers such as `MaterializeSpecMetadata` can reuse it without re-hashing
+artifact content.
 
 ### Requirement: Schema resolution
 
@@ -47,21 +58,72 @@ The use case may satisfy that normalization through repository-backed transform 
 
 ### Requirement: dependsOn resolution
 
-`GenerateSpecMetadata` MUST canonicalize `dependsOn` from persisted spec semantics before returning metadata.
+`GenerateSpecMetadata` MUST canonicalize `dependsOn` from persisted spec
+semantics before returning metadata.
 
 Resolution rules:
 
-1. Run schema extraction normally. If extraction yields `dependsOn`, treat that as the candidate extracted dependency set.
-2. Read the repository's persisted dependency state through `SpecRepository.readPersistedDependsOn(spec)`.
-3. If persisted dependency state exists, the returned `metadata.dependsOn` MUST use that persisted value.
-4. If persisted dependency state does not exist and extraction yields `dependsOn`, the returned `metadata.dependsOn` MAY use the extracted value.
-5. If both extraction and persisted state exist and they differ, metadata generation MUST fail explicitly instead of silently choosing one.
+1. Run schema extraction normally. If extraction yields `dependsOn`, treat that
+   as the candidate extracted dependency set.
+2. Read the repository's aggregate persisted state through
+   `SpecRepository.readPersistedState(spec)`.
+3. If persisted state exists, the returned `metadata.dependsOn` MUST use its
+   `dependsOn` value, regardless of what extraction yielded.
+4. If persisted state does not exist (a lock-less spec), the returned
+   `metadata.dependsOn` MUST be derived from the current canonical artifacts:
+   use the extracted value when extraction yields one, otherwise `[]`. This is a
+   live projection of current artifacts, not a cached or previously observed
+   value.
+5. If persisted state exists and its `dependsOn` differs from a non-empty
+   extracted value, metadata generation MUST fail explicitly instead of
+   silently choosing one.
 
-If `dependsOn` entries require normalization from artifact-local strings (for example relative spec links) to canonical spec IDs, that behavior must be declared through the schema's extractor transform model and executed during `extractMetadata()`.
+If `dependsOn` entries require normalization from artifact-local strings (for
+example relative spec links) to canonical spec IDs, that behavior must be
+declared through the schema's extractor transform model and executed during
+`extractMetadata()`.
 
-The use case supplies the origin context and repository-backed transform runtime needed by those registered transforms, awaits the transformed extraction output, and accepts that output as final before comparing it against persisted dependency state.
+The use case supplies the origin context and repository-backed transform
+runtime needed by those registered transforms, awaits the transformed
+extraction output, and accepts that output as final before comparing it against
+persisted state.
 
-If extraction finds dependency values but transform execution cannot normalize them, metadata generation fails explicitly. It does not silently drop those found values and continue with an incomplete `dependsOn` set.
+If extraction finds dependency values but transform execution cannot normalize
+them, metadata generation fails explicitly. It does not silently drop those
+found values and continue with an incomplete `dependsOn` set.
+
+### Requirement: One consistent lock snapshot or explicit absence
+
+`GenerateSpecMetadata` MUST read persisted state at most once per generation
+attempt and use that single observation — the complete
+`PersistedSpecStateSnapshot` or explicit absence (`null`) — consistently for
+`dependsOn`, `implementation`, `optimizations`, and
+`provenance.persistedStateHash`.
+
+When a hash is needed for `provenance.persistedStateHash` (or equivalent
+fingerprint inputs), it MUST obtain that hash via
+`SpecRepository.persistedStateMeta(spec, { includeHash: true })?.hash ?? null`
+(or from the same single observation's `originalHash` when that is already part
+of the read snapshot). It MUST NOT call a removed `persistedStateHash(spec)`
+method.
+
+It MUST NOT mix fields read from two different persisted-state observations
+within one generation attempt, and MUST NOT re-read persisted state partway
+through assembling the result.
+
+### Requirement: Fresh lock-owned optimizations only
+
+When the persisted state snapshot includes an `optimizations` block,
+`GenerateSpecMetadata` MUST include `optimizedDescription` and/or
+`optimizedContext` in the generated metadata only for fields whose persisted
+artifact and schema baseline is fresh against the artifacts and schema identity
+loaded during this same generation attempt.
+
+A stale or absent optimization field MUST be omitted from the generated
+metadata rather than included with a stale value or a placeholder.
+`GenerateSpecMetadata` MUST NOT regenerate, invalidate, or otherwise mutate
+persisted optimization state — it only decides whether to project an existing
+value.
 
 ### Requirement: Content hashes
 
@@ -74,7 +136,12 @@ The final metadata object merges:
 - all fields from `extractMetadata()` output
 - canonical `dependsOn` determined by the dependency-resolution rules above
 - implementation projection from persisted repository semantics
+- fresh lock-owned optimization fields, per Requirement: Fresh lock-owned
+  optimizations only
 - `contentHashes` from the hashing step
+- `provenance` — the exact artifact hashes/lastModified, `persistedStateHash`
+  (or `null` for a lock-less spec), schema identity, projection version, and
+  projection fingerprint used during this generation attempt
 - `generatedBy: 'core'`
 
 The result is returned with `hasExtraction: true`.
@@ -96,10 +163,19 @@ The helper is the only use-case-specific composition entry for config-based boot
 
 ## Constraints
 
-- No LLM involvement — extraction is purely deterministic via the schema's `metadataExtraction` engine
-- Delegates to async `extractMetadata()` domain service for all extraction logic — the use case orchestrates but does not implement extraction
-- Does not write to disk — writing is `SaveSpecMetadata`'s responsibility
+- No LLM involvement — extraction is purely deterministic via the schema's
+  `metadataExtraction` engine
+- Delegates to async `extractMetadata()` domain service for all extraction
+  logic — the use case orchestrates but does not implement extraction
+- `GenerateSpecMetadata` MUST NOT write to disk, mutate persisted state, or call
+  `SpecRepository.writeMetadataSnapshot()` / `writePersistedState()` under any
+  circumstance — persistence is exclusively `MaterializeSpecMetadata` and its
+  internal `PersistSpecMetadata` collaborator's responsibility
 - Content hashes only cover artifacts that were successfully loaded from disk
+- `GenerateSpecMetadata` never decides whether a persisted optimization is
+  fresh independently of the artifacts and schema loaded during the same call —
+  freshness for optimization projection uses only that same-call state, not a
+  separately re-read observation
 
 ## Spec Dependencies
 
@@ -109,3 +185,6 @@ The helper is the only use-case-specific composition entry for config-based boot
 - [`core:spec-id-format`](../spec-id-format/spec.md)
 - [`core:spec-repository-port`](../spec-repository-port/spec.md)
 - [`core:composition-resolver`](../composition-resolver/spec.md)
+- [`core:spec-optimization`](../spec-optimization/spec.md) — per-field
+  optimization record and freshness reasons used to decide which optimized
+  fields to project

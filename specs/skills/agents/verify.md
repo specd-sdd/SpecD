@@ -40,3 +40,32 @@
 
 - **WHEN** the `agents` capability is missing
 - **THEN** the agent definitions are still accessible to the orchestrator agent as files or skills
+
+### Requirement: Effective llmOptimizedContext gate
+
+#### Scenario: Optimization skipped when llmOptimizedContext is not true
+
+- **GIVEN** the effective project configuration has `llmOptimizedContext` set to `false` (or unset)
+- **WHEN** an optimizer agent runs against a spec with missing or stale optimization data
+- **THEN** the agent does not generate, persist, or write any optimized field, metadata document, or lock state
+- **AND** it exits without performing optimization
+
+#### Scenario: Optimization proceeds when llmOptimizedContext is true
+
+- **GIVEN** the effective project configuration has `llmOptimizedContext: true`
+- **WHEN** an optimizer agent runs against a spec with missing or stale optimization data
+- **THEN** the agent proceeds with generating and persisting the optimized content
+
+### Requirement: Persisted optimization writes replace metadata editors
+
+#### Scenario: Optimizer agent persists through specd spec optimizations set
+
+- **WHEN** an optimizer agent finishes generating optimized content for a spec
+- **THEN** it persists that content via `specd spec optimizations set`
+- **AND** it does not invoke a metadata-editing command such as `update-metadata` or `write-metadata`
+
+#### Scenario: Optimizer agent does not trigger metadata regeneration after persisting
+
+- **WHEN** an optimizer agent has persisted an optimization via `specd spec optimizations set`
+- **THEN** it does not invoke `specd spec generate-metadata`
+- **AND** normal consumers self-heal their own metadata projection on the next read

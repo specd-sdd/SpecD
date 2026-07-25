@@ -18,9 +18,11 @@ When `options.workspaces` is provided as a non-empty array of workspace names, o
 
 ### Requirement: Optional summary resolution
 
-When `options.includeSummary` is `true`, each result MUST include a `summary` field resolved using the same algorithm as `ListSpecs`: metadata `description` first, then `spec.md` extraction fallback.
+When `options.includeSummary` is `true`, each result MUST include a `summary` field resolved by calling `GetSpecMetadata.execute({ specId })` (default `'if-needed'` policy) and projecting its normalized `description`. `SearchSpecs` MUST NOT read a repository metadata snapshot or `spec.md` directly to resolve this field — materialization owns the deterministic-extraction fallback internally.
 
-When `options.includeSummary` is `false` or omitted, `summary` MUST NOT appear on any result.
+When materialization cannot produce a projection for a matched spec, that result's `summary` is omitted rather than failing the search.
+
+When `options.includeSummary` is `false` or omitted, `summary` MUST NOT appear on any result, and `SearchSpecs` MUST NOT materialize metadata for that result.
 
 ### Requirement: Result shape
 
@@ -51,8 +53,9 @@ The config-based `createSearchSpecs(config, options?)` form MUST derive `SearchS
 `resolveSearchSpecsDeps(resolver)` MUST resolve:
 
 - `listWorkspaces: ListWorkspaces`
-- `hasher: ContentHasher`
-- `yaml: YamlSerializer`
+- `getMetadata: GetSpecMetadata`
+
+It MUST NOT resolve `hasher: ContentHasher` or `yaml: YamlSerializer` — normalized result fields are obtained through metadata materialization, not through direct repository snapshot reads.
 
 The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
 
@@ -67,4 +70,5 @@ The helper is the only use-case-specific composition entry for config-based boot
 - [`core:list-specs`](../list-specs/spec.md)
 - [`core:workspace`](../workspace/spec.md)
 - [`core:list-workspaces`](../list-workspaces/spec.md)
+- [`core:get-spec-metadata`](../get-spec-metadata/spec.md) — self-healing resolution of normalized result fields
 - [`core:composition-resolver`](../composition-resolver/spec.md)

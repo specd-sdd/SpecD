@@ -1,0 +1,17 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "cli:entrypoint",
+    "core:get-persisted-spec-optimizations",
+    "core:update-persisted-spec-optimizations"
+  ],
+  "implementation": [
+    {
+      "file": "cli:src/commands/spec/optimizations.ts",
+      "symbols": ["registerSpecOptimizations"]
+    }
+  ]
+}

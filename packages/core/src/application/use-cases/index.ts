@@ -25,16 +25,6 @@ export {
 } from './search-specs.js'
 export { type GetSpec, type GetSpecInput, type GetSpecResult } from './get-spec.js'
 export {
-  type SaveSpecMetadata,
-  type SaveSpecMetadataInput,
-  type SaveSpecMetadataResult,
-} from './save-spec-metadata.js'
-export {
-  type InvalidateSpecMetadata,
-  type InvalidateSpecMetadataInput,
-  type InvalidateSpecMetadataResult,
-} from './invalidate-spec-metadata.js'
-export {
   type GetActiveSchema,
   type GetActiveSchemaInput,
   type GetActiveSchemaOptions,
@@ -151,6 +141,73 @@ export {
   type GenerateSpecMetadataResult,
 } from './generate-spec-metadata.js'
 export {
+  type MaterializeSpecMetadata,
+  type MaterializeSpecMetadataInput,
+  type MaterializeSpecMetadataResult,
+  type SpecMetadataGenerationWarning,
+} from './materialize-spec-metadata.js'
+export {
+  type GetSpecMetadata,
+  type GetSpecMetadataInput,
+  type GetSpecMetadataResult,
+} from './get-spec-metadata.js'
+export {
+  type RegenerateSpecMetadata,
+  type RegenerateSpecMetadataInput,
+  type RegenerateSpecMetadataResult,
+  type RegenerateSpecMetadataTarget,
+  type RegenerateSpecMetadataSpecResult,
+} from './regenerate-spec-metadata.js'
+export {
+  type InitializePersistedSpecState,
+  type InitializePersistedSpecStateInput,
+  type InitializePersistedSpecStateResult,
+  type InitializePersistedSpecStateTarget,
+  type InitializePersistedSpecStateSpecResult,
+  type InitializePersistedSpecStateFailure,
+} from './initialize-persisted-spec-state.js'
+export {
+  type GetPersistedSpecDeps,
+  type GetPersistedSpecDepsInput,
+  type GetPersistedSpecDepsResult,
+} from './get-persisted-spec-deps.js'
+export {
+  type UpdatePersistedSpecDeps,
+  type UpdatePersistedSpecDepsInput,
+  type UpdatePersistedSpecDepsResult,
+} from './update-persisted-spec-deps.js'
+export {
+  type GetPersistedSpecImplementation,
+  type GetPersistedSpecImplementationInput,
+  type GetPersistedSpecImplementationResult,
+} from './get-persisted-spec-implementation.js'
+export {
+  type UpdatePersistedSpecImplementation,
+  type UpdatePersistedSpecImplementationInput,
+  type UpdatePersistedSpecImplementationResult,
+} from './update-persisted-spec-implementation.js'
+export {
+  type GetPersistedSpecOptimizations,
+  type GetPersistedSpecOptimizationsInput,
+  type GetPersistedSpecOptimizationsResult,
+} from './get-persisted-spec-optimizations.js'
+export {
+  type UpdatePersistedSpecOptimizations,
+  type UpdatePersistedSpecOptimizationsInput,
+  type UpdatePersistedSpecOptimizationsResult,
+  type PersistedOptimizationFieldName,
+} from './update-persisted-spec-optimizations.js'
+export {
+  type GetPersistedSpecSchema,
+  type GetPersistedSpecSchemaInput,
+  type GetPersistedSpecSchemaResult,
+} from './get-persisted-spec-schema.js'
+export {
+  type UpdatePersistedSpecSchema,
+  type UpdatePersistedSpecSchemaInput,
+  type UpdatePersistedSpecSchemaResult,
+} from './update-persisted-spec-schema.js'
+export {
   type GetSpecContext,
   type GetSpecContextInput,
   type GetSpecContextResult,
@@ -205,11 +262,6 @@ export {
   type GetSpecOutlineInput,
   type SpecOutlineResult,
 } from './get-spec-outline.js'
-export {
-  type UpdateSpecMetadata,
-  type UpdateSpecMetadataInput,
-  type UpdateSpecMetadataResult,
-} from './update-spec-metadata.js'
 export { type GetProjectMetadata, type GetProjectMetadataResult } from './get-project-metadata.js'
 export {
   type UpdateProjectMetadata,

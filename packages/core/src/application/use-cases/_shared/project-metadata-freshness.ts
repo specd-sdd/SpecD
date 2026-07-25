@@ -3,8 +3,7 @@ import {
   projectMetadataSchema,
   type ProjectMetadata,
 } from '../../../domain/services/project-metadata.js'
-import { Spec, ABSENT_SPEC_SIDECAR } from '../../../domain/entities/spec.js'
-import { SpecPath } from '../../../domain/value-objects/spec-path.js'
+import { type GetSpecMetadata } from '../get-spec-metadata.js'
 import { type CompileContextConfig } from '../compile-context.js'
 import { type ContentHasher } from '../../ports/content-hasher.js'
 import { type FileReader } from '../../ports/file-reader.js'
@@ -31,6 +30,7 @@ export interface ProjectMetadataFreshnessResult {
  * @param files - File reader for reading config and metadata
  * @param hasher - Content hasher for verifying hashes
  * @param workspaceMap - Map of project workspaces
+ * @param getMetadata - Metadata materialization use case
  * @returns Freshness result with metadata and warnings
  */
 export async function checkProjectMetadataFreshness(
@@ -38,6 +38,7 @@ export async function checkProjectMetadataFreshness(
   files: FileReader,
   hasher: ContentHasher,
   workspaceMap: Map<string, ProjectWorkspace>,
+  getMetadata: GetSpecMetadata,
 ): Promise<ProjectMetadataFreshnessResult> {
   if (!config.llmOptimizedContext || !config.configPath || !config.projectRoot) {
     return { metadata: null, isFresh: false, warnings: [] }
@@ -158,29 +159,8 @@ export async function checkProjectMetadataFreshness(
           ],
         }
       }
-      const metadata = await repo.metadata(
-        new Spec(
-          spec.workspace,
-          SpecPath.parse(spec.capPath),
-          [],
-          ABSENT_SPEC_SIDECAR,
-          ABSENT_SPEC_SIDECAR,
-        ),
-      )
-      if (!metadata?.contentHashes) {
-        return {
-          metadata: projectMeta,
-          isFresh: false,
-          warnings: [
-            {
-              type: 'stale-optimization',
-              message: `Project-level optimized context is stale (spec '${specInput.id}' metadata missing). Launch specd-project-context-optimizer agent to regenerate.`,
-            },
-          ],
-        }
-      }
-      const combinedHash = Object.values(metadata.contentHashes).sort().join(',')
-      if (hasher.hash(combinedHash) !== specInput.hash) {
+      const metadata = await getMetadata.execute({ specId: specInput.id }).catch(() => null)
+      if (metadata === null || metadata.metadataFingerprint !== specInput.hash) {
         return {
           metadata: projectMeta,
           isFresh: false,

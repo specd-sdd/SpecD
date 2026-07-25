@@ -55,27 +55,27 @@ When `input.followDeps` is `true`, the use case MUST traverse `dependsOn` links 
 
 Traversal resolves dependencies in this order:
 
-1. canonical `metadata.json.dependsOn` when persisted metadata is available
-2. the schema's `metadataExtraction.dependsOn` declarations as a fallback when metadata is absent
-
-If metadata exists but is stale, the use case MAY still traverse using the persisted canonical `dependsOn` projection, but it MUST emit a `stale-metadata` warning. The use case MUST NOT treat stale metadata as though it were missing.
+1. the canonical `dependsOn` projection returned by `GetSpecMetadata.execute({ specId })` (default `'if-needed'` policy) — self-healing, so a missing or drifted cache is regenerated rather than treated as a frozen snapshot
+2. the schema's `metadataExtraction.dependsOn` declarations as a fallback only when materialization cannot produce a projection at all
 
 That fallback extraction MUST use the same shared extractor-transform registry and caller-owned origin context bag used by the other metadata-extraction consumers. Newly discovered specs MUST be added to the included set. Traversal MUST respect `input.depth` when provided.
 
 If fallback extraction finds dependency values but transform execution cannot normalize them, the use case MUST fail explicitly rather than silently treating those dependencies as absent.
 
-The use case MUST NOT read `spec-lock.json` as a generic spec artifact to discover dependencies; persisted sidecars are consumed through the canonical metadata projection.
+The use case MUST NOT read `spec-lock.json` as a generic spec artifact to discover dependencies; persisted sidecars are consumed only through `GetSpecMetadata`'s normalized projection.
 
 ### Requirement: Renders spec content from metadata when fresh
 
-For each included spec, if `.specd-metadata.yaml` exists and its content hashes match the current artifacts (verified via `ContentHasher`), the use case MUST render from the parsed metadata according to `config.contextMode`.
+For each included spec, the use case MUST first classify the entry's display mode from `config.contextMode`. It MUST call `GetSpecMetadata.execute({ specId })` only when that mode actually needs structured metadata-derived content (summary fields or full section content). List-mode entries MUST NOT trigger materialization.
 
-- In `list` mode, render no title, description, or content.
-- In `summary` mode, render title and description only.
-- In `full` mode, render description, rules, constraints, and scenarios as applicable. **If no `sections` filter is active (input is absent or empty), it MUST default to rendering Description + Rules + Constraints.** If a `sections` filter is provided, it overrides this default.
+- In `list` mode, emit list entries with no title, description, or content, and do not call `GetSpecMetadata`.
+- In `summary` mode, obtain metadata via `GetSpecMetadata` and render title and description only.
+- In `full` mode, obtain metadata via `GetSpecMetadata` and render description, rules, constraints, and scenarios as applicable. **If no `sections` filter is active (input is absent or empty), it MUST default to rendering Description + Rules + Constraints.** If a `sections` filter is provided, it overrides this default.
 - In `hybrid` mode, render the same output as `full` because project context has no change-scoped tier.
 
 Section filters MUST NOT affect list-mode or summary-mode entries.
+
+Any `metadata-cache-write-failed` or generation warning returned by `GetSpecMetadata` MUST be forwarded into the result's `warnings` array without being logged again.
 
 #### Scenario: Default sections in full mode
 
@@ -83,11 +83,11 @@ When a spec is rendered in `full` mode (including `hybrid` mode which resolves t
 
 ### Requirement: Falls back to extraction when metadata is stale or absent
 
-When metadata is stale or absent, the use case MUST:
+When `GetSpecMetadata.execute({ specId })` cannot produce a valid in-memory projection at all, the use case MUST:
 
-1. Emit a `stale-metadata` warning identifying the spec.
+1. Emit a `missing-metadata` warning identifying the spec.
 2. Attempt live extraction using the schema's `metadataExtraction` engine, the shared extractor-transform registry, and caller-owned origin context for each artifact.
-3. If extraction yields content, render it with the same section filtering as fresh metadata.
+3. If extraction yields content, render it with the same section filtering as a materialized projection.
 4. If the schema has no `metadataExtraction` declarations, render an empty spec heading.
 
 If extraction finds values for transformed fields but transform execution cannot normalize them, the use case MUST fail explicitly instead of silently omitting those found values from the rendered fallback content.
@@ -99,8 +99,8 @@ If extraction finds values for transformed fields but transform execution cannot
 - `listWorkspaces` (`ListWorkspaces`) — project orchestrator providing access to configured workspaces
 - `schemaProvider` (`SchemaProvider`) — lazy, caching provider for the fully-resolved schema
 - `files` (`FileReader`) — for reading context entry files from disk
-- `parsers` (`ArtifactParserRegistry`) — for parsing spec artifacts when metadata is stale
-- `hasher` (`ContentHasher`) — for comparing content hashes against metadata
+- `getMetadata` (`GetSpecMetadata`) — self-healing metadata read used for spec title/description/section content instead of direct content-hash freshness checks
+- `parsers` (`ArtifactParserRegistry`) — for the schema `metadataExtraction` fallback used only when materialization cannot produce a projection at all
 - `defaultConfig` (`CompileContextConfig`) — yaml-derived project context configuration snapshot baked at kernel composition time
 
 All dependencies are injected at construction time. The schema is resolved lazily on first access.
@@ -109,17 +109,13 @@ At the start of `execute`, `GetProjectContext` MUST build the effective `Compile
 
 ### Requirement: Project context optimization and invalidation
 
-When `llmOptimizedContext` is enabled, the system MUST prefer using the cached optimized project context from `project-metadata.json` if it is fresh.
+When `llmOptimizedContext` is enabled, the system MUST prefer using the cached optimized project context from [`core:project-metadata`](../project-metadata/spec.md) if it is fresh.
 
 When `llmOptimizedContext` is disabled, the use case MUST NOT return the cached optimized project context as the primary response, even if the cache is fresh. In that case it MUST continue with the standard compilation flow.
 
-The system SHALL verify the freshness of the cached context by comparing the stored hashes in `freshness` against the current state of:
+Freshness of the cached optimized project context is derived from semantic metadata fingerprints — `specd.yaml`, referenced `contextFiles`, and the materialized metadata fingerprint of every included spec — rather than from raw cache-file hashes or repository revisions, per [`core:project-metadata`](../project-metadata/spec.md).
 
-- `specd.yaml`
-- Referenced `contextFiles`
-- Metadata of included specs
-
-If all hashes match and `optimized.context` exists and is not empty, the use case SHALL use the optimized context only when optimization is enabled. Otherwise, the system MUST emit a warning and fall back to the standard compilation process.
+If the cache is fresh and `optimized.context` exists and is not empty, the use case SHALL use the optimized context only when optimization is enabled. Otherwise, the system MUST emit a warning and fall back to the standard compilation process.
 
 The warning message MUST include remediation instructions: "Launch specd-project-context-optimizer agent to generate it".
 
@@ -132,6 +128,7 @@ The config-based `createGetProjectContext(config, options?)` form MUST derive `G
 - `listWorkspaces: ListWorkspaces`
 - `schemaProvider: SchemaProvider`
 - `files: FileReader`
+- `getMetadata: GetSpecMetadata`
 - `parsers: ArtifactParserRegistry`
 - `hasher: ContentHasher`
 - `extractorTransforms: ExtractorTransformRegistry`
@@ -157,5 +154,7 @@ The helper is the only use-case-specific composition entry for config-based boot
 - [`core:spec-metadata`](../spec-metadata/spec.md)
 - [`core:schema-format`](../schema-format/spec.md)
 - [`default:_global/architecture`](../../_global/architecture/spec.md)
-- [`core:core/project-metadata`](../core/project-metadata/spec.md)
+- [`core:project-metadata`](../project-metadata/spec.md)
+- [`core:get-spec-metadata`](../get-spec-metadata/spec.md) — self-healing metadata read (`if-needed`) replacing direct freshness checks
+- [`core:spec-optimization`](../spec-optimization/spec.md) — per-field optimization freshness for included specs
 - [`core:composition-resolver`](../composition-resolver/spec.md)

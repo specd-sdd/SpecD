@@ -180,7 +180,7 @@ specs:
     type: fs
     config:
       path: specs/
-      metadataPath: .specd/metadata # optional
+      metadataPath: .specd/metadata # optional; gitignored at /.specd/metadata/ by project init
 ```
 
 _Note: A legacy string format is supported for backward compatibility (e.g. `adapter: fs` with a sibling `fs:` block), but it is deprecated and will be removed in future versions (emitting warnings at startup)._

@@ -1,6 +1,7 @@
 import { type ContentHasher } from '../../application/ports/content-hasher.js'
 import { type YamlSerializer } from '../../application/ports/yaml-serializer.js'
 import { SearchSpecs } from '../../application/use-cases/search-specs.js'
+import { type GetSpecMetadata } from '../../application/use-cases/get-spec-metadata.js'
 import { type ListWorkspaces } from '../../application/use-cases/list-workspaces.js'
 import { type SpecdConfig } from '../../application/specd-config.js'
 import {
@@ -9,6 +10,7 @@ import {
   type CompositionResolutionOptions,
 } from '../composition-resolver.js'
 import { normalizeCompositionFactoryArgs, type FactoryInput } from '../normalize-factory-args.js'
+import { createGetSpecMetadata, resolveGetSpecMetadataDeps } from './get-spec-metadata.js'
 
 /**
  * Explicit dependencies for {@link createSearchSpecs}.
@@ -20,6 +22,8 @@ export interface SearchSpecsDeps {
   readonly hasher: ContentHasher
   /** YAML serializer used for metadata parsing. */
   readonly yaml: YamlSerializer
+  /** Metadata materialization use case. */
+  readonly getMetadata: GetSpecMetadata
 }
 
 /**
@@ -33,6 +37,7 @@ export function resolveSearchSpecsDeps(resolver: CompositionResolver): SearchSpe
     listWorkspaces: resolver.getListWorkspaces(),
     hasher: resolver.getContentHasher(),
     yaml: resolver.getYamlSerializer(),
+    getMetadata: createGetSpecMetadata(resolveGetSpecMetadataDeps(resolver)),
   }
 }
 
@@ -84,7 +89,12 @@ function createSearchSpecsFromNormalized(
   input: FactoryInput<SearchSpecsDeps, CompositionResolutionOptions>,
 ): SearchSpecs {
   if (input.kind === 'deps') {
-    return new SearchSpecs(input.deps.listWorkspaces, input.deps.hasher, input.deps.yaml)
+    return new SearchSpecs(
+      input.deps.listWorkspaces,
+      input.deps.hasher,
+      input.deps.yaml,
+      input.deps.getMetadata,
+    )
   }
   const resolver = createCompositionResolver(input.config, input.options)
   return createSearchSpecs(resolveSearchSpecsDeps(resolver))
@@ -97,5 +107,5 @@ function createSearchSpecsFromNormalized(
  * @returns `true` when the input is explicit deps
  */
 function isSearchSpecsDeps(value: SearchSpecsDeps | SpecdConfig): value is SearchSpecsDeps {
-  return 'listWorkspaces' in value && 'hasher' in value && 'yaml' in value
+  return 'listWorkspaces' in value && 'hasher' in value && 'yaml' in value && 'getMetadata' in value
 }

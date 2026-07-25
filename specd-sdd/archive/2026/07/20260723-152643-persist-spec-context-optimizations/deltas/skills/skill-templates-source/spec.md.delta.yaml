@@ -1,0 +1,36 @@
+- op: added
+  description: Workflow templates must stop scanning for metadata status or scheduling routine manual regeneration now that metadata self-heals.
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Implementation tracking instructions in templates$'
+  content: |
+    ### Requirement: Metadata self-healing guidance in workflow templates
+
+    Archive-oriented, commit-oriented, and other metadata-oriented workflow skill templates MUST NOT instruct agents to scan for metadata-status values (`stale`, `missing`, `invalid`) or to run routine manual metadata regeneration as a normal workflow step. Templates MUST describe metadata as a self-healing materialized cache: normal consumers obtain a usable, current projection automatically, and `specd spec generate-metadata` MUST be presented only as an explicit forced-rebuild, cache-warming, repair, or diagnostic tool — never as a required step after a routine spec or lock change.
+
+- op: added
+  description: Optimizer agent templates must declare the llmOptimizedContext gate and drop the post-write metadata-generation instruction.
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Metadata self-healing guidance in workflow templates$'
+  content: |
+    ### Requirement: Optimizer agent gating declared in templates
+
+    The `specd-project-context-optimizer` and `specd-spec-context-optimizer` agent templates MUST declare that they perform no optimization work — no generation, no persistence — unless the effective `llmOptimizedContext` project setting is `true`. Both templates MUST direct persistence through the lock-owned persisted-optimization commands (`cli:spec-optimizations`), and neither template MUST instruct invoking spec metadata generation after persisting an optimization.
+
+- op: modified
+  description: Depend on the persisted-optimizations command family referenced by the new template guidance.
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`skills:skill`](../skill/spec.md) — base skill type
+    - [`cli:spec-optimizations`](../../cli/spec-optimizations/spec.md) — the command optimizer-agent templates must direct persistence through

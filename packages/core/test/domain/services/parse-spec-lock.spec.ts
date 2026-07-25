@@ -54,4 +54,37 @@ describe('specLockSchema', () => {
 
     expect(result.success).toBe(false)
   })
+
+  it('parses locks without optimizations (backward compatible)', () => {
+    const result = parseSpecLock(
+      JSON.stringify({
+        schema: { name: 'schema-std', version: 1 },
+        dependsOn: ['core:storage'],
+      }),
+    )
+
+    expect(result.optimizations).toBeUndefined()
+  })
+
+  it('parses locks with optimizations', () => {
+    const hash = 'sha256:' + 'b'.repeat(64)
+    const result = parseSpecLock(
+      JSON.stringify({
+        schema: { name: 'schema-std', version: 1 },
+        dependsOn: [],
+        implementation: [],
+        optimizations: {
+          optimizedDescription: {
+            value: 'short',
+            schema: { name: 'schema-std', version: 1 },
+            artifactState: {
+              'spec.md': { hash, lastModified: '2026-01-01T00:00:00.000Z' },
+            },
+          },
+        },
+      }),
+    )
+
+    expect(result.optimizations?.optimizedDescription?.value).toBe('short')
+  })
 })

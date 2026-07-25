@@ -8,7 +8,7 @@ AI agents entering a lifecycle step need relevant spec content and project conte
 
 ### Requirement: Ports and constructor
 
-`CompileContext` receives at construction time: `ChangeRepository`, `ListWorkspaces`, `SchemaProvider`, `FileReader`, `ArtifactParserRegistry`, `ContentHasher`, `PreviewSpec`, and a yaml-derived `CompileContextConfig` default snapshot.
+`CompileContext` receives at construction time: `ChangeRepository`, `ListWorkspaces`, `SchemaProvider`, `FileReader`, `ArtifactParserRegistry`, `ContentHasher`, `PreviewSpec`, `GetSpecMetadata`, and a yaml-derived `CompileContextConfig` default snapshot.
 
 ```typescript
 class CompileContext {
@@ -20,6 +20,7 @@ class CompileContext {
     parsers: ArtifactParserRegistry,
     hasher: ContentHasher,
     previewSpec: PreviewSpec,
+    getMetadata: GetSpecMetadata,
     defaultConfig: CompileContextConfig,
   )
 }
@@ -29,9 +30,9 @@ The `defaultConfig` value MUST be produced from the resolved `SpecdConfig` at ke
 
 `SchemaProvider` is a lazy, caching port that returns the fully-resolved schema (with plugins and overrides applied). It replaces the previous `SchemaRegistry` + `schemaRef` + `workspaceSchemasPaths` triple. All are injected at kernel composition time, not passed per invocation.
 
-`PreviewSpec` is the use case `CompileContext` delegates to when it needs a materialized merged view of a spec with validated deltas applied. `ContentHasher` is used for metadata freshness checks and context fingerprint inputs.
+`PreviewSpec` is the use case `CompileContext` delegates to when it needs a materialized merged view of a spec with validated deltas applied. `ContentHasher` is used for context fingerprint inputs. `GetSpecMetadata` is the use case `CompileContext` delegates to whenever it needs usable normalized or optimized content for a spec that is actually included in the compiled context — it replaces direct `SpecRepository.metadata()` freshness checks with the shared self-healing materialization contract (`policy: 'if-needed'`).
 
-`CompileContext` MUST NOT accept `LifecycleEngine` or `ImplementationDetector`, evaluate lifecycle availability, or invoke implementation autodetection.
+`CompileContext` MUST NOT accept `LifecycleEngine` or `ImplementationDetector`, evaluate lifecycle availability, or invoke implementation autodetection. It MUST NOT call `SpecRepository.readMetadataSnapshot()` directly — that method is reserved for materialization and diagnostics.
 
 ### Requirement: Input
 
@@ -140,8 +141,8 @@ Display-mode classification MUST happen after the full collection pipeline (step
 For each spec in Step 5, `dependsOn` is resolved using a three-tier fallback:
 
 1. `change.specDependsOn[specId]` — per-spec dependencies declared in the change manifest (highest priority)
-2. Metadata `dependsOn` field — the canonical normalized dependency projection loaded via `SpecRepository.metadata()`, whether fresh or stale
-3. Schema `metadataExtraction.dependsOn` engine — extracts `dependsOn` from spec content only when metadata is absent and the schema declares dependency extraction, using the shared extractor-transform registry and caller-owned origin context bag
+2. The canonical normalized dependency projection obtained by calling `GetSpecMetadata.execute({ specId })` — self-healing, so a missing or stale cache is regenerated rather than treated as a frozen stale snapshot
+3. Schema `metadataExtraction.dependsOn` engine — extracts `dependsOn` from spec content only when materialization cannot produce a projection at all and the schema declares dependency extraction, using the shared extractor-transform registry and caller-owned origin context bag
 
 The first tier that returns a non-empty result is used. If all tiers return empty, the spec is treated as having no dependencies.
 
@@ -153,14 +154,17 @@ A detected cycle is an internal traversal condition, not a user-facing warning. 
 
 ### Requirement: Staleness detection and content fallback
 
-Whenever `CompileContext` needs structured metadata-derived content for a spec — summary fields (`title`, `description`) or section-filtered full content (`rules`, `constraints`, `scenarios`) — it must check whether the spec's metadata exists (via `SpecRepository.metadata()`) and whether its `contentHashes` are fresh (all required artifact file hashes match the recorded values).
+Whenever `CompileContext` needs structured metadata-derived content for a spec that is actually included in the compiled context — summary fields (`title`, `description`) or section-filtered full content (`rules`, `constraints`, `scenarios`) — it MUST obtain that content by calling `GetSpecMetadata.execute({ specId })` with the default `'if-needed'` policy rather than reading `SpecRepository.metadata()` and reasoning about freshness itself.
 
-- **Fresh metadata** — use the structured content from metadata (`rules`, `constraints`, `scenarios`, `description`).
-- **Stale or absent metadata** — fall back to live extraction from the spec's artifact files using the schema's `metadataExtraction` declarations, the shared extractor-transform registry, and caller-owned origin context for each artifact. Emit a warning identifying the spec path so the caller knows metadata should be regenerated.
+`CompileContext` only materializes specs it actually renders (it MUST NOT eagerly materialize every collected spec before display-mode classification narrows the set).
 
-For specs in `change.specIds`, when `CompileContext` is rendering section-filtered full content and merged preview artifacts are available from `PreviewSpec`, the same metadata/extraction flow MUST operate over the merged artifact set rather than over the base spec files. This keeps merged previews and non-merged specs on the same rendering path for `sections`.
+- When materialization returns `source: 'persisted'` with `regenerated: false`, `CompileContext` uses the returned structured content directly.
+- When materialization regenerates the projection (`regenerated: true`) or falls back after a source-conflict retry, `CompileContext` still uses the returned in-memory projection — it is a valid, current projection by construction — but forwards any `metadata-cache-write-failed` or generation warning returned by `GetSpecMetadata` into its own `warnings` array without logging it again.
+- When materialization cannot produce a valid projection at all (e.g. the schema has no `metadataExtraction` declarations and generation yields nothing), `CompileContext` emits a `missing-metadata` warning identifying the spec path and renders an empty/minimal entry for that spec rather than throwing.
 
-When `sections` is absent, full-mode spec content is rendered from ordered spec-scoped artifact files rather than from metadata sections. In that case metadata freshness does not control the full-content body, though metadata may still supply summary fields.
+For specs in `change.specIds`, when `CompileContext` is rendering section-filtered full content and merged preview artifacts are available from `PreviewSpec`, the same materialization flow MUST operate over the merged artifact set rather than over the base spec files — `GetSpecMetadata` delegates to `MaterializeSpecMetadata`, which accepts the caller-provided merged content for this case so merged previews and non-merged specs stay on the same rendering path for `sections`.
+
+When `sections` is absent, full-mode spec content is rendered from ordered spec-scoped artifact files rather than from metadata sections. In that case metadata materialization is not required to render the full-content body, though a materialized projection may still supply summary fields.
 
 ### Requirement: Structured result assembly
 
@@ -219,7 +223,7 @@ If `llmOptimizedContext: true` is active in the project configuration, the conte
 
 ### Requirement: Optimization warning signal
 
-When `llmOptimizedContext` is enabled, the system MUST emit a `stale-optimization` warning for each spec that is missing fresh optimized context.
+When `llmOptimizedContext` is enabled, the system MUST emit a `stale-optimization` warning for each spec whose materialized metadata reports a missing or stale `optimizedContext` field, per the per-field freshness recorded on the spec's lock-owned optimization state.
 
 The warning message MUST include remediation instructions: "Launch specd-spec-context-optimizer agent to refresh".
 
@@ -236,6 +240,7 @@ The config-based `createCompileContext(config, options?)` form MUST derive `Comp
 - `parsers: ArtifactParserRegistry`
 - `hasher: ContentHasher`
 - `previewSpec: PreviewSpec`
+- `getMetadata: GetSpecMetadata`
 - `extractorTransforms: ExtractorTransformRegistry`
 - `workspaceRoutes: readonly SpecWorkspaceRoute[]`
 - `defaultConfig: CompileContextConfig`
@@ -309,5 +314,7 @@ const result = await compileContext.execute({
 - [`core:get-hook-instructions`](../get-hook-instructions/spec.md)
 - [`core:preview-spec`](../preview-spec/spec.md)
 - [`core:refresh-implementation-tracking`](../refresh-implementation-tracking/spec.md)
-- [`core:core/project-metadata`](../core/project-metadata/spec.md)
+- [`core:project-metadata`](../project-metadata/spec.md)
+- [`core:get-spec-metadata`](../get-spec-metadata/spec.md) — self-healing metadata read (`if-needed`) used instead of direct repository freshness checks
+- [`core:spec-optimization`](../spec-optimization/spec.md) — per-field optimization freshness backing the stale-optimization warning
 - [`core:composition-resolver`](../composition-resolver/spec.md)

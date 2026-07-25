@@ -11,9 +11,5 @@
     "cli:spec-search",
     "core:list-workspaces"
   ],
-  "implementation": [
-    {
-      "file": "cli:src/commands/spec/list.ts"
-    }
-  ]
+  "implementation": []
 }

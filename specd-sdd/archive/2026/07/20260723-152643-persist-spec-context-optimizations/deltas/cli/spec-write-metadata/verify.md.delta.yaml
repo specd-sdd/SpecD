@@ -1,0 +1,83 @@
+- op: modified
+  description: Replace the content-source scenarios with removal assertions now that the command no longer exists.
+  selector:
+    type: section
+    matches: '^Requirement: Content source$'
+  rename: 'Requirement: spec write-metadata is removed'
+  content: |
+    #### Scenario: write-metadata command is not registered
+
+    - **WHEN** the CLI `spec` parent command's subcommands are inspected
+    - **THEN** no `write-metadata` command, or any alias of it, is registered
+
+    #### Scenario: No command accepts arbitrary metadata content
+
+    - **WHEN** any `spec` subcommand is inspected for stdin, `--file`, or `--input` handling
+    - **THEN** none accepts arbitrary metadata content through those channels
+
+    #### Scenario: Agents persist optimized fields through spec optimizations set
+
+    - **GIVEN** an agent needs to persist an LLM-optimized description or context
+    - **WHEN** the agent looks for a supported CLI command
+    - **THEN** it uses `specd spec optimizations set`
+    - **AND** `specd spec write-metadata` is not available
+
+- op: removed
+  description: Remove the command-signature scenarios — they describe flags on the removed command.
+  selector:
+    type: section
+    matches: '^Requirement: Command signature$'
+
+- op: removed
+  description: Remove the JSON-validation scenario.
+  selector:
+    type: section
+    matches: '^Requirement: JSON validation$'
+
+- op: removed
+  description: Remove the invalid-JSON error scenario.
+  selector:
+    type: section
+    matches: '^Requirement: Error — invalid JSON$'
+
+- op: removed
+  description: Remove the invalid-YAML error scenario.
+  selector:
+    type: section
+    matches: '^Requirement: Error — invalid YAML$'
+
+- op: removed
+  description: Remove the text-output scenario.
+  selector:
+    type: section
+    matches: '^Requirement: Text output$'
+
+- op: removed
+  description: Remove the JSON-output scenario.
+  selector:
+    type: section
+    matches: '^Requirement: JSON output$'
+
+- op: removed
+  description: Remove the invalid-metadata-structure error scenario.
+  selector:
+    type: section
+    matches: '^Requirement: Error — invalid metadata structure$'
+
+- op: removed
+  description: Remove the spec-not-found error scenario.
+  selector:
+    type: section
+    matches: '^Requirement: Error — spec not found$'
+
+- op: removed
+  description: Remove the conflict-detected error scenarios.
+  selector:
+    type: section
+    matches: '^Requirement: Error — conflict detected$'
+
+- op: removed
+  description: Remove the dependsOn-overwrite error scenarios.
+  selector:
+    type: section
+    matches: '^Requirement: Error — dependsOn overwrite$'

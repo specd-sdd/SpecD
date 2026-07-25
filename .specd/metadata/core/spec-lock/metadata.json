@@ -1,9 +1,9 @@
 {
   "title": "core:spec-lock",
-  "description": "Archived specs need a durable sidecar that preserves spec identity, persisted dependencies, and implementation traceability independently of metadata regeneration or graph re-indexing. `spec-lock.json` is that sidecar: the canonical archived record for spec schema identity and implementation links.",
+  "description": "Archived specs need a durable sidecar that preserves spec identity, persisted\ndependencies, implementation traceability, and per-field LLM optimization state\nindependently of metadata regeneration or graph re-indexing. `spec-lock.json` is\nthat sidecar: the canonical persisted record for spec schema identity,\ndependencies, implementation links, and optional optimization baselines.\n\nA spec's canonical artifacts MAY exist before this sidecar does. Persisted state\ncomes into being deliberately — through archive publication, an explicit\none-time initialization/adoption operation, or an explicit persisted-state\nmutation — never as an incidental guess constructed from a stale cache.",
   "dependsOn": ["core:spec-id-format", "core:storage"],
   "context": [
-    "Archived specs need a durable sidecar that preserves spec identity, persisted dependencies, and implementation traceability independently of metadata regeneration or graph re-indexing. `spec-lock.json` is that sidecar: the canonical archived record for spec schema identity and implementation links."
+    "Archived specs need a durable sidecar that preserves spec identity, persisted\ndependencies, implementation traceability, and per-field LLM optimization state\nindependently of metadata regeneration or graph re-indexing. `spec-lock.json` is\nthat sidecar: the canonical persisted record for spec schema identity,\ndependencies, implementation links, and optional optimization baselines.\n\nA spec's canonical artifacts MAY exist before this sidecar does. Persisted state\ncomes into being deliberately — through archive publication, an explicit\none-time initialization/adoption operation, or an explicit persisted-state\nmutation — never as an incidental guess constructed from a stale cache."
   ],
   "rules": [
     {
@@ -15,7 +15,13 @@
     {
       "requirement": "Durable schema identity",
       "rules": [
-        "`spec-lock.json` MUST store the spec schema identity under `schema`.\n\n- `schema.name` is required.\n- `schema.version` is required.\n\nOnce recorded for a persisted spec, this schema identity MUST remain immutable unless the spec is explicitly migrated through a future schema-migration capability."
+        "`spec-lock.json` MUST store the spec schema identity under `schema`.\n\n- `schema.name` is required.\n- `schema.version` is required.\n\nOnce recorded for a persisted spec, this schema identity MUST remain immutable\nexcept through an explicit, guarded schema-reassignment operation (see\nRequirement: Guarded schema reassignment). No other write path — including\narchive-time materialization, dependency mutation, implementation mutation, or\noptimization mutation — MAY replace an existing `schema` value."
+      ]
+    },
+    {
+      "requirement": "Guarded schema reassignment",
+      "rules": [
+        "An explicit schema-reassignment operation MAY replace the `schema` recorded for\nan already-initialized spec. Reassignment MUST:\n\n- resolve and load the target schema's declared canonical artifacts and verify\n  they parse under that schema before replacing `schema`\n- preserve current `dependsOn` unchanged when the target schema does not declare\n  dependency extraction\n- require that dependencies extracted under the target schema equal the current\n  canonical `dependsOn`, failing the operation rather than silently changing\n  dependencies, when the target schema does declare dependency extraction\n- preserve `implementation` and any `optimizations` values and baselines\n  unchanged\n\nBecause each optimization baseline records the schema identity in effect when it\nwas captured, a schema reassignment makes every existing optimization stale\nrelative to the new schema even though its artifact bytes and `value` are\nunchanged. Reassignment MUST NOT clear or regenerate optimization values as a\nside effect; staleness is derived, not enforced by deletion.\n\nSelecting the schema identity already recorded is a semantic no-op and MUST NOT\nbe treated as a failure."
       ]
     },
     {
@@ -31,21 +37,33 @@
       ]
     },
     {
+      "requirement": "Optional persisted optimization state",
+      "rules": [
+        "`spec-lock.json` MAY store per-field LLM optimization state under an optional\n`optimizations` object.\n\nEach present field (`optimizedDescription`, `optimizedContext`) MUST record:\n\n- `value` — the optimized string content\n- `schema` — the schema identity in effect when the field was captured, in the\n  same `{ name, version }` shape as the lock's own `schema`\n- `artifactState` — a map of artifact filename to `{ hash, lastModified }`\n  describing the exact canonical artifact set the value was produced from\n\nEach optimized field owns an independent artifact and schema baseline. Setting\nor clearing one field MUST NOT change the baseline recorded for the other. When\nthe last present field is cleared, `optimizations` MUST be omitted entirely\nrather than retained as an empty object.\n\nA lock written before this requirement existed and containing no `optimizations`\nblock remains valid. No migration MAY synthesize `optimizations` from previously\nagent-generated `metadata.json` fields; only an explicit optimization-setting\noperation creates this state."
+      ]
+    },
+    {
+      "requirement": "Lock-less specs and explicit initialization",
+      "rules": [
+        "A spec MAY have canonical artifacts without a `spec-lock.json`. This lock-less\nstate is valid and MUST NOT be silently upgraded by an ordinary read.\n\nPersisted state for a lock-less spec MUST be created only by:\n\n- archive publication of a change targeting that spec, or\n- an explicit initialization operation that adopts existing artifacts into\n  persisted state, or\n- an explicit persisted-state mutation (dependency, implementation, or\n  optimization) that is itself a create-worthy operation for that spec\n\nExplicit initialization is a one-time adoption: it MUST fail when persisted\nstate already exists for the target spec, regardless of whether the requested\nschema identity matches. Explicit initialization MUST derive `dependsOn` from\nthe current canonical artifacts under the resolved schema rather than from any\ncached projection, default `implementation` to an empty array, and omit\n`optimizations`.\n\nSemantic no-op mutations against a lock-less spec (e.g. removing a dependency\nthat is not present, removing an implementation link that is not present, or\nclearing an optimization field that is not set) MUST NOT create persisted state."
+      ]
+    },
+    {
       "requirement": "Archive-time materialization",
       "rules": [
-        "`spec-lock.json` SHALL be written or updated only by archive-time materialization and explicit integrity-maintenance flows.\n\nArchive-time materialization MUST:\n\n- read raw project-relative implementation paths from the active change state\n- validate that each linked file belongs to the workspace implied by the archived `specId`\n- ignore entries whose raw file path falls under that workspace's `graph.excludePaths`\n- discard entries that cannot be normalized into a valid `workspace:path` identity\n- fail archive when a confirmed link points outside the workspace `codeRoot` implied by `specId`"
+        "`spec-lock.json` SHALL be written or updated only by archive-time\nmaterialization, explicit persisted-state mutation operations (dependency,\nimplementation, optimization, and schema-reassignment updates), explicit\ninitialization of a lock-less spec, and explicit integrity-maintenance flows.\n\nArchive-time materialization MUST:\n\n- read raw project-relative implementation paths from the active change state\n- validate that each linked file belongs to the workspace implied by the\n  archived `specId`\n- ignore entries whose raw file path falls under that workspace's\n  `graph.excludePaths`\n- discard entries that cannot be normalized into a valid `workspace:path`\n  identity\n- fail archive when a confirmed link points outside the workspace `codeRoot`\n  implied by `specId`\n\nEvery non-archive writer listed above MUST construct the complete persisted\nstate through the shared pure patch/construction rules for this document rather\nthan hand-assembling partial JSON, and MUST use a conditional write guarded by\nthe observed revision so concurrent writers cannot silently overwrite each\nother."
       ]
     },
     {
       "requirement": "Sidecar is the durable source of truth",
       "rules": [
-        "`spec-lock.json` MUST be the durable archived source of truth for implementation traceability.\n\n`metadata.json` MAY project or cache this information for faster consumption, but metadata regeneration MUST NOT invent, mutate, or delete implementation links independently of the sidecar."
+        "`spec-lock.json` MUST be the durable archived source of truth for\nimplementation traceability and, when present, per-field LLM optimization\nstate.\n\n`metadata.json` MAY project or cache this information for faster consumption,\nbut metadata regeneration MUST NOT invent, mutate, or delete implementation\nlinks or optimization values independently of the sidecar. A generated\nprojection MUST include an optimized field only when the sidecar's baseline for\nthat field is fresh against current canonical artifacts and schema identity."
       ]
     },
     {
       "requirement": "Repository hash of persisted lock state",
       "rules": [
-        "The SHA-256 of the durable lock sidecar bytes MUST be the value returned by\n`SpecRepository.persistedStateHash(spec)` (formerly named `specHash`). Application\ncallers MUST obtain that digest only through the repository port — not by reading\n`spec-lock.json` directly.\n\nPresence and last-modified of the lock sidecar for cheap freshness MUST surface on\n`Spec.persistedStateStamp` from `get()`, not as schema artifact filenames."
+        "The SHA-256 of the durable lock sidecar bytes MUST be the value returned by\n`SpecRepository.persistedStateMeta(spec, { includeHash: true })?.hash`\n(formerly exposed via a dedicated `specHash` / `persistedStateHash` helper).\nApplication callers MUST obtain that digest only through the repository port —\nnot by reading `spec-lock.json` directly. There MUST NOT be a separate\n`persistedStateHash(spec)` method on the port.\n\nPresence and last-modified of the lock sidecar for cheap freshness MUST surface on\n`Spec.persistedStateStamp` from `get()`, not as schema artifact filenames."
       ]
     }
   ],
@@ -71,6 +89,64 @@
       ],
       "when": ["the active project schema later changes"],
       "then": ["the sidecar keeps the original stored schema identity"]
+    },
+    {
+      "requirement": "Durable schema identity",
+      "name": "Non-reassignment write paths cannot replace schema",
+      "given": ["a persisted spec with an existing schema value"],
+      "when": [
+        "archive-time materialization, dependency mutation, implementation mutation, or optimization mutation runs against it"
+      ],
+      "then": ["the existing schema value is not replaced"]
+    },
+    {
+      "requirement": "Guarded schema reassignment",
+      "name": "Reassignment validates target schema before replacing schema",
+      "when": ["a schema-reassignment operation targets a new schema"],
+      "then": [
+        "it resolves and loads the target schema's declared canonical artifacts and verifies they parse under that schema before replacing schema"
+      ]
+    },
+    {
+      "requirement": "Guarded schema reassignment",
+      "name": "Reassignment preserves dependsOn when target schema has no dependency extraction",
+      "given": ["a target schema that does not declare dependency extraction"],
+      "when": ["schema reassignment is performed"],
+      "then": ["the current canonical dependsOn is preserved unchanged"]
+    },
+    {
+      "requirement": "Guarded schema reassignment",
+      "name": "Reassignment fails when extracted dependencies differ from canonical dependsOn",
+      "given": ["a target schema that declares dependency extraction"],
+      "when": [
+        "dependencies extracted under the target schema do not equal the current canonical dependsOn"
+      ],
+      "then": ["the reassignment operation fails instead of silently changing dependencies"]
+    },
+    {
+      "requirement": "Guarded schema reassignment",
+      "name": "Reassignment preserves implementation and optimization values",
+      "when": ["a schema-reassignment operation completes"],
+      "then": ["implementation and any optimizations values and baselines remain unchanged"]
+    },
+    {
+      "requirement": "Guarded schema reassignment",
+      "name": "Reassignment makes existing optimizations stale without deleting them",
+      "given": ["a persisted spec with existing optimization baselines"],
+      "when": ["its schema is reassigned"],
+      "then": [
+        "the existing optimization baselines are not cleared or regenerated",
+        "AND they become stale relative to the new schema"
+      ]
+    },
+    {
+      "requirement": "Guarded schema reassignment",
+      "name": "Reassigning to the currently recorded schema is a no-op",
+      "given": [
+        "a persisted spec whose recorded schema already matches the requested target schema"
+      ],
+      "when": ["a schema-reassignment operation selects that same schema identity"],
+      "then": ["the operation succeeds as a semantic no-op and is not treated as a failure"]
     },
     {
       "requirement": "Persistent dependencies",
@@ -105,6 +181,80 @@
       ]
     },
     {
+      "requirement": "Optional persisted optimization state",
+      "name": "Optimized field records value, schema baseline, and artifact state",
+      "when": ["an optimization-setting operation sets optimizedDescription or optimizedContext"],
+      "then": [
+        "the field records value, schema, and artifactState describing the exact canonical artifact set it was produced from"
+      ]
+    },
+    {
+      "requirement": "Optional persisted optimization state",
+      "name": "Independent field baselines",
+      "given": ["a lock with both optimizedDescription and optimizedContext present"],
+      "when": ["one field is set or cleared"],
+      "then": ["the baseline recorded for the other field does not change"]
+    },
+    {
+      "requirement": "Optional persisted optimization state",
+      "name": "Clearing the last optimized field omits the optimizations block",
+      "given": ["a lock with exactly one optimization field present"],
+      "when": ["that field is cleared"],
+      "then": ["optimizations is omitted entirely rather than retained as an empty object"]
+    },
+    {
+      "requirement": "Optional persisted optimization state",
+      "name": "Pre-existing lock without optimizations remains valid",
+      "given": [
+        "a spec-lock.json written before this requirement existed with no optimizations block"
+      ],
+      "when": ["it is read"],
+      "then": ["it remains valid"]
+    },
+    {
+      "requirement": "Optional persisted optimization state",
+      "name": "No migration synthesizes optimizations from agent-generated metadata",
+      "when": ["metadata regeneration or any migration flow runs"],
+      "then": [
+        "it does not synthesize optimizations from previously agent-generated metadata.json fields",
+        "AND only an explicit optimization-setting operation creates this state"
+      ]
+    },
+    {
+      "requirement": "Lock-less specs and explicit initialization",
+      "name": "Lock-less spec with canonical artifacts is valid",
+      "given": ["a spec with canonical artifacts and no spec-lock.json"],
+      "when": ["it is read"],
+      "then": ["the lock-less state is valid and is not silently upgraded by the read"]
+    },
+    {
+      "requirement": "Lock-less specs and explicit initialization",
+      "name": "Explicit initialization adopts existing artifacts",
+      "given": ["a lock-less spec"],
+      "when": ["an explicit initialization operation adopts its artifacts into persisted state"],
+      "then": [
+        "dependsOn is derived from the current canonical artifacts under the resolved schema",
+        "AND implementation defaults to an empty array",
+        "AND optimizations is omitted"
+      ]
+    },
+    {
+      "requirement": "Lock-less specs and explicit initialization",
+      "name": "Explicit initialization fails when persisted state already exists",
+      "given": ["a spec that already has persisted state"],
+      "when": ["an explicit initialization operation targets that spec"],
+      "then": ["it fails regardless of whether the requested schema identity matches"]
+    },
+    {
+      "requirement": "Lock-less specs and explicit initialization",
+      "name": "Semantic no-op mutation does not create persisted state",
+      "given": ["a lock-less spec"],
+      "when": [
+        "a mutation removes a dependency, implementation link, or optimization field that is not present or set"
+      ],
+      "then": ["persisted state is not created for that spec"]
+    },
+    {
       "requirement": "Archive-time materialization",
       "name": "Excluded path is ignored during materialization",
       "given": [
@@ -126,6 +276,18 @@
       "then": ["archive fails instead of writing an invalid canonical workspace:path"]
     },
     {
+      "requirement": "Archive-time materialization",
+      "name": "Non-archive writers use conditional revision-guarded writes",
+      "given": [
+        "a persisted-state mutation, explicit initialization, or schema-reassignment operation"
+      ],
+      "when": ["it writes spec-lock.json"],
+      "then": [
+        "it constructs the complete persisted state through the shared pure patch/construction rules rather than hand-assembling partial JSON",
+        "AND it uses a conditional write guarded by the observed revision so concurrent writers cannot silently overwrite each other"
+      ]
+    },
+    {
       "requirement": "Sidecar is the durable source of truth",
       "name": "Metadata regeneration does not mutate sidecar implementation links",
       "given": ["an existing spec-lock.json with archived implementation links"],
@@ -136,11 +298,20 @@
       ]
     },
     {
+      "requirement": "Sidecar is the durable source of truth",
+      "name": "Generated projection excludes a stale optimization field",
+      "given": [
+        "a sidecar optimization baseline that is stale against current canonical artifacts or schema identity"
+      ],
+      "when": ["metadata is regenerated"],
+      "then": ["the generated projection excludes that optimized field"]
+    },
+    {
       "requirement": "Repository hash of persisted lock state",
-      "name": "persistedStateHash matches lock sidecar bytes",
+      "name": "persistedStateMeta hash matches lock sidecar bytes",
       "given": ["a durable spec-lock.json with known content"],
-      "when": ["SpecRepository.persistedStateHash(spec) is called"],
-      "then": ["the returned digest is the SHA-256 of those sidecar bytes"]
+      "when": ["SpecRepository.persistedStateMeta(spec, { includeHash: true }) is called"],
+      "then": ["the returned hash is the SHA-256 of those sidecar bytes"]
     },
     {
       "requirement": "Repository hash of persisted lock state",
@@ -151,6 +322,12 @@
         "Spec.persistedStateStamp.present is true",
         "AND spec-lock.json does not appear in Spec.artifacts"
       ]
+    },
+    {
+      "requirement": "Repository hash of persisted lock state",
+      "name": "there is no persistedStateHash method on the port",
+      "when": ["the SpecRepository port surface is inspected"],
+      "then": ["it does not declare persistedStateHash as a method"]
     },
     {
       "requirement": "Sidecar is not a schema artifact",
@@ -173,10 +350,61 @@
       ]
     }
   ],
-  "implementation": {},
-  "contentHashes": {
-    "spec.md": "sha256:0f547ef93c90743745be66f258c6e50b600c6e618a8458d63091b935e1d3df1c",
-    "verify.md": "sha256:945d93a42e81025573bd1750aad87d0953b9395602e664e9efe5b276db2d9c41"
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "core:spec-lock",
+        "file": "core:src/domain/services/parse-spec-lock.ts",
+        "symbol": "SpecLockData"
+      },
+      {
+        "specId": "core:spec-lock",
+        "file": "core:src/domain/services/parse-spec-lock.ts",
+        "symbol": "specLockSchema"
+      },
+      {
+        "specId": "core:spec-lock",
+        "file": "core:src/domain/services/parse-spec-lock.ts",
+        "symbol": "parseSpecLock"
+      },
+      {
+        "specId": "core:spec-lock",
+        "file": "core:src/domain/services/apply-persisted-spec-state-patch.ts",
+        "symbol": "applyPersistedSpecStatePatch"
+      },
+      {
+        "specId": "core:spec-lock",
+        "file": "core:src/domain/services/apply-persisted-spec-state-patch.ts",
+        "symbol": "PersistedSpecState"
+      },
+      {
+        "specId": "core:spec-lock",
+        "file": "core:src/domain/errors/persisted-spec-state-schema-replacement-error.ts",
+        "symbol": "PersistedSpecStateSchemaReplacementError"
+      }
+    ]
   },
-  "generatedBy": "core"
+  "contentHashes": {
+    "spec.md": "sha256:0f811fee6fae100caff9ab7ac1cf70ed4778d19a97cc7285327f1d5b404876ad",
+    "verify.md": "sha256:756e0476d04b063af10f47a0a17b556150017ab165d64fda7db70182be90556f"
+  },
+  "provenance": {
+    "artifacts": {
+      "spec.md": {
+        "hash": "sha256:0f811fee6fae100caff9ab7ac1cf70ed4778d19a97cc7285327f1d5b404876ad",
+        "lastModified": "2026-07-25T11:53:31.094Z"
+      },
+      "verify.md": {
+        "hash": "sha256:756e0476d04b063af10f47a0a17b556150017ab165d64fda7db70182be90556f",
+        "lastModified": "2026-07-25T11:53:31.095Z"
+      }
+    },
+    "persistedStateHash": "sha256:e3e78496e09bb5b52c6e4358a2137c00f7dd52b43ae5d855b6c8842e737504d2",
+    "schema": {
+      "name": "schema-std",
+      "version": 1
+    },
+    "projectionVersion": 1,
+    "projectionFingerprint": "sha256:e4a28a2db6a35ed39b8308518337235b1490c2948cd839db25866ad79b22404b"
+  }
 }

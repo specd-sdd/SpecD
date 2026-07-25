@@ -60,6 +60,16 @@
 - **THEN** stdout is valid JSON with `result`, `configPath`, `schema`, `workspaces`, and `plugins` fields
 - **AND** `plugins` is an array of per-plugin install entries
 
+#### Scenario: Text output reports metadata cache path
+
+- **WHEN** `specd project init --workspace default --workspace-path specs/` is run
+- **THEN** stdout contains `metadata cache: <metadataCachePath> (ignored in .gitignore)` after the `initialized specd in ...` line
+
+#### Scenario: JSON output includes metadataCachePath
+
+- **WHEN** `specd project init --format json` is run
+- **THEN** stdout is valid JSON with a `metadataCachePath` field set to the project-relative path of the created metadata cache directory
+
 ### Requirement: Config file placement
 
 #### Scenario: Config written to git root when inside a subdirectory
@@ -106,6 +116,25 @@
 - **GIVEN** `.specd/tmp/.gitignore` already exists with the normative contents
 - **WHEN** `specd project init --force --workspace default` completes successfully
 - **THEN** `.specd/tmp/.gitignore` still contains `*` and `!.gitignore`
+
+#### Scenario: Metadata cache directory created idempotently
+
+- **GIVEN** a clean project root with no existing metadata cache directory
+- **WHEN** `specd project init --workspace default` completes successfully
+- **THEN** the default metadata cache directory `.specd/metadata/` exists
+
+#### Scenario: Metadata cache entry appended to root .gitignore
+
+- **GIVEN** a project root `.gitignore` without a `/.specd/metadata/` entry
+- **WHEN** `specd project init --workspace default` completes successfully
+- **THEN** the root `.gitignore` contains a rooted `/.specd/metadata/` entry
+- **AND** re-running `specd project init --force --workspace default` does not duplicate that entry
+
+#### Scenario: CLI surfaces metadataCachePath from the InitProject result rather than re-deriving it
+
+- **WHEN** `specd project init` completes successfully
+- **THEN** the `metadataCachePath` shown to the caller is read directly from the `InitProject` result
+- **AND** the CLI does not independently recompute the metadata cache path
 
 ### Requirement: Skills installation after init
 

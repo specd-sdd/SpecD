@@ -19,8 +19,9 @@
 #### Scenario: Specs group contains all spec use cases
 
 - **WHEN** `kernel.specs` is inspected
-- **THEN** it contains entries for: `list`, `get`, `saveMetadata`, `invalidateMetadata`, `getActiveSchema`, `validate`, `generateMetadata`, `getContext`
+- **THEN** it contains entries for: `list`, `search`, `get`, `getActiveSchema`, `validate`, `generateMetadata`, `materializeMetadata`, `getMetadata`, `regenerateMetadata`, `initializePersistedState`, `getPersistedSchema`, `updatePersistedSchema`, `getPersistedDeps`, `updatePersistedDeps`, `getPersistedImplementation`, `updatePersistedImplementation`, `getPersistedOptimizations`, `updatePersistedOptimizations`, `getContext`, `resolveSchema`, `getHealth`
 - **AND** it does not contain `approveSpec` or `approveSignoff`
+- **AND** it does not contain `saveMetadata` or `invalidateMetadata`
 - **AND** it contains `repos` as the `ReadonlyMap<string, SpecRepository>`
 
 #### Scenario: Project group contains query use cases only
@@ -67,6 +68,12 @@
 - **WHEN** `kernel.project.getConfig` is inspected after `createKernel(config)`
 - **THEN** it is an instance of `GetConfig`
 - **AND** `kernel.project.getConfig.execute()` returns a `Readonly<SpecdConfig>`
+
+#### Scenario: Specs entry mapping excludes saveMetadata/invalidateMetadata and includes the materialization/persisted-state surface
+
+- **WHEN** the entry mapping table for `kernel.specs` is reviewed
+- **THEN** it does not include `saveMetadata` or `invalidateMetadata` paths
+- **AND** it includes `materializeMetadata`, `getMetadata`, `regenerateMetadata`, `initializePersistedState`, `getPersistedSchema`, `updatePersistedSchema`, `getPersistedDeps`, `updatePersistedDeps`, `getPersistedImplementation`, `updatePersistedImplementation`, `getPersistedOptimizations`, `updatePersistedOptimizations`, `search`, and `resolveSchema` paths
 
 ### Requirement: Plugin declarations are not a kernel use case
 

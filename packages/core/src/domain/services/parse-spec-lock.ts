@@ -1,4 +1,8 @@
 import { z } from 'zod'
+import {
+  type PersistedSpecOptimizations,
+  persistedSpecOptimizationsZodSchema,
+} from './spec-optimization.js'
 
 const WORKSPACE_RE = /^[a-z][a-z0-9-]*$/
 const CAP_SEGMENT_RE = /^[a-z0-9_][a-z0-9_-]*$/
@@ -33,6 +37,7 @@ export interface SpecLockData {
   }
   readonly dependsOn: readonly string[]
   readonly implementation: readonly SpecLockImplementationEntry[]
+  readonly optimizations?: PersistedSpecOptimizations | undefined
   readonly originalHash?: string | undefined
 }
 
@@ -45,7 +50,7 @@ export interface SpecLockImplementationEntry {
 /**
  * Runtime schema for `spec-lock.json`.
  */
-export const specLockSchema: z.ZodType<SpecLockData, z.ZodTypeDef, unknown> = z.object({
+export const specLockSchema = z.object({
   schema: z.object({
     name: z.string().min(1),
     version: z.number().int().nonnegative(),
@@ -61,6 +66,7 @@ export const specLockSchema: z.ZodType<SpecLockData, z.ZodTypeDef, unknown> = z.
         .strict(),
     )
     .default([]),
+  optimizations: persistedSpecOptimizationsZodSchema.optional(),
   originalHash: z.string().regex(HASH_RE).optional(),
 })
 
@@ -72,5 +78,5 @@ export const specLockSchema: z.ZodType<SpecLockData, z.ZodTypeDef, unknown> = z.
  */
 export function parseSpecLock(content: string): SpecLockData {
   const parsed = JSON.parse(content) as unknown
-  return specLockSchema.parse(parsed)
+  return specLockSchema.parse(parsed) as SpecLockData
 }

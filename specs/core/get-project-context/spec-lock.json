@@ -9,13 +9,12 @@
     "core:spec-metadata",
     "core:schema-format",
     "default:_global/architecture",
-    "core:core/project-metadata",
-    "core:composition-resolver"
+    "core:composition-resolver",
+    "core:project-metadata",
+    "core:spec-optimization",
+    "core:get-spec-metadata"
   ],
   "implementation": [
-    {
-      "file": "core:src/composition/use-cases/get-project-context.ts"
-    },
     {
       "file": "core:src/application/use-cases/get-project-context.ts",
       "symbols": ["GetProjectContext"]

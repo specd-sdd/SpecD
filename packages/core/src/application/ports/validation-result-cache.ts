@@ -1,4 +1,8 @@
-import { type Spec } from '../../domain/entities/spec.js'
+import {
+  type Spec,
+  type SpecArtifactEntry,
+  type SpecSidecarStamp,
+} from '../../domain/entities/spec.js'
 import { type SpecRepository } from './spec-repository.js'
 
 /** Cached validation outcome for one spec. */
@@ -7,6 +11,13 @@ export interface SpecValidationEntry {
   readonly passed: boolean
   readonly failures: readonly { readonly artifactId: string; readonly description: string }[]
   readonly warnings: readonly { readonly artifactId: string; readonly description: string }[]
+}
+
+/** Stamp bundle for validation cache hard-hit comparison. */
+export interface ValidationSourceStamps {
+  readonly artifacts: readonly SpecArtifactEntry[]
+  readonly persistedStateStamp: SpecSidecarStamp
+  readonly generatedMetadataStamp: SpecSidecarStamp
 }
 
 /** Result of a validation cache lookup — either a hit or a miss. */
@@ -41,6 +52,7 @@ export abstract class ValidationResultCache {
     readonly spec: Spec
     readonly schemaFingerprint: string
     readonly engineVersion: number
+    readonly stamps?: ValidationSourceStamps
   }): Promise<ValidationCacheLookupResult>
 
   /**

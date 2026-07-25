@@ -1,0 +1,52 @@
+- op: modified
+  description: Mark the use case as removed — freshness is now derived from source fingerprints, not explicit invalidation.
+  selector:
+    type: section
+    matches: Purpose
+  content: |
+    **Removed.** `InvalidateSpecMetadata` forced a spec's cached metadata to be treated as stale by stripping `contentHashes`. Explicit invalidation is unnecessary and insufficient now: `MaterializeSpecMetadata` compares persisted metadata provenance (artifact hashes, lock hash, schema identity, projection version, and projection fingerprint) against current source state on every read and regenerates automatically when anything has drifted. An editor, Git, another process, or a database client can change source state without passing through the current process, so a manual invalidation command could never be a complete freshness signal.
+
+- op: modified
+  description: Replace the contentHashes-removal requirement with an explicit removal statement.
+  selector:
+    type: section
+    matches: 'Requirement: Removes contentHashes'
+  rename: 'Requirement: InvalidateSpecMetadata is removed'
+  content: |
+    `InvalidateSpecMetadata` MUST NOT be exported from `@specd/core`, MUST NOT be mounted on `Kernel`, and MUST NOT have a public `createInvalidateSpecMetadata` composition factory. There is no supported way to force a metadata cache stale independent of its actual source state — callers that need a guaranteed rebuild MUST use `RegenerateSpecMetadata` (forced policy), which regenerates and persists a fresh projection rather than merely marking the existing one untrustworthy.
+
+- op: removed
+  description: Remove the field-preservation requirement.
+  selector:
+    type: section
+    matches: 'Requirement: Preserves other fields'
+
+- op: removed
+  description: Remove the unknown-workspace/spec error requirement.
+  selector:
+    type: section
+    matches: 'Requirement: Error on unknown workspace or spec'
+
+- op: removed
+  description: Remove the no-op return requirement.
+  selector:
+    type: section
+    matches: 'Requirement: Returns null when not applicable'
+
+- op: removed
+  description: Remove the no-strict-validation requirement.
+  selector:
+    type: section
+    matches: 'Requirement: No strict validation on write'
+
+- op: removed
+  description: Remove the obsolete config-based factory contract.
+  selector:
+    type: section
+    matches: 'Requirement: Config-based factory delegates through resolveInvalidateSpecMetadataDeps'
+
+- op: removed
+  description: Remove constraints that only applied to the removed public writer.
+  selector:
+    type: section
+    matches: Constraints

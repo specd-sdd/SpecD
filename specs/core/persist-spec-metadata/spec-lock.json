@@ -1,0 +1,13 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "core:spec-repository-port",
+    "core:spec-metadata",
+    "default:_global/architecture",
+    "core:composition-resolver"
+  ],
+  "implementation": []
+}

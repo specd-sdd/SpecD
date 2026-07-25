@@ -25,7 +25,9 @@ The `freshness` block SHALL track:
 
 - The hash of the `specd.yaml` configuration file
 - The hashes of any `contextFiles` referenced in the configuration
-- The metadata hashes of all specs included in the project context
+- The semantic `metadataFingerprint` — returned by materializing each included spec's metadata via `MaterializeSpecMetadata` — of all specs included in the project context
+
+Per-spec entries in `freshness` MUST record the materialized `metadataFingerprint`, not a raw metadata-cache-file hash or a repository storage revision. A `metadataFingerprint` changes only when the spec's semantically meaningful metadata content changes, so freshness comparisons remain storage-adapter-independent.
 
 ### Requirement: Config-based factory delegates through resolveGetProjectMetadataDeps
 
@@ -41,4 +43,5 @@ The helper is the only use-case-specific composition entry for config-based boot
 ## Spec Dependencies
 
 - [`core:config`](../config/spec.md)
+- [`core:materialize-spec-metadata`](../materialize-spec-metadata/spec.md) — source of the per-spec `metadataFingerprint` tracked in `freshness`
 - [`core:composition-resolver`](../composition-resolver/spec.md)

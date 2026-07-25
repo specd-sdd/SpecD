@@ -10,6 +10,7 @@ import {
 } from '../../application/use-cases/compile-context.js'
 import { type ListWorkspaces } from '../../application/use-cases/list-workspaces.js'
 import { type PreviewSpec } from '../../application/use-cases/preview-spec.js'
+import { type GetSpecMetadata } from '../../application/use-cases/get-spec-metadata.js'
 import { type SpecdConfig } from '../../application/specd-config.js'
 import { type ExtractorTransformRegistry } from '../../domain/services/content-extraction.js'
 import {
@@ -19,6 +20,7 @@ import {
 } from '../composition-resolver.js'
 import { normalizeCompositionFactoryArgs, type FactoryInput } from '../normalize-factory-args.js'
 import { createPreviewSpec } from './preview-spec.js'
+import { createGetSpecMetadata, resolveGetSpecMetadataDeps } from './get-spec-metadata.js'
 
 /**
  * Explicit dependencies for {@link createCompileContext}.
@@ -31,6 +33,7 @@ export interface CompileContextDeps {
   readonly parsers: ArtifactParserRegistry
   readonly contentHasher: ContentHasher
   readonly previewSpec: PreviewSpec
+  readonly getMetadata: GetSpecMetadata
   readonly extractorTransforms: ExtractorTransformRegistry
   readonly workspaceRoutes: readonly SpecWorkspaceRoute[]
   readonly defaultConfig: CompileContextConfig
@@ -56,6 +59,7 @@ export function resolveCompileContextDeps(resolver: CompositionResolver): Compil
       schemaProvider: resolver.getSchemaProvider(),
       parsers: resolver.getArtifactParserRegistry(),
     }),
+    getMetadata: createGetSpecMetadata(resolveGetSpecMetadataDeps(resolver)),
     extractorTransforms: resolver.getExtractorTransforms(),
     workspaceRoutes: resolver.getSpecWorkspaceRoutes(),
     defaultConfig: resolver.getCompileContextConfig(),
@@ -118,6 +122,7 @@ function createCompileContextFromNormalized(
       parsers,
       contentHasher,
       previewSpec,
+      getMetadata,
       extractorTransforms,
       workspaceRoutes,
       defaultConfig,
@@ -130,6 +135,7 @@ function createCompileContextFromNormalized(
       parsers,
       contentHasher,
       previewSpec,
+      getMetadata,
       extractorTransforms,
       workspaceRoutes,
       defaultConfig,
@@ -157,6 +163,7 @@ function isCompileContextDeps(
     'parsers' in value &&
     'contentHasher' in value &&
     'previewSpec' in value &&
+    'getMetadata' in value &&
     'extractorTransforms' in value &&
     'workspaceRoutes' in value &&
     'defaultConfig' in value

@@ -1,145 +1,63 @@
 {
   "title": "Invalidate Spec Metadata",
-  "description": "When a spec's content changes outside the normal archive flow, its metadata becomes untrustworthy but deleting the entire file would lose curated fields like `dependsOn` and `description`. The `InvalidateSpecMetadata` use case marks the metadata as stale by removing only the `contentHashes` field, which causes all downstream consumers (staleness detection, `spec list --metadata-status`) to treat it as stale and forces regeneration on the next metadata pass. All other fields (title, description, rules, scenarios, etc.) are preserved.",
+  "description": "**Removed.** `InvalidateSpecMetadata` forced a spec's cached metadata to be treated as stale by stripping `contentHashes`. Explicit invalidation is unnecessary and insufficient now: `MaterializeSpecMetadata` compares persisted metadata provenance (artifact hashes, lock hash, schema identity, projection version, and projection fingerprint) against current source state on every read and regenerates automatically when anything has drifted. An editor, Git, another process, or a database client can change source state without passing through the current process, so a manual invalidation command could never be a complete freshness signal.",
   "dependsOn": ["core:spec-metadata", "core:storage", "core:composition-resolver"],
   "context": [
-    "When a spec's content changes outside the normal archive flow, its metadata becomes untrustworthy but deleting the entire file would lose curated fields like `dependsOn` and `description`. The `InvalidateSpecMetadata` use case marks the metadata as stale by removing only the `contentHashes` field, which causes all downstream consumers (staleness detection, `spec list --metadata-status`) to treat it as stale and forces regeneration on the next metadata pass. All other fields (title, description, rules, scenarios, etc.) are preserved."
+    "**Removed.** `InvalidateSpecMetadata` forced a spec's cached metadata to be treated as stale by stripping `contentHashes`. Explicit invalidation is unnecessary and insufficient now: `MaterializeSpecMetadata` compares persisted metadata provenance (artifact hashes, lock hash, schema identity, projection version, and projection fingerprint) against current source state on every read and regenerates automatically when anything has drifted. An editor, Git, another process, or a database client can change source state without passing through the current process, so a manual invalidation command could never be a complete freshness signal."
   ],
   "rules": [
     {
-      "requirement": "Removes contentHashes",
+      "requirement": "InvalidateSpecMetadata is removed",
       "rules": [
-        "When executed, loads the existing metadata via `repo.metadata(spec)`. If metadata exists, removes the `contentHashes` and `originalHash` fields, serializes the rest with `JSON.stringify(withoutHashes, null, 2)`, and writes back via `repo.saveMetadata(spec, content, { force: true })`. The `YamlSerializer` dependency is no longer needed."
-      ]
-    },
-    {
-      "requirement": "Preserves other fields",
-      "rules": [
-        "All fields other than `contentHashes` remain unchanged in the rewritten file. The use case does not validate the remaining content against the strict schema — it is a targeted mutation, not a full rewrite."
-      ]
-    },
-    {
-      "requirement": "Error on unknown workspace or spec",
-      "rules": [
-        "If the workspace does not exist in the configured repositories, the use case throws `WorkspaceNotFoundError`. If the spec does not exist in the workspace, it throws `SpecNotFoundError`."
-      ]
-    },
-    {
-      "requirement": "Returns null when not applicable",
-      "rules": [
-        "The use case returns `null` (no-op) when:\n\n- The spec has no metadata file\n- The file content is not a YAML mapping (e.g. scalar, null)\n\nIn all other cases it returns `{ spec: '<workspace>:<path>' }`."
-      ]
-    },
-    {
-      "requirement": "No strict validation on write",
-      "rules": [
-        "Because the use case intentionally removes `contentHashes` (a required field in `strictSpecMetadataSchema`), it bypasses `SaveSpecMetadata` and writes directly through `SpecRepository.saveMetadata()`. This is the only use case that writes metadata without strict validation."
-      ]
-    },
-    {
-      "requirement": "Config-based factory delegates through resolveInvalidateSpecMetadataDeps",
-      "rules": [
-        "The config-based `createInvalidateSpecMetadata(config, options?)` form MUST derive `InvalidateSpecMetadataDeps` through `resolveInvalidateSpecMetadataDeps(resolver)` and then delegate to canonical `createInvalidateSpecMetadata(deps)`.\n\n`resolveInvalidateSpecMetadataDeps(resolver)` MUST resolve:\n\n- `specRepos: ReadonlyMap<string, SpecRepository>`\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
+        "`InvalidateSpecMetadata` MUST NOT be exported from `@specd/core`, MUST NOT be mounted on `Kernel`, and MUST NOT have a public `createInvalidateSpecMetadata` composition factory. There is no supported way to force a metadata cache stale independent of its actual source state — callers that need a guaranteed rebuild MUST use `RegenerateSpecMetadata` (forced policy), which regenerates and persists a fresh projection rather than merely marking the existing one untrustworthy."
       ]
     }
-  ],
-  "constraints": [
-    "The use case contains no CLI or delivery logic — it operates purely through the SpecRepository port",
-    "The write is always forced (force: true) — there is no conflict detection for invalidation",
-    "The use case never deletes the metadata file — it only strips contentHashes",
-    "Metadata is read via SpecRepository.metadata() and written via SpecRepository.saveMetadata()"
   ],
   "scenarios": [
     {
-      "requirement": "Removes contentHashes",
-      "name": "Existing metadata with contentHashes",
-      "given": ["a spec with metadata containing contentHashes"],
-      "when": ["InvalidateSpecMetadata is called"],
+      "requirement": "InvalidateSpecMetadata is removed",
+      "name": "InvalidateSpecMetadata is not exported",
+      "when": ["@specd/core public exports are inspected"],
+      "then": ["InvalidateSpecMetadata and createInvalidateSpecMetadata are not present"]
+    },
+    {
+      "requirement": "InvalidateSpecMetadata is removed",
+      "name": "Kernel does not mount InvalidateSpecMetadata",
+      "when": ["createKernel(config) is called"],
+      "then": ["the returned kernel has no invalidateSpecMetadata entry under kernel.specs"]
+    },
+    {
+      "requirement": "InvalidateSpecMetadata is removed",
+      "name": "Guaranteed rebuilds use RegenerateSpecMetadata instead",
+      "given": ["a caller needs a guaranteed metadata rebuild"],
+      "when": ["the caller looks for a supported path"],
       "then": [
-        "the metadata is re-saved as JSON without the contentHashes field",
-        "AND all other fields (title, description, rules, etc.) are preserved"
-      ]
-    },
-    {
-      "requirement": "Removes contentHashes",
-      "name": "Existing metadata without contentHashes",
-      "given": ["a spec with metadata that has no contentHashes field"],
-      "when": ["InvalidateSpecMetadata is executed for that spec"],
-      "then": [
-        "the file is rewritten unchanged (no-op content-wise)",
-        "AND the result is still returned (not null)"
-      ]
-    },
-    {
-      "requirement": "Preserves other fields",
-      "name": "Title, description, rules survive invalidation",
-      "given": [
-        "a spec with metadata containing title: 'Auth', description: 'Handles auth', rules, and contentHashes"
-      ],
-      "when": ["InvalidateSpecMetadata is executed"],
-      "then": [
-        "the rewritten file contains title: 'Auth', description: 'Handles auth', and rules exactly as before"
-      ]
-    },
-    {
-      "requirement": "Error on unknown workspace or spec",
-      "name": "Unknown workspace",
-      "when": ["InvalidateSpecMetadata is executed with a workspace that does not exist"],
-      "then": ["it throws WorkspaceNotFoundError"]
-    },
-    {
-      "requirement": "Error on unknown workspace or spec",
-      "name": "Unknown spec",
-      "when": ["InvalidateSpecMetadata is executed for a spec path that does not exist"],
-      "then": ["it throws SpecNotFoundError"]
-    },
-    {
-      "requirement": "Returns null when not applicable",
-      "name": "No metadata file",
-      "given": ["a spec that exists but has no metadata"],
-      "when": ["InvalidateSpecMetadata is executed for that spec"],
-      "then": ["the result is null — no file is created"]
-    },
-    {
-      "requirement": "Returns null when not applicable",
-      "name": "Non-mapping content",
-      "given": ["a spec with metadata containing a scalar value (e.g. \"hello\")"],
-      "when": ["InvalidateSpecMetadata is executed"],
-      "then": ["the result is null — the file is not modified"]
-    },
-    {
-      "requirement": "No strict validation on write",
-      "name": "Metadata written without strict validation",
-      "given": ["a spec with metadata containing contentHashes"],
-      "when": ["InvalidateSpecMetadata is executed"],
-      "then": [
-        "the metadata is written directly via SpecRepository.saveMetadata() without going through SaveSpecMetadata",
-        "AND the force: true option is used to bypass conflict detection"
-      ]
-    },
-    {
-      "requirement": "Config-based factory delegates through resolveInvalidateSpecMetadataDeps",
-      "name": "createInvalidateSpecMetadata config form derives InvalidateSpecMetadataDeps through resolveInvalidateSpecMetadataDeps",
-      "when": ["createInvalidateSpecMetadata(config, options?) is invoked"],
-      "then": [
-        "it creates a composition resolver for that composition session",
-        "AND it derives InvalidateSpecMetadataDeps through resolveInvalidateSpecMetadataDeps(resolver)",
-        "AND resolveInvalidateSpecMetadataDeps(resolver) resolves:",
-        "AND the factory delegates to canonical createInvalidateSpecMetadata(deps)"
+        "it uses RegenerateSpecMetadata with a forced policy",
+        "AND it does not call InvalidateSpecMetadata"
       ]
     }
   ],
-  "implementation": {
-    "files": [
-      {
-        "specId": "core:invalidate-spec-metadata",
-        "file": "core:src/composition/use-cases/invalidate-spec-metadata.ts"
-      }
-    ]
-  },
   "contentHashes": {
-    "spec.md": "sha256:87425994c3a78247134c9997ca8185d626918c7299c64ac9028cfd6072b2d4e9",
-    "verify.md": "sha256:85f0679281feb6178229ec5d9fbe0d34ebdedbaf704597faddfce1202513d762"
+    "spec.md": "sha256:11e694e39041a69bf872087d4dcf5beb727d2c2b2a8a5422b980c05a1ba15e9b",
+    "verify.md": "sha256:5f746962d23d234e04bce513669846909410ee033c946e64c7ee35b0d3e19e71"
   },
-  "generatedBy": "core"
+  "provenance": {
+    "artifacts": {
+      "spec.md": {
+        "hash": "sha256:11e694e39041a69bf872087d4dcf5beb727d2c2b2a8a5422b980c05a1ba15e9b",
+        "lastModified": "2026-07-25T11:53:31.295Z"
+      },
+      "verify.md": {
+        "hash": "sha256:5f746962d23d234e04bce513669846909410ee033c946e64c7ee35b0d3e19e71",
+        "lastModified": "2026-07-25T11:53:31.296Z"
+      }
+    },
+    "persistedStateHash": "sha256:40d1db7bded5d5d8e4de16c6d8b544567887ef6f28fc6014f5f818359988e209",
+    "schema": {
+      "name": "schema-std",
+      "version": 1
+    },
+    "projectionVersion": 1,
+    "projectionFingerprint": "sha256:e4a28a2db6a35ed39b8308518337235b1490c2948cd839db25866ad79b22404b"
+  }
 }

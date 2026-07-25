@@ -22,8 +22,9 @@ import { detectSpecOverlap } from '../../domain/services/detect-spec-overlap.js'
 import { SpecOverlapError } from '../../domain/errors/spec-overlap-error.js'
 import { SpecArtifact } from '../../domain/value-objects/spec-artifact.js'
 import { inferFormat } from '../../domain/services/format-inference.js'
-import { type GenerateSpecMetadata } from './generate-spec-metadata.js'
-import { type SaveSpecMetadata } from './save-spec-metadata.js'
+import { type MaterializeSpecMetadata } from './materialize-spec-metadata.js'
+import { applyPersistedSpecStatePatch } from '../../domain/services/apply-persisted-spec-state-patch.js'
+import { readCachedSpecMetadata } from './_shared/read-cached-spec-metadata.js'
 import { type RunStepHooks } from './run-step-hooks.js'
 import { Logger } from '../logger.js'
 import { type ArchiveBatchSnapshotPort } from '../ports/archive-batch-snapshot.js'
@@ -143,10 +144,8 @@ interface PreparedArchivePreflightSpec {
     | readonly { readonly file: string; readonly symbols?: readonly string[] }[]
     | null
   readonly finalDependsOn: readonly string[]
-  readonly publicationPersistedSchema: { name: string; version: number } | undefined
-  readonly publicationPersistedDependsOn: readonly string[] | undefined
-  readonly publicationPersistedImplementation:
-    | readonly { readonly file: string; readonly symbols?: readonly string[] }[]
+  readonly publicationPersistedState:
+    | import('../../domain/services/apply-persisted-spec-state-patch.js').PersistedSpecState
     | undefined
   readonly sidecarActive: boolean
 }
@@ -172,8 +171,7 @@ export class ArchiveChange {
   private readonly _actor: ActorResolver
   private readonly _parsers: ArtifactParserRegistry
   private readonly _schemaProvider: SchemaProvider
-  private readonly _generateMetadata: GenerateSpecMetadata
-  private readonly _saveMetadata: SaveSpecMetadata
+  private readonly _materializeMetadata: MaterializeSpecMetadata
   private readonly _extractorTransforms: ExtractorTransformRegistry
   private readonly _workspaceRoutes: readonly SpecWorkspaceRoute[]
   private readonly _projectRoot: string
@@ -189,8 +187,7 @@ export class ArchiveChange {
    * @param actor - Resolver for the actor identity
    * @param parsers - Registry of artifact format parsers
    * @param schemaProvider - Provider for the fully-resolved schema
-   * @param generateMetadata - Use case for deterministic metadata extraction
-   * @param saveMetadata - Use case for writing metadata
+   * @param materializeMetadata - Use case for materializing spec metadata before archive
    * @param extractorTransforms - Shared extractor transform registry for pre-publication extraction
    * @param workspaceRoutes - Workspace routing metadata for cross-workspace spec reference resolution
    * @param projectRoot - Project root used to canonicalize raw implementation paths
@@ -204,8 +201,7 @@ export class ArchiveChange {
     actor: ActorResolver,
     parsers: ArtifactParserRegistry,
     schemaProvider: SchemaProvider,
-    generateMetadata: GenerateSpecMetadata,
-    saveMetadata: SaveSpecMetadata,
+    materializeMetadata: MaterializeSpecMetadata,
     extractorTransforms: ExtractorTransformRegistry = new Map(),
     workspaceRoutes: readonly SpecWorkspaceRoute[] = [],
     projectRoot = process.cwd(),
@@ -218,8 +214,7 @@ export class ArchiveChange {
     this._actor = actor
     this._parsers = parsers
     this._schemaProvider = schemaProvider
-    this._generateMetadata = generateMetadata
-    this._saveMetadata = saveMetadata
+    this._materializeMetadata = materializeMetadata
     this._extractorTransforms = extractorTransforms
     this._workspaceRoutes = workspaceRoutes
     this._projectRoot = projectRoot
@@ -458,31 +453,26 @@ export class ArchiveChange {
           change: change.name,
           specId: publication.specId,
           artifactCount: publication.writes.length,
-          implementationCount: publication.publicationPersistedImplementation?.length ?? 0,
+          implementationCount: publication.publicationPersistedState?.implementation.length ?? 0,
         })
-        await publication.specRepo.publish(publication.spec, {
-          artifacts: publication.writes.map(
-            (write) => new SpecArtifact(write.outputFilename, write.content),
-          ),
-          ...(publication.publicationPersistedSchema !== undefined
-            ? { persistedSchema: publication.publicationPersistedSchema }
-            : {}),
-          ...(publication.publicationPersistedDependsOn !== undefined
-            ? { persistedDependsOn: publication.publicationPersistedDependsOn }
-            : {}),
-          ...(publication.publicationPersistedImplementation !== undefined
-            ? { persistedImplementation: publication.publicationPersistedImplementation }
-            : {}),
-        })
+        if (publication.publicationPersistedState !== undefined) {
+          await publication.specRepo.publish(publication.spec, {
+            artifacts: publication.writes.map(
+              (write) => new SpecArtifact(write.outputFilename, write.content),
+            ),
+            persistedState: publication.publicationPersistedState,
+          })
+          await this._batchSnapshot.recordCreatedFile(publication.specId, 'spec-lock.json')
+        } else {
+          for (const write of publication.writes) {
+            await publication.specRepo.save(
+              publication.spec,
+              new SpecArtifact(write.outputFilename, write.content),
+            )
+          }
+        }
         for (const write of publication.writes) {
           await this._batchSnapshot.recordCreatedFile(publication.specId, write.outputFilename)
-        }
-        if (
-          publication.publicationPersistedSchema !== undefined ||
-          publication.publicationPersistedDependsOn !== undefined ||
-          publication.publicationPersistedImplementation !== undefined
-        ) {
-          await this._batchSnapshot.recordCreatedFile(publication.specId, 'spec-lock.json')
         }
         Logger.debug('ArchiveChange completed staged spec publication', {
           change: change.name,
@@ -542,30 +532,11 @@ export class ArchiveChange {
         const publishedState = postPublicationStates.get(specId)
         if (publishedState === undefined) continue
 
-        Logger.debug('ArchiveChange metadata generation started', { change: change.name, specId })
-        const result = await this._generateMetadata.execute({ specId })
-        if (!result.hasExtraction || Object.keys(result.metadata).length === 0) {
-          failedMetadataSpecPaths.push(specId)
-          Logger.debug('ArchiveChange metadata generation skipped', {
-            change: change.name,
-            specId,
-            skipped: 'no-extraction',
-          })
-          continue
-        }
-
-        const metadataDependsOn =
-          publishedState.sidecarActive || result.metadata.dependsOn === undefined
-            ? publishedState.finalDependsOn
-            : result.metadata.dependsOn
-
-        await this._saveMetadata.execute({
-          workspace: publishedState.workspace,
-          specPath: publishedState.specPath,
-          content:
-            JSON.stringify({ ...result.metadata, dependsOn: [...metadataDependsOn] }, null, 2) +
-            '\n',
-          force: true,
+        Logger.debug('ArchiveChange force materialization started', { change: change.name, specId })
+        await this._materializeMetadata.execute({ specId, policy: 'force' })
+        Logger.debug('ArchiveChange force materialization completed', {
+          change: change.name,
+          specId,
         })
         Logger.debug('ArchiveChange metadata generation completed', { change: change.name, specId })
       } catch {
@@ -854,17 +825,16 @@ export class ArchiveChange {
       ),
       workspaceRoutes: this._workspaceRoutes,
     })
-    const persistedSchema = await args.publication.specRepo.readPersistedSchema(
-      args.publication.spec,
-    )
-    const persistedDependsOn = await args.publication.specRepo.readPersistedDependsOn(
-      args.publication.spec,
-    )
-    const persistedImplementation = await args.publication.specRepo.readPersistedImplementation(
-      args.publication.spec,
-    )
+    const persistedState = await args.publication.specRepo.readPersistedState(args.publication.spec)
+    const persistedSchema = persistedState?.schema ?? null
+    const persistedDependsOn = persistedState?.dependsOn ?? null
+    const persistedImplementation =
+      persistedState?.implementation?.map((entry) => ({
+        file: entry.file,
+        ...(entry.symbols !== undefined ? { symbols: entry.symbols } : {}),
+      })) ?? null
 
-    const metadata = await args.publication.specRepo.metadata(args.publication.spec)
+    const metadata = await readCachedSpecMetadata(args.publication.specRepo, args.publication.spec)
     const sidecarActive =
       persistedSchema !== null ||
       this._isStructurallyCompatiblePreparedArtifacts(extractionArtifacts)
@@ -899,6 +869,28 @@ export class ArchiveChange {
         }))
       : undefined
 
+    const publicationPersistedState =
+      sidecarActive && publicationPersistedSchema !== undefined
+        ? applyPersistedSpecStatePatch(
+            persistedState !== null
+              ? { kind: 'existing', state: persistedState }
+              : {
+                  kind: 'initial',
+                  schema: publicationPersistedSchema,
+                  dependsOn: publicationPersistedDependsOn ?? [],
+                },
+            {
+              ...(publicationPersistedDependsOn !== undefined
+                ? { dependsOn: publicationPersistedDependsOn }
+                : {}),
+              ...(publicationPersistedImplementation !== undefined
+                ? { implementation: publicationPersistedImplementation }
+                : {}),
+            },
+            { specId: args.publication.specId },
+          )
+        : undefined
+
     return {
       specId: args.publication.specId,
       workspace,
@@ -911,9 +903,7 @@ export class ArchiveChange {
       persistedDependsOn,
       persistedImplementation,
       finalDependsOn,
-      publicationPersistedSchema,
-      publicationPersistedDependsOn,
-      publicationPersistedImplementation,
+      publicationPersistedState,
       sidecarActive,
     }
   }

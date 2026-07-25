@@ -8,23 +8,8 @@
     "core:resolve-schema",
     "core:config-writer-port",
     "core:kernel-builder",
-    "core:composition-resolver"
+    "core:composition-resolver",
+    "core:materialize-spec-metadata"
   ],
-  "implementation": [
-    {
-      "file": "core:src/composition/config-loader.ts",
-      "symbols": ["createDefaultConfigLoader"]
-    },
-    {
-      "file": "core:src/application/ports/config-loader.ts",
-      "symbols": ["ConfigLoader"]
-    },
-    {
-      "file": "core:src/composition/composition-resolver.ts",
-      "symbols": ["resolveMetadataPathForWorkspace"]
-    },
-    {
-      "file": "core:test/composition/composition-resolver.spec.ts"
-    }
-  ]
+  "implementation": []
 }

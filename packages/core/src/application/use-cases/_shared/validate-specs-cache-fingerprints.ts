@@ -2,7 +2,7 @@ import { type Schema } from '../../../domain/value-objects/schema.js'
 import { type ContentHasher } from '../../ports/content-hasher.js'
 
 /** Bumped when validate-specs evaluation logic changes independently of schema YAML. */
-export const VALIDATE_SPECS_ENGINE_VERSION = 1 as const
+export const VALIDATE_SPECS_ENGINE_VERSION = 2 as const
 
 const ABSENT_SENTINEL = '__absent__'
 

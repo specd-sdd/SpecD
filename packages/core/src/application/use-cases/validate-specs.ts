@@ -30,6 +30,12 @@ import {
   VALIDATE_SPECS_ENGINE_VERSION,
   computeSchemaFingerprintFromSchema,
 } from './_shared/validate-specs-cache-fingerprints.js'
+import {
+  listEntryHasMeta,
+  specFromListEntry,
+  stampsFromListEntry,
+} from './_shared/validation-source-stamps.js'
+import { type GetSpecMetadata } from './get-spec-metadata.js'
 
 /** Input for the {@link ValidateSpecs} use case. */
 export interface ValidateSpecsInput {
@@ -69,6 +75,7 @@ export class ValidateSpecs {
   private readonly _extractorTransforms: ExtractorTransformRegistry
   private readonly _workspaceRoutes: readonly SpecWorkspaceRoute[]
   private readonly _validationResultCaches: ReadonlyMap<string, ValidationResultCache>
+  private readonly _getMetadata: GetSpecMetadata
 
   /**
    * Creates a new `ValidateSpecs` use case instance.
@@ -76,6 +83,7 @@ export class ValidateSpecs {
    * @param specs - Spec repositories keyed by workspace name
    * @param schemaProvider - Provider for the fully-resolved schema
    * @param parsers - Registry of artifact format parsers
+   * @param getMetadata - Metadata materialization use case
    * @param hasher - Content hasher for metadata freshness validation
    * @param extractorTransforms - Shared extractor transform registry
    * @param workspaceRoutes - Workspace routing metadata for cross-workspace resolution
@@ -85,6 +93,7 @@ export class ValidateSpecs {
     specs: ReadonlyMap<string, SpecRepository>,
     schemaProvider: SchemaProvider,
     parsers: ArtifactParserRegistry,
+    getMetadata: GetSpecMetadata,
     hasher?: ContentHasher,
     extractorTransforms: ExtractorTransformRegistry = new Map(),
     workspaceRoutes: readonly SpecWorkspaceRoute[] = [],
@@ -93,6 +102,7 @@ export class ValidateSpecs {
     this._specs = specs
     this._schemaProvider = schemaProvider
     this._parsers = parsers
+    this._getMetadata = getMetadata
     this._hasher = hasher ?? {
       hash(content: string): string {
         return content
@@ -147,15 +157,11 @@ export class ValidateSpecs {
       if (specRepo === undefined) {
         throw new WorkspaceNotFoundError(input.workspace)
       }
-      const listed = await specRepo.list(undefined)
-      for (const entry of listed.items) {
-        const spec = await specRepo.get(SpecPath.parse(entry.path))
-        if (spec === null) continue
-        const entryResult = await this._validateSpecWithCache({
+      const listed = await specRepo.list(undefined, { includeMeta: true })
+      for (const row of listed.items) {
+        const entryResult = await this._validateListedSpecWithCache({
           specRepo,
-          spec,
-          workspace: spec.workspace,
-          capabilityPath: spec.name.toFsPath('/'),
+          row,
           specArtifactTypes,
           crossRules,
           schema,
@@ -166,15 +172,11 @@ export class ValidateSpecs {
       }
     } else {
       for (const [, specRepo] of this._specs) {
-        const listed = await specRepo.list(undefined)
+        const listed = await specRepo.list(undefined, { includeMeta: true })
         for (const row of listed.items) {
-          const spec = await specRepo.get(SpecPath.parse(row.path))
-          if (spec === null) continue
-          const entryResult = await this._validateSpecWithCache({
+          const entryResult = await this._validateListedSpecWithCache({
             specRepo,
-            spec,
-            workspace: spec.workspace,
-            capabilityPath: spec.name.toFsPath('/'),
+            row,
             specArtifactTypes,
             crossRules,
             schema,
@@ -193,6 +195,79 @@ export class ValidateSpecs {
       passed,
       failed: entries.length - passed,
     }
+  }
+
+  /**
+   * Validates one listed spec using projected Meta stamps when available.
+   *
+   * @param args - Validation context for a single listed spec
+   * @param args.specRepo - Repository for the spec workspace
+   * @param args.row - Listed spec row, optionally including Meta stamps
+   * @param args.specArtifactTypes - Spec-scoped artifact types from the schema
+   * @param args.crossRules - Cross-artifact validation rules
+   * @param args.schema - Fully-resolved schema
+   * @param args.schemaFingerprint - Schema fingerprint used for cache lookup
+   * @param args.engineVersion - Validation engine version used for cache lookup
+   * @returns Validation result for the listed spec
+   */
+  private async _validateListedSpecWithCache(args: {
+    readonly specRepo: SpecRepository
+    readonly row: import('../ports/spec-repository.js').SpecListEntry
+    readonly specArtifactTypes: readonly ArtifactType[]
+    readonly crossRules: readonly CrossArtifactValidationRule[]
+    readonly schema: Schema
+    readonly schemaFingerprint: string
+    readonly engineVersion: number
+  }): Promise<SpecValidationEntry> {
+    if (listEntryHasMeta(args.row)) {
+      const spec = specFromListEntry(args.row)
+      const stamps = stampsFromListEntry(args.row)
+      const cache = this._validationResultCaches.get(spec.workspace)
+      if (cache !== undefined) {
+        const lookup = await cache.lookup({
+          spec,
+          schemaFingerprint: args.schemaFingerprint,
+          engineVersion: args.engineVersion,
+          stamps,
+        })
+        if (lookup.kind === 'hit') {
+          return this._fromCacheEntry(lookup.entry)
+        }
+      }
+
+      const loaded = await args.specRepo.get(SpecPath.parse(args.row.path))
+      if (loaded === null) {
+        throw new SpecNotFoundError(`${args.row.workspace}:${args.row.path}`)
+      }
+
+      return this._validateSpecWithCache({
+        specRepo: args.specRepo,
+        spec: loaded,
+        workspace: loaded.workspace,
+        capabilityPath: loaded.name.toFsPath('/'),
+        specArtifactTypes: args.specArtifactTypes,
+        crossRules: args.crossRules,
+        schema: args.schema,
+        schemaFingerprint: args.schemaFingerprint,
+        engineVersion: args.engineVersion,
+      })
+    }
+
+    const spec = await args.specRepo.get(SpecPath.parse(args.row.path))
+    if (spec === null) {
+      throw new SpecNotFoundError(`${args.row.workspace}:${args.row.path}`)
+    }
+    return this._validateSpecWithCache({
+      specRepo: args.specRepo,
+      spec,
+      workspace: spec.workspace,
+      capabilityPath: spec.name.toFsPath('/'),
+      specArtifactTypes: args.specArtifactTypes,
+      crossRules: args.crossRules,
+      schema: args.schema,
+      schemaFingerprint: args.schemaFingerprint,
+      engineVersion: args.engineVersion,
+    })
   }
 
   /**
@@ -432,40 +507,44 @@ export class ValidateSpecs {
     readonly specArtifactTypes: readonly ArtifactType[]
     readonly failures: ValidationFailure[]
   }): Promise<void> {
-    const metadata = await args.specRepo.metadata(args.spec)
-    if (metadata === null) {
+    let metadata: Awaited<ReturnType<GetSpecMetadata['execute']>>['metadata']
+    try {
+      metadata = (await this._getMetadata.execute({ specId: args.label })).metadata
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error)
+      args.failures.push({
+        artifactId: 'metadata',
+        description: `Metadata for '${args.label}' could not be materialized: ${reason}`,
+      })
+      // Do not also re-check dependsOn here — the materialization error already
+      // carries the root cause (including extracted-vs-persisted mismatches).
       return
     }
 
-    if (metadata.freshness === 'stale') {
+    const persisted = await args.specRepo.readPersistedState(args.spec)
+    if (persisted === null) {
+      return
+    }
+
+    if (
+      metadata.dependsOn === undefined ||
+      !DependsOnOverwriteError.areSame(metadata.dependsOn, persisted.dependsOn)
+    ) {
       args.failures.push({
         artifactId: 'metadata',
-        description: `Metadata for '${args.label}' has stale or incomplete contentHashes`,
+        description: `Metadata for '${args.label}' has dependsOn that does not match persisted dependencies`,
       })
     }
 
-    const persistedDependsOn = await args.specRepo.readPersistedDependsOn(args.spec)
-    if (persistedDependsOn !== null) {
-      if (
-        metadata.dependsOn === undefined ||
-        !DependsOnOverwriteError.areSame(metadata.dependsOn, persistedDependsOn)
-      ) {
-        args.failures.push({
-          artifactId: 'metadata',
-          description: `Metadata for '${args.label}' has dependsOn that does not match persisted dependencies`,
-        })
-      }
-
-      const extractedDependsOn = await this._extractDependsOn(args)
-      if (
-        extractedDependsOn !== undefined &&
-        !DependsOnOverwriteError.areSame(extractedDependsOn, persistedDependsOn)
-      ) {
-        args.failures.push({
-          artifactId: 'metadata',
-          description: `Extracted dependsOn for '${args.label}' does not match persisted dependencies`,
-        })
-      }
+    const extractedDependsOn = await this._extractDependsOn(args)
+    if (
+      extractedDependsOn !== undefined &&
+      !DependsOnOverwriteError.areSame(extractedDependsOn, persisted.dependsOn)
+    ) {
+      args.failures.push({
+        artifactId: 'metadata',
+        description: `Extracted dependsOn for '${args.label}' does not match persisted dependencies`,
+      })
     }
   }
 

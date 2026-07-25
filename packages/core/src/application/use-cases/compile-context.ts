@@ -22,6 +22,11 @@ import { compileContextFingerprint } from './_shared/compile-context-fingerprint
 import { type SpecWorkspaceRoute } from './_shared/spec-reference-resolver.js'
 import { extractMetadataFromSpecArtifacts } from './_shared/extract-metadata-from-spec-artifacts.js'
 import { type ListWorkspaces, type ProjectWorkspace } from './list-workspaces.js'
+import { type GetSpecMetadata } from './get-spec-metadata.js'
+import {
+  appendMaterializationDiagnostics,
+  materializeContextSpecMetadata,
+} from './_shared/materialize-context-spec-metadata.js'
 import { mergeCompileContextRuntimeOverrides } from './_shared/merge-compile-context-config.js'
 
 const CONTEXT_SOURCE_PRIORITY: Record<ContextSpecSource, number> = {
@@ -201,6 +206,7 @@ export class CompileContext {
   private readonly _extractorTransforms: ExtractorTransformRegistry
   private readonly _workspaceRoutes: readonly SpecWorkspaceRoute[]
   private readonly _defaultConfig: CompileContextConfig
+  private readonly _getMetadata: GetSpecMetadata
 
   /**
    * Creates a new `CompileContext` use case instance.
@@ -212,6 +218,7 @@ export class CompileContext {
    * @param parsers - Registry of artifact format parsers
    * @param hasher - Content hasher for metadata freshness checks
    * @param previewSpec - Use case for merging deltas into spec content
+   * @param getMetadata - Metadata materialization use case
    * @param extractorTransforms - Shared extractor transform registry
    * @param workspaceRoutes - Workspace routing metadata for cross-workspace resolution
    * @param defaultConfig - Yaml-derived context configuration baked at composition time
@@ -224,6 +231,7 @@ export class CompileContext {
     parsers: ArtifactParserRegistry,
     hasher: ContentHasher,
     previewSpec: PreviewSpec,
+    getMetadata: GetSpecMetadata,
     extractorTransforms: ExtractorTransformRegistry = new Map(),
     workspaceRoutes: readonly SpecWorkspaceRoute[] = [],
     defaultConfig: CompileContextConfig = {},
@@ -235,6 +243,7 @@ export class CompileContext {
     this._parsers = parsers
     this._hasher = hasher
     this._previewSpec = previewSpec
+    this._getMetadata = getMetadata
     this._extractorTransforms = extractorTransforms
     this._workspaceRoutes = workspaceRoutes
     this._defaultConfig = defaultConfig
@@ -276,7 +285,13 @@ export class CompileContext {
       metadata: projectMeta,
       isFresh,
       warnings: optimizationWarnings,
-    } = await checkProjectMetadataFreshness(config, this._files, this._hasher, workspaceMap)
+    } = await checkProjectMetadataFreshness(
+      config,
+      this._files,
+      this._hasher,
+      workspaceMap,
+      this._getMetadata,
+    )
 
     const shouldUseOptimizedContext =
       config.llmOptimizedContext === true &&
@@ -426,22 +441,15 @@ export class CompileContext {
         if (manifestDeps !== undefined && manifestDeps.length > 0) {
           dependsOnList = [...manifestDeps]
         } else {
-          const meta = await repo.metadata(spec)
-
-          if (meta !== null) {
-            dependsOnList = meta.dependsOn
-            if (meta.freshness === 'stale') {
-              warnings.push({
-                type: 'stale-metadata',
-                path: specId,
-                message: `Metadata for '${specId}' is stale`,
-              })
-            }
-          } else {
+          try {
+            const materialized = await this._getMetadata.execute({ specId })
+            appendMaterializationDiagnostics(specId, materialized, warnings)
+            dependsOnList = materialized.metadata.dependsOn
+          } catch {
             warnings.push({
               type: 'missing-metadata',
               path: specId,
-              message: `No metadata for '${specId}' — dependency traversal may be incomplete. Run metadata generation to fix.`,
+              message: `No metadata for '${specId}' — dependency traversal may be incomplete.`,
             })
 
             if (depFallback !== undefined && depFallback.extraction.dependsOn !== undefined) {
@@ -531,20 +539,8 @@ export class CompileContext {
       }
 
       const spec = new Spec(workspace, specPathObj, [], ABSENT_SPEC_SIDECAR, ABSENT_SPEC_SIDECAR)
-      const metadata = await specRepo.metadata(spec)
       const specId = `${workspace}:${capPath}`
       const source = sourceMap.get(specId) ?? 'includePattern'
-
-      // Check for missing optimization if enabled
-      if (shouldUseOptimizedContext && metadata !== null) {
-        if (metadata.optimizedContext === undefined || metadata.optimizedContext === '') {
-          warnings.push({
-            type: 'stale-optimization',
-            path: specId,
-            message: `Spec '${specId}' is missing LLM-optimized context. Launch specd-spec-context-optimizer agent to refresh.`,
-          })
-        }
-      }
 
       // Determine entry mode from configured context mode and source.
       const mode: ContextSpecEntry['mode'] = (() => {
@@ -565,6 +561,24 @@ export class CompileContext {
       if (mode === 'list') {
         specs.push({ specId, source, mode })
         continue
+      }
+
+      let metadata: SpecMetadata | null = null
+      try {
+        metadata = await materializeContextSpecMetadata(this._getMetadata, specId, warnings)
+      } catch {
+        metadata = null
+      }
+
+      // Check for missing optimization if enabled
+      if (shouldUseOptimizedContext && metadata !== null) {
+        if (metadata.optimizedContext === undefined || metadata.optimizedContext === '') {
+          warnings.push({
+            type: 'stale-optimization',
+            path: specId,
+            message: `Spec '${specId}' is missing LLM-optimized context. Launch specd-spec-context-optimizer agent to refresh.`,
+          })
+        }
       }
 
       // Extract title and description from metadata (needed for both modes)
@@ -650,7 +664,7 @@ export class CompileContext {
             content = ''
           }
         } else {
-          if (metadata !== null && metadata.freshness === 'fresh') {
+          if (metadata !== null) {
             content = this._renderFromMetadata(metadata, sectionsFilter, shouldUseOptimizedContext)
           } else {
             if (metadata !== null) {

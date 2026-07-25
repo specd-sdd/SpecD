@@ -98,19 +98,12 @@ export async function traverseDependsOn(
   }
 
   const spec = new Spec(workspace, specPathObj, [], ABSENT_SPEC_SIDECAR, ABSENT_SPEC_SIDECAR)
-  const metadata = await specRepo.metadata(spec)
+  const persisted = await specRepo.readPersistedState(spec)
 
   let dependsOn: string[] | undefined
 
-  if (metadata !== null) {
-    dependsOn = metadata.dependsOn
-    if (metadata.freshness === 'stale') {
-      warnings.push({
-        type: 'stale-metadata',
-        path: key,
-        message: `Metadata for '${key}' is stale`,
-      })
-    }
+  if (persisted !== null) {
+    dependsOn = [...persisted.dependsOn]
   } else {
     warnings.push({
       type: 'missing-metadata',

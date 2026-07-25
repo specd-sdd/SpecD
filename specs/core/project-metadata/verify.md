@@ -21,7 +21,14 @@
 #### Scenario: Tracks all dependencies
 
 - **WHEN** freshness hashes are computed
-- **THEN** they include `specd.yaml`, all context files, and metadata hashes of all resolved project context specs
+- **THEN** they include `specd.yaml`, all context files, and the materialized `metadataFingerprint` of all resolved project context specs
+
+#### Scenario: Per-spec fingerprint is semantic, not a raw cache hash or storage revision
+
+- **GIVEN** a spec's metadata-cache file bytes or repository storage revision changes without any change to its semantically meaningful metadata content
+- **WHEN** its `metadataFingerprint` is recorded in `freshness`
+- **THEN** the fingerprint value does not change
+- **AND** freshness comparisons remain storage-adapter-independent
 
 ### Requirement: Config-based factory delegates through resolveGetProjectMetadataDeps
 

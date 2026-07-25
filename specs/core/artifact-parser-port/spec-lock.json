@@ -1,0 +1,13 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "default:_global/architecture",
+    "core:artifact-ast",
+    "core:delta-format",
+    "core:selector-model"
+  ],
+  "implementation": []
+}

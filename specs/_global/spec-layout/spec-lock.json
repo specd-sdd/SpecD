@@ -1,0 +1,44 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["core:schema-format", "core:content-extraction", "core:spec-id-format"],
+  "implementation": [],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Specs under `specs/`: `_global/` cross-cutting, `<package>/` internal. Each topic dir has paired `spec.md` + `verify.md`.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:64dee3830d5120520694ea893ebf64af031ebad2d87ac360b7dc26d5b633ea7c",
+          "lastModified": "2026-05-25T06:02:58.307Z"
+        },
+        "verify.md": {
+          "hash": "sha256:1886469d30e4b6b4e813d3090fa9baf4a1abad7890fe99f3237f4655c9c284b4",
+          "lastModified": "2026-05-25T06:02:58.307Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Spec Layout\n\n## Rules\n- `_global/<topic>/`: cross-cutting constraints binding all packages\n- `<package>/`: package-internal (short name: core, cli, mcp, skills, schema-std); not binding on other packages\n- Each spec: kebab-case subdir with `spec.md` (requirements) + `verify.md` (WHEN/THEN); always paired; no scenarios in spec.md; no requirement prose in verify.md\n- `spec.md` structure: `# Title`, `## Purpose`, `## Requirements` (`### Requirement: <Name>`), optional `## Constraints`, `## Examples`, `## Spec Dependencies`, `## ADRs`\n- `verify.md`: `# Verification: <Title>`, scenarios under matching `### Requirement: <Name>` with `#### Scenario: <Name>`; GIVEN/WHEN/THEN format\n- `## Spec Dependencies`: required; `_none_` or `_none — this is a global constraint spec_`; canonical label `` `<workspace>:<capability-path>` `` with optional relative link\n\n## Constraints\n- `_global/` cross-cutting only\n- Exactly two authored files per spec subdir: spec.md + verify.md\n- Delta files live in change dirs, never synced to specs/\n- kebab-case subdir names\n- Package specs not binding on other packages",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:64dee3830d5120520694ea893ebf64af031ebad2d87ac360b7dc26d5b633ea7c",
+          "lastModified": "2026-05-25T06:02:58.307Z"
+        },
+        "verify.md": {
+          "hash": "sha256:1886469d30e4b6b4e813d3090fa9baf4a1abad7890fe99f3237f4655c9c284b4",
+          "lastModified": "2026-05-25T06:02:58.307Z"
+        }
+      }
+    }
+  }
+}

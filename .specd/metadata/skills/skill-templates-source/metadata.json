@@ -1,7 +1,7 @@
 {
   "title": "skills:skill-templates-source",
   "description": "Defines how skill templates are sourced, stored, rendered, and linked to shared template content across supported agent runtimes. Templates live without static frontmatter in the skills package, while each skill directory declares its own metadata contract and `@specd/skills` renders the final installed markdown for each runtime.",
-  "dependsOn": ["skills:skill"],
+  "dependsOn": ["skills:skill", "cli:spec-optimizations"],
   "context": [
     "Defines how skill templates are sourced, stored, rendered, and linked to shared template content across supported agent runtimes. Templates live without static frontmatter in the skills package, while each skill directory declares its own metadata contract and `@specd/skills` renders the final installed markdown for each runtime."
   ],
@@ -70,6 +70,18 @@
       "requirement": "Implementation tracking instructions in templates",
       "rules": [
         "Workflow skill templates MUST include implementation-tracking guidance for active changes.\n\nAt minimum:\n\n- implementation-oriented workflows MUST mention `specd changes implementation add` when code work is being linked back to specs\n- archive-oriented workflows MUST mention resolving tracked implementation files and reviewing implementation integrity before archive\n- shared workflow guidance MUST describe tracked implementation files and confirmed implementation links using the same terminology as the change artifacts"
+      ]
+    },
+    {
+      "requirement": "Metadata self-healing guidance in workflow templates",
+      "rules": [
+        "Archive-oriented, commit-oriented, and other metadata-oriented workflow skill templates MUST NOT instruct agents to scan for metadata-status values (`stale`, `missing`, `invalid`) or to run routine manual metadata regeneration as a normal workflow step. Templates MUST describe metadata as a self-healing materialized cache: normal consumers obtain a usable, current projection automatically, and `specd spec generate-metadata` MUST be presented only as an explicit forced-rebuild, cache-warming, repair, or diagnostic tool — never as a required step after a routine spec or lock change."
+      ]
+    },
+    {
+      "requirement": "Optimizer agent gating declared in templates",
+      "rules": [
+        "The `specd-project-context-optimizer` and `specd-spec-context-optimizer` agent templates MUST declare that they perform no optimization work — no generation, no persistence — unless the effective `llmOptimizedContext` project setting is `true`. Both templates MUST direct persistence through the lock-owned persisted-optimization commands (`cli:spec-optimizations`), and neither template MUST instruct invoking spec metadata generation after persisting an optimization."
       ]
     }
   ],
@@ -296,27 +308,67 @@
         "they mention specd changes implementation add",
         "AND they mention resolving or ignoring tracked implementation files before archive"
       ]
+    },
+    {
+      "requirement": "Metadata self-healing guidance in workflow templates",
+      "name": "Templates do not instruct scanning for metadata-status values",
+      "when": [
+        "archive-oriented, commit-oriented, or other metadata-oriented workflow skill templates are inspected"
+      ],
+      "then": [
+        "they do not instruct agents to scan for metadata-status values (stale, missing, invalid) as a normal workflow step"
+      ]
+    },
+    {
+      "requirement": "Metadata self-healing guidance in workflow templates",
+      "name": "generate-metadata is presented only as an explicit forced-rebuild tool",
+      "when": ["a workflow skill template mentions specd spec generate-metadata"],
+      "then": [
+        "it presents the command as an explicit forced-rebuild, cache-warming, repair, or diagnostic tool",
+        "AND it does not present the command as a required step after a routine spec or lock change"
+      ]
+    },
+    {
+      "requirement": "Optimizer agent gating declared in templates",
+      "name": "Optimizer agent templates declare the llmOptimizedContext gate",
+      "when": [
+        "the specd-project-context-optimizer and specd-spec-context-optimizer agent templates are inspected"
+      ],
+      "then": [
+        "each declares that it performs no generation or persistence unless the effective llmOptimizedContext project setting is true"
+      ]
+    },
+    {
+      "requirement": "Optimizer agent gating declared in templates",
+      "name": "Optimizer agent templates direct persistence through lock-owned commands",
+      "when": ["the optimizer agent templates describe how to persist generated content"],
+      "then": [
+        "they direct persistence through the lock-owned persisted-optimization commands (cli:spec-optimizations)",
+        "AND neither template instructs invoking spec metadata generation after persisting an optimization"
+      ]
     }
   ],
-  "implementation": {
-    "files": [
-      {
-        "specId": "skills:skill-templates-source",
-        "file": "skills:templates/shared/shared.md.tpl"
-      },
-      {
-        "specId": "skills:skill-templates-source",
-        "file": "skills:templates/skills/specd-design/SKILL.md.tpl"
-      },
-      {
-        "specId": "skills:skill-templates-source",
-        "file": "skills:templates/skills/specd-new/SKILL.md.tpl"
-      }
-    ]
-  },
   "contentHashes": {
-    "spec.md": "sha256:887f1c12bdf5c2da82ccc88d91d4c27b8da46697cb34a869b2ecc8544cb20b00",
-    "verify.md": "sha256:61b6a6de6ba232461b9645e9a4c995741a91f977571c8f19818f6591c1513249"
+    "spec.md": "sha256:050818cf8e60ab93cb600aef1451863f7ef1833914e9d1ccbb2ce85a5a18de83",
+    "verify.md": "sha256:24bc4ef604fb7547e879b5c936f4dbfb50893fa663c8e5b7bc7c9cfa5a7aead9"
   },
-  "generatedBy": "core"
+  "provenance": {
+    "artifacts": {
+      "spec.md": {
+        "hash": "sha256:050818cf8e60ab93cb600aef1451863f7ef1833914e9d1ccbb2ce85a5a18de83",
+        "lastModified": "2026-07-25T11:53:31.748Z"
+      },
+      "verify.md": {
+        "hash": "sha256:24bc4ef604fb7547e879b5c936f4dbfb50893fa663c8e5b7bc7c9cfa5a7aead9",
+        "lastModified": "2026-07-25T11:53:31.749Z"
+      }
+    },
+    "persistedStateHash": "sha256:6fe3fbf5c455fef61b3e59a536abf67d88da376f071c2a0357fc149fd7465cb5",
+    "schema": {
+      "name": "schema-std",
+      "version": 1
+    },
+    "projectionVersion": 1,
+    "projectionFingerprint": "sha256:e4a28a2db6a35ed39b8308518337235b1490c2948cd839db25866ad79b22404b"
+  }
 }

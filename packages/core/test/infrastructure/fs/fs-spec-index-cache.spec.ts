@@ -26,7 +26,7 @@ describe('FsSpecIndexCache', () => {
 
     const source: SpecIndexSource = {
       walk: async () => specs,
-      metadata: async () => null,
+      readMetadataSnapshot: async () => ({ kind: 'missing', revision: null }),
       artifact: async (spec, filename) => {
         const content = specContent.get(`${spec.name.toString()}/${filename}`)
         return content !== undefined ? new SpecArtifact(filename, content) : null

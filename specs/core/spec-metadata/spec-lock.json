@@ -9,7 +9,17 @@
     "core:schema-format",
     "core:content-extraction",
     "core:spec-repository-port",
-    "core:spec-lock"
+    "core:spec-lock",
+    "core:spec-optimization"
   ],
-  "implementation": []
+  "implementation": [
+    {
+      "file": "core:src/domain/services/parse-metadata.ts",
+      "symbols": ["SpecMetadataProvenance", "SpecMetadata", "MetadataSnapshot"]
+    },
+    {
+      "file": "core:src/domain/services/assess-metadata-freshness.ts",
+      "symbols": ["assessMetadataFreshness"]
+    }
+  ]
 }

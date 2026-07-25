@@ -1,9 +1,14 @@
 {
   "title": "Spec Metadata",
-  "description": "When debugging context issues or verifying metadata freshness, users need to inspect what is actually recorded in a spec's metadata file. The `specd spec metadata <workspace:capability-path>` command displays the parsed contents of a spec's metadata in a structured form, including freshness status for each recorded content hash.",
-  "dependsOn": ["cli:entrypoint", "core:spec-metadata", "core:spec-id-format"],
+  "description": "When debugging context issues or verifying metadata freshness, users need to inspect what Core would actually serve for a spec's metadata. The `specd spec metadata <workspace:capability-path>` command calls `GetSpecMetadata` to obtain a self-healed, normalized metadata projection and displays it alongside materialization diagnostics — whether the projection was reused or regenerated and any generation warnings — plus any lock-owned optimized fields currently fresh enough to be included.",
+  "dependsOn": [
+    "cli:entrypoint",
+    "core:get-spec-metadata",
+    "core:spec-metadata",
+    "core:spec-id-format"
+  ],
   "context": [
-    "When debugging context issues or verifying metadata freshness, users need to inspect what is actually recorded in a spec's metadata file. The `specd spec metadata <workspace:capability-path>` command displays the parsed contents of a spec's metadata in a structured form, including freshness status for each recorded content hash."
+    "When debugging context issues or verifying metadata freshness, users need to inspect what Core would actually serve for a spec's metadata. The `specd spec metadata <workspace:capability-path>` command calls `GetSpecMetadata` to obtain a self-healed, normalized metadata projection and displays it alongside materialization diagnostics — whether the projection was reused or regenerated and any generation warnings — plus any lock-owned optimized fields currently fresh enough to be included."
   ],
   "rules": [
     {
@@ -15,25 +20,25 @@
     {
       "requirement": "Behaviour",
       "rules": [
-        "The command reads metadata for the given spec (via the core use case, which delegates to `SpecRepository.metadata()`) and renders its contents in a structured form. For each file listed in `contentHashes`, it computes the current SHA-256 hash of the file on disk and compares it against the recorded hash, reporting whether the metadata is fresh or stale per file.\n\nIf no metadata exists for the spec, the command exits with code 1."
+        "The command calls the `GetSpecMetadata` use case, which internally materializes metadata with an `if-needed` policy: it reuses a fresh persisted projection when present and transparently regenerates a missing, invalid, or stale one from current source artifacts. The command renders the returned `metadata`, `source` (`persisted` or `generated`), `regenerated` flag, and any `warnings` — it never reads `SpecRepository.metadata()` directly and never computes or compares per-file content hashes itself.\n\nIf materialization cannot produce valid metadata (for example, the spec's schema has no extraction rules), the underlying use-case error propagates through `handleError` and the command exits with code 1."
       ]
     },
     {
       "requirement": "Output format",
       "rules": [
-        "In `text` mode (default):\n\n```\nspec: <workspace>:<capability-path>\n\ntitle:       <title>\ndescription: <description>\ngeneratedBy: <core|agent>\n\ncontent hashes:\n  <filename>  <fresh|STALE>\n\ndependsOn:\n  <specId>\n  ...\n\nrules:      <N>\nconstraints: <N>\nscenarios:  <N>\n```\n\nSections with no content are omitted. `rules`, `constraints`, and `scenarios` show counts only in text mode. `generatedBy` shows which mechanism produced the metadata (`core` for deterministic extraction, `agent` for LLM-generated).\n\nIn `json` or `toon` mode, the full parsed metadata is output including all rules, constraints, and scenarios (encoded in the respective format):\n\n```json\n{\n  \"spec\": \"workspace:cap/path\",\n  \"fresh\": true,\n  \"title\": \"...\",\n  \"description\": \"...\",\n  \"generatedBy\": \"core\",\n  \"contentHashes\": [\n    {\"filename\": \"...\", \"recorded\": \"sha256:...\", \"current\": \"sha256:...\", \"fresh\": true}\n  ],\n  \"dependsOn\": [...],\n  \"rules\": [...],\n  \"constraints\": [...],\n  \"scenarios\": [...]\n}\n```\n\n`fresh` at the top level is `true` only when all `contentHashes` entries are fresh."
+        "In `text` mode (default):\n\n```\nspec: <workspace>:<capability-path>\n\ntitle:       <title>\ndescription: <description>\ngeneratedBy: <core|agent>\n\nsource:      <persisted|generated>\nregenerated: <true|false>\n\ndependsOn:\n  <specId>\n  ...\n\nrules:      <N>\nconstraints: <N>\nscenarios:  <N>\n```\n\nA `warnings:` section is printed, listing one warning per line, only when `GetSpecMetadata` returns at least one. Sections with no content are otherwise omitted. `rules`, `constraints`, and `scenarios` show counts only in text mode. `generatedBy` shows which mechanism produced the metadata (`core` for deterministic extraction, `agent` for a lock-owned optimized field currently fresh enough to be included).\n\nIn `json` or `toon` mode, the full parsed metadata is output alongside materialization diagnostics (encoded in the respective format):\n\n```json\n{\n  \"spec\": \"workspace:cap/path\",\n  \"source\": \"persisted\",\n  \"regenerated\": false,\n  \"warnings\": [],\n  \"title\": \"...\",\n  \"description\": \"...\",\n  \"generatedBy\": \"core\",\n  \"dependsOn\": [...],\n  \"rules\": [...],\n  \"constraints\": [...],\n  \"scenarios\": [...]\n}\n```\n\nThere is no top-level `fresh` flag or per-file `contentHashes` array: per-file freshness is an internal materialization decision, not a public projection."
       ]
     },
     {
       "requirement": "Error cases",
       "rules": [
-        "- If the workspace is not configured, exits with code 1.\n- If no metadata exists for the spec, exits with code 1 and prints an `error:` message to stderr."
+        "- If the workspace is not configured, exits with code 1.\n- If `GetSpecMetadata` cannot produce valid metadata (for example, the spec does not exist, or its schema has no extraction rules), exits with code 1 and prints an `error:` message to stderr.\n\nThere is no \"no metadata exists\" error: absent or stale metadata is transparently regenerated rather than treated as a failure."
       ]
     }
   ],
   "constraints": [
-    "This command is read-only — it never writes or updates metadata",
-    "Metadata regeneration is handled by specd spec generate-metadata or by a skill"
+    "This command is read-only from the caller's perspective — it never accepts metadata content and never exposes a way to edit it",
+    "GetSpecMetadata may transparently persist a freshly generated projection as a caching side effect; this command never performs a forced rebuild — that is specd spec generate-metadata"
   ],
   "scenarios": [
     {
@@ -44,28 +49,29 @@
     },
     {
       "requirement": "Behaviour",
-      "name": "Fresh hash shown as fresh",
-      "given": [
-        "default:auth/login has metadata with a contentHashes entry for spec.md matching the current file on disk"
-      ],
+      "name": "GetSpecMetadata self-heals a stale projection",
+      "given": ["a spec's persisted metadata is stale relative to current source artifacts"],
       "when": ["specd spec metadata default:auth/login is run"],
-      "then": ["the spec.md line shows fresh"]
+      "then": [
+        "the command calls GetSpecMetadata, which regenerates the projection",
+        "AND the rendered output shows source: generated and regenerated: true"
+      ]
     },
     {
       "requirement": "Behaviour",
-      "name": "Stale hash shown as STALE",
-      "given": [
-        "default:auth/login has metadata with a contentHashes entry for spec.md that does not match the current file"
-      ],
+      "name": "Fresh persisted projection is reused",
+      "given": ["a spec's persisted metadata is fresh relative to current source artifacts"],
       "when": ["specd spec metadata default:auth/login is run"],
-      "then": ["the spec.md line shows STALE"]
+      "then": ["the rendered output shows source: persisted and regenerated: false"]
     },
     {
       "requirement": "Behaviour",
-      "name": "Sections with no content omitted in text mode",
-      "given": ["metadata has no dependsOn entries"],
+      "name": "Command never reads SpecRepository.metadata() directly",
       "when": ["specd spec metadata default:auth/login is run"],
-      "then": ["the dependsOn: section is not printed"]
+      "then": [
+        "the command obtains metadata exclusively through GetSpecMetadata",
+        "AND it does not call SpecRepository.metadata() or compute per-file content hashes itself"
+      ]
     },
     {
       "requirement": "Output format",
@@ -76,39 +82,117 @@
     },
     {
       "requirement": "Output format",
-      "name": "JSON output includes full rules, constraints, scenarios",
+      "name": "Sections with no content omitted in text mode",
+      "given": ["metadata has no dependsOn entries"],
+      "when": ["specd spec metadata default:auth/login is run"],
+      "then": ["the dependsOn: section is not printed"]
+    },
+    {
+      "requirement": "Output format",
+      "name": "Warnings section printed only when GetSpecMetadata returns warnings",
+      "given": ["GetSpecMetadata returns at least one warning for the spec"],
+      "when": ["specd spec metadata default:auth/login is run"],
+      "then": ["stdout includes a warnings: section listing each warning on its own line"]
+    },
+    {
+      "requirement": "Output format",
+      "name": "No warnings section when GetSpecMetadata returns none",
+      "given": ["GetSpecMetadata returns an empty warnings array"],
+      "when": ["specd spec metadata default:auth/login is run"],
+      "then": ["stdout has no warnings: section"]
+    },
+    {
+      "requirement": "Output format",
+      "name": "generatedBy reflects the field's production mechanism",
+      "given": [
+        "a spec whose description was set through a lock-owned optimized field currently fresh enough to be included"
+      ],
+      "when": ["specd spec metadata default:auth/login is run"],
+      "then": ["stdout shows generatedBy: agent"]
+    },
+    {
+      "requirement": "Output format",
+      "name": "JSON output includes materialization diagnostics and full arrays",
       "given": ["metadata has rules, constraints, and scenarios"],
       "when": ["specd spec metadata default:auth/login --format json is run"],
       "then": [
         "stdout is valid JSON with rules, constraints, and scenarios as full arrays, not counts",
-        "AND fresh at the top level is true when all hashes match",
+        "AND it includes source, regenerated, and warnings fields",
         "AND the process exits with code 0"
       ]
     },
     {
       "requirement": "Output format",
-      "name": "JSON fresh field reflects all hashes",
-      "given": ["one of the contentHashes entries is stale"],
+      "name": "JSON output has no top-level fresh flag or contentHashes array",
       "when": ["specd spec metadata default:auth/login --format json is run"],
-      "then": ["fresh at the top level is false"]
+      "then": [
+        "the output has no top-level fresh field",
+        "AND it has no per-file contentHashes array"
+      ]
     },
     {
       "requirement": "Error cases",
-      "name": "Metadata absent",
-      "given": ["default:auth/login exists but has no metadata"],
-      "when": ["specd spec metadata default:auth/login is run"],
-      "then": ["the command exits with code 1", "AND stderr contains an error: message"]
-    },
-    {
-      "requirement": "Error cases",
-      "name": "Unknown workspace",
+      "name": "Unknown workspace exits 1",
       "when": ["specd spec metadata unknown-ws:auth/login is run"],
       "then": ["the command exits with code 1", "AND stderr contains an error: message"]
+    },
+    {
+      "requirement": "Error cases",
+      "name": "Absent metadata self-heals instead of erroring",
+      "given": ["default:auth/login exists but has no persisted metadata"],
+      "when": ["specd spec metadata default:auth/login is run"],
+      "then": [
+        "GetSpecMetadata generates and returns a fresh projection",
+        "AND the command exits with code 0"
+      ]
+    },
+    {
+      "requirement": "Error cases",
+      "name": "Unextractable spec exits 1",
+      "given": ["a spec whose schema has no metadataExtraction rules"],
+      "when": ["specd spec metadata is run for that spec"],
+      "then": [
+        "GetSpecMetadata cannot produce valid metadata",
+        "AND the command exits with code 1 with an error: message on stderr"
+      ]
     }
   ],
-  "contentHashes": {
-    "spec.md": "sha256:9a8b09c044bf6cf972f10d5ef35d946207b04a8007b14196c97a20e8805f9a1d",
-    "verify.md": "sha256:ac9c44a7e6dce13036207026949c6f1741e19e82329b0c031afed5fd3e6d08ea"
+  "implementation": {
+    "files": [
+      {
+        "specId": "cli:spec-metadata",
+        "file": "cli:test/commands/spec-metadata.spec.ts"
+      }
+    ],
+    "symbols": [
+      {
+        "specId": "cli:spec-metadata",
+        "file": "cli:src/commands/spec/metadata.ts",
+        "symbol": "registerSpecMetadata"
+      }
+    ]
   },
-  "generatedBy": "core"
+  "contentHashes": {
+    "spec.md": "sha256:4cfc9c3fc27e221d7d4ab3b32288db97eb38814565a4dbfd10cde550cc764395",
+    "verify.md": "sha256:844e0a5b1488d214a4e161a235fc35e3a9b96ae957dcd8b0de0a0c439c5904e6"
+  },
+  "provenance": {
+    "artifacts": {
+      "spec.md": {
+        "hash": "sha256:4cfc9c3fc27e221d7d4ab3b32288db97eb38814565a4dbfd10cde550cc764395",
+        "lastModified": "2026-07-25T11:53:31.254Z"
+      },
+      "verify.md": {
+        "hash": "sha256:844e0a5b1488d214a4e161a235fc35e3a9b96ae957dcd8b0de0a0c439c5904e6",
+        "lastModified": "2026-07-25T11:53:31.254Z"
+      }
+    },
+    "persistedStateHash": "sha256:f29f86f402efeb6c2f3d762f2908f5e6bb157ae93b43c4b82e55bca842272bdf",
+    "schema": {
+      "name": "schema-std",
+      "version": 1
+    },
+    "projectionVersion": 1,
+    "projectionFingerprint": "sha256:e4a28a2db6a35ed39b8308518337235b1490c2948cd839db25866ad79b22404b"
+  }
 }

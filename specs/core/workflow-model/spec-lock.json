@@ -1,0 +1,17 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "core:change",
+    "core:schema-format",
+    "core:build-schema",
+    "core:compile-context",
+    "core:get-status",
+    "core:transition-change",
+    "core:archive-change",
+    "core:hook-execution-model"
+  ],
+  "implementation": []
+}

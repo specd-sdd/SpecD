@@ -100,6 +100,10 @@ export function registerProjectInit(parent: Command): void {
 
           if (fmt === 'text') {
             output(`initialized specd in ${projectRoot}`, 'text')
+            output(
+              `metadata cache: ${initResult.metadataCachePath} (ignored in .gitignore)`,
+              'text',
+            )
             for (const entry of installed.plugins) {
               output(`plugins: ${entry.status} ${entry.name} (${entry.detail})`, 'text')
             }
@@ -110,6 +114,7 @@ export function registerProjectInit(parent: Command): void {
                 configPath: initResult.configPath,
                 schema: initResult.schemaRef,
                 workspaces: initResult.workspaces,
+                metadataCachePath: initResult.metadataCachePath,
                 plugins: installed.plugins,
               },
               fmt,
@@ -238,6 +243,7 @@ async function runInteractiveInit(options: {
 
   if (options.format === 'text') {
     output(`initialized specd in ${projectRoot}`, 'text')
+    output(`metadata cache: ${initResult.metadataCachePath} (ignored in .gitignore)`, 'text')
     for (const entry of installed.plugins) {
       output(`plugins: ${entry.status} ${entry.name} (${entry.detail})`, 'text')
     }
@@ -248,6 +254,7 @@ async function runInteractiveInit(options: {
         configPath: initResult.configPath,
         schema: initResult.schemaRef,
         workspaces: initResult.workspaces,
+        metadataCachePath: initResult.metadataCachePath,
         plugins: installed.plugins,
       },
       options.format,

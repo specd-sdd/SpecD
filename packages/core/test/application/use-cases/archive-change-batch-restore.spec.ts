@@ -4,8 +4,7 @@ import * as path from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { makeSpec } from '../../helpers/make-spec.js'
 import { ArchiveChange } from '../../../src/application/use-cases/archive-change.js'
-import { GenerateSpecMetadata } from '../../../src/application/use-cases/generate-spec-metadata.js'
-import { SaveSpecMetadata } from '../../../src/application/use-cases/save-spec-metadata.js'
+import { type MaterializeSpecMetadata } from '../../../src/application/use-cases/materialize-spec-metadata.js'
 import { Logger } from '../../../src/application/logger.js'
 import {
   type ArchiveBatchManifest,
@@ -37,6 +36,7 @@ import {
   makeSchema,
   makeSchemaProvider,
   makeSpecRepository,
+  makeMaterializeMetadata,
   testActor,
 } from './helpers.js'
 import {
@@ -52,18 +52,6 @@ import { type ArchiveListEntry } from '../../../src/domain/archived-change-index
 import { type ArchivedChange } from '../../../src/domain/entities/archived-change.js'
 import { toArchivedChangeView } from '../../../src/domain/read-only-change-view.js'
 import { Change, type ChangeEvent } from '../../../src/domain/entities/change.js'
-
-function makeGenerateMetadata(): GenerateSpecMetadata {
-  return {
-    execute: vi.fn().mockResolvedValue({ metadata: {}, hasExtraction: false }),
-  } as unknown as GenerateSpecMetadata
-}
-
-function makeSaveMetadata(): SaveSpecMetadata {
-  return {
-    execute: vi.fn().mockResolvedValue({ spec: 'default:test' }),
-  } as unknown as SaveSpecMetadata
-}
 
 async function setupFsSpecRepo(): Promise<{
   repo: FsSpecRepository
@@ -278,8 +266,7 @@ describe('ArchiveChange batch snapshot integration', () => {
       makeActorResolver(),
       makeParsers(),
       makeSchemaProvider(schema),
-      makeGenerateMetadata(),
-      makeSaveMetadata(),
+      makeMaterializeMetadata(),
       undefined,
       [],
       process.cwd(),
@@ -353,8 +340,7 @@ describe('ArchiveChange batch snapshot integration', () => {
       makeActorResolver(),
       makeParsers(),
       makeSchemaProvider(schema),
-      makeGenerateMetadata(),
-      makeSaveMetadata(),
+      makeMaterializeMetadata(),
       undefined,
       [],
       process.cwd(),
@@ -419,8 +405,7 @@ describe('ArchiveChange batch snapshot integration', () => {
       makeActorResolver(),
       makeParsers(),
       makeSchemaProvider(schema),
-      makeGenerateMetadata(),
-      makeSaveMetadata(),
+      makeMaterializeMetadata(),
       undefined,
       [],
       process.cwd(),
@@ -494,8 +479,7 @@ describe('ArchiveChange batch snapshot integration', () => {
       makeActorResolver(),
       makeParsers(),
       makeSchemaProvider(schema),
-      makeGenerateMetadata(),
-      makeSaveMetadata(),
+      makeMaterializeMetadata(),
       undefined,
       [],
       process.cwd(),
@@ -551,8 +535,7 @@ describe('ArchiveChange batch snapshot integration', () => {
       makeActorResolver(),
       makeParsers(new MarkdownParser(), new YamlParser()),
       makeSchemaProvider(schema),
-      makeGenerateMetadata(),
-      makeSaveMetadata(),
+      makeMaterializeMetadata(),
       undefined,
       [],
       process.cwd(),
@@ -590,12 +573,18 @@ describe('ArchiveChange batch snapshot integration', () => {
       }
     })
 
-    const generateMetadata = {
+    const materializeMetadata = {
       execute: vi.fn(async () => {
         order.push('metadata')
-        return { metadata: { dependsOn: ['default:auth/oauth'] }, hasExtraction: true }
+        return {
+          metadata: { dependsOn: ['default:auth/oauth'] },
+          metadataFingerprint: 'fp',
+          source: 'generated' as const,
+          regenerated: true,
+          warnings: [],
+        }
       }),
-    }
+    } as unknown as MaterializeSpecMetadata
 
     const schema = makeSchema([makeArtifactType('spec', { delta: false, scope: 'spec' })])
     const specRepo = makeSpecRepository({
@@ -633,8 +622,7 @@ describe('ArchiveChange batch snapshot integration', () => {
       makeActorResolver(),
       makeParsers(),
       makeSchemaProvider(schema),
-      generateMetadata as never,
-      makeSaveMetadata(),
+      materializeMetadata,
     )
 
     await uc.execute({ name: 'my-change' })
@@ -682,8 +670,7 @@ describe('ArchiveChange batch snapshot integration', () => {
       makeActorResolver(),
       makeParsers(),
       makeSchemaProvider(schema),
-      makeGenerateMetadata(),
-      makeSaveMetadata(),
+      makeMaterializeMetadata(),
       undefined,
       [],
       process.cwd(),
@@ -721,12 +708,15 @@ describe('ArchiveChange batch snapshot integration', () => {
       },
     })
 
-    const generateMetadata = {
+    const materializeMetadata = {
       execute: vi.fn().mockResolvedValue({
         metadata: { dependsOn: ['default:auth/oauth'] },
-        hasExtraction: true,
+        metadataFingerprint: 'fp',
+        source: 'generated' as const,
+        regenerated: true,
+        warnings: [],
       }),
-    }
+    } as unknown as MaterializeSpecMetadata
 
     const schema = makeSchema([makeArtifactType('spec', { delta: false, scope: 'spec' })])
     const change = makeArchivableChange('my-change', { specIds: ['default:auth/oauth'] })
@@ -760,8 +750,7 @@ describe('ArchiveChange batch snapshot integration', () => {
       makeActorResolver(),
       makeParsers(),
       makeSchemaProvider(schema),
-      generateMetadata as never,
-      makeSaveMetadata(),
+      materializeMetadata,
       undefined,
       [],
       process.cwd(),
@@ -771,8 +760,8 @@ describe('ArchiveChange batch snapshot integration', () => {
     await uc.execute({ name: 'my-change' })
 
     const messages = debugSpy.mock.calls.map(([message]) => String(message))
-    expect(messages.some((m) => m.includes('metadata generation started'))).toBe(true)
-    expect(messages.some((m) => m.includes('metadata generation completed'))).toBe(true)
+    expect(messages.some((m) => m.includes('force materialization started'))).toBe(true)
+    expect(messages.some((m) => m.includes('force materialization completed'))).toBe(true)
     expect(messages.some((m) => m.includes('post-archive hooks started'))).toBe(true)
     expect(messages.some((m) => m.includes('post-archive hooks completed'))).toBe(true)
     expect(postHookSpy).toHaveBeenCalled()

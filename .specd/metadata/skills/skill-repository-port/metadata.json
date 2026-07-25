@@ -60,7 +60,23 @@
     "spec.md": "sha256:f15f4aa3d875deebcb8255847c09c903b1359b075be2681d35d1217d77a68629",
     "verify.md": "sha256:d7812b57a78f408a8e1116092c0a62419b1beb74ed68f85a06787031cb0c6da2"
   },
-  "generatedBy": "agent",
-  "optimizedDescription": "Abstract interface for skill storage.",
-  "optimizedContext": "# skills:skill-repository-port\n\n## Rules\n- SkillRepositoryPort interface: SkillRepositoryPort MUST define the same interface as SkillRepository: - list(): Skill[] - get(name: string): Skill | undefined - getBundle(name: string, variables?:…\n- Port abstraction: The port is an abstract interface.\n- Dependencies: core:config, skills:skill, skills:skill-bundle\n\n## Constraints\n- The port interface MUST NOT contain any I/O code.\n"
+  "provenance": {
+    "artifacts": {
+      "spec.md": {
+        "hash": "sha256:f15f4aa3d875deebcb8255847c09c903b1359b075be2681d35d1217d77a68629",
+        "lastModified": "2026-05-25T06:02:58.507Z"
+      },
+      "verify.md": {
+        "hash": "sha256:d7812b57a78f408a8e1116092c0a62419b1beb74ed68f85a06787031cb0c6da2",
+        "lastModified": "2026-05-25T06:02:58.507Z"
+      }
+    },
+    "persistedStateHash": "sha256:e47b0cfa5850853952805190d5f25ebb3d5a81100cc580165f027dc8f17bc7f3",
+    "schema": {
+      "name": "schema-std",
+      "version": 1
+    },
+    "projectionVersion": 1,
+    "projectionFingerprint": "sha256:e4a28a2db6a35ed39b8308518337235b1490c2948cd839db25866ad79b22404b"
+  }
 }

@@ -1,0 +1,122 @@
+{
+  "title": "core:get-spec-metadata",
+  "description": "Normal callers that just want usable, current metadata for a spec should not need to know about freshness policy, generation, or persistence at all. `GetSpecMetadata` is the normal self-healing metadata query: a thin public use case that always materializes metadata on demand and returns the result together with diagnostics about where it came from.",
+  "dependsOn": ["core:materialize-spec-metadata", "core:spec-metadata", "core:spec-id-format"],
+  "context": [
+    "Normal callers that just want usable, current metadata for a spec should not need to know about freshness policy, generation, or persistence at all. `GetSpecMetadata` is the normal self-healing metadata query: a thin public use case that always materializes metadata on demand and returns the result together with diagnostics about where it came from."
+  ],
+  "rules": [
+    {
+      "requirement": "Input and delegation",
+      "rules": [
+        "`GetSpecMetadata.execute()` MUST accept an input identifying the target spec by `specId`.\n\nIt MUST delegate to `MaterializeSpecMetadata` with `policy: 'if-needed'`. `GetSpecMetadata` MUST NOT implement its own freshness comparison, generation, or persistence logic."
+      ]
+    },
+    {
+      "requirement": "Result contract",
+      "rules": [
+        "`GetSpecMetadata.execute()` MUST return a result carrying:\n\n- the usable `SpecMetadata` projection\n- the projection's semantic `metadataFingerprint`\n- `source` — whether the projection was reused (`'persisted'`) or generated during this call (`'generated'`)\n- `regenerated` — whether generation occurred during this call\n- `warnings` — any diagnostics produced during materialization, including a `metadata-cache-write-failed` warning when generation succeeded but caching it did not\n\nThis is the same shape produced by `MaterializeSpecMetadata`; `GetSpecMetadata` MUST NOT narrow, rename, or drop any of these fields when it is the terminal public caller."
+      ]
+    },
+    {
+      "requirement": "Failure semantics",
+      "rules": [
+        "`GetSpecMetadata` MUST surface a typed failure only when a valid in-memory metadata projection cannot be produced at all, or when reading the spec, its artifacts, or its persisted lock state fails. A metadata-cache write failure alone MUST NOT cause `GetSpecMetadata` to fail; it is reported as a warning on an otherwise successful result, consistent with `MaterializeSpecMetadata`'s `if-needed` policy."
+      ]
+    },
+    {
+      "requirement": "Construction and composition",
+      "rules": [
+        "`GetSpecMetadata` MUST follow the standard Core use-case and composition contract: a class with an async `execute(input)` method, explicit constructor dependencies, and a composition module exposing:\n\n- `GetSpecMetadataDeps`\n- `resolveGetSpecMetadataDeps(resolver: CompositionResolver): GetSpecMetadataDeps`\n- `createGetSpecMetadata(deps): GetSpecMetadata`\n- `createGetSpecMetadata(config: SpecdConfig, options?: CompositionResolutionOptions): GetSpecMetadata`\n\n`resolveGetSpecMetadataDeps(resolver)` MUST resolve at least `MaterializeSpecMetadata`.\n\nThe config-based `createGetSpecMetadata(config, options?)` form MUST create one `CompositionResolver`, derive dependencies through `resolveGetSpecMetadataDeps(resolver)`, and delegate to the canonical `createGetSpecMetadata(deps)` form.\n\n`GetSpecMetadata`, its `Input`/`Result` types, `Deps`, and `create*` factory MUST be exported through the Core public surface, re-exported by the SDK, and exposed on `Kernel.specs` as `getMetadata`. Hosts such as `specs metadata` and the code graph indexer MUST obtain usable metadata through this Kernel surface rather than reading a repository metadata snapshot directly."
+      ]
+    }
+  ],
+  "constraints": [
+    "GetSpecMetadata never exposes missing, invalid, or stale as a public status; those remain internal to materialization.",
+    "GetSpecMetadata never performs a forced rebuild; forced rebuilding is RegenerateSpecMetadata's responsibility."
+  ],
+  "scenarios": [
+    {
+      "requirement": "Input and delegation",
+      "name": "GetSpecMetadata performs no independent freshness logic",
+      "given": ["a call to GetSpecMetadata.execute() for a spec"],
+      "when": ["it processes the request"],
+      "then": [
+        "it delegates entirely to MaterializeSpecMetadata with policy: 'if-needed'",
+        "AND it implements no freshness comparison, generation, or persistence logic of its own"
+      ]
+    },
+    {
+      "requirement": "Result contract",
+      "name": "Result shape is passed through unchanged",
+      "given": [
+        "MaterializeSpecMetadata returns a result with metadata, metadataFingerprint, source, regenerated, and warnings"
+      ],
+      "when": ["GetSpecMetadata returns its result to the caller"],
+      "then": [
+        "all five fields are present and unmodified",
+        "AND none of them is narrowed, renamed, or dropped"
+      ]
+    },
+    {
+      "requirement": "Failure semantics",
+      "name": "Metadata-cache-write-failed warning does not fail the call",
+      "given": ["materialization succeeds in-memory but the underlying cache write fails"],
+      "when": ["GetSpecMetadata.execute() returns"],
+      "then": [
+        "the call succeeds",
+        "AND the metadata-cache-write-failed warning is reported on the successful result rather than causing a typed failure"
+      ]
+    },
+    {
+      "requirement": "Failure semantics",
+      "name": "Failure to read the spec's artifacts or lock state fails the call",
+      "given": ["reading the spec's artifacts or persisted lock state fails"],
+      "when": ["GetSpecMetadata.execute() is called"],
+      "then": ["it surfaces a typed failure"]
+    },
+    {
+      "requirement": "Construction and composition",
+      "name": "Config-based factory delegates through the resolver",
+      "given": ["a SpecdConfig and no explicit deps"],
+      "when": ["createGetSpecMetadata(config, options?) is called"],
+      "then": [
+        "exactly one CompositionResolver is created",
+        "AND dependencies are derived via resolveGetSpecMetadataDeps(resolver) before delegating to the canonical createGetSpecMetadata(deps) form"
+      ]
+    },
+    {
+      "requirement": "Construction and composition",
+      "name": "Hosts obtain metadata through Kernel.specs.getMetadata rather than reading the repository directly",
+      "given": ["a host such as specs metadata or the code graph indexer"],
+      "when": ["it needs usable metadata for a spec"],
+      "then": [
+        "it calls Kernel.specs.getMetadata",
+        "AND it does not read a repository metadata snapshot directly"
+      ]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:e0b97f9d8b0cb2510cc251fea580b9d3fb2d6628e2b5612370472c5c16ff1ac7",
+    "verify.md": "sha256:0f45ddae8cea1a3d61e7c6585fa079cb974864e7c4468d0b2b8af3cfa4076921"
+  },
+  "provenance": {
+    "artifacts": {
+      "spec.md": {
+        "hash": "sha256:e0b97f9d8b0cb2510cc251fea580b9d3fb2d6628e2b5612370472c5c16ff1ac7",
+        "lastModified": "2026-07-25T11:53:31.399Z"
+      },
+      "verify.md": {
+        "hash": "sha256:0f45ddae8cea1a3d61e7c6585fa079cb974864e7c4468d0b2b8af3cfa4076921",
+        "lastModified": "2026-07-25T11:53:31.399Z"
+      }
+    },
+    "persistedStateHash": "sha256:fdc6c176c2e7331e20b8e5c67737d9ae5e9879b4e742eaf31d6251fae482f71f",
+    "schema": {
+      "name": "schema-std",
+      "version": 1
+    },
+    "projectionVersion": 1,
+    "projectionFingerprint": "sha256:e4a28a2db6a35ed39b8308518337235b1490c2948cd839db25866ad79b22404b"
+  }
+}

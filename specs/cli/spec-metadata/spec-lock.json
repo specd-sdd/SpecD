@@ -1,0 +1,21 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "cli:entrypoint",
+    "core:get-spec-metadata",
+    "core:spec-metadata",
+    "core:spec-id-format"
+  ],
+  "implementation": [
+    {
+      "file": "cli:src/commands/spec/metadata.ts",
+      "symbols": ["registerSpecMetadata"]
+    },
+    {
+      "file": "cli:test/commands/spec-metadata.spec.ts"
+    }
+  ]
+}

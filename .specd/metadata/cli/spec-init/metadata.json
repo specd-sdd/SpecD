@@ -1,0 +1,182 @@
+{
+  "title": "cli:spec-init",
+  "description": "Imported repositories and future multi-schema projects need an explicit way to adopt existing, lock-less spec artifacts into persisted semantic state — without silently treating an incidental first mutation as adoption. `specd specs init` is the CLI command that exposes one-spec and batch persisted-state initialization by delegating directly to `InitializePersistedSpecState`.",
+  "dependsOn": ["core:initialize-persisted-spec-state", "cli:entrypoint"],
+  "context": [
+    "Imported repositories and future multi-schema projects need an explicit way to adopt existing, lock-less spec artifacts into persisted semantic state — without silently treating an incidental first mutation as adoption. `specd specs init` is the CLI command that exposes one-spec and batch persisted-state initialization by delegating directly to `InitializePersistedSpecState`."
+  ],
+  "rules": [
+    {
+      "requirement": "Command signature",
+      "rules": [
+        "```\nspecs init <spec-id> [--schema <schema-ref>]\nspecs init --all [--workspace <name>...] [--schema <schema-ref>]\n```\n\n- `<spec-id>` — mutually exclusive with `--all`; exactly one of the two target forms MUST be used\n- `--schema <schema-ref>` — optional; when omitted, the effective project schema is used\n- `--workspace <name>` — optional, repeatable, valid only with `--all`; restricts batch initialization to the named workspaces\n- `--format text|json|toon` (default `text`) per [`cli:entrypoint`](../entrypoint/spec.md)"
+      ]
+    },
+    {
+      "requirement": "Single-spec initialization",
+      "rules": [
+        "`specs init <spec-id> [--schema <schema-ref>]` MUST call `Kernel.specs.initializePersistedState` with `target: { kind: 'spec', specId }` and the optional `schemaRef`.\n\nThe command MUST NOT create spec artifacts; it operates only on artifacts that already exist. When the spec already has persisted state, the command MUST propagate `SpecAlreadyInitializedError` as an exit-code-1 failure rather than silently succeeding or reassigning the schema."
+      ]
+    },
+    {
+      "requirement": "Batch initialization",
+      "rules": [
+        "`specs init --all [--workspace <name>...] [--schema <schema-ref>]` MUST call `Kernel.specs.initializePersistedState` with `target: { kind: 'all', workspaces }` (omitting `workspaces` when no `--workspace` flags were given) and the optional `schemaRef`.\n\nThe command MUST print per-spec `initialized`/`failed` results plus the `existingSkipped` count returned by the use case. It MUST NOT pretend to initialize specs that already have persisted state — those are reported under `existingSkipped`, not `initialized` or `failed`."
+      ]
+    },
+    {
+      "requirement": "Batch exit code",
+      "rules": [
+        "When the batch result contains at least one `failed` entry among eligible (lock-less) targets, the command MUST exit with code 1. A batch run whose only non-`initialized` entries are `existingSkipped` MUST exit with code 0."
+      ]
+    },
+    {
+      "requirement": "No repeated CLI-owned initialization logic",
+      "rules": [
+        "This command MUST NOT resolve schemas, discover raw spec identities, verify artifact parseability, derive initial dependencies, or write persisted state itself. Every initialization decision MUST be delegated to `Kernel.specs.initializePersistedState`."
+      ]
+    },
+    {
+      "requirement": "Error mapping",
+      "rules": [
+        "`SpecAlreadyInitializedError` MUST map to exit code 1 with an `error:` message naming the already-initialized spec, for the single-spec form. `SpecNotFoundError` MUST map to exit code 1 with an `error:` message naming the unresolved spec. `ReadOnlyWorkspaceError` MUST map to exit code 1 without suggesting a configuration workaround; in batch mode, a read-only workspace failure MUST appear as a `failed` entry rather than being silently skipped."
+      ]
+    }
+  ],
+  "constraints": [
+    "specs init never rewrites an existing lock; schema reassignment is exposed only through specs schema set",
+    "--schema and --workspace are the only supported input refinements; there is no --force flag for this command",
+    "Every leaf subcommand form calls .allowExcessArguments(false)"
+  ],
+  "scenarios": [
+    {
+      "requirement": "Command signature",
+      "name": "spec-id and --all are mutually exclusive",
+      "when": ["specd specs init core:auth/login --all is run"],
+      "then": [
+        "the command exits with code 1 indicating the two target forms are mutually exclusive"
+      ]
+    },
+    {
+      "requirement": "Command signature",
+      "name": "--workspace is only valid alongside --all",
+      "when": ["specd specs init core:auth/login --workspace core is run"],
+      "then": ["the command exits with code 1 indicating --workspace requires --all"]
+    },
+    {
+      "requirement": "Single-spec initialization",
+      "name": "Initializing an already-initialized spec fails rather than succeeding silently",
+      "given": ["a spec that already has persisted state"],
+      "when": ["specd specs init core:auth/login is run"],
+      "then": [
+        "the command exits with code 1",
+        "AND the command propagates SpecAlreadyInitializedError rather than reassigning the schema"
+      ]
+    },
+    {
+      "requirement": "Single-spec initialization",
+      "name": "Init never creates spec artifacts for a missing spec",
+      "given": ["a spec-id with no existing artifacts"],
+      "when": ["specd specs init core:nonexistent/spec is run"],
+      "then": [
+        "the command does not create any spec artifacts",
+        "AND the command fails with SpecNotFoundError"
+      ]
+    },
+    {
+      "requirement": "Batch initialization",
+      "name": "Batch is restricted to named workspaces",
+      "when": ["specd specs init --all --workspace core --workspace cli is run"],
+      "then": [
+        "Kernel.specs.initializePersistedState is called with target: { kind: 'all', workspaces: ['core', 'cli'] }"
+      ]
+    },
+    {
+      "requirement": "Batch initialization",
+      "name": "Batch without --workspace omits the workspaces filter",
+      "when": ["specd specs init --all is run"],
+      "then": [
+        "Kernel.specs.initializePersistedState is called with target: { kind: 'all' } and no workspaces field"
+      ]
+    },
+    {
+      "requirement": "Batch initialization",
+      "name": "Batch reports existingSkipped distinctly from initialized and failed",
+      "given": ["a workspace with a mix of lock-less specs and already-initialized specs"],
+      "when": ["specd specs init --all is run"],
+      "then": [
+        "the output reports an existingSkipped count separately",
+        "AND already-initialized specs never appear under initialized or failed"
+      ]
+    },
+    {
+      "requirement": "Batch exit code",
+      "name": "Any failed entry among eligible targets yields exit code 1",
+      "given": ["a batch run where one lock-less spec fails to initialize"],
+      "when": ["specd specs init --all is run"],
+      "then": ["the command exits with code 1"]
+    },
+    {
+      "requirement": "Batch exit code",
+      "name": "Batch with only existingSkipped entries exits 0",
+      "given": ["a batch run where every target already has persisted state"],
+      "when": ["specd specs init --all is run"],
+      "then": ["the command exits with code 0"]
+    },
+    {
+      "requirement": "No repeated CLI-owned initialization logic",
+      "name": "Handler delegates every decision to Kernel.specs.initializePersistedState",
+      "when": ["specd specs init core:auth/login --schema custom@1 is run"],
+      "then": [
+        "the handler performs exactly one call to Kernel.specs.initializePersistedState",
+        "AND the handler does not resolve schemas, discover spec identities, verify parseability, or derive dependencies itself"
+      ]
+    },
+    {
+      "requirement": "Error mapping",
+      "name": "Already-initialized spec maps to exit code 1 naming the spec",
+      "given": ["a spec that already has persisted state"],
+      "when": ["specd specs init core:auth/login is run"],
+      "then": ["the command exits with code 1", "AND stderr names the already-initialized spec"]
+    },
+    {
+      "requirement": "Error mapping",
+      "name": "Unknown spec maps to exit code 1",
+      "when": ["specd specs init core:unknown/spec is run"],
+      "then": ["the command exits with code 1", "AND stderr names the unresolved spec"]
+    },
+    {
+      "requirement": "Error mapping",
+      "name": "Read-only workspace surfaces as a failed batch entry, not a silent skip",
+      "given": ["one target workspace in a batch run is readOnly"],
+      "when": ["specd specs init --all is run"],
+      "then": [
+        "that workspace's specs appear as failed entries",
+        "AND they are not silently omitted from the report"
+      ]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:121efa8a42b32c7749831a293969866a23a5baf6903fbe5eefa988b9d0825c48",
+    "verify.md": "sha256:53fbc3691535d634b1aba666d9ba0cba44c0628f89e7fb17af667801b41199c1"
+  },
+  "provenance": {
+    "artifacts": {
+      "spec.md": {
+        "hash": "sha256:121efa8a42b32c7749831a293969866a23a5baf6903fbe5eefa988b9d0825c48",
+        "lastModified": "2026-07-25T11:53:31.704Z"
+      },
+      "verify.md": {
+        "hash": "sha256:53fbc3691535d634b1aba666d9ba0cba44c0628f89e7fb17af667801b41199c1",
+        "lastModified": "2026-07-25T11:53:31.704Z"
+      }
+    },
+    "persistedStateHash": "sha256:21eca063066dcf7d36715d4e873daa87e9c36e78f894fb59e07f86700fb8d24b",
+    "schema": {
+      "name": "schema-std",
+      "version": 1
+    },
+    "projectionVersion": 1,
+    "projectionFingerprint": "sha256:e4a28a2db6a35ed39b8308518337235b1490c2948cd839db25866ad79b22404b"
+  }
+}

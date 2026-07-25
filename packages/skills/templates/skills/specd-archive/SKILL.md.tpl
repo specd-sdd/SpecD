@@ -167,11 +167,15 @@ specd changes hook-instruction <name> archiving --phase post --format text
 
 Follow guidance.
 
-### 7. Regenerate metadata
+### 7. Metadata materialization
+
+Archive force-materializes metadata after publication. Do **not** run routine `generate-metadata` here unless the user explicitly requests a full rebuild.
 
 ```bash
-specd specs generate-metadata --all --write --status stale,missing
+specd specs metadata <spec-id> --format json
 ```
+
+Confirm `source`/`regenerated` diagnostics look healthy for archived specs.
 
 ### 8. Check LLM optimization
 

@@ -7,29 +7,11 @@
   "implementation": [
     {
       "file": "core:src/application/ports/validation-result-cache.ts",
-      "symbols": [
-        "ValidationResultCache",
-        "ValidationCacheEntry",
-        "ValidationSourceStamp",
-        "ValidationCacheLookupInput",
-        "ValidationCacheLookupResult",
-        "ValidationCacheUpsertInput",
-        "ValidationResultCache,SpecValidationEntry,ValidationCacheLookupResult"
-      ]
+      "symbols": ["ValidationSourceStamps", "ValidationResultCache"]
     },
     {
       "file": "core:src/infrastructure/fs/fs-validation-result-cache.ts",
-      "symbols": [
-        "FsValidationResultCache",
-        "collectValidationSourceStamps",
-        "ValidationIndexMeta",
-        "FsValidationResultCache,stampsFromSpec,ValidationStoredStamps",
-        "stampsFromSpec",
-        "ValidationStoredStamps"
-      ]
-    },
-    {
-      "file": "core:src/ports.ts"
+      "symbols": ["FsValidationResultCache"]
     }
   ]
 }

@@ -10,7 +10,9 @@
     "core:composition-resolver",
     "core:validation-result-cache-port",
     "core:spec-lock",
-    "core:spec-repository-port"
+    "core:spec-repository-port",
+    "core:spec-optimization",
+    "core:get-spec-metadata"
   ],
   "context": [
     "Spec artifacts can drift from the schema's structural expectations over time, and there is no other mechanism to catch these violations before they cause downstream failures. The `ValidateSpecs` use case validates spec artifacts against the active schema's structural rules, supporting three scoping modes: a single spec by qualified path, all specs in a workspace, or all specs across all workspaces. Only spec-scoped artifact types from the schema are validated; change-scoped artifacts are excluded."
@@ -37,13 +39,13 @@
     {
       "requirement": "Workspace validation mode",
       "rules": [
-        "When `input.workspace` is provided (and `input.specPath` is not), the use case SHALL:\n\n1. Look up the workspace's `SpecRepository`. If not found, throw `WorkspaceNotFoundError`.\n2. List all specs in the workspace via `repo.list()`.\n3. Validate each spec."
+        "When `input.workspace` is provided (and `input.specPath` is not), the use case SHALL:\n\n1. Look up the workspace's `SpecRepository`. If not found, throw `WorkspaceNotFoundError`.\n2. List all specs in the workspace via `repo.list(undefined, { includeMeta: true })`\n   so Meta stamps are available for validation-result-cache hard hits.\n3. Validate each listed spec."
       ]
     },
     {
       "requirement": "All-workspaces validation mode",
       "rules": [
-        "When neither `input.specPath` nor `input.workspace` is provided, the use case SHALL iterate all configured workspaces and validate every spec in each."
+        "When neither `input.specPath` nor `input.workspace` is provided, the use case SHALL\niterate all configured workspaces and, for each workspace repository, list specs via\n`repo.list(undefined, { includeMeta: true })`, then validate every listed spec."
       ]
     },
     {
@@ -71,29 +73,36 @@
       ]
     },
     {
-      "requirement": "Canonical metadata consistency validation",
+      "requirement": "Metadata materialization and validation",
       "rules": [
-        "After per-artifact and cross-artifact validation for one spec, `ValidateSpecs` SHALL validate the canonical metadata state exposed through `SpecRepository.metadata()` and the repository's persisted semantic dependency operations.\n\nValidation rules:\n\n1. If metadata exists and its freshness checks indicate stale content hashes, record a `ValidationFailure` indicating that `metadata.json` must be regenerated.\n2. If metadata exists and `metadata.json.dependsOn` differs from `SpecRepository.readPersistedDependsOn(spec)`, record a `ValidationFailure` indicating that the canonical dependency projection is stale or inconsistent.\n3. If the active schema declares `metadataExtraction.dependsOn` for the spec and extraction yields a dependency set that differs from the persisted dependency state, record a `ValidationFailure`.\n4. If the schema omits dependency extraction, validation MUST still accept `metadata.json.dependsOn` when it matches the persisted dependency state.\n\nThese checks validate canonical metadata as a cache of persisted spec semantics without treating `spec-lock.json` as a normal schema artifact."
+        "After per-artifact and cross-artifact validation for one spec, `ValidateSpecs`\nSHALL obtain that spec's metadata through `GetSpecMetadata.execute({ specId })`\nbefore validating its normalized content. `ValidateSpecs` MUST NOT read\n`SpecRepository.readMetadataSnapshot()` directly to decide pass/fail on its own.\n\nValidation rules:\n\n1. Missing, invalid, or stale persisted metadata is NOT itself a validation\n   failure as long as materialization successfully produces a valid in-memory\n   projection — self-healing on read is expected behaviour, not a defect being\n   reported.\n2. If materialization cannot produce a valid metadata projection at all (for\n   example, a source read failure or a projection that fails structural\n   validation even after regeneration), record a `ValidationFailure` indicating\n   that metadata could not be materialized for the spec.\n3. Once metadata is materialized, validate its normalized `dependsOn` against\n   the spec's current persisted dependency state\n   (`SpecRepository.readPersistedState(spec).dependsOn`, or `[]` for a\n   lock-less spec). A mismatch after materialization indicates an internal\n   inconsistency and MUST be recorded as a `ValidationFailure`.\n4. If the active schema declares `metadataExtraction.dependsOn` for the spec and\n   extraction yields a dependency set that differs from the persisted\n   dependency state, record a `ValidationFailure`.\n5. If the schema omits dependency extraction, validation MUST accept the\n   materialized `dependsOn` when it matches the persisted dependency state.\n\nA `metadata-cache-write-failed` warning returned by materialization MUST be\nsurfaced as a `ValidationWarning` on the spec's entry rather than a\n`ValidationFailure` — a cache-write failure does not mean the normalized\nprojection used for validation was invalid.\n\nThese checks validate canonical metadata as a self-healing cache of persisted\nspec semantics without treating `spec-lock.json` as a normal schema artifact."
+      ]
+    },
+    {
+      "requirement": "Persisted optimization staleness is an independent failure",
+      "rules": [
+        "Independently of metadata materialization, `ValidateSpecs` SHALL check the\nfreshness of any persisted optimization fields (`optimizedDescription`,\n`optimizedContext`) recorded in the spec's persisted state against its current\nartifacts and schema identity.\n\nIf any present optimization field is stale, `ValidateSpecs` MUST record a\n`ValidationFailure` for that spec identifying the stale field(s) and reason(s).\nThis failure MUST be reported even when metadata materialization otherwise\nsucceeds and the spec's other validations pass, because Core cannot author a\nreplacement optimization value automatically — a human or an explicit optimizer\ninvocation must refresh it.\n\nA spec with no persisted optimizations, or with only fresh optimization fields,\nMUST NOT fail this check."
       ]
     },
     {
       "requirement": "Transparent validation result cache",
       "rules": [
-        "`ValidateSpecs` MUST use a workspace `ValidationResultCache` for each selected spec\nbefore running full per-spec validation, and MUST upsert after a completed full\nvalidation on cache miss.\n\nBehaviour:\n\n1. Compute the active `schemaFingerprint` and `engineVersion` for the resolved schema\n   and evaluation engine (see fingerprint rules below).\n2. For each selected spec, call cache `lookup({ spec, schemaFingerprint, engineVersion })`.\n   The cache owns the freshness cascade (via its constructor-injected\n   `SpecRepository`) defined by\n   [`core:validation-result-cache-port`](../validation-result-cache-port/spec.md).\n3. On hit, use the returned `SpecValidationEntry` as the outcome for that spec\n   without re-running artifact parse, local rules, cross-artifact rules, or\n   metadata consistency checks.\n4. On miss, perform the existing full per-spec validation path, then\n   `upsert({ entry, spec, schemaFingerprint, engineVersion })` only — not stamps\n   or fingerprints.\n\n`ValidateSpecs` MUST NOT precompute cache stamps or `cacheFingerprint`, and MUST NOT\nimplement soft-hit stamp refresh. Soft-hit persistence is invisible to this use case.\n\nBucket fingerprint inputs (supplied by ValidateSpecs / composition):\n\n- `schemaFingerprint` MUST cover schema identity plus all `scope: 'spec'` artifact\n  validations and `scope: 'spec'` cross-artifact rules, and MUST reflect whether\n  `metadataExtraction.dependsOn` is declared.\n- `engineVersion` MUST change when evaluation logic changes independently of schema\n  YAML.\n\nHost opacity: `ValidateSpecs` MUST remain the only consumer of the cache port for this\nbehaviour. Delivery hosts MUST observe identical public inputs and outputs whether a\ncache hit or miss occurred.\n\nComposition vs direct construction:\n\n- When `validationResultCaches` has no entry for the target workspace, `ValidateSpecs`\n  MUST skip cache lookup and upsert and perform full validation. This degraded path\n  exists for unit tests and direct `new ValidateSpecs(...)` construction only.\n- `resolveValidateSpecsDeps` and config-based `createValidateSpecs` MUST register one\n  `ValidationResultCache` per configured workspace so CLI and kernel paths never hit\n  the skip path during normal operation."
+        "`ValidateSpecs` MUST use a workspace `ValidationResultCache` for each selected spec\nbefore running full per-spec validation, and MUST upsert after a completed full\nvalidation on cache miss.\n\nBehaviour:\n\n1. Compute the active `schemaFingerprint` and `engineVersion` for the resolved schema\n   and evaluation engine (see fingerprint rules below).\n2. For workspace and all-workspaces discovery, list specs via\n   `repo.list(undefined, { includeMeta: true })` (or the equivalent prefix-less call).\n   The projected Meta stamps (`artifacts`, `persistedStateMeta`,\n   `generatedMetadataMeta`) MUST be passed into cache `lookup` as optional current\n   stamps so a warm **hard hit** does not require N×`repo.get()`.\n3. For each selected spec, call cache\n   `lookup({ spec, schemaFingerprint, engineVersion, stamps? })` where `stamps`\n   are derived from list Meta when available. The cache owns the freshness cascade\n   defined by\n   [`core:validation-result-cache-port`](../validation-result-cache-port/spec.md).\n4. On hard hit, use the returned `SpecValidationEntry` as the outcome for that\n   spec without re-running artifact parse, local rules, cross-artifact rules, or\n   metadata consistency checks, and without calling `get()` solely to obtain stamps.\n5. On soft hit or miss, the existing content / fingerprint / full validation path\n   applies (including any `get()` or content I/O the cache or use case already\n   requires for soft-hit/`cacheFingerprint`).\n6. On miss, after full per-spec validation,\n   `upsert({ entry, spec, schemaFingerprint, engineVersion })` only — not stamps\n   or fingerprints invented by ValidateSpecs.\n\n`ValidateSpecs` MUST NOT invent stamp algorithms or drive soft-hit stamp refresh.\nPassing repository-projected list Meta into `lookup` is allowed and required for\nmulti-spec discovery; it is not \"precomputing\" stamps outside the repository.\n\nSingle-spec validation MAY obtain stamps via `get()` or the Meta methods when list\nMeta is unavailable.\n\nBucket fingerprint inputs (supplied by ValidateSpecs / composition):\n\n- `schemaFingerprint` MUST cover schema identity plus all `scope: 'spec'` artifact\n  validations and `scope: 'spec'` cross-artifact rules, and MUST reflect whether\n  `metadataExtraction.dependsOn` is declared.\n- `engineVersion` MUST change when evaluation logic changes independently of schema\n  YAML.\n\nHost opacity: `ValidateSpecs` MUST remain the only consumer of the cache port for this\nbehaviour. Delivery hosts MUST observe identical public inputs and outputs whether a\ncache hit or miss occurred.\n\nComposition vs direct construction:\n\n- When `validationResultCaches` has no entry for the target workspace, `ValidateSpecs`\n  MUST skip cache lookup and upsert and perform full validation. This degraded path\n  exists for unit tests and direct `new ValidateSpecs(...)` construction only.\n- `resolveValidateSpecsDeps` and config-based `createValidateSpecs` MUST register one\n  `ValidationResultCache` per configured workspace so CLI and kernel paths never hit\n  the skip path during normal operation."
       ]
     },
     {
       "requirement": "Config-based factory delegates through resolveValidateSpecsDeps",
       "rules": [
-        "The config-based `createValidateSpecs(config, options?)` form MUST derive\n`ValidateSpecsDeps` through `resolveValidateSpecsDeps(resolver)` and then delegate to\ncanonical `createValidateSpecs(deps)`.\n\n`resolveValidateSpecsDeps(resolver)` MUST resolve:\n\n- `specs: ReadonlyMap<string, SpecRepository>`\n- `schemaProvider: SchemaProvider`\n- `parsers: ArtifactParserRegistry`\n- `contentHasher: ContentHasher`\n- `extractorTransforms: ExtractorTransformRegistry`\n- `workspaceRoutes: readonly SpecWorkspaceRoute[]`\n- `validationResultCaches: ReadonlyMap<string, ValidationResultCache>` (one port\n  instance per workspace, wired with that workspace's `SpecRepository`)\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap.\nThe factory MUST NOT reconstruct fs-shaped wiring inline, including filesystem paths\nfor the validation result cache."
+        "The config-based `createValidateSpecs(config, options?)` form MUST derive\n`ValidateSpecsDeps` through `resolveValidateSpecsDeps(resolver)` and then\ndelegate to canonical `createValidateSpecs(deps)`.\n\n`resolveValidateSpecsDeps(resolver)` MUST resolve:\n\n- `specs: ReadonlyMap<string, SpecRepository>`\n- `schemaProvider: SchemaProvider`\n- `parsers: ArtifactParserRegistry`\n- `contentHasher: ContentHasher`\n- `extractorTransforms: ExtractorTransformRegistry`\n- `workspaceRoutes: readonly SpecWorkspaceRoute[]`\n- `validationResultCaches: ReadonlyMap<string, ValidationResultCache>` (one port\n  instance per workspace, wired with that workspace's `SpecRepository`)\n- `getMetadata: ReadonlyMap<string, GetSpecMetadata>` (one\n  instance per workspace, used to self-heal metadata before normalized-content\n  validation)\n\nThe helper is the only use-case-specific composition entry for config-based\nbootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline, including\nfilesystem paths for the validation result cache."
       ]
     }
   ],
   "constraints": [
-    "The use case receives a ReadonlyMap<string, SpecRepository> — it MUST NOT modify the map or the repositories.",
-    "input.specPath takes precedence: when provided, input.workspace is ignored.",
-    "Validation rules come exclusively from the resolved schema — the use case does not define its own rules.",
-    "The ValidationFailure and ValidationWarning types are shared with the ValidateArtifacts use case."
+    "The use case receives a ReadonlyMap<string, SpecRepository> — it MUST NOT\nmodify the map or the repositories.",
+    "input.specPath takes precedence: when provided, input.workspace is\nignored.",
+    "Validation rules come exclusively from the resolved schema — the use case\ndoes not define its own rules.",
+    "The ValidationFailure and ValidationWarning types are shared with the\nValidateArtifacts use case.",
+    "ValidateSpecs MUST NOT implement its own metadata freshness comparison,\ngeneration, or persistence — it delegates entirely to\nGetSpecMetadata and only interprets that use case's result and\nwarnings."
   ],
   "scenarios": [
     {
@@ -255,35 +264,39 @@
       "then": ["no failure or warning is recorded for that artifact"]
     },
     {
-      "requirement": "Canonical metadata consistency validation",
-      "name": "Stale metadata hash becomes a validation failure",
+      "requirement": "Metadata materialization and validation",
+      "name": "Stale persisted metadata is self-healed, not a failure",
       "given": [
-        "a spec has metadata.json",
-        "AND its recorded contentHashes do not match the current required artifacts"
+        "a spec has metadata.json whose contentHashes no longer match the current required artifacts"
       ],
       "when": ["ValidateSpecs validates that spec"],
       "then": [
-        "the spec entry includes a ValidationFailure instructing the caller to regenerate metadata"
+        "GetSpecMetadata self-heals a fresh in-memory projection (delegating with policy: 'if-needed')",
+        "AND no ValidationFailure is recorded solely because the persisted cache was stale"
       ]
     },
     {
-      "requirement": "Canonical metadata consistency validation",
-      "name": "Repository stale classification becomes a validation failure",
-      "given": ["SpecRepository.metadata() returns persisted metadata with freshness: 'stale'"],
-      "when": ["ValidateSpecs validates that spec"],
-      "then": ["the spec entry includes a ValidationFailure for stale canonical metadata"]
-    },
-    {
-      "requirement": "Canonical metadata consistency validation",
-      "name": "Metadata dependsOn projection drift becomes a validation failure",
-      "given": ["metadata.json.dependsOn differs from SpecRepository.readPersistedDependsOn(spec)"],
+      "requirement": "Metadata materialization and validation",
+      "name": "Materialization failure becomes a validation failure",
+      "given": [
+        "GetSpecMetadata cannot produce a valid metadata projection for a spec (for example, a source read failure or a projection that fails structural validation even after regeneration)"
+      ],
       "when": ["ValidateSpecs validates that spec"],
       "then": [
-        "the spec entry includes a ValidationFailure describing the canonical dependency projection mismatch"
+        "the spec entry includes a ValidationFailure indicating that metadata could not be materialized"
       ]
     },
     {
-      "requirement": "Canonical metadata consistency validation",
+      "requirement": "Metadata materialization and validation",
+      "name": "Post-materialization dependsOn mismatch becomes a validation failure",
+      "given": [
+        "the materialized metadata's normalized dependsOn differs from SpecRepository.readPersistedState(spec).dependsOn (or [] for a lock-less spec)"
+      ],
+      "when": ["ValidateSpecs validates that spec"],
+      "then": ["the spec entry includes a ValidationFailure describing the internal inconsistency"]
+    },
+    {
+      "requirement": "Metadata materialization and validation",
       "name": "Extracted dependsOn mismatch becomes a validation failure",
       "given": [
         "the schema declares metadataExtraction.dependsOn",
@@ -293,7 +306,7 @@
       "then": ["the spec entry includes a ValidationFailure"]
     },
     {
-      "requirement": "Canonical metadata consistency validation",
+      "requirement": "Metadata materialization and validation",
       "name": "Persisted dependency projection remains valid without extraction",
       "given": [
         "the schema omits metadataExtraction.dependsOn",
@@ -301,6 +314,46 @@
       ],
       "when": ["ValidateSpecs validates that spec"],
       "then": ["no dependency-projection failure is recorded for that check"]
+    },
+    {
+      "requirement": "Metadata materialization and validation",
+      "name": "metadata-cache-write-failed is a warning, not a failure",
+      "given": [
+        "materialization returns a metadata-cache-write-failed warning while still producing a valid in-memory projection"
+      ],
+      "when": ["ValidateSpecs validates that spec"],
+      "then": [
+        "the warning is surfaced as a ValidationWarning on the spec's entry",
+        "AND it is not recorded as a ValidationFailure"
+      ]
+    },
+    {
+      "requirement": "Persisted optimization staleness is an independent failure",
+      "name": "Stale optimization field fails validation independently",
+      "given": [
+        "a spec's persisted optimizedDescription or optimizedContext is stale against its current artifacts or schema identity"
+      ],
+      "when": ["ValidateSpecs validates that spec"],
+      "then": [
+        "the spec entry includes a ValidationFailure identifying the stale field(s) and reason(s)"
+      ]
+    },
+    {
+      "requirement": "Persisted optimization staleness is an independent failure",
+      "name": "Optimization staleness failure is reported even when metadata materialization succeeds",
+      "given": [
+        "metadata materialization succeeds and all other checks pass for a spec",
+        "AND a persisted optimization field is stale"
+      ],
+      "when": ["ValidateSpecs validates that spec"],
+      "then": ["the spec entry still fails due to the stale optimization field"]
+    },
+    {
+      "requirement": "Persisted optimization staleness is an independent failure",
+      "name": "No optimizations or only fresh optimizations does not fail this check",
+      "given": ["a spec has no persisted optimizations, or only fresh optimization fields"],
+      "when": ["ValidateSpecs validates that spec"],
+      "then": ["this check does not fail for that spec"]
     },
     {
       "requirement": "Transparent validation result cache",
@@ -331,7 +384,7 @@
       "then": [
         "the full validation path runs",
         "AND upsert({ entry, spec, schemaFingerprint, engineVersion }) is called",
-        "AND ValidateSpecs does not pass stamps or cacheFingerprint"
+        "AND ValidateSpecs does not pass stamps or cacheFingerprint on upsert"
       ]
     },
     {
@@ -352,22 +405,22 @@
     },
     {
       "requirement": "Transparent validation result cache",
-      "name": "resolveValidateSpecsDeps wires caches with SpecRepository",
-      "when": ["resolveValidateSpecsDeps(resolver) runs for config-based"],
-      "then": [
-        "the resolved deps include",
-        "AND each cache instance is constructed with that workspace's SpecRepository",
-        "AND the factory does not construct filesystem validate-cache paths inline"
-      ]
+      "name": "Workspace discovery lists with includeMeta",
+      "given": ["workspace validation mode"],
+      "when": ["specs are discovered for validation"],
+      "then": ["the repository is listed with { includeMeta: true }"]
     },
     {
       "requirement": "Transparent validation result cache",
-      "name": "Composition registers a cache for every configured workspace",
-      "given": ["a project with multiple configured workspaces"],
-      "when": ["resolveValidateSpecsDeps(resolver) runs"],
+      "name": "Warm hard hit does not N×get solely for stamps",
+      "given": [
+        "workspace or all-workspaces validation with list Meta available",
+        "AND the validation result cache would hard-hit from those stamps"
+      ],
+      "when": ["ValidateSpecs looks up the cache for each listed spec"],
       "then": [
-        "validationResultCaches contains one entry per workspace name",
-        "AND validating any spec through config-based createValidateSpecs consults\nthe cache for that spec's workspace"
+        "it passes the list Meta stamps into lookup",
+        "AND it does not call repo.get() solely to obtain stamps for those hard hits"
       ]
     },
     {
@@ -380,34 +433,23 @@
         "AND resolveValidateSpecsDeps(resolver) resolves:",
         "AND the factory delegates to canonical createValidateSpecs(deps)"
       ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveValidateSpecsDeps",
+      "name": "resolveValidateSpecsDeps wires one GetSpecMetadata instance per workspace",
+      "when": ["resolveValidateSpecsDeps(resolver) runs"],
+      "then": [
+        "the resolved deps include getMetadata: ReadonlyMap<string, GetSpecMetadata> with one instance per configured workspace",
+        "AND it is used to self-heal metadata before normalized-content validation"
+      ]
     }
   ],
   "implementation": {
     "symbols": [
       {
         "specId": "core:validate-specs",
-        "file": "core:src/application/use-cases/_shared/validate-specs-cache-fingerprints.ts",
-        "symbol": "VALIDATE_SPECS_ENGINE_VERSION"
-      },
-      {
-        "specId": "core:validate-specs",
-        "file": "core:src/application/use-cases/_shared/validate-specs-cache-fingerprints.ts",
-        "symbol": "computeSchemaFingerprint"
-      },
-      {
-        "specId": "core:validate-specs",
-        "file": "core:src/application/use-cases/_shared/validate-specs-cache-fingerprints.ts",
-        "symbol": "computeInputFingerprint"
-      },
-      {
-        "specId": "core:validate-specs",
-        "file": "core:src/application/use-cases/_shared/validate-specs-cache-fingerprints.ts",
-        "symbol": "computeSchemaFingerprintFromSchema"
-      },
-      {
-        "specId": "core:validate-specs",
-        "file": "core:src/application/use-cases/_shared/validate-specs-cache-fingerprints.ts",
-        "symbol": "computeCacheFingerprint,VALIDATE_SPECS_ENGINE_VERSION"
+        "file": "core:src/application/use-cases/validate-specs.ts",
+        "symbol": "_validateMetadataConsistency"
       },
       {
         "specId": "core:validate-specs",
@@ -416,39 +458,42 @@
       },
       {
         "specId": "core:validate-specs",
-        "file": "core:src/composition/use-cases/validate-specs.ts",
-        "symbol": "ValidateSpecsDeps"
+        "file": "core:src/application/use-cases/_shared/validation-source-stamps.ts",
+        "symbol": "stampsFromListEntry"
       },
       {
         "specId": "core:validate-specs",
-        "file": "core:src/composition/use-cases/validate-specs.ts",
-        "symbol": "resolveValidateSpecsDeps"
+        "file": "core:src/application/use-cases/_shared/validation-source-stamps.ts",
+        "symbol": "specFromListEntry"
       },
       {
         "specId": "core:validate-specs",
-        "file": "core:src/composition/use-cases/validate-specs.ts",
-        "symbol": "createValidateSpecs"
-      },
-      {
-        "specId": "core:validate-specs",
-        "file": "core:src/composition/use-cases/validate-specs.ts",
-        "symbol": "createValidateSpecsFromNormalized"
-      },
-      {
-        "specId": "core:validate-specs",
-        "file": "core:src/composition/use-cases/validate-specs.ts",
-        "symbol": "isValidateSpecsDeps"
-      },
-      {
-        "specId": "core:validate-specs",
-        "file": "core:src/composition/composition-resolver.ts",
-        "symbol": "getValidationResultCaches"
+        "file": "core:src/application/use-cases/_shared/validation-source-stamps.ts",
+        "symbol": "listEntryHasMeta"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:393321257209fe240f2e3da4816a24c8e05b16293b36e4cc2c58fc5ce3f3d531",
-    "verify.md": "sha256:22ebc132714fa9e23e3b35ac60301b68fcb0cfdc8b32d7059fd1c8c1c6eeeae6"
+    "spec.md": "sha256:880fc0501a0fac11258c12b46fe7a4c74051d9097d458b2566c6724383e8fe93",
+    "verify.md": "sha256:8f38971aacdc01c9abe8b72fedd7ca0dba85da675149f058ace5eb8d7b619729"
   },
-  "generatedBy": "core"
+  "provenance": {
+    "artifacts": {
+      "spec.md": {
+        "hash": "sha256:880fc0501a0fac11258c12b46fe7a4c74051d9097d458b2566c6724383e8fe93",
+        "lastModified": "2026-07-25T11:53:31.181Z"
+      },
+      "verify.md": {
+        "hash": "sha256:8f38971aacdc01c9abe8b72fedd7ca0dba85da675149f058ace5eb8d7b619729",
+        "lastModified": "2026-07-25T11:53:31.182Z"
+      }
+    },
+    "persistedStateHash": "sha256:a7907d3813e32f72735f933c3f277b0b2fd6ff8dc01091e4b7c822111edef4a6",
+    "schema": {
+      "name": "schema-std",
+      "version": 1
+    },
+    "projectionVersion": 1,
+    "projectionFingerprint": "sha256:e4a28a2db6a35ed39b8308518337235b1490c2948cd839db25866ad79b22404b"
+  }
 }

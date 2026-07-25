@@ -11,8 +11,10 @@ Consumers of `@specd/core` need a single, stable entry point that exposes domain
 The `Kernel` interface organises use cases into three groups that mirror the domain areas of the platform:
 
 - `changes` — use cases that operate on change lifecycle (create, status, count tasks, transition, approve spec, approve signoff, draft, restore, discard, archive, validate, compile context, list, edit, skip artifact, update spec deps, list drafts, list discarded, list archived, get archived, detect overlap)
-- `specs` — use cases that operate on specs (list, get, save metadata, invalidate metadata, get active schema, validate, generate metadata, get context, resolve schema)
+- `specs` — use cases that operate on specs (list, get, get active schema, validate, resolve schema, deterministic metadata generation, self-healing/forced metadata materialization and reads, forced batch regeneration, persisted-state initialization, persisted schema inspection/reassignment, and persisted dependency/implementation/optimization queries and mutations)
 - `project` — use cases that query project configuration (list workspaces, get project context, **get config** — host-facing readonly `SpecdConfig` snapshot including `plugins`, get metadata, update metadata)
+
+`kernel.specs` MUST NOT expose `SaveSpecMetadata` or `InvalidateSpecMetadata` — metadata has no external editor after this change; `PersistSpecMetadata` is an internal collaborator of `MaterializeSpecMetadata` and is never mounted on the kernel.
 
 Plugin declaration listing is not a kernel use case — declarations are config data on the `getConfig` snapshot. Config file mutation is not a kernel use case — delivery uses `createConfigWriter()`.
 
@@ -153,20 +155,32 @@ The following table is the exhaustive mapping between kernel paths and use case 
 
 #### kernel.specs
 
-| Kernel path                | Use case class                        | Spec                                                                 | Description                                                 |
-| -------------------------- | ------------------------------------- | -------------------------------------------------------------------- | ----------------------------------------------------------- |
-| `specs.repos`              | `ReadonlyMap<string, SpecRepository>` | —                                                                    | Spec repositories keyed by workspace name                   |
-| `specs.list`               | `ListSpecs`                           | [core:list-specs](../list-specs/spec.md)                             | Lists all specs across all workspaces                       |
-| `specs.search`             | `SearchSpecs`                         | [core:search-specs](../search-specs/spec.md)                         | Searches spec content across all workspaces                 |
-| `specs.get`                | `GetSpec`                             | [core:get-spec](../get-spec/spec.md)                                 | Loads a spec and all artifact files                         |
-| `specs.saveMetadata`       | `SaveSpecMetadata`                    | [core:save-spec-metadata](../save-spec-metadata/spec.md)             | Writes a `.specd-metadata.yaml` file                        |
-| `specs.invalidateMetadata` | `InvalidateSpecMetadata`              | [core:invalidate-spec-metadata](../invalidate-spec-metadata/spec.md) | Invalidates a spec's metadata                               |
-| `specs.getActiveSchema`    | `GetActiveSchema`                     | [core:get-active-schema](../get-active-schema/spec.md)               | Resolves and returns the active schema                      |
-| `specs.validate`           | `ValidateSpecs`                       | [core:validate-specs](../validate-specs/spec.md)                     | Validates spec artifacts against schema rules               |
-| `specs.generateMetadata`   | `GenerateSpecMetadata`                | [core:generate-metadata](../generate-metadata/spec.md)               | Generates deterministic metadata from extraction rules      |
-| `specs.getContext`         | `GetSpecContext`                      | [core:get-spec-context](../get-spec-context/spec.md)                 | Builds structured context entries with dependency traversal |
-| `specs.resolveSchema`      | `ResolveSchema`                       | [core:resolve-schema](../resolve-schema/spec.md)                     | Resolves base schema with extends, plugins, and overrides   |
-| `specs.getHealth`          | `GetSpecsHealth`                      | [core:get-specs-health](../get-specs-health/spec.md)                 | Provides validation health summary of specs                 |
+| Kernel path                           | Use case class                        | Spec                                                                                         | Description                                                        |
+| ------------------------------------- | ------------------------------------- | -------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `specs.repos`                         | `ReadonlyMap<string, SpecRepository>` | —                                                                                            | Spec repositories keyed by workspace name                          |
+| `specs.list`                          | `ListSpecs`                           | [core:list-specs](../list-specs/spec.md)                                                     | Lists all specs across all workspaces                              |
+| `specs.search`                        | `SearchSpecs`                         | [core:search-specs](../search-specs/spec.md)                                                 | Searches spec content across all workspaces                        |
+| `specs.get`                           | `GetSpec`                             | [core:get-spec](../get-spec/spec.md)                                                         | Loads a spec and all artifact files                                |
+| `specs.getActiveSchema`               | `GetActiveSchema`                     | [core:get-active-schema](../get-active-schema/spec.md)                                       | Resolves and returns the active schema                             |
+| `specs.validate`                      | `ValidateSpecs`                       | [core:validate-specs](../validate-specs/spec.md)                                             | Validates spec artifacts against schema rules                      |
+| `specs.generateMetadata`              | `GenerateSpecMetadata`                | [core:generate-metadata](../generate-metadata/spec.md)                                       | Deterministic, non-writing metadata projection                     |
+| `specs.materializeMetadata`           | `MaterializeSpecMetadata`             | [core:materialize-spec-metadata](../materialize-spec-metadata/spec.md)                       | Self-healing reuse-or-regenerate metadata materialization          |
+| `specs.getMetadata`                   | `GetSpecMetadata`                     | [core:get-spec-metadata](../get-spec-metadata/spec.md)                                       | Normal self-healing metadata query and diagnostics                 |
+| `specs.regenerateMetadata`            | `RegenerateSpecMetadata`              | [core:regenerate-spec-metadata](../regenerate-spec-metadata/spec.md)                         | Explicit forced one-spec/batch metadata rebuild                    |
+| `specs.initializePersistedState`      | `InitializePersistedSpecState`        | [core:initialize-persisted-spec-state](../initialize-persisted-spec-state/spec.md)           | One-time adoption of lock-less specs into persisted semantic state |
+| `specs.getPersistedSchema`            | `GetPersistedSpecSchema`              | [core:get-persisted-spec-schema](../get-persisted-spec-schema/spec.md)                       | Reads the schema identity assigned by persisted spec state         |
+| `specs.updatePersistedSchema`         | `UpdatePersistedSpecSchema`           | [core:update-persisted-spec-schema](../update-persisted-spec-schema/spec.md)                 | Reassigns an initialized spec to a compatible resolved schema      |
+| `specs.getPersistedDeps`              | `GetPersistedSpecDeps`                | [core:get-persisted-spec-deps](../get-persisted-spec-deps/spec.md)                           | Reads canonical dependencies from persisted spec state             |
+| `specs.updatePersistedDeps`           | `UpdatePersistedSpecDeps`             | [core:update-persisted-spec-deps](../update-persisted-spec-deps/spec.md)                     | Applies list/add/remove/set/clear dependency mutations             |
+| `specs.getPersistedImplementation`    | `GetPersistedSpecImplementation`      | [core:get-persisted-spec-implementation](../get-persisted-spec-implementation/spec.md)       | Reads canonical implementation links                               |
+| `specs.updatePersistedImplementation` | `UpdatePersistedSpecImplementation`   | [core:update-persisted-spec-implementation](../update-persisted-spec-implementation/spec.md) | Adds, enriches, or removes canonical implementation links          |
+| `specs.getPersistedOptimizations`     | `GetPersistedSpecOptimizations`       | [core:get-persisted-spec-optimizations](../get-persisted-spec-optimizations/spec.md)         | Returns persisted optimized fields with per-field freshness        |
+| `specs.updatePersistedOptimizations`  | `UpdatePersistedSpecOptimizations`    | [core:update-persisted-spec-optimizations](../update-persisted-spec-optimizations/spec.md)   | Sets or clears selected optimized fields                           |
+| `specs.getContext`                    | `GetSpecContext`                      | [core:get-spec-context](../get-spec-context/spec.md)                                         | Builds structured context entries with dependency traversal        |
+| `specs.resolveSchema`                 | `ResolveSchema`                       | [core:resolve-schema](../resolve-schema/spec.md)                                             | Resolves base schema with extends, plugins, and overrides          |
+| `specs.getHealth`                     | `GetSpecsHealth`                      | [core:get-specs-health](../get-specs-health/spec.md)                                         | Provides validation health summary of specs                        |
+
+`kernel.specs` MUST NOT expose `saveMetadata` or `invalidateMetadata` paths. `PersistSpecMetadata` is not mounted on the kernel — it is an internal collaborator of `MaterializeSpecMetadata`.
 
 #### kernel.project
 
@@ -297,11 +311,21 @@ await writer.initProject({
 - [`core:approve-signoff`](../approve-signoff/spec.md)
 - [`core:list-specs`](../list-specs/spec.md)
 - [`core:get-spec`](../get-spec/spec.md)
-- [`core:save-spec-metadata`](../save-spec-metadata/spec.md)
-- [`core:invalidate-spec-metadata`](../invalidate-spec-metadata/spec.md)
 - [`core:get-active-schema`](../get-active-schema/spec.md)
 - [`core:validate-specs`](../validate-specs/spec.md)
 - [`core:generate-metadata`](../generate-metadata/spec.md)
+- [`core:materialize-spec-metadata`](../materialize-spec-metadata/spec.md)
+- [`core:get-spec-metadata`](../get-spec-metadata/spec.md)
+- [`core:regenerate-spec-metadata`](../regenerate-spec-metadata/spec.md)
+- [`core:initialize-persisted-spec-state`](../initialize-persisted-spec-state/spec.md)
+- [`core:get-persisted-spec-schema`](../get-persisted-spec-schema/spec.md)
+- [`core:update-persisted-spec-schema`](../update-persisted-spec-schema/spec.md)
+- [`core:get-persisted-spec-deps`](../get-persisted-spec-deps/spec.md)
+- [`core:update-persisted-spec-deps`](../update-persisted-spec-deps/spec.md)
+- [`core:get-persisted-spec-implementation`](../get-persisted-spec-implementation/spec.md)
+- [`core:update-persisted-spec-implementation`](../update-persisted-spec-implementation/spec.md)
+- [`core:get-persisted-spec-optimizations`](../get-persisted-spec-optimizations/spec.md)
+- [`core:update-persisted-spec-optimizations`](../update-persisted-spec-optimizations/spec.md)
 - [`core:get-spec-context`](../get-spec-context/spec.md)
 - [`core:config-writer-port`](../config-writer-port/spec.md)
 - [`core:list-workspaces`](../list-workspaces/spec.md)

@@ -1,13 +1,10 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { createHash } from 'node:crypto'
-import type { SpecRepository } from '@specd/sdk'
 import {
   makeMockConfig,
   makeMockKernel,
   makeProgram,
   mockProcessExit,
   captureStdout,
-  captureStderr,
 } from './helpers.js'
 
 vi.mock('../../src/helpers/cli-context.js', () => ({
@@ -27,42 +24,11 @@ function setup() {
     kernel: kernel,
   })
   const stdout = captureStdout()
-  const stderr = captureStderr()
   mockProcessExit()
-
-  // Get the default mock repo and add stub methods
-  const mockRepo = kernel.specs.repos.get('default') as SpecRepository & {
-    get: ReturnType<typeof vi.fn>
-    metadata: ReturnType<typeof vi.fn>
-    artifact: ReturnType<typeof vi.fn>
-    saveMetadata: ReturnType<typeof vi.fn>
-  }
-  ;(mockRepo as unknown as Record<string, unknown>).get = vi
-    .fn()
-    .mockResolvedValue({ path: 'auth/login' })
-  ;(mockRepo as unknown as Record<string, unknown>).metadata = vi.fn().mockResolvedValue(null)
-  ;(mockRepo as unknown as Record<string, unknown>).artifact = vi.fn().mockResolvedValue(null)
-  ;(mockRepo as unknown as Record<string, unknown>).saveMetadata = vi
-    .fn()
-    .mockResolvedValue(undefined)
-
-  return { config, kernel, stdout, stderr, mockRepo }
+  return { config, kernel, stdout }
 }
 
 afterEach(() => vi.restoreAllMocks())
-
-const specContent = '# Auth Spec\n\nContent here.'
-const specHash = `sha256:${createHash('sha256').update(specContent).digest('hex')}`
-
-const metadataObj = {
-  title: 'Login',
-  description: 'Handles user authentication',
-  contentHashes: { 'spec.md': specHash } as Record<string, string>,
-  dependsOn: ['default:auth/shared-errors'],
-  rules: [{ requirement: 'Must validate email', rules: ['email must contain @'] }],
-  constraints: ['Must use HTTPS'],
-  scenarios: [{ requirement: 'Must validate email', name: 'valid email accepted' }],
-}
 
 describe('spec metadata', () => {
   it('exits with error when path argument is missing', async () => {
@@ -73,78 +39,82 @@ describe('spec metadata', () => {
     await expect(program.parseAsync(['node', 'specd', 'spec', 'metadata'])).rejects.toThrow()
   })
 
-  it('prints structured text with spec label and title', async () => {
-    const { mockRepo, stdout } = setup()
-    mockRepo.metadata.mockResolvedValue(metadataObj)
-    mockRepo.artifact.mockResolvedValue({ content: specContent })
+  it('delegates to kernel.specs.getMetadata and prints diagnostics', async () => {
+    const { kernel, stdout } = setup()
+    vi.mocked(kernel.specs.getMetadata.execute).mockResolvedValue({
+      metadata: {
+        title: 'Login',
+        description: 'Handles user authentication',
+        generatedBy: 'core',
+        rules: [{ id: 'r1', text: 'rule' }],
+        constraints: [{ id: 'c1', text: 'constraint' }],
+        scenarios: [{ id: 's1', text: 'scenario' }],
+        dependsOn: ['core:spec-lock'],
+      },
+      metadataFingerprint: 'fp-abc',
+      source: 'persisted',
+      regenerated: false,
+      warnings: [{ kind: 'metadata-cache-write-failed', specId: 'default:auth/login', error: 'e' }],
+    })
 
     const program = makeProgram()
     registerSpecMetadata(program.command('spec'))
     await program.parseAsync(['node', 'specd', 'spec', 'metadata', 'auth/login'])
 
-    const out = stdout()
-    expect(out).toContain('spec: default:auth/login')
-    expect(out).toContain('title:       Login')
-    expect(out).toContain('description: Handles user authentication')
+    expect(kernel.specs.getMetadata.execute).toHaveBeenCalledWith({
+      specId: 'default:auth/login',
+    })
+    const text = stdout()
+    expect(text).toContain('spec: default:auth/login')
+    expect(text).toContain('source: persisted')
+    expect(text).toContain('regenerated: false')
+    expect(text).toContain('metadataFingerprint: fp-abc')
+    expect(text).toContain('title: Login')
+    expect(text).toContain('description: Handles user authentication')
+    expect(text).toContain('generatedBy: core')
+    expect(text).toContain('rules: 1')
+    expect(text).toContain('constraints: 1')
+    expect(text).toContain('scenarios: 1')
+    expect(text).toContain('dependsOn:')
+    expect(text).toContain('  - core:spec-lock')
+    expect(text).toContain('warnings:')
+    expect(text).toContain('  metadata-cache-write-failed: e')
+    expect(text).not.toContain('"title"')
   })
 
-  it('shows content hash freshness in text mode', async () => {
-    const { mockRepo, stdout } = setup()
-    mockRepo.metadata.mockResolvedValue(metadataObj)
-    mockRepo.artifact.mockResolvedValue({ content: specContent })
-
-    const program = makeProgram()
-    registerSpecMetadata(program.command('spec'))
-    await program.parseAsync(['node', 'specd', 'spec', 'metadata', 'auth/login'])
-
-    const out = stdout()
-    expect(out).toContain('content hashes:')
-    expect(out).toContain('spec.md  fresh')
-  })
-
-  it('shows STALE when hash does not match', async () => {
-    const { mockRepo, stdout } = setup()
-    mockRepo.metadata.mockResolvedValue(metadataObj)
-    mockRepo.artifact.mockResolvedValue({ content: 'changed content' })
-
-    const program = makeProgram()
-    registerSpecMetadata(program.command('spec'))
-    await program.parseAsync(['node', 'specd', 'spec', 'metadata', 'auth/login'])
-
-    const out = stdout()
-    expect(out).toContain('spec.md  STALE')
-  })
-
-  it('exits 1 with error when metadata file is absent', async () => {
-    const { mockRepo, stderr } = setup()
-    mockRepo.get.mockResolvedValue({ path: 'auth/login' })
-    mockRepo.metadata.mockResolvedValue(null)
-
-    const program = makeProgram()
-    registerSpecMetadata(program.command('spec'))
-    await program.parseAsync(['node', 'specd', 'spec', 'metadata', 'auth/login']).catch(() => {})
-
-    expect(process.exit).toHaveBeenCalledWith(1)
-    expect(stderr()).toContain('error:')
-  })
-
-  it('exits 1 when workspace is unknown', async () => {
-    const { stderr } = setup()
-
-    const program = makeProgram()
-    registerSpecMetadata(program.command('spec'))
-    await program
-      .parseAsync(['node', 'specd', 'spec', 'metadata', 'unknown-ws:auth/login'])
-      .catch(() => {})
-
-    expect(process.exit).toHaveBeenCalledWith(1)
-    expect(stderr()).toContain('error:')
-  })
-
-  it('outputs JSON with fresh flag and contentHashes array', async () => {
-    const { mockRepo, stdout } = setup()
-    mockRepo.metadata.mockResolvedValue(metadataObj)
-    mockRepo.artifact.mockResolvedValue({ content: specContent })
+  it('emits top-level JSON fields for structured output', async () => {
+    const { kernel, stdout } = setup()
+    const rules = [
+      { id: 'r1', text: 'rule one' },
+      { id: 'r2', text: 'rule two' },
+      { id: 'r3', text: 'rule three' },
+    ]
+    const constraints = [
+      { id: 'c1', text: 'constraint one' },
+      { id: 'c2', text: 'constraint two' },
+    ]
+    const scenarios = [
+      { id: 's1', text: 'scenario one' },
+      { id: 's2', text: 'scenario two' },
+      { id: 's3', text: 'scenario three' },
+      { id: 's4', text: 'scenario four' },
+      { id: 's5', text: 'scenario five' },
+    ]
+    vi.mocked(kernel.specs.getMetadata.execute).mockResolvedValue({
+      metadata: {
+        title: 'Login',
+        description: 'Handles user authentication',
+        rules,
+        constraints,
+        scenarios,
+        dependsOn: ['core:spec-lock'],
+        contentHashes: { 'spec.md': 'sha256:abc' },
+      },
+      metadataFingerprint: 'fp',
+      source: 'generated',
+      regenerated: true,
+      warnings: [],
+    })
 
     const program = makeProgram()
     registerSpecMetadata(program.command('spec'))
@@ -159,27 +129,64 @@ describe('spec metadata', () => {
     ])
 
     const parsed = JSON.parse(stdout())
-    expect(parsed.spec).toBe('default:auth/login')
-    expect(parsed.fresh).toBe(true)
-    expect(Array.isArray(parsed.contentHashes)).toBe(true)
-    expect(parsed.contentHashes[0].filename).toBe('spec.md')
-    expect(parsed.contentHashes[0].fresh).toBe(true)
-    expect(Array.isArray(parsed.rules)).toBe(true)
-    expect(Array.isArray(parsed.constraints)).toBe(true)
+    expect(parsed).toMatchObject({
+      spec: 'default:auth/login',
+      source: 'generated',
+      regenerated: true,
+      metadataFingerprint: 'fp',
+      warnings: [],
+      metadata: { title: 'Login' },
+    })
+    expect(parsed.metadata.rules).toEqual(rules)
+    expect(parsed.metadata.constraints).toEqual(constraints)
+    expect(parsed.metadata.scenarios).toEqual(scenarios)
+    expect(Array.isArray(parsed.metadata.rules)).toBe(true)
+    expect(Array.isArray(parsed.metadata.constraints)).toBe(true)
+    expect(Array.isArray(parsed.metadata.scenarios)).toBe(true)
+    expect(parsed).not.toHaveProperty('fresh')
+    expect(parsed).not.toHaveProperty('contentHashes')
+    expect(parsed).not.toHaveProperty('rules')
+    expect(parsed).not.toHaveProperty('constraints')
+    expect(parsed).not.toHaveProperty('scenarios')
   })
 
-  it('shows section counts in text mode', async () => {
-    const { mockRepo, stdout } = setup()
-    mockRepo.metadata.mockResolvedValue(metadataObj)
-    mockRepo.artifact.mockResolvedValue({ content: specContent })
+  it('omits dependsOn and warnings sections in text when empty', async () => {
+    const { kernel, stdout } = setup()
+    vi.mocked(kernel.specs.getMetadata.execute).mockResolvedValue({
+      metadata: {
+        title: 'Login',
+        rules: [
+          { id: 'r1', text: 'a' },
+          { id: 'r2', text: 'b' },
+          { id: 'r3', text: 'c' },
+        ],
+        constraints: [
+          { id: 'c1', text: 'x' },
+          { id: 'c2', text: 'y' },
+        ],
+        scenarios: [
+          { id: 's1', text: '1' },
+          { id: 's2', text: '2' },
+          { id: 's3', text: '3' },
+          { id: 's4', text: '4' },
+          { id: 's5', text: '5' },
+        ],
+      },
+      metadataFingerprint: 'fp',
+      source: 'persisted',
+      regenerated: false,
+      warnings: [],
+    })
 
     const program = makeProgram()
     registerSpecMetadata(program.command('spec'))
     await program.parseAsync(['node', 'specd', 'spec', 'metadata', 'auth/login'])
 
-    const out = stdout()
-    expect(out).toContain('rules:       1')
-    expect(out).toContain('constraints: 1')
-    expect(out).toContain('scenarios:   1')
+    const text = stdout()
+    expect(text).toContain('rules: 3')
+    expect(text).toContain('constraints: 2')
+    expect(text).toContain('scenarios: 5')
+    expect(text).not.toContain('dependsOn:')
+    expect(text).not.toContain('warnings:')
   })
 })

@@ -38,7 +38,7 @@ contextIncludeSpecs:
 contextExcludeSpecs:
   - 'default:_global/commits'
 
-llmOptimizedContext: false
+llmOptimizedContext: true
 
 workspaces:
   default:

@@ -4,5 +4,41 @@
     "version": 1
   },
   "dependsOn": ["default:_global/conventions"],
-  "implementation": []
+  "implementation": [],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Unified Specd Error Contract: `specd: true` discriminator, `code` in UPPER_SNAKE_CASE, actionable messages; all packages extend `SpecdError`.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:40b77a1d0fe2f715ab0733e116141da3734028175c0d83f605651eeaed7c6c53",
+          "lastModified": "2026-05-25T06:02:58.305Z"
+        },
+        "verify.md": {
+          "hash": "sha256:c401e34e489be2ca3736d24ba3cabb2d4f14a8c166574db7a56070bcbe1dbd6e",
+          "lastModified": "2026-05-25T06:02:58.306Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Error Handling Conventions\n\n## Rules\n- Specd Error Contract: extends `Error`; `readonly specd = true`; `readonly code: string`; descriptive `message`\n- `@specd/core`: canonical `SpecdError` base; all domain/application errors MUST extend it\n- All monorepo packages depending on `@specd/core`: extend `SpecdError`; SHOULD define package-level base (e.g. `SpecdCliError`)\n- Error codes: `UPPER_SNAKE_CASE`; unique per package; stable across versions\n- Messages: descriptive, actionable; no jargon or internal details\n- Optional metadata (`specId`, `filePath`, etc.) for JSON/TOON; document in JSDoc\n- Error classes: JSDoc with meaning, `code`, metadata; use cases document `@throws`\n\n## Constraints\n- System errors (OOM, network) and unexpected bugs MAY stay generic `Error` (CLI shows stack trace)\n- Domain logic MUST NOT use generic `Error` for expected/validation failures",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:40b77a1d0fe2f715ab0733e116141da3734028175c0d83f605651eeaed7c6c53",
+          "lastModified": "2026-05-25T06:02:58.305Z"
+        },
+        "verify.md": {
+          "hash": "sha256:c401e34e489be2ca3736d24ba3cabb2d4f14a8c166574db7a56070bcbe1dbd6e",
+          "lastModified": "2026-05-25T06:02:58.306Z"
+        }
+      }
+    }
+  }
 }

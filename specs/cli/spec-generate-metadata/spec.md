@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Metadata files must be regenerated whenever spec content changes, and doing it manually is error-prone. The `specd spec generate-metadata` command generates metadata content deterministically from schema extraction rules, delegating to `GenerateSpecMetadata` for generation and optionally to `SaveSpecMetadata` for persistence.
+Metadata self-heals on normal reads, but operators sometimes need a guaranteed rebuild — for cache warming, repair, CI, or diagnostics. The `specd spec generate-metadata` command is that explicit forced rebuild: it always regenerates and persists metadata for the given spec (or, with `--all`, for every spec), delegating entirely to `RegenerateSpecMetadata` (the `policy: 'force'` counterpart of the self-healing `GetSpecMetadata` read). It is never required for correctness after a lock mutation.
 
 ## Requirements
 
@@ -10,44 +10,31 @@ Metadata files must be regenerated whenever spec content changes, and doing it m
 
 The command is registered as `generate-metadata [specPath]` on the `spec` parent command. The `specPath` positional argument is optional when `--all` is used. It accepts:
 
-- `--write` — persist the generated metadata
-- `--force` — skip conflict detection when writing (requires `--write`)
-- `--all` — batch mode: generate metadata for all specs matching `--status` filter. Mutually exclusive with `<specPath>`. Requires `--write`.
-- `--status <values>` — comma-separated metadata status filter for `--all`. Accepted values: `stale`, `missing`, `invalid`, `fresh`, or the keyword `all` (every spec regardless of status). Default: `stale,missing`. Requires `--all`.
+- `--force` — skip conflict detection when persisting the regenerated projection
+- `--all` — batch mode: forcibly regenerate metadata for every spec across every workspace. Mutually exclusive with `<specPath>`.
 - `--format <fmt>` — output format: `text|json|toon` (default `text`)
 - `--config <path>` — path to `specd.yaml`
 
-The `<specPath>` argument uses the same `workspace:capability-path` syntax as other `spec` subcommands.
+There is no `--write` flag: the command always regenerates and persists. There is no `--status` flag: `--all` always targets every spec, since forced rebuilding does not depend on a spec's current freshness. The `<specPath>` argument uses the same `workspace:capability-path` syntax as other `spec` subcommands.
 
-### Requirement: Default output (no --write)
+### Requirement: Output (single spec)
 
-Without `--write`, the command generates metadata and outputs it to stdout without persisting:
+The command calls `RegenerateSpecMetadata` for the given spec and reports the persisted result:
 
-- **Text format:** outputs the generated YAML content, trimmed of trailing whitespace
-- **JSON/toon format:** outputs `{ spec: "<workspace:path>", metadata: <object> }`
-
-### Requirement: Write mode
-
-With `--write`, the command generates metadata, persists it via `SaveSpecMetadata`, and outputs a confirmation:
-
-- **Text format:** `wrote metadata for <workspace:path>`
-- **JSON/toon format:** `{ result: "ok", spec: "<workspace:path>", written: true }`
+- **Text format:** `regenerated metadata for <workspace:path>`
+- **JSON/toon format:** `{ result: "ok", spec: "<workspace:path>", regenerated: true }`
 
 ### Requirement: Force flag
 
-`--force` requires `--write`. Without `--write`, the command writes `error: --force requires --write` to stderr and exits with code 1. With `--write`, the command passes `force: true` to `SaveSpecMetadata` to skip conflict detection.
+`--force` is a standalone flag; it is passed through to `RegenerateSpecMetadata` to skip conflict detection against the observed revision when persisting the regenerated projection.
 
 ### Requirement: Batch mode (--all)
 
-With `--all`, the command iterates over all specs across all workspaces, filters by metadata status using `--status` (default `stale,missing`), generates metadata for each matching spec, and writes it. `--all` requires `--write` — without it the command exits with `error: --all requires --write`. `--all` is mutually exclusive with a positional `<specPath>` — providing both exits with `error: --all and <specPath> are mutually exclusive`.
-
-The `--status` filter accepts a comma-separated list of: `stale`, `missing`, `invalid`, `fresh`. The keyword `all` is a shorthand for every status (equivalent to regenerating every spec). `--status` without `--all` exits with `error: --status requires --all`.
-
-For each matching spec, the command calls `GenerateSpecMetadata` and then `SaveSpecMetadata`. If `GenerateSpecMetadata` returns `hasExtraction: false`, the entire batch stops with the existing `no metadataExtraction` error (this is a schema-level issue, not per-spec).
+With `--all`, the command discovers every spec across every workspace directly through workspace and repository listing — not through `ListSpecs`, since `ListSpecs` itself may materialize metadata and using it for forced selection would create a use-case cycle — and forcibly regenerates and persists metadata for each one via `RegenerateSpecMetadata`. `--all` is mutually exclusive with a positional `<specPath>` — providing both exits with `error: --all and <specPath> are mutually exclusive`.
 
 Individual spec failures during batch mode (e.g. `DependsOnOverwriteError` when `--force` is not set) are reported as warnings and the batch continues to the next spec. The command exits with code 1 if any spec failed, 0 if all succeeded.
 
-**Text output:** one line per spec processed: `wrote metadata for <specId>` on success, `error: <specId>: <message>` on failure. A summary line at the end: `generated metadata for N/M specs` (where M is total matched, N is successful).
+**Text output:** one line per spec processed: `regenerated metadata for <specId>` on success, `error: <specId>: <message>` on failure. A summary line at the end: `regenerated metadata for N/M specs` (where M is total specs, N is successful).
 
 **JSON output:** `{ result: "ok"|"partial"|"error", total: M, succeeded: N, failed: F, specs: [{ spec: "<id>", status: "ok"|"error", error?: "<msg>" }] }`
 
@@ -59,23 +46,21 @@ If the spec or workspace does not exist, the core use case throws `SpecNotFoundE
 
 If the core use case returns `hasExtraction: false` (schema has no `metadataExtraction` declarations), the command writes `error: schema has no metadataExtraction declarations` to stderr and exits with code 1.
 
-### Requirement: Error — dependsOn overwrite (write mode)
+### Requirement: Error — dependsOn overwrite
 
-When `--write` is used and `--force` is not set, if the generated metadata would change existing `dependsOn` entries, `SaveSpecMetadata` throws a `DependsOnOverwriteError`. The error propagates through `handleError` which writes `error: dependsOn would change (...)` to stderr and exits with code 1. Stdout remains empty on error.
+When `--force` is not set, if the regenerated metadata would change existing `dependsOn` entries, `RegenerateSpecMetadata` throws a `DependsOnOverwriteError`. The error propagates through `handleError` which writes `error: dependsOn would change (...)` to stderr and exits with code 1. Stdout remains empty on error.
 
-When `--write --force` is used, the overwrite check is skipped entirely.
+When `--force` is used, the overwrite check is skipped entirely.
 
 ## Constraints
 
-- The command contains no business logic — all generation is delegated to `GenerateSpecMetadata` and all writing to `SaveSpecMetadata`
-- YAML serialization uses `lineWidth: 0` for literal scalars
+- The command contains no business logic — all forced regeneration and persistence is delegated to `RegenerateSpecMetadata`
 - The command never reads or writes the filesystem directly for spec content — it uses the kernel
-- Batch mode uses `ListSpecs` with `includeMetadataStatus: true` for filtering — no custom metadata resolution in the CLI layer
-- `--status` values are validated at the CLI boundary before any spec processing begins
+- Batch mode discovers specs through workspace and repository listing, never through `ListSpecs` or any metadata-status projection
+- The command never implements its own freshness or conflict logic — `RegenerateSpecMetadata` owns it
 
 ## Spec Dependencies
 
-- [`core:generate-metadata`](../../core/generate-metadata/spec.md) — the core use case
+- [`core:regenerate-spec-metadata`](../../core/regenerate-spec-metadata/spec.md) — the core use case for forced rebuilding
 - [`core:spec-metadata`](../../core/spec-metadata/spec.md) — metadata format and validation
-- [`core:list-specs`](../../core/list-specs/spec.md) — batch mode uses `ListSpecs` with `includeMetadataStatus` for filtering
 - [`default:_global/architecture`](../../_global/architecture/spec.md) — adapter packages contain no business logic

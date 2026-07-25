@@ -1,0 +1,43 @@
+- op: modified
+  description: Mark the use case as removed now that spec-lock owns optimized fields directly.
+  selector:
+    type: section
+    matches: Purpose
+  content: |
+    **Removed.** `UpdateSpecMetadata` merged agent-provided `optimizedDescription`/`optimizedContext` into a freshly-extracted metadata document and persisted the merged result. Persisted optimizations are now owned directly by `spec-lock.json` per-field optimization records (see [`core:spec-optimization`](../spec-optimization/spec.md)) and mutated only through `UpdatePersistedSpecOptimizations` (`specs optimizations set`/`clear`). Metadata has no external editor after this change — `UpdateSpecMetadata` MUST NOT exist as a Core public use case.
+
+- op: modified
+  description: Replace the deterministic-extraction requirement with an explicit removal statement.
+  selector:
+    type: section
+    matches: 'Requirement: Deterministic extraction before merge'
+  rename: 'Requirement: UpdateSpecMetadata is removed'
+  content: |
+    `UpdateSpecMetadata` MUST NOT be exported from `@specd/core`, MUST NOT be mounted on `Kernel`, and MUST NOT have a `createUpdateSpecMetadata` composition factory. Callers that need to persist an LLM-optimized field MUST use `UpdatePersistedSpecOptimizations` instead, which writes directly to the spec's lock-owned optimization state and captures its own artifact/schema baseline.
+
+- op: removed
+  description: Remove the merge-fields requirement — there is no metadata-owned optimization merge anymore.
+  selector:
+    type: section
+    matches: 'Requirement: Merging optimized fields'
+
+- op: removed
+  description: Remove the persistence requirement — SaveSpecMetadata is no longer invoked for optimization writes.
+  selector:
+    type: section
+    matches: 'Requirement: Persistence'
+
+- op: removed
+  description: Remove the obsolete config-based factory contract.
+  selector:
+    type: section
+    matches: 'Requirement: Config-based factory delegates through resolveUpdateSpecMetadataDeps'
+
+- op: modified
+  description: Drop the dependency on the removed SaveSpecMetadata use case.
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`core:spec-metadata`](../spec-metadata/spec.md)
+    - [`core:composition-resolver`](../composition-resolver/spec.md)

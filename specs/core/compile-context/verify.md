@@ -86,33 +86,44 @@
 
 ### Requirement: Staleness detection and content fallback
 
-#### Scenario: Stale metadata emits warning
+#### Scenario: Persisted-fresh metadata is used directly
 
-- **GIVEN** `auth/jwt` metadata has `contentHashes.spec.md: 'sha256:old'`
-- **AND** the current `spec.md` hashes to `sha256:new`
-- **WHEN** `CompileContext.execute` adds `auth/jwt` via `dependsOn` traversal
-- **THEN** the result `warnings` includes a staleness warning for `auth/jwt`
+- **GIVEN** `GetSpecMetadata` returns `source: 'persisted'` with `regenerated: false` for a spec
+- **WHEN** `CompileContext` renders that spec
+- **THEN** it uses the returned structured content directly
 
-#### Scenario: Fresh metadata emits no staleness warning
+#### Scenario: Regenerated projection is used and its warnings are forwarded
 
-- **GIVEN** all `contentHashes` in metadata match the current file hashes
-- **WHEN** `CompileContext.execute` is called
-- **THEN** no staleness warnings are emitted
+- **GIVEN** `GetSpecMetadata` regenerates the projection (`regenerated: true`) or falls back after a source-conflict retry
+- **WHEN** `CompileContext` renders that spec
+- **THEN** it uses the returned in-memory projection
+- **AND** it forwards any `metadata-cache-write-failed` or generation warning into its own `warnings` array without logging it again
 
-#### Scenario: Fallback rendering uses shared transform registry
+#### Scenario: Materialization failure emits missing-metadata and renders a minimal entry
 
-- **GIVEN** a spec has stale metadata
-- **AND** the schema declares transforms in its metadata extraction rules
-- **WHEN** `CompileContext.execute` falls back to live extraction for rendered content
-- **THEN** that fallback uses the shared extractor-transform registry and origin context for the spec artifacts
+- **GIVEN** materialization cannot produce a valid projection at all (e.g. the schema has no `metadataExtraction` declarations and generation yields nothing)
+- **WHEN** `CompileContext` renders that spec
+- **THEN** it emits a `missing-metadata` warning identifying the spec path
+- **AND** it renders an empty/minimal entry for that spec rather than throwing
 
-#### Scenario: Fallback rendering fails explicitly when transform cannot normalize a found value
+#### Scenario: Only rendered specs are materialized
 
-- **GIVEN** stale metadata triggers live extraction fallback
-- **AND** the fallback extraction finds a value for a transformed field
-- **AND** the transform cannot normalize that value
-- **WHEN** `CompileContext.execute` renders fallback content
-- **THEN** the fallback path fails explicitly instead of silently dropping the found value
+- **GIVEN** a collected set of specs where only some are actually rendered after display-mode classification
+- **WHEN** `CompileContext` assembles the result
+- **THEN** it materializes metadata only for specs it actually renders, not every collected spec
+
+#### Scenario: Merged preview content flows through the same materialization path for sections
+
+- **GIVEN** a spec in `change.specIds` has merged preview artifacts available from `PreviewSpec`
+- **WHEN** `CompileContext` renders section-filtered full content for that spec
+- **THEN** the materialization flow operates over the merged artifact set rather than the base spec files
+
+#### Scenario: Full content without sections does not require metadata materialization
+
+- **GIVEN** `sections` is absent
+- **WHEN** `CompileContext` renders full-mode content for a spec
+- **THEN** the content body is rendered from ordered spec-scoped artifact files without requiring metadata materialization
+- **AND** a materialized projection may still supply summary fields
 
 ### Requirement: Missing spec IDs emit a warning
 
@@ -124,36 +135,26 @@
 
 ### Requirement: dependsOn resolution order
 
-#### Scenario: Missing metadata during dependsOn traversal emits warning
+#### Scenario: Manifest specDependsOn used as primary source for dependencies
 
-- **GIVEN** `change.specIds` includes `auth/login`
-- **AND** `auth/login` has no metadata
+- **GIVEN** `change.specDependsOn` has an entry for `auth/login` with `['auth/shared']`
+- **AND** `auth/login` metadata declares `dependsOn: ['auth/jwt']`
 - **WHEN** `CompileContext.execute` is called with `followDeps: true`
-- **THEN** `result.warnings` includes a `missing-metadata` warning for `auth/login`
+- **THEN** `auth/shared` is used as the dependency from the manifest, not `auth/jwt` from metadata
 
-#### Scenario: Canonical metadata dependency projection works without extraction
-
-- **GIVEN** a traversed persisted spec has fresh `metadata.json.dependsOn`
-- **AND** the active schema omits `metadataExtraction.dependsOn`
-- **WHEN** `CompileContext.execute` is called with `followDeps: true`
-- **THEN** traversal still uses that metadata dependency list
-
-#### Scenario: Stale metadata dependency projection remains second-tier input
+#### Scenario: Materialized metadata dependency projection used as second tier
 
 - **GIVEN** `change.specDependsOn` has no entry for a traversed spec
-- **AND** that spec has persisted `metadata.json.dependsOn`
-- **AND** the metadata is marked stale
-- **WHEN** `CompileContext.execute` is called with `followDeps: true`
-- **THEN** traversal still uses the persisted metadata dependency list before any extraction fallback
-- **AND** `result.warnings` includes `stale-metadata`
+- **WHEN** `CompileContext` resolves `dependsOn` for that spec via `GetSpecMetadata.execute({ specId })`
+- **THEN** the canonical normalized `dependsOn` from that materialized projection is used
+- **AND** this applies even when the persisted cache was stale or missing, because materialization self-heals it rather than `CompileContext` treating a stale snapshot as a frozen source
 
-#### Scenario: Fallback to transform-backed extraction when metadata absent in dependsOn traversal
+#### Scenario: Extraction fallback only when materialization produces no projection at all
 
 - **GIVEN** the schema declares `metadataExtraction.dependsOn`
-- **AND** a spec in the `dependsOn` traversal has no metadata
-- **AND** the spec's artifact content contains extractable dependency references
-- **WHEN** `CompileContext.execute` is called with `followDeps: true`
-- **THEN** dependencies are extracted from the spec content via the `metadataExtraction` engine using the shared transform registry and origin context
+- **AND** materialization cannot produce a projection at all for a spec in `dependsOn` traversal
+- **WHEN** `CompileContext` resolves `dependsOn` for that spec
+- **THEN** dependencies are extracted from spec content via the `metadataExtraction` engine using the shared transform registry and origin context
 - **AND** a `missing-metadata` warning is still emitted
 
 #### Scenario: Fallback dependency extraction does not silently drop found values
@@ -164,12 +165,11 @@
 - **WHEN** `CompileContext.execute` is called with `followDeps: true`
 - **THEN** the traversal fails explicitly instead of treating the spec as having no dependencies
 
-#### Scenario: Manifest specDependsOn used as primary source for dependencies
+#### Scenario: Empty result at every tier treats the spec as having no dependencies
 
-- **GIVEN** `change.specDependsOn` has an entry for `auth/login` with `['auth/shared']`
-- **AND** `auth/login` metadata declares `dependsOn: ['auth/jwt']`
-- **WHEN** `CompileContext.execute` is called with `followDeps: true`
-- **THEN** `auth/shared` is used as the dependency from the manifest, not `auth/jwt` from metadata
+- **GIVEN** the manifest, materialized metadata, and extraction fallback tiers all return empty for a spec
+- **WHEN** `CompileContext` resolves `dependsOn` for that spec
+- **THEN** the spec is treated as having no dependencies
 
 ### Requirement: Unknown workspace qualifiers emit a warning
 
@@ -260,6 +260,12 @@
 
 - **WHEN** `CompileContext` is assembled after lifecycle projections are removed
 - **THEN** it retains the dependencies required to collect, render, and fingerprint context
+
+#### Scenario: Construction receives GetSpecMetadata for self-healing content
+
+- **WHEN** `CompileContext` is assembled from a resolved `SpecdConfig`
+- **THEN** it receives `GetSpecMetadata` as a constructor dependency
+- **AND** it does not call `SpecRepository.readMetadataSnapshot()` directly
 
 ### Requirement: Input
 
@@ -402,7 +408,15 @@
 #### Scenario: Emits warning for missing spec optimization
 
 - **GIVEN** `llmOptimizedContext` is enabled
-- **AND** a spec is missing optimized context
+- **AND** a spec's materialized metadata reports a missing `optimizedContext` field
+- **WHEN** context is compiled
+- **THEN** it emits a `stale-optimization` warning
+- **AND** the message mentions `specd-spec-context-optimizer`
+
+#### Scenario: Emits warning for stale spec optimization
+
+- **GIVEN** `llmOptimizedContext` is enabled
+- **AND** a spec's materialized metadata reports a stale `optimizedContext` field per the per-field freshness recorded on the spec's lock-owned optimization state
 - **WHEN** context is compiled
 - **THEN** it emits a `stale-optimization` warning
 - **AND** the message mentions `specd-spec-context-optimizer`
@@ -422,8 +436,15 @@
 - `parsers: ArtifactParserRegistry`
 - `hasher: ContentHasher`
 - `previewSpec: PreviewSpec`
+- `getMetadata: GetSpecMetadata`
 - `extractorTransforms: ExtractorTransformRegistry`
 - `workspaceRoutes: readonly SpecWorkspaceRoute[]`
 - `defaultConfig: CompileContextConfig`
 - **AND** it does not resolve `LifecycleEngine`
 - **AND** the factory delegates to canonical `createCompileContext(deps)`
+
+#### Scenario: resolveCompileContextDeps wires GetSpecMetadata for self-healing
+
+- **WHEN** `resolveCompileContextDeps(resolver)` runs
+- **THEN** the resolved deps include `getMetadata: GetSpecMetadata`
+- **AND** it is used instead of direct `SpecRepository.metadata()` freshness checks

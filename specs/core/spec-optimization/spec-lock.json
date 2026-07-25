@@ -1,0 +1,21 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["core:spec-lock", "core:spec-repository-port"],
+  "implementation": [
+    {
+      "file": "core:src/domain/services/spec-optimization.ts",
+      "symbols": [
+        "PersistedArtifactStateEntry",
+        "PersistedSpecOptimizations",
+        "normalizePersistedSpecOptimizations"
+      ]
+    },
+    {
+      "file": "core:src/domain/services/spec-optimization-freshness.ts",
+      "symbols": ["classifyOptimizationFieldFreshness"]
+    }
+  ]
+}

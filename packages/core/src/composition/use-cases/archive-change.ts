@@ -7,13 +7,12 @@ import { type ChangeRepository } from '../../application/ports/change-repository
 import { type SpecRepository } from '../../application/ports/spec-repository.js'
 import { type SchemaProvider } from '../../application/ports/schema-provider.js'
 import { ArchiveChange } from '../../application/use-cases/archive-change.js'
-import { type GenerateSpecMetadata } from '../../application/use-cases/generate-spec-metadata.js'
+import { type MaterializeSpecMetadata } from '../../application/use-cases/materialize-spec-metadata.js'
 import {
   ListWorkspaces,
   type ProjectWorkspace,
 } from '../../application/use-cases/list-workspaces.js'
 import { type RunStepHooks } from '../../application/use-cases/run-step-hooks.js'
-import { type SaveSpecMetadata } from '../../application/use-cases/save-spec-metadata.js'
 import { type SpecdConfig } from '../../application/specd-config.js'
 import { type ExtractorTransformRegistry } from '../../domain/services/extract-metadata.js'
 import { type SpecWorkspaceRoute } from '../../application/use-cases/_shared/spec-reference-resolver.js'
@@ -28,8 +27,7 @@ import {
   type CompositionResolutionOptions,
 } from '../composition-resolver.js'
 import { normalizeCompositionFactoryArgs, type FactoryInput } from '../normalize-factory-args.js'
-import { createGenerateSpecMetadata } from './generate-spec-metadata.js'
-import { createSaveSpecMetadata } from './save-spec-metadata.js'
+import { createMaterializeSpecMetadata } from './materialize-spec-metadata.js'
 
 /**
  * Builds workspace spec layout map for {@link FsArchiveBatchSnapshot}.
@@ -111,8 +109,7 @@ export interface ArchiveChangeDeps {
   readonly actor: ActorResolver
   readonly parsers: ArtifactParserRegistry
   readonly schemaProvider: SchemaProvider
-  readonly generateMetadata: GenerateSpecMetadata
-  readonly saveMetadata: SaveSpecMetadata
+  readonly materializeMetadata: MaterializeSpecMetadata
   readonly extractorTransforms: ExtractorTransformRegistry
   readonly workspaceRoutes: readonly SpecWorkspaceRoute[]
   readonly projectRoot: string
@@ -141,10 +138,7 @@ export function resolveArchiveChangeDeps(resolver: CompositionResolver): Archive
     actor: resolver.getActorResolver(),
     parsers: resolver.getArtifactParserRegistry(),
     schemaProvider: resolver.getSchemaProvider(),
-    generateMetadata: createGenerateSpecMetadata(resolver.config, resolver.options),
-    saveMetadata: createSaveSpecMetadata({
-      specRepositories,
-    }),
+    materializeMetadata: createMaterializeSpecMetadata(resolver.config, resolver.options),
     extractorTransforms: resolver.getExtractorTransforms(),
     workspaceRoutes: resolver.getSpecWorkspaceRoutes(),
     projectRoot: resolver.config.projectRoot,
@@ -182,8 +176,7 @@ function createArchiveChangeFromNormalized(
       actor,
       parsers,
       schemaProvider,
-      generateMetadata,
-      saveMetadata,
+      materializeMetadata,
       extractorTransforms,
       workspaceRoutes,
       projectRoot,
@@ -198,8 +191,7 @@ function createArchiveChangeFromNormalized(
       actor,
       parsers,
       schemaProvider,
-      generateMetadata,
-      saveMetadata,
+      materializeMetadata,
       extractorTransforms,
       workspaceRoutes,
       projectRoot,
@@ -220,8 +212,7 @@ function isArchiveChangeDeps(value: ArchiveChangeDeps | SpecdConfig): value is A
     'actor' in value &&
     'parsers' in value &&
     'schemaProvider' in value &&
-    'generateMetadata' in value &&
-    'saveMetadata' in value &&
+    'materializeMetadata' in value &&
     'extractorTransforms' in value &&
     'workspaceRoutes' in value &&
     'projectRoot' in value &&

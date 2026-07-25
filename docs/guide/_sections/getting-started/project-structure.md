@@ -9,7 +9,8 @@ my-project/
 │   ├── auth/
 │   │   ├── login/
 │   │   │   ├── spec.md
-│   │   │   └── verify.md
+│   │   │   ├── verify.md
+│   │   │   └── spec-lock.json   # Persisted deps/implementation/optimizations
 │   │   └── oauth/
 │   │       ├── spec.md
 │   │       └── verify.md
@@ -22,7 +23,7 @@ my-project/
 │   ├── drafts/                # Paused work
 │   ├── discarded/             # Abandoned work
 │   ├── archive/               # Completed work
-│   └── metadata/              # Extracted spec metadata
+│   └── metadata/              # Gitignored metadata cache (.specd/metadata/)
 └── src/                       # Your application code
 ```
 

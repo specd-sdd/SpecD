@@ -9,11 +9,13 @@
     "core:schema-format",
     "core:spec-id-format",
     "core:spec-repository-port",
-    "core:composition-resolver"
+    "core:composition-resolver",
+    "core:spec-optimization"
   ],
   "implementation": [
     {
-      "file": "core:src/composition/use-cases/generate-spec-metadata.ts"
+      "file": "core:src/application/use-cases/generate-spec-metadata.ts",
+      "symbols": ["GenerateSpecMetadata"]
     }
   ]
 }

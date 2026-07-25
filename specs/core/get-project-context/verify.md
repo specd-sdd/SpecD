@@ -124,73 +124,85 @@
 - **WHEN** `execute` is called with `followDeps: true` and `depth: 1`
 - **THEN** `specs` contains A and B but not C
 
-#### Scenario: Canonical metadata dependency projection works without extraction
+#### Scenario: Materialized dependency projection works without extraction
 
-- **GIVEN** an included persisted spec has fresh `metadata.json.dependsOn`
+- **GIVEN** an included persisted spec's materialized metadata reports `dependsOn`
 - **AND** the active schema omits `metadataExtraction.dependsOn`
 - **WHEN** `execute` is called with `followDeps: true`
-- **THEN** traversal still discovers those dependencies from metadata
+- **THEN** traversal still discovers those dependencies from the materialized projection
 
-#### Scenario: Stale metadata remains distinct from missing metadata
+#### Scenario: Self-healed drifted cache remains usable for traversal without falling back
 
-- **GIVEN** an included persisted spec has `metadata.json.dependsOn`
-- **AND** that metadata is marked stale
+- **GIVEN** an included spec's persisted metadata cache is drifted or stale
+- **AND** `GetSpecMetadata` successfully regenerates a fresh projection for it
 - **WHEN** `execute` is called with `followDeps: true`
-- **THEN** traversal still sees the persisted dependency projection
-- **AND** the result includes a `stale-metadata` warning
-- **AND** the use case does not treat that spec as metadata-missing
+- **THEN** traversal uses the regenerated `dependsOn` projection
+- **AND** the spec is not treated as metadata-missing
 
-#### Scenario: DependsOn traversal falls back to transform-backed extraction
+#### Scenario: DependsOn traversal falls back to transform-backed extraction only when materialization fails
 
-- **GIVEN** a spec has no fresh metadata
+- **GIVEN** materialization cannot produce a projection at all for a spec
 - **AND** the schema declares `metadataExtraction.dependsOn` with a transform such as `resolveSpecPath`
 - **WHEN** `execute` is called with `followDeps: true`
 - **THEN** traversal uses live extraction with the shared transform registry and origin context to discover additional specs
 
 #### Scenario: DependsOn traversal does not silently drop found dependency values
 
-- **GIVEN** extraction finds dependency values for a stale or metadata-less spec
+- **GIVEN** extraction finds dependency values for a spec whose metadata cannot be materialized
 - **AND** transform execution cannot normalize those values
 - **WHEN** `execute` is called with `followDeps: true`
 - **THEN** traversal fails explicitly instead of treating the spec as having no dependencies
 
+#### Scenario: Traversal never reads spec-lock.json as a generic artifact
+
+- **WHEN** `dependsOn` traversal needs persisted sidecar influence
+- **THEN** it consumes that influence only through `GetSpecMetadata`'s normalized projection
+- **AND** it does not read `spec-lock.json` as a generic spec artifact
+
 ### Requirement: Renders spec content from metadata when fresh
 
-#### Scenario: Fresh metadata rendered with all sections in full mode
+#### Scenario: Materialized metadata rendered with all sections in full mode
 
-- **GIVEN** a spec has fresh `.specd-metadata.yaml`
+- **GIVEN** a spec's metadata materializes successfully
 - **AND** the effective display mode is full
 - **WHEN** `execute` is called without `sections` filter
 - **THEN** the spec entry includes Title, Description, Rules, and Constraints (default sections)
 
 #### Scenario: Sections filter restricts full output
 
-- **GIVEN** a spec has fresh metadata
+- **GIVEN** a spec's metadata materializes successfully
 - **AND** the effective display mode is full
 - **WHEN** `execute` is called with `sections: ["rules"]`
 - **THEN** the spec entry includes Title and Description (header persistence)
 - **AND** the spec entry includes Rules but not scenarios or constraints
 
+#### Scenario: Materialization warnings forwarded without duplicate logging
+
+- **GIVEN** `GetSpecMetadata` returns a `metadata-cache-write-failed` or generation warning while still producing usable content for an included spec
+- **WHEN** `GetProjectContext` renders that spec
+- **THEN** the warning is forwarded into the result's `warnings` array
+- **AND** it is not logged again by this use case
+
+#### Scenario: Only rendered specs are materialized
+
+- **GIVEN** `contextMode: "list"` and one or more included specs
+- **WHEN** `GetProjectContext` assembles the result
+- **THEN** it does not call `GetSpecMetadata` for those list-mode entries
+- **AND** emitted entries remain list-shaped without title, description, or content
+
 ### Requirement: Falls back to extraction when metadata is stale or absent
 
-#### Scenario: Stale metadata emits warning and falls back
+#### Scenario: Materialization failure emits missing-metadata warning and falls back to extraction
 
-- **GIVEN** a spec has `.specd-metadata.yaml` but content hashes do not match current artifacts
+- **GIVEN** a spec's metadata cannot be materialized at all
 - **WHEN** `execute` is called
-- **THEN** `warnings` contains a `stale-metadata` warning for that spec
-- **AND** the spec's `content` is rendered via live extraction
-
-#### Scenario: No metadata emits warning and falls back
-
-- **GIVEN** a spec has no `.specd-metadata.yaml`
-- **WHEN** `execute` is called
-- **THEN** `warnings` contains a `stale-metadata` warning indicating no metadata exists
+- **THEN** `warnings` contains a `missing-metadata` warning for that spec
 - **AND** the spec's `content` is rendered via live extraction if the schema supports it
 
 #### Scenario: Fallback extraction uses shared transform registry
 
 - **GIVEN** the schema declares transforms inside `metadataExtraction`
-- **WHEN** `GetProjectContext` falls back to live extraction for stale or absent metadata
+- **WHEN** `GetProjectContext` falls back to live extraction after a materialization failure
 - **THEN** it uses the shared extractor-transform registry and origin context for the artifact being rendered
 
 #### Scenario: Fallback extraction does not silently drop found transformed values
@@ -202,7 +214,7 @@
 
 #### Scenario: No metadataExtraction in schema yields empty content
 
-- **GIVEN** a spec has no metadata and the schema has no `metadataExtraction` declarations
+- **GIVEN** a spec's metadata cannot be materialized and the schema has no `metadataExtraction` declarations
 - **WHEN** `execute` is called
 - **THEN** the spec's `content` contains only the spec heading with no body
 
@@ -211,21 +223,28 @@
 #### Scenario: Constructor accepts all required ports and default config
 
 - **WHEN** `GetProjectContext` is instantiated from a resolved `SpecdConfig`
-- **THEN** it requires `listWorkspaces`, `schemaProvider`, `files`, `parsers`, `hasher`, and a yaml-derived `CompileContextConfig` default snapshot in its constructor
+- **THEN** it requires `listWorkspaces`, `schemaProvider`, `files`, `getMetadata`, `parsers`, and a yaml-derived `CompileContextConfig` default snapshot in its constructor
+
+#### Scenario: Effective config built via shallow merge of defaults and runtime overrides
+
+- **GIVEN** `GetProjectContext` was constructed with a baked `defaultConfig`
+- **WHEN** `execute(input)` is called with `contextMode` or `llmOptimizedContext` overrides
+- **THEN** the effective `CompileContextConfig` is built by shallow-merging `defaultConfig` with those overrides
+- **AND** hosts are not required to pass yaml-derived configuration on each call
 
 ### Requirement: Project context optimization and invalidation
 
 #### Scenario: Uses optimized project context when fresh
 
 - **GIVEN** `llmOptimizedContext: true`
-- **AND** `project-metadata.json` exists and all hashes match
+- **AND** `project-metadata.json` exists and its semantic metadata fingerprints (`specd.yaml`, referenced `contextFiles`, and the materialized metadata fingerprint of every included spec) all match current state
 - **WHEN** project context is retrieved
 - **THEN** the result uses `optimized.context`
 
 #### Scenario: Fresh optimized cache is ignored when llmOptimizedContext is disabled
 
 - **GIVEN** `llmOptimizedContext: false`
-- **AND** `project-metadata.json` exists and all hashes match
+- **AND** `project-metadata.json` exists and is otherwise fresh
 - **WHEN** project context is retrieved
 - **THEN** the use case does not return `optimized.context` as the primary response
 - **AND** it continues with the standard compilation flow
@@ -233,11 +252,18 @@
 #### Scenario: Falls back and warns when project context is stale
 
 - **GIVEN** `llmOptimizedContext` is enabled
-- **AND** the project context cache is stale or missing (e.g. due to `specd.yaml` hash mismatch)
+- **AND** the project context cache is stale or missing (e.g. due to a `specd.yaml` or included-spec fingerprint mismatch)
 - **WHEN** project context is compiled
 - **THEN** it falls back to raw compilation
 - **AND** it emits a warning
 - **AND** the warning message mentions `specd-project-context-optimizer`
+
+#### Scenario: Freshness is derived from semantic fingerprints, not raw cache-file hashes
+
+- **GIVEN** a `project-metadata.json` cache whose raw file bytes changed but whose `specd.yaml`, `contextFiles`, and per-spec materialized metadata fingerprints are unchanged
+- **WHEN** project context freshness is evaluated
+- **THEN** the cache is still considered fresh
+- **AND** raw cache-file hashes or repository revisions are not used to determine freshness
 
 ### Requirement: Config-based factory delegates through resolveGetProjectContextDeps
 
@@ -250,9 +276,16 @@
 - `listWorkspaces: ListWorkspaces`
 - `schemaProvider: SchemaProvider`
 - `files: FileReader`
+- `getMetadata: GetSpecMetadata`
 - `parsers: ArtifactParserRegistry`
 - `hasher: ContentHasher`
 - `extractorTransforms: ExtractorTransformRegistry`
 - `workspaceRoutes: readonly SpecWorkspaceRoute[]`
 - `defaultConfig: CompileContextConfig`
 - **AND** the factory delegates to canonical `createGetProjectContext(deps)`
+
+#### Scenario: resolveGetProjectContextDeps wires GetSpecMetadata for self-healing
+
+- **WHEN** `resolveGetProjectContextDeps(resolver)` runs
+- **THEN** the resolved deps include `getMetadata: GetSpecMetadata`
+- **AND** it replaces direct content-hash freshness checks for spec title/description/section rendering

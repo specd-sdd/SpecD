@@ -2,7 +2,7 @@
 
 ## Purpose
 
-When debugging context issues or verifying metadata freshness, users need to inspect what is actually recorded in a spec's metadata file. The `specd spec metadata <workspace:capability-path>` command displays the parsed contents of a spec's metadata in a structured form, including freshness status for each recorded content hash.
+When debugging context issues or verifying metadata freshness, users need to inspect what Core would actually serve for a spec's metadata. The `specd spec metadata <workspace:capability-path>` command calls `GetSpecMetadata` to obtain a self-healed, normalized metadata projection and displays it alongside materialization diagnostics — whether the projection was reused or regenerated and any generation warnings — plus any lock-owned optimized fields currently fresh enough to be included.
 
 ## Requirements
 
@@ -17,9 +17,9 @@ specd spec metadata <workspace:capability-path> [--format text|json|toon]
 
 ### Requirement: Behaviour
 
-The command reads metadata for the given spec (via the core use case, which delegates to `SpecRepository.metadata()`) and renders its contents in a structured form. For each file listed in `contentHashes`, it computes the current SHA-256 hash of the file on disk and compares it against the recorded hash, reporting whether the metadata is fresh or stale per file.
+The command calls the `GetSpecMetadata` use case, which internally materializes metadata with an `if-needed` policy: it reuses a fresh persisted projection when present and transparently regenerates a missing, invalid, or stale one from current source artifacts. The command renders the returned `metadata`, `source` (`persisted` or `generated`), `regenerated` flag, and any `warnings` — it never reads `SpecRepository.metadata()` directly and never computes or compares per-file content hashes itself.
 
-If no metadata exists for the spec, the command exits with code 1.
+If materialization cannot produce valid metadata (for example, the spec's schema has no extraction rules), the underlying use-case error propagates through `handleError` and the command exits with code 1.
 
 ### Requirement: Output format
 
@@ -32,8 +32,8 @@ title:       <title>
 description: <description>
 generatedBy: <core|agent>
 
-content hashes:
-  <filename>  <fresh|STALE>
+source:      <persisted|generated>
+regenerated: <true|false>
 
 dependsOn:
   <specId>
@@ -44,20 +44,19 @@ constraints: <N>
 scenarios:  <N>
 ```
 
-Sections with no content are omitted. `rules`, `constraints`, and `scenarios` show counts only in text mode. `generatedBy` shows which mechanism produced the metadata (`core` for deterministic extraction, `agent` for LLM-generated).
+A `warnings:` section is printed, listing one warning per line, only when `GetSpecMetadata` returns at least one. Sections with no content are otherwise omitted. `rules`, `constraints`, and `scenarios` show counts only in text mode. `generatedBy` shows which mechanism produced the metadata (`core` for deterministic extraction, `agent` for a lock-owned optimized field currently fresh enough to be included).
 
-In `json` or `toon` mode, the full parsed metadata is output including all rules, constraints, and scenarios (encoded in the respective format):
+In `json` or `toon` mode, the full parsed metadata is output alongside materialization diagnostics (encoded in the respective format):
 
 ```json
 {
   "spec": "workspace:cap/path",
-  "fresh": true,
+  "source": "persisted",
+  "regenerated": false,
+  "warnings": [],
   "title": "...",
   "description": "...",
   "generatedBy": "core",
-  "contentHashes": [
-    {"filename": "...", "recorded": "sha256:...", "current": "sha256:...", "fresh": true}
-  ],
   "dependsOn": [...],
   "rules": [...],
   "constraints": [...],
@@ -65,22 +64,24 @@ In `json` or `toon` mode, the full parsed metadata is output including all rules
 }
 ```
 
-`fresh` at the top level is `true` only when all `contentHashes` entries are fresh.
+There is no top-level `fresh` flag or per-file `contentHashes` array: per-file freshness is an internal materialization decision, not a public projection.
 
 ### Requirement: Error cases
 
 - If the workspace is not configured, exits with code 1.
-- If no metadata exists for the spec, exits with code 1 and prints an `error:` message to stderr.
+- If `GetSpecMetadata` cannot produce valid metadata (for example, the spec does not exist, or its schema has no extraction rules), exits with code 1 and prints an `error:` message to stderr.
+
+There is no "no metadata exists" error: absent or stale metadata is transparently regenerated rather than treated as a failure.
 
 ## Constraints
 
-- This command is read-only — it never writes or updates metadata
-- Metadata regeneration is handled by `specd spec generate-metadata` or by a skill
+- This command is read-only from the caller's perspective — it never accepts metadata content and never exposes a way to edit it
+- `GetSpecMetadata` may transparently persist a freshly generated projection as a caching side effect; this command never performs a forced rebuild — that is `specd spec generate-metadata`
 
 ## Examples
 
 ```
-# Standard metadata display (shows recorded values, marks stale hashes)
+# Standard metadata display (self-heals if stale, reports source and freshness diagnostics)
 $ specd spec metadata default:auth/login
 spec: default:auth/login
 
@@ -88,9 +89,8 @@ title:       Login
 description: Handles user authentication via login form
 generatedBy: core
 
-content hashes:
-  spec.md    fresh
-  verify.md  STALE
+source:      persisted
+regenerated: false
 
 dependsOn:
   default:auth/shared-errors
@@ -103,5 +103,6 @@ scenarios:   5
 ## Spec Dependencies
 
 - [`cli:entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
+- [`core:get-spec-metadata`](../../core/get-spec-metadata/spec.md) — self-healing metadata query and diagnostics
 - [`core:spec-metadata`](../../core/spec-metadata/spec.md) — `.specd-metadata.yaml` format and fields
 - [`core:spec-id-format`](../../core/spec-id-format/spec.md) — canonical `workspace:capabilityPath` format

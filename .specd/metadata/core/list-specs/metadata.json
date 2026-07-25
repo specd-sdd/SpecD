@@ -7,6 +7,8 @@
     "core:workspace",
     "core:list-workspaces",
     "core:spec-repository-port",
+    "core:fs-spec-repository",
+    "core:get-spec-metadata",
     "core:composition-resolver"
   ],
   "context": [
@@ -16,7 +18,7 @@
     {
       "requirement": "Enumerate specs across all workspaces",
       "rules": [
-        "`ListSpecs.execute(options?)` SHALL obtain the orchestrated project structure via the `ListWorkspaces` use case (or the corresponding kernel capability). It SHALL iterate through the resulting `ProjectWorkspace` entities and call `SpecRepository.list(options)` on each workspace's `specRepo`.\n\nIt MUST forward the same `ListOptions`, `includeSummary`, and `includeMetadataStatus` to every workspace repository call. It MUST NOT apply a default `limit` of its own — when the host omits `limit`, each repository MUST return its full filtered set per [`core:repository-port`](../repository-port/spec.md). It MUST NOT re-sort, re-filter, or re-paginate per-workspace results after the repository returns.\n\nThe merged result MUST preserve workspace declaration order from `ListWorkspaces`, with each workspace's items in the repository's canonical path order. Cross-workspace pagination is out of scope for v1 — callers paginate within a single workspace via the port or filter workspaces explicitly.\n\nWorkspace filtering SHALL be performed by matching workspace names against the orchestrated list before invoking `list()`."
+        "`ListSpecs.execute(options?)` SHALL obtain the orchestrated project structure via the `ListWorkspaces` use case (or the corresponding kernel capability). It SHALL iterate through the resulting `ProjectWorkspace` entities and call `SpecRepository.list(options)` on each workspace's `specRepo`.\n\nIt MUST forward the same `ListOptions` and `includeSummary` to every workspace repository call. It MUST NOT forward a metadata-status flag — public metadata freshness status and status filtering are removed; repository listing is a raw identity/index operation. It MUST NOT apply a default `limit` of its own — when the host omits `limit`, each repository MUST return its full filtered set per [`core:repository-port`](../repository-port/spec.md). It MUST NOT re-sort, re-filter, or re-paginate per-workspace results after the repository returns.\n\nThe merged result MUST preserve workspace declaration order from `ListWorkspaces`, with each workspace's items in the repository's canonical path order. Cross-workspace pagination is out of scope for v1 — callers paginate within a single workspace via the port or filter workspaces explicitly.\n\nWorkspace filtering SHALL be performed by matching workspace names against the orchestrated list before invoking `list()`."
       ]
     },
     {
@@ -28,39 +30,34 @@
     {
       "requirement": "Optional summary resolution",
       "rules": [
-        "When `options.includeSummary` is `true`, the use case MUST forward the flag to `SpecRepository.list()` and project `summary` onto merged results only when the repository included it in the cached entry.\n\nThe use case MUST NOT re-resolve summary via `SpecRepository.metadata()`, `spec.md` reads, or `extractSpecSummary` when the repository already returned a summary for that entry.\n\nWhen `includeSummary` is `false` or omitted, `summary` MUST NOT appear on any entry."
-      ]
-    },
-    {
-      "requirement": "Optional metadata freshness status",
-      "rules": [
-        "When `options.includeMetadataStatus` is `true`, the use case MUST forward the flag to `SpecRepository.list()` and project `metadataStatus` only when the repository included it in the cached entry.\n\nThe use case MUST NOT re-compute metadata freshness via `SpecRepository.metadata()`, content hashing, or schema validation when the repository already returned `metadataStatus`.\n\nWhen `includeMetadataStatus` is `false` or omitted, `metadataStatus` MUST NOT appear on any entry."
+        "When `options.includeSummary` is `true`, the use case MUST resolve `summary` for each entry from the workspace `SpecRepository.list()` result. Summary projection is performed at the repository/index materialization boundary (`FsSpecIndexCache` and related index rebuild paths), which self-heals metadata with `policy: 'if-needed'` (via `GetSpecMetadata` / internal materialization delegation) before projecting the normalized `description` (or, when `llmOptimizedContext` is active and the materialized metadata reports `optimizedDescription` as fresh, the optimized value). `ListSpecs` MUST NOT call `GetSpecMetadata` or `MaterializeSpecMetadata` directly for summary resolution.\n\nIt MUST NOT project a stale or missing optimized field as though it were current — a missing or stale `optimizedDescription` falls back to the normalized `description`.\n\nWhen index materialization cannot produce a projection for a spec at all, that spec's `summary` is omitted rather than causing the whole listing to fail.\n\nWhen `options.includeSummary` is `false` or omitted, `summary` MUST NOT appear on any entry, and repository listing MUST NOT trigger summary materialization for that call."
       ]
     },
     {
       "requirement": "Silent error handling for metadata and summary reads",
       "rules": [
-        "Per-spec title/summary/status resolution errors are handled at index materialization time in `FsSpecIndexCache`. `ListSpecs` MUST NOT perform supplementary I/O that could throw for individual specs.\n\nThe use case SHALL NOT propagate I/O errors from optional field projection to the caller when merging repository list results."
+        "Per-spec title resolution errors are handled at index materialization time in `FsSpecIndexCache`. Per-spec summary materialization errors at the repository/index boundary MUST be caught by the repository list path and result in that entry's `summary` being omitted — they MUST NOT abort the listing or propagate to the caller.\n\nThe use case SHALL NOT propagate I/O errors from optional field projection to the caller when merging repository list results."
       ]
     },
     {
       "requirement": "SpecListEntry shape",
       "rules": [
-        "Each entry MUST include required fields `workspace`, `path`, and `title` as returned by `SpecRepository.list()`.\n\nOptional fields (`summary`, `metadataStatus`) MUST only be present when explicitly requested via include flags **and** projected from the repository result.\n\nWhen workspace filtering is active, the result array contains entries only from the filtered workspaces."
+        "Each entry MUST include required fields `workspace`, `path`, and `title` as returned by `SpecRepository.list()`.\n\nThe optional `summary` field MUST only be present when explicitly requested via `includeSummary` **and** successfully materialized for that spec. `SpecListEntry` MUST NOT include a `metadataStatus` field — public metadata freshness status is removed.\n\nWhen workspace filtering is active, the result array contains entries only from the filtered workspaces."
       ]
     },
     {
       "requirement": "Config-based factory delegates through resolveListSpecsDeps",
       "rules": [
-        "The config-based `createListSpecs(config, options?)` form MUST derive `ListSpecsDeps` through `resolveListSpecsDeps(resolver)` and then delegate to canonical `createListSpecs(deps)`.\n\n`resolveListSpecsDeps(resolver)` MUST resolve:\n\n- `listWorkspaces: ListWorkspaces`\n\nIt MUST NOT resolve `hasher: ContentHasher` or `yaml: YamlSerializer` — `ListSpecs` orchestrates workspace repositories and forwards list options; title/summary/metadata-status enrichment happens inside `SpecRepository.list()`'s index materialization, not in this use case, so it has no dependency on content hashing or YAML serialization.\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
+        "The config-based `createListSpecs(config, options?)` form MUST derive `ListSpecsDeps` through `resolveListSpecsDeps(resolver)` and then delegate to canonical `createListSpecs(deps)`.\n\n`resolveListSpecsDeps(resolver)` MUST resolve:\n\n- `listWorkspaces: ListWorkspaces`\n\nIt MUST NOT resolve `getMetadata`, `materializeMetadata`, `hasher: ContentHasher`, or `yaml: YamlSerializer` — `ListSpecs` orchestrates workspace repositories and forwards list options; summary projection and self-healing metadata reads occur inside `SpecRepository.list()` / `FsSpecIndexCache` when `includeSummary` is requested.\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
       ]
     }
   ],
   "constraints": [
     "The use case MUST NOT modify the repositories.",
     "It SHALL depend on ListWorkspaces for consistent project traversal.",
-    "It MUST NOT re-resolve title, summary, or metadata status with extra I/O when the repository already returned those fields.",
-    "Include flags are forwarded to repositories for projection-only filtering of cached payloads."
+    "It MUST NOT re-resolve title with extra I/O when the repository already returned it.",
+    "summary is resolved via repository/index materialization only when includeSummary is requested; it is never a stale optimized value.",
+    "ListSpecs MUST NOT project or filter by metadata freshness status."
   ],
   "scenarios": [
     {
@@ -89,13 +86,12 @@
     },
     {
       "requirement": "Enumerate specs across all workspaces",
-      "name": "ListSpecs forwards include flags to each repository",
-      "when": [
-        "execute({ includeSummary: true, includeMetadataStatus: true, limit: 50 }) is called"
-      ],
+      "name": "ListSpecs forwards includeSummary and other list options to each repository",
+      "when": ["execute({ includeSummary: true, limit: 50 }) is called"],
       "then": [
         "each workspace SpecRepository.list() receives the same forwarded options",
-        "AND the use case does not re-sort or re-paginate per-workspace results"
+        "AND the use case does not re-sort or re-paginate per-workspace results",
+        "AND it does not forward a metadata-status flag"
       ]
     },
     {
@@ -137,56 +133,50 @@
     },
     {
       "requirement": "Optional summary resolution",
-      "name": "Summary forwarded from repository when requested",
+      "name": "Summary resolved via repository list/index materialization when requested",
+      "given": ["a spec whose metadata materializes successfully at the repository/index boundary"],
+      "when": ["execute({ includeSummary: true }) is called"],
+      "then": [
+        "the entry's summary is the materialized metadata's normalized description",
+        "AND ListSpecs does not call GetSpecMetadata or MaterializeSpecMetadata directly"
+      ]
+    },
+    {
+      "requirement": "Optional summary resolution",
+      "name": "Optimized description used only when fresh",
       "given": [
-        "SpecRepository.list({ includeSummary: true }) returns entries with cached summary"
+        "llmOptimizedContext is active and a spec's materialized metadata reports optimizedDescription as fresh"
       ],
       "when": ["execute({ includeSummary: true }) is called"],
-      "then": ["merged entries include the repository-provided summary"]
+      "then": ["the entry's summary uses the optimized value"]
+    },
+    {
+      "requirement": "Optional summary resolution",
+      "name": "Stale or missing optimized description falls back to normalized description",
+      "given": ["a spec's materialized metadata reports optimizedDescription as stale or missing"],
+      "when": ["execute({ includeSummary: true }) is called"],
+      "then": ["the entry's summary uses the normalized description instead"]
+    },
+    {
+      "requirement": "Optional summary resolution",
+      "name": "Materialization failure omits summary without failing the listing",
+      "given": ["index materialization cannot produce a projection for a spec at all"],
+      "when": ["execute({ includeSummary: true }) is called"],
+      "then": ["that entry's summary is omitted", "AND the overall listing still succeeds"]
     },
     {
       "requirement": "Optional summary resolution",
       "name": "Summary omitted when not requested",
       "when": ["execute() is called without includeSummary"],
-      "then": ["no entry has a summary property"]
-    },
-    {
-      "requirement": "Optional summary resolution",
-      "name": "Use case does not re-resolve summary with extra I/O",
-      "given": ["the repository already returned a cached summary for a spec entry"],
-      "when": ["execute({ includeSummary: true }) is called"],
       "then": [
-        "the use case does not call metadata(), read spec.md, or invoke summary extraction helpers for that entry"
-      ]
-    },
-    {
-      "requirement": "Optional metadata freshness status",
-      "name": "metadataStatus forwarded from repository when requested",
-      "given": [
-        "SpecRepository.list({ includeMetadataStatus: true }) returns entries with cached metadataStatus"
-      ],
-      "when": ["execute({ includeMetadataStatus: true }) is called"],
-      "then": ["merged entries include the repository-provided metadataStatus"]
-    },
-    {
-      "requirement": "Optional metadata freshness status",
-      "name": "Status not present when not requested",
-      "when": ["execute() is called without includeMetadataStatus"],
-      "then": ["no entry has a metadataStatus property"]
-    },
-    {
-      "requirement": "Optional metadata freshness status",
-      "name": "Use case does not re-compute freshness with extra I/O",
-      "given": ["the repository already returned metadataStatus for a spec entry"],
-      "when": ["execute({ includeMetadataStatus: true }) is called"],
-      "then": [
-        "the use case does not call metadata(), content hashing, or schema validation for that entry"
+        "no entry has a summary property",
+        "AND repository listing does not trigger summary materialization for that call"
       ]
     },
     {
       "requirement": "Silent error handling for metadata and summary reads",
       "name": "Repository swallows per-spec resolution errors at index time",
-      "given": ["a spec whose title/summary/status resolution fails during index materialization"],
+      "given": ["a spec whose title resolution fails during index materialization"],
       "when": ["execute() is called"],
       "then": [
         "the entry still appears with repository-provided fallback fields",
@@ -195,10 +185,12 @@
     },
     {
       "requirement": "Silent error handling for metadata and summary reads",
-      "name": "ListSpecs does not perform supplementary I/O for optional fields",
-      "when": ["execute({ includeSummary: true, includeMetadataStatus: true }) is called"],
+      "name": "Summary materialization errors are caught and omitted",
+      "given": ["repository/index summary materialization throws or fails for a spec"],
+      "when": ["execute({ includeSummary: true }) is called"],
       "then": [
-        "the use case merges repository list results without additional per-spec file reads beyond repository delegation"
+        "that entry's summary is omitted",
+        "AND the error does not abort the listing or propagate to the caller"
       ]
     },
     {
@@ -211,10 +203,11 @@
     },
     {
       "requirement": "SpecListEntry shape",
-      "name": "Optional fields appear only when requested and projected",
-      "when": ["execute({ includeSummary: true, includeMetadataStatus: true }) is called"],
+      "name": "Optional summary field appears only when requested and materialized",
+      "when": ["execute({ includeSummary: true }) is called"],
       "then": [
-        "entries may contain summary and metadataStatus only when the repository projected them"
+        "entries may contain summary only when repository/index materialization succeeded for that spec",
+        "AND no entry contains a metadataStatus field"
       ]
     },
     {
@@ -231,23 +224,40 @@
         "it creates a composition resolver for that composition session",
         "AND it derives ListSpecsDeps through resolveListSpecsDeps(resolver)",
         "AND resolveListSpecsDeps(resolver) resolves listWorkspaces: ListWorkspaces",
-        "AND it MUST NOT resolve hasher: ContentHasher or yaml: YamlSerializer",
         "AND the factory delegates to canonical createListSpecs(deps)"
+      ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveListSpecsDeps",
+      "name": "resolveListSpecsDeps does not resolve metadata, hasher, or yaml serializer",
+      "when": ["resolveListSpecsDeps(resolver) runs"],
+      "then": [
+        "it does not resolve getMetadata, materializeMetadata, hasher: ContentHasher, or yaml: YamlSerializer",
+        "AND summary projection occurs inside SpecRepository.list() / FsSpecIndexCache when includeSummary is requested"
       ]
     }
   ],
-  "implementation": {
-    "symbols": [
-      {
-        "specId": "core:list-specs",
-        "file": "core:src/application/use-cases/list-specs.ts",
-        "symbol": "ListSpecs"
-      }
-    ]
-  },
   "contentHashes": {
-    "spec.md": "sha256:15585db904bb03a6c04abf01df6f0b40474e9a61080788270bdbe86a0e948d44",
-    "verify.md": "sha256:1ebb1f68c12224bd25f39574b6cf9300d1578c6309e7b93d4e4272ed33798b99"
+    "spec.md": "sha256:ebd7ab272ce2b64d5af1672654e9cb6bdcd9cd20df69787baf2fd3696cbe627e",
+    "verify.md": "sha256:2c89e75acdf05980eb82037b23439133dd62c87337f3b92ca749e5cdb25cb632"
   },
-  "generatedBy": "core"
+  "provenance": {
+    "artifacts": {
+      "spec.md": {
+        "hash": "sha256:ebd7ab272ce2b64d5af1672654e9cb6bdcd9cd20df69787baf2fd3696cbe627e",
+        "lastModified": "2026-07-25T11:53:31.551Z"
+      },
+      "verify.md": {
+        "hash": "sha256:2c89e75acdf05980eb82037b23439133dd62c87337f3b92ca749e5cdb25cb632",
+        "lastModified": "2026-07-25T11:53:31.552Z"
+      }
+    },
+    "persistedStateHash": "sha256:9278a9f5d9a5d9d4740db01e230142cc6971994c5f18b4b4840f0b5e647818c1",
+    "schema": {
+      "name": "schema-std",
+      "version": 1
+    },
+    "projectionVersion": 1,
+    "projectionFingerprint": "sha256:e4a28a2db6a35ed39b8308518337235b1490c2948cd839db25866ad79b22404b"
+  }
 }

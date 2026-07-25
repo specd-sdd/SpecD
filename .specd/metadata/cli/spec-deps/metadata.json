@@ -1,0 +1,200 @@
+{
+  "title": "cli:spec-deps",
+  "description": "Persisted dependencies are canonical lock state, not a change-time draft, so they need a dedicated command surface distinct from `changes` scope editing. `specd specs deps` is the CLI command group that inspects and mutates the canonical `dependsOn` list recorded in a spec's persisted semantic state, by parsing input, calling the corresponding Core use case, formatting the result, and mapping typed errors.",
+  "dependsOn": [
+    "core:get-persisted-spec-deps",
+    "core:update-persisted-spec-deps",
+    "cli:entrypoint"
+  ],
+  "context": [
+    "Persisted dependencies are canonical lock state, not a change-time draft, so they need a dedicated command surface distinct from `changes` scope editing. `specd specs deps` is the CLI command group that inspects and mutates the canonical `dependsOn` list recorded in a spec's persisted semantic state, by parsing input, calling the corresponding Core use case, formatting the result, and mapping typed errors."
+  ],
+  "rules": [
+    {
+      "requirement": "Command signature",
+      "rules": [
+        "Persisted dependency features SHALL be exposed under the `specd specs deps` command group:\n\n```\nspecs deps list <spec-id>\nspecs deps add <spec-id> --dep <dependency-id>...\nspecs deps remove <spec-id> --dep <dependency-id>...\nspecs deps set <spec-id> --dep <dependency-id>...\nspecs deps clear <spec-id>\n```\n\nEvery subcommand accepts `--format text|json|toon` (default `text`) per [`cli:entrypoint`](../entrypoint/spec.md)."
+      ]
+    },
+    {
+      "requirement": "List subcommand",
+      "rules": [
+        "`specs deps list <spec-id>` MUST call `Kernel.specs.getPersistedDeps` and print the resulting `dependsOn` list.\n\nWhen the spec has no persisted state, the command MUST report that the spec is not yet initialized rather than printing an empty list indistinguishably. Text output MUST distinguish these two cases; JSON/TOON output MUST include an `initialized` field."
+      ]
+    },
+    {
+      "requirement": "Add subcommand",
+      "rules": [
+        "`specs deps add <spec-id> --dep <dependency-id>...` MUST call `Kernel.specs.updatePersistedDeps` with `add` set to the supplied dependency IDs, and print the resulting persisted `dependsOn` list."
+      ]
+    },
+    {
+      "requirement": "Remove subcommand",
+      "rules": [
+        "`specs deps remove <spec-id> --dep <dependency-id>...` MUST call `Kernel.specs.updatePersistedDeps` with `remove` set to the supplied dependency IDs, and print the resulting persisted `dependsOn` list. When the spec has no persisted state, the command MUST report the no-op outcome rather than an error."
+      ]
+    },
+    {
+      "requirement": "Set subcommand",
+      "rules": [
+        "`specs deps set <spec-id> --dep <dependency-id>...` MUST call `Kernel.specs.updatePersistedDeps` with `set` equal to the supplied dependency IDs (which may be empty to clear via `set`), and print the resulting persisted `dependsOn` list."
+      ]
+    },
+    {
+      "requirement": "Clear subcommand",
+      "rules": [
+        "`specs deps clear <spec-id>` MUST call `Kernel.specs.updatePersistedDeps` with `clear: true`, and print the resulting (empty) persisted `dependsOn` list."
+      ]
+    },
+    {
+      "requirement": "No repeated CLI-owned mutation logic",
+      "rules": [
+        "Handlers in this command group MUST NOT implement add/remove/set merge semantics, initial-state derivation, or persisted-state writes themselves. Every mutation MUST be expressed as one call to `Kernel.specs.updatePersistedDeps` with the parsed flags mapped directly onto its `UpdatePersistedSpecDepsInput`."
+      ]
+    },
+    {
+      "requirement": "Error mapping",
+      "rules": [
+        "`SpecNotFoundError` MUST map to exit code 1 with an `error:` message naming the unresolved spec. `ArtifactConflictError` MUST map to exit code 1 with an `error:` message indicating a concurrent modification and instructing the user to retry. `ReadOnlyWorkspaceError` MUST map to exit code 1 without suggesting a configuration workaround, per [`core:workspace`](../../core/workspace/spec.md) readOnly error-message conventions."
+      ]
+    }
+  ],
+  "constraints": [
+    "These commands never read or write spec-lock.json directly — every operation flows through Kernel.specs.getPersistedDeps / Kernel.specs.updatePersistedDeps",
+    "This command group is distinct from changes scope editing (change edit --add-spec); it operates on canonical persisted state, not a change's draft specDependsOn",
+    "Every leaf subcommand calls .allowExcessArguments(false)"
+  ],
+  "scenarios": [
+    {
+      "requirement": "Command signature",
+      "name": "Every subcommand accepts --format",
+      "when": ["specd specs deps list core:auth/login --format json is run"],
+      "then": ["the output is valid JSON"]
+    },
+    {
+      "requirement": "List subcommand",
+      "name": "List prints the persisted dependsOn list",
+      "given": ["a spec with persisted dependsOn: ['core:auth/shared']"],
+      "when": ["specd specs deps list core:auth/login is run"],
+      "then": ["the command exits with code 0", "AND the output includes core:auth/shared"]
+    },
+    {
+      "requirement": "List subcommand",
+      "name": "List on an uninitialized spec reports not-yet-initialized distinctly",
+      "given": ["a spec with no persisted state"],
+      "when": ["specd specs deps list core:auth/login is run"],
+      "then": [
+        "the text output reports the spec is not yet initialized rather than printing an empty list",
+        "AND specd specs deps list core:auth/login --format json includes initialized: false"
+      ]
+    },
+    {
+      "requirement": "Add subcommand",
+      "name": "Add appends every supplied dependency ID",
+      "given": ["a spec with persisted dependsOn: ['core:a']"],
+      "when": ["specd specs deps add core:auth/login --dep core:b --dep core:c is run"],
+      "then": [
+        "the command exits with code 0",
+        "AND the resulting dependsOn list includes core:a, core:b, and core:c"
+      ]
+    },
+    {
+      "requirement": "Remove subcommand",
+      "name": "Remove drops the given dependency",
+      "given": ["a spec with persisted dependsOn: ['core:a', 'core:b']"],
+      "when": ["specd specs deps remove core:auth/login --dep core:b is run"],
+      "then": ["the resulting dependsOn list is ['core:a']"]
+    },
+    {
+      "requirement": "Remove subcommand",
+      "name": "Remove on an uninitialized spec reports a no-op, not an error",
+      "given": ["a spec with no persisted state"],
+      "when": ["specd specs deps remove core:auth/login --dep core:b is run"],
+      "then": [
+        "the command reports the no-op outcome",
+        "AND the command does not exit with an error"
+      ]
+    },
+    {
+      "requirement": "Set subcommand",
+      "name": "Set replaces the entire dependsOn list",
+      "given": ["a spec with persisted dependsOn: ['core:a', 'core:b']"],
+      "when": ["specd specs deps set core:auth/login --dep core:c is run"],
+      "then": ["the resulting dependsOn list is exactly ['core:c']"]
+    },
+    {
+      "requirement": "Set subcommand",
+      "name": "Set with no --dep flags clears the list",
+      "given": ["a spec with persisted dependsOn: ['core:a']"],
+      "when": ["specd specs deps set core:auth/login is run with no --dep flags"],
+      "then": ["the resulting dependsOn list is empty"]
+    },
+    {
+      "requirement": "Clear subcommand",
+      "name": "Clear empties the dependsOn list",
+      "given": ["a spec with persisted dependsOn: ['core:a', 'core:b']"],
+      "when": ["specd specs deps clear core:auth/login is run"],
+      "then": ["the resulting dependsOn list is empty"]
+    },
+    {
+      "requirement": "No repeated CLI-owned mutation logic",
+      "name": "Add, remove, and set map directly onto UpdatePersistedSpecDepsInput",
+      "when": ["any of specs deps add, specs deps remove, or specs deps set is run"],
+      "then": [
+        "the handler performs exactly one call to Kernel.specs.updatePersistedDeps with the parsed flags mapped directly onto its input",
+        "AND the handler does not compute add/remove/set merge semantics itself"
+      ]
+    },
+    {
+      "requirement": "Error mapping",
+      "name": "Unknown spec maps to exit code 1",
+      "when": ["specd specs deps list core:unknown/spec is run"],
+      "then": ["the command exits with code 1", "AND stderr names the unresolved spec"]
+    },
+    {
+      "requirement": "Error mapping",
+      "name": "Concurrent modification maps to exit code 1 with retry guidance",
+      "given": [
+        "a concurrent write causes Kernel.specs.updatePersistedDeps to throw ArtifactConflictError"
+      ],
+      "when": ["specd specs deps add core:auth/login --dep core:c is run"],
+      "then": [
+        "the command exits with code 1",
+        "AND stderr indicates a concurrent modification and instructs the user to retry"
+      ]
+    },
+    {
+      "requirement": "Error mapping",
+      "name": "Read-only workspace maps to exit code 1 without a configuration workaround",
+      "given": ["the spec's workspace is readOnly"],
+      "when": ["specd specs deps add core:auth/login --dep core:c is run"],
+      "then": [
+        "the command exits with code 1",
+        "AND stderr does not suggest a configuration workaround"
+      ]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:f9ecfc2ae10d2989984e8238e12bbf1aca5ae7a4df3f4ff21f5ae409366eb625",
+    "verify.md": "sha256:8577ffa98b9aa94dd9cebe2988b4c1f8637233410685eb259d78f5dab7a01a8d"
+  },
+  "provenance": {
+    "artifacts": {
+      "spec.md": {
+        "hash": "sha256:f9ecfc2ae10d2989984e8238e12bbf1aca5ae7a4df3f4ff21f5ae409366eb625",
+        "lastModified": "2026-07-25T11:53:31.267Z"
+      },
+      "verify.md": {
+        "hash": "sha256:8577ffa98b9aa94dd9cebe2988b4c1f8637233410685eb259d78f5dab7a01a8d",
+        "lastModified": "2026-07-25T11:53:31.268Z"
+      }
+    },
+    "persistedStateHash": "sha256:73a1525588d29445880627700b75fb7e977eee583aa117575ca2966ac447e44b",
+    "schema": {
+      "name": "schema-std",
+      "version": 1
+    },
+    "projectionVersion": 1,
+    "projectionFingerprint": "sha256:e4a28a2db6a35ed39b8308518337235b1490c2948cd839db25866ad79b22404b"
+  }
+}

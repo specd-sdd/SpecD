@@ -1,4 +1,4 @@
-import { type PersistedSpecMetadata } from '../../domain/services/parse-metadata.js'
+import { type SpecMetadata } from '../../domain/services/parse-metadata.js'
 import { type SpecRepository } from '../ports/spec-repository.js'
 import { type SchemaProvider } from '../ports/schema-provider.js'
 import { type ArtifactParserRegistry } from '../ports/artifact-parser.js'
@@ -12,6 +12,8 @@ import { traverseDependsOn, type DependsOnFallback } from './_shared/depends-on-
 import { type SpecWorkspaceRoute } from './_shared/spec-reference-resolver.js'
 import { type ResolvedSpec } from './_shared/spec-pattern-matching.js'
 import { type ListWorkspaces, type ProjectWorkspace } from './list-workspaces.js'
+import { type GetSpecMetadata } from './get-spec-metadata.js'
+import { materializeContextSpecMetadata } from './_shared/materialize-context-spec-metadata.js'
 
 /** Valid section filter flags for spec context queries. */
 export type SpecContextSectionFlag = 'rules' | 'constraints' | 'scenarios'
@@ -87,12 +89,14 @@ export class GetSpecContext {
   private readonly _parsers: ArtifactParserRegistry | undefined
   private readonly _extractorTransforms: ExtractorTransformRegistry
   private readonly _workspaceRoutes: readonly SpecWorkspaceRoute[]
+  private readonly _getMetadata: GetSpecMetadata
 
   /**
    * Creates a new `GetSpecContext` use case instance.
    *
    * @param listWorkspaces - The project orchestrator
    * @param hasher - Content hasher for metadata freshness checks
+   * @param getMetadata - Metadata materialization use case
    * @param schemaProvider - Provider for schema-driven dependsOn fallback extraction
    * @param parsers - Registry of artifact parsers used for fallback extraction
    * @param extractorTransforms - Shared extractor transform registry
@@ -101,6 +105,7 @@ export class GetSpecContext {
   constructor(
     listWorkspaces: ListWorkspaces,
     hasher: ContentHasher,
+    getMetadata: GetSpecMetadata,
     schemaProvider?: SchemaProvider,
     parsers?: ArtifactParserRegistry,
     extractorTransforms: ExtractorTransformRegistry = new Map(),
@@ -108,6 +113,7 @@ export class GetSpecContext {
   ) {
     this._listWorkspaces = listWorkspaces
     this._hasher = hasher
+    this._getMetadata = getMetadata
     this._schemaProvider = schemaProvider
     this._parsers = parsers
     this._extractorTransforms = extractorTransforms
@@ -146,7 +152,12 @@ export class GetSpecContext {
     }
 
     const rootLabel = `${input.workspace}:${input.specPath.toString()}`
-    const metadata = await repo.metadata(spec)
+    let metadata: SpecMetadata | null = null
+    try {
+      metadata = await materializeContextSpecMetadata(this._getMetadata, rootLabel, warnings)
+    } catch {
+      metadata = null
+    }
     entries.push(
       this._buildEntry(
         rootLabel,
@@ -220,7 +231,7 @@ export class GetSpecContext {
     mode: SpecContextEntry['mode'],
     repo: SpecRepository,
     spec: import('../../domain/entities/spec.js').Spec,
-    metadata: PersistedSpecMetadata | null,
+    metadata: SpecMetadata | null,
     sections: ReadonlyArray<SpecContextSectionFlag> | undefined,
     warnings: ContextWarning[],
     llmOptimizedContext = false,
@@ -230,14 +241,6 @@ export class GetSpecContext {
     }
 
     if (metadata !== null) {
-      if (metadata.freshness === 'stale') {
-        warnings.push({
-          type: 'stale-metadata',
-          path: specLabel,
-          message: `Metadata for '${specLabel}' is stale`,
-        })
-      }
-
       if (llmOptimizedContext) {
         if (metadata.optimizedContext === undefined || metadata.optimizedContext === '') {
           warnings.push({
@@ -248,7 +251,7 @@ export class GetSpecContext {
         }
       }
 
-      if (metadata.freshness === 'fresh') {
+      {
         if (mode === 'summary') {
           return {
             spec: specLabel,
@@ -305,26 +308,6 @@ export class GetSpecContext {
             : {}),
         }
       }
-
-      if (mode === 'summary') {
-        return {
-          spec: specLabel,
-          source,
-          mode,
-          stale: true,
-          ...(metadata.title !== undefined ? { title: metadata.title } : {}),
-          ...(metadata.description !== undefined ? { description: metadata.description } : {}),
-        }
-      }
-
-      return {
-        spec: specLabel,
-        source,
-        mode,
-        stale: true,
-        ...(metadata.title !== undefined ? { title: metadata.title } : {}),
-        ...(metadata.description !== undefined ? { description: metadata.description } : {}),
-      }
     }
 
     return { spec: specLabel, source, mode, stale: true }
@@ -371,7 +354,12 @@ export class GetSpecContext {
       return null
     }
 
-    const depMetadata = await repo.metadata(depSpec)
+    let depMetadata: SpecMetadata | null = null
+    try {
+      depMetadata = await materializeContextSpecMetadata(this._getMetadata, depLabel, warnings)
+    } catch {
+      depMetadata = null
+    }
     return this._buildEntry(
       depLabel,
       'dependency',

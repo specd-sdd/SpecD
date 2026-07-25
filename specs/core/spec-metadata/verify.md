@@ -60,17 +60,17 @@
 
 #### Scenario: Title absent — fallback to path
 
-- **WHEN** `metadata.yaml` has no `title` field
+- **WHEN** `metadata.json` has no `title` field
 - **THEN** tooling displays the spec's path (e.g. `core/change`) instead of a title
 
 #### Scenario: Valid metadata file with only dependsOn
 
-- **WHEN** `metadata.yaml` contains `dependsOn: [core/storage]` and `contentHashes` with entries for each file
-- **THEN** specd parses `core/storage` as a dependency and uses the per-file hashes for staleness detection
+- **WHEN** `metadata.json` contains `"dependsOn": ["core:storage"]` and `contentHashes` with entries for each file
+- **THEN** specd parses `core:storage` as a dependency and uses the per-file hashes for staleness detection
 
 #### Scenario: Empty dependsOn
 
-- **WHEN** `metadata.yaml` contains `dependsOn: []`
+- **WHEN** `metadata.json` contains `"dependsOn": []`
 - **THEN** the spec has no declared dependencies — no traversal occurs from this spec
 
 #### Scenario: Cross-workspace dependency
@@ -80,150 +80,136 @@
 
 #### Scenario: Unqualified path resolves to same workspace
 
-- **WHEN** a spec in the `default` workspace has `dependsOn: [auth/login]`
+- **WHEN** a spec in the `default` workspace has `"dependsOn": ["auth/login"]`
 - **THEN** specd resolves `auth/login` within the `default` workspace
 
-### Requirement: Write-time structural validation
+#### Scenario: Generated metadata includes provenance
+
+- **WHEN** metadata is generated for a spec
+- **THEN** the document includes a `provenance` object describing the source artifact hashes, `persistedStateHash`, schema identity, `projectionVersion`, and `projectionFingerprint` used to produce it
+
+#### Scenario: optimizedDescription is omitted when its lock baseline is stale
+
+- **GIVEN** the spec-lock optimization baseline for `optimizedDescription` is stale against current artifacts or schema identity
+- **WHEN** metadata is generated
+- **THEN** `optimizedDescription` is omitted from the generated document rather than fabricated
+
+#### Scenario: generatedBy is always core for newly generated documents
+
+- **WHEN** metadata is generated
+- **THEN** `generatedBy` is always `"core"`
+- **AND** a legacy document with `generatedBy: "agent"` may still be read leniently for migration
+
+### Requirement: Source provenance
+
+#### Scenario: Provenance records per-artifact hash and diagnostic lastModified
+
+- **WHEN** metadata is generated
+- **THEN** `provenance.artifacts` records, for each artifact filename, its content `hash` and a diagnostic `lastModified` stamp
+
+#### Scenario: Provenance records persistedStateHash or null when lock absent
+
+- **GIVEN** a spec with no persisted lock state
+- **WHEN** metadata is generated
+- **THEN** `provenance.persistedStateHash` is `null`
+
+#### Scenario: Provenance records schema identity, projection version, and projection fingerprint
+
+- **WHEN** metadata is generated
+- **THEN** `provenance.schema` records the `PersistedSchemaIdentity` in effect at generation time
+- **AND** `provenance.projectionVersion` and `provenance.projectionFingerprint` record the generation/projection contract used
+
+#### Scenario: contentHashes remains derivable from provenance.artifacts
+
+- **WHEN** metadata is generated
+- **THEN** the simpler `contentHashes` convenience field does not diverge from `provenance.artifacts`
+
+#### Scenario: lastModified alone is diagnostic, not a freshness input
+
+- **GIVEN** an artifact whose `lastModified` differs but whose content hash is unchanged
+- **WHEN** freshness is compared using `provenance`
+- **THEN** the comparison relies on `hash`, `persistedStateHash`, `schema`, `projectionVersion`, and `projectionFingerprint` — never `lastModified` alone
+
+### Requirement: Structural validation before persistence
 
 #### Scenario: Valid metadata accepted
 
-- **GIVEN** a YAML string with `title: 'Config'`, `description: 'Handles config'`, `keywords: ['lifecycle']`, `dependsOn: ['core:storage']`, and `contentHashes: { 'spec.md': 'sha256:a3f1...64hex' }`
-- **WHEN** `SaveSpecMetadata` is executed with that content
+- **GIVEN** a JSON object with `title: 'Config'`, `description: 'Handles config'`, `keywords: ['lifecycle']`, `dependsOn: ['core:storage']`, and `contentHashes: { 'spec.md': 'sha256:a3f1...64hex' }`
+- **WHEN** `PersistSpecMetadata` validates that content before writing
 - **THEN** the file is written successfully
 
 #### Scenario: Missing title rejected
 
-- **GIVEN** a YAML string with `description: 'Some description'` but no `title`
-- **WHEN** `SaveSpecMetadata` is executed with that content
-- **THEN** a `MetadataValidationError` is thrown
+- **GIVEN** a JSON object with `description: 'Some description'` but no `title`
+- **WHEN** `PersistSpecMetadata` validates that content
+- **THEN** a typed validation error is thrown
 - **AND** the file is not written
 
 #### Scenario: Missing description rejected
 
-- **GIVEN** a YAML string with `title: 'Test'` but no `description`
-- **WHEN** `SaveSpecMetadata` is executed with that content
-- **THEN** a `MetadataValidationError` is thrown
+- **GIVEN** a JSON object with `title: 'Test'` but no `description`
+- **WHEN** `PersistSpecMetadata` validates that content
+- **THEN** a typed validation error is thrown
 - **AND** the file is not written
 
 #### Scenario: Invalid keywords rejected
 
-- **GIVEN** a YAML string with `keywords: ['Valid', 123]`
-- **WHEN** `SaveSpecMetadata` is executed with that content
-- **THEN** a `MetadataValidationError` is thrown indicating keywords must be lowercase strings
+- **GIVEN** a JSON object with `keywords: ['Valid', 123]`
+- **WHEN** `PersistSpecMetadata` validates that content
+- **THEN** a typed validation error is thrown indicating keywords must be lowercase strings
 - **AND** the file is not written
 
 #### Scenario: Invalid dependsOn format rejected
 
-- **GIVEN** a YAML string with `dependsOn: ['not a valid id!']`
-- **WHEN** `SaveSpecMetadata` is executed with that content
-- **THEN** a `MetadataValidationError` is thrown indicating the spec ID format is invalid
+- **GIVEN** a JSON object with `dependsOn: ['not a valid id!']`
+- **WHEN** `PersistSpecMetadata` validates that content
+- **THEN** a typed validation error is thrown indicating the spec ID format is invalid
 - **AND** the file is not written
 
 #### Scenario: Invalid contentHashes format rejected
 
-- **GIVEN** a YAML string with `contentHashes: { 'spec.md': 'md5:abc' }`
-- **WHEN** `SaveSpecMetadata` is executed with that content
-- **THEN** a `MetadataValidationError` is thrown indicating the hash format is invalid
+- **GIVEN** a JSON object with `contentHashes: { 'spec.md': 'md5:abc' }`
+- **WHEN** `PersistSpecMetadata` validates that content
+- **THEN** a typed validation error is thrown indicating the hash format is invalid
 - **AND** the file is not written
 
 #### Scenario: Invalid rules structure rejected
 
-- **GIVEN** a YAML string with `rules: [{ requirement: '' }]`
-- **WHEN** `SaveSpecMetadata` is executed with that content
-- **THEN** a `MetadataValidationError` is thrown
+- **GIVEN** a JSON object with `rules: [{ requirement: '' }]`
+- **WHEN** `PersistSpecMetadata` validates that content
+- **THEN** a typed validation error is thrown
 - **AND** the file is not written
 
 #### Scenario: Invalid scenarios structure rejected
 
-- **GIVEN** a YAML string with `scenarios: [{ requirement: 'X', name: 'Y' }]` (missing `when` and `then`)
-- **WHEN** `SaveSpecMetadata` is executed with that content
-- **THEN** a `MetadataValidationError` is thrown
+- **GIVEN** a JSON object with `scenarios: [{ requirement: 'X', name: 'Y' }]` (missing `when` and `then`)
+- **WHEN** `PersistSpecMetadata` validates that content
+- **THEN** a typed validation error is thrown
 - **AND** the file is not written
 
 #### Scenario: Unknown top-level keys allowed
 
-- **GIVEN** a YAML string with `title: 'Test'`, `description: 'A test'`, and `customField: 'value'`
-- **WHEN** `SaveSpecMetadata` is executed with that content
+- **GIVEN** a JSON object with `title: 'Test'`, `description: 'A test'`, and `customField: 'value'`
+- **WHEN** `PersistSpecMetadata` validates that content
 - **THEN** the file is written successfully — unknown keys are passed through
 
 #### Scenario: Empty content rejected
 
-- **GIVEN** an empty YAML string (no fields)
-- **WHEN** `SaveSpecMetadata` is executed with that content
-- **THEN** a `MetadataValidationError` is thrown — content must be a YAML mapping with at least `title` and `description`
+- **GIVEN** an empty JSON object (no fields)
+- **WHEN** `PersistSpecMetadata` validates that content
+- **THEN** a typed validation error is thrown — content must be a JSON object with at least `title` and `description`
 
 #### Scenario: Read path remains lenient
 
-- **GIVEN** a `.specd-metadata.yaml` on disk with `keywords: [123, true]` (invalid types)
+- **GIVEN** a `metadata.json` on disk with `keywords: [123, true]` (invalid types)
 - **WHEN** `parseMetadata` reads the file
 - **THEN** it returns `{}` without throwing — read path never blocks operations
 
-#### Scenario: Schema supports optimized fields
+#### Scenario: Schema supports optimized fields and provenance
 
-- **GIVEN** a metadata object with `optimizedDescription` and `optimizedContext`
+- **GIVEN** a metadata object with `optimizedDescription`, `optimizedContext`, and a well-formed `provenance` object
 - **WHEN** validated against `strictSpecMetadataSchema`
 - **THEN** validation passes
-
-### Requirement: dependsOn overwrite protection
-
-#### Scenario: dependsOn entries removed — error thrown
-
-- **GIVEN** existing metadata has `dependsOn: ['core:config', 'core:schema-format']`
-- **WHEN** `SaveSpecMetadata` is executed with content that has `dependsOn: ['core:config']`
-- **THEN** a `DependsOnOverwriteError` is thrown with `existingDeps` and `incomingDeps`
-- **AND** the file is not written
-
-#### Scenario: dependsOn entries added — error thrown
-
-- **GIVEN** existing metadata has `dependsOn: ['core:config', 'core:schema-format']`
-- **WHEN** `SaveSpecMetadata` is executed with content that has `dependsOn: ['core:config', 'core:schema-format', 'core:change']`
-- **THEN** a `DependsOnOverwriteError` is thrown
-- **AND** the file is not written
-
-#### Scenario: dependsOn entries replaced — error thrown
-
-- **GIVEN** existing metadata has `dependsOn: ['core:config', 'core:schema-format']`
-- **WHEN** `SaveSpecMetadata` is executed with content that has `dependsOn: ['core:change', 'core:schema-format']`
-- **THEN** a `DependsOnOverwriteError` is thrown
-- **AND** the file is not written
-
-#### Scenario: dependsOn dropped entirely — error thrown
-
-- **GIVEN** existing metadata has `dependsOn: ['core:config', 'core:schema-format']`
-- **WHEN** `SaveSpecMetadata` is executed with content that has no `dependsOn`
-- **THEN** a `DependsOnOverwriteError` is thrown
-- **AND** the file is not written
-
-#### Scenario: Same dependsOn in different order — allowed
-
-- **GIVEN** existing metadata has `dependsOn: ['core:config', 'core:schema-format']`
-- **WHEN** `SaveSpecMetadata` is executed with content that has `dependsOn: ['core:schema-format', 'core:config']`
-- **THEN** the file is written successfully — order is not significant
-
-#### Scenario: dependsOn change with force — allowed
-
-- **GIVEN** existing metadata has `dependsOn: ['core:config', 'core:schema-format']`
-- **WHEN** `SaveSpecMetadata` is executed with `force: true` and content that has `dependsOn: ['core:change']`
-- **THEN** the file is written successfully — force bypasses the check
-
-#### Scenario: No existing metadata — new dependsOn allowed
-
-- **GIVEN** no existing metadata for the spec
-- **WHEN** `SaveSpecMetadata` is executed with content that has `dependsOn: ['core:config']`
-- **THEN** the file is written successfully
-
-#### Scenario: Existing metadata without dependsOn — new dependsOn allowed
-
-- **GIVEN** existing metadata has no `dependsOn` field
-- **WHEN** `SaveSpecMetadata` is executed with content that has `dependsOn: ['core:config']`
-- **THEN** the file is written successfully — adding dependsOn to a spec that had none is allowed
-
-#### Scenario: Error message includes removed and added entries
-
-- **GIVEN** existing metadata has `dependsOn: ['core:config', 'core:schema-format']`
-- **WHEN** `SaveSpecMetadata` is executed with content that has `dependsOn: ['core:change']`
-- **THEN** the error message includes the removed entries (`core:config`, `core:schema-format`) and the added entry (`core:change`)
-- **AND** the message includes a hint to use `--force`
 
 ### Requirement: Deterministic generation at archive time
 
@@ -323,47 +309,49 @@
 - **THEN** `metadata.json` includes an `implementation` projection derived from the sidecar
 - **AND** the sidecar remains the authoritative source
 
-### Requirement: Staleness detection
+### Requirement: Freshness assessment is application-owned
 
-#### Scenario: Content unchanged — no warning
+#### Scenario: Content hash mismatch marks metadata stale
 
-- **WHEN** the current hash of the spec's requiredSpecArtifacts matches `contentHashes` in metadata
-- **THEN** no staleness warning is emitted
+- **GIVEN** persisted metadata's `provenance.artifacts` hash for a file differs from that file's current content hash
+- **WHEN** `assessMetadataFreshness` compares persisted and current source state
+- **THEN** the result is stale
 
-#### Scenario: Content changed — warning emitted
+#### Scenario: persistedStateHash transition to or from absence marks metadata stale
 
-- **WHEN** a spec's `spec.md` has been modified and its hash no longer matches `contentHashes`
-- **THEN** specd emits a warning that the spec metadata may be stale and the agent should regenerate it
+- **GIVEN** persisted metadata's `provenance.persistedStateHash` differs from the spec's current `persistedStateHash(spec)`, including a transition to or from lock absence
+- **WHEN** `assessMetadataFreshness` runs
+- **THEN** the result is stale
 
-#### Scenario: Missing contentHashes — treated as stale
+#### Scenario: Schema identity change marks metadata stale
 
-- **WHEN** metadata exists but has no `contentHashes` field
-- **THEN** specd emits the same staleness warning
+- **GIVEN** persisted metadata's `provenance.schema` differs from the spec's current persisted schema identity
+- **WHEN** `assessMetadataFreshness` runs
+- **THEN** the result is stale
 
-#### Scenario: requiredSpecArtifact missing from contentHashes — treated as stale
+#### Scenario: Projection version or fingerprint change marks metadata stale
 
-- **WHEN** a `requiredSpecArtifacts` file exists but has no corresponding entry in `contentHashes`
-- **THEN** specd emits a staleness warning
+- **GIVEN** persisted metadata's `provenance.projectionVersion` or `provenance.projectionFingerprint` differs from the generator's current values
+- **WHEN** `assessMetadataFreshness` runs
+- **THEN** the result is stale
 
-#### Scenario: Projected dependsOn drift is treated as stale
+#### Scenario: lastModified alone does not cause staleness
 
-- **GIVEN** `metadata.json.dependsOn` differs from the repository's persisted dependency state for the same spec
-- **WHEN** metadata freshness is evaluated
-- **THEN** the metadata is treated as stale
-- **AND** the result instructs the caller to regenerate metadata
+- **GIVEN** a persisted artifact's `lastModified` value differs from its current value but its content hash is unchanged
+- **WHEN** `assessMetadataFreshness` runs
+- **THEN** the metadata is not treated as stale solely because of `lastModified`
 
-#### Scenario: Existing stale metadata is returned as stale, not missing
+#### Scenario: Repository never classifies freshness
 
-- **GIVEN** a persisted `metadata.json` file exists for the spec
-- **AND** its freshness evaluation fails
-- **WHEN** `SpecRepository.metadata()` is called
-- **THEN** the caller receives the parsed persisted metadata with `freshness: 'stale'`
-- **AND** the result is not `null`
+- **WHEN** `SpecRepository.readMetadataSnapshot(spec)` is called
+- **THEN** the returned `kind` is one of `missing`, `invalid`, or `present`
+- **AND** the repository does not compute or return `fresh`/`stale`
 
-#### Scenario: Stale metadata does not block operations
+#### Scenario: Freshness comparison is used only by MaterializeSpecMetadata
 
-- **WHEN** metadata is stale
-- **THEN** specd emits a warning but does not block any command
+- **WHEN** a repository adapter or ordinary consumer needs a freshness decision
+- **THEN** it does not reimplement `assessMetadataFreshness` independently
+- **AND** `MaterializeSpecMetadata` is the internal caller that uses the comparison to decide reuse versus regeneration
 
 ### Requirement: Use by CompileContext
 
@@ -385,13 +373,18 @@
 - **THEN** `core:storage` is still discovered from metadata
 - **AND** no direct sidecar artifact read is required
 
-#### Scenario: Consumers distinguish missing metadata from stale metadata
+#### Scenario: Materialization returns a confirmed-fresh or just-regenerated value
 
-- **GIVEN** one spec has no persisted metadata file
-- **AND** another spec has persisted metadata marked `stale`
-- **WHEN** a context consumer reads both through `SpecRepository.metadata()`
-- **THEN** the missing case is handled as `null`
-- **AND** the stale case remains readable with a `stale-metadata` warning
+- **GIVEN** a spec whose persisted metadata may be missing, invalid, or stale
+- **WHEN** a consumer requests its metadata through `GetSpecMetadata` / `MaterializeSpecMetadata`
+- **THEN** the consumer receives a value that is either confirmed fresh or was just regenerated from current source state
+- **AND** the consumer does not implement its own missing/stale fallback logic
+
+#### Scenario: readMetadataSnapshot is not used by ordinary consumers for freshness decisions
+
+- **WHEN** `CompileContext` or another context-oriented consumer needs the canonical normalized representation of a persisted spec
+- **THEN** it obtains it through Core metadata materialization
+- **AND** it does not call `SpecRepository.readMetadataSnapshot()` directly to make a freshness decision
 
 #### Scenario: Missing spec in dependsOn skipped with warning
 
@@ -405,12 +398,30 @@
 
 ### Requirement: Version control
 
-#### Scenario: Metadata committed with project
+#### Scenario: New project gitignores the metadata cache directory
 
-- **GIVEN** a project with `.specd/metadata/` tracked in version control
-- **WHEN** metadata is generated (as `metadata.json`)
-- **THEN** the `.json` files are committed alongside specs
-- **AND** consumers read them without regeneration
+- **GIVEN** a newly initialized project
+- **WHEN** the metadata cache directory is initialized
+- **THEN** a rooted `/.specd/metadata/` entry is added to the project-root `.gitignore`
+
+#### Scenario: Rooted ignore entry does not affect similarly named nested directories
+
+- **GIVEN** a nested directory elsewhere in the repo that happens to be named `.specd/metadata`
+- **WHEN** the root `.gitignore` entry `/.specd/metadata/` is evaluated
+- **THEN** only the project-root metadata cache directory is ignored
+
+#### Scenario: Existing tracked metadata is not automatically untracked
+
+- **GIVEN** a project that already tracks generated metadata files in Git
+- **WHEN** the gitignore entry is added
+- **THEN** previously tracked metadata files remain tracked until an explicit one-time migration removes them
+
+#### Scenario: Custom metadataPath is the operator's responsibility
+
+- **GIVEN** a project configures a custom filesystem `metadataPath` outside the default location
+- **WHEN** that path is used for generated metadata
+- **THEN** runtime does not rewrite `.gitignore` for that custom path
+- **AND** keeping it out of version control is the operator's responsibility
 
 #### Scenario: Implementation files projected into metadata
 

@@ -32,7 +32,7 @@
     {
       "requirement": "Non-interactive mode",
       "rules": [
-        "When not in interactive mode, the command uses the flag values (or defaults) directly, calls `createConfigWriter().initProject(...)`, optionally installs plugins specified via `--plugin`, and prints output according to `--format`.\n\n- `text`: prints `initialized specd in <absolute-project-root-path>` followed by per-plugin install status lines when any `--plugin` flags were given.\n- `json` or `toon`: outputs `{\"result\":\"ok\",\"configPath\":\"...\",\"schema\":\"...\",\"workspaces\":[...],\"plugins\":[...]}` where `plugins` is an array of install result entries (`name`, `status`, `detail`)."
+        "When not in interactive mode, the command uses the flag values (or defaults) directly, calls `createConfigWriter().initProject(...)`, optionally installs plugins specified via `--plugin`, and prints output according to `--format`.\n\n- `text`: prints `initialized specd in <absolute-project-root-path>` followed by `metadata cache: <metadataCachePath> (ignored in .gitignore)`, then per-plugin install status lines when any `--plugin` flags were given.\n- `json` or `toon`: outputs `{\"result\":\"ok\",\"configPath\":\"...\",\"schema\":\"...\",\"workspaces\":[...],\"metadataCachePath\":\"...\",\"plugins\":[...]}` where `metadataCachePath` is the project-relative path to the created, Git-ignored metadata cache directory (default `.specd/metadata/`), and `plugins` is an array of install result entries (`name`, `status`, `detail`)."
       ]
     },
     {
@@ -44,7 +44,7 @@
     {
       "requirement": "Delegation to ConfigWriter",
       "rules": [
-        "The CLI passes the resolved project root, schema reference, workspace id, workspace specs path, and force flag to `createConfigWriter().initProject(...)`. All file creation — `specd.yaml`, storage directories, root `.gitignore` entries, and `{configPath}/tmp/.gitignore` — is handled by the `ConfigWriter` port. The CLI never touches `specd.yaml` or tmp cache paths directly and MUST NOT call `createInitProject`, `InitProject.execute`, or `kernel.project.init`.\n\nThe `{configPath}/tmp/.gitignore` file MUST be created idempotently during `initProject` with normative contents:\n\n```gitignore\n*\n!.gitignore\n```\n\nThis keeps all tmp artifacts (including `fs-cache/`) out of version control while allowing the ignore rule file itself to remain tracked."
+        "The CLI passes the resolved project root, schema reference, workspace id, workspace specs path, and force flag to `createConfigWriter().initProject(...)`. All file creation — `specd.yaml`, storage directories, the default metadata cache directory, root `.gitignore` entries (including the metadata cache entry), and `{configPath}/tmp/.gitignore` — is handled by the `ConfigWriter` port. The CLI never touches `specd.yaml`, the metadata cache, or tmp cache paths directly and MUST NOT call `createInitProject`, `InitProject.execute`, or `kernel.project.init`.\n\nThe `{configPath}/tmp/.gitignore` file MUST be created idempotently during `initProject` with normative contents:\n\n```gitignore\n*\n!.gitignore\n```\n\nThis keeps all tmp artifacts (including `fs-cache/`) out of version control while allowing the ignore rule file itself to remain tracked.\n\n`initProject` also idempotently creates the default metadata cache directory and appends its rooted ignore entry (default `/.specd/metadata/`) to the project-root `.gitignore`, so a fresh clone or deleted cache is immediately usable without a separate maintenance command. The CLI surfaces the resulting `metadataCachePath` from the `InitProject` result rather than re-deriving it."
       ]
     },
     {
@@ -134,6 +134,22 @@
       ]
     },
     {
+      "requirement": "Non-interactive mode",
+      "name": "Text output reports metadata cache path",
+      "when": ["specd project init --workspace default --workspace-path specs/ is run"],
+      "then": [
+        "stdout contains metadata cache: <metadataCachePath> (ignored in .gitignore) after the initialized specd in ... line"
+      ]
+    },
+    {
+      "requirement": "Non-interactive mode",
+      "name": "JSON output includes metadataCachePath",
+      "when": ["specd project init --format json is run"],
+      "then": [
+        "stdout is valid JSON with a metadataCachePath field set to the project-relative path of the created metadata cache directory"
+      ]
+    },
+    {
       "requirement": "Config file placement",
       "name": "Config written to git root when inside a subdirectory",
       "given": ["a git repository with root at /repo and the CWD is /repo/packages/foo"],
@@ -190,6 +206,32 @@
       "then": [".specd/tmp/.gitignore still contains * and !.gitignore"]
     },
     {
+      "requirement": "Delegation to ConfigWriter",
+      "name": "Metadata cache directory created idempotently",
+      "given": ["a clean project root with no existing metadata cache directory"],
+      "when": ["specd project init --workspace default completes successfully"],
+      "then": ["the default metadata cache directory .specd/metadata/ exists"]
+    },
+    {
+      "requirement": "Delegation to ConfigWriter",
+      "name": "Metadata cache entry appended to root .gitignore",
+      "given": ["a project root .gitignore without a /.specd/metadata/ entry"],
+      "when": ["specd project init --workspace default completes successfully"],
+      "then": [
+        "the root .gitignore contains a rooted /.specd/metadata/ entry",
+        "AND re-running specd project init --force --workspace default does not duplicate that entry"
+      ]
+    },
+    {
+      "requirement": "Delegation to ConfigWriter",
+      "name": "CLI surfaces metadataCachePath from the InitProject result rather than re-deriving it",
+      "when": ["specd project init completes successfully"],
+      "then": [
+        "the metadataCachePath shown to the caller is read directly from the InitProject result",
+        "AND the CLI does not independently recompute the metadata cache path"
+      ]
+    },
+    {
       "requirement": "Skills installation after init",
       "name": "Plugins are installed for selected plugins after init",
       "when": ["specd project init --plugin @specd/plugin-agent-claude is run"],
@@ -220,10 +262,42 @@
       ]
     }
   ],
-  "implementation": {},
-  "contentHashes": {
-    "spec.md": "sha256:0250d81532651f95fcb81b4ce8b1cf34a357228a43f240ac95cf3d3a552b8507",
-    "verify.md": "sha256:e8475ca733201087dd694572c915a873b6ade9f8415020bc9e2ecb9445f1365b"
+  "implementation": {
+    "files": [
+      {
+        "specId": "cli:project-init",
+        "file": "cli:test/commands/project-init.spec.ts"
+      }
+    ],
+    "symbols": [
+      {
+        "specId": "cli:project-init",
+        "file": "cli:src/commands/project/init.ts",
+        "symbol": "registerProjectInit"
+      }
+    ]
   },
-  "generatedBy": "core"
+  "contentHashes": {
+    "spec.md": "sha256:79f482087c1bd75e1047b856267e39d367d71222ed16cda48a6b1793d551c672",
+    "verify.md": "sha256:2bed700fbfb87ab60045b699b2b7c7066b2f95fe08be4bd18ed4fb16a4c6727c"
+  },
+  "provenance": {
+    "artifacts": {
+      "spec.md": {
+        "hash": "sha256:79f482087c1bd75e1047b856267e39d367d71222ed16cda48a6b1793d551c672",
+        "lastModified": "2026-07-25T11:53:31.678Z"
+      },
+      "verify.md": {
+        "hash": "sha256:2bed700fbfb87ab60045b699b2b7c7066b2f95fe08be4bd18ed4fb16a4c6727c",
+        "lastModified": "2026-07-25T11:53:31.678Z"
+      }
+    },
+    "persistedStateHash": "sha256:b494428896bc432ca99bc817bbb8c4f7c36db8ff4fdbf1d6634d5483ba6a845f",
+    "schema": {
+      "name": "schema-std",
+      "version": 1
+    },
+    "projectionVersion": 1,
+    "projectionFingerprint": "sha256:e4a28a2db6a35ed39b8308518337235b1490c2948cd839db25866ad79b22404b"
+  }
 }

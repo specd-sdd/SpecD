@@ -12,7 +12,8 @@ The use case SHALL compute current SHA-256 hashes for:
 
 - The project's `specd.yaml`
 - All `contextFiles` defined in the configuration
-- All spec metadata for specs currently included in the project context
+
+For every spec currently included in the project context, the use case SHALL call `GetSpecMetadata.execute({ specId })` (default `'if-needed'` policy) and record the returned `metadataFingerprint` in `freshness`, rather than hashing a raw metadata-cache-file snapshot or a repository storage revision. This keeps freshness comparisons storage-adapter-independent and self-healing: a spec whose metadata was missing or stale is regenerated as part of this computation.
 
 ### Requirement: Atomicity
 
@@ -31,6 +32,7 @@ The config-based `createUpdateProjectMetadata(config, options?)` form MUST deriv
 - `config: SpecdConfig`
 - `listWorkspaces: ListWorkspaces`
 - `specRepos: ReadonlyMap<string, SpecRepository>`
+- `getMetadata: GetSpecMetadata`
 - `files: FileReader`
 - `fileWriter: FileWriter`
 - `hasher: ContentHasher`
@@ -40,4 +42,5 @@ The helper is the only use-case-specific composition entry for config-based boot
 ## Spec Dependencies
 
 - [`core:project-metadata`](../project-metadata/spec.md)
+- [`core:get-spec-metadata`](../get-spec-metadata/spec.md) — per-spec semantic fingerprint source
 - [`core:composition-resolver`](../composition-resolver/spec.md)

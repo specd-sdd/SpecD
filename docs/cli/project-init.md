@@ -25,7 +25,17 @@ Options:
   - offers multi-select plugin installation
 - Plugin installation after init uses the same orchestration as `plugins install`.
 - Plugin declarations are persisted under `plugins.agents`.
+- Creates `.specd/metadata/` and appends `/.specd/metadata/` to the root `.gitignore` (idempotent).
 - Exits with code `1` if any selected plugin installation fails.
+
+## Metadata cache migration
+
+If an existing repository committed `.specd/metadata/` before it was gitignored, untrack it manually (specd does not run `git rm --cached` for you):
+
+```bash
+git rm -r --cached .specd/metadata
+git commit -m "chore: stop tracking specd metadata cache"
+```
 
 ## Output
 

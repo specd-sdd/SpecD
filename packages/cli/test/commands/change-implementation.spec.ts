@@ -108,7 +108,7 @@ describe('change implementation', () => {
       expect(e.code).toBe(1)
     }
 
-    expect(stderr()).toContain('error: Implementation file not found at: missing.ts')
+    expect(stderr()).toContain('error: Implementation file "missing.ts" does not exist')
   })
 
   it('resolve supports comma-separated file lists', async () => {
@@ -173,7 +173,7 @@ describe('change implementation', () => {
       if (!(e instanceof ExitSentinel)) throw e
     }
 
-    expect(stderr()).toContain('error: Implementation file not found at: missing.ts')
+    expect(stderr()).toContain('error: Implementation file "missing.ts" does not exist')
   })
 
   it('review displays removed tracked files', async () => {

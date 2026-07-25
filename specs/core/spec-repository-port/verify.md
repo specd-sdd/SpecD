@@ -29,36 +29,19 @@
 - **WHEN** `reindex()` is called
 - **THEN** the spec list index under `{configPath}/tmp/fs-cache/specs/core/` is fully rebuilt from disk
 
-### Requirement: saveMetadata persists metadata with conflict detection
-
-#### Scenario: Read-only workspace throws error
-
-- **GIVEN** a `SpecRepository` with ownership `readOnly`
-- **WHEN** `saveMetadata(spec, content)` is called
-- **THEN** `ReadOnlyWorkspaceError` is thrown before any filesystem operation
-
-#### Scenario: Write with conflict detection
-
-- **GIVEN** a `SpecRepository` with ownership `owned`
-- **AND** existing metadata file with a different hash than `content.originalHash`
-- **WHEN** `saveMetadata(spec, content)` is called
-- **THEN** `ArtifactConflictError` is thrown
-
-#### Scenario: Force write skips conflict detection
-
-- **GIVEN** a `SpecRepository` with ownership `owned`
-- **AND** existing metadata with different hash
-- **WHEN** `saveMetadata(spec, content, { force: true })` is called
-- **THEN** the file is written without error
-
 ### Requirement: Abstract class with abstract methods
 
-#### Scenario: Port is an abstract class with abstract storage methods
+#### Scenario: Port declares its full abstract storage method roster
 
 - **WHEN** `SpecRepository` is examined
 - **THEN** it is declared as `abstract class`
-- **AND** `get`, `list`, `count`, `reindex`, `artifact`, `save`, `delete`, `resolveFromPath`, `metadata`, `saveMetadata`, and `search` are declared as `abstract` methods
+- **AND** `get`, `list`, `count`, `reindex`, `artifact`, `save`, `delete`, `resolveFromPath`, `readMetadataSnapshot`, `writeMetadataSnapshot`, `readPersistedState`, `writePersistedState`, `artifactMeta`, `persistedStateMeta`, `generatedMetadataMeta`, `specFingerprint`, and `search` are declared as `abstract` methods
 - **AND** a concrete implementation can extend it and implement these methods
+
+#### Scenario: Removed field-wise and hash-only methods are not part of the abstract roster
+
+- **WHEN** `SpecRepository` is examined
+- **THEN** the abstract roster does not declare `metadata`, `saveMetadata`, `readPersistedSchema`, `readPersistedDependsOn`, `readPersistedImplementation`, `updatePersistedState`, or `persistedStateHash`
 
 ### Requirement: Workspace scoping
 
@@ -113,17 +96,23 @@
 - **WHEN** the repository projects a `SpecListEntry`
 - **THEN** `title` equals the last segment of `path`
 
-#### Scenario: Summary and metadataStatus respect include flags
+#### Scenario: Summary and Meta respect include flags
 
-- **GIVEN** a cached spec list entry payload with resolvable summary and metadata status
-- **WHEN** `list(undefined, { includeSummary: true, includeMetadataStatus: true })` is called
-- **THEN** returned items include projected `summary` and `metadataStatus`
+- **GIVEN** a cached spec list entry payload with resolvable summary and Meta stamps
+- **WHEN** `list(undefined, { includeSummary: true, includeMeta: true })` is called
+- **THEN** returned items include projected `summary`, `artifacts`, `persistedStateMeta`, and `generatedMetadataMeta`
+- **AND** none of the Meta fields include `hash`
 - **WHEN** the same call omits both include flags
-- **THEN** returned items omit `summary` and `metadataStatus`
+- **THEN** returned items omit `summary`, `artifacts`, `persistedStateMeta`, and `generatedMetadataMeta`
+
+#### Scenario: includeMeta omitted leaves Meta fields absent
+
+- **GIVEN** `list()` is called without `includeMeta`
+- **THEN** `artifacts`, `persistedStateMeta`, and `generatedMetadataMeta` are omitted from each entry
 
 #### Scenario: Resolution errors still return an entry with title fallback
 
-- **GIVEN** a spec whose summary or status resolution encounters an I/O error during indexing
+- **GIVEN** a spec whose summary or Meta resolution encounters an I/O error during indexing
 - **WHEN** `list()` is called
 - **THEN** the spec still appears with a title fallback
 - **AND** the list call does not fail because of that individual spec
@@ -245,28 +234,55 @@
 - **WHEN** `resolveFromPath("not-a-spec-link")` is called and the path does not resolve to any spec
 - **THEN** `null` is returned
 
-### Requirement: metadata returns parsed metadata or null
+### Requirement: readMetadataSnapshot and writeMetadataSnapshot
 
-#### Scenario: ReadOnly workspace rejects saveMetadata
+#### Scenario: Missing metadata reports kind missing
+
+- **WHEN** `readMetadataSnapshot(spec)` is called and no metadata is persisted for the spec
+- **THEN** it returns `{ kind: 'missing', revision: null }`
+
+#### Scenario: Invalid persisted metadata reports kind invalid
+
+- **GIVEN** persisted metadata content that fails to parse
+- **WHEN** `readMetadataSnapshot(spec)` is called
+- **THEN** it returns `{ kind: 'invalid', revision, error: SpecMetadataParseError }`
+
+#### Scenario: Present metadata reports kind present with revision
+
+- **GIVEN** persisted metadata content that parses successfully
+- **WHEN** `readMetadataSnapshot(spec)` is called
+- **THEN** it returns `{ kind: 'present', metadata, revision }`
+
+#### Scenario: writeMetadataSnapshot creates metadata when expectedRevision is null
+
+- **GIVEN** no metadata is currently persisted for the spec
+- **WHEN** `writeMetadataSnapshot(spec, metadata, { expectedRevision: null })` is called
+- **THEN** the metadata is created
+- **AND** the newly persisted `MetadataSnapshot` is returned
+
+#### Scenario: writeMetadataSnapshot replaces metadata when expectedRevision matches
+
+- **GIVEN** metadata persisted at a known revision
+- **WHEN** `writeMetadataSnapshot(spec, metadata, { expectedRevision: <that revision> })` is called
+- **THEN** the previously observed revision is replaced with the new complete `SpecMetadata` projection
+
+#### Scenario: writeMetadataSnapshot rejects a stale expectedRevision
+
+- **GIVEN** metadata persisted at a revision different from the caller's `expectedRevision`
+- **WHEN** `writeMetadataSnapshot(spec, metadata, { expectedRevision: <stale revision> })` is called
+- **THEN** the write is rejected with the repository's conflict error rather than silently rebasing
+
+#### Scenario: writeMetadataSnapshot is not subject to the readOnly guard
 
 - **GIVEN** a `SpecRepository` bound to a workspace with `readOnly` ownership
-- **WHEN** `saveMetadata(spec, content)` is called
-- **THEN** `ReadOnlyWorkspaceError` is thrown
-- **AND** no file is written to disk
+- **WHEN** `writeMetadataSnapshot(spec, metadata, options)` is called
+- **THEN** the write proceeds without throwing `ReadOnlyWorkspaceError`
 
-#### Scenario: Metadata exists
+#### Scenario: readMetadataSnapshot never reports freshness
 
-- **GIVEN** a spec `core:config` with a `metadata.json` in the metadata storage
-- **WHEN** `metadata(spec)` is called
-- **THEN** the result contains the parsed JSON content with `originalHash`
-- **AND** `saveMetadata(spec, '{"title":"Config"}')` persists the JSON content
-- **AND** the file can be read back via `metadata(spec)` with `title: "Config"`
-
-#### Scenario: Metadata does not exist
-
-- **GIVEN** a spec with no metadata on disk
-- **WHEN** `metadata(spec)` is called
-- **THEN** `null` is returned
+- **WHEN** `readMetadataSnapshot(spec)` is called
+- **THEN** the returned `kind` is one of `missing`, `invalid`, or `present`
+- **AND** the repository does not infer or encode `fresh` or `stale`
 
 ### Requirement: search returns specs matching a text query
 
@@ -302,20 +318,38 @@
 - **WHEN** `search("invoice")` is called
 - **THEN** only specs within the `billing` workspace are returned
 
-### Requirement: persisted spec semantics, persistedStateHash, and specFingerprint
+### Requirement: Aggregate persisted state, Meta observations, and specFingerprint
 
-#### Scenario: persistedStateHash remains stable when state is unchanged
+#### Scenario: persistedStateMeta hash remains stable when state is unchanged
 
 - **GIVEN** a persisted spec with unchanged persisted lock state
-- **WHEN** the repository is asked for `persistedStateHash` twice
-- **THEN** both calls return the same hash
+- **WHEN** `persistedStateMeta(spec, { includeHash: true })` is called twice
+- **THEN** both calls return the same `hash`
 
-#### Scenario: persistedStateHash changes when lock state is modified
+#### Scenario: persistedStateMeta hash changes when lock state is modified
 
-- **GIVEN** a persisted spec with an initial `persistedStateHash`
+- **GIVEN** a persisted spec with an initial `persistedStateMeta(..., { includeHash: true }).hash`
 - **WHEN** the repository updates persisted dependencies or implementation state for
   that spec
 - **THEN** the returned hash differs from the previous value
+
+#### Scenario: persistedStateMeta without includeHash omits hash
+
+- **GIVEN** a present persisted-state sidecar
+- **WHEN** `persistedStateMeta(spec)` is called without `includeHash`
+- **THEN** the result includes `lastModified` and does not include `hash`
+
+#### Scenario: persistedStateMeta returns null when sidecar is absent
+
+- **GIVEN** a lock-less spec
+- **WHEN** `persistedStateMeta(spec)` is called
+- **THEN** `null` is returned
+
+#### Scenario: there is no persistedStateHash method on the port
+
+- **WHEN** `SpecRepository` is examined
+- **THEN** it does not declare `persistedStateHash` as a method
+- **AND** callers that need the hash use `persistedStateMeta(spec, { includeHash: true })?.hash ?? null`
 
 #### Scenario: specFingerprint orders artifact hashes by filename
 
@@ -323,15 +357,60 @@
 - **WHEN** `specFingerprint` is computed twice
 - **THEN** both calls return the same digest
 - **AND** the digest incorporates per-artifact content hashes ordered by filename
-  alphabetically plus `persistedStateHash` (or an absent sentinel)
+  alphabetically plus `persistedStateMeta(..., { includeHash: true })?.hash` (or an absent sentinel)
 
-#### Scenario: persisted dependency state is read semantically
+#### Scenario: readPersistedState returns the complete persisted snapshot
 
-- **GIVEN** a persisted spec with archived dependency state
-- **WHEN** application logic needs the canonical persisted `dependsOn` list
-- **THEN** it reads that value through `readPersistedDependsOn(spec)`
-- **AND** it does not need `Spec.artifacts` or generic artifact reads to discover the
-  sidecar
+- **GIVEN** a persisted spec with archived schema, dependsOn, implementation, and optional optimizations
+- **WHEN** `readPersistedState(spec)` is called
+- **THEN** it returns the complete `PersistedSpecStateSnapshot` including `schema`, `dependsOn`, `implementation`, `optimizations`, and the sidecar's `originalHash`
+- **AND** application logic does not need `Spec.artifacts` or generic artifact reads to discover the sidecar
+
+#### Scenario: readPersistedState returns null when no persisted state exists
+
+- **GIVEN** a lock-less spec
+- **WHEN** `readPersistedState(spec)` is called
+- **THEN** `null` is returned
+
+#### Scenario: writePersistedState creates state when expectedRevision is null
+
+- **GIVEN** no persisted state exists for the spec
+- **WHEN** `writePersistedState(spec, state, { expectedRevision: null })` is called
+- **THEN** the complete persisted state is created
+- **AND** the newly persisted `PersistedSpecStateSnapshot` is returned
+
+#### Scenario: writePersistedState replaces state when expectedRevision matches
+
+- **GIVEN** persisted state observed at a known revision
+- **WHEN** `writePersistedState(spec, state, { expectedRevision: <that revision> })` is called
+- **THEN** the complete persisted state is replaced atomically
+
+#### Scenario: writePersistedState rejects a stale expectedRevision
+
+- **GIVEN** persisted state at a revision different from the caller's `expectedRevision`
+- **WHEN** `writePersistedState(spec, state, { expectedRevision: <stale revision> })` is called
+- **THEN** the write is rejected with the repository's conflict error rather than silently rebasing
+
+#### Scenario: artifactMeta returns lastModified without hash by default
+
+- **GIVEN** a schema-declared artifact present on disk
+- **WHEN** `artifactMeta(spec, filename)` is called without `includeHash`
+- **THEN** it returns `{ lastModified }` without `hash`
+- **AND** the artifact's content is not loaded or returned
+
+#### Scenario: artifactMeta returns hash only when includeHash is true
+
+- **GIVEN** a schema-declared artifact present on disk
+- **WHEN** `artifactMeta(spec, filename, { includeHash: true })` is called
+- **THEN** it returns `{ hash, lastModified }`
+- **AND** the artifact's content is not returned to the caller beyond hashing
+
+#### Scenario: generatedMetadataMeta observes the metadata cache file
+
+- **GIVEN** a present or absent generated metadata cache file
+- **WHEN** `generatedMetadataMeta(spec)` is called
+- **THEN** it returns `GeneratedMetadataMeta` with `lastModified` when present, or `null` when absent
+- **AND** it does not include `hash` unless `includeHash: true`
 
 ### Requirement: Filesystem-backed specs capability
 
@@ -346,12 +425,3 @@
 - **GIVEN** a repository implementation not backed by a directly addressable filesystem
 - **WHEN** it implements the `SpecRepository` contract
 - **THEN** it is not required to expose `specsPath`
-
-#### Scenario: Stale metadata remains readable
-
-- **GIVEN** a spec has persisted `metadata.json`
-- **AND** staleness detection marks it stale
-- **WHEN** `metadata(spec)` is called
-- **THEN** the repository returns the parsed persisted metadata
-- **AND** the result includes `freshness: 'stale'`
-- **AND** the repository does not regenerate metadata implicitly

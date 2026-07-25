@@ -9,18 +9,24 @@ import { SpecPath } from '../../domain/value-objects/spec-path.js'
 import { SpecArtifact } from '../../domain/value-objects/spec-artifact.js'
 import { ArtifactConflictError } from '../../domain/errors/artifact-conflict-error.js'
 import { ReadOnlyWorkspaceError } from '../../domain/errors/read-only-workspace-error.js'
+import { SpecMetadataParseError } from '../../domain/errors/spec-metadata-parse-error.js'
 import { SpecPublicationError } from '../../domain/errors/spec-publication-error.js'
 import {
   specMetadataSchema,
-  type PersistedSpecMetadata,
+  type MetadataSnapshot,
+  type SpecMetadata,
 } from '../../domain/services/parse-metadata.js'
 import {
-  parseSpecLock,
-  type SpecLockData,
-  type SpecLockImplementationEntry,
-} from '../../domain/services/parse-spec-lock.js'
+  type PersistedSpecState,
+  type PersistedSpecStateSnapshot,
+} from '../../domain/services/apply-persisted-spec-state-patch.js'
+import { parseSpecLock, type SpecLockData } from '../../domain/services/parse-spec-lock.js'
 import {
   SpecRepository,
+  type ArtifactMeta,
+  type GeneratedMetadataMeta,
+  type PersistedStateMeta,
+  type SpecMetaOptions,
   type SpecRepositoryConfig as BaseSpecRepositoryConfig,
   type SpecPublication,
   type ResolveFromPathResult,
@@ -30,12 +36,12 @@ import {
   type SpecListOptions,
 } from '../../application/ports/spec-repository.js'
 import { type ListResult } from '../../application/ports/repository.js'
+import { projectListMetaFromSourceFiles } from './project-list-meta.js'
 import { Logger } from '../../application/logger.js'
 import { isEnoent } from './is-enoent.js'
 import { normalizeRelativePath, resolveConfinedPath } from './path-confinement.js'
 import { writeFileAtomic } from './write-atomic.js'
 import { sha256 } from './hash.js'
-import { checkMetadataFreshness } from '../../application/use-cases/_shared/metadata-freshness.js'
 import { FsSpecIndexCache, type SpecIndexSource } from './fs-spec-index-cache.js'
 import { type SourceFileStamp } from './fs-index-cache-base.js'
 import { ensureTmpGitignore } from './ensure-tmp-gitignore.js'
@@ -144,7 +150,7 @@ export class FsSpecRepository extends SpecRepository {
 
     const source: SpecIndexSource = {
       walk: () => this._listAllSpecs(),
-      metadata: (spec) => this.metadata(spec),
+      readMetadataSnapshot: (spec) => this.readMetadataSnapshot(spec),
       artifact: (spec, filename) => this.artifact(spec, filename),
       sourceFileStamps: (spec) => this._computeSourceFileStamps(spec),
     }
@@ -266,6 +272,17 @@ export class FsSpecRepository extends SpecRepository {
             return entry.path === prefixStr || entry.path.startsWith(`${prefixStr}/`)
           }
         : undefined
+
+    if (options?.includeMeta === true) {
+      const listed = await this._indexCache.listWithSourceFiles(options, filter)
+      return {
+        items: listed.items.map(({ entry, sourceFiles }) =>
+          this._projectSpecInclude(entry, options, sourceFiles),
+        ),
+        meta: listed.meta,
+      }
+    }
+
     const result = await this._indexCache.list(options, filter)
     return {
       items: result.items.map((entry) => this._projectSpecInclude(entry, options)),
@@ -288,15 +305,28 @@ export class FsSpecRepository extends SpecRepository {
    *
    * @param entry - Full stored/materialized entry
    * @param options - Include projection options
+   * @param sourceFiles - Indexed source file stamps when `includeMeta` is requested
    * @returns The projected entry
    */
-  private _projectSpecInclude(entry: SpecListEntry, options?: SpecListOptions): SpecListEntry {
-    const { summary, metadataStatus, ...rest } = entry
-    return {
+  private _projectSpecInclude(
+    entry: SpecListEntry,
+    options?: SpecListOptions,
+    sourceFiles?: readonly SourceFileStamp[],
+  ): SpecListEntry {
+    const { summary, ...rest } = entry
+    const projected: SpecListEntry = {
       ...rest,
       ...(options?.includeSummary && summary !== undefined ? { summary } : {}),
-      ...(options?.includeMetadataStatus && metadataStatus !== undefined ? { metadataStatus } : {}),
     }
+
+    if (options?.includeMeta === true && sourceFiles !== undefined) {
+      return {
+        ...projected,
+        ...projectListMetaFromSourceFiles(sourceFiles),
+      }
+    }
+
+    return projected
   }
 
   /**
@@ -429,21 +459,9 @@ export class FsSpecRepository extends SpecRepository {
         await writeFileAtomic(filePath, artifact.content)
       }
 
-      if (
-        publication.persistedSchema !== undefined ||
-        publication.persistedDependsOn !== undefined ||
-        publication.persistedImplementation !== undefined
-      ) {
-        const specLockPath = this._specLockFilePathInDir(stagingDir)
-        const specLock: SpecLockData = {
-          schema: publication.persistedSchema ?? { name: 'unknown', version: 0 },
-          dependsOn: publication.persistedDependsOn ?? [],
-          implementation: (publication.persistedImplementation ??
-            []) as SpecLockImplementationEntry[],
-        }
-        await fs.mkdir(path.dirname(specLockPath), { recursive: true })
-        await writeFileAtomic(specLockPath, JSON.stringify(specLock, null, 2) + '\n')
-      }
+      const specLockPath = this._specLockFilePathInDir(stagingDir)
+      await fs.mkdir(path.dirname(specLockPath), { recursive: true })
+      await writeFileAtomic(specLockPath, serializeSpecLock(publication.persistedState))
     } catch (error) {
       throw new SpecPublicationError(specId, stagingDir, errorMessage(error))
     }
@@ -492,152 +510,248 @@ export class FsSpecRepository extends SpecRepository {
   }
 
   /**
-   * Returns the parsed metadata for the given spec, or `null` if no metadata
-   * file exists.
+   * Reads the exact persisted semantic state, or `null` when no lock exists.
    *
-   * Reads from `<metadataPath>/<specFsPath>/metadata.json`, parses via the
-   * lenient schema, and attaches `originalHash` (SHA-256 of raw content).
-   *
-   * @param spec - The spec whose metadata to load
-   * @returns Parsed metadata with `originalHash`, or `null` if absent
+   * @param spec - The spec whose lock file to read
+   * @returns Parsed persisted state snapshot, or `null` when absent
    */
-  override async metadata(spec: Spec): Promise<PersistedSpecMetadata | null> {
-    const filePath = this._metadataFilePath(spec.name)
-
-    let content: string
-    try {
-      content = await fs.readFile(filePath, 'utf8')
-    } catch (err) {
-      if (isEnoent(err)) return null
-      throw err
-    }
-
-    const hash = sha256(content)
-    const persistedDependsOn = await this.readPersistedDependsOn(spec)
-
-    try {
-      const parsed = JSON.parse(content) as unknown
-      const result = specMetadataSchema.safeParse(parsed)
-      const metadata = result.success ? result.data : {}
-      const freshness = await this._classifyMetadataFreshness(spec, metadata, persistedDependsOn)
-      return { ...metadata, originalHash: hash, freshness } as PersistedSpecMetadata
-    } catch {
-      return { originalHash: hash, freshness: 'stale' }
-    }
+  override async readPersistedState(spec: Spec): Promise<PersistedSpecStateSnapshot | null> {
+    const data = await this._readSpecLock(spec)
+    if (data === null) return null
+    return toPersistedStateSnapshot(data)
   }
 
   /**
-   * Persists raw JSON metadata content for a spec.
+   * Conditionally replaces the complete persisted state in `spec-lock.json`.
    *
-   * Writes to `<metadataPath>/<specFsPath>/metadata.json`. Creates the
-   * directory if needed. Supports conflict detection via `originalHash`.
-   *
-   * @param spec - The spec to write metadata for
-   * @param content - Raw JSON string to persist
-   * @param options - Save options with optional conflict detection
-   * @param options.force - Skip conflict detection when `true`
-   * @param options.originalHash - Expected hash of the current file on disk
-   * @throws {ArtifactConflictError} On hash mismatch when `force` is not set
+   * @param spec - The spec whose lock file to write
+   * @param state - Complete persisted state to serialize
+   * @param options - Revision guard for optimistic concurrency
+   * @param options.expectedRevision - Required current lock hash, or `null` to create
+   * @returns Written state snapshot including the new content hash
    */
-  override async saveMetadata(
+  override async writePersistedState(
     spec: Spec,
-    content: string,
-    options?: { force?: boolean; originalHash?: string },
-  ): Promise<void> {
+    state: PersistedSpecState,
+    options: { readonly expectedRevision: string | null },
+  ): Promise<PersistedSpecStateSnapshot> {
     if (this.ownership() === 'readOnly') {
       throw new ReadOnlyWorkspaceError(
         `Cannot write to spec "${this.workspace()}:${spec.name.toString()}" — workspace "${this.workspace()}" is readOnly.`,
       )
     }
 
-    const filePath = this._metadataFilePath(spec.name)
-    const dir = path.dirname(filePath)
-    await fs.mkdir(dir, { recursive: true })
+    const filePath = this._specLockFilePath(spec.name)
+    const current = await this._readSpecLock(spec)
+    const content = serializeSpecLock(state)
 
-    if (options?.originalHash !== undefined && options.force !== true) {
-      let currentContent: string
+    if (options.expectedRevision === null) {
+      if (current !== null) {
+        const currentContent = await fs.readFile(filePath, 'utf8')
+        throw new ArtifactConflictError(SPEC_LOCK_FILENAME, content, currentContent)
+      }
+    } else if (current === null || current.originalHash !== options.expectedRevision) {
+      let currentContent = ''
       try {
         currentContent = await fs.readFile(filePath, 'utf8')
       } catch (err) {
-        if (isEnoent(err)) {
-          currentContent = ''
-        } else {
-          throw err
-        }
+        if (!isEnoent(err)) throw err
       }
-
-      const currentHash = sha256(currentContent)
-      if (currentHash !== options.originalHash) {
-        throw new ArtifactConflictError('metadata.json', content, currentContent)
-      }
+      throw new ArtifactConflictError(SPEC_LOCK_FILENAME, content, currentContent)
     }
 
+    const dir = path.dirname(filePath)
+    await fs.mkdir(dir, { recursive: true })
     await writeFileAtomic(filePath, content)
     await this._indexCache.refresh(spec)
+
+    return { ...state, originalHash: sha256(content) }
   }
 
   /**
-   * Returns the persisted schema identity for the given spec, or `null` if absent.
+   * Returns physical artifact metadata for one filename, or `null` when absent.
    *
-   * @param spec - The spec whose persisted schema to load
-   * @returns The persisted schema identity, or `null` if absent
+   * @param spec - The spec containing the artifact
+   * @param filename - Artifact basename to inspect
+   * @param options - Whether to include a content hash
+   * @returns Artifact metadata, or `null` when the file is absent
    */
-  override async readPersistedSchema(
+  override async artifactMeta(
     spec: Spec,
-  ): Promise<{ name: string; version: number } | null> {
-    const data = await this._readSpecLock(spec)
-    return data?.schema ?? null
-  }
-
-  /**
-   * Returns the persisted dependencies for the given spec, or `null` if absent.
-   *
-   * @param spec - The spec whose persisted dependencies to load
-   * @returns The persisted dependencies, or `null` if absent
-   */
-  override async readPersistedDependsOn(spec: Spec): Promise<readonly string[] | null> {
-    const data = await this._readSpecLock(spec)
-    return data?.dependsOn ?? null
-  }
-
-  /**
-   * Returns the persisted implementation links for the given spec, or `null` if absent.
-   *
-   * @param spec - The spec whose persisted implementation links to load
-   * @returns The persisted implementation links, or `null` if absent
-   */
-  override async readPersistedImplementation(
-    spec: Spec,
-  ): Promise<readonly { readonly file: string; readonly symbols?: readonly string[] }[] | null> {
-    const data = await this._readSpecLock(spec)
-    return (
-      (data?.implementation as readonly {
-        readonly file: string
-        readonly symbols?: readonly string[]
-      }[]) ?? null
+    filename: string,
+    options?: SpecMetaOptions,
+  ): Promise<ArtifactMeta | null> {
+    const filePath = resolveConfinedPath(
+      this._specDir(spec.name),
+      filename,
+      allowedSpecArtifactFilenames(spec),
     )
-  }
 
-  /**
-   * Returns a stable hash representing the persisted spec state.
-   *
-   * @param spec - The spec whose stable hash to compute
-   * @returns The stable hash, or `null` if absent
-   */
-  override async persistedStateHash(spec: Spec): Promise<string | null> {
-    const filePath = this._specLockFilePath(spec.name)
+    let stat: Awaited<ReturnType<typeof fs.stat>>
     try {
-      const content = await fs.readFile(filePath, 'utf8')
-      return sha256(content)
+      stat = await fs.stat(filePath)
     } catch (err) {
       if (isEnoent(err)) return null
       throw err
     }
+
+    const lastModified = stat.mtime.toISOString()
+    if (options?.includeHash !== true) {
+      return { lastModified }
+    }
+
+    const fileContent = await fs.readFile(filePath, 'utf8')
+    return {
+      lastModified,
+      hash: sha256(fileContent),
+    }
+  }
+
+  /**
+   * Cheap observation of the persisted semantic state sidecar.
+   *
+   * @param spec - The spec whose lock file to inspect
+   * @param options - Whether to include a content hash
+   * @returns Sidecar metadata, or `null` when absent
+   */
+  override async persistedStateMeta(
+    spec: Spec,
+    options?: SpecMetaOptions,
+  ): Promise<PersistedStateMeta | null> {
+    return this._sidecarMeta(this._specLockFilePath(spec.name), options)
+  }
+
+  /**
+   * Cheap observation of the generated metadata cache file.
+   *
+   * @param spec - The spec whose metadata file to inspect
+   * @param options - Whether to include a content hash
+   * @returns Sidecar metadata, or `null` when absent
+   */
+  override async generatedMetadataMeta(
+    spec: Spec,
+    options?: SpecMetaOptions,
+  ): Promise<GeneratedMetadataMeta | null> {
+    return this._sidecarMeta(this._metadataFilePath(spec.name), options)
+  }
+
+  /**
+   * Returns lastModified and optional hash for one sidecar path.
+   *
+   * @param filePath - Absolute sidecar file path
+   * @param options - Whether to include a content hash
+   * @returns Sidecar Meta, or `null` when absent
+   */
+  private async _sidecarMeta(
+    filePath: string,
+    options?: SpecMetaOptions,
+  ): Promise<PersistedStateMeta | null> {
+    let stat: Awaited<ReturnType<typeof fs.stat>>
+    try {
+      stat = await fs.stat(filePath)
+    } catch (err) {
+      if (isEnoent(err)) return null
+      throw err
+    }
+
+    const lastModified = stat.mtime.toISOString()
+    if (options?.includeHash !== true) {
+      return { lastModified }
+    }
+
+    const content = await fs.readFile(filePath, 'utf8')
+    return {
+      lastModified,
+      hash: sha256(content),
+    }
+  }
+
+  /**
+   * Reads the exact persisted metadata observation.
+   *
+   * @param spec - The spec whose metadata file to read
+   * @returns Present, missing, or invalid metadata snapshot
+   */
+  override async readMetadataSnapshot(spec: Spec): Promise<MetadataSnapshot> {
+    const filePath = this._metadataFilePath(spec.name)
+    const specId = `${this.workspace()}:${spec.name.toString()}`
+
+    let content: string
+    try {
+      content = await fs.readFile(filePath, 'utf8')
+    } catch (err) {
+      if (isEnoent(err)) return { kind: 'missing', revision: null }
+      throw err
+    }
+
+    const revision = sha256(content)
+    try {
+      const parsed = JSON.parse(content) as unknown
+      const result = specMetadataSchema.safeParse(parsed)
+      if (!result.success) {
+        const issues = result.error.issues.map((issue) => issue.message).join('; ')
+        return {
+          kind: 'invalid',
+          revision,
+          error: new SpecMetadataParseError(specId, issues),
+        }
+      }
+      return { kind: 'present', metadata: result.data as SpecMetadata, revision }
+    } catch (err) {
+      return {
+        kind: 'invalid',
+        revision,
+        error: new SpecMetadataParseError(specId, err instanceof Error ? err.message : String(err)),
+      }
+    }
+  }
+
+  /**
+   * Writes one complete metadata projection. Read-only workspaces still permit this write.
+   *
+   * @param spec - The spec whose metadata file to write
+   * @param metadata - Complete metadata projection to serialize
+   * @param options - Revision guard for optimistic concurrency
+   * @param options.expectedRevision - Required current metadata hash, or `null` to create
+   * @returns Written metadata snapshot including the new revision hash
+   */
+  override async writeMetadataSnapshot(
+    spec: Spec,
+    metadata: SpecMetadata,
+    options: { readonly expectedRevision: string | null },
+  ): Promise<MetadataSnapshot> {
+    const filePath = this._metadataFilePath(spec.name)
+    const current = await this.readMetadataSnapshot(spec)
+    const content = serializeMetadataSnapshot(metadata)
+
+    if (options.expectedRevision === null) {
+      if (current.kind !== 'missing') {
+        const currentContent =
+          current.kind === 'present'
+            ? serializeMetadataSnapshot(current.metadata)
+            : await fs.readFile(filePath, 'utf8').catch(() => '')
+        throw new ArtifactConflictError('metadata.json', content, currentContent)
+      }
+    } else if (current.revision !== options.expectedRevision) {
+      const currentContent =
+        current.kind === 'present'
+          ? serializeMetadataSnapshot(current.metadata)
+          : await fs.readFile(filePath, 'utf8').catch(() => '')
+      throw new ArtifactConflictError('metadata.json', content, currentContent)
+    }
+
+    const dir = path.dirname(filePath)
+    await fs.mkdir(dir, { recursive: true })
+    await writeFileAtomic(filePath, content)
+    await this._indexCache.refresh(spec)
+
+    return { kind: 'present', metadata, revision: sha256(content) }
   }
 
   /** @inheritdoc */
   override async specFingerprint(spec: Spec): Promise<string> {
-    const persistedStateHash = await this.persistedStateHash(spec)
+    const persistedStateHash =
+      (await this.persistedStateMeta(spec, { includeHash: true }))?.hash ?? null
     const sortedArtifacts = [...spec.artifacts].sort((a, b) => a.filename.localeCompare(b.filename))
     const artifactEntries: Array<{ filename: string; contentHash: string }> = []
     for (const entry of sortedArtifacts) {
@@ -651,69 +765,6 @@ export class FsSpecRepository extends SpecRepository {
       persistedStateHash: persistedStateHash ?? '__absent__',
     })
     return sha256(JSON.stringify(canonical))
-  }
-
-  /**
-   * Updates the persisted schema identity for the given spec.
-   *
-   * @param spec - The spec whose persisted schema to update
-   * @param schema - The new schema identity
-   * @param schema.name - The schema name
-   * @param schema.version - The schema version
-   * @param options - Update options
-   * @param options.force - Skip conflict detection when `true`
-   * @param options.originalHash - Expected hash of the persisted spec state
-   */
-  override async updatePersistedSchema(
-    spec: Spec,
-    schema: { name: string; version: number },
-    options?: { force?: boolean; originalHash?: string },
-  ): Promise<void> {
-    const data = (await this._readSpecLock(spec)) ?? this._emptySpecLock()
-    await this._saveSpecLock(spec, { ...data, schema }, options)
-  }
-
-  /**
-   * Updates the persisted dependencies for the given spec.
-   *
-   * @param spec - The spec whose persisted dependencies to update
-   * @param dependsOn - The new dependency list
-   * @param options - Update options
-   * @param options.force - Skip conflict detection when `true`
-   * @param options.originalHash - Expected hash of the persisted spec state
-   */
-  override async updatePersistedDependsOn(
-    spec: Spec,
-    dependsOn: readonly string[],
-    options?: { force?: boolean; originalHash?: string },
-  ): Promise<void> {
-    const data = (await this._readSpecLock(spec)) ?? this._emptySpecLock()
-    await this._saveSpecLock(spec, { ...data, dependsOn }, options)
-  }
-
-  /**
-   * Updates the persisted implementation links for the given spec.
-   *
-   * @param spec - The spec whose persisted implementation links to update
-   * @param implementation - The new implementation link list
-   * @param options - Update options
-   * @param options.force - Skip conflict detection when `true`
-   * @param options.originalHash - Expected hash of the persisted spec state
-   */
-  override async updatePersistedImplementation(
-    spec: Spec,
-    implementation: readonly { readonly file: string; readonly symbols?: readonly string[] }[],
-    options?: { force?: boolean; originalHash?: string },
-  ): Promise<void> {
-    const data = (await this._readSpecLock(spec)) ?? this._emptySpecLock()
-    await this._saveSpecLock(
-      spec,
-      {
-        ...data,
-        implementation: implementation as SpecLockImplementationEntry[],
-      },
-      options,
-    )
   }
 
   /**
@@ -735,105 +786,6 @@ export class FsSpecRepository extends SpecRepository {
     }
 
     return { ...parseSpecLock(content), originalHash: sha256(content) }
-  }
-
-  /**
-   * Persists `spec-lock.json` for the given spec.
-   *
-   * Supports optimistic conflict detection via `options.originalHash`.
-   *
-   * @param spec - The spec whose sidecar should be written
-   * @param content - Parsed sidecar payload to persist
-   * @param options - Save options
-   * @param options.force - Skip conflict detection when `true`
-   * @param options.originalHash - Expected hash of the persisted spec state
-   */
-  private async _saveSpecLock(
-    spec: Spec,
-    content: SpecLockData,
-    options?: { force?: boolean; originalHash?: string },
-  ): Promise<void> {
-    if (this.ownership() === 'readOnly') {
-      throw new ReadOnlyWorkspaceError(
-        `Cannot write to spec "${this.workspace()}:${spec.name.toString()}" — workspace "${this.workspace()}" is readOnly.`,
-      )
-    }
-
-    const filePath = this._specLockFilePath(spec.name)
-    const dir = path.dirname(filePath)
-    await fs.mkdir(dir, { recursive: true })
-
-    if (options?.originalHash !== undefined && options.force !== true) {
-      let currentContent: string
-      try {
-        currentContent = await fs.readFile(filePath, 'utf8')
-      } catch (err) {
-        if (isEnoent(err)) {
-          currentContent = ''
-        } else {
-          throw err
-        }
-      }
-
-      const currentHash = sha256(currentContent)
-      if (currentHash !== options.originalHash) {
-        throw new ArtifactConflictError(SPEC_LOCK_FILENAME, JSON.stringify(content), currentContent)
-      }
-    }
-
-    const { originalHash, ...persisted } = content
-    void originalHash
-    await writeFileAtomic(filePath, JSON.stringify(persisted, null, 2) + '\n')
-    await this._indexCache.refresh(spec)
-  }
-
-  /**
-   * Returns an empty spec lock data object.
-   *
-   * @returns An empty spec lock data object
-   */
-  private _emptySpecLock(): SpecLockData {
-    return {
-      schema: { name: 'unknown', version: 0 },
-      dependsOn: [],
-      implementation: [],
-    }
-  }
-
-  /**
-   * Classifies persisted metadata freshness for one spec.
-   *
-   * @param spec - The spec whose metadata is being evaluated
-   * @param metadata - Parsed metadata object
-   * @param persistedDependsOn - Persisted dependency state from semantic storage
-   * @returns `'fresh'` when hashes and projected dependencies match, otherwise `'stale'`
-   */
-  private async _classifyMetadataFreshness(
-    spec: Spec,
-    metadata: Record<string, unknown>,
-    persistedDependsOn: readonly string[] | null,
-  ): Promise<'fresh' | 'stale'> {
-    const freshness = await checkMetadataFreshness(
-      isStringRecord(metadata.contentHashes) ? metadata.contentHashes : undefined,
-      async (filename) => {
-        const artifact = await this.artifact(spec, filename)
-        return artifact?.content ?? null
-      },
-      sha256,
-    )
-
-    if (!freshness.allFresh) {
-      return 'stale'
-    }
-
-    if (
-      persistedDependsOn !== null &&
-      (!Array.isArray(metadata.dependsOn) || !sameStringSet(metadata.dependsOn, persistedDependsOn))
-    ) {
-      return 'stale'
-    }
-
-    return 'fresh'
   }
 
   /**
@@ -1233,34 +1185,48 @@ function allowedSpecArtifactFilenames(spec: Spec): ReadonlySet<string> {
 }
 
 /**
- * Checks whether a value is a string-to-string record.
+ * Serializes complete persisted state into canonical `spec-lock.json` bytes.
  *
- * @param value - Candidate record
- * @returns `true` when every enumerable value is a string
+ * @param state - Complete persisted state to serialize
+ * @returns Canonical JSON with trailing newline
  */
-function isStringRecord(value: unknown): value is Record<string, string> {
-  if (typeof value !== 'object' || value === null) {
-    return false
+function serializeSpecLock(state: PersistedSpecState): string {
+  const payload: Record<string, unknown> = {
+    schema: state.schema,
+    dependsOn: state.dependsOn,
+    implementation: state.implementation,
   }
-
-  return Object.values(value).every((entry) => typeof entry === 'string')
+  if (state.optimizations !== undefined) {
+    payload.optimizations = state.optimizations
+  }
+  return JSON.stringify(payload, null, 2) + '\n'
 }
 
 /**
- * Compares two dependency lists ignoring order.
+ * Serializes metadata into canonical `metadata.json` bytes.
  *
- * @param left - First list
- * @param right - Second list
- * @returns `true` when both lists contain the same entries
+ * @param metadata - Metadata projection to serialize
+ * @returns Canonical JSON with trailing newline
  */
-function sameStringSet(left: readonly string[], right: readonly string[]): boolean {
-  if (left.length !== right.length) {
-    return false
-  }
+function serializeMetadataSnapshot(metadata: SpecMetadata): string {
+  return JSON.stringify(metadata, null, 2) + '\n'
+}
 
-  const sortedLeft = [...left].sort()
-  const sortedRight = [...right].sort()
-  return sortedLeft.every((entry, index) => entry === sortedRight[index])
+/**
+ * Converts parsed lock data into a persisted-state snapshot.
+ *
+ * @param data - Parsed lock sidecar data
+ * @returns Persisted state snapshot including content hash
+ */
+function toPersistedStateSnapshot(data: SpecLockData): PersistedSpecStateSnapshot {
+  const { originalHash, schema, dependsOn, implementation, optimizations } = data
+  return {
+    schema,
+    dependsOn,
+    implementation,
+    ...(optimizations !== undefined ? { optimizations } : {}),
+    originalHash: originalHash!,
+  }
 }
 
 /**

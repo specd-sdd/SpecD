@@ -7,16 +7,23 @@
     "default:_global/architecture",
     "core:composition",
     "core:storage",
-    "core:spec-repository-port"
+    "core:spec-repository-port",
+    "core:spec-lock",
+    "core:spec-metadata",
+    "core:spec-optimization"
   ],
   "implementation": [
     {
       "file": "core:src/infrastructure/fs/spec-repository.ts",
-      "symbols": [
-        "FsSpecRepository,persistedStateHash,specFingerprint,_buildSpec",
-        "specFingerprint",
-        "persistedStateHash"
-      ]
+      "symbols": ["FsSpecRepository", "projectListMetaFromSourceFiles"]
+    },
+    {
+      "file": "core:src/infrastructure/fs/project-list-meta.ts",
+      "symbols": ["projectListMetaFromSourceFiles"]
+    },
+    {
+      "file": "core:src/infrastructure/fs/fs-spec-index-cache.ts",
+      "symbols": ["FsSpecIndexCache"]
     }
   ]
 }

@@ -9,16 +9,13 @@ Generates or updates `metadata.json` files in two steps:
 
 ## Architecture
 
-The deterministic path runs `specs generate-metadata --write` which:
+Metadata is a **self-healing cache** under `.specd/metadata/`. Normal reads through `specs metadata` materialize projections on demand — you do **not** run routine `generate-metadata` after edits.
 
-- Parses artifacts into ASTs via the schema's artifact parsers
-- Runs extractors declared in `metadataExtraction` (selectors, captures, groupBy, transforms)
-- Computes SHA-256 content hashes and resolves dependency paths
-- Writes `metadata.json` with `generatedBy: core`
+- **Persisted semantic state** (`spec-lock.json`) owns `dependsOn`, `implementation`, `optimizations`, and schema identity. Mutate it with `specs deps`, `specs implementation`, and `specs optimizations` — never by editing metadata files directly.
+- **Deterministic extraction** — `specs generate-metadata` rebuilds the metadata projection from artifacts and persisted state. Use it for forced rebuilds (`--all`), not day-to-day workflow.
+- **LLM optimization** — optimizer subagents write results through `specs optimizations set`, not `write-metadata`.
 
-Subagents **only optimize** — they read the generated metadata (not the raw spec files), clean up semantic fields, and return the full JSON as their result string. They **never write files**. The main orchestrator receives the JSON from each subagent and writes it via `specs write-metadata`.
-
-After optimization, the final written metadata must have `generatedBy: agent` (not `core`), since the LLM optimization step has enhanced it beyond pure deterministic extraction.
+Removed commands: `specs write-metadata`, `specs update-metadata`, `specs invalidate-metadata`, and `specs list --metadata-status`.
 
 ## Instructions
 
@@ -52,55 +49,32 @@ When this skill is invoked:
    ```
 
    Save the current `dependsOn` array (if any) for comparison after generation.
-   d. Run deterministic generation (without `--force`):
+   d. Force a rebuild only when the user explicitly requests regeneration:
 
    ```bash
-   specd specs generate-metadata <spec-id> --write
+   specd specs generate-metadata <spec-id>
    ```
 
    **Error handling:**
-   - If the schema has no `metadataExtraction` (command exits with error), fall back to the
-     legacy LLM extraction subagent (see "LLM subagent fallback" below).
-   - If the command fails for any other reason (e.g., validation error, missing artifacts,
-     metadata already fresh), report the error to the user and ask how to proceed. Do NOT
-     silently retry with `--force` — the user must decide.
-     e. **Reconcile `dependsOn`** — compare the newly generated `dependsOn` with the saved
-     existing ones (see "dependsOn preservation" below). If there are differences, ask the
-     user before proceeding.
-     f. Launch a single optimizer subagent (see "Subagent prompt" below) with `<spec-id>` substituted.
+   - If the schema has no `metadataExtraction`, fall back to the legacy LLM extraction subagent (see "LLM subagent fallback" below).
+   - If the command fails for any other reason, report the error and ask how to proceed.
+     e. Launch a single optimizer subagent (see "Subagent prompt" below) with `<spec-id>` substituted.
      Single-spec mode: the subagent runs the freshness + quality check and may return `FRESH`.
 
 3. **If all specs:**
 
-   a. Run:
-
-   ```bash
-   specd specs list --metadata-status stale,missing,invalid --format json
-   ```
-
-   b. Parse the JSON. For each workspace, collect the spec IDs.
-   If the result is empty (no stale, missing, or invalid specs), report that all metadata is fresh and stop.
-   c. **Capture existing `dependsOn` for each spec** before regeneration:
+   a. Ask the user which specs need optimization — do **not** scan `metadataStatus` (removed).
+   b. For each selected spec, read current materialized metadata:
 
    ```bash
    specd specs metadata <spec-id> --format json
    ```
 
-   Save each spec's current `dependsOn` array (if any).
-   d. Run deterministic generation for all stale/missing/invalid specs at once:
+   c. Force rebuild only when explicitly requested:
 
    ```bash
-   specd specs generate-metadata --all --write --status stale,missing,invalid
+   specd specs generate-metadata --all
    ```
-
-   The `--all` flag processes every matching spec in a single invocation. If any spec
-   fails, the command reports per-spec errors but continues with the rest. After it
-   completes, review the output for failures and report them to the user with error
-   details — ask how to proceed for each (skip, retry with `--force`, or abort).
-   e. **Reconcile `dependsOn` for each spec** — compare new vs existing. Collect all
-   discrepancies and present them to the user in a single summary before proceeding
-   to optimization (see "dependsOn preservation" below).
-   f. Launch optimizer subagents **in parallel batches** — up to 5 concurrent subagents at a time.
    Each subagent receives its own `<spec-id>`. Prepend `BATCH MODE:` to the prompt for batch specs.
    g. As each subagent completes, **write its result** (see "Writing results" below).
    h. After all subagents complete, report a summary.
@@ -126,9 +100,7 @@ When this skill is invoked:
      **Ask the user** before adding them:
      > `dependsOn` for `<spec-id>`: the extractor found new dependency `<dep>`. Add it?
    - **No changes**: Proceed silently.
-     d. After user confirmation, write the reconciled `dependsOn` back to the metadata file
-     before launching the optimizer subagent. Use `specs write-metadata` with a JSON string that has
-     the corrected `dependsOn`.
+     d. After user confirmation, update persisted dependencies with `specs deps` before launching the optimizer subagent.
      e. In **batch mode** (all specs), collect all discrepancies first, then present them to
      the user in a single grouped summary to avoid question fatigue.
 
@@ -158,22 +130,14 @@ When a subagent returns:
   `FORCE FULL REGEN: previous output failed quality gate.`
   If it fails again, treat it as `ERROR:` and continue.
 
-  If checks pass, write it:
+  If checks pass, persist optimized fields through persisted state:
 
 ```bash
-cat > /tmp/specd-metadata-<safe-name>.json << 'JSONEOF'
-<json content from subagent>
-JSONEOF
-specd specs write-metadata <spec-id> --input /tmp/specd-metadata-<safe-name>.json
+specd specs optimizations set <spec-id> --optimized-description "<text>" --optimized-context "<text>"
 specd specs metadata <spec-id> --format json
-rm /tmp/specd-metadata-<safe-name>.json
 ```
 
-Where `<safe-name>` is the spec ID with colons and slashes replaced by hyphens.
-If `write-metadata` fails, report the error to the user and ask how to proceed — do NOT
-silently retry with `--force`.
-After writing, `specs metadata` output must show non-empty `keywords` and non-empty `contentHashes`.
-If it does not, log `ERROR:` for that spec.
+Confirm materialized metadata reflects the fresh optimization values.
 
 ## Subagent prompt
 

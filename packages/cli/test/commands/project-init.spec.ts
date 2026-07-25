@@ -5,6 +5,7 @@ const mockInitProject = vi.fn().mockResolvedValue({
   configPath: '/project/specd.yaml',
   schemaRef: '@specd/schema-std',
   workspaces: ['default'],
+  metadataCachePath: '.specd/metadata',
 })
 
 vi.mock('@specd/sdk', async (importOriginal) => {
@@ -45,6 +46,7 @@ function setup() {
     configPath: '/project/specd.yaml',
     schemaRef: '@specd/schema-std',
     workspaces: ['default'],
+    metadataCachePath: '.specd/metadata',
   })
   vi.mocked(resolveCliContext).mockResolvedValue({
     config: makeMockConfig(),
@@ -195,6 +197,25 @@ describe('project init', () => {
       expect(parsed.configPath).toBe('/project/specd.yaml')
       expect(parsed.schema).toBe('@specd/schema-std')
       expect(parsed.workspaces).toEqual(['default'])
+      expect(parsed.metadataCachePath).toBe('.specd/metadata')
+    })
+
+    it('prints metadata cache line in text output', async () => {
+      const { stdout } = setup()
+
+      const program = makeProgram()
+      registerProjectInit(program)
+      await program.parseAsync([
+        'node',
+        'specd',
+        'init',
+        '--workspace',
+        'default',
+        '--workspace-path',
+        'specs/',
+      ])
+
+      expect(stdout()).toContain('metadata cache: .specd/metadata (ignored in .gitignore)')
     })
 
     it('exits 1 when specd.yaml exists and --force is not given', async () => {

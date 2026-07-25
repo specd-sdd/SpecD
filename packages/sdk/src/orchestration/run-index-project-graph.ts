@@ -1,6 +1,5 @@
 import {
   buildProjectGraphConfig,
-  createIndexProjectGraph,
   type CodeGraphProvider,
   type IndexProgressCallback,
   type IndexResult,
@@ -80,14 +79,13 @@ export async function runIndexProjectGraph(
   })
 
   const executeIndex = async (provider: CodeGraphProvider): Promise<RunIndexProjectGraphResult> => {
-    const indexProjectGraph = createIndexProjectGraph()
-    return indexProjectGraph.execute({
-      provider,
+    return provider.index({
       projectRoot,
       workspaces,
       graphConfig,
       codeGraphVersion,
       vcsRoot,
+      getSpecMetadata: ctx.kernel.specs.getMetadata,
       ...(input.force !== undefined ? { force: input.force } : {}),
       ...(vcsRef !== undefined ? { vcsRef } : {}),
       ...(input.onProgress !== undefined ? { onProgress: input.onProgress } : {}),

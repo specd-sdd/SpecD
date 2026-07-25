@@ -139,6 +139,14 @@ At minimum:
 - archive-oriented workflows MUST mention resolving tracked implementation files and reviewing implementation integrity before archive
 - shared workflow guidance MUST describe tracked implementation files and confirmed implementation links using the same terminology as the change artifacts
 
+### Requirement: Metadata self-healing guidance in workflow templates
+
+Archive-oriented, commit-oriented, and other metadata-oriented workflow skill templates MUST NOT instruct agents to scan for metadata-status values (`stale`, `missing`, `invalid`) or to run routine manual metadata regeneration as a normal workflow step. Templates MUST describe metadata as a self-healing materialized cache: normal consumers obtain a usable, current projection automatically, and `specd spec generate-metadata` MUST be presented only as an explicit forced-rebuild, cache-warming, repair, or diagnostic tool — never as a required step after a routine spec or lock change.
+
+### Requirement: Optimizer agent gating declared in templates
+
+The `specd-project-context-optimizer` and `specd-spec-context-optimizer` agent templates MUST declare that they perform no optimization work — no generation, no persistence — unless the effective `llmOptimizedContext` project setting is `true`. Both templates MUST direct persistence through the lock-owned persisted-optimization commands (`cli:spec-optimizations`), and neither template MUST instruct invoking spec metadata generation after persisting an optimization.
+
 ## Constraints
 
 - Templates in the skills package MUST NOT contain static frontmatter YAML blocks.
@@ -156,3 +164,4 @@ At minimum:
 ## Spec Dependencies
 
 - [`skills:skill`](../skill/spec.md) — base skill type
+- [`cli:spec-optimizations`](../../cli/spec-optimizations/spec.md) — the command optimizer-agent templates must direct persistence through

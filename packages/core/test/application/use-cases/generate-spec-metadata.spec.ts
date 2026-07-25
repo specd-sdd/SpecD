@@ -437,7 +437,7 @@ describe('GenerateSpecMetadata', () => {
     )
 
     await expect(useCase.execute({ specId: 'default:auth/login' })).rejects.toThrow(
-      "Generated metadata for 'default:auth/login' found extracted dependencies [default:auth/shared] that do not match persisted dependencies [default:auth/other].",
+      'dependsOn would change (removed: default:auth/other; added: default:auth/shared)',
     )
   })
 
@@ -510,6 +510,7 @@ describe('GenerateSpecMetadata', () => {
     const result = await useCase.execute({ specId: 'default:auth/login' })
     expect(result.hasExtraction).toBe(true)
     expect(result.metadata.dependsOn).toEqual(['default:auth/shared'])
+    expect(result.sourceState).toEqual(result.metadata.provenance)
   })
 
   it('fails extraction when resolveSpecPath cannot resolve any candidate', async () => {
@@ -578,5 +579,47 @@ describe('GenerateSpecMetadata', () => {
     )
 
     await expect(useCase.execute({ specId: 'default:auth/login' })).rejects.toThrow()
+  })
+
+  it('includes only fresh lock-owned optimizations in metadata projection', async () => {
+    const schema = makeSchema()
+    const content = '# Auth Login\n'
+    const spec = makeSpec({
+      workspace: 'default',
+      name: 'auth/login',
+      filenames: ['spec.md', 'spec-lock.json'],
+    })
+    const repo = makeSpecRepository({
+      specs: [spec],
+      artifacts: {
+        'auth/login/spec.md': content,
+        'auth/login/spec-lock.json': JSON.stringify({
+          schema: { name: 'specd-std', version: 1 },
+          dependsOn: [],
+          implementation: [],
+          optimizations: {
+            optimizedDescription: {
+              value: 'Fresh optimized description',
+              artifactState: {
+                'spec.md': { hash: 'sha256:placeholder', lastModified: '2020-01-01T00:00:00.000Z' },
+              },
+              schema: { name: 'specd-std', version: 1 },
+            },
+          },
+        }),
+      },
+    })
+
+    const useCase = new GenerateSpecMetadata(
+      makeListWorkspaces(new Map([['default', repo]])),
+      makeSchemaProvider(schema),
+      makeParsers(),
+      makeContentHasher(),
+      createBuiltinExtractorTransforms(),
+    )
+
+    const result = await useCase.execute({ specId: 'default:auth/login' })
+    expect(result.metadata.optimizedDescription).toBeUndefined()
+    expect(result.sourceState.persistedStateHash).not.toBeNull()
   })
 })

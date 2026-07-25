@@ -2,98 +2,13 @@
 
 ## Purpose
 
-Writing metadata to disk without validation risks corrupting the spec's machine-readable summary, and silently overwriting curated `dependsOn` entries can discard human-verified dependency decisions. `SaveSpecMetadata` guards against both: it validates incoming JSON content against the strict schema, protects curated `dependsOn` from silent overwrite, delegates conflict detection to the repository layer, and persists the metadata via `SpecRepository.saveMetadata()`. It is invoked by `ArchiveChange` during deterministic metadata generation and may also be called directly by tooling (e.g. the LLM refining metadata).
+**Removed.** `SaveSpecMetadata` validated and persisted arbitrary caller-supplied metadata JSON, including agent-authored optimized fields. Its guarded-persistence responsibility (validate a complete generated projection, then conditionally write) moves to `PersistSpecMetadata`, an internal collaborator used only by `MaterializeSpecMetadata`. Unlike `SaveSpecMetadata`, `PersistSpecMetadata` accepts only a complete generated projection plus an observed revision — it is not a general-purpose metadata-editing operation and is never exposed on Kernel, Core public exports, SDK, CLI, or MCP.
 
 ## Requirements
 
-### Requirement: Input contract
+### Requirement: SaveSpecMetadata is removed
 
-`SaveSpecMetadata.execute()` accepts a `SaveSpecMetadataInput` with the following fields:
-
-- `workspace` (string, required) — the workspace name (e.g. `'default'`, `'billing'`)
-- `specPath` (SpecPath, required) — the spec path within the workspace (e.g. `'auth/oauth'`)
-- `content` (string, required) — raw JSON string to write as metadata
-- `force` (boolean, optional) — when `true`, skip conflict detection and `dependsOn` overwrite protection
-
-### Requirement: Output contract
-
-On success, `execute()` SHALL return a `SaveSpecMetadataResult` containing:
-
-- `spec` (string) — the qualified spec label in the form `workspace:specName` (e.g. `'default:auth/oauth'`)
-
-### Requirement: Content validation before write
-
-Before writing, the use case parses the input `content` string with `JSON.parse()`. If parsing fails or the result is not an object, a `MetadataValidationError` is thrown with `content must be a JSON object`. The parsed object is validated against `strictSpecMetadataSchema`. If validation fails, a `MetadataValidationError` is thrown listing the Zod issues. This validation uses the strict schema — the read path (`metadata()`) uses the lenient schema.
-
-### Requirement: Workspace resolution
-
-The use case MUST resolve the workspace from the injected `specRepos` map. If the workspace name does not match any entry in the map, the use case SHALL throw `WorkspaceNotFoundError`.
-
-### Requirement: Spec existence check
-
-After resolving the workspace, the use case MUST look up the spec via `SpecRepository.get(specPath)`. If the spec does not exist (returns `null`), the use case SHALL throw `SpecNotFoundError` with the qualified spec identifier (`workspace:specPath`).
-
-### Requirement: Conflict detection via originalHash
-
-When `force` is not set, the use case MUST load the existing metadata (if any) via `SpecRepository.metadata()` and capture its `originalHash`. This hash is passed to `SpecRepository.saveMetadata()` so that the repository layer can detect concurrent modifications. When `force` is set, this step is skipped entirely — no existing metadata is loaded.
-
-If `SpecRepository.metadata()` returns persisted metadata with `freshness: 'stale'`, `SaveSpecMetadata` MUST still use its `originalHash` for optimistic concurrency. Staleness does not make the persisted file unreadable for this use case because the purpose of the read is to protect the existing serialized snapshot on disk, not to reconstruct canonical metadata.
-
-### Requirement: dependsOn overwrite protection
-
-When `force` is not set and existing metadata exists on disk, the use case MUST check whether the incoming content would change the `dependsOn` array:
-
-1. Parse the existing metadata content (loaded via `SpecRepository.metadata()` in the conflict detection step) and validate it against `specMetadataSchema` (the lenient schema)
-2. Extract the `dependsOn` arrays from both existing and incoming metadata
-3. Compare the two arrays using `DependsOnOverwriteError.areSame()`, which performs order-independent comparison
-4. If the existing metadata has a non-empty `dependsOn` and the incoming `dependsOn` differs, throw `DependsOnOverwriteError`
-5. If the existing metadata has no `dependsOn` (absent or empty), any incoming `dependsOn` is allowed
-
-If the existing metadata file is stale, `SaveSpecMetadata` still performs this comparison against the persisted `dependsOn` value currently on disk. The overwrite check protects against silently discarding that persisted snapshot; it does not attempt deterministic metadata regeneration.
-
-When `force` is set, this check MUST be skipped entirely.
-
-### Requirement: Sidecar ownership boundary
-
-`SaveSpecMetadata` MUST persist `metadata.json` only. It MUST NOT create, modify, or delete `spec-lock.json`.
-
-For persisted specs whose durable dependency state is owned by `spec-lock.json`:
-
-- `SaveSpecMetadata` MAY still write `metadata.json.dependsOn` when the caller provides valid content.
-- `SaveSpecMetadata` does not decide whether `metadata.json.dependsOn` is authoritative for archive-time persistence.
-- Archive-time consistency between metadata and sidecar is enforced by `ArchiveChange`, not by `SaveSpecMetadata`.
-
-This keeps metadata writes focused on validation and optimistic concurrency while leaving durable dependency authority to the archive pipeline.
-
-### Requirement: Artifact persistence
-
-After all validations pass, the use case MUST delegate to `SpecRepository.saveMetadata()` with the raw JSON content, the `originalHash` (if captured), and `{ force: true }` when `force` is set, or with an empty options object otherwise.
-
-### Requirement: Constructor dependencies
-
-The use case receives:
-
-- `specRepos: ReadonlyMap<string, SpecRepository>` — workspace-keyed spec repositories
-
-The `YamlSerializer` dependency is no longer needed — metadata content is JSON, parsed with `JSON.parse()`.
-
-### Requirement: Config-based factory delegates through resolveSaveSpecMetadataDeps
-
-The config-based `createSaveSpecMetadata(config, options?)` form MUST derive `SaveSpecMetadataDeps` through `resolveSaveSpecMetadataDeps(resolver)` and then delegate to canonical `createSaveSpecMetadata(deps)`.
-
-`resolveSaveSpecMetadataDeps(resolver)` MUST resolve:
-
-- `specRepos: ReadonlyMap<string, SpecRepository>`
-
-The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
-
-## Constraints
-
-- Content validation uses `strictSpecMetadataSchema` (write-time), not the lenient `specMetadataSchema` (read-time) — this ensures metadata on disk always meets the strict schema requirements
-- The existing metadata is parsed with `specMetadataSchema` (lenient) for the `dependsOn` check, because on-disk metadata may predate strict schema requirements
-- The use case does not handle `ArtifactConflictError` — it propagates from the repository layer to the caller
-- Validation order is: content schema validation, workspace resolution, spec existence, conflict detection / `dependsOn` check, then persist
-- Metadata is persisted via `SpecRepository.saveMetadata()`, not via the generic `save()` method
+`SaveSpecMetadata` MUST NOT be exported from `@specd/core`, MUST NOT be mounted on `Kernel`, and MUST NOT have a public `createSaveSpecMetadata` composition factory. Arbitrary metadata persistence is no longer an application operation reachable by any host. The only remaining metadata writer is the internal `PersistSpecMetadata` collaborator invoked by `MaterializeSpecMetadata`, which accepts a complete generated projection and observed `revision` — never a caller-supplied partial or arbitrary JSON payload.
 
 ## Spec Dependencies
 

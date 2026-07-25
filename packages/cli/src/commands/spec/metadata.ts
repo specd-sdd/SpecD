@@ -1,11 +1,69 @@
 import { type Command } from 'commander'
-import { SpecPath, checkMetadataFreshness, NodeContentHasher } from '@specd/sdk'
-
-const hasher = new NodeContentHasher()
+import { type SpecMetadata } from '@specd/sdk'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
-import { handleError, cliError } from '../../handle-error.js'
+import { handleError } from '../../handle-error.js'
 import { parseSpecId } from '../../helpers/spec-path.js'
+
+/**
+ * Formats metadata as structured text for terminal output.
+ *
+ * @param specId - Canonical spec identifier
+ * @param metadata - Materialized metadata payload
+ * @param source - Metadata source from materialization
+ * @param regenerated - Whether metadata was regenerated in this call
+ * @param metadataFingerprint - Metadata fingerprint hash
+ * @param warnings - Materialization warnings
+ * @returns Structured text output
+ */
+function formatMetadataText(
+  specId: string,
+  metadata: SpecMetadata,
+  source: 'persisted' | 'generated',
+  regenerated: boolean,
+  metadataFingerprint: string,
+  warnings: ReadonlyArray<{ kind: string; specId: string; error: string }>,
+): string {
+  const lines: string[] = [
+    `spec: ${specId}`,
+    `source: ${source}`,
+    `regenerated: ${regenerated}`,
+    `metadataFingerprint: ${metadataFingerprint}`,
+  ]
+
+  if (metadata.title !== undefined && metadata.title !== '') {
+    lines.push(`title: ${metadata.title}`)
+  }
+  if (metadata.description !== undefined && metadata.description !== '') {
+    lines.push(`description: ${metadata.description}`)
+  }
+  if (metadata.generatedBy !== undefined) {
+    lines.push(`generatedBy: ${metadata.generatedBy}`)
+  }
+
+  const rules = metadata.rules ?? []
+  const constraints = metadata.constraints ?? []
+  const scenarios = metadata.scenarios ?? []
+  if (rules.length > 0) lines.push(`rules: ${rules.length}`)
+  if (constraints.length > 0) lines.push(`constraints: ${constraints.length}`)
+  if (scenarios.length > 0) lines.push(`scenarios: ${scenarios.length}`)
+
+  if (metadata.dependsOn !== undefined && metadata.dependsOn.length > 0) {
+    lines.push('dependsOn:')
+    for (const dep of metadata.dependsOn) {
+      lines.push(`  - ${dep}`)
+    }
+  }
+
+  if (warnings.length > 0) {
+    lines.push('warnings:')
+    for (const warning of warnings) {
+      lines.push(`  ${warning.kind}: ${warning.error}`)
+    }
+  }
+
+  return lines.join('\n')
+}
 
 /**
  * Registers the `spec metadata` subcommand on the given parent command.
@@ -17,7 +75,7 @@ export function registerSpecMetadata(parent: Command): void {
     .command('metadata <specPath>')
     .allowExcessArguments(false)
     .description(
-      'Display the parsed metadata for a spec, including extracted fields, content hashes, and freshness status.',
+      'Display self-healed metadata for a spec, including source and regeneration diagnostics.',
     )
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
@@ -27,115 +85,45 @@ export function registerSpecMetadata(parent: Command): void {
 JSON/TOON output schema:
   {
     spec: string
-    fresh: boolean
-    title?: string
-    description?: string
-    generatedBy?: 'core' | 'agent'
-    contentHashes: Array<{ filename: string, recorded: string, current: string, fresh: boolean }>
-    dependsOn?: string[]
-    keywords?: string[]
-    context?: string[]
-    rules: Array<{ requirement: string, rules: string[] }>
-    constraints: string[]
-    scenarios: Array<{ requirement: string, name: string, given?: string[], when?: string[], then?: string[] }>
+    source: "persisted" | "generated"
+    regenerated: boolean
+    metadataFingerprint: string
+    warnings: Array<{ kind, specId, error }>
+    metadata: object
   }
 `,
     )
     .action(async (specPath: string, opts: { format: string; config?: string }) => {
       try {
         const { config, kernel } = await resolveCliContext({ configPath: opts.config })
-        const parsed = parseSpecId(specPath, config)
-
-        const repo = kernel.specs.repos.get(parsed.workspace)
-        if (repo === undefined) {
-          cliError(`workspace '${parsed.workspace}' not found`, opts.format)
-        }
-
-        const specPathObj = SpecPath.parse(parsed.capabilityPath)
-        const spec = await repo.get(specPathObj)
-        if (spec === null) {
-          cliError(`spec '${specPath}' not found`, opts.format)
-        }
-
-        const metadata = await repo.metadata(spec)
-        if (metadata === null) {
-          cliError(`no metadata for spec '${specPath}'`, opts.format)
-        }
-
-        const specLabel = `${parsed.workspace}:${parsed.capabilityPath}`
-
-        // Compute freshness for each content hash
-        const freshnessResult = await checkMetadataFreshness(
-          metadata.contentHashes,
-          async (filename) => {
-            const artifact = await repo.artifact(spec, filename)
-            return artifact?.content ?? null
-          },
-          (c) => hasher.hash(c),
-        )
-        const hashEntries = freshnessResult.entries
-        const allFresh = freshnessResult.allFresh
-
-        const effectiveRules = metadata.rules ?? []
-        const effectiveConstraints = metadata.constraints ?? []
-        const effectiveScenarios = metadata.scenarios ?? []
-
+        const specId = parseSpecId(specPath, config).specId
+        const result = await kernel.specs.getMetadata.execute({ specId })
         const fmt = parseFormat(opts.format)
+
         if (fmt === 'text') {
-          const lines: string[] = [`spec: ${specLabel}`]
-
-          lines.push('')
-
-          if (metadata.title !== undefined) lines.push(`title:       ${metadata.title}`)
-          if (metadata.description !== undefined) lines.push(`description: ${metadata.description}`)
-          if (metadata.generatedBy !== undefined) lines.push(`generatedBy: ${metadata.generatedBy}`)
-          if (
-            metadata.title !== undefined ||
-            metadata.description !== undefined ||
-            metadata.generatedBy !== undefined
+          output(
+            formatMetadataText(
+              specId,
+              result.metadata,
+              result.source,
+              result.regenerated,
+              result.metadataFingerprint,
+              result.warnings,
+            ),
+            'text',
           )
-            lines.push('')
-
-          if (hashEntries.length > 0) {
-            lines.push('content hashes:')
-            for (const h of hashEntries) {
-              lines.push(`  ${h.filename}  ${h.fresh ? 'fresh' : 'STALE'}`)
-            }
-            lines.push('')
-          }
-
-          if (metadata.dependsOn !== undefined && metadata.dependsOn.length > 0) {
-            lines.push('dependsOn:')
-            for (const dep of metadata.dependsOn) {
-              lines.push(`  ${dep}`)
-            }
-            lines.push('')
-          }
-
-          const counts: string[] = []
-          if (effectiveRules.length > 0) counts.push(`rules:       ${effectiveRules.length}`)
-          if (effectiveConstraints.length > 0)
-            counts.push(`constraints: ${effectiveConstraints.length}`)
-          if (effectiveScenarios.length > 0)
-            counts.push(`scenarios:   ${effectiveScenarios.length}`)
-          if (counts.length > 0) lines.push(...counts)
-
-          output(lines.join('\n'), 'text')
         } else {
-          const jsonObj: Record<string, unknown> = {
-            spec: specLabel,
-            fresh: allFresh,
-          }
-          if (metadata.title !== undefined) jsonObj.title = metadata.title
-          if (metadata.description !== undefined) jsonObj.description = metadata.description
-          if (metadata.generatedBy !== undefined) jsonObj.generatedBy = metadata.generatedBy
-          jsonObj.contentHashes = hashEntries
-          if (metadata.dependsOn !== undefined) jsonObj.dependsOn = metadata.dependsOn
-          if (metadata.keywords !== undefined) jsonObj.keywords = metadata.keywords
-          jsonObj.rules = effectiveRules
-          jsonObj.constraints = effectiveConstraints
-          jsonObj.scenarios = effectiveScenarios
-          output(jsonObj, fmt)
+          output(
+            {
+              spec: specId,
+              source: result.source,
+              regenerated: result.regenerated,
+              metadataFingerprint: result.metadataFingerprint,
+              warnings: result.warnings,
+              metadata: result.metadata,
+            },
+            fmt,
+          )
         }
       } catch (err) {
         handleError(err, opts.format)

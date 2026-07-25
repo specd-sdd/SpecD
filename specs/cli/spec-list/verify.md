@@ -70,8 +70,8 @@
 
 #### Scenario: Include flags forwarded only when present
 
-- **WHEN** `specd spec list --summary --metadata-status --format json` is run
-- **THEN** `ListSpecs.execute` is called with `includeSummary: true` and `includeMetadataStatus: true`
+- **WHEN** `specd spec list --summary --format json` is run
+- **THEN** `ListSpecs.execute` is called with `includeSummary: true`
 
 #### Scenario: CLI does not re-sort or paginate after the use case returns
 
@@ -132,63 +132,6 @@
 - **WHEN** `specd spec list` is run without `--summary`
 - **THEN** the row for `default:auth/login` does not include any summary text
 
-### Requirement: Status resolution
-
-#### Scenario: Status fresh when all hashes match
-
-- **GIVEN** `default:auth/login` has `.specd-metadata.yaml` with `contentHashes` whose SHA-256 values match the current `spec.md` and `verify.md` files
-- **WHEN** `specd spec list --metadata-status` is run
-- **THEN** the row for `default:auth/login` shows `fresh` as its status
-
-#### Scenario: Status stale when hash differs
-
-- **GIVEN** `default:auth/login` has `.specd-metadata.yaml` with a `contentHashes` entry for `spec.md` whose recorded hash does not match the current file content
-- **WHEN** `specd spec list --metadata-status` is run
-- **THEN** the row for `default:auth/login` shows `stale` as its status
-
-#### Scenario: Status missing when no metadata file
-
-- **GIVEN** `default:auth/login` has no `.specd-metadata.yaml` file
-- **WHEN** `specd spec list --metadata-status` is run
-- **THEN** the row for `default:auth/login` shows `missing` as its status
-
-#### Scenario: Status stale when contentHashes absent
-
-- **GIVEN** `default:auth/login` has `.specd-metadata.yaml` but no `contentHashes` field
-- **WHEN** `specd spec list --metadata-status` is run
-- **THEN** the row for `default:auth/login` shows `stale` as its status
-
-#### Scenario: Status invalid when metadata fails structural validation
-
-- **GIVEN** `default:auth/login` has `.specd-metadata.yaml` with `keywords: [123]` (invalid type per strict schema)
-- **WHEN** `specd spec list --metadata-status` is run
-- **THEN** the row for `default:auth/login` shows `invalid` as its status
-
-#### Scenario: Status not shown without flag
-
-- **GIVEN** `default:auth/login` has `.specd-metadata.yaml`
-- **WHEN** `specd spec list` is run without `--metadata-status`
-- **THEN** the row for `default:auth/login` does not include any status text
-
-#### Scenario: Filter by single status
-
-- **GIVEN** the project has three specs: one `fresh`, one `stale`, one `missing`
-- **WHEN** `specd spec list --metadata-status stale` is run
-- **THEN** only the spec with `stale` status is shown
-
-#### Scenario: Filter by multiple statuses
-
-- **GIVEN** the project has three specs: one `fresh`, one `stale`, one `missing`
-- **WHEN** `specd spec list --metadata-status stale,missing` is run
-- **THEN** the `stale` and `missing` specs are shown
-- **AND** the `fresh` spec is not shown
-
-#### Scenario: JSON output with status
-
-- **GIVEN** workspace `default` has spec `auth/login` with `fresh` metadata
-- **WHEN** `specd spec list --metadata-status --format json` is run
-- **THEN** the entry for `default:auth/login` has `"metadataStatus": "fresh"`
-
 ### Requirement: Output format
 
 #### Scenario: Specs listed per workspace with title
@@ -235,6 +178,12 @@
 - **GIVEN** `ListSpecs.execute` returns `default:a/spec` before `default:m/spec`
 - **WHEN** `specd spec list --workspace default` is run
 - **THEN** `default:a/spec` appears before `default:m/spec` in stdout
+
+#### Scenario: No metadataStatus field or column present
+
+- **WHEN** `specd spec list --format json` is run
+- **THEN** no entry includes a `metadataStatus` field
+- **AND** in text mode, no `METADATA STATUS` column header is printed
 
 ### Requirement: Empty output
 

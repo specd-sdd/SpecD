@@ -27,13 +27,23 @@ export function makeMockSpecRepository(
     list: async () => makeListResult(specs),
     count: async () => specs.length,
     get: async (specPath: SpecPath) => byPath.get(specPath.toFsPath('/')) ?? null,
-    persistedStateHash: async () => 'sha256:test',
+    persistedStateMeta: async (_spec: Spec, options?: { readonly includeHash?: boolean }) =>
+      options?.includeHash === true
+        ? { lastModified: new Date().toISOString(), hash: 'sha256:test' }
+        : { lastModified: new Date().toISOString() },
+    generatedMetadataMeta: async () => null,
     metadata: async (s: Spec) => {
       const meta = metadataMap.get(s.name.toString())
       return meta ?? { title: s.name.toString() }
     },
-    readPersistedDependsOn: async () => [],
-    readPersistedImplementation: async () => [],
+    readMetadataSnapshot: async (s: Spec) => {
+      const meta = metadataMap.get(s.name.toString())
+      if (meta === undefined) {
+        return { kind: 'missing' as const, revision: null }
+      }
+      return { kind: 'present' as const, metadata: meta as never, revision: 'sha256:test' }
+    },
+    readPersistedState: async () => null,
     artifact: async () => ({ content: '# Spec Content' }),
   } as unknown as SpecRepository
 }

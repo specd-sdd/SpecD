@@ -1,0 +1,22 @@
+# verify.md delta paired with project-metadata/spec.md.delta.yaml — updates
+# input-tracking coverage from raw metadata hashes to the semantic
+# metadataFingerprint produced by MaterializeSpecMetadata, and covers that the
+# fingerprint is storage-adapter-independent.
+
+- op: modified
+  description: Track semantic metadataFingerprint values instead of raw metadata hashes, and cover storage-adapter independence.
+  selector:
+    type: section
+    matches: 'Requirement: Input tracking'
+  content: |
+    #### Scenario: Tracks all dependencies
+
+    - **WHEN** freshness hashes are computed
+    - **THEN** they include `specd.yaml`, all context files, and the materialized `metadataFingerprint` of all resolved project context specs
+
+    #### Scenario: Per-spec fingerprint is semantic, not a raw cache hash or storage revision
+
+    - **GIVEN** a spec's metadata-cache file bytes or repository storage revision changes without any change to its semantically meaningful metadata content
+    - **WHEN** its `metadataFingerprint` is recorded in `freshness`
+    - **THEN** the fingerprint value does not change
+    - **AND** freshness comparisons remain storage-adapter-independent

@@ -1,0 +1,49 @@
+- op: modified
+  description: Drop the --metadata-status forwarding scenario now that the flag no longer exists.
+  selector:
+    type: section
+    matches: '^Requirement: List options forwarding$'
+  content: |
+    #### Scenario: Pagination flags forwarded to ListSpecs
+
+    - **WHEN** `specd spec list --limit 25 --page 2 --format json` is run
+    - **THEN** `ListSpecs.execute` is called with `limit` 25 and `page` 2
+
+    #### Scenario: Keyset cursor uses path only
+
+    - **WHEN** `specd spec list --after-key default:auth/login --format json` is run
+    - **THEN** `ListSpecs.execute` is called with `after.key` equal to `default:auth/login`
+    - **AND** no `after.id` field is set
+
+    #### Scenario: Include flags forwarded only when present
+
+    - **WHEN** `specd spec list --summary --format json` is run
+    - **THEN** `ListSpecs.execute` is called with `includeSummary: true`
+
+    #### Scenario: CLI does not re-sort or paginate after the use case returns
+
+    - **GIVEN** `ListSpecs.execute` returns specs in capability path ascending order for a workspace
+    - **WHEN** `specd spec list --workspace default` is run
+    - **THEN** stdout rows appear in the same order as returned by the use case
+
+- op: removed
+  description: Remove the status-resolution scenarios — metadata freshness is no longer a public CLI-facing status.
+  selector:
+    type: section
+    matches: '^Requirement: Status resolution$'
+
+- op: added
+  description: Verify the METADATA STATUS column and metadataStatus field are gone from rendered output.
+  position:
+    parent:
+      type: section
+      matches: '^Requirement: Output format$'
+    after:
+      type: section
+      matches: '^Scenario: CLI preserves repository order within workspace$'
+  content: |
+    #### Scenario: No metadataStatus field or column present
+
+    - **WHEN** `specd spec list --format json` is run
+    - **THEN** no entry includes a `metadataStatus` field
+    - **AND** in text mode, no `METADATA STATUS` column header is printed

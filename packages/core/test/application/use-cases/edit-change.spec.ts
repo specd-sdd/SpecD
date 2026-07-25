@@ -127,9 +127,10 @@ describe('EditChange', () => {
             ],
             artifacts: {
               'auth/logout/spec.md': '# Logout flow',
-              'auth/logout/metadata.json': JSON.stringify({
+              'auth/logout/spec-lock.json': JSON.stringify({
+                schema: { name: 'specd-std', version: 1 },
                 dependsOn: ['default:shared/metadata'],
-                contentHashes: { 'spec.md': 'sha256:' + 'a'.repeat(64) },
+                implementation: [],
               }),
             },
           }),

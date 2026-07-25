@@ -1,0 +1,53 @@
+- op: modified
+  description: Replace the contentHashes-removal scenarios with removal assertions now that InvalidateSpecMetadata no longer exists.
+  selector:
+    type: section
+    matches: '^Requirement: Removes contentHashes$'
+  rename: 'Requirement: InvalidateSpecMetadata is removed'
+  content: |
+    #### Scenario: InvalidateSpecMetadata is not exported
+
+    - **WHEN** `@specd/core` public exports are inspected
+    - **THEN** `InvalidateSpecMetadata` and `createInvalidateSpecMetadata` are not present
+
+    #### Scenario: Kernel does not mount InvalidateSpecMetadata
+
+    - **WHEN** `createKernel(config)` is called
+    - **THEN** the returned kernel has no `invalidateSpecMetadata` entry under `kernel.specs`
+
+    #### Scenario: Guaranteed rebuilds use RegenerateSpecMetadata instead
+
+    - **GIVEN** a caller needs a guaranteed metadata rebuild
+    - **WHEN** the caller looks for a supported path
+    - **THEN** it uses `RegenerateSpecMetadata` with a forced policy
+    - **AND** it does not call `InvalidateSpecMetadata`
+
+- op: removed
+  description: Remove the field-preservation scenario.
+  selector:
+    type: section
+    matches: '^Requirement: Preserves other fields$'
+
+- op: removed
+  description: Remove the unknown-workspace/spec error scenarios.
+  selector:
+    type: section
+    matches: '^Requirement: Error on unknown workspace or spec$'
+
+- op: removed
+  description: Remove the no-op return scenarios.
+  selector:
+    type: section
+    matches: '^Requirement: Returns null when not applicable$'
+
+- op: removed
+  description: Remove the no-strict-validation scenario.
+  selector:
+    type: section
+    matches: '^Requirement: No strict validation on write$'
+
+- op: removed
+  description: Remove the obsolete config-based factory contract scenario.
+  selector:
+    type: section
+    matches: '^Requirement: Config-based factory delegates through resolveInvalidateSpecMetadataDeps$'

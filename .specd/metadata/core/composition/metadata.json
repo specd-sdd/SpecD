@@ -6,7 +6,8 @@
     "core:resolve-schema",
     "core:config-writer-port",
     "core:kernel-builder",
-    "core:composition-resolver"
+    "core:composition-resolver",
+    "core:materialize-spec-metadata"
   ],
   "context": [
     "Delivery mechanisms must not know how ports, adapters, and use cases are wired together, yet something needs to assemble these pieces. The `composition/` layer in `@specd/core` serves this role as the only layer permitted to import from `infrastructure/`, exposing use-case factories, config I/O factories (`createDefaultConfigLoader`, `createConfigWriter`), a kernel that builds domain use cases from a resolved config object, and ports for config read/write. CLI, MCP, and plugin adapters interact exclusively with this layer."
@@ -124,6 +125,12 @@
       "requirement": "Kernel-mounted use case surface",
       "rules": [
         "The `\".\"` public barrel MUST export the `Kernel` interface and, for every use case instance mounted on `kernel.changes`, `kernel.specs`, or `kernel.project`:\n\n- the use-case type\n- all public `*Input` and `*Result` types needed to call `execute()`\n- the public `createX` factory function(s) from `composition/use-cases/` that construct that use case without `createKernel`\n\nThe `\".\"` barrel MUST export port **types** referenced on `Kernel` (`ChangeRepository`, `SpecRepository`, `SchemaRegistry`) for typing. Port implementations MUST NOT be exported from `\".\"`."
+      ]
+    },
+    {
+      "requirement": "Metadata materialization and persisted-state factories replace obsolete metadata mutation factories",
+      "rules": [
+        "The composition layer MUST provide the standard `*Deps` interface, `resolve*Deps(resolver)` helper, and overloaded `createX(deps)` / `createX(config, options?)` factory pair for every public use case introduced by spec-lock optimization persistence and self-healing metadata materialization, including at minimum: `MaterializeSpecMetadata`, `GetSpecMetadata`, `RegenerateSpecMetadata`, `InitializePersistedSpecState`, `GetPersistedSpecSchema`, `UpdatePersistedSpecSchema`, `GetPersistedSpecDeps`, `UpdatePersistedSpecDeps`, `GetPersistedSpecImplementation`, `UpdatePersistedSpecImplementation`, `GetPersistedSpecOptimizations`, and `UpdatePersistedSpecOptimizations`.\n\nThe composition layer MUST NOT export `createSaveSpecMetadata`, `createUpdateSpecMetadata`, or `createInvalidateSpecMetadata`, and MUST NOT export the corresponding `SaveSpecMetadata`, `UpdateSpecMetadata`, or `InvalidateSpecMetadata` use-case types from the `\".\"` public barrel. Those use cases are removed; metadata has no external editor after this change.\n\n`PersistSpecMetadata` is an internal collaborator of `MaterializeSpecMetadata` only. It MUST NOT have a public `createPersistSpecMetadata` factory, MUST NOT be kernel-mounted, and MUST NOT appear on the `\".\"`, `\"./ports\"`, or `\"./extensions\"` public entry points."
       ]
     },
     {
@@ -482,6 +489,33 @@
       "then": ["a GetStatusResult is returned without calling createKernel"]
     },
     {
+      "requirement": "Metadata materialization and persisted-state factories replace obsolete metadata mutation factories",
+      "name": "Standard factory pattern for metadata materialization and persisted-state use cases",
+      "when": ["the public composition exports are inspected"],
+      "then": [
+        "MaterializeSpecMetadata, GetSpecMetadata, RegenerateSpecMetadata, InitializePersistedSpecState, GetPersistedSpecSchema, UpdatePersistedSpecSchema, GetPersistedSpecDeps, UpdatePersistedSpecDeps, GetPersistedSpecImplementation, UpdatePersistedSpecImplementation, GetPersistedSpecOptimizations, and UpdatePersistedSpecOptimizations each have a create* factory",
+        "AND each factory supports both createX(deps) and createX(config, options?) call shapes"
+      ]
+    },
+    {
+      "requirement": "Metadata materialization and persisted-state factories replace obsolete metadata mutation factories",
+      "name": "Obsolete metadata mutation factories are removed from composition",
+      "when": ["the public composition exports are inspected"],
+      "then": [
+        "createSaveSpecMetadata, createUpdateSpecMetadata, and createInvalidateSpecMetadata are not present",
+        "AND SaveSpecMetadata, UpdateSpecMetadata, and InvalidateSpecMetadata use-case types are not exported from the \".\" public barrel"
+      ]
+    },
+    {
+      "requirement": "Metadata materialization and persisted-state factories replace obsolete metadata mutation factories",
+      "name": "PersistSpecMetadata stays an internal collaborator",
+      "when": ["the public entry points \".\", \"./ports\", and \"./extensions\" are inspected"],
+      "then": [
+        "no createPersistSpecMetadata factory or PersistSpecMetadata type is present",
+        "AND PersistSpecMetadata is not kernel-mounted"
+      ]
+    },
+    {
       "requirement": "Repository factories on public root",
       "name": "Default spec repository without kernel",
       "given": ["a loaded SpecdConfig and workspace context"],
@@ -524,34 +558,27 @@
       ]
     }
   ],
-  "implementation": {
-    "files": [
-      {
-        "specId": "core:composition",
-        "file": "core:test/composition/composition-resolver.spec.ts"
-      }
-    ],
-    "symbols": [
-      {
-        "specId": "core:composition",
-        "file": "core:src/composition/config-loader.ts",
-        "symbol": "createDefaultConfigLoader"
-      },
-      {
-        "specId": "core:composition",
-        "file": "core:src/application/ports/config-loader.ts",
-        "symbol": "ConfigLoader"
-      },
-      {
-        "specId": "core:composition",
-        "file": "core:src/composition/composition-resolver.ts",
-        "symbol": "resolveMetadataPathForWorkspace"
-      }
-    ]
-  },
   "contentHashes": {
-    "spec.md": "sha256:5e47298b6c89f365dbf26316995c8264833bfe35791582756145339f3ffb59dc",
-    "verify.md": "sha256:16fb86b63ad01ca8053c8826c7c38b0684a01bfe22c70ff9654f3a0c3c95964d"
+    "spec.md": "sha256:a23d3295d75d8c9906e3095838f66581e8450b4569dd813742f1421faed2b381",
+    "verify.md": "sha256:d1b527ab77d07c59ee2050e8e380c86ee3248ecf62cad81626385926aba71e94"
   },
-  "generatedBy": "core"
+  "provenance": {
+    "artifacts": {
+      "spec.md": {
+        "hash": "sha256:a23d3295d75d8c9906e3095838f66581e8450b4569dd813742f1421faed2b381",
+        "lastModified": "2026-07-25T11:53:31.497Z"
+      },
+      "verify.md": {
+        "hash": "sha256:d1b527ab77d07c59ee2050e8e380c86ee3248ecf62cad81626385926aba71e94",
+        "lastModified": "2026-07-25T11:53:31.498Z"
+      }
+    },
+    "persistedStateHash": "sha256:7dd63b8188c6e5d3e390bee690d582b66139ad68983002fd33c5eeacaa0fd788",
+    "schema": {
+      "name": "schema-std",
+      "version": 1
+    },
+    "projectionVersion": 1,
+    "projectionFingerprint": "sha256:e4a28a2db6a35ed39b8308518337235b1490c2948cd839db25866ad79b22404b"
+  }
 }

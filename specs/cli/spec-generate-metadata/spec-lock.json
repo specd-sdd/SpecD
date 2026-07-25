@@ -1,0 +1,20 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "core:regenerate-spec-metadata",
+    "core:spec-metadata",
+    "default:_global/architecture"
+  ],
+  "implementation": [
+    {
+      "file": "cli:src/commands/spec/generate-metadata.ts",
+      "symbols": ["registerSpecGenerateMetadata"]
+    },
+    {
+      "file": "cli:test/commands/spec-generate-metadata.spec.ts"
+    }
+  ]
+}

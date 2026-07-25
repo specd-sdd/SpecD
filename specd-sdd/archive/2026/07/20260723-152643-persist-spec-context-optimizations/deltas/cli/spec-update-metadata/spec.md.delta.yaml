@@ -1,0 +1,36 @@
+- op: modified
+  description: Mark the command as removed now that the underlying use case no longer exists.
+  selector:
+    type: section
+    matches: Purpose
+  content: |
+    **Removed.** The `specd spec update-metadata <workspace:capability-path>` command accepted a partial metadata JSON/YAML payload and delegated to the (now removed) `UpdateSpecMetadata` use case to merge LLM-optimized fields into generated metadata. Optimized fields are now owned directly by `spec-lock.json` and mutated only through `specs optimizations set`/`clear` (see `cli:spec-optimizations`). There is no `update-metadata` command or alias.
+
+- op: modified
+  description: Replace the command-signature requirement with an explicit removal statement.
+  selector:
+    type: section
+    matches: 'Requirement: Command signature'
+  rename: 'Requirement: spec update-metadata is removed'
+  content: |
+    The CLI MUST NOT register an `update-metadata` command, or any alias of it, on the `spec` parent command. Agents that need to persist an LLM-optimized description or context MUST use `specd spec optimizations set` instead.
+
+- op: removed
+  description: Remove the partial-schema-input requirement — there is no partial metadata payload anymore.
+  selector:
+    type: section
+    matches: 'Requirement: Partial schema input'
+
+- op: removed
+  description: Remove the delegation requirement — the target use case no longer exists.
+  selector:
+    type: section
+    matches: 'Requirement: Delegation'
+
+- op: modified
+  description: Drop the dependency on the removed core:update-spec-metadata use case.
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    _none_

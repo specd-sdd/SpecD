@@ -1,0 +1,42 @@
+- op: modified
+  description: Materialize included specs' metadata and record semantic fingerprints instead of hashing raw metadata content.
+  selector:
+    type: section
+    matches: 'Requirement: Hash computation'
+  content: |
+    The use case SHALL compute current SHA-256 hashes for:
+
+    - The project's `specd.yaml`
+    - All `contextFiles` defined in the configuration
+
+    For every spec currently included in the project context, the use case SHALL call `GetSpecMetadata.execute({ specId })` (default `'if-needed'` policy) and record the returned `metadataFingerprint` in `freshness`, rather than hashing a raw metadata-cache-file snapshot or a repository storage revision. This keeps freshness comparisons storage-adapter-independent and self-healing: a spec whose metadata was missing or stale is regenerated as part of this computation.
+
+- op: modified
+  description: Resolve GetSpecMetadata for per-spec fingerprint computation.
+  selector:
+    type: section
+    matches: 'Requirement: Config-based factory delegates through resolveUpdateProjectMetadataDeps'
+  content: |
+    The config-based `createUpdateProjectMetadata(config, options?)` form MUST derive `UpdateProjectMetadataDeps` through `resolveUpdateProjectMetadataDeps(resolver)` and then delegate to canonical `createUpdateProjectMetadata(deps)`.
+
+    `resolveUpdateProjectMetadataDeps(resolver)` MUST resolve:
+
+    - `config: SpecdConfig`
+    - `listWorkspaces: ListWorkspaces`
+    - `specRepos: ReadonlyMap<string, SpecRepository>`
+    - `getMetadata: GetSpecMetadata`
+    - `files: FileReader`
+    - `fileWriter: FileWriter`
+    - `hasher: ContentHasher`
+
+    The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+
+- op: modified
+  description: Add the materialization dependency.
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`core:project-metadata`](../project-metadata/spec.md)
+    - [`core:get-spec-metadata`](../get-spec-metadata/spec.md) — per-spec semantic fingerprint source
+    - [`core:composition-resolver`](../composition-resolver/spec.md)

@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { makeSpec } from '../../helpers/make-spec.js'
 import {
   GetProjectContext,
@@ -11,6 +11,7 @@ import { Spec } from '../../../src/domain/entities/spec.js'
 import { ExtractorTransformError } from '../../../src/domain/errors/extractor-transform-error.js'
 import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
 import { createBuiltinExtractorTransforms } from '../../../src/composition/extractor-transforms/index.js'
+import { type SpecRepository } from '../../../src/application/ports/spec-repository.js'
 import {
   makeSpecRepository,
   makeSchemaProvider,
@@ -21,6 +22,8 @@ import {
   makeParsers,
   makeContentHasher,
   makeListWorkspaces,
+  makeGetSpecMetadata,
+  missingGetSpecMetadata,
 } from './helpers.js'
 
 type LegacyGetProjectContextInput = GetProjectContextInput & { config?: CompileContextConfig }
@@ -34,15 +37,19 @@ function makeGetProjectContext(
   extractorTransforms = createBuiltinExtractorTransforms(),
   workspaceRoutes: readonly { workspace: string; prefixSegments: readonly string[] }[] = [],
   defaultConfig: CompileContextConfig = {},
+  specRepos?: Map<string, SpecRepository>,
 ): GetProjectContext & {
   execute: (input: LegacyGetProjectContextInput) => Promise<GetProjectContextResult>
 } {
+  const getMetadata =
+    specRepos !== undefined ? makeGetSpecMetadata(specRepos, hasher) : missingGetSpecMetadata
   const uc = new GetProjectContext(
     listWorkspaces,
     schemaProvider,
     files,
     parsers,
     hasher,
+    getMetadata,
     extractorTransforms,
     workspaceRoutes,
     defaultConfig,
@@ -55,6 +62,7 @@ function makeGetProjectContext(
       files,
       parsers,
       hasher,
+      getMetadata,
       extractorTransforms,
       workspaceRoutes,
       config,
@@ -136,14 +144,17 @@ describe('GetProjectContext', () => {
       specs: [spec],
       artifacts: { 'auth/login/spec.md': '# Auth Login' },
     })
-    const specRepos = makeListWorkspaces(new Map([['default', repo]]))
-
+    const specRepos = new Map([['default', repo]])
     const uc = makeGetProjectContext(
-      specRepos,
+      makeListWorkspaces(specRepos),
       makeSchemaProvider(schema),
       makeFileReader(),
       makeParsers(),
       makeContentHasher(),
+      createBuiltinExtractorTransforms(),
+      [],
+      {},
+      specRepos,
     )
 
     const result = await uc.execute({
@@ -179,14 +190,17 @@ describe('GetProjectContext', () => {
         }),
       },
     })
-    const specRepos = makeListWorkspaces(new Map([['default', repo]]))
-
+    const specRepos = new Map([['default', repo]])
     const uc = makeGetProjectContext(
-      specRepos,
+      makeListWorkspaces(specRepos),
       makeSchemaProvider(schema),
       makeFileReader(),
       makeParsers(),
       makeContentHasher(),
+      createBuiltinExtractorTransforms(),
+      [],
+      {},
+      specRepos,
     )
 
     const result = await uc.execute({
@@ -221,14 +235,17 @@ describe('GetProjectContext', () => {
         'billing/payments/spec.md': '# Payments',
       },
     })
-    const specRepos = makeListWorkspaces(new Map([['default', repo]]))
-
+    const specRepos = new Map([['default', repo]])
     const uc = makeGetProjectContext(
-      specRepos,
+      makeListWorkspaces(specRepos),
       makeSchemaProvider(schema),
       makeFileReader(),
       makeParsers(),
       makeContentHasher(),
+      createBuiltinExtractorTransforms(),
+      [],
+      {},
+      specRepos,
     )
 
     const result = await uc.execute({
@@ -335,12 +352,22 @@ describe('GetProjectContext', () => {
       ],
       artifacts: {
         'auth/login/spec.md': loginContent,
+        'auth/login/spec-lock.json': JSON.stringify({
+          schema: { name: 'specd-std', version: 1 },
+          dependsOn: ['default:auth/shared'],
+          implementation: [],
+        }),
         'auth/login/.specd-metadata.yaml': JSON.stringify({
           title: 'Login',
           dependsOn: ['default:auth/shared'],
           contentHashes: { 'spec.md': hasher.hash(loginContent) },
         }),
         'auth/shared/spec.md': sharedContent,
+        'auth/shared/spec-lock.json': JSON.stringify({
+          schema: { name: 'specd-std', version: 1 },
+          dependsOn: [],
+          implementation: [],
+        }),
         'auth/shared/.specd-metadata.yaml': JSON.stringify({
           title: 'Shared',
           contentHashes: { 'spec.md': hasher.hash(sharedContent) },
@@ -348,12 +375,17 @@ describe('GetProjectContext', () => {
       },
     })
 
+    const specReposMap = new Map([['default', repo]])
     const uc = makeGetProjectContext(
-      makeListWorkspaces(new Map([['default', repo]])),
+      makeListWorkspaces(specReposMap),
       makeSchemaProvider(schema),
       makeFileReader(),
       makeParsers(),
       hasher,
+      createBuiltinExtractorTransforms(),
+      [],
+      {},
+      specReposMap,
     )
 
     const result = await uc.execute({
@@ -771,18 +803,22 @@ describe('GetProjectContext', () => {
           'auth/login/spec.md': '# Content\n',
         },
       })
-      const specRepos = makeListWorkspaces(new Map([['default', repo]]))
+      const specReposMap = new Map([['default', repo]])
 
       const fileReader = makeFileReader({
         [configYamlPath]: 'config',
       })
 
       const uc = makeGetProjectContext(
-        specRepos,
+        makeListWorkspaces(specReposMap),
         makeSchemaProvider(schema),
         fileReader,
         makeParsers(),
         hasher,
+        createBuiltinExtractorTransforms(),
+        [],
+        {},
+        specReposMap,
       )
 
       const result = await uc.execute({
@@ -800,5 +836,46 @@ describe('GetProjectContext', () => {
         ),
       ).toBe(true)
     })
+  })
+
+  it('list mode does not call GetSpecMetadata for included specs', async () => {
+    const specType = makeArtifactType('specs', {
+      scope: 'spec',
+      output: 'spec.md',
+      format: 'markdown',
+    })
+    const schema = makeSchema([specType])
+    const spec = makeSpec({ workspace: 'default', name: 'auth/login', filenames: ['spec.md'] })
+    const repo = makeSpecRepository({
+      specs: [spec],
+      artifacts: { 'auth/login/spec.md': '# Auth Login' },
+    })
+    const specRepos = new Map([['default', repo]])
+    const getMetadata = {
+      execute: vi.fn(async () => {
+        throw new Error('GetSpecMetadata must not be called in list mode')
+      }),
+    }
+
+    const uc = new GetProjectContext(
+      makeListWorkspaces(specRepos),
+      makeSchemaProvider(schema),
+      makeFileReader(),
+      makeParsers(),
+      makeContentHasher(),
+      getMetadata as never,
+      createBuiltinExtractorTransforms(),
+      [],
+      { contextMode: 'list', contextIncludeSpecs: ['default:auth/login'] },
+    )
+
+    const result = await uc.execute({})
+
+    expect(result.specs).toHaveLength(1)
+    expect(result.specs[0]?.mode).toBe('list')
+    expect(result.specs[0]?.title).toBeUndefined()
+    expect(result.specs[0]?.description).toBeUndefined()
+    expect(result.specs[0]?.content).toBeUndefined()
+    expect(getMetadata.execute).not.toHaveBeenCalled()
   })
 })

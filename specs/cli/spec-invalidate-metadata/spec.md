@@ -2,38 +2,15 @@
 
 ## Purpose
 
-Sometimes metadata needs to be forcibly marked stale without deleting the file or losing fields like `dependsOn`. The `specd spec invalidate-metadata` command marks a spec's metadata as stale by removing its `contentHashes` field, forcing regeneration on the next pass.
+**Removed.** The `specd spec invalidate-metadata` command forced a spec's metadata stale by stripping `contentHashes`, delegating to the (now removed) `InvalidateSpecMetadata` use case. `MaterializeSpecMetadata` now compares persisted provenance against current source state on every read and regenerates automatically, so there is no supported way — nor any need — to manually mark a cache stale. A guaranteed rebuild is available through `specd spec generate-metadata`, which forces regeneration via `RegenerateSpecMetadata`.
 
 ## Requirements
 
-### Requirement: Command signature
+### Requirement: spec invalidate-metadata is removed
 
-The command is registered as `invalidate-metadata <specPath>` on the `spec` parent command. It accepts:
-
-- `--format <fmt>` — output format: `text|json|toon` (default `text`)
-- `--config <path>` — path to `specd.yaml`
-
-The `<specPath>` argument uses the same `workspace:capability-path` syntax as other `spec` subcommands.
-
-### Requirement: Text output
-
-On success, text format outputs: `invalidated metadata for <workspace:path>`
-
-### Requirement: JSON output
-
-On success, JSON format outputs: `{ "result": "ok", "spec": "<workspace:path>" }`
-
-### Requirement: Error — spec not found or no metadata
-
-If the spec does not exist, or has no metadata, the command writes `error: spec '<specPath>' not found or has no metadata` to stderr and exits with code 1.
-
-## Constraints
-
-- The command contains no business logic — all work is delegated to the `InvalidateSpecMetadata` use case
-- The command never reads or writes the filesystem directly for spec content — it uses the kernel
+The CLI MUST NOT register an `invalidate-metadata` command, or any alias of it, on the `spec` parent command. Callers that need a guaranteed rebuild MUST use `specd spec generate-metadata` instead.
 
 ## Spec Dependencies
 
 - [`default:_global/architecture`](../../_global/architecture/spec.md) — adapter packages contain no business logic
 - [`default:_global/conventions`](../../_global/conventions/spec.md) — error types, named exports
-- [`core:invalidate-spec-metadata`](../../core/invalidate-spec-metadata/spec.md) — the use case this command delegates to

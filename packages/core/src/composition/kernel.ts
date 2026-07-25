@@ -27,7 +27,18 @@ import { type GetSpecOutline } from '../application/use-cases/get-spec-outline.j
 import { type GetSpecsHealth } from '../application/use-cases/get-specs-health.js'
 import { type GetStatus } from '../application/use-cases/get-status.js'
 import { type InvalidateChange } from '../application/use-cases/invalidate-change.js'
-import { type InvalidateSpecMetadata } from '../application/use-cases/invalidate-spec-metadata.js'
+import { type MaterializeSpecMetadata } from '../application/use-cases/materialize-spec-metadata.js'
+import { type GetSpecMetadata } from '../application/use-cases/get-spec-metadata.js'
+import { type RegenerateSpecMetadata } from '../application/use-cases/regenerate-spec-metadata.js'
+import { InitializePersistedSpecState } from '../application/use-cases/initialize-persisted-spec-state.js'
+import { GetPersistedSpecDeps } from '../application/use-cases/get-persisted-spec-deps.js'
+import { UpdatePersistedSpecDeps } from '../application/use-cases/update-persisted-spec-deps.js'
+import { GetPersistedSpecImplementation } from '../application/use-cases/get-persisted-spec-implementation.js'
+import { UpdatePersistedSpecImplementation } from '../application/use-cases/update-persisted-spec-implementation.js'
+import { GetPersistedSpecOptimizations } from '../application/use-cases/get-persisted-spec-optimizations.js'
+import { UpdatePersistedSpecOptimizations } from '../application/use-cases/update-persisted-spec-optimizations.js'
+import { GetPersistedSpecSchema } from '../application/use-cases/get-persisted-spec-schema.js'
+import { UpdatePersistedSpecSchema } from '../application/use-cases/update-persisted-spec-schema.js'
 import { type ListArchived } from '../application/use-cases/list-archived.js'
 import { type ListChanges } from '../application/use-cases/list-changes.js'
 import { type ListDiscarded } from '../application/use-cases/list-discarded.js'
@@ -39,14 +50,12 @@ import { type RefreshImplementationTracking } from '../application/use-cases/ref
 import { type ResolveSchema } from '../application/use-cases/resolve-schema.js'
 import { type RestoreChange } from '../application/use-cases/restore-change.js'
 import { type RunStepHooks } from '../application/use-cases/run-step-hooks.js'
-import { type SaveSpecMetadata } from '../application/use-cases/save-spec-metadata.js'
 import { type SearchSpecs } from '../application/use-cases/search-specs.js'
 import { type SkipArtifact } from '../application/use-cases/skip-artifact.js'
 import { type TransitionChange } from '../application/use-cases/transition-change.js'
 import { type UpdateImplementationTracking } from '../application/use-cases/update-implementation-tracking.js'
 import { type UpdateProjectMetadata } from '../application/use-cases/update-project-metadata.js'
 import { type UpdateSpecDeps } from '../application/use-cases/update-spec-deps.js'
-import { type UpdateSpecMetadata } from '../application/use-cases/update-spec-metadata.js'
 import { type ValidateArtifacts } from '../application/use-cases/validate-artifacts.js'
 import { type ValidateSchema } from '../application/use-cases/validate-schema.js'
 import { type ValidateSpecs } from '../application/use-cases/validate-specs.js'
@@ -116,9 +125,14 @@ import {
   resolveInvalidateChangeDeps,
 } from './use-cases/invalidate-change.js'
 import {
-  createInvalidateSpecMetadata,
-  resolveInvalidateSpecMetadataDeps,
-} from './use-cases/invalidate-spec-metadata.js'
+  createMaterializeSpecMetadata,
+  resolveMaterializeSpecMetadataDeps,
+} from './use-cases/materialize-spec-metadata.js'
+import { createGetSpecMetadata, resolveGetSpecMetadataDeps } from './use-cases/get-spec-metadata.js'
+import {
+  createRegenerateSpecMetadata,
+  resolveRegenerateSpecMetadataDeps,
+} from './use-cases/regenerate-spec-metadata.js'
 import { createListArchived, resolveListArchivedDeps } from './use-cases/list-archived.js'
 import { createListChanges, resolveListChangesDeps } from './use-cases/list-changes.js'
 import { createListDiscarded, resolveListDiscardedDeps } from './use-cases/list-discarded.js'
@@ -133,10 +147,6 @@ import {
 import { createResolveSchema, resolveResolveSchemaDeps } from './use-cases/resolve-schema.js'
 import { createRestoreChange, resolveRestoreChangeDeps } from './use-cases/restore-change.js'
 import { createRunStepHooks, resolveRunStepHooksDeps } from './use-cases/run-step-hooks.js'
-import {
-  createSaveSpecMetadata,
-  resolveSaveSpecMetadataDeps,
-} from './use-cases/save-spec-metadata.js'
 import { createSearchSpecs, resolveSearchSpecsDeps } from './use-cases/search-specs.js'
 import { createSkipArtifact, resolveSkipArtifactDeps } from './use-cases/skip-artifact.js'
 import {
@@ -147,9 +157,11 @@ import {
   createUpdateImplementationTracking,
   resolveUpdateImplementationTrackingDeps,
 } from './use-cases/update-implementation-tracking.js'
-import { createUpdateProjectMetadata } from './use-cases/update-project-metadata.js'
+import {
+  createUpdateProjectMetadata,
+  resolveUpdateProjectMetadataDeps,
+} from './use-cases/update-project-metadata.js'
 import { createUpdateSpecDeps, resolveUpdateSpecDepsDeps } from './use-cases/update-spec-deps.js'
-import { createUpdateSpecMetadata } from './use-cases/update-spec-metadata.js'
 import {
   createValidateArtifacts,
   resolveValidateArtifactsDeps,
@@ -205,15 +217,24 @@ export interface Kernel {
     search: SearchSpecs
     get: GetSpec
     getOutline: GetSpecOutline
-    saveMetadata: SaveSpecMetadata
-    invalidateMetadata: InvalidateSpecMetadata
+    materializeMetadata: MaterializeSpecMetadata
+    getMetadata: GetSpecMetadata
+    regenerateMetadata: RegenerateSpecMetadata
+    initializePersistedState: InitializePersistedSpecState
+    getPersistedDeps: GetPersistedSpecDeps
+    updatePersistedDeps: UpdatePersistedSpecDeps
+    getPersistedImplementation: GetPersistedSpecImplementation
+    updatePersistedImplementation: UpdatePersistedSpecImplementation
+    getPersistedOptimizations: GetPersistedSpecOptimizations
+    updatePersistedOptimizations: UpdatePersistedSpecOptimizations
+    getPersistedSchema: GetPersistedSpecSchema
+    updatePersistedSchema: UpdatePersistedSpecSchema
     getActiveSchema: GetActiveSchema
     resolve: ResolveSchema
     validateSchema: ValidateSchema
     validate: ValidateSpecs
     getHealth: GetSpecsHealth
     generateMetadata: GenerateSpecMetadata
-    updateMetadata: UpdateSpecMetadata
     getContext: GetSpecContext
   }
   project: {
@@ -270,6 +291,45 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
   const getArchived = createGetArchivedChange(resolveGetArchivedChangeDeps(resolver))
   const resolveSchema = createResolveSchema(resolveResolveSchemaDeps(resolver))
   const getActiveSchema = createGetActiveSchema(resolveGetActiveSchemaDeps(resolver))
+
+  const resolveInitialDeps = {
+    parsers: resolver.getArtifactParserRegistry(),
+    extractorTransforms: resolver.getExtractorTransforms(),
+    hasher: resolver.getContentHasher(),
+  }
+  const initializePersistedState = new InitializePersistedSpecState(
+    specsRepos,
+    listWorkspaces,
+    getActiveSchema,
+    resolveInitialDeps,
+  )
+  const getPersistedDeps = new GetPersistedSpecDeps(specsRepos)
+  const updatePersistedDeps = new UpdatePersistedSpecDeps(
+    specsRepos,
+    getActiveSchema,
+    resolveInitialDeps,
+  )
+  const getPersistedImplementation = new GetPersistedSpecImplementation(specsRepos)
+  const updatePersistedImplementation = new UpdatePersistedSpecImplementation(
+    specsRepos,
+    listWorkspaces,
+    resolver.getFileReader(),
+    getActiveSchema,
+    resolveInitialDeps,
+  )
+  const getPersistedOptimizations = new GetPersistedSpecOptimizations(specsRepos, getActiveSchema)
+  const updatePersistedOptimizations = new UpdatePersistedSpecOptimizations(
+    specsRepos,
+    getActiveSchema,
+    resolveInitialDeps,
+  )
+  const getPersistedSchema = new GetPersistedSpecSchema(specsRepos)
+  const updatePersistedSchema = new UpdatePersistedSpecSchema(
+    specsRepos,
+    getActiveSchema,
+    resolveInitialDeps,
+  )
+
   const runStepHooks = createRunStepHooks(resolveRunStepHooksDeps(resolver))
   const refreshImplementationTracking = createRefreshImplementationTracking(
     resolveRefreshImplementationTrackingDeps(resolver),
@@ -277,7 +337,13 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
   const detectOverlap = createDetectOverlap(resolveDetectOverlapDeps(resolver))
   const preview = createPreviewSpec(resolvePreviewSpecDeps(resolver))
   const generateMetadata = createGenerateSpecMetadata(resolveGenerateSpecMetadataDeps(resolver))
-  const saveMetadata = createSaveSpecMetadata(resolveSaveSpecMetadataDeps(resolver))
+  const materializeMetadata = createMaterializeSpecMetadata(
+    resolveMaterializeSpecMetadataDeps(resolver),
+  )
+  const getSpecMetadata = createGetSpecMetadata(resolveGetSpecMetadataDeps(resolver))
+  const regenerateMetadata = createRegenerateSpecMetadata(
+    resolveRegenerateSpecMetadataDeps(resolver),
+  )
 
   const create = createCreateChange(resolveCreateChangeDeps(resolver))
   const status = createGetStatus(resolveGetStatusDeps(resolver))
@@ -310,16 +376,9 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
   const searchSpecs = createSearchSpecs(resolveSearchSpecsDeps(resolver))
   const getSpec = createGetSpec(resolveGetSpecDeps(resolver))
   const getOutline = createGetSpecOutline(resolveGetSpecOutlineDeps(resolver))
-  const invalidateMetadata = createInvalidateSpecMetadata(
-    resolveInvalidateSpecMetadataDeps(resolver),
-  )
   const validateSchema = createValidateSchema(resolveValidateSchemaDeps(resolver))
   const validateSpecs = createValidateSpecs(resolveValidateSpecsDeps(resolver))
   const getHealth = createGetSpecsHealth({ validateSpecs })
-  const updateMetadata = createUpdateSpecMetadata({
-    generateMetadata: resolveGenerateSpecMetadataDeps(resolver),
-    saveMetadata: resolveSaveSpecMetadataDeps(resolver),
-  })
   const getContext = createGetSpecContext(resolveGetSpecContextDeps(resolver))
 
   const getProjectSummary = createGetProjectSummary(resolveGetProjectSummaryDeps(resolver))
@@ -329,14 +388,9 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
     config: resolver.config,
     fileReader: resolver.getFileReader(),
   })
-  const updateProjectMetadata = createUpdateProjectMetadata({
-    config: resolver.config,
-    listWorkspaces,
-    specRepositories: specsRepos,
-    fileReader: resolver.getFileReader(),
-    fileWriter: resolver.getFileWriter(),
-    contentHasher: resolver.getContentHasher(),
-  })
+  const updateProjectMetadata = createUpdateProjectMetadata(
+    resolveUpdateProjectMetadataDeps(resolver),
+  )
 
   return {
     registry: resolver.registry,
@@ -382,15 +436,24 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
       search: searchSpecs,
       get: getSpec,
       getOutline,
-      saveMetadata,
-      invalidateMetadata,
+      materializeMetadata,
+      getMetadata: getSpecMetadata,
+      regenerateMetadata,
+      initializePersistedState,
+      getPersistedDeps,
+      updatePersistedDeps,
+      getPersistedImplementation,
+      updatePersistedImplementation,
+      getPersistedOptimizations,
+      updatePersistedOptimizations,
+      getPersistedSchema,
+      updatePersistedSchema,
       getActiveSchema,
       resolve: resolveSchema,
       validateSchema,
       validate: validateSpecs,
       getHealth,
       generateMetadata,
-      updateMetadata,
       getContext,
     },
     project: {

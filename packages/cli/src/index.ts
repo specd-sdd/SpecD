@@ -52,11 +52,13 @@ import { registerSpecOutline } from './commands/spec/outline.js'
 import { registerSpecContext } from './commands/spec/context.js'
 import { registerSpecMetadata } from './commands/spec/metadata.js'
 import { registerSpecResolvePath } from './commands/spec/resolve-path.js'
-import { registerSpecWriteMetadata } from './commands/spec/write-metadata.js'
-import { registerSpecUpdateMetadata } from './commands/spec/update-metadata.js'
-import { registerSpecInvalidateMetadata } from './commands/spec/invalidate-metadata.js'
 import { registerSpecValidate } from './commands/spec/validate.js'
 import { registerSpecGenerateMetadata } from './commands/spec/generate-metadata.js'
+import { registerSpecInit } from './commands/spec/init.js'
+import { registerSpecSchema } from './commands/spec/schema.js'
+import { registerSpecDeps } from './commands/spec/deps.js'
+import { registerSpecImplementation } from './commands/spec/implementation.js'
+import { registerSpecOptimizations } from './commands/spec/optimizations.js'
 
 // project
 import { registerProjectInit } from './commands/project/init.js'
@@ -183,11 +185,13 @@ registerSpecOutline(specCmd)
 registerSpecContext(specCmd)
 registerSpecMetadata(specCmd)
 registerSpecResolvePath(specCmd)
-registerSpecWriteMetadata(specCmd)
-registerSpecUpdateMetadata(specCmd)
-registerSpecInvalidateMetadata(specCmd)
 registerSpecValidate(specCmd)
 registerSpecGenerateMetadata(specCmd)
+registerSpecInit(specCmd)
+registerSpecSchema(specCmd)
+registerSpecDeps(specCmd)
+registerSpecImplementation(specCmd)
+registerSpecOptimizations(specCmd)
 
 // ---- project ----
 const projectCmd = program

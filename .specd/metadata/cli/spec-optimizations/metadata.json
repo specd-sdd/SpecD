@@ -1,0 +1,209 @@
+{
+  "title": "cli:spec-optimizations",
+  "description": "Optimized fields are lock-owned durable state, not metadata to inject through a generic writer, so they need a dedicated command surface used by the spec-context optimizer agent and by humans reviewing optimization freshness. `specd specs optimizations` is the CLI command group that inspects and mutates the persisted `optimizedDescription` and `optimizedContext` fields by parsing input, calling the corresponding Core use case, formatting the result, and mapping typed errors.",
+  "dependsOn": [
+    "cli:entrypoint",
+    "core:get-persisted-spec-optimizations",
+    "core:update-persisted-spec-optimizations"
+  ],
+  "context": [
+    "Optimized fields are lock-owned durable state, not metadata to inject through a generic writer, so they need a dedicated command surface used by the spec-context optimizer agent and by humans reviewing optimization freshness. `specd specs optimizations` is the CLI command group that inspects and mutates the persisted `optimizedDescription` and `optimizedContext` fields by parsing input, calling the corresponding Core use case, formatting the result, and mapping typed errors."
+  ],
+  "rules": [
+    {
+      "requirement": "Command signature",
+      "rules": [
+        "Persisted optimization features SHALL be exposed under the `specd specs optimizations` command group:\n\n```\nspecs optimizations get <spec-id> [--field optimizedDescription|optimizedContext]\nspecs optimizations set <spec-id> --input <json-file|->\nspecs optimizations clear <spec-id> --field optimizedDescription|optimizedContext...\n```\n\nEvery subcommand accepts `--format text|json|toon` (default `text`) per [`cli:entrypoint`](../entrypoint/spec.md)."
+      ]
+    },
+    {
+      "requirement": "Get subcommand",
+      "rules": [
+        "`specs optimizations get <spec-id> [--field <name>]` MUST call `Kernel.specs.getPersistedOptimizations` with the optional `field` filter and print each present field's value together with its freshness and staleness reasons.\n\nText output MUST clearly mark a stale field as `STALE` alongside its reasons (`artifact-added`, `artifact-removed`, `artifact-changed`, `schema-changed`). JSON/TOON output MUST include the full per-field freshness and aggregate `fresh` result from the use case unchanged.\n\nWhen the spec has no persisted state, the command MUST report that the spec is not yet initialized. When the requested field is absent, the command MUST report it as missing rather than as an error."
+      ]
+    },
+    {
+      "requirement": "Set subcommand",
+      "rules": [
+        "`specs optimizations set <spec-id> --input <json-file|->` MUST read JSON content from the given file path, or from stdin when `--input -` is given. The command MUST parse the content as a JSON object whose keys are a subset of `optimizedDescription` and `optimizedContext` with string values, and MUST reject any other shape at the CLI boundary with an `error:` message before calling Core.\n\nOn success, the command MUST call `Kernel.specs.updatePersistedOptimizations` with `set` equal to the parsed object, and print the resulting persisted optimization values."
+      ]
+    },
+    {
+      "requirement": "Clear subcommand",
+      "rules": [
+        "`specs optimizations clear <spec-id> --field <name>...` MUST call `Kernel.specs.updatePersistedOptimizations` with `clear` equal to the supplied field names, and print the resulting persisted optimization values (which may be empty)."
+      ]
+    },
+    {
+      "requirement": "No repeated CLI-owned mutation or freshness logic",
+      "rules": [
+        "Handlers in this command group MUST NOT compute artifact hashes, staleness reasons, or baseline capture themselves, and MUST NOT implement persisted-state writes directly. Every read and mutation MUST be expressed as one call to `Kernel.specs.getPersistedOptimizations` or `Kernel.specs.updatePersistedOptimizations` with the parsed flags mapped directly onto the use case's typed input."
+      ]
+    },
+    {
+      "requirement": "Error mapping",
+      "rules": [
+        "`SpecNotFoundError` MUST map to exit code 1 with an `error:` message naming the unresolved spec. Invalid `--input` JSON MUST map to exit code 1 with an `error: invalid JSON: <message>` before any Core call is made. `ArtifactConflictError` MUST map to exit code 1 with an `error:` message indicating a concurrent modification and instructing the user to retry. `ReadOnlyWorkspaceError` MUST map to exit code 1 without suggesting a configuration workaround."
+      ]
+    }
+  ],
+  "constraints": [
+    "These commands never read or write spec-lock.json directly — every operation flows through Kernel.specs.getPersistedOptimizations / Kernel.specs.updatePersistedOptimizations",
+    "This command group never invokes an LLM and never decides whether optimization work should happen; the effective llmOptimizedContext gate is enforced by the caller (skill or agent template), not by this CLI surface",
+    "specs optimizations set is the only supported entry point for persisting an optimized value after this change; there is no write-metadata equivalent for optimizations",
+    "Every leaf subcommand calls .allowExcessArguments(false)"
+  ],
+  "scenarios": [
+    {
+      "requirement": "Command signature",
+      "name": "Every subcommand accepts --format",
+      "when": ["specd specs optimizations get core:auth/login --format json is run"],
+      "then": ["the output is valid JSON"]
+    },
+    {
+      "requirement": "Get subcommand",
+      "name": "Text output marks a stale field with its staleness reasons",
+      "given": ["optimizedContext is stale with reasons ['artifact-changed', 'schema-changed']"],
+      "when": ["specd specs optimizations get core:auth/login is run"],
+      "then": ["the text output marks the field STALE", "AND the output lists both reasons"]
+    },
+    {
+      "requirement": "Get subcommand",
+      "name": "JSON output includes full per-field and aggregate freshness unchanged",
+      "given": ["a mix of fresh and stale optimization fields"],
+      "when": ["specd specs optimizations get core:auth/login --format json is run"],
+      "then": [
+        "the JSON output includes each field's freshness and reasons, and the aggregate fresh value, exactly as returned by the use case"
+      ]
+    },
+    {
+      "requirement": "Get subcommand",
+      "name": "Get on an uninitialized spec reports not-yet-initialized",
+      "given": ["a spec with no persisted state"],
+      "when": ["specd specs optimizations get core:auth/login is run"],
+      "then": ["the command reports the spec is not yet initialized"]
+    },
+    {
+      "requirement": "Get subcommand",
+      "name": "Get with --field for an absent field reports missing, not an error",
+      "given": ["persisted optimizations has only optimizedDescription"],
+      "when": ["specd specs optimizations get core:auth/login --field optimizedContext is run"],
+      "then": [
+        "the command reports the field as missing",
+        "AND the command does not exit with an error"
+      ]
+    },
+    {
+      "requirement": "Set subcommand",
+      "name": "Set reads JSON from stdin with --input -",
+      "given": ["{\"optimizedDescription\": \"text\"} is piped to stdin"],
+      "when": ["specd specs optimizations set core:auth/login --input - is run"],
+      "then": [
+        "the command calls Kernel.specs.updatePersistedOptimizations with set equal to the parsed object"
+      ]
+    },
+    {
+      "requirement": "Set subcommand",
+      "name": "Set rejects an unknown-key JSON shape at the CLI boundary",
+      "given": ["an --input file containing {\"unexpectedKey\": \"value\"}"],
+      "when": ["specd specs optimizations set core:auth/login --input file.json is run"],
+      "then": ["the command exits with code 1 with an error: message", "AND Kernel is never called"]
+    },
+    {
+      "requirement": "Set subcommand",
+      "name": "Set rejects invalid JSON before calling Core",
+      "given": ["an --input file containing malformed JSON"],
+      "when": ["specd specs optimizations set core:auth/login --input file.json is run"],
+      "then": [
+        "the command exits with code 1 with an error: invalid JSON: <message>",
+        "AND Kernel.specs.updatePersistedOptimizations is never called"
+      ]
+    },
+    {
+      "requirement": "Clear subcommand",
+      "name": "Clear accepts multiple --field flags",
+      "when": [
+        "specd specs optimizations clear core:auth/login --field optimizedDescription --field optimizedContext is run"
+      ],
+      "then": [
+        "the command calls Kernel.specs.updatePersistedOptimizations with clear equal to both field names"
+      ]
+    },
+    {
+      "requirement": "Clear subcommand",
+      "name": "Clear result may be empty when the last field is removed",
+      "given": ["clearing removes the last remaining optimization field"],
+      "when": [
+        "specd specs optimizations clear core:auth/login --field optimizedDescription is run"
+      ],
+      "then": ["the printed result shows no remaining optimization values"]
+    },
+    {
+      "requirement": "No repeated CLI-owned mutation or freshness logic",
+      "name": "Handler never computes hashes or staleness reasons itself",
+      "when": ["specd specs optimizations get core:auth/login is run"],
+      "then": [
+        "the handler performs exactly one call to Kernel.specs.getPersistedOptimizations",
+        "AND the handler does not compute artifact hashes or staleness reasons directly"
+      ]
+    },
+    {
+      "requirement": "Error mapping",
+      "name": "Unknown spec maps to exit code 1",
+      "when": ["specd specs optimizations get core:unknown/spec is run"],
+      "then": ["the command exits with code 1", "AND stderr names the unresolved spec"]
+    },
+    {
+      "requirement": "Error mapping",
+      "name": "Concurrent modification maps to exit code 1 with retry guidance",
+      "given": ["ArtifactConflictError is thrown by the use case"],
+      "when": ["specd specs optimizations set core:auth/login --input file.json is run"],
+      "then": [
+        "the command exits with code 1",
+        "AND stderr indicates a concurrent modification and instructs the user to retry"
+      ]
+    },
+    {
+      "requirement": "Error mapping",
+      "name": "Read-only workspace maps to exit code 1 without a configuration workaround",
+      "given": ["the spec's workspace is readOnly"],
+      "when": ["specd specs optimizations set core:auth/login --input file.json is run"],
+      "then": [
+        "the command exits with code 1",
+        "AND stderr does not suggest a configuration workaround"
+      ]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "cli:spec-optimizations",
+        "file": "cli:src/commands/spec/optimizations.ts",
+        "symbol": "registerSpecOptimizations"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:1c277f96f47e922f58d86a8d004a04d3ada543659ae05d00540cce9846b0175d",
+    "verify.md": "sha256:07da71eb3a20896011a077653f1306ca6ecce75e8e6566c6a1738b62b969e08a"
+  },
+  "provenance": {
+    "artifacts": {
+      "spec.md": {
+        "hash": "sha256:1c277f96f47e922f58d86a8d004a04d3ada543659ae05d00540cce9846b0175d",
+        "lastModified": "2026-07-25T11:53:31.277Z"
+      },
+      "verify.md": {
+        "hash": "sha256:07da71eb3a20896011a077653f1306ca6ecce75e8e6566c6a1738b62b969e08a",
+        "lastModified": "2026-07-25T11:53:31.278Z"
+      }
+    },
+    "persistedStateHash": "sha256:9c86a5a1ae2cef77259674c24b0d8c2d8998140bb07d5f44b0fb294b97f9e938",
+    "schema": {
+      "name": "schema-std",
+      "version": 1
+    },
+    "projectionVersion": 1,
+    "projectionFingerprint": "sha256:e4a28a2db6a35ed39b8308518337235b1490c2948cd839db25866ad79b22404b"
+  }
+}

@@ -1,10 +1,11 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { makeSpec } from '../../helpers/make-spec.js'
 import * as fs from 'node:fs/promises'
 import * as os from 'node:os'
 import * as path from 'node:path'
 import { createBuiltinExtractorTransforms } from '../../../src/composition/extractor-transforms/index.js'
 import { ValidateSpecs } from '../../../src/application/use-cases/validate-specs.js'
+import { type GetSpecMetadata } from '../../../src/application/use-cases/get-spec-metadata.js'
 import { SchemaNotFoundError } from '../../../src/application/errors/schema-not-found-error.js'
 import { WorkspaceNotFoundError } from '../../../src/application/errors/workspace-not-found-error.js'
 import { SpecNotFoundError } from '../../../src/application/errors/spec-not-found-error.js'
@@ -18,6 +19,7 @@ import {
   makeParsers,
   makeParser,
   makeContentHasher,
+  makeGetSpecMetadata,
 } from './helpers.js'
 import {
   ValidationResultCache,
@@ -37,6 +39,28 @@ import {
 import { createCompositionResolver } from '../../../src/composition/composition-resolver.js'
 import { resolveValidateSpecsDeps } from '../../../src/composition/use-cases/validate-specs.js'
 import { type SpecdConfig } from '../../../src/application/specd-config.js'
+
+function buildValidateSpecs(
+  specRepos: ReadonlyMap<string, SpecRepository>,
+  schemaProvider: ReturnType<typeof makeSchemaProvider>,
+  parsers: ReturnType<typeof makeParsers>,
+  hasher: ReturnType<typeof makeContentHasher> = makeContentHasher(),
+  extractorTransforms = createBuiltinExtractorTransforms(),
+  workspaceRoutes: readonly import('../../../src/application/use-cases/_shared/spec-reference-resolver.js').SpecWorkspaceRoute[] = [],
+  validationResultCaches: ReadonlyMap<string, ValidationResultCache> = new Map(),
+  getMetadata: ReturnType<typeof makeGetSpecMetadata> = makeGetSpecMetadata(new Map(specRepos)),
+): ValidateSpecs {
+  return new ValidateSpecs(
+    specRepos,
+    schemaProvider,
+    parsers,
+    getMetadata,
+    hasher,
+    extractorTransforms,
+    workspaceRoutes,
+    validationResultCaches,
+  )
+}
 
 class InMemoryValidationResultCache extends ValidationResultCache {
   readonly upserts: Array<{
@@ -86,6 +110,7 @@ class InMemoryValidationResultCache extends ValidationResultCache {
     readonly spec: Spec
     readonly schemaFingerprint: string
     readonly engineVersion: number
+    readonly stamps?: import('../../../src/application/ports/validation-result-cache.js').ValidationSourceStamps
   }): Promise<ValidationCacheLookupResult> {
     if (
       input.schemaFingerprint !== this._schemaFingerprint ||
@@ -97,7 +122,7 @@ class InMemoryValidationResultCache extends ValidationResultCache {
     const row = this._rows.get(specId)
     if (row === undefined) return { kind: 'miss' }
 
-    const currentStamps = stampsFromSpec(input.spec)
+    const currentStamps = input.stamps !== undefined ? input.stamps : stampsFromSpec(input.spec)
     if (JSON.stringify(row.stamps) === JSON.stringify(currentStamps)) {
       return { kind: 'hit', entry: row.entry }
     }
@@ -158,7 +183,7 @@ describe('ValidateSpecs', () => {
       ['billing', repo2],
     ])
 
-    const uc = new ValidateSpecs(specRepos, makeSchemaProvider(schema), makeParsers())
+    const uc = buildValidateSpecs(specRepos, makeSchemaProvider(schema), makeParsers())
     const result = await uc.execute({})
 
     expect(result.totalSpecs).toBe(2)
@@ -170,7 +195,7 @@ describe('ValidateSpecs', () => {
   it('throws SchemaNotFoundError when schema not resolved', async () => {
     const specRepos = new Map([['default', makeSpecRepository()]])
 
-    const uc = new ValidateSpecs(specRepos, makeSchemaProvider(null), makeParsers())
+    const uc = buildValidateSpecs(specRepos, makeSchemaProvider(null), makeParsers())
 
     await expect(uc.execute({})).rejects.toThrow(SchemaNotFoundError)
   })
@@ -186,7 +211,7 @@ describe('ValidateSpecs', () => {
     })
     const specRepos = new Map([['default', repo]])
 
-    const uc = new ValidateSpecs(specRepos, makeSchemaProvider(schema), makeParsers())
+    const uc = buildValidateSpecs(specRepos, makeSchemaProvider(schema), makeParsers())
     const result = await uc.execute({})
 
     expect(result.entries[0]!.passed).toBe(true)
@@ -203,7 +228,7 @@ describe('ValidateSpecs', () => {
     const repo = makeSpecRepository({ specs: [spec] })
     const specRepos = new Map([['default', repo]])
 
-    const uc = new ValidateSpecs(specRepos, makeSchemaProvider(schema), makeParsers())
+    const uc = buildValidateSpecs(specRepos, makeSchemaProvider(schema), makeParsers())
     const result = await uc.execute({})
 
     expect(result.entries[0]!.passed).toBe(false)
@@ -217,7 +242,7 @@ describe('ValidateSpecs', () => {
     const schema = makeSchema([specType])
     const specRepos = new Map([['default', makeSpecRepository()]])
 
-    const uc = new ValidateSpecs(specRepos, makeSchemaProvider(schema), makeParsers())
+    const uc = buildValidateSpecs(specRepos, makeSchemaProvider(schema), makeParsers())
     await expect(
       uc.execute({
         workspace: 'nonexistent',
@@ -282,7 +307,7 @@ describe('ValidateSpecs', () => {
         }
       },
     })
-    const uc = new ValidateSpecs(
+    const uc = buildValidateSpecs(
       new Map([['default', repo]]),
       makeSchemaProvider(schema),
       makeParsers(parser, makeParser()),
@@ -360,7 +385,7 @@ describe('ValidateSpecs', () => {
         }
       },
     })
-    const uc = new ValidateSpecs(
+    const uc = buildValidateSpecs(
       new Map([['default', repo]]),
       makeSchemaProvider(schema),
       makeParsers(parser, makeParser()),
@@ -385,7 +410,7 @@ describe('ValidateSpecs', () => {
     })
     const specRepos = new Map([['default', repo]])
 
-    const uc = new ValidateSpecs(specRepos, makeSchemaProvider(schema), makeParsers())
+    const uc = buildValidateSpecs(specRepos, makeSchemaProvider(schema), makeParsers())
     const result = await uc.execute({ specPath: 'default:auth/login' })
 
     expect(result.totalSpecs).toBe(1)
@@ -398,7 +423,7 @@ describe('ValidateSpecs', () => {
     const schema = makeSchema([specType])
     const specRepos = new Map([['default', makeSpecRepository()]])
 
-    const uc = new ValidateSpecs(specRepos, makeSchemaProvider(schema), makeParsers())
+    const uc = buildValidateSpecs(specRepos, makeSchemaProvider(schema), makeParsers())
     await expect(uc.execute({ specPath: 'nonexistent:auth/login' })).rejects.toThrow(
       WorkspaceNotFoundError,
     )
@@ -409,7 +434,7 @@ describe('ValidateSpecs', () => {
     const schema = makeSchema([specType])
     const specRepos = new Map([['default', makeSpecRepository()]])
 
-    const uc = new ValidateSpecs(specRepos, makeSchemaProvider(schema), makeParsers())
+    const uc = buildValidateSpecs(specRepos, makeSchemaProvider(schema), makeParsers())
     await expect(uc.execute({ specPath: 'default:nonexistent' })).rejects.toThrow(SpecNotFoundError)
   })
 
@@ -425,7 +450,7 @@ describe('ValidateSpecs', () => {
     })
     const specRepos = new Map([['default', repo]])
 
-    const uc = new ValidateSpecs(specRepos, makeSchemaProvider(schema), makeParsers())
+    const uc = buildValidateSpecs(specRepos, makeSchemaProvider(schema), makeParsers())
     const result = await uc.execute({})
 
     expect(result.passed).toBe(1)
@@ -448,7 +473,7 @@ describe('ValidateSpecs', () => {
     })
     const specRepos = new Map([['default', repo]])
 
-    const uc = new ValidateSpecs(specRepos, makeSchemaProvider(schema), makeParsers())
+    const uc = buildValidateSpecs(specRepos, makeSchemaProvider(schema), makeParsers())
     const result = await uc.execute({})
 
     expect(result.passed).toBe(1)
@@ -470,7 +495,7 @@ describe('ValidateSpecs', () => {
     })
     const specRepos = new Map([['default', repo]])
 
-    const uc = new ValidateSpecs(specRepos, makeSchemaProvider(schema), makeParsers())
+    const uc = buildValidateSpecs(specRepos, makeSchemaProvider(schema), makeParsers())
     const result = await uc.execute({ workspace: 'default' })
 
     expect(result.totalSpecs).toBe(2)
@@ -494,7 +519,7 @@ describe('ValidateSpecs', () => {
     })
     const specRepos = new Map([['default', repo]])
 
-    const uc = new ValidateSpecs(specRepos, makeSchemaProvider(schema), makeParsers())
+    const uc = buildValidateSpecs(specRepos, makeSchemaProvider(schema), makeParsers())
     const result = await uc.execute({})
 
     expect(result.totalSpecs).toBe(2)
@@ -518,7 +543,7 @@ describe('ValidateSpecs', () => {
     })
     const specRepos = new Map([['default', repo]])
 
-    const uc = new ValidateSpecs(specRepos, makeSchemaProvider(schema), makeParsers())
+    const uc = buildValidateSpecs(specRepos, makeSchemaProvider(schema), makeParsers())
     const result = await uc.execute({})
 
     expect(result.passed).toBe(1)
@@ -541,7 +566,7 @@ describe('ValidateSpecs', () => {
 
     const mdParser = makeParser()
     const yamlParser = makeParser()
-    const uc = new ValidateSpecs(
+    const uc = buildValidateSpecs(
       specRepos,
       makeSchemaProvider(schema),
       makeParsers(mdParser, yamlParser),
@@ -552,7 +577,7 @@ describe('ValidateSpecs', () => {
     expect(result.entries[0]!.failures).toEqual([])
   })
 
-  it('fails when metadata content hashes are stale', async () => {
+  it('self-heals when cached metadata content hashes are stale', async () => {
     const schema = makeSchema([makeArtifactType('specs', { scope: 'spec', output: 'spec.md' })])
     const spec = makeSpec({ workspace: 'default', name: 'auth/login', filenames: ['spec.md'] })
     const repo = makeSpecRepository({
@@ -566,19 +591,15 @@ describe('ValidateSpecs', () => {
       },
     })
 
-    const result = await new ValidateSpecs(
+    const result = await buildValidateSpecs(
       new Map([['default', repo]]),
       makeSchemaProvider(schema),
       makeParsers(),
       makeContentHasher(),
     ).execute({})
 
-    expect(result.failed).toBe(1)
-    expect(
-      result.entries[0]?.failures.some((failure) =>
-        failure.description.includes('stale or incomplete contentHashes'),
-      ),
-    ).toBe(true)
+    expect(result.failed).toBe(0)
+    expect(result.passed).toBe(1)
   })
 
   it('fails when metadata dependsOn drifts from persisted dependencies', async () => {
@@ -601,7 +622,7 @@ describe('ValidateSpecs', () => {
       },
     })
 
-    const result = await new ValidateSpecs(
+    const result = await buildValidateSpecs(
       new Map([['default', repo]]),
       makeSchemaProvider(schema),
       makeParsers(),
@@ -681,7 +702,7 @@ describe('ValidateSpecs', () => {
           .join('\n'),
     })
 
-    const result = await new ValidateSpecs(
+    const result = await buildValidateSpecs(
       new Map([['default', repo]]),
       makeSchemaProvider(schema),
       makeParsers(markdownParser),
@@ -695,6 +716,49 @@ describe('ValidateSpecs', () => {
         failure.description.includes("Extracted dependsOn for 'default:auth/login'"),
       ),
     ).toBe(true)
+  })
+
+  it('fails when metadata materialization throws instead of swallowing the error', async () => {
+    const hasher = makeContentHasher()
+    const specContent = '# Auth Login\n'
+    const schema = makeSchema([makeArtifactType('specs', { scope: 'spec', output: 'spec.md' })])
+    const spec = makeSpec({ workspace: 'default', name: 'auth/login', filenames: ['spec.md'] })
+    const repo = makeSpecRepository({
+      specs: [spec],
+      artifacts: {
+        'auth/login/spec.md': specContent,
+        'auth/login/spec-lock.json': JSON.stringify({
+          schema: { name: 'schema-std', version: 1 },
+          dependsOn: ['default:auth/persisted'],
+          implementation: [],
+        }),
+      },
+    })
+    const failingGetMetadata = {
+      execute: async () => {
+        throw new Error(
+          "Generated metadata for 'default:auth/login' found extracted dependencies [default:auth/typo] that do not match persisted dependencies [default:auth/persisted].",
+        )
+      },
+    } as unknown as GetSpecMetadata
+
+    const result = await buildValidateSpecs(
+      new Map([['default', repo]]),
+      makeSchemaProvider(schema),
+      makeParsers(),
+      hasher,
+      createBuiltinExtractorTransforms(),
+      [],
+      new Map(),
+      failingGetMetadata,
+    ).execute({})
+
+    expect(result.failed).toBe(1)
+    expect(result.entries[0]?.failures).toHaveLength(1)
+    expect(result.entries[0]?.failures[0]?.description).toContain('could not be materialized')
+    expect(result.entries[0]?.failures[0]?.description).toContain(
+      'extracted dependencies [default:auth/typo]',
+    )
   })
 
   it('passes when extraction is omitted and metadata matches persisted dependencies', async () => {
@@ -720,7 +784,7 @@ describe('ValidateSpecs', () => {
       },
     })
 
-    const result = await new ValidateSpecs(
+    const result = await buildValidateSpecs(
       new Map([['default', repo]]),
       makeSchemaProvider(schema),
       makeParsers(),
@@ -786,7 +850,7 @@ describe('ValidateSpecs', () => {
       cacheFingerprint,
     )
 
-    const uc = new ValidateSpecs(
+    const uc = buildValidateSpecs(
       new Map([['default', repo]]),
       makeSchemaProvider(schema),
       parseSpy,
@@ -831,7 +895,7 @@ describe('ValidateSpecs', () => {
       (content) => hasher.hash(content),
     )
 
-    const uc = new ValidateSpecs(
+    const uc = buildValidateSpecs(
       new Map([['default', repo]]),
       makeSchemaProvider(schema),
       parseSpy,
@@ -902,7 +966,7 @@ describe('ValidateSpecs', () => {
       cacheFingerprint,
     )
 
-    const uc = new ValidateSpecs(
+    const uc = buildValidateSpecs(
       new Map([['default', repo]]),
       makeSchemaProvider(schema),
       parseSpy,
@@ -915,6 +979,73 @@ describe('ValidateSpecs', () => {
     const result = await uc.execute({ specPath: 'default:auth/login' })
     expect(result.entries[0]!.passed).toBe(true)
     expect(parseCount).toBe(0)
+  })
+
+  it('workspace discovery hard hits without calling get when list Meta is provided', async () => {
+    const specType = makeArtifactType('specs', { scope: 'spec', output: 'spec.md' })
+    const schema = makeSchema([specType])
+    const hasher = makeContentHasher()
+    const spec = makeSpec({ workspace: 'default', name: 'auth/login', filenames: ['spec.md'] })
+    const repo = makeSpecRepository({
+      specs: [spec],
+      artifacts: { 'auth/login/spec.md': '# Auth Login Spec' },
+    })
+    const getSpy = vi.spyOn(repo, 'get')
+    const parseSpy = makeParsers()
+    const originalGet = parseSpy.get.bind(parseSpy)
+    let parseCount = 0
+    parseSpy.get = (format: string) => {
+      const parser = originalGet(format)
+      if (parser === undefined) return undefined
+      return {
+        ...parser,
+        parse(content: string) {
+          parseCount += 1
+          return parser.parse(content)
+        },
+      }
+    }
+
+    const schemaFingerprint = computeSchemaFingerprintFromSchema(schema, hasher)
+    const cache = new InMemoryValidationResultCache(
+      repo,
+      schemaFingerprint,
+      VALIDATE_SPECS_ENGINE_VERSION,
+      (content) => hasher.hash(content),
+    )
+    const cacheFingerprint = await repo
+      .specFingerprint(spec)
+      .then((fp) =>
+        computeCacheFingerprint({ specFingerprint: fp, metadataContentHash: null }, (content) =>
+          hasher.hash(content),
+        ),
+      )
+    cache.seed(
+      'default:auth/login',
+      {
+        spec: 'default:auth/login',
+        passed: true,
+        failures: [],
+        warnings: [],
+      },
+      stampsFromSpec(spec),
+      cacheFingerprint,
+    )
+
+    const uc = buildValidateSpecs(
+      new Map([['default', repo]]),
+      makeSchemaProvider(schema),
+      parseSpy,
+      hasher,
+      new Map(),
+      [],
+      new Map([['default', cache]]),
+    )
+
+    const result = await uc.execute({ workspace: 'default' })
+    expect(result.entries[0]!.passed).toBe(true)
+    expect(parseCount).toBe(0)
+    expect(getSpy).not.toHaveBeenCalled()
   })
 
   it('resolveValidateSpecsDeps includes validationResultCaches', async () => {

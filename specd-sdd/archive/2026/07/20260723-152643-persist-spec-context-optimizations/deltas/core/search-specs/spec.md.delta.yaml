@@ -1,0 +1,41 @@
+- op: modified
+  description: Resolve result summaries through self-healing materialization instead of a raw metadata/spec.md read.
+  selector:
+    type: section
+    matches: 'Requirement: Optional summary resolution'
+  content: |
+    When `options.includeSummary` is `true`, each result MUST include a `summary` field resolved by calling `GetSpecMetadata.execute({ specId })` (default `'if-needed'` policy) and projecting its normalized `description`. `SearchSpecs` MUST NOT read a repository metadata snapshot or `spec.md` directly to resolve this field — materialization owns the deterministic-extraction fallback internally.
+
+    When materialization cannot produce a projection for a matched spec, that result's `summary` is omitted rather than failing the search.
+
+    When `options.includeSummary` is `false` or omitted, `summary` MUST NOT appear on any result, and `SearchSpecs` MUST NOT materialize metadata for that result.
+
+- op: modified
+  description: Resolve GetSpecMetadata instead of raw hashing/YAML ports for summary resolution.
+  selector:
+    type: section
+    matches: 'Requirement: Config-based factory delegates through resolveSearchSpecsDeps'
+  content: |
+    The config-based `createSearchSpecs(config, options?)` form MUST derive `SearchSpecsDeps` through `resolveSearchSpecsDeps(resolver)` and then delegate to canonical `createSearchSpecs(deps)`.
+
+    `resolveSearchSpecsDeps(resolver)` MUST resolve:
+
+    - `listWorkspaces: ListWorkspaces`
+    - `getMetadata: GetSpecMetadata`
+
+    It MUST NOT resolve `hasher: ContentHasher` or `yaml: YamlSerializer` — normalized result fields are obtained through metadata materialization, not through direct repository snapshot reads.
+
+    The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+
+- op: modified
+  description: Add the materialization dependency.
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`core:spec-repository-port`](../spec-repository-port/spec.md)
+    - [`core:list-specs`](../list-specs/spec.md)
+    - [`core:workspace`](../workspace/spec.md)
+    - [`core:list-workspaces`](../list-workspaces/spec.md)
+    - [`core:get-spec-metadata`](../get-spec-metadata/spec.md) — self-healing resolution of normalized result fields
+    - [`core:composition-resolver`](../composition-resolver/spec.md)

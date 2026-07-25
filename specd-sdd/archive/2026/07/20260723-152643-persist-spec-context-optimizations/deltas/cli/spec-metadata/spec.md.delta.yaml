@@ -1,0 +1,123 @@
+- op: modified
+  description: The command now returns a self-healed projection with materialization diagnostics through GetSpecMetadata.
+  selector:
+    type: section
+    matches: Purpose
+  content: |
+    When debugging context issues or verifying metadata freshness, users need to inspect what Core would actually serve for a spec's metadata. The `specd spec metadata <workspace:capability-path>` command calls `GetSpecMetadata` to obtain a self-healed, normalized metadata projection and displays it alongside materialization diagnostics — whether the projection was reused or regenerated and any generation warnings — plus any lock-owned optimized fields currently fresh enough to be included.
+
+- op: modified
+  description: Behaviour now delegates to the self-healing GetSpecMetadata query instead of raw repository reads and per-file hash comparison.
+  selector:
+    type: section
+    matches: 'Requirement: Behaviour'
+  content: |
+    The command calls the `GetSpecMetadata` use case, which internally materializes metadata with an `if-needed` policy: it reuses a fresh persisted projection when present and transparently regenerates a missing, invalid, or stale one from current source artifacts. The command renders the returned `metadata`, `source` (`persisted` or `generated`), `regenerated` flag, and any `warnings` — it never reads `SpecRepository.metadata()` directly and never computes or compares per-file content hashes itself.
+
+    If materialization cannot produce valid metadata (for example, the spec's schema has no extraction rules), the underlying use-case error propagates through `handleError` and the command exits with code 1.
+
+- op: modified
+  description: Replace the per-file freshness table with materialization diagnostics; drop the top-level fresh flag.
+  selector:
+    type: section
+    matches: 'Requirement: Output format'
+  content: |
+    In `text` mode (default):
+
+    ```
+    spec: <workspace>:<capability-path>
+
+    title:       <title>
+    description: <description>
+    generatedBy: <core|agent>
+
+    source:      <persisted|generated>
+    regenerated: <true|false>
+
+    dependsOn:
+      <specId>
+      ...
+
+    rules:      <N>
+    constraints: <N>
+    scenarios:  <N>
+    ```
+
+    A `warnings:` section is printed, listing one warning per line, only when `GetSpecMetadata` returns at least one. Sections with no content are otherwise omitted. `rules`, `constraints`, and `scenarios` show counts only in text mode. `generatedBy` shows which mechanism produced the metadata (`core` for deterministic extraction, `agent` for a lock-owned optimized field currently fresh enough to be included).
+
+    In `json` or `toon` mode, the full parsed metadata is output alongside materialization diagnostics (encoded in the respective format):
+
+    ```json
+    {
+      "spec": "workspace:cap/path",
+      "source": "persisted",
+      "regenerated": false,
+      "warnings": [],
+      "title": "...",
+      "description": "...",
+      "generatedBy": "core",
+      "dependsOn": [...],
+      "rules": [...],
+      "constraints": [...],
+      "scenarios": [...]
+    }
+    ```
+
+    There is no top-level `fresh` flag or per-file `contentHashes` array: per-file freshness is an internal materialization decision, not a public projection.
+
+- op: modified
+  description: Remove the missing-metadata exit case — GetSpecMetadata self-heals instead of failing when nothing is persisted.
+  selector:
+    type: section
+    matches: 'Requirement: Error cases'
+  content: |
+    - If the workspace is not configured, exits with code 1.
+    - If `GetSpecMetadata` cannot produce valid metadata (for example, the spec does not exist, or its schema has no extraction rules), exits with code 1 and prints an `error:` message to stderr.
+
+    There is no "no metadata exists" error: absent or stale metadata is transparently regenerated rather than treated as a failure.
+
+- op: modified
+  description: Reflect self-healing in place of the prior read-only cache-inspection framing.
+  selector:
+    type: section
+    matches: Constraints
+  content: |
+    - This command is read-only from the caller's perspective — it never accepts metadata content and never exposes a way to edit it
+    - `GetSpecMetadata` may transparently persist a freshly generated projection as a caching side effect; this command never performs a forced rebuild — that is `specd spec generate-metadata`
+
+- op: modified
+  description: Update the example output to match the diagnostics-based rendering.
+  selector:
+    type: section
+    matches: Examples
+  content: |
+    ```
+    # Standard metadata display (self-heals if stale, reports source and freshness diagnostics)
+    $ specd spec metadata default:auth/login
+    spec: default:auth/login
+
+    title:       Login
+    description: Handles user authentication via login form
+    generatedBy: core
+
+    source:      persisted
+    regenerated: false
+
+    dependsOn:
+      default:auth/shared-errors
+
+    rules:       3
+    constraints: 2
+    scenarios:   5
+    ```
+
+- op: modified
+  description: Add the GetSpecMetadata dependency this command now delegates to.
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`cli:entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
+    - [`core:get-spec-metadata`](../../core/get-spec-metadata/spec.md) — self-healing metadata query and diagnostics
+    - [`core:spec-metadata`](../../core/spec-metadata/spec.md) — `.specd-metadata.yaml` format and fields
+    - [`core:spec-id-format`](../../core/spec-id-format/spec.md) — canonical `workspace:capabilityPath` format

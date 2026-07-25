@@ -1,0 +1,1000 @@
+{
+  "name": "remove-legacy-metadata-skill",
+  "createdAt": "2026-07-23T09:37:27.212Z",
+  "description": "Remove the obsolete specd-metadata skill and route metadata optimization through specialized agents.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": ["skills:skill-templates-source", "skills:agents"],
+  "specDependsOn": {
+    "skills:skill-templates-source": ["skills:skill"],
+    "skills:agents": ["skills:skill", "skills:workflow-automation"]
+  },
+  "invalidationPolicy": "downstream",
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:49bed8234ca435ac9a6e89f894f4fdfc8a08556a23590cb4593465604e561b43"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "pending-review",
+      "files": [
+        {
+          "key": "skills:skill-templates-source",
+          "filename": "deltas/skills/skill-templates-source/spec.md.delta.yaml",
+          "state": "pending-review",
+          "validatedHash": "sha256:8d549ceec2540cff13e1aa53e2529537454c93a60660a5b7dd2c374cfadcc2db"
+        },
+        {
+          "key": "skills:agents",
+          "filename": "deltas/skills/agents/spec.md.delta.yaml",
+          "state": "pending-review",
+          "validatedHash": "sha256:a4b1bea5a1751a9a1890b6e116bd7e6a0acc22b9b2f483dd88340785f89b78f0"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "pending-review",
+      "files": [
+        {
+          "key": "skills:skill-templates-source",
+          "filename": "deltas/skills/skill-templates-source/verify.md.delta.yaml",
+          "state": "pending-review",
+          "validatedHash": "sha256:b9b2c5ae9f14b6d131cc9af52a49ac78cb136a5d08329240f408224aa41c6670"
+        },
+        {
+          "key": "skills:agents",
+          "filename": "deltas/skills/agents/verify.md.delta.yaml",
+          "state": "pending-review",
+          "validatedHash": "sha256:87311d8a3dee6ebc42929cae86ebc72c53588ca1f71686b7eff984472a773412"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "pending-review",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "pending-review",
+          "validatedHash": "sha256:7db40620f84509705064436a40de1ccc41b1a578cd77b0f82e7d5080ae2aeb9e"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "pending-review",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "pending-review",
+          "validatedHash": "sha256:c8e96e29c907738065a0eb30ec52ce5a7725027470109e6f722b83167eef7d9e"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-07-23T09:37:27.212Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": ["skills:skill-templates-source", "skills:agents"],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-23T09:37:27.236Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "skills:skill-templates-source"
+        },
+        {
+          "type": "specs",
+          "key": "skills:agents"
+        },
+        {
+          "type": "verify",
+          "key": "skills:skill-templates-source"
+        },
+        {
+          "type": "verify",
+          "key": "skills:agents"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-23T09:39:03.983Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-23T10:42:32.316Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:51:17.374Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: skills:agents, skills:skill-templates-source",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["skills:skill-templates-source", "skills:agents"]
+        },
+        {
+          "type": "verify",
+          "files": ["skills:skill-templates-source", "skills:agents"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-25T11:51:17.374Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:51:30.507Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: skills:agents, skills:skill-templates-source",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["skills:skill-templates-source", "skills:agents"]
+        },
+        {
+          "type": "verify",
+          "files": ["skills:skill-templates-source", "skills:agents"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:51:38.619Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: skills:agents, skills:skill-templates-source",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["skills:skill-templates-source", "skills:agents"]
+        },
+        {
+          "type": "verify",
+          "files": ["skills:skill-templates-source", "skills:agents"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:52:09.632Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: skills:agents, skills:skill-templates-source",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["skills:skill-templates-source", "skills:agents"]
+        },
+        {
+          "type": "verify",
+          "files": ["skills:skill-templates-source", "skills:agents"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:52:20.106Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: skills:agents, skills:skill-templates-source",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["skills:skill-templates-source", "skills:agents"]
+        },
+        {
+          "type": "verify",
+          "files": ["skills:skill-templates-source", "skills:agents"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:52:22.350Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: skills:agents, skills:skill-templates-source",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["skills:skill-templates-source", "skills:agents"]
+        },
+        {
+          "type": "verify",
+          "files": ["skills:skill-templates-source", "skills:agents"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:52:24.595Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: skills:agents, skills:skill-templates-source",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["skills:skill-templates-source", "skills:agents"]
+        },
+        {
+          "type": "verify",
+          "files": ["skills:skill-templates-source", "skills:agents"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:52:26.900Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: skills:agents, skills:skill-templates-source",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["skills:skill-templates-source", "skills:agents"]
+        },
+        {
+          "type": "verify",
+          "files": ["skills:skill-templates-source", "skills:agents"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:52:29.146Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: skills:agents, skills:skill-templates-source",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["skills:skill-templates-source", "skills:agents"]
+        },
+        {
+          "type": "verify",
+          "files": ["skills:skill-templates-source", "skills:agents"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:52:31.406Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: skills:agents, skills:skill-templates-source",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["skills:skill-templates-source", "skills:agents"]
+        },
+        {
+          "type": "verify",
+          "files": ["skills:skill-templates-source", "skills:agents"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:52:33.645Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: skills:agents, skills:skill-templates-source",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["skills:skill-templates-source", "skills:agents"]
+        },
+        {
+          "type": "verify",
+          "files": ["skills:skill-templates-source", "skills:agents"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:52:35.898Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: skills:agents, skills:skill-templates-source",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["skills:skill-templates-source", "skills:agents"]
+        },
+        {
+          "type": "verify",
+          "files": ["skills:skill-templates-source", "skills:agents"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:52:38.236Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: skills:agents, skills:skill-templates-source",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["skills:skill-templates-source", "skills:agents"]
+        },
+        {
+          "type": "verify",
+          "files": ["skills:skill-templates-source", "skills:agents"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:52:40.393Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: skills:agents, skills:skill-templates-source",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["skills:skill-templates-source", "skills:agents"]
+        },
+        {
+          "type": "verify",
+          "files": ["skills:skill-templates-source", "skills:agents"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:52:42.640Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: skills:agents, skills:skill-templates-source",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["skills:skill-templates-source", "skills:agents"]
+        },
+        {
+          "type": "verify",
+          "files": ["skills:skill-templates-source", "skills:agents"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:52:44.963Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: skills:agents, skills:skill-templates-source",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["skills:skill-templates-source", "skills:agents"]
+        },
+        {
+          "type": "verify",
+          "files": ["skills:skill-templates-source", "skills:agents"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:52:47.253Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: skills:agents, skills:skill-templates-source",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["skills:skill-templates-source", "skills:agents"]
+        },
+        {
+          "type": "verify",
+          "files": ["skills:skill-templates-source", "skills:agents"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:52:49.439Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: skills:agents, skills:skill-templates-source",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["skills:skill-templates-source", "skills:agents"]
+        },
+        {
+          "type": "verify",
+          "files": ["skills:skill-templates-source", "skills:agents"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:52:51.548Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: skills:agents, skills:skill-templates-source",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["skills:skill-templates-source", "skills:agents"]
+        },
+        {
+          "type": "verify",
+          "files": ["skills:skill-templates-source", "skills:agents"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:52:53.824Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: skills:agents, skills:skill-templates-source",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["skills:skill-templates-source", "skills:agents"]
+        },
+        {
+          "type": "verify",
+          "files": ["skills:skill-templates-source", "skills:agents"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:52:55.845Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: skills:agents, skills:skill-templates-source",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["skills:skill-templates-source", "skills:agents"]
+        },
+        {
+          "type": "verify",
+          "files": ["skills:skill-templates-source", "skills:agents"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:52:58.090Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: skills:agents, skills:skill-templates-source",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["skills:skill-templates-source", "skills:agents"]
+        },
+        {
+          "type": "verify",
+          "files": ["skills:skill-templates-source", "skills:agents"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:53:00.281Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: skills:agents, skills:skill-templates-source",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["skills:skill-templates-source", "skills:agents"]
+        },
+        {
+          "type": "verify",
+          "files": ["skills:skill-templates-source", "skills:agents"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:53:02.555Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: skills:agents, skills:skill-templates-source",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["skills:skill-templates-source", "skills:agents"]
+        },
+        {
+          "type": "verify",
+          "files": ["skills:skill-templates-source", "skills:agents"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:53:16.418Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: skills:agents, skills:skill-templates-source",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["skills:skill-templates-source", "skills:agents"]
+        },
+        {
+          "type": "verify",
+          "files": ["skills:skill-templates-source", "skills:agents"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:53:25.139Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: skills:agents, skills:skill-templates-source",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["skills:skill-templates-source", "skills:agents"]
+        },
+        {
+          "type": "verify",
+          "files": ["skills:skill-templates-source", "skills:agents"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:53:27.386Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: skills:agents, skills:skill-templates-source",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["skills:skill-templates-source", "skills:agents"]
+        },
+        {
+          "type": "verify",
+          "files": ["skills:skill-templates-source", "skills:agents"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T11:53:29.741Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'persist-spec-context-optimizations' was archived with overlapping specs: skills:agents, skills:skill-templates-source",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["skills:skill-templates-source", "skills:agents"]
+        },
+        {
+          "type": "verify",
+          "files": ["skills:skill-templates-source", "skills:agents"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    }
+  ]
+}

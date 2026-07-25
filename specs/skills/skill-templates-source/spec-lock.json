@@ -3,16 +3,6 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": ["skills:skill"],
-  "implementation": [
-    {
-      "file": "skills:templates/shared/shared.md.tpl"
-    },
-    {
-      "file": "skills:templates/skills/specd-design/SKILL.md.tpl"
-    },
-    {
-      "file": "skills:templates/skills/specd-new/SKILL.md.tpl"
-    }
-  ]
+  "dependsOn": ["skills:skill", "cli:spec-optimizations"],
+  "implementation": []
 }

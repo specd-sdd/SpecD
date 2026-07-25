@@ -1,0 +1,165 @@
+{
+  "title": "core:regenerate-spec-metadata",
+  "description": "Cache warming, repair, CI diagnostics, and post-migration rebuilding all need an explicit way to force metadata reconstruction regardless of whether the persisted cache looks fresh, without duplicating the generation and persistence logic already owned by materialization. `RegenerateSpecMetadata` is that explicit, optionally batched, forced rebuild orchestration, used by the `specs generate-metadata` CLI command.",
+  "dependsOn": [
+    "core:materialize-spec-metadata",
+    "core:list-workspaces",
+    "core:spec-metadata",
+    "core:composition-resolver"
+  ],
+  "context": [
+    "Cache warming, repair, CI diagnostics, and post-migration rebuilding all need an explicit way to force metadata reconstruction regardless of whether the persisted cache looks fresh, without duplicating the generation and persistence logic already owned by materialization. `RegenerateSpecMetadata` is that explicit, optionally batched, forced rebuild orchestration, used by the `specs generate-metadata` CLI command."
+  ],
+  "rules": [
+    {
+      "requirement": "Input and target shapes",
+      "rules": [
+        "`RegenerateSpecMetadata.execute()` MUST accept an input identifying either:\n\n- a single spec, by `specId`; or\n- a batch target, optionally scoped to a set of workspace names.\n\nThere is no partial-selection mode based on metadata status; batch mode always targets every discovered spec within scope."
+      ]
+    },
+    {
+      "requirement": "Delegates generation to forced materialization",
+      "rules": [
+        "For each target spec, `RegenerateSpecMetadata` MUST invoke `MaterializeSpecMetadata` with `policy: 'force'`. It MUST NOT reimplement generation, freshness comparison, or persistence itself."
+      ]
+    },
+    {
+      "requirement": "Batch discovery avoids the ListSpecs cycle",
+      "rules": [
+        "Batch mode MUST discover raw spec identities through `ListWorkspaces` and each workspace's repository listing of spec identities, not through `ListSpecs`. `ListSpecs` may itself materialize metadata, so using it to select specs for forced regeneration would create a use-case dependency cycle."
+      ]
+    },
+    {
+      "requirement": "One-spec failure semantics",
+      "rules": [
+        "For a single-spec target, if the underlying `MaterializeSpecMetadata` call fails — including a forced cache-write failure — `RegenerateSpecMetadata` MUST report that as a failed result for the operation."
+      ]
+    },
+    {
+      "requirement": "Batch failure semantics",
+      "rules": [
+        "For a batch target, `RegenerateSpecMetadata` MUST continue processing remaining specs after an individual spec fails. It MUST return a per-spec result set indicating success or failure for every targeted spec, and MUST report a non-zero/failing overall outcome when at least one targeted spec failed.\n\nA workspace or spec scoped out by the `workspaces` filter MUST NOT appear in the per-spec result set."
+      ]
+    },
+    {
+      "requirement": "Construction and composition",
+      "rules": [
+        "`RegenerateSpecMetadata` MUST follow the standard Core use-case and composition contract: a class with an async `execute(input)` method, explicit constructor dependencies, and a composition module exposing:\n\n- `RegenerateSpecMetadataDeps`\n- `resolveRegenerateSpecMetadataDeps(resolver: CompositionResolver): RegenerateSpecMetadataDeps`\n- `createRegenerateSpecMetadata(deps): RegenerateSpecMetadata`\n- `createRegenerateSpecMetadata(config: SpecdConfig, options?: CompositionResolutionOptions): RegenerateSpecMetadata`\n\n`resolveRegenerateSpecMetadataDeps(resolver)` MUST resolve at least:\n\n- `MaterializeSpecMetadata`\n- `ListWorkspaces`\n\nThe config-based `createRegenerateSpecMetadata(config, options?)` form MUST create one `CompositionResolver`, derive dependencies through `resolveRegenerateSpecMetadataDeps(resolver)`, and delegate to the canonical `createRegenerateSpecMetadata(deps)` form.\n\n`RegenerateSpecMetadata`, its `Input`/`Result` types, `Deps`, and `create*` factory MUST be exported through the Core public surface, re-exported by the SDK, and exposed on `Kernel.specs` as `regenerateMetadata`."
+      ]
+    }
+  ],
+  "constraints": [
+    "RegenerateSpecMetadata never selects targets by metadata freshness status; forced regeneration is unconditional across the resolved scope.",
+    "CLI handlers for specs generate-metadata MUST delegate one-spec and unfiltered batch work directly to this use case rather than looping over MaterializeSpecMetadata themselves."
+  ],
+  "scenarios": [
+    {
+      "requirement": "Input and target shapes",
+      "name": "Batch mode ignores metadata freshness for target selection",
+      "given": ["a batch target with no workspaces filter"],
+      "when": ["execute() runs in batch mode"],
+      "then": [
+        "every discovered spec within scope is targeted regardless of whether its persisted metadata currently looks fresh",
+        "AND there is no partial-selection mode based on metadata status"
+      ]
+    },
+    {
+      "requirement": "Delegates generation to forced materialization",
+      "name": "Regeneration never reimplements generation or persistence",
+      "given": ["a single-spec or batch target"],
+      "when": ["RegenerateSpecMetadata processes each target spec"],
+      "then": [
+        "it invokes MaterializeSpecMetadata with policy: 'force' for that spec",
+        "AND it does not reimplement generation, freshness comparison, or persistence logic itself"
+      ]
+    },
+    {
+      "requirement": "Batch discovery avoids the ListSpecs cycle",
+      "name": "Batch discovery uses ListWorkspaces and repository listing, not ListSpecs",
+      "given": ["a batch target scoped to a set of workspaces"],
+      "when": ["raw spec identities are discovered for the batch"],
+      "then": [
+        "discovery goes through ListWorkspaces and each workspace repository's spec identity listing",
+        "AND ListSpecs is never called to select specs for forced regeneration"
+      ]
+    },
+    {
+      "requirement": "One-spec failure semantics",
+      "name": "Forced cache-write failure fails the single-spec result",
+      "given": [
+        "a single-spec target whose underlying MaterializeSpecMetadata call with policy: 'force' fails because the forced cache write fails"
+      ],
+      "when": ["execute() returns"],
+      "then": ["the operation reports a failed result for that spec"]
+    },
+    {
+      "requirement": "Batch failure semantics",
+      "name": "Batch continues after an individual spec fails",
+      "given": ["a batch target where one targeted spec fails materialization"],
+      "when": ["execute() processes the batch"],
+      "then": [
+        "processing continues for all remaining targeted specs",
+        "AND the returned per-spec result set marks every targeted spec as succeeded or failed",
+        "AND the overall outcome is reported as failing because at least one spec failed"
+      ]
+    },
+    {
+      "requirement": "Batch failure semantics",
+      "name": "Workspace-filtered-out specs are absent from the result set",
+      "given": ["a batch target scoped to a subset of workspaces via workspaces"],
+      "when": ["execute() returns its per-spec result set"],
+      "then": [
+        "specs belonging to workspaces excluded by the filter do not appear in that result set at all"
+      ]
+    },
+    {
+      "requirement": "Construction and composition",
+      "name": "Config-based factory delegates through the resolver",
+      "given": ["a SpecdConfig and no explicit deps"],
+      "when": ["createRegenerateSpecMetadata(config, options?) is called"],
+      "then": [
+        "exactly one CompositionResolver is created",
+        "AND dependencies are derived via resolveRegenerateSpecMetadataDeps(resolver) before delegating to the canonical createRegenerateSpecMetadata(deps) form"
+      ]
+    },
+    {
+      "requirement": "Construction and composition",
+      "name": "Kernel exposes regenerateMetadata",
+      "given": ["a constructed Kernel"],
+      "when": ["Kernel.specs.regenerateMetadata is invoked"],
+      "then": ["it behaves as the RegenerateSpecMetadata use case's execute()"]
+    }
+  ],
+  "implementation": {
+    "symbols": [
+      {
+        "specId": "core:regenerate-spec-metadata",
+        "file": "core:src/application/use-cases/regenerate-spec-metadata.ts",
+        "symbol": "RegenerateSpecMetadata"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:6fe210b4e155bffd38cd13328944830b354a8f96cb6048f4d8026ca12e21ba2d",
+    "verify.md": "sha256:c82fbe8934a652e1123a76d6006109ccca74a7be206c172ca4a2cbe2cc5d87d6"
+  },
+  "provenance": {
+    "artifacts": {
+      "spec.md": {
+        "hash": "sha256:6fe210b4e155bffd38cd13328944830b354a8f96cb6048f4d8026ca12e21ba2d",
+        "lastModified": "2026-07-25T11:53:31.582Z"
+      },
+      "verify.md": {
+        "hash": "sha256:c82fbe8934a652e1123a76d6006109ccca74a7be206c172ca4a2cbe2cc5d87d6",
+        "lastModified": "2026-07-25T11:53:31.582Z"
+      }
+    },
+    "persistedStateHash": "sha256:a09302a0cf7a5fa1076685ce57ea326c53ceb40e2ab7fb0e860cba5354540486",
+    "schema": {
+      "name": "schema-std",
+      "version": 1
+    },
+    "projectionVersion": 1,
+    "projectionFingerprint": "sha256:e4a28a2db6a35ed39b8308518337235b1490c2948cd839db25866ad79b22404b"
+  }
+}

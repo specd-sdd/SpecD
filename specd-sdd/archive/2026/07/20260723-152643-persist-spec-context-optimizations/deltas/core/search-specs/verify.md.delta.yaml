@@ -1,0 +1,52 @@
+# verify.md delta paired with search-specs/spec.md.delta.yaml — resolves
+# result summaries through self-healing GetSpecMetadata instead of a
+# raw metadata/spec.md read, covers materialization-failure omission, and
+# swaps the config-based factory's hasher/yaml deps for getMetadata.
+
+- op: modified
+  description: Resolve result summaries through self-healing materialization and cover materialization-failure omission.
+  selector:
+    type: section
+    matches: 'Requirement: Optional summary resolution'
+  content: |
+    #### Scenario: Summary included when requested
+
+    - **GIVEN** a matching spec's metadata materializes successfully with `description: "Handles auth"`
+    - **WHEN** `execute("auth", { includeSummary: true })` is called
+    - **THEN** the result entry includes `summary: "Handles auth"`
+
+    #### Scenario: Summary absent when not requested
+
+    - **GIVEN** a matching spec's metadata would materialize with a description
+    - **WHEN** `execute("auth")` is called without `includeSummary`
+    - **THEN** the result entry has no `summary` property
+    - **AND** `SearchSpecs` does not materialize metadata for that result
+
+    #### Scenario: Materialization failure omits summary without failing the search
+
+    - **GIVEN** materialization cannot produce a projection for a matched spec
+    - **WHEN** `execute("auth", { includeSummary: true })` is called
+    - **THEN** that result's `summary` is omitted
+    - **AND** the search still returns the result with its other fields
+
+- op: modified
+  description: Resolve GetSpecMetadata instead of raw hashing/YAML ports.
+  selector:
+    type: section
+    matches: 'Requirement: Config-based factory delegates through resolveSearchSpecsDeps'
+  content: |
+    #### Scenario: createSearchSpecs config form derives SearchSpecsDeps through resolveSearchSpecsDeps
+
+    - **WHEN** `createSearchSpecs(config, options?)` is invoked
+    - **THEN** it creates a composition resolver for that composition session
+    - **AND** it derives `SearchSpecsDeps` through `resolveSearchSpecsDeps(resolver)`
+    - **AND** `resolveSearchSpecsDeps(resolver)` resolves:
+    - `listWorkspaces: ListWorkspaces`
+    - `getMetadata: GetSpecMetadata`
+    - **AND** the factory delegates to canonical `createSearchSpecs(deps)`
+
+    #### Scenario: resolveSearchSpecsDeps does not resolve hasher or yaml serializer
+
+    - **WHEN** `resolveSearchSpecsDeps(resolver)` runs
+    - **THEN** it does not resolve `hasher: ContentHasher` or `yaml: YamlSerializer`
+    - **AND** normalized result fields are obtained through metadata materialization, not through direct repository snapshot reads

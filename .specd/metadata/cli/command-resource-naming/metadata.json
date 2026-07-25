@@ -97,7 +97,23 @@
     "spec.md": "sha256:b159acf1428275aff42bb08cb60f33d4aedf3c3936dbf571abfa1f684b3d013c",
     "verify.md": "sha256:5467d54c7ce56fac9155ad7d223ba5351700e642096099ae28487a963d3854df"
   },
-  "generatedBy": "agent",
-  "optimizedDescription": "Inconsistent singular/plural command-group naming increases cognitive load and makes CLI usage less predictable.",
-  "optimizedContext": "# Command Resource Naming\n\n## Rules\n- Canonical plural groups: For countable CLI resources, the canonical command-group name SHALL be plural.\n- Singular aliases: Each canonical plural group SHALL accept a singular alias for backward compatibility.\n- Help and docs canonical display: CLI help, project documentation, and agent-authored workflow artifacts SHALL present canonical plural command groups as the primary form.\n- Behavioral equivalence: For any canonical group and its singular alias, command behavior, outputs, and exit codes MUST be equivalent for the same subcommand and arguments.\n- Workflow equivalence mapping: When workflow guidance allows skipping a command because another command already produced equivalent information, the mapping MUST be explicit and deterministic.\n- Dependencies: cli:entrypoint\n\n## Constraints\n- This policy applies to command-group naming only; it does not rename domain entities or internal use-case identifiers.\n- Introducing plural canonicals MUST NOT break existing singular invocations.\n"
+  "provenance": {
+    "artifacts": {
+      "spec.md": {
+        "hash": "sha256:b159acf1428275aff42bb08cb60f33d4aedf3c3936dbf571abfa1f684b3d013c",
+        "lastModified": "2026-05-25T06:02:58.362Z"
+      },
+      "verify.md": {
+        "hash": "sha256:5467d54c7ce56fac9155ad7d223ba5351700e642096099ae28487a963d3854df",
+        "lastModified": "2026-05-25T06:02:58.362Z"
+      }
+    },
+    "persistedStateHash": "sha256:1e70c65f4d5d3008ce6d135379d6999ced12c398dcb39a69a89505a3ced3110f",
+    "schema": {
+      "name": "schema-std",
+      "version": 1
+    },
+    "projectionVersion": 1,
+    "projectionFingerprint": "sha256:e4a28a2db6a35ed39b8308518337235b1490c2948cd839db25866ad79b22404b"
+  }
 }

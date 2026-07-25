@@ -4,10 +4,5 @@
     "version": 1
   },
   "dependsOn": ["default:_global/architecture", "core:config"],
-  "implementation": [
-    {
-      "file": "core:src/infrastructure/fs/config-writer.ts",
-      "symbols": ["FsConfigWriter.initProject"]
-    }
-  ]
+  "implementation": []
 }

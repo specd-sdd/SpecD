@@ -43,6 +43,7 @@ describe('FsConfigWriter', () => {
       expect(result.configPath).toBe(path.join(tmpDir, 'specd.yaml'))
       expect(result.schemaRef).toBe('@specd/schema-std')
       expect(result.workspaces).toEqual(['default'])
+      expect(result.metadataCachePath).toBe('.specd/metadata')
 
       const content = await fs.readFile(result.configPath, 'utf8')
       const parsed = yamlParse(content) as Record<string, unknown>
@@ -61,7 +62,7 @@ describe('FsConfigWriter', () => {
       await writer.initProject(defaultOptions())
 
       const storageBase = path.join(tmpDir, '.specd')
-      const dirs = ['changes', 'drafts', 'discarded', 'archive']
+      const dirs = ['changes', 'drafts', 'discarded', 'archive', 'metadata']
       for (const dir of dirs) {
         const stat = await fs.stat(path.join(storageBase, dir))
         expect(stat.isDirectory()).toBe(true)
@@ -82,6 +83,18 @@ describe('FsConfigWriter', () => {
       const gitignore = await fs.readFile(path.join(tmpDir, '.gitignore'), 'utf8')
       expect(gitignore).toContain('specd.local.yaml')
       expect(gitignore).toContain('specd.local.*.yaml')
+      expect(gitignore).toContain('/.specd/metadata/')
+    })
+
+    it('does not duplicate metadata gitignore entry across reruns', async () => {
+      await writer.initProject(defaultOptions())
+      await writer.initProject({ ...defaultOptions(), force: true })
+
+      const gitignore = await fs.readFile(path.join(tmpDir, '.gitignore'), 'utf8')
+      const metadataCount = gitignore
+        .split('\n')
+        .filter((line) => line.trim() === '/.specd/metadata/').length
+      expect(metadataCount).toBe(1)
     })
 
     it('does not duplicate gitignore entries across reruns', async () => {

@@ -1,0 +1,44 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [],
+  "implementation": [],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Unified logging: console-compatible interface (`log`/`info`/`debug`/`warn`/`error`); `log` aliases `info`; avoid direct `console` in production.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:f2fb42bf418db441a956f48cec60ed302529761fc9010817ba4fb0d71c3f4fe6",
+          "lastModified": "2026-05-25T06:02:58.306Z"
+        },
+        "verify.md": {
+          "hash": "sha256:12697234dce805f8f3406a6313c2ad069d5075897099e25e0e1f7fc2b097dd78",
+          "lastModified": "2026-05-25T06:02:58.306Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Logging\n\n## Rules\n- Interface compatible with `console` API minimum: `log()`, `info()`, `debug()`, `warn()`, `error()`\n- `log()` aliases `info()`\n- Minimal console impl: `fatal` → `console.error()` + `[FATAL]` prefix; `trace` → `console.debug()`/`log()` + `[TRACE]` prefix\n- Level semantics: `trace` fine-grained; `debug` diagnostics; `info`/`log` app events; `warn` non-critical; `error` operation failures; `fatal` critical/terminate\n- Avoid direct global `console` in production; use logging abstraction",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:f2fb42bf418db441a956f48cec60ed302529761fc9010817ba4fb0d71c3f4fe6",
+          "lastModified": "2026-05-25T06:02:58.306Z"
+        },
+        "verify.md": {
+          "hash": "sha256:12697234dce805f8f3406a6313c2ad069d5075897099e25e0e1f7fc2b097dd78",
+          "lastModified": "2026-05-25T06:02:58.306Z"
+        }
+      }
+    }
+  }
+}

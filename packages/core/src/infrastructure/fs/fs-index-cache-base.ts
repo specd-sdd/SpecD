@@ -142,13 +142,24 @@ export class FsIndexCache<TEntry> {
    * @returns Sorted entries (not paginated)
    */
   async sortedEntries(filter?: (entry: TEntry) => boolean): Promise<TEntry[]> {
+    const lines = await this.sortedWireLines(filter)
+    return lines.map((line) => line.entry)
+  }
+
+  /**
+   * Returns indexed wire lines in canonical sort order after freshness checks.
+   *
+   * @param filter - Optional predicate applied to entries before sorting
+   * @returns Sorted wire lines including helper freshness fields
+   */
+  async sortedWireLines(filter?: (entry: TEntry) => boolean): Promise<IndexWireLine<TEntry>[]> {
     await this._ensureFresh()
     const lines = await this._readLines()
-    let entries = lines.map((line) => line.entry)
+    let filtered = lines
     if (filter !== undefined) {
-      entries = entries.filter(filter)
+      filtered = lines.filter((line) => filter(line.entry))
     }
-    return [...entries].sort(this._config.compare)
+    return [...filtered].sort((a, b) => this._config.compare(a.entry, b.entry))
   }
 
   /**

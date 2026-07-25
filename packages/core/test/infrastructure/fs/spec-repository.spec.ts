@@ -10,7 +10,17 @@ import { SpecArtifact } from '../../../src/domain/value-objects/spec-artifact.js
 import { ArtifactConflictError } from '../../../src/domain/errors/artifact-conflict-error.js'
 import { FsSpecRepository } from '../../../src/infrastructure/fs/spec-repository.js'
 import { sha256 } from '../../../src/infrastructure/fs/hash.js'
-import { type SpecLockData } from '../../../src/domain/services/parse-spec-lock.js'
+import { type PersistedSpecState } from '../../../src/domain/services/apply-persisted-spec-state-patch.js'
+import { type SpecMetadata } from '../../../src/domain/services/parse-metadata.js'
+
+function defaultPersistedState(overrides: Partial<PersistedSpecState> = {}): PersistedSpecState {
+  return {
+    schema: { name: 'schema-std', version: 1 },
+    dependsOn: [],
+    implementation: [],
+    ...overrides,
+  }
+}
 
 // ---- Setup / teardown helpers ----
 
@@ -329,10 +339,10 @@ describe('FsSpecRepository', () => {
     })
   })
 
-  // ---- metadata ----
+  // ---- readMetadataSnapshot / writeMetadataSnapshot ----
 
-  describe('metadata', () => {
-    it('returns null when metadata.json does not exist', async () => {
+  describe('readMetadataSnapshot / writeMetadataSnapshot', () => {
+    it('readMetadataSnapshot returns missing when metadata.json does not exist', async () => {
       const spec = buildTestSpec({
         workspace: 'default',
         name: 'auth/login',
@@ -340,110 +350,96 @@ describe('FsSpecRepository', () => {
       })
       await writeSpecFile(ctx, 'auth/login', 'spec.md', '# Login spec')
 
-      const result = await ctx.repo.metadata(spec)
+      const result = await ctx.repo.readMetadataSnapshot(spec)
 
-      expect(result).toBeNull()
+      expect(result).toEqual({ kind: 'missing', revision: null })
     })
 
-    it('returns fresh metadata with originalHash when content hashes and sidecar agree', async () => {
+    it('writeMetadataSnapshot creates present snapshot with revision hash', async () => {
       const spec = buildTestSpec({
         workspace: 'default',
         name: 'auth/login',
         filenames: ['spec.md'],
       })
-      const specContent = '# Login spec'
-      await writeSpecFile(ctx, 'auth/login', 'spec.md', specContent)
-      await writeSpecFile(
-        ctx,
-        'auth/login',
-        'spec-lock.json',
-        JSON.stringify({
-          schema: { name: 'schema-std', version: 1 },
-          dependsOn: ['default:shared/auth'],
-        }),
-      )
-      await ctx.repo.saveMetadata(
-        spec,
-        JSON.stringify({
-          title: 'Login',
-          description: 'Handles login',
-          dependsOn: ['default:shared/auth'],
-          contentHashes: { 'spec.md': sha256(specContent) },
-        }),
-      )
+      const metadata: SpecMetadata = {
+        title: 'Login',
+        description: 'Handles login',
+        contentHashes: { 'spec.md': sha256('# Login spec') },
+      }
+      await writeSpecFile(ctx, 'auth/login', 'spec.md', '# Login spec')
 
-      const result = await ctx.repo.metadata(spec)
+      const result = await ctx.repo.writeMetadataSnapshot(spec, metadata, {
+        expectedRevision: null,
+      })
 
-      expect(result).not.toBeNull()
-      expect(result!.title).toBe('Login')
-      expect(result!.freshness).toBe('fresh')
-      expect(result!.originalHash).toBe(
-        sha256(
-          JSON.stringify({
-            title: 'Login',
-            description: 'Handles login',
-            dependsOn: ['default:shared/auth'],
-            contentHashes: { 'spec.md': sha256(specContent) },
-          }),
+      expect(result.kind).toBe('present')
+      if (result.kind === 'present') {
+        expect(result.metadata.title).toBe('Login')
+        expect(result.revision).toMatch(/^sha256:/)
+      }
+    })
+
+    it('readMetadataSnapshot returns invalid for malformed JSON', async () => {
+      const spec = buildTestSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md'],
+      })
+      await writeMetadataFile(ctx, 'auth/login', '{not json')
+
+      const result = await ctx.repo.readMetadataSnapshot(spec)
+
+      expect(result.kind).toBe('invalid')
+      if (result.kind === 'invalid') {
+        expect(result.revision).toMatch(/^sha256:/)
+      }
+    })
+
+    it('writeMetadataSnapshot rejects creation when metadata already exists', async () => {
+      const spec = buildTestSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md'],
+      })
+      const metadata: SpecMetadata = {
+        title: 'Login',
+        description: 'Handles login',
+        contentHashes: { 'spec.md': sha256('# Login spec') },
+      }
+      await ctx.repo.writeMetadataSnapshot(spec, metadata, { expectedRevision: null })
+
+      await expect(
+        ctx.repo.writeMetadataSnapshot(
+          spec,
+          { ...metadata, title: 'Other' },
+          { expectedRevision: null },
         ),
-      )
+      ).rejects.toBeInstanceOf(ArtifactConflictError)
     })
 
-    it('returns stale metadata instead of null when hashes are outdated', async () => {
+    it('writeMetadataSnapshot enforces revision mismatch', async () => {
       const spec = buildTestSpec({
         workspace: 'default',
         name: 'auth/login',
         filenames: ['spec.md'],
       })
-      await writeSpecFile(ctx, 'auth/login', 'spec.md', '# Updated spec')
-      await ctx.repo.saveMetadata(
-        spec,
-        JSON.stringify({
-          title: 'Login',
-          description: 'Handles login',
-          contentHashes: { 'spec.md': sha256('# Old spec') },
-        }),
-      )
-
-      const result = await ctx.repo.metadata(spec)
-
-      expect(result).not.toBeNull()
-      expect(result!.title).toBe('Login')
-      expect(result!.freshness).toBe('stale')
-    })
-
-    it('returns stale metadata when dependsOn drifts from spec-lock.json', async () => {
-      const spec = buildTestSpec({
-        workspace: 'default',
-        name: 'auth/login',
-        filenames: ['spec.md'],
+      const metadata: SpecMetadata = {
+        title: 'Login',
+        description: 'Handles login',
+        contentHashes: { 'spec.md': sha256('# Login spec') },
+      }
+      const created = await ctx.repo.writeMetadataSnapshot(spec, metadata, {
+        expectedRevision: null,
       })
-      const specContent = '# Login spec'
-      await writeSpecFile(ctx, 'auth/login', 'spec.md', specContent)
-      await writeSpecFile(
-        ctx,
-        'auth/login',
-        'spec-lock.json',
-        JSON.stringify({
-          schema: { name: 'schema-std', version: 1 },
-          dependsOn: ['default:shared/persisted'],
-        }),
-      )
-      await ctx.repo.saveMetadata(
-        spec,
-        JSON.stringify({
-          title: 'Login',
-          description: 'Handles login',
-          dependsOn: ['default:shared/metadata'],
-          contentHashes: { 'spec.md': sha256(specContent) },
-        }),
-      )
+      assert(created.kind === 'present')
 
-      const result = await ctx.repo.metadata(spec)
-
-      expect(result).not.toBeNull()
-      expect(result!.dependsOn).toEqual(['default:shared/metadata'])
-      expect(result!.freshness).toBe('stale')
+      await expect(
+        ctx.repo.writeMetadataSnapshot(
+          spec,
+          { ...metadata, title: 'Updated' },
+          { expectedRevision: sha256('stale') },
+        ),
+      ).rejects.toBeInstanceOf(ArtifactConflictError)
     })
   })
 
@@ -556,6 +552,7 @@ describe('FsSpecRepository', () => {
           new SpecArtifact('spec.md', '# New'),
           new SpecArtifact('verify.md', 'new verify'),
         ],
+        persistedState: defaultPersistedState(),
       })
 
       await expect(readSpecFile(ctx, 'auth/login', 'spec.md')).resolves.toBe('# New')
@@ -573,6 +570,7 @@ describe('FsSpecRepository', () => {
       await expect(
         ctx.repo.publish(spec, {
           artifacts: [new SpecArtifact('../escape.md', '# Broken')],
+          persistedState: defaultPersistedState(),
         }),
       ).rejects.toThrow('manual recovery')
 
@@ -971,21 +969,7 @@ describe('FsSpecRepository', () => {
       await expect(roCtx.repo.save(spec, artifact)).rejects.toThrow(ReadOnlyWorkspaceError)
     })
 
-    it('saveMetadata() throws ReadOnlyWorkspaceError', async () => {
-      const { ReadOnlyWorkspaceError } =
-        await import('../../../src/domain/errors/read-only-workspace-error.js')
-      const spec = buildTestSpec({
-        workspace: 'default',
-        name: 'auth/tokens',
-        filenames: ['spec.md'],
-      })
-
-      await expect(roCtx.repo.saveMetadata(spec, '{"title":"Tokens"}')).rejects.toThrow(
-        ReadOnlyWorkspaceError,
-      )
-    })
-
-    it('updatePersistedSchema() throws ReadOnlyWorkspaceError', async () => {
+    it('writePersistedState() throws ReadOnlyWorkspaceError', async () => {
       const { ReadOnlyWorkspaceError } =
         await import('../../../src/domain/errors/read-only-workspace-error.js')
       const spec = buildTestSpec({
@@ -995,8 +979,25 @@ describe('FsSpecRepository', () => {
       })
 
       await expect(
-        roCtx.repo.updatePersistedSchema(spec, { name: 'schema-std', version: 1 }),
+        roCtx.repo.writePersistedState(spec, defaultPersistedState(), { expectedRevision: null }),
       ).rejects.toThrow(ReadOnlyWorkspaceError)
+    })
+
+    it('writeMetadataSnapshot() is permitted on readOnly workspace', async () => {
+      const spec = buildTestSpec({
+        workspace: 'default',
+        name: 'auth/tokens',
+        filenames: ['spec.md'],
+      })
+      const metadata: SpecMetadata = {
+        title: 'Tokens',
+        description: 'Token spec',
+        contentHashes: { 'spec.md': sha256('# Tokens spec') },
+      }
+
+      await expect(
+        roCtx.repo.writeMetadataSnapshot(spec, metadata, { expectedRevision: null }),
+      ).resolves.toMatchObject({ kind: 'present' })
     })
 
     it('get() still works on readOnly workspace', async () => {
@@ -1048,9 +1049,14 @@ describe('FsSpecRepository', () => {
       const spec = await repo.get(SpecPath.parse('get-skill'))
       expect(spec).not.toBeNull()
 
-      await repo.saveMetadata(
+      await repo.writeMetadataSnapshot(
         spec!,
-        JSON.stringify({ title: 'Get Skill', description: 'Test', contentHashes: {} }),
+        {
+          title: 'Get Skill',
+          description: 'Test',
+          contentHashes: { 'spec.md': sha256('# Get Skill') },
+        },
+        { expectedRevision: null },
       )
 
       const metadataPath = path.join(
@@ -1094,9 +1100,14 @@ describe('FsSpecRepository', () => {
       const spec = await repo.get(SpecPath.parse('core/config'))
       expect(spec).not.toBeNull()
 
-      await repo.saveMetadata(
+      await repo.writeMetadataSnapshot(
         spec!,
-        JSON.stringify({ title: 'Config', description: 'Test', contentHashes: {} }),
+        {
+          title: 'Config',
+          description: 'Test',
+          contentHashes: { 'spec.md': sha256('# Config') },
+        },
+        { expectedRevision: null },
       )
 
       const metadataPath = path.join(
@@ -1119,42 +1130,49 @@ describe('FsSpecRepository', () => {
   })
 
   describe('persisted spec state', () => {
-    it('readPersistedSchema() returns null when absent', async () => {
+    it('readPersistedState() returns null when absent', async () => {
       const spec = buildTestSpec({
         workspace: 'default',
         name: 'auth/login',
         filenames: ['spec.md'],
       })
 
-      await expect(ctx.repo.readPersistedSchema(spec)).resolves.toBeNull()
+      await expect(ctx.repo.readPersistedState(spec)).resolves.toBeNull()
     })
 
-    it('updatePersistedDependsOn() persists and readPersistedDependsOn() returns content', async () => {
+    it('writePersistedState() creates state with expectedRevision null guard', async () => {
       const spec = buildTestSpec({
         workspace: 'default',
         name: 'auth/login',
         filenames: ['spec.md'],
       })
 
-      await ctx.repo.updatePersistedDependsOn(spec, [
-        'core:storage',
-        'default:_global/architecture',
-      ])
+      const created = await ctx.repo.writePersistedState(
+        spec,
+        defaultPersistedState({
+          dependsOn: ['core:storage', 'default:_global/architecture'],
+        }),
+        { expectedRevision: null },
+      )
 
-      const result = await ctx.repo.readPersistedDependsOn(spec)
-      expect(result).toEqual(['core:storage', 'default:_global/architecture'])
+      expect(created.dependsOn).toEqual(['core:storage', 'default:_global/architecture'])
+      expect(created.originalHash).toMatch(/^sha256:/)
+
+      await expect(
+        ctx.repo.writePersistedState(spec, defaultPersistedState(), { expectedRevision: null }),
+      ).rejects.toBeInstanceOf(ArtifactConflictError)
     })
 
-    it('updatePersistedSchema() enforces conflict detection', async () => {
+    it('writePersistedState() enforces revision mismatch conflict', async () => {
       const spec = buildTestSpec({
         workspace: 'default',
         name: 'auth/login',
         filenames: ['spec.md'],
       })
 
-      await ctx.repo.updatePersistedSchema(spec, { name: 'schema-std', version: 1 })
-      const originalHash = await ctx.repo.persistedStateHash(spec)
-      expect(originalHash).not.toBeNull()
+      const created = await ctx.repo.writePersistedState(spec, defaultPersistedState(), {
+        expectedRevision: null,
+      })
 
       await writeSpecFile(
         ctx,
@@ -1171,22 +1189,15 @@ describe('FsSpecRepository', () => {
       )
 
       await expect(
-        ctx.repo.updatePersistedSchema(
+        ctx.repo.writePersistedState(
           spec,
-          { name: 'schema-std', version: 2 },
-          { originalHash: originalHash! },
+          defaultPersistedState({ schema: { name: 'schema-std', version: 2 } }),
+          { expectedRevision: created.originalHash },
         ),
       ).rejects.toBeInstanceOf(ArtifactConflictError)
     })
 
-    it('updatePersistedSchema() force overwrites on hash mismatch', async () => {
-      const spec = buildTestSpec({
-        workspace: 'default',
-        name: 'auth/login',
-        filenames: ['spec.md'],
-      })
-
-      await ctx.repo.updatePersistedSchema(spec, { name: 'schema-std', version: 1 })
+    it('readPersistedState() parses old locks without optimizations', async () => {
       await writeSpecFile(
         ctx,
         'auth/login',
@@ -1194,33 +1205,82 @@ describe('FsSpecRepository', () => {
         JSON.stringify(
           {
             schema: { name: 'schema-std', version: 1 },
-            dependsOn: ['core:changed'],
+            dependsOn: ['core:storage'],
+            implementation: [],
           },
           null,
           2,
         ) + '\n',
       )
-
-      await ctx.repo.updatePersistedSchema(
-        spec,
-        { name: 'schema-std', version: 2 },
-        { force: true, originalHash: sha256('stale') },
-      )
-
-      const result = await ctx.repo.readPersistedSchema(spec)
-      expect(result!.version).toBe(2)
-    })
-
-    it('persistedStateHash() returns null when no sidecar exists', async () => {
       const spec = buildTestSpec({
         workspace: 'default',
         name: 'auth/login',
         filenames: ['spec.md'],
       })
-      await expect(ctx.repo.persistedStateHash(spec)).resolves.toBeNull()
+
+      const result = await ctx.repo.readPersistedState(spec)
+
+      expect(result).toMatchObject({
+        schema: { name: 'schema-std', version: 1 },
+        dependsOn: ['core:storage'],
+        implementation: [],
+      })
+      expect(result!.optimizations).toBeUndefined()
     })
 
-    it('persistedStateHash() returns SHA-256 of lock sidecar bytes', async () => {
+    it('artifactMeta() returns lastModified without hash by default', async () => {
+      const content = '# Login spec'
+      await writeSpecFile(ctx, 'auth/login', 'spec.md', content)
+      const spec = buildTestSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md'],
+      })
+
+      const result = await ctx.repo.artifactMeta(spec, 'spec.md')
+
+      expect(result).toEqual({
+        lastModified: expect.stringMatching(/^\d{4}-/),
+      })
+    })
+
+    it('artifactMeta() returns hash and lastModified when includeHash is set', async () => {
+      const content = '# Login spec'
+      await writeSpecFile(ctx, 'auth/login', 'spec.md', content)
+      const spec = buildTestSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md'],
+      })
+
+      const result = await ctx.repo.artifactMeta(spec, 'spec.md', { includeHash: true })
+
+      expect(result).toEqual({
+        hash: sha256(content),
+        lastModified: expect.stringMatching(/^\d{4}-/),
+      })
+    })
+
+    it('artifactMeta() returns null when artifact is absent', async () => {
+      const spec = buildTestSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md'],
+      })
+
+      await expect(ctx.repo.artifactMeta(spec, 'spec.md')).resolves.toBeNull()
+    })
+
+    it('persistedStateMeta() returns null when no sidecar exists', async () => {
+      const spec = buildTestSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md'],
+      })
+      await expect(ctx.repo.persistedStateMeta(spec)).resolves.toBeNull()
+    })
+
+    it('persistedStateMeta() returns lastModified without hash by default', async () => {
       const lockContent =
         JSON.stringify({ schema: { name: 'schema-std', version: 1 }, dependsOn: [] }, null, 2) +
         '\n'
@@ -1228,7 +1288,45 @@ describe('FsSpecRepository', () => {
       await writeSpecFile(ctx, 'auth/login', 'spec-lock.json', lockContent)
 
       const spec = (await ctx.repo.get(SpecPath.parse('auth/login')))!
-      await expect(ctx.repo.persistedStateHash(spec)).resolves.toBe(sha256(lockContent))
+      const meta = await ctx.repo.persistedStateMeta(spec)
+      expect(meta).not.toBeNull()
+      expect(meta?.hash).toBeUndefined()
+      expect(meta?.lastModified).toMatch(/^\d{4}-/)
+    })
+
+    it('persistedStateMeta() returns SHA-256 of lock sidecar bytes when includeHash is set', async () => {
+      const lockContent =
+        JSON.stringify({ schema: { name: 'schema-std', version: 1 }, dependsOn: [] }, null, 2) +
+        '\n'
+      await writeSpecFile(ctx, 'auth/login', 'spec.md', '# Login')
+      await writeSpecFile(ctx, 'auth/login', 'spec-lock.json', lockContent)
+
+      const spec = (await ctx.repo.get(SpecPath.parse('auth/login')))!
+      await expect(ctx.repo.persistedStateMeta(spec, { includeHash: true })).resolves.toEqual({
+        lastModified: expect.any(String),
+        hash: sha256(lockContent),
+      })
+    })
+
+    it('list({ includeMeta: true }) projects sourceFiles without hashes', async () => {
+      await writeSpecFile(ctx, 'auth/login', 'spec.md', '# Login')
+      await writeSpecFile(
+        ctx,
+        'auth/login',
+        'spec-lock.json',
+        JSON.stringify({ schema: { name: 'schema-std', version: 1 }, dependsOn: [] }, null, 2),
+      )
+
+      await ctx.repo.reindex()
+      const listed = await ctx.repo.list(undefined, { includeMeta: true })
+      expect(listed.items).toHaveLength(1)
+      const row = listed.items[0]!
+      expect(row.artifacts).toEqual(
+        expect.arrayContaining([expect.objectContaining({ filename: 'spec.md' })]),
+      )
+      expect(row.artifacts?.every((artifact) => !('hash' in artifact))).toBe(true)
+      expect(row.persistedStateMeta).toEqual({ lastModified: expect.any(String) })
+      expect(row.persistedStateMeta && 'hash' in row.persistedStateMeta).toBe(false)
     })
 
     it('specFingerprint() is unchanged when only generated metadata changes', async () => {
@@ -1266,32 +1364,6 @@ describe('FsSpecRepository', () => {
       })
 
       await expect(ctx.repo.artifact(spec, 'spec-lock.json')).rejects.toThrow()
-    })
-
-    it('readPersistedDependsOn() still reads spec-lock.json through semantic API', async () => {
-      await writeSpecFile(
-        ctx,
-        'auth/login',
-        'spec-lock.json',
-        JSON.stringify(
-          {
-            schema: { name: 'schema-std', version: 1 },
-            dependsOn: ['core:storage'],
-            implementation: [],
-          },
-          null,
-          2,
-        ) + '\n',
-      )
-      const spec = buildTestSpec({
-        workspace: 'default',
-        name: 'auth/login',
-        filenames: ['spec.md'],
-      })
-
-      const result = await ctx.repo.readPersistedDependsOn(spec)
-
-      expect(result).toEqual(['core:storage'])
     })
   })
 

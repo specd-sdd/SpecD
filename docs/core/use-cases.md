@@ -480,23 +480,9 @@ Finalises a completed change: runs pre-archive hooks, merges delta artifacts int
 
 Only the initial persisted move into `archiving` is serialized through `ChangeRepository.mutate(...)`; overlap checks, hooks, spec sync, archive storage, and metadata generation remain outside that critical section.
 
-This use case is the most port-intensive — it composes `RunStepHooks`, `GenerateSpecMetadata`, and `SaveSpecMetadata` alongside five direct ports.
+This use case is the most port-intensive — it composes `RunStepHooks`, `MaterializeSpecMetadata` (force policy post-commit), and persisted-state publication via `applyPersistedSpecStatePatch` alongside direct ports.
 
-**Constructor:**
-
-```typescript
-new ArchiveChange(
-  changes: ChangeRepository,
-  specs: ReadonlyMap<string, SpecRepository>,
-  archive: ArchiveRepository,
-  runStepHooks: RunStepHooks,
-  actor: ActorResolver,
-  parsers: ArtifactParserRegistry,
-  schemaProvider: SchemaProvider,
-  generateMetadata: GenerateSpecMetadata,
-  saveMetadata: SaveSpecMetadata,
-)
-```
+**Constructor:** (via `createKernel`) — `archive` receives `materializeMetadata` instead of the removed `saveMetadata` / `updateMetadata` / `invalidateMetadata` editors.
 
 **Input:**
 
@@ -637,6 +623,8 @@ new ValidateSpecs(
 | `workspace` | `string` | no       | Validate all specs in this workspace. Mutually exclusive with `specPath`.               |
 
 When both fields are absent, all specs across all workspaces are validated.
+
+For workspace and all-workspaces modes, discovery uses `repo.list(undefined, { includeMeta: true })` so validation-result-cache hard hits can compare stamp bundles without N×`get()` calls. Single-spec mode may still load stamps via `get()` or Meta methods.
 
 **Returns:** `Promise<ValidateSpecsResult>`
 

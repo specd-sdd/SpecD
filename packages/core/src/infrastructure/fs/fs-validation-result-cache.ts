@@ -11,6 +11,7 @@ import {
   ValidationResultCache,
   type SpecValidationEntry,
   type ValidationCacheLookupResult,
+  type ValidationSourceStamps,
 } from '../../application/ports/validation-result-cache.js'
 import { computeCacheFingerprint } from '../../application/use-cases/_shared/validate-specs-cache-fingerprints.js'
 import { isEnoent } from './is-enoent.js'
@@ -89,6 +90,7 @@ export class FsValidationResultCache extends ValidationResultCache {
     readonly spec: Spec
     readonly schemaFingerprint: string
     readonly engineVersion: number
+    readonly stamps?: ValidationSourceStamps
   }): Promise<ValidationCacheLookupResult> {
     const meta = await this._readMeta()
     if (
@@ -106,7 +108,7 @@ export class FsValidationResultCache extends ValidationResultCache {
       return { kind: 'miss' }
     }
 
-    const currentStamps = stampsFromSpec(input.spec)
+    const currentStamps = input.stamps !== undefined ? input.stamps : stampsFromSpec(input.spec)
     if (stampsDeepEqual(row.stamps, currentStamps)) {
       return { kind: 'hit', entry: row.entry }
     }
@@ -398,7 +400,10 @@ export function stampsFromSpec(spec: Spec): ValidationStoredStamps {
  * @param b - Second stamp bundle
  * @returns Whether both bundles are equivalent
  */
-function stampsDeepEqual(a: ValidationStoredStamps, b: ValidationStoredStamps): boolean {
+function stampsDeepEqual(
+  a: ValidationStoredStamps | ValidationSourceStamps,
+  b: ValidationStoredStamps | ValidationSourceStamps,
+): boolean {
   if (a.persistedStateStamp.present !== b.persistedStateStamp.present) return false
   if (a.persistedStateStamp.lastModified !== b.persistedStateStamp.lastModified) return false
   if (a.generatedMetadataStamp.present !== b.generatedMetadataStamp.present) return false

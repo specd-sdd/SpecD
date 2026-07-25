@@ -13,6 +13,8 @@ import {
   makeSchema,
   makeSchemaProvider,
   makeSpecRepository,
+  makeGetSpecMetadata,
+  missingGetSpecMetadata,
 } from './helpers.js'
 import { WorkspaceNotFoundError } from '../../../src/application/errors/workspace-not-found-error.js'
 import { SpecNotFoundError } from '../../../src/application/errors/spec-not-found-error.js'
@@ -30,6 +32,13 @@ describe('GetSpecContext', () => {
       title: 'Login Flow',
       description: 'Handles user login',
       contentHashes: { 'spec.md': contentHash },
+      provenance: {
+        artifacts: { 'spec.md': { hash: contentHash, lastModified: '2024-01-15T00:00:00.000Z' } },
+        persistedStateHash: null,
+        schema: { name: 'specd-std', version: 1 },
+        projectionVersion: 1,
+        projectionFingerprint: 'fp-test',
+      },
     })
 
     const spec = makeSpec({
@@ -46,7 +55,11 @@ describe('GetSpecContext', () => {
     })
     const specRepos = makeListWorkspaces(new Map([['default', repo]]))
 
-    const uc = new GetSpecContext(specRepos, hasher)
+    const uc = new GetSpecContext(
+      specRepos,
+      hasher,
+      makeGetSpecMetadata(new Map([['default', repo]])),
+    )
     const result = await uc.execute({
       workspace: 'default',
       specPath: SpecPath.parse('auth/login'),
@@ -63,7 +76,7 @@ describe('GetSpecContext', () => {
   it('throws WorkspaceNotFoundError when workspace not found', async () => {
     const specRepos = makeListWorkspaces(new Map([['default', makeSpecRepository()]]))
 
-    const uc = new GetSpecContext(specRepos, makeContentHasher())
+    const uc = new GetSpecContext(specRepos, makeContentHasher(), missingGetSpecMetadata)
     await expect(
       uc.execute({
         workspace: 'nonexistent',
@@ -76,7 +89,7 @@ describe('GetSpecContext', () => {
     const repo = makeSpecRepository({ specs: [] })
     const specRepos = makeListWorkspaces(new Map([['default', repo]]))
 
-    const uc = new GetSpecContext(specRepos, makeContentHasher())
+    const uc = new GetSpecContext(specRepos, makeContentHasher(), missingGetSpecMetadata)
     await expect(
       uc.execute({
         workspace: 'default',
@@ -85,7 +98,7 @@ describe('GetSpecContext', () => {
     ).rejects.toThrow(SpecNotFoundError)
   })
 
-  it('returns warnings for stale metadata', async () => {
+  it('materializes metadata for entries with mismatched cache hashes', async () => {
     const metadataContent = JSON.stringify({
       title: 'Login Flow',
       contentHashes: { 'spec.md': 'sha256:stale-hash-that-does-not-match' },
@@ -105,19 +118,22 @@ describe('GetSpecContext', () => {
     })
     const specRepos = makeListWorkspaces(new Map([['default', repo]]))
 
-    const uc = new GetSpecContext(specRepos, makeContentHasher())
+    const uc = new GetSpecContext(
+      specRepos,
+      makeContentHasher(),
+      makeGetSpecMetadata(new Map([['default', repo]])),
+    )
     const result = await uc.execute({
       workspace: 'default',
       specPath: SpecPath.parse('auth/login'),
     })
 
     expect(result.entries).toHaveLength(1)
-    expect(result.entries[0]!.stale).toBe(true)
-    expect(result.warnings).toHaveLength(1)
-    expect(result.warnings[0]!.type).toBe('stale-metadata')
+    expect(result.entries[0]!.stale).toBe(false)
+    expect(result.entries[0]!.title).toBe('Login Flow')
   })
 
-  it('follows metadata dependsOn even without schema extraction support', async () => {
+  it('follows persisted dependsOn even without schema extraction support', async () => {
     const hasher = makeContentHasher()
     const loginContent = '# Login\n'
     const sharedContent = '# Shared\n'
@@ -125,10 +141,28 @@ describe('GetSpecContext', () => {
       title: 'Login',
       dependsOn: ['default:auth/shared'],
       contentHashes: { 'spec.md': hasher.hash(loginContent) },
+      provenance: {
+        artifacts: {
+          'spec.md': { hash: hasher.hash(loginContent), lastModified: '2024-01-15T00:00:00.000Z' },
+        },
+        persistedStateHash: 'sha256:test-lock',
+        schema: { name: 'std', version: 1 },
+        projectionVersion: 1,
+        projectionFingerprint: 'fp-test',
+      },
     })
     const sharedMetadata = JSON.stringify({
       title: 'Shared',
       contentHashes: { 'spec.md': hasher.hash(sharedContent) },
+      provenance: {
+        artifacts: {
+          'spec.md': { hash: hasher.hash(sharedContent), lastModified: '2024-01-15T00:00:00.000Z' },
+        },
+        persistedStateHash: 'sha256:test-lock',
+        schema: { name: 'std', version: 1 },
+        projectionVersion: 1,
+        projectionFingerprint: 'fp-test',
+      },
     })
 
     const repo = makeSpecRepository({
@@ -147,12 +181,26 @@ describe('GetSpecContext', () => {
       artifacts: {
         'auth/login/spec.md': loginContent,
         'auth/login/.specd-metadata.yaml': loginMetadata,
+        'auth/login/spec-lock.json': JSON.stringify({
+          schema: { name: 'std', version: 1 },
+          dependsOn: ['default:auth/shared'],
+          implementation: [],
+        }),
         'auth/shared/spec.md': sharedContent,
         'auth/shared/.specd-metadata.yaml': sharedMetadata,
+        'auth/shared/spec-lock.json': JSON.stringify({
+          schema: { name: 'std', version: 1 },
+          dependsOn: [],
+          implementation: [],
+        }),
       },
     })
 
-    const uc = new GetSpecContext(makeListWorkspaces(new Map([['default', repo]])), hasher)
+    const uc = new GetSpecContext(
+      makeListWorkspaces(new Map([['default', repo]])),
+      hasher,
+      makeGetSpecMetadata(new Map([['default', repo]])),
+    )
     const result = await uc.execute({
       workspace: 'default',
       specPath: SpecPath.parse('auth/login'),
@@ -238,6 +286,7 @@ describe('GetSpecContext', () => {
     const uc = new GetSpecContext(
       makeListWorkspaces(new Map([['default', repo]])),
       hasher,
+      makeGetSpecMetadata(new Map([['default', repo]])),
       makeSchemaProvider(schema),
       makeParsers(markdownParser),
       createBuiltinExtractorTransforms(),

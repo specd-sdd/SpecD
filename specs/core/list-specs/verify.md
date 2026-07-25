@@ -23,11 +23,12 @@
 - **WHEN** `execute({ workspaces: ["alpha"] })` is called
 - **THEN** only entries from workspace `alpha` are returned
 
-#### Scenario: ListSpecs forwards include flags to each repository
+#### Scenario: ListSpecs forwards includeSummary and other list options to each repository
 
-- **WHEN** `execute({ includeSummary: true, includeMetadataStatus: true, limit: 50 })` is called
+- **WHEN** `execute({ includeSummary: true, limit: 50 })` is called
 - **THEN** each workspace `SpecRepository.list()` receives the same forwarded options
 - **AND** the use case does not re-sort or re-paginate per-workspace results
+- **AND** it does not forward a metadata-status flag
 
 #### Scenario: Omitted limit is forwarded without inventing a default
 
@@ -60,55 +61,53 @@
 
 ### Requirement: Optional summary resolution
 
-#### Scenario: Summary forwarded from repository when requested
+#### Scenario: Summary resolved via repository list/index materialization when requested
 
-- **GIVEN** `SpecRepository.list({ includeSummary: true })` returns entries with cached `summary`
+- **GIVEN** a spec whose metadata materializes successfully at the repository/index boundary
 - **WHEN** `execute({ includeSummary: true })` is called
-- **THEN** merged entries include the repository-provided `summary`
+- **THEN** the entry's `summary` is the materialized metadata's normalized `description`
+- **AND** `ListSpecs` does not call `GetSpecMetadata` or `MaterializeSpecMetadata` directly
+
+#### Scenario: Optimized description used only when fresh
+
+- **GIVEN** `llmOptimizedContext` is active and a spec's materialized metadata reports `optimizedDescription` as fresh
+- **WHEN** `execute({ includeSummary: true })` is called
+- **THEN** the entry's `summary` uses the optimized value
+
+#### Scenario: Stale or missing optimized description falls back to normalized description
+
+- **GIVEN** a spec's materialized metadata reports `optimizedDescription` as stale or missing
+- **WHEN** `execute({ includeSummary: true })` is called
+- **THEN** the entry's `summary` uses the normalized `description` instead
+
+#### Scenario: Materialization failure omits summary without failing the listing
+
+- **GIVEN** index materialization cannot produce a projection for a spec at all
+- **WHEN** `execute({ includeSummary: true })` is called
+- **THEN** that entry's `summary` is omitted
+- **AND** the overall listing still succeeds
 
 #### Scenario: Summary omitted when not requested
 
 - **WHEN** `execute()` is called without `includeSummary`
 - **THEN** no entry has a `summary` property
-
-#### Scenario: Use case does not re-resolve summary with extra I/O
-
-- **GIVEN** the repository already returned a cached summary for a spec entry
-- **WHEN** `execute({ includeSummary: true })` is called
-- **THEN** the use case does not call `metadata()`, read `spec.md`, or invoke summary extraction helpers for that entry
-
-### Requirement: Optional metadata freshness status
-
-#### Scenario: metadataStatus forwarded from repository when requested
-
-- **GIVEN** `SpecRepository.list({ includeMetadataStatus: true })` returns entries with cached `metadataStatus`
-- **WHEN** `execute({ includeMetadataStatus: true })` is called
-- **THEN** merged entries include the repository-provided `metadataStatus`
-
-#### Scenario: Status not present when not requested
-
-- **WHEN** `execute()` is called without `includeMetadataStatus`
-- **THEN** no entry has a `metadataStatus` property
-
-#### Scenario: Use case does not re-compute freshness with extra I/O
-
-- **GIVEN** the repository already returned `metadataStatus` for a spec entry
-- **WHEN** `execute({ includeMetadataStatus: true })` is called
-- **THEN** the use case does not call `metadata()`, content hashing, or schema validation for that entry
+- **AND** repository listing does not trigger summary materialization for that call
 
 ### Requirement: Silent error handling for metadata and summary reads
 
 #### Scenario: Repository swallows per-spec resolution errors at index time
 
-- **GIVEN** a spec whose title/summary/status resolution fails during index materialization
+- **GIVEN** a spec whose title resolution fails during index materialization
 - **WHEN** `execute()` is called
 - **THEN** the entry still appears with repository-provided fallback fields
 - **AND** no error is thrown to the caller
 
-#### Scenario: ListSpecs does not perform supplementary I/O for optional fields
+#### Scenario: Summary materialization errors are caught and omitted
 
-- **WHEN** `execute({ includeSummary: true, includeMetadataStatus: true })` is called
-- **THEN** the use case merges repository list results without additional per-spec file reads beyond repository delegation
+- **GIVEN** repository/index summary materialization throws or fails for a spec
+- **WHEN** `execute({ includeSummary: true })` is called
+- **THEN** that entry's `summary` is omitted
+- **AND** the error does not abort the listing or propagate to the caller
 
 ### Requirement: SpecListEntry shape
 
@@ -117,10 +116,11 @@
 - **WHEN** `execute()` is called
 - **THEN** each entry contains `workspace`, `path`, and `title` as returned by `SpecRepository.list()`
 
-#### Scenario: Optional fields appear only when requested and projected
+#### Scenario: Optional summary field appears only when requested and materialized
 
-- **WHEN** `execute({ includeSummary: true, includeMetadataStatus: true })` is called
-- **THEN** entries may contain `summary` and `metadataStatus` only when the repository projected them
+- **WHEN** `execute({ includeSummary: true })` is called
+- **THEN** entries may contain `summary` only when repository/index materialization succeeded for that spec
+- **AND** no entry contains a `metadataStatus` field
 
 #### Scenario: Workspace filter limits merged results
 
@@ -135,5 +135,10 @@
 - **THEN** it creates a composition resolver for that composition session
 - **AND** it derives `ListSpecsDeps` through `resolveListSpecsDeps(resolver)`
 - **AND** `resolveListSpecsDeps(resolver)` resolves `listWorkspaces: ListWorkspaces`
-- **AND** it MUST NOT resolve `hasher: ContentHasher` or `yaml: YamlSerializer`
 - **AND** the factory delegates to canonical `createListSpecs(deps)`
+
+#### Scenario: resolveListSpecsDeps does not resolve metadata, hasher, or yaml serializer
+
+- **WHEN** `resolveListSpecsDeps(resolver)` runs
+- **THEN** it does not resolve `getMetadata`, `materializeMetadata`, `hasher: ContentHasher`, or `yaml: YamlSerializer`
+- **AND** summary projection occurs inside `SpecRepository.list()` / `FsSpecIndexCache` when `includeSummary` is requested

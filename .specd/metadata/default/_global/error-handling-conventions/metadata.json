@@ -124,12 +124,29 @@
       ]
     }
   ],
-  "implementation": {},
+  "optimizedDescription": "Unified Specd Error Contract: `specd: true` discriminator, `code` in UPPER_SNAKE_CASE, actionable messages; all packages extend `SpecdError`.",
+  "optimizedContext": "# Error Handling Conventions\n\n## Rules\n- Specd Error Contract: extends `Error`; `readonly specd = true`; `readonly code: string`; descriptive `message`\n- `@specd/core`: canonical `SpecdError` base; all domain/application errors MUST extend it\n- All monorepo packages depending on `@specd/core`: extend `SpecdError`; SHOULD define package-level base (e.g. `SpecdCliError`)\n- Error codes: `UPPER_SNAKE_CASE`; unique per package; stable across versions\n- Messages: descriptive, actionable; no jargon or internal details\n- Optional metadata (`specId`, `filePath`, etc.) for JSON/TOON; document in JSDoc\n- Error classes: JSDoc with meaning, `code`, metadata; use cases document `@throws`\n\n## Constraints\n- System errors (OOM, network) and unexpected bugs MAY stay generic `Error` (CLI shows stack trace)\n- Domain logic MUST NOT use generic `Error` for expected/validation failures",
   "contentHashes": {
     "spec.md": "sha256:40b77a1d0fe2f715ab0733e116141da3734028175c0d83f605651eeaed7c6c53",
     "verify.md": "sha256:c401e34e489be2ca3736d24ba3cabb2d4f14a8c166574db7a56070bcbe1dbd6e"
   },
-  "generatedBy": "agent",
-  "optimizedDescription": "Standardized error handling across specd: every user-facing error must be machine-readable, actionable, and consistent.",
-  "optimizedContext": "# Error Handling Conventions\n\n## Rules\n\n- All user-facing errors SHALL follow Specd Error Contract: (1) inherit from `Error`, (2) have `readonly specd = true` discriminator, (3) have `readonly code: string`, (4) have descriptive human-readable `message`.\n- `@specd/core` SHALL define canonical `SpecdError` base class. Every domain/application error MUST extend `SpecdError`.\n- Every package depending on `@specd/core` MUST extend `SpecdError` for its errors. SHOULD define package-level base (e.g. `SpecdCodeGraphError`, `SpecdCliError`) for namespace.\n- Error codes SHALL be `UPPER_SNAKE_CASE` (e.g. `CHANGE_NOT_FOUND`). Unique within package, stable across versions.\n- Error messages MUST be descriptive, tell user how to fix. Avoid jargon/internal details.\n- Errors MAY include additional metadata properties (`specId`, `filePath`, `expected`). SHOULD be documented in JSDoc.\n- All error classes MUST include JSDoc: what error represents, machine-readable `code`, any metadata properties. Use cases MUST document thrown errors with `@throws`.\n\n## Constraints\n\n- System errors (OOM, network failure) and unexpected bugs MAY remain generic `Error` — handled as system errors with stack trace\n- Domain logic MUST NOT use generic `Error` for expected failure modes or validation errors"
+  "provenance": {
+    "artifacts": {
+      "spec.md": {
+        "hash": "sha256:40b77a1d0fe2f715ab0733e116141da3734028175c0d83f605651eeaed7c6c53",
+        "lastModified": "2026-05-25T06:02:58.305Z"
+      },
+      "verify.md": {
+        "hash": "sha256:c401e34e489be2ca3736d24ba3cabb2d4f14a8c166574db7a56070bcbe1dbd6e",
+        "lastModified": "2026-05-25T06:02:58.306Z"
+      }
+    },
+    "persistedStateHash": "sha256:c27b363d8b1cdab21cd1ed78d5024700aeec82c507e9bb5fe87e819414d99408",
+    "schema": {
+      "name": "schema-std",
+      "version": 1
+    },
+    "projectionVersion": 1,
+    "projectionFingerprint": "sha256:e4a28a2db6a35ed39b8308518337235b1490c2948cd839db25866ad79b22404b"
+  }
 }

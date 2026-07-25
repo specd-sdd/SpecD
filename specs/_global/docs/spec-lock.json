@@ -6,7 +6,46 @@
   "dependsOn": ["default:_global/conventions"],
   "implementation": [
     {
+      "file": "default:docs/core/ports.md"
+    },
+    {
       "file": "default:docs/core/use-cases.md"
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "All docs under `docs/`; MADR ADRs; CLI/MCP/Core/SDK references; JSDoc on all symbols; docs updated with API/template changes.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:e689008bd3a3facc0fcb2f59dd7d531765f0c60d0335f998cb25d2a7bfffb1db",
+          "lastModified": "2026-07-23T07:56:44.065Z"
+        },
+        "verify.md": {
+          "hash": "sha256:4d8ad4dc2a992c1d5a0217a292d300b61f2b92adda0d8efa185e137b1731bc83",
+          "lastModified": "2026-07-23T07:28:57.623Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Documentation Conventions\n\n## Rules\n- Structure: `docs/{adr,cli,mcp,core,schemas}/`; nothing outside except root `README.md`, `AGENTS.md`, `CLAUDE.md`\n- ADRs: MADR format in `docs/adr/`; sequential `NNNN-kebab-title.md`; never reuse numbers; `### Confirmation` always present; `### Spec` in `## More Information` links related specs\n- ADR creation: every significant decision (multi-package, constrains future, non-obvious choice)\n- CLI: every command documented in `docs/cli/` (purpose, flags, examples, exit codes); output/caching contract changes update docs in same change\n- MCP: every tool/resource in `docs/mcp/` (input/output schema, examples)\n- Core docs (`docs/core/`): `@specd/core` package reference — semantics/contracts; NOT integrator import guide\n- Integrators (cli, mcp, API, IPC): import `@specd/sdk` only; no mixing `@specd/core` + `@specd/code-graph`\n- `docs/core/index.md` + `docs/code-graph/index.md`: prominent callout — hosts start at `docs/sdk/`, import `@specd/sdk`\n- `@specd/core` examples labeled plugin/core-only; MAY note re-export from sdk; MUST NOT imply integrators choose either\n- `docs/sdk/`: only integrator Docusaurus entry (sidebar SDK, before package-reference); `@specd/sdk` single import surface; host bootstrap; kernel + standalone factories\n- JSDoc on ALL symbols (not just exports): description, `@param`, `@returns` (omit void), `@throws`\n- Composition API docs: update `docs/` when public surface changes; document `createX(deps)`, `createX(config, options?)`, kernel/builder roles, `CompositionResolver` path\n- Template variable removal/rename or list/summary contract changes: update all affected `docs/` in same change\n\n## Constraints\n- Markdown files; ADR `NNNN-kebab-case-title.md`; sequential numbers never reused\n- Significant decisions need ADR with `### Spec` subsection\n- Specs may have `## ADRs` for provenance (not dependencies); specs depend on specs only, never ADRs directly\n- ADR constraints enforced via spec first\n- Doc changes in-scope: `docs/config/`, `docs/guide/`, `docs/schemas/`, `docs/adr/`, `docs/core/`, `docs/cli/` and any file with stale tokens",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:e689008bd3a3facc0fcb2f59dd7d531765f0c60d0335f998cb25d2a7bfffb1db",
+          "lastModified": "2026-07-23T07:56:44.065Z"
+        },
+        "verify.md": {
+          "hash": "sha256:4d8ad4dc2a992c1d5a0217a292d300b61f2b92adda0d8efa185e137b1731bc83",
+          "lastModified": "2026-07-23T07:28:57.623Z"
+        }
+      }
+    }
+  }
 }

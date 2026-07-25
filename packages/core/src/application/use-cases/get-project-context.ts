@@ -24,8 +24,10 @@ import {
   extractMetadataFromSpecArtifacts,
   type MetadataArtifactInput,
 } from './_shared/extract-metadata-from-spec-artifacts.js'
-import { type ListWorkspaces, type ProjectWorkspace } from './list-workspaces.js'
+import { type GetSpecMetadata } from './get-spec-metadata.js'
+import { materializeContextSpecMetadata } from './_shared/materialize-context-spec-metadata.js'
 import { mergeCompileContextRuntimeOverrides } from './_shared/merge-compile-context-config.js'
+import { type ListWorkspaces, type ProjectWorkspace } from './list-workspaces.js'
 
 /** Input for the {@link GetProjectContext} use case. */
 export interface GetProjectContextInput {
@@ -85,6 +87,7 @@ export class GetProjectContext {
   private readonly _extractorTransforms: ExtractorTransformRegistry
   private readonly _workspaceRoutes: readonly SpecWorkspaceRoute[]
   private readonly _defaultConfig: CompileContextConfig
+  private readonly _getMetadata: GetSpecMetadata
 
   /**
    * Creates a new `GetProjectContext` use case instance.
@@ -94,6 +97,7 @@ export class GetProjectContext {
    * @param files - Reader for project-level context file entries
    * @param parsers - Registry of artifact format parsers
    * @param hasher - Content hasher for metadata freshness checks
+   * @param getMetadata - Metadata materialization use case
    * @param extractorTransforms - Shared extractor transform registry
    * @param workspaceRoutes - Workspace routing metadata for cross-workspace resolution
    * @param defaultConfig - Yaml-derived context configuration baked at composition time
@@ -104,6 +108,7 @@ export class GetProjectContext {
     files: FileReader,
     parsers: ArtifactParserRegistry,
     hasher: ContentHasher,
+    getMetadata: GetSpecMetadata,
     extractorTransforms: ExtractorTransformRegistry = new Map(),
     workspaceRoutes: readonly SpecWorkspaceRoute[] = [],
     defaultConfig: CompileContextConfig = {},
@@ -113,6 +118,7 @@ export class GetProjectContext {
     this._files = files
     this._parsers = parsers
     this._hasher = hasher
+    this._getMetadata = getMetadata
     this._extractorTransforms = extractorTransforms
     this._workspaceRoutes = workspaceRoutes
     this._defaultConfig = defaultConfig
@@ -146,7 +152,13 @@ export class GetProjectContext {
       metadata: projectMeta,
       isFresh,
       warnings: optimizationWarnings,
-    } = await checkProjectMetadataFreshness(config, this._files, this._hasher, workspaceMap)
+    } = await checkProjectMetadataFreshness(
+      config,
+      this._files,
+      this._hasher,
+      workspaceMap,
+      this._getMetadata,
+    )
 
     warnings.push(...optimizationWarnings)
 
@@ -257,11 +269,23 @@ export class GetProjectContext {
       }
 
       const spec = new Spec(workspace, specPathObj, [], ABSENT_SPEC_SIDECAR, ABSENT_SPEC_SIDECAR)
-      const metadata = await specRepo.metadata(spec)
       const specId = `${workspace}:${capPath}`
+      const source: ContextSpecEntry['source'] = 'includePattern'
+
+      // Classify display mode before materializing — list entries never call GetSpecMetadata.
+      if (resolvedMode === 'list') {
+        specs.push({ specId, source, mode: 'list' })
+        continue
+      }
+
+      let metadata: SpecMetadata | null = null
+      try {
+        metadata = await materializeContextSpecMetadata(this._getMetadata, specId, warnings)
+      } catch {
+        metadata = null
+      }
       const title = metadata?.title ?? ''
       const description = metadata?.description ?? ''
-      const source: ContextSpecEntry['source'] = 'includePattern'
 
       // Check for missing optimization if enabled
       if (config.llmOptimizedContext && metadata !== null) {
@@ -274,11 +298,6 @@ export class GetProjectContext {
         }
       }
 
-      if (resolvedMode === 'list') {
-        specs.push({ specId, source, mode: 'list' })
-        continue
-      }
-
       if (resolvedMode === 'summary') {
         specs.push({ specId, title, description, source, mode: 'summary' })
         continue
@@ -286,22 +305,14 @@ export class GetProjectContext {
 
       let content: string
 
-      if (metadata !== null && metadata.freshness === 'fresh') {
+      if (metadata !== null) {
         content = this._renderFromMetadata(metadata, sectionsFilter, config.llmOptimizedContext)
       } else {
-        if (metadata !== null) {
-          warnings.push({
-            type: 'stale-metadata',
-            path: specId,
-            message: `Metadata for '${specId}' is stale — falling back to extracted sections`,
-          })
-        } else {
-          warnings.push({
-            type: 'stale-metadata',
-            path: specId,
-            message: `No metadata for '${specId}' — falling back to extracted sections`,
-          })
-        }
+        warnings.push({
+          type: 'stale-metadata',
+          path: specId,
+          message: `No metadata for '${specId}' — falling back to extracted sections`,
+        })
 
         let contentFallback = ''
         const extraction = schema.metadataExtraction()

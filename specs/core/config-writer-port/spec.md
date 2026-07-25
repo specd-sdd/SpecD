@@ -35,6 +35,7 @@ The `InitProjectResult` interface MUST contain:
 - `configPath: string` — absolute path to the created `specd.yaml` file
 - `schemaRef: string` — schema reference as written
 - `workspaces: readonly string[]` — workspace IDs created
+- `metadataCachePath: string` — project-relative path of the metadata cache directory created or ensured by `initProject` (default `.specd/metadata`)
 
 ### Requirement: InitProject behaviour
 
@@ -42,8 +43,10 @@ The `initProject` method MUST:
 
 1. Create a `specd.yaml` file in `projectRoot` with the schema and default workspace configuration. The `storage` block is omitted by default, allowing storage paths to resolve automatically to standard `fs` defaults under `specdPath`.
 2. Create the workspace specs directory (e.g. `specs/`) and the required default storage directories (`.specd/changes/`, `.specd/drafts/`, `.specd/discarded/`, `.specd/archive/`)
-3. Create `{configPath}/tmp/.gitignore` idempotently with normative contents: so all tmp artifacts (including `{configPath}/tmp/fs-cache/` and change locks) stay out of version control while the ignore file itself remains trackable.
-4. Append both `specd.local.yaml` and the `specd.local.*.yaml` local-variant pattern to `.gitignore` if not already present
+3. Create the resolved metadata cache directory (default `.specd/metadata/`) idempotently, so a fresh clone or a deleted cache directory is complete without a separate maintenance command.
+4. Append `/.specd/metadata/` to the root `.gitignore` idempotently — without duplicating an existing identical entry and without disturbing other ignore content. The entry MUST be rooted so similarly named nested directories are unaffected. This step applies only to the default filesystem metadata layout; a configured non-filesystem repository is not subject to it, and a custom filesystem `metadataPath` is not rewritten automatically.
+5. Create `{configPath}/tmp/.gitignore` idempotently with normative contents: so all tmp artifacts (including `{configPath}/tmp/fs-cache/` and change locks) stay out of version control while the ignore file itself remains trackable.
+6. Append both `specd.local.yaml` and the `specd.local.*.yaml` local-variant pattern to `.gitignore` if not already present
 
 ### Requirement: InitProject already-initialised guard
 

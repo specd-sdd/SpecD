@@ -175,10 +175,29 @@
       "then": ["it should be typed as readonly string[]"]
     }
   ],
-  "implementation": {},
+  "optimizedDescription": "TypeScript monorepo conventions: strict mode, ESM-only, named exports, kebab-case files, SpecdError hierarchy, lazy metadata loading.",
+  "optimizedContext": "# Coding Conventions\n\n## Rules\n- TypeScript: `strict: true`, `noUncheckedIndexedAccess: true`, `exactOptionalPropertyTypes: true`; no `@ts-ignore`/`@ts-expect-error` without comment\n- ESM only: `\"type\": \"module\"`, `NodeNext`; no CommonJS unless documented exception\n- Named exports only; no default exports\n- Files: `kebab-case.ts`; tests `.spec.ts` in `test/` mirroring `src/` (not co-located); no `index.ts` except package root; layer barrels permitted if >50 internal modules\n- No `any`; use `unknown` + type guards; wrap third-party `any` in typed adapters\n- Public exports: explicit return types; private may infer\n- Errors in `@specd/core`: extend `SpecdError`; no generic `Error` for expected failures; machine-readable `code`; follow `default:_global/error-handling-conventions`\n- Private backing fields: underscore prefix (`_name` for `get name()`)\n- Lazy loading: `list()`/`search()` return metadata/reference only; full content via explicit `get()`/`artifact()`/`resolve()`; never speculative preload\n- Immutability: `readonly` on domain VOs/entities; `as const` for config literals\n\n## Constraints\n- strict via tsconfig.base.json\n- No default exports; no `any`\n- kebab-case.ts source files\n- Domain/application errors extend SpecdError\n- Public APIs have explicit return types\n- Collection methods return metadata only; content via explicit load",
   "contentHashes": {
     "spec.md": "sha256:3cdf0f80c512c98c736fe52c18b80fbab72d0a07df314a331148ff792d3fcba5",
     "verify.md": "sha256:8f11fa700ad83e665ab4b522fda41b1757d44b31471150ca7b010e00f99cd26d"
   },
-  "generatedBy": "core"
+  "provenance": {
+    "artifacts": {
+      "spec.md": {
+        "hash": "sha256:3cdf0f80c512c98c736fe52c18b80fbab72d0a07df314a331148ff792d3fcba5",
+        "lastModified": "2026-07-23T00:34:57.312Z"
+      },
+      "verify.md": {
+        "hash": "sha256:8f11fa700ad83e665ab4b522fda41b1757d44b31471150ca7b010e00f99cd26d",
+        "lastModified": "2026-07-23T00:34:57.313Z"
+      }
+    },
+    "persistedStateHash": "sha256:0c47c9938cc5d3991d2b2a2a0b83c85ff7a29fa99414a3908c62b1f1cef86daf",
+    "schema": {
+      "name": "schema-std",
+      "version": 1
+    },
+    "projectionVersion": 1,
+    "projectionFingerprint": "sha256:e4a28a2db6a35ed39b8308518337235b1490c2948cd839db25866ad79b22404b"
+  }
 }

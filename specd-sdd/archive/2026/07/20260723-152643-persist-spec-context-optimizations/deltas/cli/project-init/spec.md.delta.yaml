@@ -1,0 +1,29 @@
+- op: modified
+  description: Expose the metadata cache path and confirm it is created and ignored in non-interactive output.
+  selector:
+    type: section
+    matches: 'Requirement: Non-interactive mode'
+  content: |
+    When not in interactive mode, the command uses the flag values (or defaults) directly, calls `createConfigWriter().initProject(...)`, optionally installs plugins specified via `--plugin`, and prints output according to `--format`.
+
+    - `text`: prints `initialized specd in <absolute-project-root-path>` followed by `metadata cache: <metadataCachePath> (ignored in .gitignore)`, then per-plugin install status lines when any `--plugin` flags were given.
+    - `json` or `toon`: outputs `{"result":"ok","configPath":"...","schema":"...","workspaces":[...],"metadataCachePath":"...","plugins":[...]}` where `metadataCachePath` is the project-relative path to the created, Git-ignored metadata cache directory (default `.specd/metadata/`), and `plugins` is an array of install result entries (`name`, `status`, `detail`).
+
+- op: modified
+  description: Delegation now also covers creation and idempotent Git-ignoring of the metadata cache directory.
+  selector:
+    type: section
+    matches: 'Requirement: Delegation to ConfigWriter'
+  content: |
+    The CLI passes the resolved project root, schema reference, workspace id, workspace specs path, and force flag to `createConfigWriter().initProject(...)`. All file creation — `specd.yaml`, storage directories, the default metadata cache directory, root `.gitignore` entries (including the metadata cache entry), and `{configPath}/tmp/.gitignore` — is handled by the `ConfigWriter` port. The CLI never touches `specd.yaml`, the metadata cache, or tmp cache paths directly and MUST NOT call `createInitProject`, `InitProject.execute`, or `kernel.project.init`.
+
+    The `{configPath}/tmp/.gitignore` file MUST be created idempotently during `initProject` with normative contents:
+
+    ```gitignore
+    *
+    !.gitignore
+    ```
+
+    This keeps all tmp artifacts (including `fs-cache/`) out of version control while allowing the ignore rule file itself to remain tracked.
+
+    `initProject` also idempotently creates the default metadata cache directory and appends its rooted ignore entry (default `/.specd/metadata/`) to the project-root `.gitignore`, so a fresh clone or deleted cache is immediately usable without a separate maintenance command. The CLI surfaces the resulting `metadataCachePath` from the `InitProject` result rather than re-deriving it.

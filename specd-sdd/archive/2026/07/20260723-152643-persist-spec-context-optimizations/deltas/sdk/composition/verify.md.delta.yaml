@@ -1,0 +1,20 @@
+- op: added
+  description: Verify the SDK barrel tracks the revised metadata materialization surface and never restores removed metadata mutation APIs.
+  position:
+    parent:
+      type: section
+      matches: '^Requirement: Public barrel exports$'
+    after:
+      type: section
+      matches: '^Scenario: SDK re-exports kernel-equivalent factories from core$'
+  content: |
+    #### Scenario: SDK tracks revised metadata materialization surface
+
+    - **WHEN** importing from `@specd/sdk`
+    - **THEN** `MaterializeSpecMetadata`, `GetSpecMetadata`, `RegenerateSpecMetadata`, `InitializePersistedSpecState`, and their `create*` factories are available
+
+    #### Scenario: SDK does not restore removed metadata mutation APIs
+
+    - **WHEN** importing from `@specd/sdk`
+    - **THEN** `SaveSpecMetadata`, `UpdateSpecMetadata`, `InvalidateSpecMetadata`, `createSaveSpecMetadata`, `createUpdateSpecMetadata`, and `createInvalidateSpecMetadata` are not exported
+    - **AND** `PersistSpecMetadata` is not exported

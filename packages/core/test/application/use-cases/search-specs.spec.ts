@@ -3,7 +3,12 @@ import { makeSpec } from '../../helpers/make-spec.js'
 import { SearchSpecs } from '../../../src/application/use-cases/search-specs.js'
 import { Spec } from '../../../src/domain/entities/spec.js'
 import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
-import { makeSpecRepository, makeContentHasher, makeListWorkspaces } from './helpers.js'
+import {
+  makeSpecRepository,
+  makeContentHasher,
+  makeListWorkspaces,
+  makeGetSpecMetadata,
+} from './helpers.js'
 
 import { type YamlSerializer } from '../../../src/application/ports/yaml-serializer.js'
 
@@ -46,6 +51,7 @@ describe('SearchSpecs', () => {
       makeListWorkspaces(specRepos),
       makeContentHasher(),
       makeYamlSerializer(),
+      makeGetSpecMetadata(specRepos),
     )
 
     const result = (await uc.execute('query')) as any[]
@@ -73,6 +79,7 @@ describe('SearchSpecs', () => {
       makeListWorkspaces(specRepos),
       makeContentHasher(),
       makeYamlSerializer(),
+      makeGetSpecMetadata(specRepos),
     )
 
     const result = await uc.execute('query', { workspaces: ['a'] })
@@ -94,6 +101,7 @@ describe('SearchSpecs', () => {
       makeListWorkspaces(specRepos),
       makeContentHasher(),
       makeYamlSerializer(),
+      makeGetSpecMetadata(specRepos),
     )
 
     const result = await uc.execute('query', { limit: 2 })
@@ -123,6 +131,7 @@ describe('SearchSpecs', () => {
       makeListWorkspaces(specRepos),
       makeContentHasher(),
       makeYamlSerializer(),
+      makeGetSpecMetadata(specRepos),
     )
 
     const result = await uc.execute('query', { includeSummary: true })
@@ -153,6 +162,7 @@ describe('SearchSpecs', () => {
       makeListWorkspaces(specRepos),
       makeContentHasher(),
       makeYamlSerializer(),
+      makeGetSpecMetadata(specRepos),
     )
 
     const result = (await uc.execute('query')) as any[]
@@ -180,6 +190,7 @@ describe('SearchSpecs', () => {
       makeListWorkspaces(specRepos),
       makeContentHasher(),
       makeYamlSerializer(),
+      makeGetSpecMetadata(specRepos),
     )
 
     const result = (await uc.execute('query')) as any[]
@@ -204,6 +215,7 @@ describe('SearchSpecs', () => {
       makeListWorkspaces(specRepos),
       makeContentHasher(),
       makeYamlSerializer(),
+      makeGetSpecMetadata(specRepos),
     )
 
     const result = (await uc.execute('query')) as any[]
@@ -220,6 +232,7 @@ describe('SearchSpecs', () => {
       makeListWorkspaces(specRepos),
       makeContentHasher(),
       makeYamlSerializer(),
+      makeGetSpecMetadata(specRepos),
     )
 
     const result = (await uc.execute('query')) as any[]

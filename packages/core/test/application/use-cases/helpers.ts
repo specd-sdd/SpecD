@@ -1,4 +1,7 @@
 import { SchemaNotFoundError } from '../../../src/application/errors/schema-not-found-error.js'
+import { type GetSpecMetadata } from '../../../src/application/use-cases/get-spec-metadata.js'
+import { type MaterializeSpecMetadata } from '../../../src/application/use-cases/materialize-spec-metadata.js'
+import { makeSnapshotGetSpecMetadata } from '../../helpers/make-cached-get-spec-metadata.js'
 import {
   Change,
   type ActorIdentity,
@@ -25,10 +28,22 @@ import {
   type SpecListEntry,
   type SpecListOptions,
   SpecRepository,
+  type ArtifactMeta,
+  type GeneratedMetadataMeta,
+  type PersistedStateMeta,
+  type SpecMetaOptions,
   type ResolveFromPathResult,
   type SpecSearchResult,
 } from '../../../src/application/ports/spec-repository.js'
-import { type PersistedSpecMetadata } from '../../../src/domain/services/parse-metadata.js'
+import {
+  type MetadataSnapshot,
+  type SpecMetadata,
+} from '../../../src/domain/services/parse-metadata.js'
+import { SpecMetadataParseError } from '../../../src/domain/errors/spec-metadata-parse-error.js'
+import {
+  type PersistedSpecState,
+  type PersistedSpecStateSnapshot,
+} from '../../../src/domain/services/apply-persisted-spec-state-patch.js'
 import {
   ArchiveRepository,
   type ArchiveListOptions,
@@ -272,6 +287,8 @@ export class StubSpecRepository extends SpecRepository {
     from?: SpecPath,
   ) => Promise<ResolveFromPathResult | null>
   readonly saved = new Map<string, string>()
+  private _persistedState = new Map<string, PersistedSpecStateSnapshot>()
+  private _metadataSnapshots = new Map<string, MetadataSnapshot>()
 
   constructor(opts: {
     specs?: Spec[]
@@ -302,11 +319,26 @@ export class StubSpecRepository extends SpecRepository {
       prefix === undefined
         ? this._specs
         : this._specs.filter((s) => prefix.equals(s.name) || prefix.isAncestorOf(s.name))
-    const entries: SpecListEntry[] = filtered.map((spec) => ({
-      workspace: spec.workspace,
-      path: spec.name.toFsPath('/'),
-      title: spec.name.toString().split('/').at(-1) ?? spec.name.toString(),
-    }))
+    const entries: SpecListEntry[] = filtered.map((spec) => {
+      const base: SpecListEntry = {
+        workspace: spec.workspace,
+        path: spec.name.toFsPath('/'),
+        title: spec.name.toString().split('/').at(-1) ?? spec.name.toString(),
+      }
+      if (options?.includeMeta !== true) {
+        return base
+      }
+      return {
+        ...base,
+        artifacts: [...spec.artifacts],
+        persistedStateMeta: spec.persistedStateStamp.present
+          ? { lastModified: spec.persistedStateStamp.lastModified! }
+          : null,
+        generatedMetadataMeta: spec.generatedMetadataStamp.present
+          ? { lastModified: spec.generatedMetadataStamp.lastModified! }
+          : null,
+      }
+    })
     const sorted = [...entries].sort((a, b) => a.path.localeCompare(b.path))
     return paginateList(sorted, options, (item) => ({ key: item.path }))
   }
@@ -317,8 +349,21 @@ export class StubSpecRepository extends SpecRepository {
 
   override async reindex(): Promise<void> {}
 
-  override async persistedStateHash(): Promise<string | null> {
-    return 'sha256:test'
+  override async persistedStateMeta(
+    _spec: Spec,
+    options?: SpecMetaOptions,
+  ): Promise<PersistedStateMeta | null> {
+    if (options?.includeHash === true) {
+      return { lastModified: new Date().toISOString(), hash: 'sha256:test' }
+    }
+    return { lastModified: new Date().toISOString() }
+  }
+
+  override async generatedMetadataMeta(
+    _spec: Spec,
+    options?: SpecMetaOptions,
+  ): Promise<GeneratedMetadataMeta | null> {
+    return null
   }
 
   override async specFingerprint(_spec: Spec): Promise<string> {
@@ -341,114 +386,129 @@ export class StubSpecRepository extends SpecRepository {
       this.saved.set(`${spec.name.toString()}/${artifact.filename}`, artifact.content)
       this.saved.set(artifact.filename, artifact.content)
     }
-    if (publication.persistedDependsOn !== undefined) {
-      const lockData = {
-        schema: publication.persistedSchema ?? { name: 'test-schema', version: 1 },
-        dependsOn: publication.persistedDependsOn,
-        implementation: publication.persistedImplementation ?? [],
-      }
-      const json = JSON.stringify(lockData)
-      this.saved.set(`${spec.name.toString()}/spec-lock.json`, json)
-      this.saved.set('spec-lock.json', json)
-    }
+    const snapshot = await this.writePersistedState(spec, publication.persistedState, {
+      expectedRevision: (await this.readPersistedState(spec))?.originalHash ?? null,
+    })
+    this._persistedState.set(spec.name.toString(), snapshot)
   }
 
   override async delete(): Promise<void> {}
 
-  override async metadata(spec: Spec): Promise<PersistedSpecMetadata | null> {
+  override async readPersistedState(spec: Spec): Promise<PersistedSpecStateSnapshot | null> {
+    const stored = this._persistedState.get(spec.name.toString())
+    if (stored !== undefined) return stored
+
+    const key = `${spec.name.toString()}/spec-lock.json`
+    const content = this._artifacts[key]
+    if (content === undefined || content === null) return null
+    try {
+      const parsed = JSON.parse(content) as Omit<PersistedSpecStateSnapshot, 'originalHash'>
+      return { ...parsed, originalHash: 'sha256:test-lock' }
+    } catch {
+      return null
+    }
+  }
+
+  override async writePersistedState(
+    spec: Spec,
+    state: PersistedSpecState,
+    options: { readonly expectedRevision: string | null },
+  ): Promise<PersistedSpecStateSnapshot> {
+    const current = await this.readPersistedState(spec)
+    if (options.expectedRevision === null) {
+      if (current !== null) {
+        throw new Error('persisted state already exists')
+      }
+    } else if (current === null || current.originalHash !== options.expectedRevision) {
+      throw new Error('persisted state revision mismatch')
+    }
+
+    const snapshot: PersistedSpecStateSnapshot = {
+      ...state,
+      originalHash: 'sha256:test-lock',
+    }
+    this._persistedState.set(spec.name.toString(), snapshot)
+    const json = JSON.stringify({
+      schema: state.schema,
+      dependsOn: state.dependsOn,
+      implementation: state.implementation,
+      ...(state.optimizations !== undefined ? { optimizations: state.optimizations } : {}),
+    })
+    this._artifacts[`${spec.name.toString()}/spec-lock.json`] = json
+    this.saved.set(`${spec.name.toString()}/spec-lock.json`, json)
+    this.saved.set('spec-lock.json', json)
+    return snapshot
+  }
+
+  override async artifactMeta(
+    spec: Spec,
+    filename: string,
+    options?: SpecMetaOptions,
+  ): Promise<ArtifactMeta | null> {
+    const artifact = await this.artifact(spec, filename)
+    if (artifact === null) return null
+    const hasher = new NodeContentHasher()
+    const lastModified = new Date().toISOString()
+    if (options?.includeHash !== true) {
+      return { lastModified }
+    }
+    return {
+      lastModified,
+      hash: artifact.originalHash ?? hasher.hash(artifact.content),
+    }
+  }
+
+  override async readMetadataSnapshot(spec: Spec): Promise<MetadataSnapshot> {
+    const stored = this._metadataSnapshots.get(spec.name.toString())
+    if (stored !== undefined) return stored
+
     const jsonKey = `${spec.name.toString()}/metadata.json`
     const legacyKey = `${spec.name.toString()}/.specd-metadata.yaml`
     const content = this._artifacts[jsonKey] ?? this._artifacts[legacyKey]
-    if (content === undefined || content === null) return null
-
-    let parsed: Record<string, unknown>
-    try {
-      parsed = JSON.parse(content) as Record<string, unknown>
-    } catch {
-      return { originalHash: 'sha256:test-metadata', freshness: 'stale' }
+    if (content === undefined || content === null) {
+      return { kind: 'missing', revision: null }
     }
 
-    const hasher = new NodeContentHasher()
-    const metadataDependsOn = Array.isArray(parsed.dependsOn)
-      ? parsed.dependsOn.filter((entry): entry is string => typeof entry === 'string')
-      : undefined
-    const persistedDependsOn = await this.readPersistedDependsOn(spec)
-    const hashFresh =
-      !parsed.contentHashes ||
-      (isStringRecord(parsed.contentHashes) &&
-        (Object.keys(parsed.contentHashes).length === 0 ||
-          Object.entries(parsed.contentHashes).every(([filename, recorded]) => {
-            const artifactKey = `${spec.name.toString()}/${filename}`
-            const artifactContent = this._artifacts[artifactKey]
-            return (
-              artifactContent !== undefined &&
-              artifactContent !== null &&
-              hasher.hash(artifactContent) === recorded
-            )
-          })))
-    const dependsOnFresh =
-      persistedDependsOn === null ||
-      (metadataDependsOn !== undefined && sameStringSet(metadataDependsOn, persistedDependsOn))
-
-    return {
-      ...parsed,
-      freshness: hashFresh && dependsOnFresh ? 'fresh' : 'stale',
-      originalHash: 'sha256:test-metadata',
-    } as PersistedSpecMetadata
+    try {
+      const parsed = JSON.parse(content) as SpecMetadata
+      return { kind: 'present', metadata: parsed, revision: 'sha256:test-metadata' }
+    } catch {
+      return {
+        kind: 'invalid',
+        revision: 'sha256:test-metadata',
+        error: new SpecMetadataParseError(
+          `${spec.workspace}:${spec.name.toString()}`,
+          'invalid json',
+        ),
+      }
+    }
   }
 
-  override async saveMetadata(_spec: Spec, content: string): Promise<void> {
+  override async writeMetadataSnapshot(
+    spec: Spec,
+    metadata: SpecMetadata,
+    options: { readonly expectedRevision: string | null },
+  ): Promise<MetadataSnapshot> {
+    const current = await this.readMetadataSnapshot(spec)
+    if (options.expectedRevision === null && current.kind !== 'missing') {
+      throw new Error('metadata already exists')
+    }
+    if (options.expectedRevision !== null && current.revision !== options.expectedRevision) {
+      throw new Error('metadata revision mismatch')
+    }
+
+    const content = JSON.stringify(metadata)
     this.saved.set('metadata.json', content)
     this.saved.set('.specd-metadata.yaml', content)
-  }
-
-  override async readPersistedSchema(
-    spec: Spec,
-  ): Promise<{ name: string; version: number } | null> {
-    const key = `${spec.name.toString()}/spec-lock.json`
-    const content = this._artifacts[key]
-    if (content === undefined || content === null) return null
-    try {
-      const parsed: Record<string, unknown> = JSON.parse(content)
-      return (parsed.schema as { name: string; version: number } | undefined) ?? null
-    } catch {
-      return null
+    this._artifacts[`${spec.name.toString()}/metadata.json`] = content
+    const snapshot: MetadataSnapshot = {
+      kind: 'present',
+      metadata,
+      revision: 'sha256:test-metadata',
     }
+    this._metadataSnapshots.set(spec.name.toString(), snapshot)
+    return snapshot
   }
-
-  override async readPersistedDependsOn(spec: Spec): Promise<readonly string[] | null> {
-    const key = `${spec.name.toString()}/spec-lock.json`
-    const content = this._artifacts[key]
-    if (content === undefined || content === null) return null
-    try {
-      const parsed: Record<string, unknown> = JSON.parse(content)
-      return (parsed.dependsOn as readonly string[] | undefined) ?? null
-    } catch {
-      return null
-    }
-  }
-
-  override async readPersistedImplementation(
-    spec: Spec,
-  ): Promise<readonly { readonly file: string; readonly symbols?: readonly string[] }[] | null> {
-    const key = `${spec.name.toString()}/spec-lock.json`
-    const content = this._artifacts[key]
-    if (content === undefined || content === null) return null
-    try {
-      const parsed: Record<string, unknown> = JSON.parse(content)
-      return (
-        (parsed.implementation as
-          | readonly { readonly file: string; readonly symbols?: readonly string[] }[]
-          | undefined) ?? null
-      )
-    } catch {
-      return null
-    }
-  }
-
-  override async updatePersistedSchema(): Promise<void> {}
-  override async updatePersistedDependsOn(): Promise<void> {}
-  override async updatePersistedImplementation(): Promise<void> {}
 
   override async resolveFromPath(
     inputPath: string,
@@ -879,12 +939,21 @@ export function makeArchivableChange(
   return c
 }
 
-export function makeGenerateMetadata(): any {
-  return { execute: async () => ({ hasExtraction: true, metadata: {} }) }
-}
-
-export function makeSaveMetadata(): any {
-  return { execute: async () => ({ spec: 'test' }) }
+/**
+ * Creates a stub {@link MaterializeSpecMetadata} that returns empty generated metadata.
+ *
+ * @returns Typed materialize-metadata test double
+ */
+export function makeMaterializeMetadata(): MaterializeSpecMetadata {
+  return {
+    execute: async () => ({
+      metadata: {},
+      metadataFingerprint: 'test',
+      source: 'generated' as const,
+      regenerated: true,
+      warnings: [],
+    }),
+  } as unknown as MaterializeSpecMetadata
 }
 
 /**
@@ -968,4 +1037,25 @@ function sameStringSet(left: readonly string[], right: readonly string[]): boole
   const sortedLeft = [...left].sort()
   const sortedRight = [...right].sort()
   return sortedLeft.every((entry, index) => entry === sortedRight[index])
+}
+
+/** GetSpecMetadata test double that always fails materialization. */
+export const missingGetSpecMetadata = {
+  execute: async () => {
+    throw new Error('metadata missing')
+  },
+} as unknown as GetSpecMetadata
+
+/**
+ * Creates a snapshot-backed {@link GetSpecMetadata} for unit tests.
+ *
+ * @param repos - Spec repositories keyed by workspace name
+ * @param hasher - Optional content hasher
+ * @returns GetSpecMetadata test double
+ */
+export function makeGetSpecMetadata(
+  repos: Map<string, SpecRepository>,
+  hasher: ContentHasher = makeContentHasher(),
+): GetSpecMetadata {
+  return makeSnapshotGetSpecMetadata(repos, hasher)
 }

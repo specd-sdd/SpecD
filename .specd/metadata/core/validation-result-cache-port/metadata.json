@@ -21,7 +21,7 @@
     {
       "requirement": "SpecRepository injected at construction",
       "rules": [
-        "Because this port owns the ValidateSpecs freshness cascade, each instance MUST receive\nthe workspace `SpecRepository` (same workspace identity) at **construction time** via\ncomposition. The repository MUST NOT be passed on every `lookup` / `upsert` call.\n\nConstruction contract:\n\n- The abstract port (or its concrete adapters) MUST accept `SpecRepository` as a\n  constructor dependency (directly or via a narrow deps object that includes it).\n- The injected repository's `workspace()` MUST match the cache instance's workspace.\n- Adapters MAY also receive storage/path deps (e.g. `configPath`) in the same\n  constructor; those remain infrastructure concerns.\n- `lookup` / `upsert` method signatures MUST NOT take a `SpecRepository` parameter.\n\nThe injected repository is how the cache loads cheap `Spec` stamps (`get()`), computes\n`specFingerprint()`, and hashes raw metadata bytes for `cacheFingerprint`. The cache\nMUST NOT invent SpecRepository stamp helpers (`validationSourceStamps`,\n`readValidationSidecar`); it MUST use the contractual repository APIs above."
+        "Because this port owns the ValidateSpecs freshness cascade, each instance MUST receive\nthe workspace `SpecRepository` (same workspace identity) at **construction time** via\ncomposition. The repository MUST NOT be passed on every `lookup` / `upsert` call.\n\nConstruction contract:\n\n- The abstract port (or its concrete adapters) MUST accept `SpecRepository` as a\n  constructor dependency (directly or via a narrow deps object that includes it).\n- The injected repository's `workspace()` MUST match the cache instance's workspace.\n- Adapters MAY also receive storage/path deps (e.g. `configPath`) in the same\n  constructor; those remain infrastructure concerns.\n- `lookup` / `upsert` method signatures MUST NOT take a `SpecRepository` parameter.\n\nThe injected repository is how the cache loads cheap stamps when `lookup` does not\nreceive optional `stamps`, computes `specFingerprint()`, and hashes raw metadata\nbytes for `cacheFingerprint`. Callers MAY supply stamps projected from\n`list({ includeMeta: true })` or `get()` for hard-hit without a redundant `get()`.\nThe cache MUST NOT invent SpecRepository stamp helpers (`validationSourceStamps`,\n`readValidationSidecar`); it MUST use the contractual repository APIs above."
       ]
     },
     {
@@ -45,13 +45,13 @@
     {
       "requirement": "cacheFingerprint canonical form",
       "rules": [
-        "`cacheFingerprint` MUST be the content hash of sorted-key JSON with exactly:\n\n```text\n{\n  specFingerprint: <digest from SpecRepository.specFingerprint(spec)>,\n  metadataContentHash: <digest of raw metadata.json bytes> | \"__absent__\"\n}\n```\n\nRules:\n\n- `specFingerprint` MUST come from `SpecRepository.specFingerprint(spec)` (artifacts +\n  `persistedStateHash`; never includes metadata).\n- `metadataContentHash` MUST hash the **raw** generated metadata file bytes when\n  present. It MUST NOT require calling `metadata()` (no JSON parse / freshness\n  classification on this path).\n- When the metadata file is absent, `metadataContentHash` MUST be the literal\n  `\"__absent__\"`.\n- Adapters MUST NOT invent a third flat fingerprint that re-lists artifact\n  filenames + lock + metadata into one payload; composition of the two digests above\n  is the contract."
+        "`cacheFingerprint` MUST be the content hash of sorted-key JSON with exactly:\n\n```text\n{\n  specFingerprint: <digest from SpecRepository.specFingerprint(spec)>,\n  metadataContentHash: <digest of raw metadata.json bytes> | \"__absent__\"\n}\n```\n\nRules:\n\n- `specFingerprint` MUST come from `SpecRepository.specFingerprint(spec)` (artifacts +\n  persisted-state hash via `persistedStateMeta({ includeHash: true })`; never includes\n  metadata).\n- `metadataContentHash` MUST hash the **raw** generated metadata file bytes when\n  present. It MUST NOT require calling a freshness-classifying metadata API.\n- When the metadata file is absent, `metadataContentHash` MUST be the literal\n  `\"__absent__\"`.\n- Adapters MUST NOT invent a third flat fingerprint that re-lists artifact\n  filenames + lock + metadata into one payload; composition of the two digests above\n  is the contract."
       ]
     },
     {
       "requirement": "Lookup cascade owned by the cache",
       "rules": [
-        "`lookup` MUST own freshness evaluation for one spec. ValidateSpecs MUST NOT precompute\nstamps or fingerprints for the cascade and MUST NOT drive soft-hit persistence.\n\nFor each lookup the cache MUST:\n\n1. If bucket validity fails → return miss.\n2. Load current stamps via `SpecRepository.get()` (no artifact content reads).\n3. If stored stamps match current stamps → **hard hit**: return `{ kind: 'hit', entry }`\n   without computing `cacheFingerprint` or revalidating.\n4. If stamps differ → compute `cacheFingerprint` lazily using the canonical form in\n   this spec. If it matches the stored fingerprint → **soft hit**: persist refreshed\n   stamps without changing `cacheFingerprint` or `entry`, then return\n   `{ kind: 'hit', entry }`.\n5. Otherwise → return `{ kind: 'miss' }`."
+        "`lookup` MUST own freshness evaluation for one spec. ValidateSpecs MUST NOT invent\nstamp algorithms or drive soft-hit persistence. ValidateSpecs MAY pass optional\ncurrent stamps already projected by `SpecRepository.list({ includeMeta: true })`\nor equivalent `Spec` stamp fields from `get()`.\n\nFor each lookup the cache MUST:\n\n1. If bucket validity fails → return miss.\n2. Resolve current stamps:\n   - If `input.stamps` is provided, use those stamps for the hard-hit comparison\n     and MUST NOT call `SpecRepository.get()` solely to load stamps.\n   - Otherwise load current stamps via `SpecRepository.get()` (no artifact content\n     reads).\n3. If stored stamps match current stamps → **hard hit**: return `{ kind: 'hit', entry }`\n   without computing `cacheFingerprint` or revalidating.\n4. If stamps differ → compute `cacheFingerprint` lazily using the canonical form in\n   this spec (which MAY call `get()` / `specFingerprint` / raw metadata hash as\n   needed). If it matches the stored fingerprint → **soft hit**: persist refreshed\n   stamps without changing `cacheFingerprint` or `entry`, then return\n   `{ kind: 'hit', entry }`.\n5. Otherwise → return `{ kind: 'miss' }`.\n\nOptional `stamps` MUST be semantically equivalent to the stamp bundle stored from\n`Spec` / list Meta (`artifact lastModified`s, persisted-state and generated-metadata\npresence/`lastModified`). Adapters MUST treat list Meta and `get()` stamps as\ninterchangeable for hard-hit comparison."
       ]
     },
     {
@@ -63,7 +63,7 @@
     {
       "requirement": "Method signatures",
       "rules": [
-        "The port MUST expose:\n\n- `workspace(): string`\n- \\`lookup(input: {\n  spec: Spec\n  schemaFingerprint: string\n  engineVersion: number\n  }): Promise<\n  | { kind: 'hit'; entry: SpecValidationEntry }\n  | { kind: 'miss' }\n- `upsert(input: {\n    entry: SpecValidationEntry\n    spec: Spec\n    schemaFingerprint: string\n    engineVersion: number\n  }): Promise<void>`\n\n`schemaFingerprint` / `engineVersion` on `lookup` are bucket-validity inputs only.\n`lookup` / `upsert` receive `Spec` so the cache knows which row to touch; freshness\nI/O (stamps, `specFingerprint`, raw metadata hash) still goes through the\n**constructor-injected** `SpecRepository`. They MUST NOT accept stamps,\n`cacheFingerprint`, `refreshStamps`, or a repository argument."
+        "The port MUST expose:\n\n- `workspace(): string`\n- \\`lookup(input: {\n  spec: Spec\n  schemaFingerprint: string\n  engineVersion: number\n  stamps?: ValidationSourceStamps\n  }): Promise<\n  | { kind: 'hit'; entry: SpecValidationEntry }\n  | { kind: 'miss' }\n- `upsert(input: {\n  entry: SpecValidationEntry\n  spec: Spec\n  schemaFingerprint: string\n  engineVersion: number\n  }): Promise<void>`\n\n`schemaFingerprint` / `engineVersion` on `lookup` are bucket-validity inputs only.\n`lookup` / `upsert` receive `Spec` so the cache knows which row to touch. Optional\n`stamps` on `lookup` are a hard-hit acceleration input equivalent to stamps from\n`get()` or `list({ includeMeta: true })`. Soft-hit / miss I/O\n(`specFingerprint`, raw metadata hash, stamp refresh) still goes through the\n**constructor-injected** `SpecRepository` when needed.\n\nThey MUST NOT accept `cacheFingerprint`, `refreshStamps`, or a repository argument."
       ]
     },
     {
@@ -203,33 +203,37 @@
     {
       "requirement": "Lookup cascade owned by the cache",
       "name": "Matching stamps produce a hard hit",
-      "given": ["a stored row whose stamps match current get() stamps and whose bucket is"],
-      "when": ["a lookup runs"],
+      "given": ["a stored row whose stamps match current stamps and whose bucket is valid"],
+      "when": ["lookup is called"],
+      "then": ["it returns { kind: 'hit', entry } without computing cacheFingerprint"]
+    },
+    {
+      "requirement": "Lookup cascade owned by the cache",
+      "name": "Optional stamps skip get for hard-hit comparison",
+      "given": ["lookup is called with stamps derived from list({ includeMeta: true })"],
+      "when": ["the cache evaluates hard-hit"],
       "then": [
-        "the result is { kind: 'hit', entry }",
-        "AND cacheFingerprint is not recomputed as a requirement of the hit path"
+        "it does not call SpecRepository.get() solely to load stamps",
+        "AND it returns a hard hit"
       ]
     },
     {
       "requirement": "Lookup cascade owned by the cache",
       "name": "Soft hit refreshes stamps inside the cache",
       "given": ["a stored row whose stamps differ but whose cacheFingerprint still matches"],
-      "when": ["a lookup runs"],
+      "when": ["lookup is called"],
       "then": [
-        "the result is { kind: 'hit', entry }",
+        "the cache may load repository state needed for cacheFingerprint",
         "AND the cache persists refreshed stamps without changing cacheFingerprint or\nentry",
-        "AND the caller does not receive a soft-hit / refresh protocol flag"
+        "AND it returns { kind: 'hit', entry }"
       ]
     },
     {
       "requirement": "Lookup cascade owned by the cache",
-      "name": "Fingerprint miss requires full validation upsert",
+      "name": "Miss when stamps and fingerprint both differ",
       "given": ["a stored row whose stamps and cacheFingerprint both differ from current"],
-      "when": ["a lookup runs"],
-      "then": [
-        "the result is { kind: 'miss' }",
-        "AND after full validation an upsert stores the new entry, stamps, and fingerprint"
-      ]
+      "when": ["lookup is called"],
+      "then": ["it returns { kind: 'miss' }"]
     },
     {
       "requirement": "Lookup result shape",
@@ -242,20 +246,20 @@
     },
     {
       "requirement": "Method signatures",
-      "name": "lookup is hit or miss only",
-      "when": ["lookup({ spec, schemaFingerprint, engineVersion }) completes"],
+      "name": "lookup accepts optional stamps but not cacheFingerprint or repository",
+      "when": ["the port method signatures are examined"],
       "then": [
-        "the result is { kind: 'hit', entry } or { kind: 'miss' }",
-        "AND the call does not accept stamps, cacheFingerprint, or a repository argument"
+        "lookup MAY accept optional stamps",
+        "AND MUST NOT accept cacheFingerprint, refreshStamps, or a SpecRepository\nargument"
       ]
     },
     {
       "requirement": "Method signatures",
-      "name": "upsert input is entry-centric",
-      "when": ["upsert is invoked after a miss"],
+      "name": "Upsert still materializes stamps itself",
+      "when": ["upsert is called after a full validation miss"],
       "then": [
-        "its input includes entry, spec, schemaFingerprint, and engineVersion",
-        "AND MUST NOT include stamps, cacheFingerprint, or SpecRepository"
+        "the cache materializes current stamps and cacheFingerprint via its",
+        "AND the use case MUST NOT pass stamps or cacheFingerprint on upsert"
       ]
     },
     {
@@ -288,13 +292,12 @@
     }
   ],
   "implementation": {
-    "files": [
+    "symbols": [
       {
         "specId": "core:validation-result-cache-port",
-        "file": "core:src/ports.ts"
-      }
-    ],
-    "symbols": [
+        "file": "core:src/application/ports/validation-result-cache.ts",
+        "symbol": "ValidationSourceStamps"
+      },
       {
         "specId": "core:validation-result-cache-port",
         "file": "core:src/application/ports/validation-result-cache.ts",
@@ -302,69 +305,32 @@
       },
       {
         "specId": "core:validation-result-cache-port",
-        "file": "core:src/application/ports/validation-result-cache.ts",
-        "symbol": "ValidationCacheEntry"
-      },
-      {
-        "specId": "core:validation-result-cache-port",
-        "file": "core:src/application/ports/validation-result-cache.ts",
-        "symbol": "ValidationSourceStamp"
-      },
-      {
-        "specId": "core:validation-result-cache-port",
-        "file": "core:src/application/ports/validation-result-cache.ts",
-        "symbol": "ValidationCacheLookupInput"
-      },
-      {
-        "specId": "core:validation-result-cache-port",
-        "file": "core:src/application/ports/validation-result-cache.ts",
-        "symbol": "ValidationCacheLookupResult"
-      },
-      {
-        "specId": "core:validation-result-cache-port",
-        "file": "core:src/application/ports/validation-result-cache.ts",
-        "symbol": "ValidationCacheUpsertInput"
-      },
-      {
-        "specId": "core:validation-result-cache-port",
-        "file": "core:src/application/ports/validation-result-cache.ts",
-        "symbol": "ValidationResultCache,SpecValidationEntry,ValidationCacheLookupResult"
-      },
-      {
-        "specId": "core:validation-result-cache-port",
         "file": "core:src/infrastructure/fs/fs-validation-result-cache.ts",
         "symbol": "FsValidationResultCache"
-      },
-      {
-        "specId": "core:validation-result-cache-port",
-        "file": "core:src/infrastructure/fs/fs-validation-result-cache.ts",
-        "symbol": "collectValidationSourceStamps"
-      },
-      {
-        "specId": "core:validation-result-cache-port",
-        "file": "core:src/infrastructure/fs/fs-validation-result-cache.ts",
-        "symbol": "ValidationIndexMeta"
-      },
-      {
-        "specId": "core:validation-result-cache-port",
-        "file": "core:src/infrastructure/fs/fs-validation-result-cache.ts",
-        "symbol": "FsValidationResultCache,stampsFromSpec,ValidationStoredStamps"
-      },
-      {
-        "specId": "core:validation-result-cache-port",
-        "file": "core:src/infrastructure/fs/fs-validation-result-cache.ts",
-        "symbol": "stampsFromSpec"
-      },
-      {
-        "specId": "core:validation-result-cache-port",
-        "file": "core:src/infrastructure/fs/fs-validation-result-cache.ts",
-        "symbol": "ValidationStoredStamps"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:49e945d53781a9e3d338c880c13f932ac3bdae9b04c7106e66d853b0596dc452",
-    "verify.md": "sha256:794ea67a5b41e81a1649c6b2e364642e7b781848996202e709964b329aac93ad"
+    "spec.md": "sha256:1c72e7f88b2c2c8f85f017057b9959fcb5afeffcbd95ee006aa4ad80f1ca1f3a",
+    "verify.md": "sha256:9360f53951dac16616927f6fcfc3f9955565e52b841600d86771c89e642da090"
   },
-  "generatedBy": "core"
+  "provenance": {
+    "artifacts": {
+      "spec.md": {
+        "hash": "sha256:1c72e7f88b2c2c8f85f017057b9959fcb5afeffcbd95ee006aa4ad80f1ca1f3a",
+        "lastModified": "2026-07-25T11:53:31.849Z"
+      },
+      "verify.md": {
+        "hash": "sha256:9360f53951dac16616927f6fcfc3f9955565e52b841600d86771c89e642da090",
+        "lastModified": "2026-07-25T11:53:31.850Z"
+      }
+    },
+    "persistedStateHash": "sha256:e3a633c1ef42388a34a5042afa487f297e116faf42c10540fd912061e9b63468",
+    "schema": {
+      "name": "schema-std",
+      "version": 1
+    },
+    "projectionVersion": 1,
+    "projectionFingerprint": "sha256:e4a28a2db6a35ed39b8308518337235b1490c2948cd839db25866ad79b22404b"
+  }
 }

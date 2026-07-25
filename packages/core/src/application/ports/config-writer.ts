@@ -20,6 +20,8 @@ export interface InitProjectResult {
   readonly schemaRef: string
   /** Workspace IDs created. */
   readonly workspaces: readonly string[]
+  /** Project-relative path to the metadata cache directory. */
+  readonly metadataCachePath: string
 }
 
 /**

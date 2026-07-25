@@ -1,0 +1,64 @@
+- op: added
+  description: Verify the indexer routes title, description, and fingerprint through Core's GetSpecMetadata instead of raw sidecar reads.
+  position:
+    parent:
+      type: section
+      matches: '^Requirement: IndexCodeGraph use case$'
+    after:
+      type: section
+      matches: '^Scenario: No VCS ref in options$'
+  content: |
+    #### Scenario: Indexer uses GetSpecMetadata instead of raw metadata reads
+
+    - **GIVEN** a spec repository capable of returning both a raw metadata snapshot and a materialized `GetSpecMetadata` projection
+    - **WHEN** the indexer builds `SpecNode` data for that spec
+    - **THEN** it calls Core's `GetSpecMetadata` use case for `title`, `description`, and `metadataFingerprint`
+    - **AND** it does not parse raw sidecar metadata files directly
+
+- op: modified
+  description: Replace the raw repo.metadata() call with GetSpecMetadata.execute() in the spec-data-pull scenario.
+  selector:
+    type: section
+    matches: '^Scenario: Indexer pulls spec data from repository$'
+  content: |
+    #### Scenario: Indexer pulls spec data from repository
+
+    - **WHEN** indexing specs
+    - **THEN** the indexer SHALL directly call `repo.list()`, `GetSpecMetadata.execute({ specId })`, and `repo.readPersistedDependsOn()`
+    - **AND** it SHALL NOT rely on the CLI to provide pre-resolved spec objects
+
+- op: removed
+  description: Remove the raw-artifact contentHash computation scenario — fingerprint computation now belongs to GetSpecMetadata, not the indexer.
+  selector:
+    type: section
+    matches: '^Scenario: Spec contentHash from content artifacts only$'
+
+- op: modified
+  description: Update the incremental spec-skip scenario to compare the materialized metadataFingerprint instead of a raw contentHash.
+  selector:
+    type: section
+    matches: '^Scenario: Incremental spec indexing skips unchanged specs$'
+  content: |
+    #### Scenario: Incremental spec indexing skips unchanged specs
+
+    - **GIVEN** a spec was indexed with `metadataFingerprint` `abc`
+    - **AND** `GetSpecMetadata.execute({ specId })` returns the same `metadataFingerprint` `abc`
+    - **WHEN** spec indexing runs again
+    - **THEN** the spec is skipped because its semantic fingerprint matches the value stored on the `SpecNode`
+
+- op: added
+  description: Verify a semantic-fingerprint change reprocesses a spec even when raw artifact bytes or timestamps are unchanged.
+  position:
+    parent:
+      type: section
+      matches: '^Requirement: Spec dependency indexing$'
+    after:
+      type: section
+      matches: '^Scenario: Incremental spec indexing skips unchanged specs$'
+  content: |
+    #### Scenario: Semantic fingerprint change forces reprocessing
+
+    - **GIVEN** a spec was indexed with `metadataFingerprint` `abc`
+    - **AND** `GetSpecMetadata.execute({ specId })` now returns `metadataFingerprint` `def`
+    - **WHEN** spec indexing runs again
+    - **THEN** the spec is reprocessed even if the underlying cache file's raw bytes or timestamp did not change

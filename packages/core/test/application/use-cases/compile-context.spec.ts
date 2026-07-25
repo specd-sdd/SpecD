@@ -8,6 +8,7 @@ import {
   type CompileContextResult,
 } from '../../../src/application/use-cases/compile-context.js'
 import { type PreviewSpec } from '../../../src/application/use-cases/preview-spec.js'
+import { type GetSpecMetadata } from '../../../src/application/use-cases/get-spec-metadata.js'
 import { ChangeNotFoundError } from '../../../src/application/errors/change-not-found-error.js'
 import { SchemaNotFoundError } from '../../../src/application/errors/schema-not-found-error.js'
 import { SchemaMismatchError } from '../../../src/application/errors/schema-mismatch-error.js'
@@ -40,6 +41,8 @@ import {
   makeArtifactType as makeArtifactTypeBase,
   makeSchema as makeSchemaBase,
   makeContentHasher,
+  makeGetSpecMetadata,
+  missingGetSpecMetadata,
 } from './helpers.js'
 
 // ---------------------------------------------------------------------------
@@ -132,6 +135,7 @@ function freshMetadata(
     description?: string
     dependsOn?: string[]
     contentHashes?: Record<string, string>
+    provenance?: boolean
     rules?: Array<{ requirement: string; rules: string[] }>
     constraints?: string[]
     scenarios?: Array<{ requirement: string; name: string; when?: string[]; then?: string[] }>
@@ -155,7 +159,34 @@ function freshMetadata(
   if (opts.scenarios && opts.scenarios.length > 0) {
     obj.scenarios = opts.scenarios
   }
+  if (opts.provenance !== false) {
+    obj.provenance = metadataProvenance(specContent)
+  }
   return JSON.stringify(obj)
+}
+
+function lockJson(dependsOn: string[]): string {
+  return JSON.stringify({
+    schema: { name: 'specd-std', version: 1 },
+    dependsOn,
+    implementation: [],
+  })
+}
+
+function metadataProvenance(
+  specContent: string,
+  opts: { persistedStateHash?: string | null } = {},
+): NonNullable<
+  import('../../../src/domain/services/parse-metadata.js').SpecMetadata['provenance']
+> {
+  const hash = sha256Hex(specContent)
+  return {
+    artifacts: { 'spec.md': { hash, lastModified: '2024-01-15T00:00:00.000Z' } },
+    persistedStateHash: opts.persistedStateHash ?? null,
+    schema: { name: 'specd-std', version: 1 },
+    projectionVersion: 1,
+    projectionFingerprint: 'fp-test',
+  }
 }
 
 /** A stubbed parser that does nothing meaningful. */
@@ -224,6 +255,7 @@ function createCompileContextForTest(
   extractorTransforms: ExtractorTransformRegistry,
   workspaceRoutes: readonly { workspace: string; prefixSegments: readonly string[] }[],
   defaultConfig: CompileContextConfig,
+  getMetadata: GetSpecMetadata = missingGetSpecMetadata,
 ): CompileContext {
   return new CompileContext(
     changeRepo,
@@ -233,6 +265,7 @@ function createCompileContextForTest(
     parsers,
     hasher,
     previewSpec,
+    getMetadata,
     extractorTransforms,
     workspaceRoutes,
     defaultConfig,
@@ -308,6 +341,11 @@ function makeSut(opts: {
     workspace: string
     prefixSegments: readonly string[]
   }[]
+  /**
+   * Override metadata materialization. Use {@link missingGetSpecMetadata} for
+   * extraction-fallback scenarios (materialization cannot produce a projection).
+   */
+  getMetadata?: GetSpecMetadata
 }): {
   sut: CompileContext & {
     execute: (input: LegacyCompileContextInput) => Promise<CompileContextResult>
@@ -333,6 +371,10 @@ function makeSut(opts: {
   const previewSpecImpl = previewSpec ?? makeStubPreviewSpec()
   const extractorTransformsImpl = extractorTransforms ?? new Map()
   const workspaceRoutesImpl = workspaceRoutes ?? []
+  const hasher = makeContentHasher()
+  const getMetadata =
+    opts.getMetadata ??
+    (specRepos !== undefined ? makeGetSpecMetadata(specRepos, hasher) : missingGetSpecMetadata)
 
   const sut = createCompileContextForTest(
     changeRepo,
@@ -340,11 +382,12 @@ function makeSut(opts: {
     schemaProvider,
     fileReaderImpl,
     parsers,
-    makeContentHasher(),
+    hasher,
     previewSpecImpl,
     extractorTransformsImpl,
     workspaceRoutesImpl,
     noOp,
+    getMetadata,
   ) as CompileContext & {
     execute: (input: LegacyCompileContextInput) => Promise<CompileContextResult>
   }
@@ -356,11 +399,12 @@ function makeSut(opts: {
       schemaProvider,
       fileReaderImpl,
       parsers,
-      makeContentHasher(),
+      hasher,
       previewSpecImpl,
       extractorTransformsImpl,
       workspaceRoutesImpl,
       cfg,
+      getMetadata,
     ),
   )
 
@@ -576,6 +620,8 @@ describe('CompileContext', () => {
         specRepos: repos,
         parsers: new Map([['markdown', markdownParser]]) as ArtifactParserRegistry,
         extractorTransforms: createBuiltinExtractorTransforms(),
+        // Materialization must fail entirely for extraction-fallback tier to run.
+        getMetadata: missingGetSpecMetadata,
       })
 
       const result = await sut.execute({
@@ -646,6 +692,7 @@ describe('CompileContext', () => {
         specRepos: repos,
         parsers: new Map([['markdown', markdownParser]]) as ArtifactParserRegistry,
         extractorTransforms: createBuiltinExtractorTransforms(),
+        getMetadata: missingGetSpecMetadata,
       })
 
       await expect(
@@ -750,6 +797,7 @@ describe('CompileContext', () => {
           { workspace: 'default', prefixSegments: ['_global'] },
           { workspace: 'core', prefixSegments: ['core'] },
         ],
+        getMetadata: missingGetSpecMetadata,
       })
 
       const result = await sut.execute({
@@ -1126,8 +1174,10 @@ describe('CompileContext', () => {
       const specRepo = makeSpecRepo([loginSpec, sharedSpec], {
         'auth/login/.specd-metadata.yaml': loginMetadata,
         'auth/login/spec.md': loginContent,
+        'auth/login/spec-lock.json': lockJson(['default:auth/shared']),
         'auth/shared/.specd-metadata.yaml': sharedMetadata,
         'auth/shared/spec.md': sharedContent,
+        'auth/shared/spec-lock.json': lockJson([]),
       })
 
       const change = makeChange('my-change', {
@@ -1302,8 +1352,10 @@ describe('CompileContext', () => {
       const specRepo = makeSpecRepo([loginSpec, jwtSpec], {
         'auth/login/.specd-metadata.yaml': loginMetadata,
         'auth/login/spec.md': loginContent,
+        'auth/login/spec-lock.json': lockJson(['default:auth/jwt']),
         'auth/jwt/.specd-metadata.yaml': staleMetadata,
         'auth/jwt/spec.md': jwtContent,
+        'auth/jwt/spec-lock.json': lockJson([]),
       })
 
       const change = makeChange('my-change', {
@@ -1628,6 +1680,8 @@ describe('CompileContext', () => {
         schema,
         specRepos: new Map([['default', specRepo]]),
         parsers,
+        // Extraction fallback only when materialization cannot produce a projection.
+        getMetadata: missingGetSpecMetadata,
       })
 
       const result = await sut.execute({
@@ -1885,6 +1939,7 @@ describe('CompileContext', () => {
         schema,
         specRepos: new Map([['default', specRepo]]),
         parsers,
+        getMetadata: missingGetSpecMetadata,
       })
 
       const result = await sut.execute({
@@ -2070,6 +2125,7 @@ describe('CompileContext', () => {
         schema,
         specRepos: new Map([['default', specRepo]]),
         parsers,
+        getMetadata: missingGetSpecMetadata,
       })
 
       const result = await sut.execute({
@@ -2134,12 +2190,16 @@ describe('CompileContext', () => {
       const specRepo = makeSpecRepo([specA, specB, specC, specD], {
         'a/.specd-metadata.yaml': metadataA,
         'a/spec.md': contentA,
+        'a/spec-lock.json': lockJson(['default:b']),
         'b/.specd-metadata.yaml': metadataB,
         'b/spec.md': contentB,
+        'b/spec-lock.json': lockJson(['default:c']),
         'c/.specd-metadata.yaml': metadataC,
         'c/spec.md': contentC,
+        'c/spec-lock.json': lockJson(['default:d']),
         'd/.specd-metadata.yaml': metadataD,
         'd/spec.md': contentD,
+        'd/spec-lock.json': lockJson([]),
       })
 
       const change = makeChange('my-change', {
@@ -2182,10 +2242,13 @@ describe('CompileContext', () => {
       const specRepo = makeSpecRepo([specA, specB, specC], {
         'a/.specd-metadata.yaml': metadataA,
         'a/spec.md': contentA,
+        'a/spec-lock.json': lockJson(['default:b']),
         'b/.specd-metadata.yaml': metadataB,
         'b/spec.md': contentB,
+        'b/spec-lock.json': lockJson(['default:c']),
         'c/.specd-metadata.yaml': metadataC,
         'c/spec.md': contentC,
+        'c/spec-lock.json': lockJson([]),
       })
 
       const change = makeChange('my-change', {
@@ -2286,12 +2349,16 @@ describe('CompileContext', () => {
       const specRepo = makeSpecRepo([loginSpec, sharedSpec, architectureSpec, jwtSpec], {
         'auth/login/.specd-metadata.yaml': loginMetadata,
         'auth/login/spec.md': loginContent,
+        'auth/login/spec-lock.json': lockJson(['default:auth/shared']),
         'auth/shared/.specd-metadata.yaml': sharedMetadata,
         'auth/shared/spec.md': sharedContent,
+        'auth/shared/spec-lock.json': lockJson(['default:auth/jwt']),
         '_global/architecture/.specd-metadata.yaml': architectureMetadata,
         '_global/architecture/spec.md': architectureContent,
+        '_global/architecture/spec-lock.json': lockJson([]),
         'auth/jwt/.specd-metadata.yaml': jwtMetadata,
         'auth/jwt/spec.md': jwtContent,
+        'auth/jwt/spec-lock.json': lockJson([]),
       })
 
       const change = makeChange('my-change', { specIds: ['default:auth/login'] })
@@ -2376,8 +2443,22 @@ describe('CompileContext', () => {
 
       const change = makeChange('my-change', { specIds: ['default:auth/login'] })
       const schema = makeSchema()
+      const getMetadata = {
+        execute: vi.fn(async () => ({
+          metadata,
+          metadataFingerprint: 'fp',
+          source: 'persisted' as const,
+          regenerated: false,
+          warnings: [],
+        })),
+      }
 
-      const { sut } = makeSut({ change, schema, specRepos: new Map([['default', specRepo]]) })
+      const { sut } = makeSut({
+        change,
+        schema,
+        specRepos: new Map([['default', specRepo]]),
+        getMetadata: getMetadata as never,
+      })
 
       const result = await sut.execute({
         name: 'my-change',
@@ -2392,6 +2473,7 @@ describe('CompileContext', () => {
       expect(result.specs[0]?.title).toBeUndefined()
       expect(result.specs[0]?.description).toBeUndefined()
       expect(result.specs[0]?.content).toBeUndefined()
+      expect(getMetadata.execute).not.toHaveBeenCalled()
     })
 
     it('full mode renders all collected entries as full', async () => {
@@ -3511,6 +3593,7 @@ describe('CompileContext', () => {
         optimizedContext: 'Optimized context rules and constraints',
         contentHashes: { 'spec.md': sha256Hex(loginContent) },
         rules: [{ requirement: 'Auth', rules: ['Standard rule'] }],
+        provenance: metadataProvenance(loginContent),
       }
 
       const specRepo = makeSpecRepo([loginSpec], {
@@ -3581,6 +3664,7 @@ describe('CompileContext', () => {
         contentHashes: { 'spec.md': sha256Hex(loginContent) },
         rules: [{ requirement: 'Auth', rules: ['Standard rule'] }],
         constraints: ['Standard constraint'],
+        provenance: metadataProvenance(loginContent),
       }
 
       const specRepo = makeSpecRepo([loginSpec], {
@@ -3645,6 +3729,7 @@ describe('CompileContext', () => {
             then: ['Logged in'],
           },
         ],
+        provenance: metadataProvenance(loginContent),
       }
 
       const specRepo = makeSpecRepo([loginSpec], {
@@ -3689,6 +3774,8 @@ describe('CompileContext', () => {
       const changeRepo = makeStubChangeRepo(change)
       const schemaProvider = makeStubSchemaProvider(schema)
       const listWorkspaces = makeListWorkspaces(new Map([['default', specRepo]]))
+      const hasher = makeContentHasher()
+      const getMetadata = makeGetSpecMetadata(new Map([['default', specRepo]]), hasher)
 
       const sut = createCompileContextForTest(
         changeRepo,
@@ -3696,7 +3783,7 @@ describe('CompileContext', () => {
         schemaProvider,
         makeStubFileReader(),
         new Map() as ArtifactParserRegistry,
-        makeContentHasher(),
+        hasher,
         makeStubPreviewSpec(),
         new Map(),
         [],
@@ -3704,6 +3791,7 @@ describe('CompileContext', () => {
           contextIncludeSpecs: ['default:auth/login'],
           contextMode: 'summary',
         },
+        getMetadata,
       )
 
       const result = await sut.execute({

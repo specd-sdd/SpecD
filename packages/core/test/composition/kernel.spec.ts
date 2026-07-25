@@ -170,4 +170,22 @@ describe('createKernel', () => {
 
     expect(kernel.changes.countTasks).toBeInstanceOf(CountTasks)
   })
+
+  it('exposes persisted-state metadata surface without legacy editors', async () => {
+    const config = await makeConfig()
+    const kernel = await createKernel(config)
+
+    expect(kernel.specs.initializePersistedState).toBeDefined()
+    expect(kernel.specs.getPersistedDeps).toBeDefined()
+    expect(kernel.specs.updatePersistedDeps).toBeDefined()
+    expect(kernel.specs.getPersistedImplementation).toBeDefined()
+    expect(kernel.specs.updatePersistedImplementation).toBeDefined()
+    expect(kernel.specs.getPersistedOptimizations).toBeDefined()
+    expect(kernel.specs.updatePersistedOptimizations).toBeDefined()
+    expect(kernel.specs.getPersistedSchema).toBeDefined()
+    expect(kernel.specs.updatePersistedSchema).toBeDefined()
+    expect('saveMetadata' in kernel.specs).toBe(false)
+    expect('updateMetadata' in kernel.specs).toBe(false)
+    expect('invalidateMetadata' in kernel.specs).toBe(false)
+  })
 })

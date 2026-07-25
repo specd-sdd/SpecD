@@ -1,13 +1,7 @@
 import { type Command } from 'commander'
 import chalk from 'chalk'
-import {
-  type SpecListEntry,
-  type SpecMetadataStatus,
-  type ProjectWorkspace,
-  type SpecRepository,
-} from '@specd/sdk'
+import { type SpecListEntry, type ProjectWorkspace, type SpecRepository } from '@specd/sdk'
 import { resolveCliContext } from '../../helpers/cli-context.js'
-import { parseCommaSeparatedValues } from '../../helpers/parse-comma-values.js'
 import {
   addListPaginationOptions,
   formatTruncationHint,
@@ -28,23 +22,18 @@ function collect(value: string, previous: string[]): string[] {
   return [...previous, value]
 }
 
-/**
- * Column widths shared across all workspace groups in a single `spec list` run.
- */
-type GlobalWidths = { pathW: number; titleW: number; metadataStatusW: number; summaryW: number }
+/** Column widths shared across all workspace groups in a single `spec list` run. */
+type GlobalWidths = { pathW: number; titleW: number; summaryW: number }
 
 /**
- * Computes column widths from ALL entries across ALL workspaces so every
- * workspace group uses the same fixed column sizes.
+ * Computes column widths from ALL entries across ALL workspaces.
  *
  * @param entries - All spec list entries.
- * @param includeMetadataStatus - Whether a STATUS column is shown.
  * @param includeSummary - Whether a SUMMARY column is shown.
  * @returns The computed column widths.
  */
 function computeGlobalWidths(
   entries: readonly SpecListEntry[],
-  includeMetadataStatus: boolean,
   includeSummary: boolean,
 ): GlobalWidths {
   return {
@@ -56,12 +45,6 @@ function computeGlobalWidths(
       'TITLE',
       entries.map((s) => s.title),
     ),
-    metadataStatusW: includeMetadataStatus
-      ? colWidth(
-          'METADATA STATUS',
-          entries.map((s) => s.metadataStatus ?? ''),
-        )
-      : 0,
     summaryW: includeSummary
       ? Math.min(
           60,
@@ -79,7 +62,6 @@ function computeGlobalWidths(
  *
  * @param workspaceObj - Workspace details used as the table title.
  * @param specs - Entries belonging to this workspace.
- * @param includeMetadataStatus - Whether to include a STATUS column.
  * @param includeSummary - Whether to include a SUMMARY column.
  * @param widths - Column widths computed across all workspaces.
  * @returns Formatted block for this workspace group.
@@ -87,12 +69,10 @@ function computeGlobalWidths(
 function renderWorkspaceGroup(
   workspaceObj: ProjectWorkspace,
   specs: SpecListEntry[],
-  includeMetadataStatus: boolean,
   includeSummary: boolean,
   widths: GlobalWidths,
 ): string {
   let innerWidth = widths.pathW + 2 + widths.titleW
-  if (includeMetadataStatus) innerWidth += 2 + widths.metadataStatusW
   if (includeSummary) innerWidth += 2 + widths.summaryW
 
   let wsLabel = `workspace: ${workspaceObj.name}`
@@ -113,8 +93,6 @@ function renderWorkspaceGroup(
     { header: 'PATH', width: widths.pathW },
     { header: 'TITLE', width: widths.titleW },
   ]
-  if (includeMetadataStatus)
-    columns.push({ header: 'METADATA STATUS', width: widths.metadataStatusW })
   if (includeSummary) columns.push({ header: 'SUMMARY', width: widths.summaryW, overflow: 'wrap' })
 
   if (specs.length === 0) {
@@ -126,7 +104,6 @@ function renderWorkspaceGroup(
     columns,
     specs.map((s) => {
       const row = [`${workspaceObj.name}:${s.path}`, s.title]
-      if (includeMetadataStatus) row.push(s.metadataStatus ?? '')
       if (includeSummary) row.push(s.summary ?? '')
       return row
     }),
@@ -144,13 +121,9 @@ export function registerSpecList(parent: Command): void {
     .command('list')
     .allowExcessArguments(false)
     .description(
-      'List all specs in the project across all workspaces, with their identifiers and titles. Metadata freshness is shown when --metadata-status is provided; summaries are shown when --summary is provided.',
+      'List all specs in the project across all workspaces, with their identifiers and titles.',
     )
     .option('--summary', 'include a short description for each spec')
-    .option(
-      '--metadata-status [filter]',
-      'show metadata freshness status; optionally filter by fresh,stale,missing,invalid',
-    )
     .option('--workspace <name>', 'filter by workspace (repeatable)', collect, [])
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
@@ -168,7 +141,7 @@ JSON/TOON output schema:
   {
     workspaces: Array<{
       name: string
-      specs: Array<{ path, title, metadataStatus?, summary? }>
+      specs: Array<{ path, title, summary? }>
       meta: { total, count, limit, page?, after? }
     }>
   }
@@ -177,7 +150,6 @@ JSON/TOON output schema:
     .action(
       async (opts: {
         summary?: boolean
-        metadataStatus?: boolean | string
         workspace: string[]
         format: string
         config?: string
@@ -188,26 +160,15 @@ JSON/TOON output schema:
         try {
           const { kernel } = await resolveCliContext({ configPath: opts.config })
           const includeSummary = opts.summary === true
-          const includeMetadataStatus = opts.metadataStatus !== undefined
-          const metadataStatusFilter = parseMetadataStatusFilter(opts.metadataStatus)
           const parsedLimit = parseLimitFlag(opts.limit)
           const pagination = parseListPaginationFlags(opts, { allowAfterId: false })
 
           const result = await kernel.specs.list.execute({
             ...pagination,
             includeSummary,
-            includeMetadataStatus,
             ...(opts.workspace.length > 0 ? { workspaces: opts.workspace } : {}),
           })
           const fmt = parseFormat(opts.format)
-
-          const filteredItems =
-            metadataStatusFilter === null
-              ? result.items
-              : result.items.filter(
-                  (e) =>
-                    e.metadataStatus !== undefined && metadataStatusFilter.has(e.metadataStatus),
-                )
 
           const workspaces = await kernel.project.listWorkspaces.execute()
           const workspaceNames = workspaces.map((w) => w.name)
@@ -219,7 +180,7 @@ JSON/TOON output schema:
 
           const byWorkspace = new Map<string, SpecListEntry[]>()
           for (const name of visibleWorkspaces) byWorkspace.set(name, [])
-          for (const entry of filteredItems) byWorkspace.get(entry.workspace)?.push(entry)
+          for (const entry of result.items) byWorkspace.get(entry.workspace)?.push(entry)
 
           const workspaceMeta = new Map(
             result.byWorkspace.map((slice) => [slice.workspace, slice.meta]),
@@ -232,7 +193,7 @@ JSON/TOON output schema:
             }
 
             const workspaceMap = new Map(workspaces.map((w) => [w.name, w]))
-            const widths = computeGlobalWidths(filteredItems, includeMetadataStatus, includeSummary)
+            const widths = computeGlobalWidths(result.items, includeSummary)
             const groups = visibleWorkspaces.map((name) => {
               const wsObj: ProjectWorkspace = workspaceMap.get(name) ?? {
                 name,
@@ -245,7 +206,6 @@ JSON/TOON output schema:
               const block = renderWorkspaceGroup(
                 wsObj,
                 byWorkspace.get(name) ?? [],
-                includeMetadataStatus,
                 includeSummary,
                 widths,
               )
@@ -272,9 +232,6 @@ JSON/TOON output schema:
                     specs: specs.map((s) => ({
                       path: `${name}:${s.path}`,
                       title: s.title,
-                      ...(includeMetadataStatus && s.metadataStatus !== undefined
-                        ? { metadataStatus: s.metadataStatus }
-                        : {}),
                       ...(includeSummary && s.summary !== undefined ? { summary: s.summary } : {}),
                     })),
                     meta,
@@ -289,28 +246,4 @@ JSON/TOON output schema:
         }
       },
     )
-}
-
-const VALID_METADATA_STATUSES: ReadonlySet<SpecMetadataStatus> = new Set([
-  'fresh',
-  'stale',
-  'missing',
-  'invalid',
-])
-
-/**
- * Parses the `--metadata-status` option value into a filter set.
- *
- * @param value - The raw option value: `undefined` (not passed), `true` (flag only), or a string
- * @returns A set of status tokens to filter by, or `null` if no filtering
- */
-function parseMetadataStatusFilter(
-  value: boolean | string | undefined,
-): Set<SpecMetadataStatus> | null {
-  if (typeof value !== 'string') return null
-  try {
-    return parseCommaSeparatedValues(value, VALID_METADATA_STATUSES, '--metadata-status')
-  } catch {
-    return null
-  }
 }

@@ -1,0 +1,171 @@
+# verify.md delta paired with validate-specs/spec.md.delta.yaml — rewrites
+# metadata-consistency coverage around self-healing materialization (missing/
+# stale is not itself a failure; a materialization failure is), adds
+# independent persisted-optimization-staleness failure coverage, and adds the
+# getMetadata dependency to the config-based factory coverage.
+
+- op: modified
+  description: Rename to match spec.md and rewrite scenarios around self-healing materialization — missing/stale persisted metadata is not itself a failure, a materialization failure is, and dependsOn is checked post-materialization against readPersistedState.
+  rename: 'Requirement: Metadata materialization and validation'
+  selector:
+    type: section
+    matches: 'Requirement: Canonical metadata consistency validation'
+  content: |
+    #### Scenario: Stale persisted metadata is self-healed, not a failure
+
+    - **GIVEN** a spec has `metadata.json` whose `contentHashes` no longer match the current required artifacts
+    - **WHEN** `ValidateSpecs` validates that spec
+    - **THEN** `GetSpecMetadata` self-heals a fresh in-memory projection (delegating with `policy: 'if-needed'`)
+    - **AND** no `ValidationFailure` is recorded solely because the persisted cache was stale
+
+    #### Scenario: Materialization failure becomes a validation failure
+
+    - **GIVEN** `GetSpecMetadata` cannot produce a valid metadata projection for a spec (for example, a source read failure or a projection that fails structural validation even after regeneration)
+    - **WHEN** `ValidateSpecs` validates that spec
+    - **THEN** the spec entry includes a `ValidationFailure` indicating that metadata could not be materialized
+
+    #### Scenario: Post-materialization dependsOn mismatch becomes a validation failure
+
+    - **GIVEN** the materialized metadata's normalized `dependsOn` differs from `SpecRepository.readPersistedState(spec).dependsOn` (or `[]` for a lock-less spec)
+    - **WHEN** `ValidateSpecs` validates that spec
+    - **THEN** the spec entry includes a `ValidationFailure` describing the internal inconsistency
+
+    #### Scenario: Extracted dependsOn mismatch becomes a validation failure
+
+    - **GIVEN** the schema declares `metadataExtraction.dependsOn`
+    - **AND** extraction yields a dependency set different from the persisted dependency state
+    - **WHEN** `ValidateSpecs` validates that spec
+    - **THEN** the spec entry includes a `ValidationFailure`
+
+    #### Scenario: Persisted dependency projection remains valid without extraction
+
+    - **GIVEN** the schema omits `metadataExtraction.dependsOn`
+    - **AND** `metadata.json.dependsOn` matches the persisted dependency state
+    - **WHEN** `ValidateSpecs` validates that spec
+    - **THEN** no dependency-projection failure is recorded for that check
+
+    #### Scenario: metadata-cache-write-failed is a warning, not a failure
+
+    - **GIVEN** materialization returns a `metadata-cache-write-failed` warning while still producing a valid in-memory projection
+    - **WHEN** `ValidateSpecs` validates that spec
+    - **THEN** the warning is surfaced as a `ValidationWarning` on the spec's entry
+    - **AND** it is not recorded as a `ValidationFailure`
+
+- op: added
+  description: New requirement making persisted optimization staleness an independent validation failure, checked regardless of metadata materialization outcome.
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: 'Requirement: Metadata materialization and validation'
+  content: |
+    ### Requirement: Persisted optimization staleness is an independent failure
+
+    #### Scenario: Stale optimization field fails validation independently
+
+    - **GIVEN** a spec's persisted `optimizedDescription` or `optimizedContext` is stale against its current artifacts or schema identity
+    - **WHEN** `ValidateSpecs` validates that spec
+    - **THEN** the spec entry includes a `ValidationFailure` identifying the stale field(s) and reason(s)
+
+    #### Scenario: Optimization staleness failure is reported even when metadata materialization succeeds
+
+    - **GIVEN** metadata materialization succeeds and all other checks pass for a spec
+    - **AND** a persisted optimization field is stale
+    - **WHEN** `ValidateSpecs` validates that spec
+    - **THEN** the spec entry still fails due to the stale optimization field
+
+    #### Scenario: No optimizations or only fresh optimizations does not fail this check
+
+    - **GIVEN** a spec has no persisted optimizations, or only fresh optimization fields
+    - **WHEN** `ValidateSpecs` validates that spec
+    - **THEN** this check does not fail for that spec
+
+- op: modified
+  description: Add coverage for the new getMetadata dependency resolved per workspace.
+  selector:
+    type: section
+    matches: 'Requirement: Config-based factory delegates through resolveValidateSpecsDeps'
+  content: |
+    #### Scenario: createValidateSpecs config form derives ValidateSpecsDeps through resolveValidateSpecsDeps
+
+    - **WHEN** `createValidateSpecs(config, options?)` is invoked
+    - **THEN** it creates a composition resolver for that composition session
+    - **AND** it derives `ValidateSpecsDeps` through `resolveValidateSpecsDeps(resolver)`
+    - **AND** `resolveValidateSpecsDeps(resolver)` resolves:
+      - `specs: ReadonlyMap<string, SpecRepository>`
+      - `schemaProvider: SchemaProvider`
+      - `parsers: ArtifactParserRegistry`
+      - `contentHasher: ContentHasher`
+      - `extractorTransforms: ExtractorTransformRegistry`
+      - `workspaceRoutes: readonly SpecWorkspaceRoute[]`
+      - `validationResultCaches: ReadonlyMap<string, ValidationResultCache>`
+      - `getMetadata: ReadonlyMap<string, GetSpecMetadata>`
+    - **AND** the factory delegates to canonical `createValidateSpecs(deps)`
+
+    #### Scenario: resolveValidateSpecsDeps wires one GetSpecMetadata instance per workspace
+
+    - **WHEN** `resolveValidateSpecsDeps(resolver)` runs
+    - **THEN** the resolved deps include `getMetadata: ReadonlyMap<string, GetSpecMetadata>` with one instance per configured workspace
+    - **AND** it is used to self-heal metadata before normalized-content validation
+
+- op: modified
+  description: Add list includeMeta discovery and hard-hit without N×get to transparent cache scenarios.
+  selector:
+    type: section
+    matches: 'Requirement: Transparent validation result cache'
+  content: |
+    #### Scenario: Hard hit skips full validation work
+
+    - **GIVEN** a valid cache row for a spec whose stamps still match
+    - **WHEN** `ValidateSpecs` validates that spec via
+      `lookup({ spec, schemaFingerprint, engineVersion, stamps? })`
+    - **THEN** the cached `SpecValidationEntry` is returned for that spec
+    - **AND** artifact parse, rule evaluation, cross-artifact evaluation, and metadata
+      consistency checks are not re-run for that spec
+
+    #### Scenario: Soft hit is invisible to ValidateSpecs
+
+    - **GIVEN** a cache row whose stamps changed but whose `cacheFingerprint` still matches
+    - **WHEN** `ValidateSpecs` validates that spec
+    - **THEN** the result is a hit with the cached entry
+    - **AND** ValidateSpecs does not receive a soft-hit / `refreshStamps` signal
+    - **AND** full validation is not re-run
+
+    #### Scenario: Miss runs full validation and upserts including failures
+
+    - **GIVEN** no usable cache row for a spec (bucket invalid, stamp+fingerprint miss, or
+      absent)
+    - **WHEN** `ValidateSpecs` validates that spec and records failures and warnings
+    - **THEN** the full validation path runs
+    - **AND** `upsert({ entry, spec, schemaFingerprint, engineVersion })` is called
+    - **AND** ValidateSpecs does not pass stamps or `cacheFingerprint` on upsert
+
+    #### Scenario: Lock content change forces miss via cacheFingerprint
+
+    - **GIVEN** two otherwise identical specs whose persisted lock sidecar contents differ
+    - **WHEN** each is validated after an initial cached pass
+    - **THEN** the second validation cannot hard/soft-hit on the first row's fingerprint
+      path (lock feeds persisted-state hash inside `specFingerprint`)
+
+    #### Scenario: Hosts observe identical public behaviour on hit or miss
+
+    - **WHEN** a host invokes validation with the same public inputs
+    - **THEN** returned `ValidateSpecsResult` shape and fields are unchanged by whether a
+      cache hit occurred
+    - **AND** the host is not required to pass cache-specific options
+
+    #### Scenario: Workspace discovery lists with includeMeta
+
+    - **GIVEN** workspace validation mode
+    - **WHEN** specs are discovered for validation
+    - **THEN** the repository is listed with `{ includeMeta: true }`
+
+    #### Scenario: Warm hard hit does not N×get solely for stamps
+
+    - **GIVEN** workspace or all-workspaces validation with list Meta available
+    - **AND** the validation result cache would hard-hit from those stamps
+    - **WHEN** `ValidateSpecs` looks up the cache for each listed spec
+    - **THEN** it passes the list Meta stamps into `lookup`
+    - **AND** it does not call `repo.get()` solely to obtain stamps for those hard hits

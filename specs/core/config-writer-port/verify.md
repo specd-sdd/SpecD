@@ -20,6 +20,43 @@
 - **AND** the workspace specs directory and standard storage directories under `.specd/` are created
 - **AND** both `specd.local.yaml` and `specd.local.*.yaml` are appended to `.gitignore`
 
+#### Scenario: Metadata cache directory created idempotently
+
+- **GIVEN** a directory with no existing `specd.yaml` or metadata cache directory
+- **WHEN** `initProject` completes successfully
+- **THEN** the resolved metadata cache directory (default `.specd/metadata/`) exists
+
+#### Scenario: Metadata cache directory creation is idempotent on re-init
+
+- **GIVEN** the resolved metadata cache directory already exists
+- **WHEN** `initProject` is called again with `force: true`
+- **THEN** the metadata cache directory still exists and no error is thrown
+
+#### Scenario: Metadata cache entry appended to root .gitignore
+
+- **GIVEN** a root `.gitignore` without a `/.specd/metadata/` entry
+- **WHEN** `initProject` completes successfully
+- **THEN** the root `.gitignore` contains a rooted `/.specd/metadata/` entry
+- **AND** other existing ignore content is undisturbed
+
+#### Scenario: Metadata cache entry is not duplicated on re-init
+
+- **GIVEN** a root `.gitignore` already containing the rooted `/.specd/metadata/` entry
+- **WHEN** `initProject` is called again with `force: true`
+- **THEN** the `/.specd/metadata/` entry appears only once in `.gitignore`
+
+#### Scenario: Non-default filesystem metadataPath is not rewritten automatically
+
+- **GIVEN** the resolved workspace storage config specifies a custom filesystem `metadataPath`
+- **WHEN** `initProject` completes successfully
+- **THEN** the custom `metadataPath` directory is not silently relocated or renamed by `initProject`
+
+#### Scenario: Non-filesystem repository is not subject to the metadata gitignore step
+
+- **GIVEN** the resolved configuration declares a non-filesystem spec repository adapter
+- **WHEN** `initProject` completes successfully
+- **THEN** the root `.gitignore` metadata-cache step does not apply for that workspace
+
 #### Scenario: initProject creates tmp gitignore for fs-cache and locks
 
 - **GIVEN** a directory with no existing `specd.yaml`
@@ -101,4 +138,4 @@
 #### Scenario: InitProjectResult contains required fields
 
 - **WHEN** `InitProjectResult` interface is inspected
-- **THEN** it contains `configPath: string`, `schemaRef: string`, `workspaces: readonly string[]`
+- **THEN** it contains `configPath: string`, `schemaRef: string`, `workspaces: readonly string[]`, and `metadataCachePath: string`

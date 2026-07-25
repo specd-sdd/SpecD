@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Without a quick inventory of all specs, users and agents cannot orient themselves in a project or spot stale metadata. `specd specs list` is the canonical command and lists all specs across all configured workspaces, always including a title per spec and optionally a short summary and metadata freshness status.
+Without a quick inventory of all specs, users and agents cannot orient themselves in a project. `specd specs list` is the canonical command and lists all specs across all configured workspaces, always including a title per spec and optionally a short summary, both self-healed through Core materialization.
 
 `specd spec list` remains supported as an alias.
 
@@ -11,27 +11,25 @@ Without a quick inventory of all specs, users and agents cannot orient themselve
 ### Requirement: Command signature
 
 ```
-specd specs list [--workspace <name>] [--summary] [--metadata-status [filter]] [--limit <n|all>] [--page <p>] [--after-key <path>] [--format text|json|toon]
+specd specs list [--workspace <name>] [--summary] [--limit <n|all>] [--page <p>] [--after-key <path>] [--format text|json|toon]
 ```
 
 Alias:
 
 ```
-specd spec list [--workspace <name>] [--summary] [--metadata-status [filter]] [--limit <n|all>] [--page <p>] [--after-key <path>] [--format text|json|toon]
+specd spec list [--workspace <name>] [--summary] [--limit <n|all>] [--page <p>] [--after-key <path>] [--format text|json|toon]
 ```
 
 - `--workspace <name>` — optional, repeatable; include only specs belonging to the named workspace(s). When omitted, all workspaces are included
 - `--summary` — optional flag; when present, a short summary is included for each spec alongside the title (`includeSummary`)
-- `--metadata-status` — optional flag with optional filter value; when present, a metadata-freshness METADATA STATUS column is included for each spec (`includeMetadataStatus`)
-  - Without a filter value (`--metadata-status`), all specs are shown with their status
-  - With a comma-separated filter value (`--metadata-status stale`, `--metadata-status stale,missing`), only specs matching at least one of the listed statuses are shown
-  - Valid filter tokens: `fresh`, `stale`, `missing`, `invalid`
 - `--limit <n|all>` — optional; when a positive integer is given, caps entries **per workspace query**. When omitted or set to `all`, the host MUST NOT pass `limit` to `ListSpecs` (full catalog per workspace). There is **no** CLI default numeric limit.
 - `--page <p>` — optional; 1-based page number; MUST be paired with a numeric `--limit` (not `all`)
 - `--after-key <path>` — optional; exclusive keyset cursor — capability path (with `/` separators) of the last seen spec in the workspace being paginated
 - `--format text|json|toon` — optional; output format, defaults to `text`
 
 `--page` is mutually exclusive with `--after-key`. `--page` with `--limit all` or without a numeric `--limit` MUST be rejected. Spec list keyset cursors omit `after-id` (path alone is the sort key). `--after-key` with `--limit all` (or omitted limit) is allowed and returns the remainder after the cursor.
+
+There is no `--metadata-status` flag. The command never implements cache freshness or regeneration logic itself; title and summary are always self-healed through Core materialization when `ListSpecs` needs the normalized projection.
 
 ### Requirement: Workspace filtering
 
@@ -48,9 +46,8 @@ The command MUST invoke `ListSpecs.execute()` and map CLI flags to list options:
 - Numeric `--limit`, `--page`, `--after-key` → `limit`, `page`, and `after: { key }` (no `id` for specs)
 - `--limit all` or omitted `--limit` → omit `limit` from the use-case input
 - `--summary` → `includeSummary: true`
-- `--metadata-status` → `includeMetadataStatus: true`
 
-Include flags MUST be set only when the corresponding CLI flag is present. The command MUST NOT re-resolve summary or metadata status with extra I/O when the repository already returned those fields. The command MUST NOT re-sort or paginate after the use case returns.
+Include flags MUST be set only when the corresponding CLI flag is present. The command MUST NOT reimplement summary resolution, metadata freshness, or regeneration with extra I/O — `ListSpecs` already materializes what it needs internally. The command MUST NOT re-sort or paginate after the use case returns.
 
 ### Requirement: Title resolution
 
@@ -74,30 +71,14 @@ When `--summary` is passed, a short summary is included for each spec, resolved 
 
 Summary extraction from `spec.md` is performed by `@specd/core` as a pure function — the CLI does not contain Markdown parsing logic.
 
-### Requirement: Status resolution
-
-When `--metadata-status` is passed, each spec receives a metadata-freshness status, determined as follows:
-
-1. If the spec has no `.specd-metadata.yaml` file → `missing`
-2. If the metadata file exists but fails structural validation against `specMetadataSchema` → `invalid`
-3. If the metadata exists but has no `contentHashes` field (or it is empty) → `stale`
-4. If any recorded hash in `contentHashes` does not match the SHA-256 hash of the current artifact file → `stale`
-5. If a file listed in `contentHashes` no longer exists → `stale`
-6. Otherwise → `fresh`
-
-When a filter value is provided (e.g. `--metadata-status stale,missing`), only specs whose status matches at least one of the filter tokens are included in the output. Tokens are case-insensitive and comma-separated.
-
-Status resolution is performed by `@specd/core` — the CLI receives the resolved value.
-
 ### Requirement: Output format
 
 In `text` mode (default), specs are grouped by workspace. Each group is rendered as a table:
 
 - The workspace name is printed as a bold title line above the table.
 - Each workspace group begins with an inverse-video workspace header row: `  workspace: <name>  `, padded to the same inner width as the column header row below it.
-- Immediately below the workspace header is an inverse-video column header row. The header includes columns depending on which flags are passed: `PATH  TITLE` (default), with `METADATA STATUS` appended when `--metadata-status` is present, and `SUMMARY` appended when `--summary` is present.
+- Immediately below the workspace header is an inverse-video column header row. The header includes columns depending on which flags are passed: `PATH  TITLE` (default), with `SUMMARY` appended when `--summary` is present.
 - Data rows list one spec per line. The PATH column displays the fully-qualified spec identifier `workspace:capability-path` (e.g. `default:auth/login`). All columns are aligned to globally fixed widths (computed across all entries in all workspaces on the current page).
-- When `--metadata-status` is passed, a `METADATA STATUS` column appears after `TITLE`, showing `fresh`, `stale`, `missing`, or `invalid`.
 - When `--summary` is passed, `SUMMARY` follows as an additional aligned column using wrap overflow (capped at 60 characters).
 - Workspace groups are separated by a blank line.
 
@@ -124,7 +105,6 @@ In `json` or `toon` mode, each workspace entry includes paginated spec results:
         {
           "path": "workspace:cap/path",
           "title": "...",
-          "metadataStatus": "fresh",
           "summary": "..."
         }
       ],
@@ -144,7 +124,7 @@ When `--workspace` filters are applied in JSON/toon mode, the `workspaces` array
 
 When `--summary` is not passed, `summary` is omitted from text rows and from JSON/toon objects. When `--summary` is passed but no summary is available for a spec, the text row shows the title only and the JSON/toon object omits `summary` (does not include `null`).
 
-When `--metadata-status` is not passed, `metadataStatus` is omitted from JSON/toon objects. When `--metadata-status` is passed, `metadataStatus` is always present as a string (`"fresh"`, `"stale"`, `"missing"`, or `"invalid"`).
+There is no `metadataStatus` field or `METADATA STATUS` column: metadata freshness is an internal materialization decision, not a public projection.
 
 ### Requirement: Empty output
 
@@ -207,22 +187,6 @@ $ specd spec list --format json
 
 $ specd spec list --summary --format json
 {"workspaces":[{"name":"default","specs":[{"path":"default:auth/login","title":"Login","summary":"Handles user authentication via login form"}],"meta":{"total":1,"count":1,"limit":1}}]}
-
-$ specd spec list --metadata-status
-  workspace: default
-  PATH                      TITLE     METADATA STATUS
-  default:auth/login        Login     fresh
-  default:auth/register     Register  stale
-  default:billing/invoices  Invoices  missing
-
-$ specd spec list --metadata-status stale,missing
-  workspace: default
-  PATH                      TITLE     METADATA STATUS
-  default:auth/register     Register  stale
-  default:billing/invoices  Invoices  missing
-
-$ specd spec list --metadata-status --format json
-{"workspaces":[{"name":"default","specs":[{"path":"default:auth/login","title":"Login","metadataStatus":"fresh"},{"path":"default:auth/register","title":"Register","metadataStatus":"stale"}],"meta":{"total":2,"count":2,"limit":2}}]}
 
 $ specd spec list --workspace default --format json
 {"workspaces":[{"name":"default","specs":[{"path":"default:auth/login","title":"Login"},{"path":"default:auth/register","title":"Register"}],"meta":{"total":2,"count":2,"limit":2}}]}

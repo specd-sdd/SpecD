@@ -7,18 +7,15 @@ import { type ProjectWorkspace } from '../list-workspaces.js'
  */
 export interface PersistedSpecDepsResult {
   readonly dependsOn: readonly string[]
-  readonly source: 'persisted' | 'metadata' | 'empty'
+  readonly source: 'persisted' | 'empty'
 }
 
 /**
  * Loads the persisted dependency baseline for a spec from durable storage.
  *
- * Reads persisted dependencies first, then falls back to `metadata.json`,
- * returning an empty dependency set only when neither source exists.
- *
- * @param workspaces - Orchestrated workspaces keyed by name
- * @param specId - Fully-qualified spec id to resolve
- * @returns Persisted dependency set plus its source
+ * @param workspaces - Project workspaces keyed by name
+ * @param specId - Canonical spec ID
+ * @returns Persisted dependencies and their storage source
  */
 export async function loadPersistedSpecDependsOn(
   workspaces: ReadonlyMap<string, ProjectWorkspace>,
@@ -36,14 +33,9 @@ export async function loadPersistedSpecDependsOn(
     return { dependsOn: [], source: 'empty' }
   }
 
-  const dependsOn = await repo.readPersistedDependsOn(spec)
-  if (dependsOn !== null) {
-    return { dependsOn, source: 'persisted' }
-  }
-
-  const metadata = await repo.metadata(spec)
-  if (metadata?.dependsOn !== undefined) {
-    return { dependsOn: [...metadata.dependsOn], source: 'metadata' }
+  const persisted = await repo.readPersistedState(spec)
+  if (persisted !== null) {
+    return { dependsOn: persisted.dependsOn, source: 'persisted' }
   }
 
   return { dependsOn: [], source: 'empty' }

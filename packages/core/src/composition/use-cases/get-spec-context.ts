@@ -3,6 +3,7 @@ import { type ContentHasher } from '../../application/ports/content-hasher.js'
 import { type SchemaProvider } from '../../application/ports/schema-provider.js'
 import { type SpecWorkspaceRoute } from '../../application/use-cases/_shared/spec-reference-resolver.js'
 import { GetSpecContext } from '../../application/use-cases/get-spec-context.js'
+import { type GetSpecMetadata } from '../../application/use-cases/get-spec-metadata.js'
 import { type ListWorkspaces } from '../../application/use-cases/list-workspaces.js'
 import { type SpecdConfig } from '../../application/specd-config.js'
 import { type ExtractorTransformRegistry } from '../../domain/services/content-extraction.js'
@@ -12,6 +13,7 @@ import {
   type CompositionResolutionOptions,
 } from '../composition-resolver.js'
 import { normalizeCompositionFactoryArgs, type FactoryInput } from '../normalize-factory-args.js'
+import { createGetSpecMetadata, resolveGetSpecMetadataDeps } from './get-spec-metadata.js'
 
 /**
  * Explicit dependencies for {@link createGetSpecContext}.
@@ -19,6 +21,7 @@ import { normalizeCompositionFactoryArgs, type FactoryInput } from '../normalize
 export interface GetSpecContextDeps {
   readonly listWorkspaces: ListWorkspaces
   readonly contentHasher: ContentHasher
+  readonly getMetadata: GetSpecMetadata
   readonly schemaProvider: SchemaProvider
   readonly parsers: ArtifactParserRegistry
   readonly extractorTransforms: ExtractorTransformRegistry
@@ -35,6 +38,7 @@ export function resolveGetSpecContextDeps(resolver: CompositionResolver): GetSpe
   return {
     listWorkspaces: resolver.getListWorkspaces(),
     contentHasher: resolver.getContentHasher(),
+    getMetadata: createGetSpecMetadata(resolveGetSpecMetadataDeps(resolver)),
     schemaProvider: resolver.getSchemaProvider(),
     parsers: resolver.getArtifactParserRegistry(),
     extractorTransforms: resolver.getExtractorTransforms(),
@@ -93,6 +97,7 @@ function createGetSpecContextFromNormalized(
     const {
       listWorkspaces,
       contentHasher,
+      getMetadata,
       schemaProvider,
       parsers,
       extractorTransforms,
@@ -101,6 +106,7 @@ function createGetSpecContextFromNormalized(
     return new GetSpecContext(
       listWorkspaces,
       contentHasher,
+      getMetadata,
       schemaProvider,
       parsers,
       extractorTransforms,
@@ -124,6 +130,7 @@ function isGetSpecContextDeps(
   return (
     'listWorkspaces' in value &&
     'contentHasher' in value &&
+    'getMetadata' in value &&
     'schemaProvider' in value &&
     'parsers' in value &&
     'extractorTransforms' in value &&

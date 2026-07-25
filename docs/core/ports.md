@@ -126,6 +126,20 @@ abstract class SpecRepository extends Repository {
 }
 ```
 
+### Meta observations
+
+Cheap physical observations use a shared `*Meta` family. Every Meta type exposes `lastModified`; content `hash` is opt-in via `SpecMetaOptions.includeHash`.
+
+| Method                                   | Returns                         | Notes                           |
+| ---------------------------------------- | ------------------------------- | ------------------------------- |
+| `artifactMeta(spec, filename, options?)` | `ArtifactMeta \| null`          | One canonical artifact file     |
+| `persistedStateMeta(spec, options?)`     | `PersistedStateMeta \| null`    | `spec-lock.json` sidecar        |
+| `generatedMetadataMeta(spec, options?)`  | `GeneratedMetadataMeta \| null` | Generated `metadata.json` cache |
+
+The removed `persistedStateHash(spec)` method is replaced by `persistedStateMeta(spec, { includeHash: true })?.hash ?? null`. The provenance field `persistedStateHash` inside generated metadata is unrelated and remains.
+
+`list(prefix?, options?)` accepts `includeMeta?: boolean`. When set, each `SpecListEntry` projects lastModified-only Meta (`artifacts`, `persistedStateMeta`, `generatedMetadataMeta`). List never returns content hashes — use the Meta methods with `includeHash: true` when a digest is required.
+
 ### Methods
 
 #### `get(name: SpecPath): Promise<Spec | null>`

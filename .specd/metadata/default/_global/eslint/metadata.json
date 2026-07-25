@@ -117,11 +117,29 @@
       "then": ["the linter must report an error"]
     }
   ],
+  "optimizedDescription": "Root `eslint.config.js` enforces conventions + architecture layer boundaries via type-aware rules on all packages.",
+  "optimizedContext": "# ESLint Rules\n\n## Rules\n- Reject explicit `any`; use `unknown` + guards\n- Reject default exports\n- Exported functions/methods: explicit return types\n- `src/` files: kebab-case naming\n- JSDoc on all functions, methods, classes, types, interfaces: description, `@param`, `@returns`, `@throws`\n- Layer boundaries via `no-restricted-imports`: domain/ → no application/infrastructure/composition; application/ → no infrastructure/composition; infrastructure/ → no composition\n\n## Constraints\n- Type-aware rules for all `.ts`\n- Lint errors fixed before commit (lint-staged pre-commit)\n- `test/**/*.spec.ts` exempt from JSDoc\n- `dist/`, `node_modules/` excluded",
   "contentHashes": {
     "spec.md": "sha256:cbf52148d3d70d89911d05a46cf3c51adb27fd6860b86e578800ec58fa8de5b1",
     "verify.md": "sha256:e5a6830ee9ea6fa665c8cef868242888f1af151606625cecf0f254da7284a799"
   },
-  "generatedBy": "agent",
-  "optimizedDescription": "ESLint contract: enforce core TS conventions and layer boundaries with type-aware rules across monorepo.",
-  "optimizedContext": "# ESLint Rules\n\n## Rules\n\n- ESLint MUST reject explicit `any` type annotations. Use `unknown` at boundaries, then narrow with type guards.\n- ESLint MUST reject default exports in all source files.\n- Exported functions and class methods MUST have explicit return type annotations. Internal functions may rely on inference when type is obvious.\n- All source files under `src/` MUST use `kebab-case` filenames.\n- All functions, methods, classes, type aliases, and interfaces in source files MUST have JSDoc. JSDoc includes description, `@param`, `@returns` when non-`void`, and `@throws`.\n- ESLint MUST enforce architecture import boundaries with `no-restricted-imports`. `domain/` must not import `application/`, `infrastructure/`, or `composition/`. `application/` must not import `infrastructure/` or `composition/`. `infrastructure/` must not import `composition/`.\n\n## Constraints\n\n- Type-aware lint rules are enabled for all `.ts` files\n- Lint errors must be fixed before commit\n- `test/**/*.spec.ts` files are exempt from JSDoc requirements\n- `dist/` and `node_modules/` are excluded from lint rules"
+  "provenance": {
+    "artifacts": {
+      "spec.md": {
+        "hash": "sha256:cbf52148d3d70d89911d05a46cf3c51adb27fd6860b86e578800ec58fa8de5b1",
+        "lastModified": "2026-05-04T16:57:11.719Z"
+      },
+      "verify.md": {
+        "hash": "sha256:e5a6830ee9ea6fa665c8cef868242888f1af151606625cecf0f254da7284a799",
+        "lastModified": "2026-05-25T06:02:58.306Z"
+      }
+    },
+    "persistedStateHash": "sha256:af93c33787a9e3e310ba50c102db2e65336bdb6adfb04496d701dfc07929155c",
+    "schema": {
+      "name": "schema-std",
+      "version": 1
+    },
+    "projectionVersion": 1,
+    "projectionFingerprint": "sha256:e4a28a2db6a35ed39b8308518337235b1490c2948cd839db25866ad79b22404b"
+  }
 }

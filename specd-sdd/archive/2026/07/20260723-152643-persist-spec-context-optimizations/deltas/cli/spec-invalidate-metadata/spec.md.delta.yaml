@@ -1,0 +1,49 @@
+- op: modified
+  description: Mark the command as removed — freshness is derived from source fingerprints, not manual invalidation.
+  selector:
+    type: section
+    matches: Purpose
+  content: |
+    **Removed.** The `specd spec invalidate-metadata` command forced a spec's metadata stale by stripping `contentHashes`, delegating to the (now removed) `InvalidateSpecMetadata` use case. `MaterializeSpecMetadata` now compares persisted provenance against current source state on every read and regenerates automatically, so there is no supported way — nor any need — to manually mark a cache stale. A guaranteed rebuild is available through `specd spec generate-metadata`, which forces regeneration via `RegenerateSpecMetadata`.
+
+- op: modified
+  description: Replace the command-signature requirement with an explicit removal statement.
+  selector:
+    type: section
+    matches: 'Requirement: Command signature'
+  rename: 'Requirement: spec invalidate-metadata is removed'
+  content: |
+    The CLI MUST NOT register an `invalidate-metadata` command, or any alias of it, on the `spec` parent command. Callers that need a guaranteed rebuild MUST use `specd spec generate-metadata` instead.
+
+- op: removed
+  description: Remove the text-output requirement.
+  selector:
+    type: section
+    matches: 'Requirement: Text output'
+
+- op: removed
+  description: Remove the JSON-output requirement.
+  selector:
+    type: section
+    matches: 'Requirement: JSON output'
+
+- op: removed
+  description: Remove the spec-not-found-or-no-metadata error requirement.
+  selector:
+    type: section
+    matches: 'Requirement: Error — spec not found or no metadata'
+
+- op: removed
+  description: Remove constraints that only applied to the removed invalidation command.
+  selector:
+    type: section
+    matches: Constraints
+
+- op: modified
+  description: Drop the dependency on the removed core:invalidate-spec-metadata use case.
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`default:_global/architecture`](../../_global/architecture/spec.md) — adapter packages contain no business logic
+    - [`default:_global/conventions`](../../_global/conventions/spec.md) — error types, named exports

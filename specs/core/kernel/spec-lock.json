@@ -30,11 +30,8 @@
     "core:approve-signoff",
     "core:list-specs",
     "core:get-spec",
-    "core:save-spec-metadata",
-    "core:invalidate-spec-metadata",
     "core:get-active-schema",
     "core:validate-specs",
-    "core:generate-metadata",
     "core:get-spec-context",
     "core:config-writer-port",
     "core:list-workspaces",
@@ -45,15 +42,20 @@
     "core:resolve-schema",
     "core:spec-overlap",
     "core:get-specs-health",
-    "core:count-tasks"
+    "core:count-tasks",
+    "core:regenerate-spec-metadata",
+    "core:get-spec-metadata",
+    "core:get-persisted-spec-deps",
+    "core:update-persisted-spec-deps",
+    "core:get-persisted-spec-implementation",
+    "core:update-persisted-spec-implementation",
+    "core:get-persisted-spec-optimizations",
+    "core:update-persisted-spec-optimizations",
+    "core:materialize-spec-metadata",
+    "core:get-persisted-spec-schema",
+    "core:update-persisted-spec-schema",
+    "core:initialize-persisted-spec-state",
+    "core:generate-metadata"
   ],
-  "implementation": [
-    {
-      "file": "core:src/composition/kernel.ts",
-      "symbols": ["Kernel", "createKernel"]
-    },
-    {
-      "file": "core:test/composition/kernel.spec.ts"
-    }
-  ]
+  "implementation": []
 }

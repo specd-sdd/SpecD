@@ -1,0 +1,12 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "core:update-persisted-spec-implementation",
+    "cli:entrypoint",
+    "core:get-persisted-spec-implementation"
+  ],
+  "implementation": []
+}

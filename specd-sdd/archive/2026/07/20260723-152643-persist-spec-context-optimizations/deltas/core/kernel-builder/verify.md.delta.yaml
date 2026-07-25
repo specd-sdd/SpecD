@@ -1,0 +1,25 @@
+# verify.md delta paired with kernel-builder/spec.md.delta.yaml — covers the
+# requirement that build() exposes the complete kernel.specs materialization
+# and persisted-state use-case surface for every override combination,
+# without a second drift-prone use-case list.
+
+- op: modified
+  description: Add a scenario confirming build() exposes the complete kernel.specs materialization/persisted-state surface without a second use-case list.
+  selector:
+    type: section
+    matches: 'Requirement: Builder builds kernels with createKernel-equivalent semantics'
+  content: |
+    #### Scenario: Equivalent registrations produce equivalent kernels
+
+    - **GIVEN** the same resolved config and the same additive registrations
+    - **WHEN** one kernel is produced through the builder and another through `createKernel(config, options)`
+    - **THEN** both kernels preserve the built-in capabilities
+    - **AND** both expose the same merged registry contents
+    - **AND** both construct shared adapters once before returning an immutable kernel
+
+    #### Scenario: Built kernel exposes the complete kernel.specs materialization and persisted-state surface
+
+    - **GIVEN** a kernel built through the builder with any combination of registry and repository overrides
+    - **WHEN** `kernel.specs` is inspected
+    - **THEN** it includes `generateMetadata`, `materializeMetadata`, `getMetadata`, `regenerateMetadata`, `initializePersistedState`, persisted schema inspection/reassignment, and persisted dependency/implementation/optimization queries and mutations
+    - **AND** the builder does not maintain a second, independently-updated use-case list that could drift from `createKernel()`

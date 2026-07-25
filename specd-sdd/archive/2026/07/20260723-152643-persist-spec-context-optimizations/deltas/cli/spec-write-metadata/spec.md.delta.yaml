@@ -1,0 +1,82 @@
+- op: modified
+  description: Mark the command as removed — arbitrary metadata injection is no longer a supported operation.
+  selector:
+    type: section
+    matches: Purpose
+  content: |
+    **Removed.** The `specd spec write-metadata` command accepted arbitrary metadata JSON/YAML from stdin or a file and persisted it through the (now removed) `SaveSpecMetadata` use case. Metadata is now a self-healing materialized cache with no external editor: normalized fields are always derived from current source artifacts by `MaterializeSpecMetadata`, and the only writable persisted state is lock-owned optimized fields, mutated through `specd spec optimizations set`/`clear`.
+
+- op: modified
+  description: Replace the command-signature requirement with an explicit removal statement.
+  selector:
+    type: section
+    matches: 'Requirement: Command signature'
+  rename: 'Requirement: spec write-metadata is removed'
+  content: |
+    The CLI MUST NOT register a `write-metadata` command, or any alias of it, on the `spec` parent command, and MUST NOT accept arbitrary metadata content from stdin, `--file`, or `--input` for any command. Agents that need to persist an LLM-optimized description or context MUST use `specd spec optimizations set` instead.
+
+- op: removed
+  description: Remove the content-source requirement.
+  selector:
+    type: section
+    matches: 'Requirement: Content source'
+
+- op: removed
+  description: Remove the invalid-YAML error requirement.
+  selector:
+    type: section
+    matches: 'Requirement: Error — invalid YAML'
+
+- op: removed
+  description: Remove the JSON-validation requirement.
+  selector:
+    type: section
+    matches: 'Requirement: JSON validation'
+
+- op: removed
+  description: Remove the text-output requirement.
+  selector:
+    type: section
+    matches: 'Requirement: Text output'
+
+- op: removed
+  description: Remove the JSON-output requirement.
+  selector:
+    type: section
+    matches: 'Requirement: JSON output'
+
+- op: removed
+  description: Remove the spec-not-found error requirement.
+  selector:
+    type: section
+    matches: 'Requirement: Error — spec not found'
+
+- op: removed
+  description: Remove the invalid-JSON error requirement.
+  selector:
+    type: section
+    matches: 'Requirement: Error — invalid JSON'
+
+- op: removed
+  description: Remove the invalid-metadata-structure error requirement.
+  selector:
+    type: section
+    matches: 'Requirement: Error — invalid metadata structure'
+
+- op: removed
+  description: Remove the conflict-detected error requirement.
+  selector:
+    type: section
+    matches: 'Requirement: Error — conflict detected'
+
+- op: removed
+  description: Remove the dependsOn-overwrite error requirement.
+  selector:
+    type: section
+    matches: 'Requirement: Error — dependsOn overwrite'
+
+- op: removed
+  description: Remove constraints that only applied to the removed writer command.
+  selector:
+    type: section
+    matches: Constraints

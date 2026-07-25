@@ -753,16 +753,15 @@ specd specs list [options]
 
 List all specs known to the project, grouped by workspace.
 
-| Option                       | Description                                                                                                                                |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `--limit <n>`                | Maximum entries per workspace (optional; use `all` for no limit).                                                                          |
-| `--page <p>`                 | 1-based page number (mutually exclusive with `--after-key`).                                                                               |
-| `--after-key <key>`          | Exclusive keyset cursor sort key (`--after-id` is not supported for spec lists).                                                           |
-| `--summary`                  | Include a short description (`SUMMARY` column) for each spec.                                                                              |
-| `--metadata-status [filter]` | Filter by metadata freshness. Valid values: `fresh`, `stale`, `missing`, `invalid`. Omitting the value shows all with their status column. |
-| `--workspace <name>`         | Filter by workspace name. Repeatable: `--workspace alpha --workspace beta`.                                                                |
-| `--format text\|json\|toon`  | Output format. JSON/TOON return `{ workspaces: [{ name, specs, meta }] }`.                                                                 |
-| `--config <path>`            | Config file path.                                                                                                                          |
+| Option                      | Description                                                                      |
+| --------------------------- | -------------------------------------------------------------------------------- |
+| `--limit <n>`               | Maximum entries per workspace (optional; use `all` for no limit).                |
+| `--page <p>`                | 1-based page number (mutually exclusive with `--after-key`).                     |
+| `--after-key <key>`         | Exclusive keyset cursor sort key (`--after-id` is not supported for spec lists). |
+| `--summary`                 | Include a short description (`SUMMARY` column) for each spec.                    |
+| `--workspace <name>`        | Filter by workspace name. Repeatable: `--workspace alpha --workspace beta`.      |
+| `--format text\|json\|toon` | Output format. JSON/TOON return `{ workspaces: [{ name, specs, meta }] }`.       |
+| `--config <path>`           | Config file path.                                                                |
 
 Per-workspace truncated text output includes `showing <count> of <total> (use --limit/--page)`.
 
@@ -874,12 +873,76 @@ Rendering mode is controlled by `contextMode` in `specd.yaml` (`list`, `summary`
 specd specs metadata <specPath> [options]
 ```
 
-Show the parsed metadata for a spec: title, content hashes, dependency links, and artifact counts. Reads from `metadata.json` if present and fresh; falls back to extraction from artifact content otherwise.
+Show materialized metadata for a spec: title, dependency links, rules, and diagnostics. Self-heals the `.specd/metadata/` cache on read when the projection is stale.
+
+Text output includes `source` (`persisted` or `generated`) and `regenerated` when the cache was rebuilt.
 
 | Option                      | Description       |
 | --------------------------- | ----------------- |
 | `--format text\|json\|toon` | Output format.    |
 | `--config <path>`           | Config file path. |
+
+See [spec metadata](spec-metadata.md).
+
+### spec init
+
+```
+specd specs init <specPath> | --all [options]
+```
+
+Initialize persisted semantic state (`spec-lock.json`) for one spec or every lock-less spec.
+
+| Option               | Description                                    |
+| -------------------- | ---------------------------------------------- |
+| `--all`              | Initialize all specs without persisted state.  |
+| `--workspace <name>` | Restrict `--all` to named workspaces.          |
+| `--schema <ref>`     | Schema reference to record (default: project). |
+
+See [spec init](spec-init.md).
+
+### spec schema
+
+```
+specd specs schema get <specPath>
+specd specs schema set <specPath> --schema <ref>
+```
+
+Read or update the persisted schema identity for an initialized spec.
+
+See [spec schema](spec-schema.md).
+
+### spec deps
+
+```
+specd specs deps list <specPath>
+specd specs deps add|remove|set|clear <specPath> [options]
+```
+
+Manage persisted `dependsOn` links in `spec-lock.json`.
+
+See [spec deps](spec-deps.md).
+
+### spec implementation
+
+```
+specd specs implementation list <specPath>
+specd specs implementation add|remove <specPath> [options]
+```
+
+Manage persisted implementation tracking links.
+
+See [spec implementation](spec-implementation.md).
+
+### spec optimizations
+
+```
+specd specs optimizations get <specPath>
+specd specs optimizations set|clear <specPath> [options]
+```
+
+Manage persisted LLM optimization baselines. Reports per-field freshness on `get`.
+
+See [spec optimizations](spec-optimizations.md).
 
 ### spec resolve-path
 
@@ -914,70 +977,24 @@ Validate the artifact files for a spec against the active schema's validation ru
 | `--format text\|json\|toon` | Output format.                             |
 | `--config <path>`           | Config file path.                          |
 
-### spec write-metadata
-
-```
-specd specs write-metadata <specPath> [options]
-```
-
-Write a `metadata.json` file for a spec. By default reads from stdin unless `--input` is given.
-
-| Option                      | Description                                    |
-| --------------------------- | ---------------------------------------------- |
-| `--input <file>`            | Read metadata from this file instead of stdin. |
-| `--force`                   | Overwrite an existing metadata file.           |
-| `--format text\|json\|toon` | Output format.                                 |
-| `--config <path>`           | Config file path.                              |
-
-### spec update-metadata
-
-```
-specd specs update-metadata <specPath> [options]
-```
-
-Update spec metadata with LLM-optimized fields. Performs fresh extraction and merge.
-
-| Option                      | Description                                    |
-| --------------------------- | ---------------------------------------------- |
-| `--input <file>`            | Read metadata from this file instead of stdin. |
-| `--format text\|json\|toon` | Output format.                                 |
-| `--config <path>`           | Config file path.                              |
-
-### spec invalidate-metadata
-
-```
-specd specs invalidate-metadata <specPath> [options]
-```
-
-Mark a spec's `metadata.json` as stale. SpecD will fall back to live extraction on next context compilation until the metadata is regenerated.
-
-| Option                      | Description       |
-| --------------------------- | ----------------- |
-| `--format text\|json\|toon` | Output format.    |
-| `--config <path>`           | Config file path. |
-
 ### spec generate-metadata
 
 ```
-specd specs generate-metadata [specPath] [options]
+specd specs generate-metadata [specPath] [--all] [options]
 ```
 
-Generate metadata for a spec (or all specs) from the schema rules and artifact content. By default, prints the generated metadata without writing it. Pass `--write` to persist it.
+Force-regenerate metadata projections for one spec or every spec (`--all`). Cache-write failures are command failures.
 
-| Option                      | Description                                                                                              |
-| --------------------------- | -------------------------------------------------------------------------------------------------------- |
-| `--write`                   | Write the generated metadata to `metadata.json`.                                                         |
-| `--force`                   | Overwrite existing metadata files when writing.                                                          |
-| `--all`                     | Generate metadata for all specs in the project.                                                          |
-| `--status <filter>`         | Generate only for specs whose metadata matches this status. Valid values: `stale`, `missing`, `invalid`. |
-| `--format text\|json\|toon` | Output format.                                                                                           |
-| `--config <path>`           | Config file path.                                                                                        |
+| Option                      | Description                           |
+| --------------------------- | ------------------------------------- |
+| `--all`                     | Regenerate every spec in the project. |
+| `--workspace <name>`        | Restrict `--all` to named workspaces. |
+| `--format text\|json\|toon` | Output format.                        |
+| `--config <path>`           | Config file path.                     |
 
-```bash
-# Regenerate stale and missing metadata across the whole project
-specd specs generate-metadata --all --status stale --write
-specd specs generate-metadata --all --status missing --write
-```
+See [spec generate-metadata](spec-generate-metadata.md).
+
+Removed commands: `specs write-metadata`, `specs update-metadata`, and `specs invalidate-metadata`.
 
 ---
 

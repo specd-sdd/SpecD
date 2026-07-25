@@ -1,7 +1,7 @@
 {
   "title": "core:project-metadata",
   "description": "Project-level context can be large and benefit from LLM optimization. To avoid repeated manual assembly and allow for efficient agent consumption, we need a dedicated storage and schema for project-level metadata. The `project-metadata.json` file stores optimized context alongside freshness hashes to ensure the cached content remains valid as the project configuration or included specs change.",
-  "dependsOn": ["core:config", "core:composition-resolver"],
+  "dependsOn": ["core:config", "core:composition-resolver", "core:materialize-spec-metadata"],
   "context": [
     "Project-level context can be large and benefit from LLM optimization. To avoid repeated manual assembly and allow for efficient agent consumption, we need a dedicated storage and schema for project-level metadata. The `project-metadata.json` file stores optimized context alongside freshness hashes to ensure the cached content remains valid as the project configuration or included specs change."
   ],
@@ -21,7 +21,7 @@
     {
       "requirement": "Input tracking",
       "rules": [
-        "The `freshness` block SHALL track:\n\n- The hash of the `specd.yaml` configuration file\n- The hashes of any `contextFiles` referenced in the configuration\n- The metadata hashes of all specs included in the project context"
+        "The `freshness` block SHALL track:\n\n- The hash of the `specd.yaml` configuration file\n- The hashes of any `contextFiles` referenced in the configuration\n- The semantic `metadataFingerprint` — returned by materializing each included spec's metadata via `MaterializeSpecMetadata` — of all specs included in the project context\n\nPer-spec entries in `freshness` MUST record the materialized `metadataFingerprint`, not a raw metadata-cache-file hash or a repository storage revision. A `metadataFingerprint` changes only when the spec's semantically meaningful metadata content changes, so freshness comparisons remain storage-adapter-independent."
       ]
     },
     {
@@ -49,7 +49,19 @@
       "name": "Tracks all dependencies",
       "when": ["freshness hashes are computed"],
       "then": [
-        "they include specd.yaml, all context files, and metadata hashes of all resolved project context specs"
+        "they include specd.yaml, all context files, and the materialized metadataFingerprint of all resolved project context specs"
+      ]
+    },
+    {
+      "requirement": "Input tracking",
+      "name": "Per-spec fingerprint is semantic, not a raw cache hash or storage revision",
+      "given": [
+        "a spec's metadata-cache file bytes or repository storage revision changes without any change to its semantically meaningful metadata content"
+      ],
+      "when": ["its metadataFingerprint is recorded in freshness"],
+      "then": [
+        "the fingerprint value does not change",
+        "AND freshness comparisons remain storage-adapter-independent"
       ]
     },
     {
@@ -64,17 +76,27 @@
       ]
     }
   ],
-  "implementation": {
-    "files": [
-      {
-        "specId": "core:project-metadata",
-        "file": "core:src/composition/use-cases/get-project-metadata.ts"
-      }
-    ]
-  },
   "contentHashes": {
-    "spec.md": "sha256:64f887d1ca3245253820c32e76a45707ee9dedc329e1c7909923a9f1a1d4d877",
-    "verify.md": "sha256:16789898523a9f7d17bf2ded857de9b213b6e253cb9915b69e5141148bb4ab46"
+    "spec.md": "sha256:d39ac6857dd3254a747f3703f850a32448a11fe68f85f947abe23bd2222bf1f7",
+    "verify.md": "sha256:bf7c420ca8337d4c1dcfa90718e655411421b97c0f7b9ba83248a074c535f1ac"
   },
-  "generatedBy": "core"
+  "provenance": {
+    "artifacts": {
+      "spec.md": {
+        "hash": "sha256:d39ac6857dd3254a747f3703f850a32448a11fe68f85f947abe23bd2222bf1f7",
+        "lastModified": "2026-07-25T11:53:31.723Z"
+      },
+      "verify.md": {
+        "hash": "sha256:bf7c420ca8337d4c1dcfa90718e655411421b97c0f7b9ba83248a074c535f1ac",
+        "lastModified": "2026-07-25T11:53:31.723Z"
+      }
+    },
+    "persistedStateHash": "sha256:e3e652d27b145676beb59d20f3e84b806ea3b76d3dd45ed9cc76269033dcbc74",
+    "schema": {
+      "name": "schema-std",
+      "version": 1
+    },
+    "projectionVersion": 1,
+    "projectionFingerprint": "sha256:e4a28a2db6a35ed39b8308518337235b1490c2948cd839db25866ad79b22404b"
+  }
 }

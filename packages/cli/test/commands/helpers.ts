@@ -317,7 +317,18 @@ export function makeMockKernel(overrides: Record<string, unknown> = {}): Kernel 
     search: { execute: vi.fn().mockResolvedValue([]) },
     get: { execute: vi.fn() },
     getOutline: { execute: vi.fn() },
-    saveMetadata: { execute: vi.fn() },
+    materializeMetadata: { execute: vi.fn() },
+    getMetadata: { execute: vi.fn() },
+    regenerateMetadata: { execute: vi.fn() },
+    initializePersistedState: { execute: vi.fn() },
+    getPersistedDeps: { execute: vi.fn() },
+    updatePersistedDeps: { execute: vi.fn() },
+    getPersistedImplementation: { execute: vi.fn() },
+    updatePersistedImplementation: { execute: vi.fn() },
+    getPersistedOptimizations: { execute: vi.fn() },
+    updatePersistedOptimizations: { execute: vi.fn() },
+    getPersistedSchema: { execute: vi.fn() },
+    updatePersistedSchema: { execute: vi.fn() },
     getActiveSchema: {
       execute: vi.fn().mockResolvedValue({
         raw: false,
@@ -331,7 +342,6 @@ export function makeMockKernel(overrides: Record<string, unknown> = {}): Kernel 
     },
     validateSchema: { execute: vi.fn() },
     validate: { execute: vi.fn() },
-    invalidateMetadata: { execute: vi.fn() },
     generateMetadata: { execute: vi.fn() },
     getContext: {
       execute: vi.fn().mockResolvedValue({ entries: [], warnings: [] }),

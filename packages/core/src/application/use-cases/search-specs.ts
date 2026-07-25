@@ -7,6 +7,7 @@ import { type YamlSerializer } from '../ports/yaml-serializer.js'
 import { type Spec } from '../../domain/entities/spec.js'
 import { extractSpecSummary } from '../../domain/services/spec-summary.js'
 import { type ContentHasher } from '../ports/content-hasher.js'
+import { type GetSpecMetadata } from '../use-cases/get-spec-metadata.js'
 import { type ListWorkspaces, type ProjectWorkspace } from './list-workspaces.js'
 
 export type { SpecSearchMatch }
@@ -48,6 +49,7 @@ export class SearchSpecs {
   private readonly _listWorkspaces: ListWorkspaces
   private readonly _hasher: ContentHasher
   private readonly _yaml: YamlSerializer
+  private readonly _getMetadata: GetSpecMetadata
 
   /**
    * Creates a new SearchSpecs instance.
@@ -55,11 +57,18 @@ export class SearchSpecs {
    * @param listWorkspaces - The project orchestrator.
    * @param hasher - Content hasher for spec hashing.
    * @param yaml - YAML serializer for parsing artifacts.
+   * @param getMetadata - Metadata materialization use case.
    */
-  constructor(listWorkspaces: ListWorkspaces, hasher: ContentHasher, yaml: YamlSerializer) {
+  constructor(
+    listWorkspaces: ListWorkspaces,
+    hasher: ContentHasher,
+    yaml: YamlSerializer,
+    getMetadata: GetSpecMetadata,
+  ) {
     this._listWorkspaces = listWorkspaces
     this._hasher = hasher
     this._yaml = yaml
+    this._getMetadata = getMetadata
   }
 
   /**
@@ -135,8 +144,9 @@ export class SearchSpecs {
    */
   private async _resolveTitle(repo: SpecRepository, spec: Spec): Promise<string> {
     try {
-      const meta = await repo.metadata(spec)
-      if (meta?.title !== undefined && meta.title.trim().length > 0) {
+      const specId = `${spec.workspace}:${spec.name.toFsPath('/')}`
+      const meta = (await this._getMetadata.execute({ specId })).metadata
+      if (meta.title !== undefined && meta.title.trim().length > 0) {
         return meta.title.trim()
       }
     } catch {
@@ -169,8 +179,9 @@ export class SearchSpecs {
    */
   private async _resolveSummary(repo: SpecRepository, spec: Spec): Promise<string | undefined> {
     try {
-      const meta = await repo.metadata(spec)
-      if (meta?.description !== undefined && meta.description.trim().length > 0) {
+      const specId = `${spec.workspace}:${spec.name.toFsPath('/')}`
+      const meta = (await this._getMetadata.execute({ specId })).metadata
+      if (meta.description !== undefined && meta.description.trim().length > 0) {
         return meta.description.trim()
       }
     } catch {

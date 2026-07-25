@@ -6,7 +6,8 @@
     "core:list-specs",
     "core:workspace",
     "core:list-workspaces",
-    "core:composition-resolver"
+    "core:composition-resolver",
+    "core:get-spec-metadata"
   ],
   "context": [
     "Consumers need a core-level use case to search spec content by keyword without depending on the code graph. `SearchSpecs` provides content-based search across all configured workspaces by delegating to each workspace's `SpecRepository.search()` method. It is the fallback search path when the code graph is unavailable, and the primary search path for consumers that do not have graph access."
@@ -27,7 +28,7 @@
     {
       "requirement": "Optional summary resolution",
       "rules": [
-        "When `options.includeSummary` is `true`, each result MUST include a `summary` field resolved using the same algorithm as `ListSpecs`: metadata `description` first, then `spec.md` extraction fallback.\n\nWhen `options.includeSummary` is `false` or omitted, `summary` MUST NOT appear on any result."
+        "When `options.includeSummary` is `true`, each result MUST include a `summary` field resolved by calling `GetSpecMetadata.execute({ specId })` (default `'if-needed'` policy) and projecting its normalized `description`. `SearchSpecs` MUST NOT read a repository metadata snapshot or `spec.md` directly to resolve this field — materialization owns the deterministic-extraction fallback internally.\n\nWhen materialization cannot produce a projection for a matched spec, that result's `summary` is omitted rather than failing the search.\n\nWhen `options.includeSummary` is `false` or omitted, `summary` MUST NOT appear on any result, and `SearchSpecs` MUST NOT materialize metadata for that result."
       ]
     },
     {
@@ -51,7 +52,7 @@
     {
       "requirement": "Config-based factory delegates through resolveSearchSpecsDeps",
       "rules": [
-        "The config-based `createSearchSpecs(config, options?)` form MUST derive `SearchSpecsDeps` through `resolveSearchSpecsDeps(resolver)` and then delegate to canonical `createSearchSpecs(deps)`.\n\n`resolveSearchSpecsDeps(resolver)` MUST resolve:\n\n- `listWorkspaces: ListWorkspaces`\n- `hasher: ContentHasher`\n- `yaml: YamlSerializer`\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
+        "The config-based `createSearchSpecs(config, options?)` form MUST derive `SearchSpecsDeps` through `resolveSearchSpecsDeps(resolver)` and then delegate to canonical `createSearchSpecs(deps)`.\n\n`resolveSearchSpecsDeps(resolver)` MUST resolve:\n\n- `listWorkspaces: ListWorkspaces`\n- `getMetadata: GetSpecMetadata`\n\nIt MUST NOT resolve `hasher: ContentHasher` or `yaml: YamlSerializer` — normalized result fields are obtained through metadata materialization, not through direct repository snapshot reads.\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
       ]
     }
   ],
@@ -102,16 +103,31 @@
     {
       "requirement": "Optional summary resolution",
       "name": "Summary included when requested",
-      "given": ["a matching spec has metadata with description: \"Handles auth\""],
+      "given": [
+        "a matching spec's metadata materializes successfully with description: \"Handles auth\""
+      ],
       "when": ["execute(\"auth\", { includeSummary: true }) is called"],
       "then": ["the result entry includes summary: \"Handles auth\""]
     },
     {
       "requirement": "Optional summary resolution",
       "name": "Summary absent when not requested",
-      "given": ["a matching spec has metadata with a description"],
+      "given": ["a matching spec's metadata would materialize with a description"],
       "when": ["execute(\"auth\") is called without includeSummary"],
-      "then": ["the result entry has no summary property"]
+      "then": [
+        "the result entry has no summary property",
+        "AND SearchSpecs does not materialize metadata for that result"
+      ]
+    },
+    {
+      "requirement": "Optional summary resolution",
+      "name": "Materialization failure omits summary without failing the search",
+      "given": ["materialization cannot produce a projection for a matched spec"],
+      "when": ["execute(\"auth\", { includeSummary: true }) is called"],
+      "then": [
+        "that result's summary is omitted",
+        "AND the search still returns the result with its other fields"
+      ]
     },
     {
       "requirement": "Result shape",
@@ -146,20 +162,38 @@
         "AND resolveSearchSpecsDeps(resolver) resolves:",
         "AND the factory delegates to canonical createSearchSpecs(deps)"
       ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveSearchSpecsDeps",
+      "name": "resolveSearchSpecsDeps does not resolve hasher or yaml serializer",
+      "when": ["resolveSearchSpecsDeps(resolver) runs"],
+      "then": [
+        "it does not resolve hasher: ContentHasher or yaml: YamlSerializer",
+        "AND normalized result fields are obtained through metadata materialization, not through direct repository snapshot reads"
+      ]
     }
   ],
-  "implementation": {
-    "symbols": [
-      {
-        "specId": "core:search-specs",
-        "file": "core:src/application/use-cases/search-specs.ts",
-        "symbol": "SearchSpecs"
-      }
-    ]
-  },
   "contentHashes": {
-    "spec.md": "sha256:5d15a6b42badeb7f1ef5592372d58254d8ef6d9abee748ce599e7bfb011f30b7",
-    "verify.md": "sha256:53ea13dd424f4c66acf50447623678b4ce35c6287d10fdcb880f132d4b361cd8"
+    "spec.md": "sha256:db32480e9ced3e980a84920133a6f48c8ed6383b90665160c26289ed8df358f5",
+    "verify.md": "sha256:55342902fe7ffd141581582affe7f4bf150b29a9bb561147a972505b5fc8cade"
   },
-  "generatedBy": "core"
+  "provenance": {
+    "artifacts": {
+      "spec.md": {
+        "hash": "sha256:db32480e9ced3e980a84920133a6f48c8ed6383b90665160c26289ed8df358f5",
+        "lastModified": "2026-07-25T11:53:31.711Z"
+      },
+      "verify.md": {
+        "hash": "sha256:55342902fe7ffd141581582affe7f4bf150b29a9bb561147a972505b5fc8cade",
+        "lastModified": "2026-07-25T11:53:31.711Z"
+      }
+    },
+    "persistedStateHash": "sha256:628cfc41aaacff4f32122612b1c39067bdb176886fc7b64c313982a26a00d444",
+    "schema": {
+      "name": "schema-std",
+      "version": 1
+    },
+    "projectionVersion": 1,
+    "projectionFingerprint": "sha256:e4a28a2db6a35ed39b8308518337235b1490c2948cd839db25866ad79b22404b"
+  }
 }

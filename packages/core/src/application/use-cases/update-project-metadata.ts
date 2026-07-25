@@ -4,8 +4,6 @@ import {
   type ProjectMetadata,
   type UpdateProjectMetadataPayload,
 } from '../../domain/services/project-metadata.js'
-import { Spec, ABSENT_SPEC_SIDECAR } from '../../domain/entities/spec.js'
-import { SpecPath } from '../../domain/value-objects/spec-path.js'
 import { type SpecdConfig } from '../specd-config.js'
 import { type SpecRepository } from '../ports/spec-repository.js'
 import { type ContentHasher } from '../ports/content-hasher.js'
@@ -13,6 +11,7 @@ import { type FileReader } from '../ports/file-reader.js'
 import { type FileWriter } from '../ports/file-writer.js'
 import { listMatchingSpecs, type ResolvedSpec } from './_shared/spec-pattern-matching.js'
 import { type ListWorkspaces } from './list-workspaces.js'
+import { type GetSpecMetadata } from './get-spec-metadata.js'
 
 /** Input for the {@link UpdateProjectMetadata} use case. */
 export interface UpdateProjectMetadataInput {
@@ -45,6 +44,7 @@ export class UpdateProjectMetadata {
    * @param _files - File reader for config and context files
    * @param _fileWriter - File writer for persisting metadata
    * @param _hasher - Content hasher for invalidation hashes
+   * @param _getMetadata - Use case for materializing spec metadata freshness inputs
    */
   constructor(
     private readonly _config: SpecdConfig,
@@ -53,6 +53,7 @@ export class UpdateProjectMetadata {
     private readonly _files: FileReader,
     private readonly _fileWriter: FileWriter,
     private readonly _hasher: ContentHasher,
+    private readonly _getMetadata: GetSpecMetadata,
   ) {}
 
   /**
@@ -110,26 +111,15 @@ export class UpdateProjectMetadata {
       }
     }
 
-    for (const [id, spec] of specs) {
-      const repo = this._specRepos.get(spec.workspace)
-      if (repo) {
-        const metadata = await repo.metadata(
-          new Spec(
-            spec.workspace,
-            SpecPath.parse(spec.capPath),
-            [],
-            ABSENT_SPEC_SIDECAR,
-            ABSENT_SPEC_SIDECAR,
-          ),
-        )
-        if (metadata?.contentHashes) {
-          // Use the combined hash of spec files as the spec's metadata hash
-          const combinedHash = Object.values(metadata.contentHashes).sort().join(',')
-          freshnessInputs.specMetadata.push({
-            id,
-            hash: this._hasher.hash(combinedHash),
-          })
-        }
+    for (const [id] of specs) {
+      try {
+        const materialized = await this._getMetadata.execute({ specId: id })
+        freshnessInputs.specMetadata.push({
+          id,
+          hash: materialized.metadataFingerprint,
+        })
+      } catch {
+        // Skip specs that cannot materialize metadata during freshness capture.
       }
     }
 

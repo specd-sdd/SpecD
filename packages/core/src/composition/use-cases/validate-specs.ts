@@ -4,6 +4,7 @@ import { type SchemaProvider } from '../../application/ports/schema-provider.js'
 import { type SpecRepository } from '../../application/ports/spec-repository.js'
 import { type ValidationResultCache } from '../../application/ports/validation-result-cache.js'
 import { ValidateSpecs } from '../../application/use-cases/validate-specs.js'
+import { type GetSpecMetadata } from '../../application/use-cases/get-spec-metadata.js'
 import { type SpecdConfig } from '../../application/specd-config.js'
 import { type ExtractorTransformRegistry } from '../../domain/services/content-extraction.js'
 import { type SpecWorkspaceRoute } from '../../application/use-cases/_shared/spec-reference-resolver.js'
@@ -13,6 +14,7 @@ import {
   type CompositionResolutionOptions,
 } from '../composition-resolver.js'
 import { normalizeCompositionFactoryArgs, type FactoryInput } from '../normalize-factory-args.js'
+import { createGetSpecMetadata, resolveGetSpecMetadataDeps } from './get-spec-metadata.js'
 
 /**
  * Explicit dependencies for {@link createValidateSpecs}.
@@ -21,6 +23,7 @@ export interface ValidateSpecsDeps {
   readonly specs: ReadonlyMap<string, SpecRepository>
   readonly schemaProvider: SchemaProvider
   readonly parsers: ArtifactParserRegistry
+  readonly getMetadata: GetSpecMetadata
   readonly contentHasher: ContentHasher
   readonly extractorTransforms: ExtractorTransformRegistry
   readonly workspaceRoutes: readonly SpecWorkspaceRoute[]
@@ -38,6 +41,7 @@ export function resolveValidateSpecsDeps(resolver: CompositionResolver): Validat
     specs: resolver.getSpecRepositories(),
     schemaProvider: resolver.getSchemaProvider(),
     parsers: resolver.getArtifactParserRegistry(),
+    getMetadata: createGetSpecMetadata(resolveGetSpecMetadataDeps(resolver)),
     contentHasher: resolver.getContentHasher(),
     extractorTransforms: resolver.getExtractorTransforms(),
     workspaceRoutes: resolver.getSpecWorkspaceRoutes(),
@@ -97,6 +101,7 @@ function createValidateSpecsFromNormalized(
       specs,
       schemaProvider,
       parsers,
+      getMetadata,
       contentHasher,
       extractorTransforms,
       workspaceRoutes,
@@ -106,6 +111,7 @@ function createValidateSpecsFromNormalized(
       specs,
       schemaProvider,
       parsers,
+      getMetadata,
       contentHasher,
       extractorTransforms,
       workspaceRoutes,
@@ -128,6 +134,7 @@ function isValidateSpecsDeps(value: ValidateSpecsDeps | SpecdConfig): value is V
     'specs' in value &&
     'schemaProvider' in value &&
     'parsers' in value &&
+    'getMetadata' in value &&
     'contentHasher' in value &&
     'extractorTransforms' in value &&
     'workspaceRoutes' in value &&

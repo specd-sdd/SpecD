@@ -1,0 +1,275 @@
+{
+  "title": "UpdatePersistedSpecImplementation",
+  "description": "Archived implementation traceability sometimes needs correction outside the change lifecycle — a rename missed by materialization, or a symbol link added after the fact. `UpdatePersistedSpecImplementation` is the canonical-spec counterpart of change-time implementation tracking: it adds, enriches, or removes implementation links directly on a spec's persisted semantic state, using the same file-existence and link-normalization discipline as change tracking, but operating on canonical `workspace:path` identities instead of raw project-relative paths.",
+  "dependsOn": [
+    "core:spec-repository-port",
+    "core:spec-id-format",
+    "core:update-implementation-tracking",
+    "core:storage",
+    "core:workspace",
+    "core:initialize-persisted-spec-state"
+  ],
+  "context": [
+    "Archived implementation traceability sometimes needs correction outside the change lifecycle — a rename missed by materialization, or a symbol link added after the fact. `UpdatePersistedSpecImplementation` is the canonical-spec counterpart of change-time implementation tracking: it adds, enriches, or removes implementation links directly on a spec's persisted semantic state, using the same file-existence and link-normalization discipline as change tracking, but operating on canonical `workspace:path` identities instead of raw project-relative paths."
+  ],
+  "rules": [
+    {
+      "requirement": "Input contract",
+      "rules": [
+        "`UpdatePersistedSpecImplementation.execute` SHALL accept an `UpdatePersistedSpecImplementationInput` with:\n\n- `specId` (required, string) — the spec whose persisted implementation links are being mutated\n- `action` (required, `'add' | 'remove'`)\n- `file` (required, string) — a project-relative file path, relative to the codeRoot of `specId`'s workspace\n- `symbols` (optional, readonly string array) — symbol refinements for the link"
+      ]
+    },
+    {
+      "requirement": "File must exist for add",
+      "rules": [
+        "When `action = 'add'`, the use case MUST require the target file to exist on disk within the codeRoot of `specId`'s workspace. When it does not, the use case MUST throw `ImplementationFileNotFoundError` and MUST NOT mutate persisted state."
+      ]
+    },
+    {
+      "requirement": "Canonical file identity and workspace confinement",
+      "rules": [
+        "Before mutating persisted state, the use case MUST normalize `file` into the canonical `workspace:path` implementation identity defined by [`core:spec-lock`](../spec-lock/spec.md): forward-slash-normalized, relative to the codeRoot of `specId`'s workspace, using workspace lookup from [`core:workspace`](../workspace/spec.md) and path resolution from [`core:storage`](../storage/spec.md).\n\nWhen `file` resolves outside the codeRoot implied by `specId`'s workspace, the use case MUST throw `ImplementationWorkspaceBoundaryError` and MUST NOT mutate persisted state. It MUST NOT silently coerce or drop an out-of-boundary path."
+      ]
+    },
+    {
+      "requirement": "Add creates or enriches a canonical link",
+      "rules": [
+        "When `action = 'add'`, the use case MUST create or enrich the confirmed implementation link for the normalized `file` identity, using symbol refinements when `symbols` is provided.\n\nWhen `symbols` is provided, the use case MUST add those symbols to the link's symbol set without discarding previously recorded symbols for the same file. When `symbols` is omitted, the use case MUST ensure a file-level link exists (an entry with no `symbols` field) without altering any existing symbol-level entries for that file."
+      ]
+    },
+    {
+      "requirement": "Remove removes canonical links",
+      "rules": [
+        "When `action = 'remove'` and `symbols` is provided, the use case MUST remove only those symbol names from the link's symbol set for the normalized `file` identity. When the remaining symbol set becomes empty and no explicit file-level link was separately recorded, the use case MAY remove the entry entirely.\n\nWhen `action = 'remove'` and `symbols` is omitted, the use case MUST remove the whole implementation entry for the normalized `file` identity, including any symbol-level refinements."
+      ]
+    },
+    {
+      "requirement": "Add creates missing persisted state",
+      "rules": [
+        "When persisted state does not exist and `action = 'add'`, the use case MUST resolve an initial base through the same `resolveInitialPersistedDependsOn()` service used by [`core:initialize-persisted-spec-state`](../initialize-persisted-spec-state/spec.md), defaulting `implementation` to `[]` before applying the requested link addition."
+      ]
+    },
+    {
+      "requirement": "Remove against missing state is a no-op",
+      "rules": [
+        "When persisted state does not exist and `action = 'remove'`, the use case MUST NOT create persisted state. It MUST return a result reflecting `implementation: []` and `created: false` without calling `writePersistedState`."
+      ]
+    },
+    {
+      "requirement": "Applying the mutation through the shared patch helper",
+      "rules": [
+        "The use case MUST compute the resulting `implementation` array and pass it as a patch to the shared pure `applyPersistedSpecStatePatch()` service, then pass the complete resulting `PersistedSpecState` to `SpecRepository.writePersistedState()` with `expectedRevision` equal to the observed `originalHash`, or `null` when persisted state was absent."
+      ]
+    },
+    {
+      "requirement": "Conflict handling",
+      "rules": [
+        "When the repository detects that the observed revision no longer matches the persisted state at write time, the use case MUST propagate `ArtifactConflictError` rather than retrying or silently rebasing the mutation."
+      ]
+    },
+    {
+      "requirement": "Unknown spec fails with a typed error",
+      "rules": [
+        "When the spec identity cannot be resolved to an existing spec artifact set in its workspace, `execute` SHALL throw `SpecNotFoundError`."
+      ]
+    },
+    {
+      "requirement": "Result contract",
+      "rules": [
+        "On success, `execute` SHALL return an `UpdatePersistedSpecImplementationResult` containing:\n\n- `specId` — the fully-qualified spec identity\n- `implementation` — the resulting persisted implementation link list after the mutation\n- `created` — `true` when persisted state was newly created by this call, `false` otherwise"
+      ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveUpdatePersistedSpecImplementationDeps",
+      "rules": [
+        "The config-based `createUpdatePersistedSpecImplementation(config, options?)` form MUST derive `UpdatePersistedSpecImplementationDeps` through `resolveUpdatePersistedSpecImplementationDeps(resolver)` and then delegate to canonical `createUpdatePersistedSpecImplementation(deps)`.\n\n`resolveUpdatePersistedSpecImplementationDeps(resolver)` MUST resolve:\n\n- `specs: ReadonlyMap<string, SpecRepository>` — one repository instance per workspace\n- `workspaces` — workspace configuration lookup used to resolve codeRoot for path normalization\n- `files: FileReader` — used for file-existence checks\n- `initializePersistedSpecState` collaborator sufficient to invoke `resolveInitialPersistedDependsOn()` for the add creation path\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
+      ]
+    }
+  ],
+  "constraints": [
+    "This use case never mutates a change's draft trackedImplementationFiles or in-progress confirmed links; it mutates only canonical persisted lock state",
+    "readOnly workspace ownership MUST reject the write with ReadOnlyWorkspaceError before any persisted-state I/O",
+    "Link normalization and symbol-refinement rules mirror change-tracking behavior but always operate on the canonical workspace:path identity, never on raw project-relative paths in storage"
+  ],
+  "scenarios": [
+    {
+      "requirement": "Input contract",
+      "name": "action must be add or remove",
+      "given": [
+        "an UpdatePersistedSpecImplementationInput with an action value other than 'add' or 'remove'"
+      ],
+      "when": ["execute is called"],
+      "then": ["it is rejected as an invalid input"]
+    },
+    {
+      "requirement": "File must exist for add",
+      "name": "Adding a link for a non-existent file fails without mutating state",
+      "given": [
+        "action: 'add' and a file that does not exist on disk within the codeRoot of specId's workspace"
+      ],
+      "when": ["execute is called"],
+      "then": ["it throws ImplementationFileNotFoundError", "AND persisted state is not mutated"]
+    },
+    {
+      "requirement": "Canonical file identity and workspace confinement",
+      "name": "Path outside the workspace codeRoot fails instead of being coerced",
+      "given": ["a file value that resolves outside the codeRoot implied by specId's workspace"],
+      "when": ["execute is called"],
+      "then": [
+        "it throws ImplementationWorkspaceBoundaryError",
+        "AND it does not silently coerce or drop the out-of-boundary path, and persisted state is not mutated"
+      ]
+    },
+    {
+      "requirement": "Canonical file identity and workspace confinement",
+      "name": "Nested path is normalized to a forward-slash canonical identity",
+      "given": ["a file value referring to a nested path within the workspace codeRoot"],
+      "when": ["execute normalizes it for action: 'add'"],
+      "then": [
+        "the resulting canonical identity uses forward slashes and is relative to the codeRoot, per core:spec-lock"
+      ]
+    },
+    {
+      "requirement": "Add creates or enriches a canonical link",
+      "name": "Adding symbols to an existing file-level link preserves previously recorded symbols",
+      "given": [
+        "persisted state with a file-level link for core:src/a.ts (no symbols) and a prior symbol-level entry for a different file"
+      ],
+      "when": ["execute is called with action: 'add', file: 'src/a.ts', and symbols: [\"foo\"]"],
+      "then": [
+        "the link for core:src/a.ts includes foo in its symbol set",
+        "AND previously recorded symbols for other files are not discarded"
+      ]
+    },
+    {
+      "requirement": "Add creates or enriches a canonical link",
+      "name": "Adding without symbols does not alter existing symbol-level entries",
+      "given": [
+        "persisted state with a symbol-level link for core:src/a.ts with symbols: [\"foo\"]"
+      ],
+      "when": ["execute is called with action: 'add', file: 'src/a.ts', and no symbols"],
+      "then": [
+        "a file-level link exists for that file",
+        "AND the existing symbol-level entry for foo is not altered"
+      ]
+    },
+    {
+      "requirement": "Remove removes canonical links",
+      "name": "Removing specific symbols leaves other symbols intact",
+      "given": ["a persisted link for core:src/a.ts with symbols: [\"foo\", \"bar\"]"],
+      "when": ["execute is called with action: 'remove', file: 'src/a.ts', symbols: [\"foo\"]"],
+      "then": ["the resulting link retains symbols: [\"bar\"]"]
+    },
+    {
+      "requirement": "Remove removes canonical links",
+      "name": "Removing the last symbol may remove the entry entirely when no separate file-level link exists",
+      "given": [
+        "a persisted link for core:src/a.ts with only symbols: [\"foo\"] and no separately recorded file-level link"
+      ],
+      "when": ["execute is called with action: 'remove', file: 'src/a.ts', symbols: [\"foo\"]"],
+      "then": [
+        "the remaining symbol set becomes empty",
+        "AND the entry may be removed entirely for that file"
+      ]
+    },
+    {
+      "requirement": "Remove removes canonical links",
+      "name": "Removing without symbols removes the whole entry including symbol refinements",
+      "given": ["a persisted link for core:src/a.ts with symbols: [\"foo\", \"bar\"]"],
+      "when": ["execute is called with action: 'remove', file: 'src/a.ts', and no symbols"],
+      "then": [
+        "the whole implementation entry for core:src/a.ts is removed, including all symbol-level refinements"
+      ]
+    },
+    {
+      "requirement": "Add creates missing persisted state",
+      "name": "add against a lock-less spec derives an initial base with empty implementation",
+      "given": ["a spec with no persisted state and an existing file on disk"],
+      "when": ["execute is called with action: 'add'"],
+      "then": [
+        "resolveInitialPersistedDependsOn() is used to derive the initial base",
+        "AND implementation defaults to [] before the requested link addition is applied"
+      ]
+    },
+    {
+      "requirement": "Remove against missing state is a no-op",
+      "name": "remove against a lock-less spec does not create state",
+      "given": ["a spec with no persisted state"],
+      "when": ["execute is called with action: 'remove'"],
+      "then": [
+        "the result reflects implementation: [] and created: false",
+        "AND writePersistedState is never called"
+      ]
+    },
+    {
+      "requirement": "Applying the mutation through the shared patch helper",
+      "name": "Only the computed implementation array is patched",
+      "given": ["an effective base and a newly computed implementation array"],
+      "when": ["execute applies the mutation"],
+      "then": [
+        "it passes the computed implementation array as a patch to applyPersistedSpecStatePatch()",
+        "AND the complete resulting PersistedSpecState is passed to SpecRepository.writePersistedState() with expectedRevision equal to the observed originalHash, or null when absent"
+      ]
+    },
+    {
+      "requirement": "Conflict handling",
+      "name": "Stale expectedRevision produces ArtifactConflictError without retry",
+      "given": ["the observed revision no longer matches the persisted state at write time"],
+      "when": ["execute calls writePersistedState"],
+      "then": [
+        "it propagates ArtifactConflictError",
+        "AND it does not retry or silently rebase the mutation"
+      ]
+    },
+    {
+      "requirement": "Unknown spec fails with a typed error",
+      "name": "Unresolvable spec identity throws SpecNotFoundError",
+      "given": ["a specId that does not resolve to an existing spec artifact set in its workspace"],
+      "when": ["execute is called"],
+      "then": ["it throws SpecNotFoundError"]
+    },
+    {
+      "requirement": "Result contract",
+      "name": "created is true only when persisted state was newly created",
+      "given": ["a spec with no persisted state"],
+      "when": ["execute is called with action: 'add' for an existing file"],
+      "then": [
+        "the result's created field is true",
+        "AND implementation reflects the resulting link list after the mutation"
+      ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveUpdatePersistedSpecImplementationDeps",
+      "name": "Config-based factory resolves the file reader, workspace lookup, and initializePersistedSpecState collaborator",
+      "given": ["a SpecdConfig and no explicit deps"],
+      "when": ["createUpdatePersistedSpecImplementation(config, options?) is called"],
+      "then": [
+        "UpdatePersistedSpecImplementationDeps is derived through resolveUpdatePersistedSpecImplementationDeps(resolver), including a repository per workspace, workspace configuration lookup, a FileReader, and an initializePersistedSpecState collaborator",
+        "AND the factory does not reconstruct fs-shaped wiring inline"
+      ]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:3105bed729dd811f07b0a026969df38e53cc65a82b0c824cc58e6d99d76a87bd",
+    "verify.md": "sha256:fdfa225314486b370242438df664ed27635e1a9d51bfc091ba9f4e98a3cbe39f"
+  },
+  "provenance": {
+    "artifacts": {
+      "spec.md": {
+        "hash": "sha256:3105bed729dd811f07b0a026969df38e53cc65a82b0c824cc58e6d99d76a87bd",
+        "lastModified": "2026-07-25T11:53:31.313Z"
+      },
+      "verify.md": {
+        "hash": "sha256:fdfa225314486b370242438df664ed27635e1a9d51bfc091ba9f4e98a3cbe39f",
+        "lastModified": "2026-07-25T11:53:31.313Z"
+      }
+    },
+    "persistedStateHash": "sha256:7614994830e1bf3aeed229f0089e8cb72c66e6bda7dab1e0dd435c07d52d25ce",
+    "schema": {
+      "name": "schema-std",
+      "version": 1
+    },
+    "projectionVersion": 1,
+    "projectionFingerprint": "sha256:e4a28a2db6a35ed39b8308518337235b1490c2948cd839db25866ad79b22404b"
+  }
+}

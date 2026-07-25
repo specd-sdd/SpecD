@@ -1,0 +1,27 @@
+- op: modified
+  description: Require build() to expose the complete revised kernel.specs surface, including materialization and persisted-state use cases, for every override combination.
+  selector:
+    type: section
+    matches: 'Requirement: Builder builds kernels with createKernel-equivalent semantics'
+  content: |
+    Calling `build()` on the builder SHALL produce a kernel with the same semantics as calling `createKernel(config, options)` with the equivalent accumulated registrations.
+
+    This equivalence includes:
+
+    - built-in capabilities remain available
+    - external registrations extend rather than replace built-ins
+    - shared adapters are constructed once
+    - the resulting kernel is immutable after construction
+    - `build()` returns the complete `kernel.specs` use-case set defined by [`core:kernel`](../kernel/spec.md) — including `generateMetadata`, `materializeMetadata`, `getMetadata`, `regenerateMetadata`, `initializePersistedState`, persisted schema inspection/reassignment, and persisted dependency/implementation/optimization queries and mutations — for every registry and repository override combination the builder supports. The builder MUST NOT maintain a second, independently-updated use-case list that can drift from `createKernel()`.
+
+- op: modified
+  description: Add the materialization dependency reflected in the guaranteed kernel.specs surface.
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`core:kernel`](../kernel/spec.md) — kernel shape, additive registries, merged registry exposure
+    - [`core:composition`](../composition/spec.md) — composition-layer exports and construction responsibilities
+    - [`core:composition-resolver`](../composition-resolver/spec.md) — shared config-to-deps resolver path reused by builder and kernel
+    - [`core:materialize-spec-metadata`](../materialize-spec-metadata/spec.md) — self-healing materialization use case that must remain present on every built kernel
+    - [`default:_global/architecture`](../../_global/architecture/spec.md) — composition-layer boundaries

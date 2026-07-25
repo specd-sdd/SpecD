@@ -1,0 +1,132 @@
+{
+  "title": "GetPersistedSpecImplementation",
+  "description": "Reviewers and tooling that need to know which files and symbols a spec's archived implementation is anchored to must read the canonical `spec-lock.json` record, not a regenerated metadata projection. `GetPersistedSpecImplementation` is the read-only application use case that exposes the persisted implementation links recorded in a spec's persisted semantic state.",
+  "dependsOn": ["core:spec-repository-port", "core:spec-id-format"],
+  "context": [
+    "Reviewers and tooling that need to know which files and symbols a spec's archived implementation is anchored to must read the canonical `spec-lock.json` record, not a regenerated metadata projection. `GetPersistedSpecImplementation` is the read-only application use case that exposes the persisted implementation links recorded in a spec's persisted semantic state."
+  ],
+  "rules": [
+    {
+      "requirement": "Input contract",
+      "rules": [
+        "`GetPersistedSpecImplementation.execute` SHALL accept a `GetPersistedSpecImplementationInput` with:\n\n- `specId` (required, string) — the fully-qualified spec identity to read"
+      ]
+    },
+    {
+      "requirement": "Reads persisted state through the repository port",
+      "rules": [
+        "The use case MUST resolve the spec's workspace repository and call `SpecRepository.readPersistedState(spec)`. It MUST NOT read `spec-lock.json` directly and MUST NOT materialize or read generated metadata to answer this query."
+      ]
+    },
+    {
+      "requirement": "Result contract for an initialized spec",
+      "rules": [
+        "When persisted state exists, `execute` SHALL return a `GetPersistedSpecImplementationResult` containing:\n\n- `specId` — the fully-qualified spec identity\n- `implementation` — the exact `readonly PersistedImplementationLink[]` recorded in the persisted state snapshot, in stored order\n- `initialized` — `true`\n\nEach `PersistedImplementationLink` MUST preserve the distinction between a file-level link (`symbols` absent) and a symbol-level link (`symbols` present and non-empty), unchanged from storage."
+      ]
+    },
+    {
+      "requirement": "Result contract for a spec with no persisted state",
+      "rules": [
+        "When `readPersistedState` returns `null`, `execute` SHALL return a `GetPersistedSpecImplementationResult` with `implementation: []` and `initialized: false`. The use case MUST NOT create persisted state as a side effect of this read."
+      ]
+    },
+    {
+      "requirement": "Unknown spec fails with a typed error",
+      "rules": [
+        "When the spec identity cannot be resolved to an existing spec artifact set in its workspace, `execute` SHALL throw `SpecNotFoundError`."
+      ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveGetPersistedSpecImplementationDeps",
+      "rules": [
+        "The config-based `createGetPersistedSpecImplementation(config, options?)` form MUST derive `GetPersistedSpecImplementationDeps` through `resolveGetPersistedSpecImplementationDeps(resolver)` and then delegate to canonical `createGetPersistedSpecImplementation(deps)`.\n\n`resolveGetPersistedSpecImplementationDeps(resolver)` MUST resolve:\n\n- `specs: ReadonlyMap<string, SpecRepository>` — one repository instance per workspace\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
+      ]
+    }
+  ],
+  "constraints": [
+    "This use case is read-only — it never creates, mutates, or writes persisted state",
+    "The returned implementation list is the durable archived traceability record; it MUST NOT be confused with autodetected candidates or in-progress change tracking state",
+    "readOnly workspace ownership does not affect this operation — reads are always permitted"
+  ],
+  "scenarios": [
+    {
+      "requirement": "Input contract",
+      "name": "specId is required",
+      "given": ["a GetPersistedSpecImplementationInput missing specId"],
+      "when": ["execute is called"],
+      "then": ["it is rejected as an invalid input"]
+    },
+    {
+      "requirement": "Reads persisted state through the repository port",
+      "name": "The query never reads spec-lock.json or materializes metadata",
+      "given": ["a spec with both persisted implementation links and a generated metadata cache"],
+      "when": ["GetPersistedSpecImplementation.execute runs"],
+      "then": [
+        "it obtains its answer by calling SpecRepository.readPersistedState(spec) only",
+        "AND it does not read spec-lock.json directly or materialize/read generated metadata"
+      ]
+    },
+    {
+      "requirement": "Result contract for an initialized spec",
+      "name": "File-level and symbol-level links are distinguished unchanged from storage",
+      "given": [
+        "a persisted state with a file-level link for core:src/a.ts (no symbols) and a symbol-level link for core:src/b.ts with symbols: [\"foo\"]"
+      ],
+      "when": ["execute returns"],
+      "then": [
+        "the file-level link is returned with symbols absent",
+        "AND the symbol-level link is returned with its exact non-empty symbols list, in stored order"
+      ]
+    },
+    {
+      "requirement": "Result contract for a spec with no persisted state",
+      "name": "Uninitialized spec returns an empty list without creating state",
+      "given": ["a spec whose readPersistedState returns null"],
+      "when": ["execute is called"],
+      "then": [
+        "the result has implementation: [] and initialized: false",
+        "AND no persisted state is created as a side effect"
+      ]
+    },
+    {
+      "requirement": "Unknown spec fails with a typed error",
+      "name": "Unresolvable spec identity throws SpecNotFoundError",
+      "given": ["a specId that does not resolve to an existing spec artifact set in its workspace"],
+      "when": ["execute is called"],
+      "then": ["it throws SpecNotFoundError"]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveGetPersistedSpecImplementationDeps",
+      "name": "Config-based factory resolves one repository per workspace via the shared helper",
+      "given": ["a SpecdConfig and no explicit deps"],
+      "when": ["createGetPersistedSpecImplementation(config, options?) is called"],
+      "then": [
+        "GetPersistedSpecImplementationDeps is derived through resolveGetPersistedSpecImplementationDeps(resolver)",
+        "AND the factory does not reconstruct fs-shaped wiring inline"
+      ]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:5ebc0af04feafc359527493b954b63662cb2a65d5b02a10bba95998b3ef3c5cd",
+    "verify.md": "sha256:6f87ed47d97193e9136d4001cef5379ddb689cd987d88b46a40665f18cef9b8e"
+  },
+  "provenance": {
+    "artifacts": {
+      "spec.md": {
+        "hash": "sha256:5ebc0af04feafc359527493b954b63662cb2a65d5b02a10bba95998b3ef3c5cd",
+        "lastModified": "2026-07-25T11:53:31.347Z"
+      },
+      "verify.md": {
+        "hash": "sha256:6f87ed47d97193e9136d4001cef5379ddb689cd987d88b46a40665f18cef9b8e",
+        "lastModified": "2026-07-25T11:53:31.348Z"
+      }
+    },
+    "persistedStateHash": "sha256:80ba95e8f10cece50c2e36cc9963bb348230ba45b9cdac2f464c92e9776125a6",
+    "schema": {
+      "name": "schema-std",
+      "version": 1
+    },
+    "projectionVersion": 1,
+    "projectionFingerprint": "sha256:e4a28a2db6a35ed39b8308518337235b1490c2948cd839db25866ad79b22404b"
+  }
+}

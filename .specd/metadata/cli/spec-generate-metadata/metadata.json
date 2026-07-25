@@ -1,44 +1,37 @@
 {
   "title": "Spec Generate-Metadata",
-  "description": "Metadata files must be regenerated whenever spec content changes, and doing it manually is error-prone. The `specd spec generate-metadata` command generates metadata content deterministically from schema extraction rules, delegating to `GenerateSpecMetadata` for generation and optionally to `SaveSpecMetadata` for persistence.",
+  "description": "Metadata self-heals on normal reads, but operators sometimes need a guaranteed rebuild — for cache warming, repair, CI, or diagnostics. The `specd spec generate-metadata` command is that explicit forced rebuild: it always regenerates and persists metadata for the given spec (or, with `--all`, for every spec), delegating entirely to `RegenerateSpecMetadata` (the `policy: 'force'` counterpart of the self-healing `GetSpecMetadata` read). It is never required for correctness after a lock mutation.",
   "dependsOn": [
-    "core:generate-metadata",
+    "core:regenerate-spec-metadata",
     "core:spec-metadata",
-    "core:list-specs",
     "default:_global/architecture"
   ],
   "context": [
-    "Metadata files must be regenerated whenever spec content changes, and doing it manually is error-prone. The `specd spec generate-metadata` command generates metadata content deterministically from schema extraction rules, delegating to `GenerateSpecMetadata` for generation and optionally to `SaveSpecMetadata` for persistence."
+    "Metadata self-heals on normal reads, but operators sometimes need a guaranteed rebuild — for cache warming, repair, CI, or diagnostics. The `specd spec generate-metadata` command is that explicit forced rebuild: it always regenerates and persists metadata for the given spec (or, with `--all`, for every spec), delegating entirely to `RegenerateSpecMetadata` (the `policy: 'force'` counterpart of the self-healing `GetSpecMetadata` read). It is never required for correctness after a lock mutation."
   ],
   "rules": [
     {
       "requirement": "Command signature",
       "rules": [
-        "The command is registered as `generate-metadata [specPath]` on the `spec` parent command. The `specPath` positional argument is optional when `--all` is used. It accepts:\n\n- `--write` — persist the generated metadata\n- `--force` — skip conflict detection when writing (requires `--write`)\n- `--all` — batch mode: generate metadata for all specs matching `--status` filter. Mutually exclusive with `<specPath>`. Requires `--write`.\n- `--status <values>` — comma-separated metadata status filter for `--all`. Accepted values: `stale`, `missing`, `invalid`, `fresh`, or the keyword `all` (every spec regardless of status). Default: `stale,missing`. Requires `--all`.\n- `--format <fmt>` — output format: `text|json|toon` (default `text`)\n- `--config <path>` — path to `specd.yaml`\n\nThe `<specPath>` argument uses the same `workspace:capability-path` syntax as other `spec` subcommands."
+        "The command is registered as `generate-metadata [specPath]` on the `spec` parent command. The `specPath` positional argument is optional when `--all` is used. It accepts:\n\n- `--force` — skip conflict detection when persisting the regenerated projection\n- `--all` — batch mode: forcibly regenerate metadata for every spec across every workspace. Mutually exclusive with `<specPath>`.\n- `--format <fmt>` — output format: `text|json|toon` (default `text`)\n- `--config <path>` — path to `specd.yaml`\n\nThere is no `--write` flag: the command always regenerates and persists. There is no `--status` flag: `--all` always targets every spec, since forced rebuilding does not depend on a spec's current freshness. The `<specPath>` argument uses the same `workspace:capability-path` syntax as other `spec` subcommands."
       ]
     },
     {
-      "requirement": "Default output (no --write)",
+      "requirement": "Output (single spec)",
       "rules": [
-        "Without `--write`, the command generates metadata and outputs it to stdout without persisting:\n\n- **Text format:** outputs the generated YAML content, trimmed of trailing whitespace\n- **JSON/toon format:** outputs `{ spec: \"<workspace:path>\", metadata: <object> }`"
-      ]
-    },
-    {
-      "requirement": "Write mode",
-      "rules": [
-        "With `--write`, the command generates metadata, persists it via `SaveSpecMetadata`, and outputs a confirmation:\n\n- **Text format:** `wrote metadata for <workspace:path>`\n- **JSON/toon format:** `{ result: \"ok\", spec: \"<workspace:path>\", written: true }`"
+        "The command calls `RegenerateSpecMetadata` for the given spec and reports the persisted result:\n\n- **Text format:** `regenerated metadata for <workspace:path>`\n- **JSON/toon format:** `{ result: \"ok\", spec: \"<workspace:path>\", regenerated: true }`"
       ]
     },
     {
       "requirement": "Force flag",
       "rules": [
-        "`--force` requires `--write`. Without `--write`, the command writes `error: --force requires --write` to stderr and exits with code 1. With `--write`, the command passes `force: true` to `SaveSpecMetadata` to skip conflict detection."
+        "`--force` is a standalone flag; it is passed through to `RegenerateSpecMetadata` to skip conflict detection against the observed revision when persisting the regenerated projection."
       ]
     },
     {
       "requirement": "Batch mode (--all)",
       "rules": [
-        "With `--all`, the command iterates over all specs across all workspaces, filters by metadata status using `--status` (default `stale,missing`), generates metadata for each matching spec, and writes it. `--all` requires `--write` — without it the command exits with `error: --all requires --write`. `--all` is mutually exclusive with a positional `<specPath>` — providing both exits with `error: --all and <specPath> are mutually exclusive`.\n\nThe `--status` filter accepts a comma-separated list of: `stale`, `missing`, `invalid`, `fresh`. The keyword `all` is a shorthand for every status (equivalent to regenerating every spec). `--status` without `--all` exits with `error: --status requires --all`.\n\nFor each matching spec, the command calls `GenerateSpecMetadata` and then `SaveSpecMetadata`. If `GenerateSpecMetadata` returns `hasExtraction: false`, the entire batch stops with the existing `no metadataExtraction` error (this is a schema-level issue, not per-spec).\n\nIndividual spec failures during batch mode (e.g. `DependsOnOverwriteError` when `--force` is not set) are reported as warnings and the batch continues to the next spec. The command exits with code 1 if any spec failed, 0 if all succeeded.\n\n**Text output:** one line per spec processed: `wrote metadata for <specId>` on success, `error: <specId>: <message>` on failure. A summary line at the end: `generated metadata for N/M specs` (where M is total matched, N is successful).\n\n**JSON output:** `{ result: \"ok\"|\"partial\"|\"error\", total: M, succeeded: N, failed: F, specs: [{ spec: \"<id>\", status: \"ok\"|\"error\", error?: \"<msg>\" }] }`"
+        "With `--all`, the command discovers every spec across every workspace directly through workspace and repository listing — not through `ListSpecs`, since `ListSpecs` itself may materialize metadata and using it for forced selection would create a use-case cycle — and forcibly regenerates and persists metadata for each one via `RegenerateSpecMetadata`. `--all` is mutually exclusive with a positional `<specPath>` — providing both exits with `error: --all and <specPath> are mutually exclusive`.\n\nIndividual spec failures during batch mode (e.g. `DependsOnOverwriteError` when `--force` is not set) are reported as warnings and the batch continues to the next spec. The command exits with code 1 if any spec failed, 0 if all succeeded.\n\n**Text output:** one line per spec processed: `regenerated metadata for <specId>` on success, `error: <specId>: <message>` on failure. A summary line at the end: `regenerated metadata for N/M specs` (where M is total specs, N is successful).\n\n**JSON output:** `{ result: \"ok\"|\"partial\"|\"error\", total: M, succeeded: N, failed: F, specs: [{ spec: \"<id>\", status: \"ok\"|\"error\", error?: \"<msg>\" }] }`"
       ]
     },
     {
@@ -54,18 +47,17 @@
       ]
     },
     {
-      "requirement": "Error — dependsOn overwrite (write mode)",
+      "requirement": "Error — dependsOn overwrite",
       "rules": [
-        "When `--write` is used and `--force` is not set, if the generated metadata would change existing `dependsOn` entries, `SaveSpecMetadata` throws a `DependsOnOverwriteError`. The error propagates through `handleError` which writes `error: dependsOn would change (...)` to stderr and exits with code 1. Stdout remains empty on error.\n\nWhen `--write --force` is used, the overwrite check is skipped entirely."
+        "When `--force` is not set, if the regenerated metadata would change existing `dependsOn` entries, `RegenerateSpecMetadata` throws a `DependsOnOverwriteError`. The error propagates through `handleError` which writes `error: dependsOn would change (...)` to stderr and exits with code 1. Stdout remains empty on error.\n\nWhen `--force` is used, the overwrite check is skipped entirely."
       ]
     }
   ],
   "constraints": [
-    "The command contains no business logic — all generation is delegated to GenerateSpecMetadata and all writing to SaveSpecMetadata",
-    "YAML serialization uses lineWidth: 0 for literal scalars",
+    "The command contains no business logic — all forced regeneration and persistence is delegated to RegenerateSpecMetadata",
     "The command never reads or writes the filesystem directly for spec content — it uses the kernel",
-    "Batch mode uses ListSpecs with includeMetadataStatus: true for filtering — no custom metadata resolution in the CLI layer",
-    "--status values are validated at the CLI boundary before any spec processing begins"
+    "Batch mode discovers specs through workspace and repository listing, never through ListSpecs or any metadata-status projection",
+    "The command never implements its own freshness or conflict logic — RegenerateSpecMetadata owns it"
   ],
   "scenarios": [
     {
@@ -75,15 +67,29 @@
       "then": ["the command exits with an error"]
     },
     {
+      "requirement": "Command signature",
+      "name": "No --write flag accepted",
+      "when": ["specd spec generate-metadata auth/login --write is invoked"],
+      "then": [
+        "the command exits with an unknown-option error, since the command always regenerates and persists without a separate write flag"
+      ]
+    },
+    {
+      "requirement": "Command signature",
+      "name": "No --status flag accepted",
+      "when": ["specd spec generate-metadata --all --status stale is invoked"],
+      "then": ["the command exits with an unknown-option error, since --status no longer exists"]
+    },
+    {
       "requirement": "Error — spec not found",
       "name": "Unknown spec exits 1",
-      "when": ["specd spec generate-metadata core:nonexistent --write is invoked"],
+      "when": ["specd spec generate-metadata core:nonexistent is invoked"],
       "then": ["stderr contains error: Spec 'core:nonexistent' not found", "AND exits with code 1"]
     },
     {
       "requirement": "Error — spec not found",
       "name": "Unknown workspace exits 1",
-      "when": ["specd spec generate-metadata fake:auth/login --write is invoked"],
+      "when": ["specd spec generate-metadata fake:auth/login is invoked"],
       "then": [
         "stderr contains an error: message about the unknown workspace",
         "AND exits with code 1"
@@ -99,55 +105,45 @@
       ]
     },
     {
-      "requirement": "Default output (no --write)",
-      "name": "Text format outputs YAML to stdout",
-      "given": ["the core use case returns metadata with title: 'Login' and generatedBy: 'core'"],
-      "when": ["specd spec generate-metadata auth/login is invoked without --write"],
+      "requirement": "Output (single spec)",
+      "name": "Text format reports regenerated spec",
+      "when": ["specd spec generate-metadata auth/login is invoked"],
       "then": [
-        "stdout contains the YAML representation including title: Login and generatedBy: core"
+        "it calls RegenerateSpecMetadata for default:auth/login",
+        "AND stdout contains regenerated metadata for default:auth/login"
       ]
     },
     {
-      "requirement": "Default output (no --write)",
-      "name": "JSON format outputs spec and metadata",
-      "given": ["the core use case returns metadata with title: 'Login'"],
+      "requirement": "Output (single spec)",
+      "name": "JSON format reports regenerated result",
       "when": ["specd spec generate-metadata auth/login --format json is invoked"],
       "then": [
-        "stdout contains a JSON object with spec: \"default:auth/login\" and metadata containing the extracted fields"
-      ]
-    },
-    {
-      "requirement": "Write mode",
-      "name": "Write persists metadata and confirms",
-      "when": ["specd spec generate-metadata auth/login --write is invoked"],
-      "then": [
-        "SaveSpecMetadata is called with the generated YAML content",
-        "AND stdout contains wrote metadata for default:auth/login"
+        "stdout contains { \"result\": \"ok\", \"spec\": \"default:auth/login\", \"regenerated\": true }"
       ]
     },
     {
       "requirement": "Force flag",
-      "name": "Write with force passes force flag",
-      "when": ["specd spec generate-metadata auth/login --write --force is invoked"],
-      "then": ["SaveSpecMetadata is called with force: true"]
+      "name": "Force flag passed through to RegenerateSpecMetadata",
+      "when": ["specd spec generate-metadata auth/login --force is invoked"],
+      "then": ["RegenerateSpecMetadata is called with force: true"]
     },
     {
       "requirement": "Force flag",
-      "name": "Force without write exits with error",
-      "when": ["specd spec generate-metadata auth/login --force is invoked without --write"],
+      "name": "Omitting --force keeps standard conflict detection",
+      "when": ["specd spec generate-metadata auth/login is invoked without --force"],
       "then": [
-        "the command writes error: --force requires --write to stderr",
-        "AND exits with code 1"
+        "RegenerateSpecMetadata is called with force not set to true",
+        "AND standard conflict detection against the observed revision applies"
       ]
     },
     {
-      "requirement": "Error — dependsOn overwrite (write mode)",
-      "name": "dependsOn change in write mode exits 1",
+      "requirement": "Error — dependsOn overwrite",
+      "name": "dependsOn change exits 1",
       "given": [
         "existing metadata has dependsOn: [core:config, core:schema-format]",
-        "AND the generated metadata has dependsOn: [core:change]"
+        "AND the regenerated metadata has dependsOn: [core:change]"
       ],
-      "when": ["specd spec generate-metadata auth/login --write is invoked without --force"],
+      "when": ["specd spec generate-metadata auth/login is invoked without --force"],
       "then": [
         "the command writes error: dependsOn would change to stderr",
         "AND exits with code 1",
@@ -155,15 +151,13 @@
       ]
     },
     {
-      "requirement": "Error — dependsOn overwrite (write mode)",
-      "name": "Write mode JSON output on dependsOn error",
+      "requirement": "Error — dependsOn overwrite",
+      "name": "JSON output on dependsOn error",
       "given": [
         "existing metadata has dependsOn: [core:config]",
-        "AND the generated metadata has dependsOn: [core:change]"
+        "AND the regenerated metadata has dependsOn: [core:change]"
       ],
-      "when": [
-        "specd spec generate-metadata auth/login --write --format json is invoked without --force"
-      ],
+      "when": ["specd spec generate-metadata auth/login --format json is invoked without --force"],
       "then": [
         "the command exits with code 1",
         "AND stderr contains error: dependsOn would change",
@@ -171,92 +165,98 @@
       ]
     },
     {
-      "requirement": "Error — dependsOn overwrite (write mode)",
-      "name": "--write --force bypasses dependsOn check",
+      "requirement": "Error — dependsOn overwrite",
+      "name": "--force bypasses dependsOn check",
       "given": [
         "existing metadata has dependsOn: [core:config]",
-        "AND the generated metadata has dependsOn: [core:change]"
+        "AND the regenerated metadata has dependsOn: [core:change]"
       ],
-      "when": ["specd spec generate-metadata auth/login --write --force is invoked"],
+      "when": ["specd spec generate-metadata auth/login --force is invoked"],
       "then": ["the write succeeds"]
     },
     {
       "requirement": "Batch mode (--all)",
-      "name": "--all without --write",
-      "when": ["specd spec generate-metadata --all is run without --write"],
-      "then": ["stderr contains error: --all requires --write and exit code is 1"]
-    },
-    {
-      "requirement": "Batch mode (--all)",
-      "name": "--all with specPath",
-      "when": ["specd spec generate-metadata core:config --all --write is run"],
+      "name": "--all with specPath is rejected",
+      "when": ["specd spec generate-metadata core:config --all is run"],
       "then": [
-        "stderr contains error: --all and <specPath> are mutually exclusive and exit code is 1"
+        "stderr contains error: --all and <specPath> are mutually exclusive",
+        "AND exit code is 1"
       ]
     },
     {
       "requirement": "Batch mode (--all)",
-      "name": "--status without --all",
-      "when": ["specd spec generate-metadata --status stale --write is run without --all"],
-      "then": ["stderr contains error: --status requires --all and exit code is 1"]
-    },
-    {
-      "requirement": "Batch mode (--all)",
-      "name": "--all with default status filter",
-      "given": [
-        "3 specs exist: one with stale metadata, one with missing metadata, one with fresh metadata"
-      ],
-      "when": ["specd spec generate-metadata --all --write is run"],
+      "name": "--all discovers every spec without ListSpecs and regenerates unfiltered",
+      "given": ["3 specs exist across two workspaces with varying metadata freshness"],
+      "when": ["specd spec generate-metadata --all is run"],
       "then": [
-        "metadata is generated and written for the stale and missing specs only",
-        "AND the fresh spec is skipped",
-        "AND text output shows wrote metadata for ... for each processed spec",
-        "AND a summary line shows generated metadata for 2/2 specs"
+        "every spec is discovered directly through workspace and repository listing, not through ListSpecs",
+        "AND metadata is forcibly regenerated and persisted for all 3 specs regardless of current freshness",
+        "AND a summary line shows regenerated metadata for 3/3 specs"
       ]
-    },
-    {
-      "requirement": "Batch mode (--all)",
-      "name": "--all --status all",
-      "given": ["3 specs exist with varying metadata status"],
-      "when": ["specd spec generate-metadata --all --write --status all is run"],
-      "then": ["metadata is generated for all 3 specs regardless of status"]
     },
     {
       "requirement": "Batch mode (--all)",
       "name": "--all with individual failures continues batch",
-      "given": ["2 specs have stale metadata, one will fail with DependsOnOverwriteError"],
-      "when": ["specd spec generate-metadata --all --write is run without --force"],
+      "given": ["2 specs exist, one will fail with DependsOnOverwriteError"],
+      "when": ["specd spec generate-metadata --all is run without --force"],
       "then": [
         "the failing spec is reported as an error",
         "AND the other spec succeeds",
         "AND exit code is 1",
-        "AND summary shows generated metadata for 1/2 specs"
+        "AND summary shows regenerated metadata for 1/2 specs"
       ]
     },
     {
       "requirement": "Batch mode (--all)",
       "name": "--all --force skips conflict detection",
-      "given": ["specs with stale metadata and existing dependsOn"],
-      "when": ["specd spec generate-metadata --all --write --force is run"],
+      "given": ["specs with existing dependsOn that would otherwise conflict"],
+      "when": ["specd spec generate-metadata --all --force is run"],
       "then": ["all specs are regenerated without conflict errors"]
     },
     {
       "requirement": "Batch mode (--all)",
       "name": "--all JSON output",
-      "given": ["2 specs with stale metadata"],
-      "when": ["specd spec generate-metadata --all --write --format json is run"],
+      "given": ["2 specs across the project"],
+      "when": ["specd spec generate-metadata --all --format json is run"],
       "then": ["output is { result: \"ok\", total: 2, succeeded: 2, failed: 0, specs: [...] }"]
-    },
-    {
-      "requirement": "Batch mode (--all)",
-      "name": "invalid --status value",
-      "when": ["specd spec generate-metadata --all --write --status bogus is run"],
-      "then": ["stderr contains an error about invalid status value and exit code is 1"]
     }
   ],
-  "contentHashes": {
-    "spec.md": "sha256:31779df702848045b9e9e4bdb0eedb81b7e29302ff28afb58fb5dec50a600cb3",
-    "verify.md": "sha256:992ab2e4834d0e02044a7ee3f5b68249d823fabf65b071bc56d0b35cccb1e64d"
+  "implementation": {
+    "files": [
+      {
+        "specId": "cli:spec-generate-metadata",
+        "file": "cli:test/commands/spec-generate-metadata.spec.ts"
+      }
+    ],
+    "symbols": [
+      {
+        "specId": "cli:spec-generate-metadata",
+        "file": "cli:src/commands/spec/generate-metadata.ts",
+        "symbol": "registerSpecGenerateMetadata"
+      }
+    ]
   },
-  "generatedBy": "core"
+  "contentHashes": {
+    "spec.md": "sha256:50101da16546488b2f58b367e9b4e0fed0fff19556bdbad21fe4b8f102f62575",
+    "verify.md": "sha256:60ae49b6cc99d2ee836d0eb8362da93c5c54bd3f51bc84ca2d273d3f1d9c4de8"
+  },
+  "provenance": {
+    "artifacts": {
+      "spec.md": {
+        "hash": "sha256:50101da16546488b2f58b367e9b4e0fed0fff19556bdbad21fe4b8f102f62575",
+        "lastModified": "2026-07-25T11:53:31.217Z"
+      },
+      "verify.md": {
+        "hash": "sha256:60ae49b6cc99d2ee836d0eb8362da93c5c54bd3f51bc84ca2d273d3f1d9c4de8",
+        "lastModified": "2026-07-25T11:53:31.217Z"
+      }
+    },
+    "persistedStateHash": "sha256:2450489e61827b5035db0874d0906bfc02d988518f2ed9c575d6484c00784bf0",
+    "schema": {
+      "name": "schema-std",
+      "version": 1
+    },
+    "projectionVersion": 1,
+    "projectionFingerprint": "sha256:e4a28a2db6a35ed39b8308518337235b1490c2948cd839db25866ad79b22404b"
+  }
 }

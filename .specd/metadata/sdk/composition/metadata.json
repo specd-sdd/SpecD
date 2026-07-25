@@ -26,7 +26,7 @@
     {
       "requirement": "Public barrel exports",
       "rules": [
-        "`package.json` `exports` MUST include:\n\n- `\".\"` → `src/index.ts` (curated host surface)\n- `\"./ports\"` → re-export `@specd/core/ports`\n- `\"./extensions\"` → re-export `@specd/core/extensions`\n\n`src/index.ts` SHALL export explicitly (no `export * from '@specd/core'`):\n\n- SDK composition: `openSpecdHost`, `createSdkContext`, `withOpenGraphProvider`, `SdkHostContext`, `OpenSpecdHostInput`, `OpenSpecdHostResult`, `WithOpenGraphProviderOptions`\n- SDK orchestration: `buildProjectStatusSnapshot`, `runIndexProjectGraph`, and their input/result types\n- Explicit re-exports from `@specd/core` `\".\"` public barrel (bootstrap, `Kernel`, kernel-equivalent `createX` factories, repository factories, kernel use-case I/O types, domain entities, errors)\n- Explicit re-exports from `@specd/code-graph` `\".\"` public barrel (provider factory, host use cases, graph host-adapter symbols listed under **Public barrel exports for host adapters**)\n- `SDK_VERSION`, `codeGraphVersion`, `getCodeGraphVersion`\n\nThe `\".\"` barrel MUST NOT export infrastructure adapters, internal composition helpers, or symbols that are only available from `\"./internal\"` entry points of dependency packages."
+        "`package.json` `exports` MUST include:\n\n- `\".\"` → `src/index.ts` (curated host surface)\n- `\"./ports\"` → re-export `@specd/core/ports`\n- `\"./extensions\"` → re-export `@specd/core/extensions`\n\n`src/index.ts` SHALL export explicitly (no `export * from '@specd/core'`):\n\n- SDK composition: `openSpecdHost`, `createSdkContext`, `withOpenGraphProvider`, `SdkHostContext`, `OpenSpecdHostInput`, `OpenSpecdHostResult`, `WithOpenGraphProviderOptions`\n- SDK orchestration: `buildProjectStatusSnapshot`, `runIndexProjectGraph`, and their input/result types\n- Explicit re-exports from `@specd/core` `\".\"` public barrel (bootstrap, `Kernel`, kernel-equivalent `createX` factories, repository factories, kernel use-case I/O types, domain entities, errors). This MUST track the revised `kernel.specs` surface — including `MaterializeSpecMetadata`, `GetSpecMetadata`, `RegenerateSpecMetadata`, `InitializePersistedSpecState`, persisted schema inspection/reassignment, and persisted dependency/implementation/optimization use cases — and their `create*` factories.\n- Explicit re-exports from `@specd/code-graph` `\".\"` public barrel (provider factory, host use cases, graph host-adapter symbols listed under **Public barrel exports for host adapters**)\n- `SDK_VERSION`, `codeGraphVersion`, `getCodeGraphVersion`\n\nThe `\".\"` barrel MUST NOT export infrastructure adapters, internal composition helpers, or symbols that are only available from `\"./internal\"` entry points of dependency packages.\n\nThe `\".\"` barrel MUST NOT re-export `SaveSpecMetadata`, `UpdateSpecMetadata`, `InvalidateSpecMetadata`, or their `createSaveSpecMetadata` / `createUpdateSpecMetadata` / `createInvalidateSpecMetadata` factories — those use cases are removed from `@specd/core` and MUST NOT be restored at the SDK layer. `PersistSpecMetadata` MUST NOT be exported — it is an internal collaborator of `MaterializeSpecMetadata` only."
       ]
     },
     {
@@ -87,6 +87,23 @@
     },
     {
       "requirement": "Public barrel exports",
+      "name": "SDK tracks revised metadata materialization surface",
+      "when": ["importing from @specd/sdk"],
+      "then": [
+        "MaterializeSpecMetadata, GetSpecMetadata, RegenerateSpecMetadata, InitializePersistedSpecState, and their create* factories are available"
+      ]
+    },
+    {
+      "requirement": "Public barrel exports",
+      "name": "SDK does not restore removed metadata mutation APIs",
+      "when": ["importing from @specd/sdk"],
+      "then": [
+        "SaveSpecMetadata, UpdateSpecMetadata, InvalidateSpecMetadata, createSaveSpecMetadata, createUpdateSpecMetadata, and createInvalidateSpecMetadata are not exported",
+        "AND PersistSpecMetadata is not exported"
+      ]
+    },
+    {
+      "requirement": "Public barrel exports",
       "name": "SDK ports subpath re-exports core ports",
       "when": ["importing ChangeRepository from @specd/sdk/ports"],
       "then": ["the type resolves to the same contract as @specd/core/ports"]
@@ -120,21 +137,27 @@
       "then": ["it equals the version field in packages/sdk/package.json"]
     }
   ],
-  "implementation": {
-    "files": [
-      {
-        "specId": "sdk:composition",
-        "file": "sdk:src/core-reexports.ts"
-      },
-      {
-        "specId": "sdk:composition",
-        "file": "sdk:test/barrel.spec.ts"
-      }
-    ]
-  },
   "contentHashes": {
-    "spec.md": "sha256:af6c02a6fc652fd4f7f9340049f37497cbf0f166f5d915a847fe88a8e39429bd",
-    "verify.md": "sha256:43a083fce155eadc8f99c4df903b5fb3926a4f61f0e6f6ba4429c61ef5a31dd7"
+    "spec.md": "sha256:fc065b78b23d9a9fbc402684d19fb63afea8bc387989ac727965533888b23537",
+    "verify.md": "sha256:053f26e9d5fa57a608acbad2c092a7785b29efbe6c24a9bbaff8db056bf6f294"
   },
-  "generatedBy": "core"
+  "provenance": {
+    "artifacts": {
+      "spec.md": {
+        "hash": "sha256:fc065b78b23d9a9fbc402684d19fb63afea8bc387989ac727965533888b23537",
+        "lastModified": "2026-07-25T11:53:31.594Z"
+      },
+      "verify.md": {
+        "hash": "sha256:053f26e9d5fa57a608acbad2c092a7785b29efbe6c24a9bbaff8db056bf6f294",
+        "lastModified": "2026-07-25T11:53:31.594Z"
+      }
+    },
+    "persistedStateHash": "sha256:4e25cd61d59bbc6afaf202f53dc095fe017025bcf401f34296f0e17032680ead",
+    "schema": {
+      "name": "schema-std",
+      "version": 1
+    },
+    "projectionVersion": 1,
+    "projectionFingerprint": "sha256:e4a28a2db6a35ed39b8308518337235b1490c2948cd839db25866ad79b22404b"
+  }
 }

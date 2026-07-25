@@ -1,0 +1,44 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["default:_global/conventions"],
+  "implementation": [],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Root `eslint.config.js` enforces conventions + architecture layer boundaries via type-aware rules on all packages.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:cbf52148d3d70d89911d05a46cf3c51adb27fd6860b86e578800ec58fa8de5b1",
+          "lastModified": "2026-05-04T16:57:11.719Z"
+        },
+        "verify.md": {
+          "hash": "sha256:e5a6830ee9ea6fa665c8cef868242888f1af151606625cecf0f254da7284a799",
+          "lastModified": "2026-05-25T06:02:58.306Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# ESLint Rules\n\n## Rules\n- Reject explicit `any`; use `unknown` + guards\n- Reject default exports\n- Exported functions/methods: explicit return types\n- `src/` files: kebab-case naming\n- JSDoc on all functions, methods, classes, types, interfaces: description, `@param`, `@returns`, `@throws`\n- Layer boundaries via `no-restricted-imports`: domain/ → no application/infrastructure/composition; application/ → no infrastructure/composition; infrastructure/ → no composition\n\n## Constraints\n- Type-aware rules for all `.ts`\n- Lint errors fixed before commit (lint-staged pre-commit)\n- `test/**/*.spec.ts` exempt from JSDoc\n- `dist/`, `node_modules/` excluded",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:cbf52148d3d70d89911d05a46cf3c51adb27fd6860b86e578800ec58fa8de5b1",
+          "lastModified": "2026-05-04T16:57:11.719Z"
+        },
+        "verify.md": {
+          "hash": "sha256:e5a6830ee9ea6fa665c8cef868242888f1af151606625cecf0f254da7284a799",
+          "lastModified": "2026-05-25T06:02:58.306Z"
+        }
+      }
+    }
+  }
+}

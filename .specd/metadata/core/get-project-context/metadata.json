@@ -7,8 +7,10 @@
     "core:spec-metadata",
     "core:schema-format",
     "default:_global/architecture",
-    "core:core/project-metadata",
-    "core:composition-resolver"
+    "core:composition-resolver",
+    "core:project-metadata",
+    "core:spec-optimization",
+    "core:get-spec-metadata"
   ],
   "context": [
     "Tooling sometimes needs the project's compiled spec context without an active change — for example, when generating agent instructions or answering project-wide queries. `GetProjectContext` provides this by compiling the project-level context block (steps 1-4 of the compilation pipeline: `context:` entries, project-level include/exclude patterns) with all configured workspaces treated as active. It is the change-independent counterpart to `CompileContext`."
@@ -53,37 +55,37 @@
     {
       "requirement": "Supports dependsOn traversal when followDeps is true",
       "rules": [
-        "When `input.followDeps` is `true`, the use case MUST traverse `dependsOn` links starting from each included spec.\n\nTraversal resolves dependencies in this order:\n\n1. canonical `metadata.json.dependsOn` when persisted metadata is available\n2. the schema's `metadataExtraction.dependsOn` declarations as a fallback when metadata is absent\n\nIf metadata exists but is stale, the use case MAY still traverse using the persisted canonical `dependsOn` projection, but it MUST emit a `stale-metadata` warning. The use case MUST NOT treat stale metadata as though it were missing.\n\nThat fallback extraction MUST use the same shared extractor-transform registry and caller-owned origin context bag used by the other metadata-extraction consumers. Newly discovered specs MUST be added to the included set. Traversal MUST respect `input.depth` when provided.\n\nIf fallback extraction finds dependency values but transform execution cannot normalize them, the use case MUST fail explicitly rather than silently treating those dependencies as absent.\n\nThe use case MUST NOT read `spec-lock.json` as a generic spec artifact to discover dependencies; persisted sidecars are consumed through the canonical metadata projection."
+        "When `input.followDeps` is `true`, the use case MUST traverse `dependsOn` links starting from each included spec.\n\nTraversal resolves dependencies in this order:\n\n1. the canonical `dependsOn` projection returned by `GetSpecMetadata.execute({ specId })` (default `'if-needed'` policy) — self-healing, so a missing or drifted cache is regenerated rather than treated as a frozen snapshot\n2. the schema's `metadataExtraction.dependsOn` declarations as a fallback only when materialization cannot produce a projection at all\n\nThat fallback extraction MUST use the same shared extractor-transform registry and caller-owned origin context bag used by the other metadata-extraction consumers. Newly discovered specs MUST be added to the included set. Traversal MUST respect `input.depth` when provided.\n\nIf fallback extraction finds dependency values but transform execution cannot normalize them, the use case MUST fail explicitly rather than silently treating those dependencies as absent.\n\nThe use case MUST NOT read `spec-lock.json` as a generic spec artifact to discover dependencies; persisted sidecars are consumed only through `GetSpecMetadata`'s normalized projection."
       ]
     },
     {
       "requirement": "Renders spec content from metadata when fresh",
       "rules": [
-        "For each included spec, if `.specd-metadata.yaml` exists and its content hashes match the current artifacts (verified via `ContentHasher`), the use case MUST render from the parsed metadata according to `config.contextMode`.\n\n- In `list` mode, render no title, description, or content.\n- In `summary` mode, render title and description only.\n- In `full` mode, render description, rules, constraints, and scenarios as applicable. **If no `sections` filter is active (input is absent or empty), it MUST default to rendering Description + Rules + Constraints.** If a `sections` filter is provided, it overrides this default.\n- In `hybrid` mode, render the same output as `full` because project context has no change-scoped tier.\n\nSection filters MUST NOT affect list-mode or summary-mode entries.\n\n#### Scenario: Default sections in full mode\n\nWhen a spec is rendered in `full` mode (including `hybrid` mode which resolves to `full` here) and no `sections` filter is active (input is absent or empty), it MUST default to rendering **Description + Rules + Constraints**."
+        "For each included spec, the use case MUST first classify the entry's display mode from `config.contextMode`. It MUST call `GetSpecMetadata.execute({ specId })` only when that mode actually needs structured metadata-derived content (summary fields or full section content). List-mode entries MUST NOT trigger materialization.\n\n- In `list` mode, emit list entries with no title, description, or content, and do not call `GetSpecMetadata`.\n- In `summary` mode, obtain metadata via `GetSpecMetadata` and render title and description only.\n- In `full` mode, obtain metadata via `GetSpecMetadata` and render description, rules, constraints, and scenarios as applicable. **If no `sections` filter is active (input is absent or empty), it MUST default to rendering Description + Rules + Constraints.** If a `sections` filter is provided, it overrides this default.\n- In `hybrid` mode, render the same output as `full` because project context has no change-scoped tier.\n\nSection filters MUST NOT affect list-mode or summary-mode entries.\n\nAny `metadata-cache-write-failed` or generation warning returned by `GetSpecMetadata` MUST be forwarded into the result's `warnings` array without being logged again.\n\n#### Scenario: Default sections in full mode\n\nWhen a spec is rendered in `full` mode (including `hybrid` mode which resolves to `full` here) and no `sections` filter is active (input is absent or empty), it MUST default to rendering **Description + Rules + Constraints**."
       ]
     },
     {
       "requirement": "Falls back to extraction when metadata is stale or absent",
       "rules": [
-        "When metadata is stale or absent, the use case MUST:\n\n1. Emit a `stale-metadata` warning identifying the spec.\n2. Attempt live extraction using the schema's `metadataExtraction` engine, the shared extractor-transform registry, and caller-owned origin context for each artifact.\n3. If extraction yields content, render it with the same section filtering as fresh metadata.\n4. If the schema has no `metadataExtraction` declarations, render an empty spec heading.\n\nIf extraction finds values for transformed fields but transform execution cannot normalize them, the use case MUST fail explicitly instead of silently omitting those found values from the rendered fallback content."
+        "When `GetSpecMetadata.execute({ specId })` cannot produce a valid in-memory projection at all, the use case MUST:\n\n1. Emit a `missing-metadata` warning identifying the spec.\n2. Attempt live extraction using the schema's `metadataExtraction` engine, the shared extractor-transform registry, and caller-owned origin context for each artifact.\n3. If extraction yields content, render it with the same section filtering as a materialized projection.\n4. If the schema has no `metadataExtraction` declarations, render an empty spec heading.\n\nIf extraction finds values for transformed fields but transform execution cannot normalize them, the use case MUST fail explicitly instead of silently omitting those found values from the rendered fallback content."
       ]
     },
     {
       "requirement": "Construction dependencies",
       "rules": [
-        "`GetProjectContext` depends on the following ports/services injected via constructor:\n\n- `listWorkspaces` (`ListWorkspaces`) — project orchestrator providing access to configured workspaces\n- `schemaProvider` (`SchemaProvider`) — lazy, caching provider for the fully-resolved schema\n- `files` (`FileReader`) — for reading context entry files from disk\n- `parsers` (`ArtifactParserRegistry`) — for parsing spec artifacts when metadata is stale\n- `hasher` (`ContentHasher`) — for comparing content hashes against metadata\n- `defaultConfig` (`CompileContextConfig`) — yaml-derived project context configuration snapshot baked at kernel composition time\n\nAll dependencies are injected at construction time. The schema is resolved lazily on first access.\n\nAt the start of `execute`, `GetProjectContext` MUST build the effective `CompileContextConfig` by shallow-merging `defaultConfig` with any runtime overrides (`contextMode`, `llmOptimizedContext`) present on the input. Hosts MUST NOT pass yaml-derived configuration on each call."
+        "`GetProjectContext` depends on the following ports/services injected via constructor:\n\n- `listWorkspaces` (`ListWorkspaces`) — project orchestrator providing access to configured workspaces\n- `schemaProvider` (`SchemaProvider`) — lazy, caching provider for the fully-resolved schema\n- `files` (`FileReader`) — for reading context entry files from disk\n- `getMetadata` (`GetSpecMetadata`) — self-healing metadata read used for spec title/description/section content instead of direct content-hash freshness checks\n- `parsers` (`ArtifactParserRegistry`) — for the schema `metadataExtraction` fallback used only when materialization cannot produce a projection at all\n- `defaultConfig` (`CompileContextConfig`) — yaml-derived project context configuration snapshot baked at kernel composition time\n\nAll dependencies are injected at construction time. The schema is resolved lazily on first access.\n\nAt the start of `execute`, `GetProjectContext` MUST build the effective `CompileContextConfig` by shallow-merging `defaultConfig` with any runtime overrides (`contextMode`, `llmOptimizedContext`) present on the input. Hosts MUST NOT pass yaml-derived configuration on each call."
       ]
     },
     {
       "requirement": "Project context optimization and invalidation",
       "rules": [
-        "When `llmOptimizedContext` is enabled, the system MUST prefer using the cached optimized project context from `project-metadata.json` if it is fresh.\n\nWhen `llmOptimizedContext` is disabled, the use case MUST NOT return the cached optimized project context as the primary response, even if the cache is fresh. In that case it MUST continue with the standard compilation flow.\n\nThe system SHALL verify the freshness of the cached context by comparing the stored hashes in `freshness` against the current state of:\n\n- `specd.yaml`\n- Referenced `contextFiles`\n- Metadata of included specs\n\nIf all hashes match and `optimized.context` exists and is not empty, the use case SHALL use the optimized context only when optimization is enabled. Otherwise, the system MUST emit a warning and fall back to the standard compilation process.\n\nThe warning message MUST include remediation instructions: \"Launch specd-project-context-optimizer agent to generate it\"."
+        "When `llmOptimizedContext` is enabled, the system MUST prefer using the cached optimized project context from [`core:project-metadata`](../project-metadata/spec.md) if it is fresh.\n\nWhen `llmOptimizedContext` is disabled, the use case MUST NOT return the cached optimized project context as the primary response, even if the cache is fresh. In that case it MUST continue with the standard compilation flow.\n\nFreshness of the cached optimized project context is derived from semantic metadata fingerprints — `specd.yaml`, referenced `contextFiles`, and the materialized metadata fingerprint of every included spec — rather than from raw cache-file hashes or repository revisions, per [`core:project-metadata`](../project-metadata/spec.md).\n\nIf the cache is fresh and `optimized.context` exists and is not empty, the use case SHALL use the optimized context only when optimization is enabled. Otherwise, the system MUST emit a warning and fall back to the standard compilation process.\n\nThe warning message MUST include remediation instructions: \"Launch specd-project-context-optimizer agent to generate it\"."
       ]
     },
     {
       "requirement": "Config-based factory delegates through resolveGetProjectContextDeps",
       "rules": [
-        "The config-based `createGetProjectContext(config, options?)` form MUST derive `GetProjectContextDeps` through `resolveGetProjectContextDeps(resolver)` and then delegate to canonical `createGetProjectContext(deps)`.\n\n`resolveGetProjectContextDeps(resolver)` MUST resolve:\n\n- `listWorkspaces: ListWorkspaces`\n- `schemaProvider: SchemaProvider`\n- `files: FileReader`\n- `parsers: ArtifactParserRegistry`\n- `hasher: ContentHasher`\n- `extractorTransforms: ExtractorTransformRegistry`\n- `workspaceRoutes: readonly SpecWorkspaceRoute[]`\n- `defaultConfig: CompileContextConfig`\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
+        "The config-based `createGetProjectContext(config, options?)` form MUST derive `GetProjectContextDeps` through `resolveGetProjectContextDeps(resolver)` and then delegate to canonical `createGetProjectContext(deps)`.\n\n`resolveGetProjectContextDeps(resolver)` MUST resolve:\n\n- `listWorkspaces: ListWorkspaces`\n- `schemaProvider: SchemaProvider`\n- `files: FileReader`\n- `getMetadata: GetSpecMetadata`\n- `parsers: ArtifactParserRegistry`\n- `hasher: ContentHasher`\n- `extractorTransforms: ExtractorTransformRegistry`\n- `workspaceRoutes: readonly SpecWorkspaceRoute[]`\n- `defaultConfig: CompileContextConfig`\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
       ]
     }
   ],
@@ -241,33 +243,32 @@
     },
     {
       "requirement": "Supports dependsOn traversal when followDeps is true",
-      "name": "Canonical metadata dependency projection works without extraction",
+      "name": "Materialized dependency projection works without extraction",
       "given": [
-        "an included persisted spec has fresh metadata.json.dependsOn",
+        "an included persisted spec's materialized metadata reports dependsOn",
         "AND the active schema omits metadataExtraction.dependsOn"
       ],
       "when": ["execute is called with followDeps: true"],
-      "then": ["traversal still discovers those dependencies from metadata"]
+      "then": ["traversal still discovers those dependencies from the materialized projection"]
     },
     {
       "requirement": "Supports dependsOn traversal when followDeps is true",
-      "name": "Stale metadata remains distinct from missing metadata",
+      "name": "Self-healed drifted cache remains usable for traversal without falling back",
       "given": [
-        "an included persisted spec has metadata.json.dependsOn",
-        "AND that metadata is marked stale"
+        "an included spec's persisted metadata cache is drifted or stale",
+        "AND GetSpecMetadata successfully regenerates a fresh projection for it"
       ],
       "when": ["execute is called with followDeps: true"],
       "then": [
-        "traversal still sees the persisted dependency projection",
-        "AND the result includes a stale-metadata warning",
-        "AND the use case does not treat that spec as metadata-missing"
+        "traversal uses the regenerated dependsOn projection",
+        "AND the spec is not treated as metadata-missing"
       ]
     },
     {
       "requirement": "Supports dependsOn traversal when followDeps is true",
-      "name": "DependsOn traversal falls back to transform-backed extraction",
+      "name": "DependsOn traversal falls back to transform-backed extraction only when materialization fails",
       "given": [
-        "a spec has no fresh metadata",
+        "materialization cannot produce a projection at all for a spec",
         "AND the schema declares metadataExtraction.dependsOn with a transform such as resolveSpecPath"
       ],
       "when": ["execute is called with followDeps: true"],
@@ -279,16 +280,28 @@
       "requirement": "Supports dependsOn traversal when followDeps is true",
       "name": "DependsOn traversal does not silently drop found dependency values",
       "given": [
-        "extraction finds dependency values for a stale or metadata-less spec",
+        "extraction finds dependency values for a spec whose metadata cannot be materialized",
         "AND transform execution cannot normalize those values"
       ],
       "when": ["execute is called with followDeps: true"],
       "then": ["traversal fails explicitly instead of treating the spec as having no dependencies"]
     },
     {
+      "requirement": "Supports dependsOn traversal when followDeps is true",
+      "name": "Traversal never reads spec-lock.json as a generic artifact",
+      "when": ["dependsOn traversal needs persisted sidecar influence"],
+      "then": [
+        "it consumes that influence only through GetSpecMetadata's normalized projection",
+        "AND it does not read spec-lock.json as a generic spec artifact"
+      ]
+    },
+    {
       "requirement": "Renders spec content from metadata when fresh",
-      "name": "Fresh metadata rendered with all sections in full mode",
-      "given": ["a spec has fresh .specd-metadata.yaml", "AND the effective display mode is full"],
+      "name": "Materialized metadata rendered with all sections in full mode",
+      "given": [
+        "a spec's metadata materializes successfully",
+        "AND the effective display mode is full"
+      ],
       "when": ["execute is called without sections filter"],
       "then": [
         "the spec entry includes Title, Description, Rules, and Constraints (default sections)"
@@ -297,7 +310,10 @@
     {
       "requirement": "Renders spec content from metadata when fresh",
       "name": "Sections filter restricts full output",
-      "given": ["a spec has fresh metadata", "AND the effective display mode is full"],
+      "given": [
+        "a spec's metadata materializes successfully",
+        "AND the effective display mode is full"
+      ],
       "when": ["execute is called with sections: [\"rules\"]"],
       "then": [
         "the spec entry includes Title and Description (header persistence)",
@@ -305,24 +321,34 @@
       ]
     },
     {
-      "requirement": "Falls back to extraction when metadata is stale or absent",
-      "name": "Stale metadata emits warning and falls back",
+      "requirement": "Renders spec content from metadata when fresh",
+      "name": "Materialization warnings forwarded without duplicate logging",
       "given": [
-        "a spec has .specd-metadata.yaml but content hashes do not match current artifacts"
+        "GetSpecMetadata returns a metadata-cache-write-failed or generation warning while still producing usable content for an included spec"
       ],
-      "when": ["execute is called"],
+      "when": ["GetProjectContext renders that spec"],
       "then": [
-        "warnings contains a stale-metadata warning for that spec",
-        "AND the spec's content is rendered via live extraction"
+        "the warning is forwarded into the result's warnings array",
+        "AND it is not logged again by this use case"
+      ]
+    },
+    {
+      "requirement": "Renders spec content from metadata when fresh",
+      "name": "Only rendered specs are materialized",
+      "given": ["contextMode: \"list\" and one or more included specs"],
+      "when": ["GetProjectContext assembles the result"],
+      "then": [
+        "it does not call GetSpecMetadata for those list-mode entries",
+        "AND emitted entries remain list-shaped without title, description, or content"
       ]
     },
     {
       "requirement": "Falls back to extraction when metadata is stale or absent",
-      "name": "No metadata emits warning and falls back",
-      "given": ["a spec has no .specd-metadata.yaml"],
+      "name": "Materialization failure emits missing-metadata warning and falls back to extraction",
+      "given": ["a spec's metadata cannot be materialized at all"],
       "when": ["execute is called"],
       "then": [
-        "warnings contains a stale-metadata warning indicating no metadata exists",
+        "warnings contains a missing-metadata warning for that spec",
         "AND the spec's content is rendered via live extraction if the schema supports it"
       ]
     },
@@ -330,7 +356,7 @@
       "requirement": "Falls back to extraction when metadata is stale or absent",
       "name": "Fallback extraction uses shared transform registry",
       "given": ["the schema declares transforms inside metadataExtraction"],
-      "when": ["GetProjectContext falls back to live extraction for stale or absent metadata"],
+      "when": ["GetProjectContext falls back to live extraction after a materialization failure"],
       "then": [
         "it uses the shared extractor-transform registry and origin context for the artifact being rendered"
       ]
@@ -348,7 +374,9 @@
     {
       "requirement": "Falls back to extraction when metadata is stale or absent",
       "name": "No metadataExtraction in schema yields empty content",
-      "given": ["a spec has no metadata and the schema has no metadataExtraction declarations"],
+      "given": [
+        "a spec's metadata cannot be materialized and the schema has no metadataExtraction declarations"
+      ],
       "when": ["execute is called"],
       "then": ["the spec's content contains only the spec heading with no body"]
     },
@@ -357,7 +385,17 @@
       "name": "Constructor accepts all required ports and default config",
       "when": ["GetProjectContext is instantiated from a resolved SpecdConfig"],
       "then": [
-        "it requires listWorkspaces, schemaProvider, files, parsers, hasher, and a yaml-derived CompileContextConfig default snapshot in its constructor"
+        "it requires listWorkspaces, schemaProvider, files, getMetadata, parsers, and a yaml-derived CompileContextConfig default snapshot in its constructor"
+      ]
+    },
+    {
+      "requirement": "Construction dependencies",
+      "name": "Effective config built via shallow merge of defaults and runtime overrides",
+      "given": ["GetProjectContext was constructed with a baked defaultConfig"],
+      "when": ["execute(input) is called with contextMode or llmOptimizedContext overrides"],
+      "then": [
+        "the effective CompileContextConfig is built by shallow-merging defaultConfig with those overrides",
+        "AND hosts are not required to pass yaml-derived configuration on each call"
       ]
     },
     {
@@ -365,7 +403,7 @@
       "name": "Uses optimized project context when fresh",
       "given": [
         "llmOptimizedContext: true",
-        "AND project-metadata.json exists and all hashes match"
+        "AND project-metadata.json exists and its semantic metadata fingerprints (specd.yaml, referenced contextFiles, and the materialized metadata fingerprint of every included spec) all match current state"
       ],
       "when": ["project context is retrieved"],
       "then": ["the result uses optimized.context"]
@@ -375,7 +413,7 @@
       "name": "Fresh optimized cache is ignored when llmOptimizedContext is disabled",
       "given": [
         "llmOptimizedContext: false",
-        "AND project-metadata.json exists and all hashes match"
+        "AND project-metadata.json exists and is otherwise fresh"
       ],
       "when": ["project context is retrieved"],
       "then": [
@@ -388,13 +426,25 @@
       "name": "Falls back and warns when project context is stale",
       "given": [
         "llmOptimizedContext is enabled",
-        "AND the project context cache is stale or missing (e.g. due to specd.yaml hash mismatch)"
+        "AND the project context cache is stale or missing (e.g. due to a specd.yaml or included-spec fingerprint mismatch)"
       ],
       "when": ["project context is compiled"],
       "then": [
         "it falls back to raw compilation",
         "AND it emits a warning",
         "AND the warning message mentions specd-project-context-optimizer"
+      ]
+    },
+    {
+      "requirement": "Project context optimization and invalidation",
+      "name": "Freshness is derived from semantic fingerprints, not raw cache-file hashes",
+      "given": [
+        "a project-metadata.json cache whose raw file bytes changed but whose specd.yaml, contextFiles, and per-spec materialized metadata fingerprints are unchanged"
+      ],
+      "when": ["project context freshness is evaluated"],
+      "then": [
+        "the cache is still considered fresh",
+        "AND raw cache-file hashes or repository revisions are not used to determine freshness"
       ]
     },
     {
@@ -407,14 +457,19 @@
         "AND resolveGetProjectContextDeps(resolver) resolves:",
         "AND the factory delegates to canonical createGetProjectContext(deps)"
       ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveGetProjectContextDeps",
+      "name": "resolveGetProjectContextDeps wires GetSpecMetadata for self-healing",
+      "when": ["resolveGetProjectContextDeps(resolver) runs"],
+      "then": [
+        "the resolved deps include getMetadata: GetSpecMetadata",
+        "AND it replaces direct content-hash freshness checks for spec title/description/section rendering"
+      ]
     }
   ],
   "implementation": {
     "files": [
-      {
-        "specId": "core:get-project-context",
-        "file": "core:src/composition/use-cases/get-project-context.ts"
-      },
       {
         "specId": "core:get-project-context",
         "file": "core:test/application/use-cases/get-project-context.spec.ts"
@@ -429,8 +484,26 @@
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:70245ef4b0eeab5959cf09aae2ce42e0549131e7d89350ecc5077a2b0ee0aede",
-    "verify.md": "sha256:f7c03a82190fb57fb26e3fb8b3ae26eabfd2b4ae72df380bf19204c920833388"
+    "spec.md": "sha256:5b4716afc05b707976adc452928e2c6aaee435df75506544c727476c5212be34",
+    "verify.md": "sha256:1907f0bfe7f6f7a4cbdae26dbb9b704b02f91731cabc182fa5562d76204453d9"
   },
-  "generatedBy": "core"
+  "provenance": {
+    "artifacts": {
+      "spec.md": {
+        "hash": "sha256:5b4716afc05b707976adc452928e2c6aaee435df75506544c727476c5212be34",
+        "lastModified": "2026-07-25T11:53:31.515Z"
+      },
+      "verify.md": {
+        "hash": "sha256:1907f0bfe7f6f7a4cbdae26dbb9b704b02f91731cabc182fa5562d76204453d9",
+        "lastModified": "2026-07-25T11:53:31.515Z"
+      }
+    },
+    "persistedStateHash": "sha256:10d15b2c7659c5d768c688e80e3098e2de27ea3fedda1a27694c84532bc7d77f",
+    "schema": {
+      "name": "schema-std",
+      "version": 1
+    },
+    "projectionVersion": 1,
+    "projectionFingerprint": "sha256:e4a28a2db6a35ed39b8308518337235b1490c2948cd839db25866ad79b22404b"
+  }
 }

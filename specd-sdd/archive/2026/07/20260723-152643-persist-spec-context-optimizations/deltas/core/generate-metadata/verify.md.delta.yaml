@@ -1,0 +1,181 @@
+# verify.md delta paired with generate-metadata/spec.md.delta.yaml — adds
+# provenance-record coverage to the result, replaces readPersistedDependsOn
+# references with readPersistedState (and covers lock-less live projection),
+# adds coverage for single-snapshot consistency and fresh-only optimization
+# projection, and reflects both in the assembled-result scenarios.
+
+- op: modified
+  description: Add coverage for the provenance record now returned alongside metadata.
+  selector:
+    type: section
+    matches: 'Requirement: Input and output'
+  content: |
+    #### Scenario: execute accepts specId string
+
+    - **WHEN** `GenerateSpecMetadata.execute` is called
+    - **THEN** it accepts a `specId` string parameter (e.g. `'core/change'` or `'billing:invoices/create'`)
+
+    #### Scenario: Returns metadata and hasExtraction flag
+
+    - **WHEN** `GenerateSpecMetadata.execute` completes successfully
+    - **THEN** it returns `{ metadata: SpecMetadata, hasExtraction: boolean }`
+
+    #### Scenario: metadata contains extracted fields and hashes
+
+    - **WHEN** `GenerateSpecMetadata.execute` completes with extraction
+    - **THEN** the returned `metadata` contains fields from `extractMetadata()` plus `contentHashes` and `generatedBy: 'core'`
+
+    #### Scenario: Result includes a provenance record reflecting the exact call state
+
+    - **WHEN** `GenerateSpecMetadata` completes successfully
+    - **THEN** the returned `metadata.provenance` reflects the exact artifact hashes/lastModified, `persistedStateHash`, schema identity, projection version, and projection fingerprint loaded during this call
+    - **AND** `MaterializeSpecMetadata` can reuse it without re-hashing artifact content
+
+- op: modified
+  description: Replace readPersistedDependsOn references with the aggregate readPersistedState, and cover the lock-less live-projection rule.
+  selector:
+    type: section
+    matches: 'Requirement: dependsOn resolution'
+  content: |
+    #### Scenario: Relative spec path resolved during extraction
+
+    - **GIVEN** the current spec origin is workspace `core` and capability path `core/change`
+    - **AND** extraction yields the relative link `../storage/spec.md`
+    - **AND** the schema declares `transform: resolveSpecPath`
+    - **WHEN** `GenerateSpecMetadata` executes extraction
+    - **THEN** the transformed `dependsOn` value is `core:storage`
+    - **AND** no separate post-extraction repair step runs afterward
+
+    #### Scenario: Cross-workspace relative spec path resolves through repository-backed normalization
+
+    - **GIVEN** the current spec origin is workspace `core` and capability path `core/actor-resolver-port`
+    - **AND** extraction yields the relative link `../../_global/architecture/spec.md`
+    - **AND** the registered `resolveSpecPath` runtime uses repository-backed resolution across configured workspaces
+    - **WHEN** `GenerateSpecMetadata` executes extraction
+    - **THEN** the transformed `dependsOn` value is `default:_global/architecture`
+    - **AND** it is not normalized to `core:_global/architecture`
+
+    #### Scenario: Persisted state overrides omitted extracted dependsOn
+
+    - **GIVEN** extraction does not yield `dependsOn`
+    - **AND** `SpecRepository.readPersistedState(spec)` returns a snapshot with `dependsOn: ['core:storage']`
+    - **WHEN** `GenerateSpecMetadata` assembles metadata
+    - **THEN** the returned `metadata.dependsOn` is `['core:storage']`
+
+    #### Scenario: Mismatched extracted and persisted dependencies fail generation
+
+    - **GIVEN** extraction yields `dependsOn: ['core:config']`
+    - **AND** `SpecRepository.readPersistedState(spec)` returns a snapshot with `dependsOn: ['core:storage']`
+    - **WHEN** `GenerateSpecMetadata` executes
+    - **THEN** metadata generation fails explicitly instead of silently choosing one set
+
+    #### Scenario: Lock-less spec derives dependsOn as a live projection of current artifacts
+
+    - **GIVEN** `SpecRepository.readPersistedState(spec)` returns `null` for a lock-less spec
+    - **WHEN** `GenerateSpecMetadata` assembles metadata
+    - **THEN** `metadata.dependsOn` is derived from the current canonical artifacts — the extracted value when extraction yields one, otherwise `[]`
+    - **AND** it is not read from any cached or previously observed value
+
+    #### Scenario: Unresolvable dependency value fails extraction instead of being omitted
+
+    - **GIVEN** extraction yields a `dependsOn` value like `https://example.com`
+    - **AND** the registered transform cannot normalize that value
+    - **WHEN** `GenerateSpecMetadata` executes extraction
+    - **THEN** extraction fails explicitly instead of silently omitting that dependency
+
+    #### Scenario: Canonical spec ID may pass through resolveSpecPath when enabled by args
+
+    - **GIVEN** extraction yields the canonical spec ID `core:storage`
+    - **AND** the schema declares `transform: { name: "resolveSpecPath", args: ["true"] }`
+    - **WHEN** `GenerateSpecMetadata` executes extraction
+    - **THEN** the final `dependsOn` value remains `core:storage`
+
+- op: added
+  description: New scenarios covering the single-read, internally consistent persisted-state observation used for one generation attempt.
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: 'Requirement: dependsOn resolution'
+  content: |
+    ### Requirement: One consistent lock snapshot or explicit absence
+
+    #### Scenario: Single persisted-state read is reused across all dependent fields
+
+    - **GIVEN** a generation attempt that reads persisted state once
+    - **WHEN** `GenerateSpecMetadata` assembles `dependsOn`, `implementation`, `optimizations`, and `provenance.persistedStateHash`
+    - **THEN** all four use that same single `PersistedSpecStateSnapshot` observation (or explicit `null`)
+
+    #### Scenario: Persisted state is not re-read partway through assembly
+
+    - **WHEN** `GenerateSpecMetadata` is executing a single generation attempt
+    - **THEN** it does not call `SpecRepository.readPersistedState(spec)` more than once for that attempt
+
+    #### Scenario: Explicit absence is treated as one consistent observation
+
+    - **GIVEN** `SpecRepository.readPersistedState(spec)` returns `null`
+    - **WHEN** `GenerateSpecMetadata` assembles the result
+    - **THEN** `dependsOn`, `implementation`, and `provenance.persistedStateHash` all reflect that same absence rather than a mix of observations
+
+    #### Scenario: provenance.persistedStateHash uses persistedStateMeta includeHash or snapshot originalHash
+
+    - **GIVEN** a generation attempt with present persisted state
+    - **WHEN** `GenerateSpecMetadata` assembles `provenance.persistedStateHash`
+    - **THEN** the hash is obtained via `persistedStateMeta(..., { includeHash: true })`
+      or the single observation's `originalHash`
+    - **AND** the use case does not call a `persistedStateHash` repository method
+
+- op: added
+  description: New scenarios covering the fresh-only projection rule for lock-owned optimization fields.
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: 'Requirement: One consistent lock snapshot or explicit absence'
+  content: |
+    ### Requirement: Fresh lock-owned optimizations only
+
+    #### Scenario: Fresh optimization field is projected
+
+    - **GIVEN** the persisted `optimizations.optimizedDescription` baseline is fresh against the artifacts and schema loaded during this generation attempt
+    - **WHEN** `GenerateSpecMetadata` assembles metadata
+    - **THEN** `optimizedDescription` is included with its persisted value
+
+    #### Scenario: Stale optimization field is omitted, not fabricated
+
+    - **GIVEN** the persisted `optimizations.optimizedContext` baseline is stale against the artifacts or schema loaded during this generation attempt
+    - **WHEN** `GenerateSpecMetadata` assembles metadata
+    - **THEN** `optimizedContext` is omitted from the generated metadata rather than included with a stale value or placeholder
+
+    #### Scenario: Generation never mutates persisted optimization state
+
+    - **WHEN** `GenerateSpecMetadata` evaluates optimization freshness
+    - **THEN** it does not regenerate, invalidate, or otherwise mutate the persisted `optimizations` block
+    - **AND** it only decides whether to project an existing value
+
+- op: modified
+  description: Cover that the assembled result also includes fresh optimization fields and the provenance record.
+  selector:
+    type: section
+    matches: 'Requirement: Assembled result'
+  content: |
+    #### Scenario: Result includes generatedBy marker
+
+    - **WHEN** `GenerateSpecMetadata` completes successfully with extraction
+    - **THEN** `metadata.generatedBy` is `'core'`
+
+    #### Scenario: Result merges extracted fields and hashes
+
+    - **WHEN** `GenerateSpecMetadata` completes successfully
+    - **THEN** the returned metadata contains both the `extractMetadata()` output fields and `contentHashes`
+    - **AND** `hasExtraction` is `true`
+
+    #### Scenario: Result includes fresh optimization fields and provenance
+
+    - **GIVEN** a generation attempt with a fresh optimizations baseline present
+    - **WHEN** `GenerateSpecMetadata` completes successfully
+    - **THEN** the returned metadata includes the fresh optimization fields, `contentHashes`, and a `provenance` record for this generation attempt

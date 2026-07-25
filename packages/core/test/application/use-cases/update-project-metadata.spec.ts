@@ -6,6 +6,7 @@ import { type SpecRepository } from '../../../src/application/ports/spec-reposit
 import { type FileReader } from '../../../src/application/ports/file-reader.js'
 import { type FileWriter } from '../../../src/application/ports/file-writer.js'
 import { type ContentHasher } from '../../../src/application/ports/content-hasher.js'
+import { type GetSpecMetadata } from '../../../src/application/use-cases/get-spec-metadata.js'
 
 describe('UpdateProjectMetadata', () => {
   it('computes hashes and saves project metadata', async () => {
@@ -48,6 +49,16 @@ describe('UpdateProjectMetadata', () => {
       hash: vi.fn().mockImplementation((c) => `hash(${c})`),
     } as unknown as ContentHasher
 
+    const getMetadata = {
+      execute: vi.fn().mockResolvedValue({
+        metadata: {},
+        metadataFingerprint: 'fp-auth-login',
+        source: 'persisted',
+        regenerated: false,
+        warnings: [],
+      }),
+    } as unknown as GetSpecMetadata
+
     const useCase = new UpdateProjectMetadata(
       config,
       listWorkspaces,
@@ -55,6 +66,7 @@ describe('UpdateProjectMetadata', () => {
       files,
       fileWriter,
       hasher,
+      getMetadata,
     )
 
     const result = await useCase.execute({
@@ -71,7 +83,7 @@ describe('UpdateProjectMetadata', () => {
     expect(savedMetadata.optimized.context).toBe('Optimized Context')
     expect(savedMetadata.freshness.inputs.config.hash).toBe('hash(config content)')
     expect(savedMetadata.freshness.inputs.contextFiles[0].hash).toBe('hash(agents content)')
-    expect(savedMetadata.freshness.inputs.specMetadata[0].hash).toBe('hash(sha256:spec)')
+    expect(savedMetadata.freshness.inputs.specMetadata[0].hash).toBe('fp-auth-login')
     expect(result.path).toBe('/project/.specd/project-metadata.json')
   })
 })

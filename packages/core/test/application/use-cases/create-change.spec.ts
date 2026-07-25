@@ -152,13 +152,17 @@ describe('CreateChange', () => {
       expect(result.change.specDependsOn.get('default:auth/login')).toEqual(['default:shared/auth'])
     })
 
-    it('falls back to metadata for dependencies when sidecar is absent', async () => {
+    it('falls back to persisted state for dependencies when sidecar is absent', async () => {
       const repo = makeChangeRepository()
       const specRepo = makeSpecRepository({
-        specs: [makeSpec({ workspace: 'default', name: 'auth/login', filenames: [] })],
+        specs: [
+          makeSpec({ workspace: 'default', name: 'auth/login', filenames: ['spec-lock.json'] }),
+        ],
         artifacts: {
-          'auth/login/metadata.json': JSON.stringify({
+          'auth/login/spec-lock.json': JSON.stringify({
+            schema: { name: 'specd-std', version: 1 },
             dependsOn: ['default:shared/auth'],
+            implementation: [],
           }),
         },
       })
@@ -174,14 +178,25 @@ describe('CreateChange', () => {
       expect(result.change.specDependsOn.get('default:auth/login')).toEqual(['default:shared/auth'])
     })
 
-    it('still falls back to stale metadata for dependencies when sidecar is absent', async () => {
+    it('still falls back to persisted state for dependencies when metadata cache is stale', async () => {
       const repo = makeChangeRepository()
       const specRepo = makeSpecRepository({
-        specs: [makeSpec({ workspace: 'default', name: 'auth/login', filenames: ['spec.md'] })],
+        specs: [
+          makeSpec({
+            workspace: 'default',
+            name: 'auth/login',
+            filenames: ['spec.md', 'spec-lock.json'],
+          }),
+        ],
         artifacts: {
           'auth/login/spec.md': '# Login flow',
-          'auth/login/metadata.json': JSON.stringify({
+          'auth/login/spec-lock.json': JSON.stringify({
+            schema: { name: 'specd-std', version: 1 },
             dependsOn: ['default:shared/auth'],
+            implementation: [],
+          }),
+          'auth/login/metadata.json': JSON.stringify({
+            dependsOn: ['default:other/dep'],
             contentHashes: { 'spec.md': 'sha256:' + 'a'.repeat(64) },
           }),
         },

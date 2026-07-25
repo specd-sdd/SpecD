@@ -10,11 +10,6 @@ export { createListWorkspaces, type ListWorkspacesDeps } from './list-workspaces
 export { createGetProjectSummary } from './get-project-summary.js'
 export { createSearchSpecs, type SearchSpecsDeps } from './search-specs.js'
 export { createGetSpec, type GetSpecDeps } from './get-spec.js'
-export { createSaveSpecMetadata, type SaveSpecMetadataDeps } from './save-spec-metadata.js'
-export {
-  createInvalidateSpecMetadata,
-  type InvalidateSpecMetadataDeps,
-} from './invalidate-spec-metadata.js'
 export { createGetActiveSchema, type GetActiveSchemaDeps } from './get-active-schema.js'
 export { createGetProjectContext, type GetProjectContextDeps } from './get-project-context.js'
 export { createGetConfig, type GetConfigDeps } from './get-config.js'
@@ -59,6 +54,50 @@ export {
 export { createGetSpecOutline, type GetSpecOutlineDeps } from './get-spec-outline.js'
 export { createValidateSchema, type ValidateSchemaDeps } from './validate-schema.js'
 export { createGenerateSpecMetadata } from './generate-spec-metadata.js'
-export { createUpdateSpecMetadata } from './update-spec-metadata.js'
+export {
+  createMaterializeSpecMetadata,
+  type MaterializeSpecMetadataDeps,
+} from './materialize-spec-metadata.js'
+export { createGetSpecMetadata, type GetSpecMetadataDeps } from './get-spec-metadata.js'
+export {
+  createRegenerateSpecMetadata,
+  type RegenerateSpecMetadataDeps,
+} from './regenerate-spec-metadata.js'
+export {
+  createInitializePersistedSpecState,
+  type InitializePersistedSpecStateDeps,
+} from './initialize-persisted-spec-state.js'
+export {
+  createGetPersistedSpecDeps,
+  type GetPersistedSpecDepsDeps,
+} from './get-persisted-spec-deps.js'
+export {
+  createUpdatePersistedSpecDeps,
+  type UpdatePersistedSpecDepsDeps,
+} from './update-persisted-spec-deps.js'
+export {
+  createGetPersistedSpecImplementation,
+  type GetPersistedSpecImplementationDeps,
+} from './get-persisted-spec-implementation.js'
+export {
+  createUpdatePersistedSpecImplementation,
+  type UpdatePersistedSpecImplementationDeps,
+} from './update-persisted-spec-implementation.js'
+export {
+  createGetPersistedSpecOptimizations,
+  type GetPersistedSpecOptimizationsDeps,
+} from './get-persisted-spec-optimizations.js'
+export {
+  createUpdatePersistedSpecOptimizations,
+  type UpdatePersistedSpecOptimizationsDeps,
+} from './update-persisted-spec-optimizations.js'
+export {
+  createGetPersistedSpecSchema,
+  type GetPersistedSpecSchemaDeps,
+} from './get-persisted-spec-schema.js'
+export {
+  createUpdatePersistedSpecSchema,
+  type UpdatePersistedSpecSchemaDeps,
+} from './update-persisted-spec-schema.js'
 export { createGetProjectMetadata } from './get-project-metadata.js'
 export { createUpdateProjectMetadata } from './update-project-metadata.js'

@@ -9,7 +9,9 @@
     "core:workspace",
     "core:spec-id-format",
     "core:list-workspaces",
-    "core:composition-resolver"
+    "core:composition-resolver",
+    "core:spec-optimization",
+    "core:get-spec-metadata"
   ],
   "context": [
     "AI agents and delivery mechanisms need to understand a spec together with everything it depends on, but dependency chains can be deep and metadata may be stale or missing. The `GetSpecContext` use case builds structured context entries for a single spec, optionally following `dependsOn` links transitively, to assemble the full context needed to understand a spec and its dependency chain. Metadata freshness is checked via SHA-256 content hashes; stale or absent metadata produces a minimal entry."
@@ -24,19 +26,19 @@
     {
       "requirement": "Build context entry from metadata",
       "rules": [
-        "For each resolved spec, the use case SHALL load all artifact files and attempt to read metadata via `SpecRepository.metadata()`. The rendered entry shape SHALL be controlled by the resolved `contextMode`:\n\n- `list` — include only `spec`, `stale`, and mode/source metadata.\n- `summary` — include `spec`, `stale`, title, and description when available.\n- `full` — include `spec`, `stale`, title, description, rules, constraints, and scenarios when available.\n- `hybrid` — equivalent to `full` for a single-spec context command, because there is no change-scoped tier.\n\nWhen metadata exists and content hashes confirm freshness, the entry SHALL render from metadata according to that mode. In full mode, `rules`, `constraints`, and `scenarios` are included when no section filter is active or when the corresponding section is requested."
+        "For each resolved spec, the use case SHALL load all artifact files and obtain usable metadata by calling `GetSpecMetadata.execute({ specId })` (default `'if-needed'` policy) rather than reading `SpecRepository.metadata()` directly. The rendered entry shape SHALL be controlled by the resolved `contextMode`:\n\n- `list` — include only `spec`, `stale`, and mode/source metadata.\n- `summary` — include `spec`, `stale`, title, and description when available.\n- `full` — include `spec`, `stale`, title, description, rules, constraints, and scenarios when available.\n- `hybrid` — equivalent to `full` for a single-spec context command, because there is no change-scoped tier.\n\nWhen materialization succeeds, the entry SHALL render from the returned metadata according to that mode, and `stale` SHALL be `false`. In full mode, `rules`, `constraints`, and `scenarios` are included when no section filter is active or when the corresponding section is requested. Any `metadata-cache-write-failed` or generation warning returned by `GetSpecMetadata` SHALL be forwarded into the result's `warnings` array without being logged again by this use case."
       ]
     },
     {
       "requirement": "Prefer LLM-optimized context",
       "rules": [
-        "If `llmOptimizedContext: true` is active in the project configuration, the use case SHALL prefer `optimizedContext` for the spec if it exists and is not empty. If missing or empty, it SHALL fall back to the standard `context`."
+        "If `llmOptimizedContext: true` is active in the project configuration, the use case SHALL prefer `optimizedContext` for the spec if the materialized metadata reports it as present and fresh. If missing, stale, or empty, it SHALL fall back to the standard `context` and SHALL emit a `stale-optimization` warning identifying the spec, with remediation instructions: \"Launch specd-spec-context-optimizer agent to refresh\".\n\nOptimization freshness is derived from the per-field artifact and schema baselines recorded on the spec's lock-owned optimization state (see [`core:spec-optimization`](../spec-optimization/spec.md)), not from the metadata document's own freshness."
       ]
     },
     {
       "requirement": "Stale or absent metadata produces minimal entry",
       "rules": [
-        "When `SpecRepository.metadata()` returns `null` or content hashes indicate staleness, the use case SHALL emit a stale entry without pretending that full content is available.\n\n- In `list` mode, the entry contains only `spec`, `stale: true`, and mode/source metadata.\n- In `summary`, `full`, and `hybrid` modes, the entry contains `spec`, `stale: true`, and any title or description that can be safely extracted without fresh metadata.\n\nNo rules, constraints, or scenarios SHALL be included from stale metadata."
+        "When `GetSpecMetadata.execute({ specId })` cannot produce a valid in-memory projection (for example the schema declares no `metadataExtraction` and generation yields nothing), the use case SHALL emit a stale entry without pretending that full content is available.\n\n- In `list` mode, the entry contains only `spec`, `stale: true`, and mode/source metadata.\n- In `summary`, `full`, and `hybrid` modes, the entry contains `spec`, `stale: true`, and any title or description that can be safely extracted without a valid materialized projection.\n\nNo rules, constraints, or scenarios SHALL be included when materialization could not produce a projection. This is a materialization failure, not a raw content-hash staleness check — `GetSpecMetadata` already regenerates a missing or drifted cache internally."
       ]
     },
     {
@@ -48,7 +50,7 @@
     {
       "requirement": "Transitive dependency traversal",
       "rules": [
-        "When `input.followDeps` is `true`, the use case SHALL traverse dependencies transitively. For each unvisited spec identity:\n\n1. Resolve the canonical dependency list from `metadata.json.dependsOn` when persisted metadata is available.\n2. If metadata is missing, MAY fall back to the schema's `metadataExtraction.dependsOn` declarations when the schema provides them.\n3. If metadata exists but is stale, the use case MAY continue using its persisted `dependsOn` projection for traversal, but it MUST emit a `stale-metadata` warning for that spec.\n4. If neither canonical metadata nor extraction yields dependencies, treat the spec as having no outgoing dependencies.\n\nTraversal SHALL use DFS with cycle detection."
+        "When `input.followDeps` is `true`, the use case SHALL traverse dependencies transitively. For each unvisited spec identity:\n\n1. Resolve the canonical dependency list from the metadata returned by `GetSpecMetadata.execute({ specId })` — this is self-healing, so a missing or stale cache is regenerated rather than treated as a frozen stale snapshot.\n2. If materialization cannot produce a projection at all, MAY fall back to the schema's `metadataExtraction.dependsOn` declarations when the schema provides them.\n3. If neither materialized metadata nor extraction yields dependencies, treat the spec as having no outgoing dependencies.\n\nTraversal SHALL use DFS with cycle detection."
       ]
     },
     {
@@ -60,7 +62,7 @@
     {
       "requirement": "Warnings for unresolvable dependencies",
       "rules": [
-        "During dependency traversal, the use case SHALL emit warnings (not throw) for:\n\n- Missing metadata on the current spec during traversal — `type: 'missing-metadata'`.\n- Unknown workspace referenced in a dependency — `type: 'unknown-workspace'`.\n- Dependency spec not found in its workspace — `type: 'missing-spec'`.\n- Stale metadata on any resolved entry whose persisted dependency projection is still being used — `type: 'stale-metadata'`.\n\nWarnings MUST be collected in the result's `warnings` array and MUST NOT interrupt traversal.\n\nThe use case MUST NOT read `spec-lock.json` through generic artifact access in order to continue traversal. Persisted sidecars influence traversal only through repository semantic state that has already been projected into metadata."
+        "During dependency traversal, the use case SHALL emit warnings (not throw) for:\n\n- Materialization unable to produce a usable projection for the current spec during traversal — `type: 'missing-metadata'`.\n- Unknown workspace referenced in a dependency — `type: 'unknown-workspace'`.\n- Dependency spec not found in its workspace — `type: 'missing-spec'`.\n- Stale or missing lock-owned optimization fields on any resolved entry, when `llmOptimizedContext` is active — `type: 'stale-optimization'`.\n\nWarnings MUST be collected in the result's `warnings` array and MUST NOT interrupt traversal.\n\nThe use case MUST NOT read `spec-lock.json` through generic artifact access in order to continue traversal. Persisted sidecars influence traversal only through `GetSpecMetadata`'s normalized projection."
       ]
     },
     {
@@ -72,7 +74,7 @@
     {
       "requirement": "Config-based factory delegates through resolveGetSpecContextDeps",
       "rules": [
-        "The config-based `createGetSpecContext(config, options?)` form MUST derive `GetSpecContextDeps` through `resolveGetSpecContextDeps(resolver)` and then delegate to canonical `createGetSpecContext(deps)`.\n\n`resolveGetSpecContextDeps(resolver)` MUST resolve:\n\n- `listWorkspaces: ListWorkspaces`\n- `hasher: ContentHasher`\n- `schemaProvider?: SchemaProvider`\n- `parsers?: ArtifactParserRegistry`\n- `extractorTransforms: ExtractorTransformRegistry`\n- `workspaceRoutes: readonly SpecWorkspaceRoute[]`\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
+        "The config-based `createGetSpecContext(config, options?)` form MUST derive `GetSpecContextDeps` through `resolveGetSpecContextDeps(resolver)` and then delegate to canonical `createGetSpecContext(deps)`.\n\n`resolveGetSpecContextDeps(resolver)` MUST resolve:\n\n- `listWorkspaces: ListWorkspaces`\n- `hasher: ContentHasher`\n- `getMetadata: GetSpecMetadata`\n- `schemaProvider?: SchemaProvider`\n- `parsers?: ArtifactParserRegistry`\n- `extractorTransforms: ExtractorTransformRegistry`\n- `workspaceRoutes: readonly SpecWorkspaceRoute[]`\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
       ]
     }
   ],
@@ -104,9 +106,9 @@
     },
     {
       "requirement": "Build context entry from metadata",
-      "name": "Full mode produces full entry from fresh metadata",
+      "name": "Full mode produces full entry when materialization succeeds",
       "given": [
-        "a spec with fresh metadata containing title, description, rules, constraints, and scenarios",
+        "a spec whose materialized metadata contains title, description, rules, constraints, and scenarios",
         "AND effective context mode is full"
       ],
       "when": ["execute(input) is called without section filters"],
@@ -116,9 +118,9 @@
     },
     {
       "requirement": "Build context entry from metadata",
-      "name": "Summary mode produces summary entry from fresh metadata",
+      "name": "Summary mode produces summary entry when materialization succeeds",
       "given": [
-        "a spec with fresh metadata containing title and description",
+        "a spec whose materialized metadata contains title and description",
         "AND effective context mode is summary"
       ],
       "when": ["execute(input) is called"],
@@ -126,8 +128,11 @@
     },
     {
       "requirement": "Build context entry from metadata",
-      "name": "List mode produces list entry from fresh metadata",
-      "given": ["a spec with fresh metadata", "AND effective context mode is list"],
+      "name": "List mode produces list entry when materialization succeeds",
+      "given": [
+        "a spec whose metadata materializes successfully",
+        "AND effective context mode is list"
+      ],
       "when": ["execute(input) is called"],
       "then": [
         "the entry includes identity/mode fields but no title, description, rules, constraints, or scenarios"
@@ -136,23 +141,57 @@
     {
       "requirement": "Build context entry from metadata",
       "name": "Full mode defaults to Description + Rules + Constraints",
-      "given": ["a spec with fresh metadata", "AND effective context mode is full"],
+      "given": [
+        "a spec whose metadata materializes successfully",
+        "AND effective context mode is full"
+      ],
       "when": ["GetSpecContext.execute is called without section filters"],
       "then": ["the entry includes Title, Description, Rules, and Constraints"]
     },
     {
+      "requirement": "Build context entry from metadata",
+      "name": "Materialization warnings are forwarded without duplicate logging",
+      "given": [
+        "GetSpecMetadata returns a metadata-cache-write-failed or generation warning while still producing usable content"
+      ],
+      "when": ["GetSpecContext builds the entry for that spec"],
+      "then": [
+        "the warning is forwarded into the result's warnings array",
+        "AND it is not logged again by this use case"
+      ]
+    },
+    {
       "requirement": "Stale or absent metadata produces minimal entry",
-      "name": "No metadata yields stale list entry in list mode",
-      "given": ["a spec with no metadata", "AND effective context mode is list"],
+      "name": "Materialization failure yields stale list entry in list mode",
+      "given": [
+        "GetSpecMetadata cannot produce a valid projection for the spec",
+        "AND effective context mode is list"
+      ],
       "when": ["execute(input) is called"],
       "then": ["the entry is stale and includes only minimal list-shape fields"]
     },
     {
       "requirement": "Stale or absent metadata produces minimal entry",
-      "name": "Stale hashes yield stale summary/full-compatible entry",
-      "given": ["a spec with metadata whose content hashes do not match current files"],
+      "name": "Materialization failure yields stale summary/full-compatible entry",
+      "given": [
+        "GetSpecMetadata cannot produce a valid projection for the spec",
+        "AND effective context mode is summary, full, or hybrid"
+      ],
       "when": ["execute(input) is called"],
-      "then": ["the entry is stale", "AND a warning of type 'stale-metadata' is emitted"]
+      "then": [
+        "the entry is stale: true and contains only spec, stale, and any title/description safely extracted without a valid projection",
+        "AND no rules, constraints, or scenarios are included"
+      ]
+    },
+    {
+      "requirement": "Stale or absent metadata produces minimal entry",
+      "name": "Self-healed content-hash drift does not produce a stale entry",
+      "given": [
+        "a spec's persisted metadata content hashes no longer match current files",
+        "AND GetSpecMetadata successfully regenerates a fresh projection for it"
+      ],
+      "when": ["execute(input) is called"],
+      "then": ["the entry is not stale — materialization already self-healed the drifted cache"]
     },
     {
       "requirement": "Section filtering",
@@ -177,15 +216,17 @@
     {
       "requirement": "Transitive dependency traversal",
       "name": "Dependencies resolved recursively",
-      "given": ["spec A depends on spec B, which depends on spec C, all with fresh metadata"],
+      "given": [
+        "spec A depends on spec B, which depends on spec C, all materializing successfully"
+      ],
       "when": ["execute({ ..., followDeps: true }) is called on spec A"],
       "then": ["entries contains A, B, and C in that order"]
     },
     {
       "requirement": "Transitive dependency traversal",
-      "name": "Canonical metadata dependsOn works without extraction",
+      "name": "Materialized metadata dependsOn works without extraction",
       "given": [
-        "the root spec has fresh metadata.json.dependsOn: ['default:B']",
+        "the root spec's materialized metadata reports dependsOn: ['default:B']",
         "AND the active schema omits metadataExtraction.dependsOn"
       ],
       "when": ["execute({ ..., followDeps: true }) is called"],
@@ -193,15 +234,15 @@
     },
     {
       "requirement": "Transitive dependency traversal",
-      "name": "Stale metadata remains usable for dependency traversal with warning",
+      "name": "Extraction fallback used only when materialization produces no projection at all",
       "given": [
-        "the root spec has persisted metadata.json.dependsOn: ['default:B']",
-        "AND that metadata is marked stale"
+        "the root spec's metadata cannot be materialized at all",
+        "AND the schema declares metadataExtraction.dependsOn"
       ],
       "when": ["execute({ ..., followDeps: true }) is called"],
       "then": [
-        "dependency traversal still includes spec B",
-        "AND the result includes a stale-metadata warning"
+        "dependency traversal falls back to schema-extracted dependsOn",
+        "AND a missing-metadata warning is emitted for that spec"
       ]
     },
     {
@@ -259,10 +300,32 @@
     },
     {
       "requirement": "Warnings for unresolvable dependencies",
-      "name": "Missing metadata during traversal emits warning",
-      "given": ["a dependency spec with no metadata"],
+      "name": "Materialization failure during traversal emits warning",
+      "given": ["a dependency spec whose metadata cannot be materialized"],
       "when": ["dependency traversal reaches that spec"],
       "then": ["warnings contains an entry with type: 'missing-metadata'"]
+    },
+    {
+      "requirement": "Warnings for unresolvable dependencies",
+      "name": "Stale or missing optimization on a resolved entry emits warning during traversal",
+      "given": [
+        "llmOptimizedContext is active",
+        "AND a resolved entry's lock-owned optimizedContext baseline is stale or missing"
+      ],
+      "when": ["dependency traversal resolves that entry"],
+      "then": [
+        "warnings contains an entry with type: 'stale-optimization'",
+        "AND traversal continues"
+      ]
+    },
+    {
+      "requirement": "Warnings for unresolvable dependencies",
+      "name": "Traversal never reads spec-lock.json through generic artifact access",
+      "when": ["dependency traversal needs persisted sidecar influence"],
+      "then": [
+        "it obtains that influence only through GetSpecMetadata's normalized projection",
+        "AND it does not read spec-lock.json through generic artifact access"
+      ]
     },
     {
       "requirement": "Result shape",
@@ -273,9 +336,36 @@
     {
       "requirement": "Prefer LLM-optimized context",
       "name": "Uses optimized context for single spec",
-      "given": ["llmOptimizedContext: true", "AND the spec has optimizedContext populated"],
+      "given": [
+        "llmOptimizedContext: true",
+        "AND the materialized metadata reports optimizedContext as present and fresh"
+      ],
       "when": ["GetSpecContext is executed"],
       "then": ["the entry uses the optimized content"]
+    },
+    {
+      "requirement": "Prefer LLM-optimized context",
+      "name": "Falls back to standard context and warns when optimization is stale or missing",
+      "given": [
+        "llmOptimizedContext: true",
+        "AND the spec's lock-owned optimizedContext baseline is stale, missing, or empty"
+      ],
+      "when": ["GetSpecContext is executed"],
+      "then": [
+        "the entry uses the standard context",
+        "AND a stale-optimization warning identifying the spec is emitted with remediation instructions mentioning specd-spec-context-optimizer"
+      ]
+    },
+    {
+      "requirement": "Prefer LLM-optimized context",
+      "name": "Optimization freshness is derived from lock-owned baselines, not metadata document freshness",
+      "given": [
+        "a spec's metadata document is otherwise fresh but its lock-owned optimizedContext baseline is stale against current artifacts or schema identity"
+      ],
+      "when": ["GetSpecContext evaluates whether to use optimized context"],
+      "then": [
+        "it treats optimizedContext as stale based on the per-field lock-owned baseline, not the metadata document's own freshness"
+      ]
     },
     {
       "requirement": "Config-based factory delegates through resolveGetSpecContextDeps",
@@ -287,19 +377,38 @@
         "AND resolveGetSpecContextDeps(resolver) resolves:",
         "AND the factory delegates to canonical createGetSpecContext(deps)"
       ]
+    },
+    {
+      "requirement": "Config-based factory delegates through resolveGetSpecContextDeps",
+      "name": "resolveGetSpecContextDeps wires GetSpecMetadata for self-healing",
+      "when": ["resolveGetSpecContextDeps(resolver) runs"],
+      "then": [
+        "the resolved deps include getMetadata: GetSpecMetadata",
+        "AND it is used instead of a direct SpecRepository.metadata() freshness check"
+      ]
     }
   ],
-  "implementation": {
-    "files": [
-      {
-        "specId": "core:get-spec-context",
-        "file": "core:src/composition/use-cases/get-spec-context.ts"
-      }
-    ]
-  },
   "contentHashes": {
-    "spec.md": "sha256:d43ffcc2ba94352510a2c9cc9c4b049904f6c66e591a796499ebbba262fbc2a0",
-    "verify.md": "sha256:e983a07cb0592d275cf3f0d5c8cab0785f22717781cbccdf8f380306956e6fbe"
+    "spec.md": "sha256:a853877a08f394bbd87a585ac933fe108f51fcd355ac7fd7908430bd099e44a1",
+    "verify.md": "sha256:5c262522a03378c0f1469b5766fb0505f25912457175c30847a9320a875691f0"
   },
-  "generatedBy": "core"
+  "provenance": {
+    "artifacts": {
+      "spec.md": {
+        "hash": "sha256:a853877a08f394bbd87a585ac933fe108f51fcd355ac7fd7908430bd099e44a1",
+        "lastModified": "2026-07-25T11:53:31.198Z"
+      },
+      "verify.md": {
+        "hash": "sha256:5c262522a03378c0f1469b5766fb0505f25912457175c30847a9320a875691f0",
+        "lastModified": "2026-07-25T11:53:31.199Z"
+      }
+    },
+    "persistedStateHash": "sha256:aa018b22baa680c4fad68eaf8b1bf405dd0ed4fdd8503461f7039c34103cfa20",
+    "schema": {
+      "name": "schema-std",
+      "version": 1
+    },
+    "projectionVersion": 1,
+    "projectionFingerprint": "sha256:e4a28a2db6a35ed39b8308518337235b1490c2948cd839db25866ad79b22404b"
+  }
 }

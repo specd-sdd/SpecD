@@ -35,6 +35,17 @@
 - **WHEN** importing from `@specd/sdk`
 - **THEN** `createGetStatus` and `createSpecRepository` are available
 
+#### Scenario: SDK tracks revised metadata materialization surface
+
+- **WHEN** importing from `@specd/sdk`
+- **THEN** `MaterializeSpecMetadata`, `GetSpecMetadata`, `RegenerateSpecMetadata`, `InitializePersistedSpecState`, and their `create*` factories are available
+
+#### Scenario: SDK does not restore removed metadata mutation APIs
+
+- **WHEN** importing from `@specd/sdk`
+- **THEN** `SaveSpecMetadata`, `UpdateSpecMetadata`, `InvalidateSpecMetadata`, `createSaveSpecMetadata`, `createUpdateSpecMetadata`, and `createInvalidateSpecMetadata` are not exported
+- **AND** `PersistSpecMetadata` is not exported
+
 #### Scenario: SDK ports subpath re-exports core ports
 
 - **WHEN** importing `ChangeRepository` from `@specd/sdk/ports`

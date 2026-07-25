@@ -16,27 +16,29 @@ The use case SHALL resolve the requested spec by first obtaining the correspondi
 
 ### Requirement: Build context entry from metadata
 
-For each resolved spec, the use case SHALL load all artifact files and attempt to read metadata via `SpecRepository.metadata()`. The rendered entry shape SHALL be controlled by the resolved `contextMode`:
+For each resolved spec, the use case SHALL load all artifact files and obtain usable metadata by calling `GetSpecMetadata.execute({ specId })` (default `'if-needed'` policy) rather than reading `SpecRepository.metadata()` directly. The rendered entry shape SHALL be controlled by the resolved `contextMode`:
 
 - `list` — include only `spec`, `stale`, and mode/source metadata.
 - `summary` — include `spec`, `stale`, title, and description when available.
 - `full` — include `spec`, `stale`, title, description, rules, constraints, and scenarios when available.
 - `hybrid` — equivalent to `full` for a single-spec context command, because there is no change-scoped tier.
 
-When metadata exists and content hashes confirm freshness, the entry SHALL render from metadata according to that mode. In full mode, `rules`, `constraints`, and `scenarios` are included when no section filter is active or when the corresponding section is requested.
+When materialization succeeds, the entry SHALL render from the returned metadata according to that mode, and `stale` SHALL be `false`. In full mode, `rules`, `constraints`, and `scenarios` are included when no section filter is active or when the corresponding section is requested. Any `metadata-cache-write-failed` or generation warning returned by `GetSpecMetadata` SHALL be forwarded into the result's `warnings` array without being logged again by this use case.
 
 ### Requirement: Prefer LLM-optimized context
 
-If `llmOptimizedContext: true` is active in the project configuration, the use case SHALL prefer `optimizedContext` for the spec if it exists and is not empty. If missing or empty, it SHALL fall back to the standard `context`.
+If `llmOptimizedContext: true` is active in the project configuration, the use case SHALL prefer `optimizedContext` for the spec if the materialized metadata reports it as present and fresh. If missing, stale, or empty, it SHALL fall back to the standard `context` and SHALL emit a `stale-optimization` warning identifying the spec, with remediation instructions: "Launch specd-spec-context-optimizer agent to refresh".
+
+Optimization freshness is derived from the per-field artifact and schema baselines recorded on the spec's lock-owned optimization state (see [`core:spec-optimization`](../spec-optimization/spec.md)), not from the metadata document's own freshness.
 
 ### Requirement: Stale or absent metadata produces minimal entry
 
-When `SpecRepository.metadata()` returns `null` or content hashes indicate staleness, the use case SHALL emit a stale entry without pretending that full content is available.
+When `GetSpecMetadata.execute({ specId })` cannot produce a valid in-memory projection (for example the schema declares no `metadataExtraction` and generation yields nothing), the use case SHALL emit a stale entry without pretending that full content is available.
 
 - In `list` mode, the entry contains only `spec`, `stale: true`, and mode/source metadata.
-- In `summary`, `full`, and `hybrid` modes, the entry contains `spec`, `stale: true`, and any title or description that can be safely extracted without fresh metadata.
+- In `summary`, `full`, and `hybrid` modes, the entry contains `spec`, `stale: true`, and any title or description that can be safely extracted without a valid materialized projection.
 
-No rules, constraints, or scenarios SHALL be included from stale metadata.
+No rules, constraints, or scenarios SHALL be included when materialization could not produce a projection. This is a materialization failure, not a raw content-hash staleness check — `GetSpecMetadata` already regenerates a missing or drifted cache internally.
 
 ### Requirement: Section filtering
 
@@ -48,10 +50,9 @@ Section filters MUST have no effect in `list` or `summary` modes. Those modes co
 
 When `input.followDeps` is `true`, the use case SHALL traverse dependencies transitively. For each unvisited spec identity:
 
-1. Resolve the canonical dependency list from `metadata.json.dependsOn` when persisted metadata is available.
-2. If metadata is missing, MAY fall back to the schema's `metadataExtraction.dependsOn` declarations when the schema provides them.
-3. If metadata exists but is stale, the use case MAY continue using its persisted `dependsOn` projection for traversal, but it MUST emit a `stale-metadata` warning for that spec.
-4. If neither canonical metadata nor extraction yields dependencies, treat the spec as having no outgoing dependencies.
+1. Resolve the canonical dependency list from the metadata returned by `GetSpecMetadata.execute({ specId })` — this is self-healing, so a missing or stale cache is regenerated rather than treated as a frozen stale snapshot.
+2. If materialization cannot produce a projection at all, MAY fall back to the schema's `metadataExtraction.dependsOn` declarations when the schema provides them.
+3. If neither materialized metadata nor extraction yields dependencies, treat the spec as having no outgoing dependencies.
 
 Traversal SHALL use DFS with cycle detection.
 
@@ -63,14 +64,14 @@ When `input.depth` is provided and `followDeps` is `true`, the use case MUST NOT
 
 During dependency traversal, the use case SHALL emit warnings (not throw) for:
 
-- Missing metadata on the current spec during traversal — `type: 'missing-metadata'`.
+- Materialization unable to produce a usable projection for the current spec during traversal — `type: 'missing-metadata'`.
 - Unknown workspace referenced in a dependency — `type: 'unknown-workspace'`.
 - Dependency spec not found in its workspace — `type: 'missing-spec'`.
-- Stale metadata on any resolved entry whose persisted dependency projection is still being used — `type: 'stale-metadata'`.
+- Stale or missing lock-owned optimization fields on any resolved entry, when `llmOptimizedContext` is active — `type: 'stale-optimization'`.
 
 Warnings MUST be collected in the result's `warnings` array and MUST NOT interrupt traversal.
 
-The use case MUST NOT read `spec-lock.json` through generic artifact access in order to continue traversal. Persisted sidecars influence traversal only through repository semantic state that has already been projected into metadata.
+The use case MUST NOT read `spec-lock.json` through generic artifact access in order to continue traversal. Persisted sidecars influence traversal only through `GetSpecMetadata`'s normalized projection.
 
 ### Requirement: Result shape
 
@@ -89,6 +90,7 @@ The config-based `createGetSpecContext(config, options?)` form MUST derive `GetS
 
 - `listWorkspaces: ListWorkspaces`
 - `hasher: ContentHasher`
+- `getMetadata: GetSpecMetadata`
 - `schemaProvider?: SchemaProvider`
 - `parsers?: ArtifactParserRegistry`
 - `extractorTransforms: ExtractorTransformRegistry`
@@ -112,4 +114,6 @@ The helper is the only use-case-specific composition entry for config-based boot
 - [`core:workspace`](../workspace/spec.md)
 - [`core:spec-id-format`](../spec-id-format/spec.md)
 - [`core:list-workspaces`](../list-workspaces/spec.md)
+- [`core:get-spec-metadata`](../get-spec-metadata/spec.md) — self-healing metadata read (`if-needed`) replacing direct repository freshness checks
+- [`core:spec-optimization`](../spec-optimization/spec.md) — per-field optimization freshness backing stale/missing optimization diagnostics
 - [`core:composition-resolver`](../composition-resolver/spec.md)

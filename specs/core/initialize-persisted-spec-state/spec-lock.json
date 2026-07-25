@@ -1,0 +1,18 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "core:spec-repository-port",
+    "core:spec-lock",
+    "core:schema-format",
+    "core:get-active-schema",
+    "core:content-extraction",
+    "core:list-workspaces",
+    "core:spec-id-format",
+    "core:composition-resolver",
+    "core:generate-metadata"
+  ],
+  "implementation": []
+}

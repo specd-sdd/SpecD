@@ -1,0 +1,171 @@
+{
+  "title": "cli:spec-schema",
+  "description": "Changing the schema of an already-initialized spec is a deliberate, guarded decision distinct from initial adoption, so it needs its own inspection and mutation surface. `specd specs schema` is the CLI command group that reads the schema identity recorded in a spec's persisted state and explicitly reassigns it to a compatible resolved schema, by delegating entirely to the corresponding Core use cases.",
+  "dependsOn": [
+    "core:get-persisted-spec-schema",
+    "core:update-persisted-spec-schema",
+    "cli:entrypoint"
+  ],
+  "context": [
+    "Changing the schema of an already-initialized spec is a deliberate, guarded decision distinct from initial adoption, so it needs its own inspection and mutation surface. `specd specs schema` is the CLI command group that reads the schema identity recorded in a spec's persisted state and explicitly reassigns it to a compatible resolved schema, by delegating entirely to the corresponding Core use cases."
+  ],
+  "rules": [
+    {
+      "requirement": "Command signature",
+      "rules": [
+        "```\nspecs schema get <spec-id>\nspecs schema set <spec-id> --schema <schema-ref>\n```\n\nBoth subcommands accept `--format text|json|toon` (default `text`) per [`cli:entrypoint`](../entrypoint/spec.md). `--schema` is required on `set`."
+      ]
+    },
+    {
+      "requirement": "Get subcommand",
+      "rules": [
+        "`specs schema get <spec-id>` MUST call `Kernel.specs.getPersistedSchema` and print the resulting `{ name, version }` schema identity.\n\nWhen the spec has no persisted state, the command MUST propagate `SpecNotInitializedError` as an exit-code-1 failure rather than printing a default or empty schema identity."
+      ]
+    },
+    {
+      "requirement": "Set subcommand",
+      "rules": [
+        "`specs schema set <spec-id> --schema <schema-ref>` MUST call `Kernel.specs.updatePersistedSchema` with the given `schemaRef`, and print the resulting schema identity and persisted `dependsOn` list, including whether the operation was a no-op (`changed: false`) because the target schema equaled the currently persisted schema.\n\n`set` MUST require an existing lock; it MUST NOT create one. When the spec has no persisted state, the command MUST propagate `SpecNotInitializedError`."
+      ]
+    },
+    {
+      "requirement": "No repeated CLI-owned reassignment logic",
+      "rules": [
+        "This command group MUST NOT resolve schema references, parse artifacts under a candidate schema, extract or compare dependencies, or write persisted state itself. Every decision MUST be delegated to `Kernel.specs.getPersistedSchema` / `Kernel.specs.updatePersistedSchema`."
+      ]
+    },
+    {
+      "requirement": "Error mapping",
+      "rules": [
+        "`SpecNotFoundError` MUST map to exit code 1 with an `error:` message naming the unresolved spec. `SpecNotInitializedError` MUST map to exit code 1 with an `error:` message instructing the user to run `specs init` first. `PersistedSchemaDependencyConflictError` MUST map to exit code 1 with an `error:` message showing both the current and extracted dependency lists, and MUST instruct the user to reconcile dependencies explicitly through `specs deps` rather than retrying the schema change. `ArtifactConflictError` MUST map to exit code 1 with an `error:` message indicating a concurrent modification. `ReadOnlyWorkspaceError` MUST map to exit code 1 without suggesting a configuration workaround."
+      ]
+    }
+  ],
+  "constraints": [
+    "specs schema set never fabricates or discards implementation links or optimization values; it only changes schema and, when required by extraction compatibility, leaves dependsOn unchanged",
+    "specs schema set is the only supported path for changing an initialized spec's persisted schema identity; there is no implicit reassignment through specs init or any mutation command",
+    "Every leaf subcommand calls .allowExcessArguments(false)"
+  ],
+  "scenarios": [
+    {
+      "requirement": "Command signature",
+      "name": "--schema is required on set",
+      "when": ["specd specs schema set core:auth/login is run without --schema"],
+      "then": ["the command exits with a usage error indicating --schema is required"]
+    },
+    {
+      "requirement": "Get subcommand",
+      "name": "Get prints the persisted schema identity",
+      "given": ["persisted state with schema: { name: 'default', version: 1 }"],
+      "when": ["specd specs schema get core:auth/login is run"],
+      "then": ["the output shows name: default and version: 1"]
+    },
+    {
+      "requirement": "Get subcommand",
+      "name": "Get on an uninitialized spec propagates SpecNotInitializedError",
+      "given": ["a spec with no persisted state"],
+      "when": ["specd specs schema get core:auth/login is run"],
+      "then": [
+        "the command exits with code 1",
+        "AND the command does not print a default or empty schema identity"
+      ]
+    },
+    {
+      "requirement": "Set subcommand",
+      "name": "Set prints the resulting schema identity and dependsOn",
+      "given": ["persisted state with schema: { name: 'default', version: 1 }"],
+      "when": ["specd specs schema set core:auth/login --schema other@2 is run"],
+      "then": ["the output shows the new schema identity and the resulting dependsOn list"]
+    },
+    {
+      "requirement": "Set subcommand",
+      "name": "Set reports a no-op when the target schema equals the current schema",
+      "given": ["persisted state with schema: { name: 'default', version: 1 }"],
+      "when": ["specd specs schema set core:auth/login --schema default@1 is run"],
+      "then": ["the output indicates changed: false"]
+    },
+    {
+      "requirement": "Set subcommand",
+      "name": "Set on an uninitialized spec propagates SpecNotInitializedError rather than creating one",
+      "given": ["a spec with no persisted state"],
+      "when": ["specd specs schema set core:auth/login --schema default@1 is run"],
+      "then": ["the command exits with code 1", "AND no persisted state is created"]
+    },
+    {
+      "requirement": "No repeated CLI-owned reassignment logic",
+      "name": "Handler delegates resolution, parsing, and dependency comparison to Core",
+      "when": ["specd specs schema set core:auth/login --schema other@2 is run"],
+      "then": [
+        "the handler performs exactly one call to Kernel.specs.updatePersistedSchema",
+        "AND the handler does not resolve schema references, parse artifacts, or extract/compare dependencies itself"
+      ]
+    },
+    {
+      "requirement": "Error mapping",
+      "name": "Unknown spec maps to exit code 1",
+      "when": ["specd specs schema get core:unknown/spec is run"],
+      "then": ["the command exits with code 1", "AND stderr names the unresolved spec"]
+    },
+    {
+      "requirement": "Error mapping",
+      "name": "Uninitialized spec instructs the user to run specs init",
+      "given": ["a spec with no persisted state"],
+      "when": ["specd specs schema get core:auth/login is run"],
+      "then": [
+        "the command exits with code 1",
+        "AND stderr instructs the user to run specs init first"
+      ]
+    },
+    {
+      "requirement": "Error mapping",
+      "name": "Dependency conflict shows both dependency lists and instructs specs deps",
+      "given": ["a target schema whose extracted dependencies differ from the persisted dependsOn"],
+      "when": ["specd specs schema set core:auth/login --schema other@2 is run"],
+      "then": [
+        "the command exits with code 1",
+        "AND stderr shows both the current and extracted dependency lists",
+        "AND stderr instructs the user to reconcile dependencies explicitly through specs deps rather than retrying the schema change"
+      ]
+    },
+    {
+      "requirement": "Error mapping",
+      "name": "Concurrent modification maps to exit code 1",
+      "given": ["ArtifactConflictError is thrown by the use case"],
+      "when": ["specd specs schema set core:auth/login --schema other@2 is run"],
+      "then": ["the command exits with code 1", "AND stderr indicates a concurrent modification"]
+    },
+    {
+      "requirement": "Error mapping",
+      "name": "Read-only workspace maps to exit code 1 without a configuration workaround",
+      "given": ["the spec's workspace is readOnly"],
+      "when": ["specd specs schema set core:auth/login --schema other@2 is run"],
+      "then": [
+        "the command exits with code 1",
+        "AND stderr does not suggest a configuration workaround"
+      ]
+    }
+  ],
+  "contentHashes": {
+    "spec.md": "sha256:6773eb34fff1eaa0d246f1d1c06099f81bcac7342cb24a4ba3ec9a4f49fa24bb",
+    "verify.md": "sha256:6f276f295bc557038769a7666a8560de448e07e1ccb7b99866f343c4c80872af"
+  },
+  "provenance": {
+    "artifacts": {
+      "spec.md": {
+        "hash": "sha256:6773eb34fff1eaa0d246f1d1c06099f81bcac7342cb24a4ba3ec9a4f49fa24bb",
+        "lastModified": "2026-07-25T11:53:31.842Z"
+      },
+      "verify.md": {
+        "hash": "sha256:6f276f295bc557038769a7666a8560de448e07e1ccb7b99866f343c4c80872af",
+        "lastModified": "2026-07-25T11:53:31.843Z"
+      }
+    },
+    "persistedStateHash": "sha256:9b294c65b5c27e4be1ef91bc13dd310fbd572da6e7d50c2731d0203f60520819",
+    "schema": {
+      "name": "schema-std",
+      "version": 1
+    },
+    "projectionVersion": 1,
+    "projectionFingerprint": "sha256:e4a28a2db6a35ed39b8308518337235b1490c2948cd839db25866ad79b22404b"
+  }
+}

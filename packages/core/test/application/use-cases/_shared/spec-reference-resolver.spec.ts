@@ -9,8 +9,16 @@ import {
   type ResolveFromPathResult,
   type SpecSearchResult,
   SpecRepository,
+  type ArtifactMeta,
 } from '../../../../src/application/ports/spec-repository.js'
-import { type PersistedSpecMetadata } from '../../../../src/domain/services/parse-metadata.js'
+import {
+  type MetadataSnapshot,
+  type SpecMetadata,
+} from '../../../../src/domain/services/parse-metadata.js'
+import {
+  type PersistedSpecState,
+  type PersistedSpecStateSnapshot,
+} from '../../../../src/domain/services/apply-persisted-spec-state-patch.js'
 import {
   createSpecReferenceResolver,
   type SpecWorkspaceRoute,
@@ -46,7 +54,20 @@ class FakeSpecRepository extends SpecRepository {
     return this._knownSpecs.size
   }
 
-  override async persistedStateHash(_spec: Spec): Promise<string | null> {
+  override async persistedStateMeta(
+    _spec: Spec,
+    options?: import('../../../../src/application/ports/spec-repository.js').SpecMetaOptions,
+  ): Promise<
+    import('../../../../src/application/ports/spec-repository.js').PersistedStateMeta | null
+  > {
+    return options?.includeHash === true
+      ? { lastModified: new Date().toISOString(), hash: 'sha256:test' }
+      : { lastModified: new Date().toISOString() }
+  }
+
+  override async generatedMetadataMeta(): Promise<
+    import('../../../../src/application/ports/spec-repository.js').GeneratedMetadataMeta | null
+  > {
     return null
   }
 
@@ -54,44 +75,33 @@ class FakeSpecRepository extends SpecRepository {
     return 'sha256:test-spec-fingerprint'
   }
 
-  override async metadata(_spec: Spec): Promise<PersistedSpecMetadata | null> {
+  override async readPersistedState(_spec: Spec): Promise<PersistedSpecStateSnapshot | null> {
     return null
   }
 
-  override async saveMetadata(
+  override async writePersistedState(
     _spec: Spec,
-    _content: string,
-    _options?: { force?: boolean; originalHash?: string },
-  ): Promise<void> {}
+    state: PersistedSpecState,
+    _options: { readonly expectedRevision: string | null },
+  ): Promise<PersistedSpecStateSnapshot> {
+    return { ...state, originalHash: 'sha256:test' }
+  }
 
-  override async readPersistedSchema(
-    _spec: Spec,
-  ): Promise<{ name: string; version: number } | null> {
+  override async artifactMeta(_spec: Spec, _filename: string): Promise<ArtifactMeta | null> {
     return null
   }
 
-  override async readPersistedDependsOn(_spec: Spec): Promise<readonly string[] | null> {
-    return null
+  override async readMetadataSnapshot(_spec: Spec): Promise<MetadataSnapshot> {
+    return { kind: 'missing', revision: null }
   }
 
-  override async readPersistedImplementation(
+  override async writeMetadataSnapshot(
     _spec: Spec,
-  ): Promise<readonly { readonly file: string; readonly symbols?: readonly string[] }[] | null> {
-    return null
+    metadata: SpecMetadata,
+    _options: { readonly expectedRevision: string | null },
+  ): Promise<MetadataSnapshot> {
+    return { kind: 'present', metadata, revision: 'sha256:test' }
   }
-
-  override async updatePersistedSchema(
-    _spec: Spec,
-    _schema: { name: string; version: number },
-  ): Promise<void> {}
-  override async updatePersistedDependsOn(
-    _spec: Spec,
-    _dependsOn: readonly string[],
-  ): Promise<void> {}
-  override async updatePersistedImplementation(
-    _spec: Spec,
-    _implementation: readonly { readonly file: string; readonly symbols?: readonly string[] }[],
-  ): Promise<void> {}
 
   override async search(_query: string): Promise<SpecSearchResult[]> {
     return []

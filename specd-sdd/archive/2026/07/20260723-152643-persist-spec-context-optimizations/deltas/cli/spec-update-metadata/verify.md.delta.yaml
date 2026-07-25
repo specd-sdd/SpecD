@@ -1,0 +1,30 @@
+- op: modified
+  description: Replace the command-signature scenario with a removal assertion now that the command no longer exists.
+  selector:
+    type: section
+    matches: '^Requirement: Command signature$'
+  rename: 'Requirement: spec update-metadata is removed'
+  content: |
+    #### Scenario: update-metadata command is not registered
+
+    - **WHEN** the CLI `spec` parent command's subcommands are inspected
+    - **THEN** no `update-metadata` command, or any alias of it, is registered
+
+    #### Scenario: Agents persist optimized fields through spec optimizations set
+
+    - **GIVEN** an agent needs to persist an LLM-optimized description or context
+    - **WHEN** the agent looks for a supported CLI command
+    - **THEN** it uses `specd spec optimizations set`
+    - **AND** `specd spec update-metadata` is not available
+
+- op: removed
+  description: Remove the partial-schema-input scenarios — there is no partial metadata payload anymore.
+  selector:
+    type: section
+    matches: '^Requirement: Partial schema input$'
+
+- op: removed
+  description: Remove the delegation scenario — the target use case no longer exists.
+  selector:
+    type: section
+    matches: '^Requirement: Delegation$'
