@@ -27,7 +27,12 @@ vi.mock('../../../src/helpers/cli-context.js', async () => {
   }
 })
 
-import { openSpecdHost, buildProjectStatusSnapshot, type GetGraphHealthResult } from '@specd/sdk'
+import {
+  openSpecdHost,
+  buildProjectStatusSnapshot,
+  type GetGraphHealthResult,
+  type GetProjectSummaryResult,
+} from '@specd/sdk'
 import { registerProjectStatus } from '../../../src/commands/project/status.js'
 import { type MockKernel } from '../helpers.js'
 
@@ -42,7 +47,7 @@ const emptySummary = {
 
 function stubSnapshot(
   kernel: MockKernel,
-  summary = emptySummary,
+  summary: GetProjectSummaryResult = emptySummary,
   graphHealth: GetGraphHealthResult | null = {
     lastIndexedAt: '2026-01-01',
     stale: false,
@@ -115,6 +120,8 @@ describe('project status', () => {
     expect(buildProjectStatusSnapshot).toHaveBeenCalledWith(expect.objectContaining({ kernel }), {
       includeGraph: true,
       includeHotspots: false,
+      includeChanges: true,
+      includeSpecsHealth: true,
     })
 
     const out = stdout()
@@ -122,6 +129,73 @@ describe('project status', () => {
     expect(out).toContain('specs: 12 total')
     expect(out).toContain('default: 5')
     expect(out).toContain('core: 7')
+  })
+
+  it('includes active/draft listings and specs health in text output', async () => {
+    const { kernel, stdout } = setup()
+    stubSnapshot(kernel, {
+      activeCount: 1,
+      draftCount: 1,
+      discardedCount: 0,
+      archivedCount: 0,
+      specsByWorkspace: { default: 1 },
+      workspaceCount: 1,
+      active: [
+        { name: 'active-change', state: 'implementing', tasks: { incomplete: 2, total: 5 } },
+      ],
+      drafts: [{ name: 'draft-change', state: 'drafted', tasks: { incomplete: 1, total: 3 } }],
+      specsHealth: {
+        totalSpecs: 10,
+        passed: 8,
+        failed: 1,
+        warned: 1,
+        issues: [{ spec: 'core:foo', passed: false, failures: [], warnings: [] }],
+      },
+    })
+
+    const program = makeProgram()
+    registerProjectStatus(program.command('project'))
+    await program.parseAsync(['node', 'specd', 'project', 'status'])
+
+    const out = stdout()
+    expect(out).toContain('active-change [implementing] tasks 2/5')
+    expect(out).toContain('draft-change [drafted] tasks 1/3')
+    expect(out).toContain('specsHealth: 10 total · 8 ok · 1 failed · 1 warning')
+    expect(out).toContain('specsHealth.issues:')
+  })
+
+  it('includes listings and specs health in JSON output', async () => {
+    const { kernel, stdout } = setup()
+    stubSnapshot(kernel, {
+      activeCount: 1,
+      draftCount: 0,
+      discardedCount: 0,
+      archivedCount: 0,
+      specsByWorkspace: { default: 1 },
+      workspaceCount: 1,
+      active: [{ name: 'only-active', state: 'ready', tasks: { incomplete: 0, total: 1 } }],
+      drafts: [],
+      specsHealth: {
+        totalSpecs: 1,
+        passed: 1,
+        failed: 0,
+        warned: 0,
+        issues: [],
+      },
+    })
+
+    const program = makeProgram()
+    registerProjectStatus(program.command('project'))
+    await program.parseAsync(['node', 'specd', 'project', 'status', '--format', 'json'])
+
+    const parsed = JSON.parse(stdout()) as {
+      active: Array<{ name: string }>
+      drafts: unknown[]
+      specsHealth: { passed: number }
+    }
+    expect(parsed.active[0]?.name).toBe('only-active')
+    expect(parsed.drafts).toEqual([])
+    expect(parsed.specsHealth.passed).toBe(1)
   })
 
   it('includes archived count in JSON output', async () => {

@@ -67,6 +67,8 @@ JSON/TOON output schema:
         const snapshot = await buildProjectStatusSnapshot(host, {
           includeGraph: true,
           includeHotspots: opts.graph ?? false,
+          includeChanges: true,
+          includeSpecsHealth: true,
         })
         const summary = snapshot.summary
         const graphHealth = snapshot.graphHealth
@@ -84,6 +86,9 @@ JSON/TOON output schema:
 
         const approvals = snapshot.approvals
         const llmOptimizedContext = snapshot.llmOptimizedContext
+        const activeChanges = summary.active ?? []
+        const draftChanges = summary.drafts ?? []
+        const specsHealth = summary.specsHealth
 
         let contextData:
           | {
@@ -157,6 +162,9 @@ JSON/TOON output schema:
                 discarded: summary.discardedCount,
                 archived: summary.archivedCount,
               },
+              active: activeChanges,
+              drafts: draftChanges,
+              ...(specsHealth !== undefined ? { specsHealth } : {}),
               graph: {
                 freshness: graphFreshness,
                 stale: graphStale,
@@ -204,6 +212,38 @@ JSON/TOON output schema:
           `specs: ${String(totalSpecs)} total`,
           ...specCounts.map((c) => `  ${c.name}: ${String(c.count)}`),
           `changes: ${summary.activeCount} active, ${summary.draftCount} drafts, ${summary.discardedCount} discarded, ${summary.archivedCount} archived`,
+          ...(activeChanges.length > 0
+            ? [
+                `changes.active:`,
+                ...activeChanges.map(
+                  (entry) =>
+                    `  ${entry.name} [${entry.state}] tasks ${entry.tasks.incomplete}/${entry.tasks.total}`,
+                ),
+              ]
+            : ['changes.active: (none)']),
+          ...(draftChanges.length > 0
+            ? [
+                `changes.drafts:`,
+                ...draftChanges.map(
+                  (entry) =>
+                    `  ${entry.name} [${entry.state}] tasks ${entry.tasks.incomplete}/${entry.tasks.total}`,
+                ),
+              ]
+            : ['changes.drafts: (none)']),
+          ...(specsHealth !== undefined
+            ? [
+                `specsHealth: ${specsHealth.totalSpecs} total · ${specsHealth.passed} ok · ${specsHealth.failed} failed · ${specsHealth.warned} warning`,
+                ...(specsHealth.issues.length > 0
+                  ? [
+                      `specsHealth.issues:`,
+                      ...specsHealth.issues.map(
+                        (issue) =>
+                          `  ${issue.spec} (${issue.passed ? 'warning' : 'failed'}: ${issue.failures.length} failures, ${issue.warnings.length} warnings)`,
+                      ),
+                    ]
+                  : []),
+              ]
+            : []),
           `graph.freshness: ${graphFreshness ?? 'never indexed'} (${graphStale === true ? 'stale' : graphStale === false ? 'fresh' : 'unknown'})`,
           ...(fingerprintMismatch === true
             ? ['graph.derivation: ⚠ fingerprint mismatch — reindex recommended']

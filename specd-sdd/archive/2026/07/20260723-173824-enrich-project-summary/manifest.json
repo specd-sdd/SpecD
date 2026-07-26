@@ -1,0 +1,1574 @@
+{
+  "name": "enrich-project-summary",
+  "createdAt": "2026-07-23T17:38:24.676Z",
+  "description": "Extend GetProjectSummary with optional change listings (tasks) and specs health behind flags, preserving count-only default",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "core:get-project-summary",
+    "sdk:build-project-status-snapshot",
+    "cli:project-status",
+    "cli:project-dashboard"
+  ],
+  "specDependsOn": {
+    "core:get-project-summary": [
+      "core:list-workspaces",
+      "core:list-changes",
+      "core:list-drafts",
+      "core:list-discarded",
+      "core:list-archived",
+      "core:kernel",
+      "core:composition-resolver",
+      "core:get-specs-health",
+      "core:count-tasks"
+    ],
+    "sdk:build-project-status-snapshot": [
+      "sdk:host-context",
+      "core:get-project-summary",
+      "code-graph:get-graph-health"
+    ],
+    "cli:project-status": [
+      "core:list-workspaces",
+      "core:get-project-summary",
+      "core:get-project-context",
+      "sdk:build-project-status-snapshot",
+      "sdk:host-context"
+    ],
+    "cli:project-dashboard": ["cli:entrypoint", "core:config"]
+  },
+  "invalidationPolicy": "downstream",
+  "trackedImplementationFiles": [
+    {
+      "file": ".specd/metadata/cli/change-artifact-instruction/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/cli/change-check-overlap/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/cli/change-discard/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/cli/change-edit/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/cli/change-hook-instruction/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/cli/change-skip-artifact/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/cli/command-resource-naming/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/cli/drafts-restore/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/cli/entrypoint/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/cli/logging-integration/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/cli/plugins-show/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/cli/project-init/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/cli/project-update/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/cli/schema-extend/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/cli/schema-fork/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/cli/schema-show/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/cli/schema-validate/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/cli/spec-generate-metadata/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/cli/spec-init/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/cli/spec-invalidate-metadata/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/cli/spec-metadata/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/cli/spec-optimizations/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/cli/spec-outline/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/cli/spec-resolve-path/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/cli/spec-show/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/cli/spec-update-metadata/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/cli/spec-validate/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/code-graph/composition/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/code-graph/get-graph-health/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/code-graph/hotspots/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/code-graph/indexer/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/code-graph/staleness-detection/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/actor-resolver-null/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/actor-resolver-privacy/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/archive-change/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/archive-repository-port/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/archived-change-index-entry/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/artifact-ast/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/build-schema/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/change-list-entry/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/change-manifest/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/change-repository-port/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/change/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/compile-context/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/composition-resolver/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/composition/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/config-writer-port/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/config/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/content-extraction/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/content-hasher-port/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/count-tasks/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/create-change/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/delta-format/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/discarded-change-view/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/drafted-change-read-only-error/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/drafted-change-view/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/external-hook-runner-port/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/file-reader-port/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/fs-change-repository/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/fs-spec-repository/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/generate-metadata/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/get-active-schema/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/get-persisted-spec-deps/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/get-persisted-spec-implementation/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/get-persisted-spec-optimizations/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/get-persisted-spec-schema/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/get-project-context/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/get-project-summary/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/get-spec-metadata/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/get-specs-health/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/implementation-detector-port/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/invalidate-spec-metadata/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/kernel-builder/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/kernel/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/lifecycle-engine/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/list-archived/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/list-changes/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/list-discarded/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/list-drafts/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/list-workspaces/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/logger-port/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/materialize-spec-metadata/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/parse-schema-yaml/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/pino-logger/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/project-metadata/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/read-only-change-view/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/regenerate-spec-metadata/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/repository-port/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/resolve-schema/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/save-spec-metadata/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/schema-format/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/schema-merge/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/schema-registry-port/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/selector-model/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/snapshot-hasher/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/spec-id-format/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/spec-lock/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/spec-metadata/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/spec-optimization/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/spec-overlap/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/spec-repository-port/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/storage/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/update-persisted-spec-optimizations/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/update-project-metadata/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/update-spec-metadata/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/validate-specs/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/validation-result-cache-port/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/workflow-model/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/workspace/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/yaml-serializer-port/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/default/_global/conventions/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/default/_global/docs/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/default/_global/error-handling-conventions/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/default/_global/eslint/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/default/_global/spec-layout/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/default/_global/testing/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/plugin-manager/install-plugin-use-case/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/plugin-manager/list-plugins-use-case/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/plugin-manager/load-plugin-use-case/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/plugin-manager/plugin-errors/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/plugin-manager/plugin-loader/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/plugin-manager/plugin-repository-port/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/plugin-manager/specd-plugin-type/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/plugin-manager/uninstall-plugin-use-case/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/plugin-manager/update-plugin-use-case/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/public-web/public-site/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/sdk/build-project-status-snapshot/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/sdk/composition/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/sdk/host-context/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/skills/agents/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/skills/get-skill/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/skills/list-skills/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/skills/skill-bundle/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/skills/skill-repository-port/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/skills/skill-templates-source/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/entrypoint/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/composition/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/get-graph-health/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/staleness-detection/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/archive-change/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/archive-repository-port/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/archived-change-index-entry/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/build-schema/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/change-list-entry/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/change-manifest/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/change-repository-port/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/change/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/compile-context/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/composition-resolver/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/composition/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/config-writer-port/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/config/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/count-tasks/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/discarded-change-view/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/drafted-change-read-only-error/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/drafted-change-view/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/get-active-schema/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/get-project-context/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/get-project-summary/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/get-spec-metadata/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/get-specs-health/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/implementation-detector-port/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/kernel-builder/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/kernel/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/lifecycle-engine/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/list-archived/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/list-changes/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/list-discarded/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/list-drafts/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/list-workspaces/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/materialize-spec-metadata/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/project-metadata/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/read-only-change-view/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/repository-port/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/resolve-schema/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/schema-format/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/schema-registry-port/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/spec-id-format/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/spec-metadata/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/spec-optimization/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/spec-overlap/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/spec-repository-port/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/storage/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/validate-specs/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/workflow-model/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/workspace/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/sdk/build-project-status-snapshot/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/sdk/composition/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/sdk/host-context/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "EXPLORATION_EVENT_BUS.md",
+      "state": "ignored"
+    },
+    {
+      "file": "EXPLORATION_LIFECYCLE_TRANSITIONS_UX.md",
+      "state": "ignored"
+    },
+    {
+      "file": "EXPLORATION_SPECD_BRANCH_MERGE_SKILL.md",
+      "state": "ignored"
+    },
+    {
+      "file": "EXPLORATION_STORAGE_ABSTRACTION.md",
+      "state": "ignored"
+    },
+    {
+      "file": "assets/specd-changes-hooks.svg",
+      "state": "ignored"
+    },
+    {
+      "file": "assets/specd-changes-status.svg",
+      "state": "ignored"
+    },
+    {
+      "file": "assets/specd-changes-validate.svg",
+      "state": "ignored"
+    },
+    {
+      "file": "assets/specd-specs-lists.svg",
+      "state": "ignored"
+    },
+    {
+      "file": "assets/specd.svg",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/get-project-summary.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/get-project-summary.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/orchestration/build-project-status-snapshot.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/project/status.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/project/dashboard.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/cli/cli-reference.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/core/use-cases.md",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/project-dashboard.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/project/status.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/get-project-summary.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/get-project-summary.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/test/orchestration/build-project-status-snapshot.spec.ts",
+      "state": "resolved"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "core:get-project-summary",
+      "file": "packages/core/src/application/use-cases/get-project-summary.ts",
+      "fileLinkExplicit": false,
+      "symbols": [
+        "GetProjectSummaryInput",
+        "ProjectChangeSummaryEntry",
+        "GetProjectSummaryResult",
+        "GetProjectSummary"
+      ]
+    },
+    {
+      "specId": "core:get-project-summary",
+      "file": "packages/core/src/composition/use-cases/get-project-summary.ts",
+      "fileLinkExplicit": false,
+      "symbols": [
+        "GetProjectSummaryDeps",
+        "resolveGetProjectSummaryDeps",
+        "createGetProjectSummary"
+      ]
+    },
+    {
+      "specId": "sdk:build-project-status-snapshot",
+      "file": "packages/sdk/src/orchestration/build-project-status-snapshot.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["BuildProjectStatusSnapshotOptions", "buildProjectStatusSnapshot"]
+    },
+    {
+      "specId": "cli:project-status",
+      "file": "packages/cli/src/commands/project/status.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["registerProjectStatus"]
+    },
+    {
+      "specId": "cli:project-dashboard",
+      "file": "packages/cli/src/commands/project/dashboard.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["registerProjectDashboard"]
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:9e138e6cd5a367b8f67c7f2aa6290aec8ff48f97e467133b796f17ab53d6fb5d"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:get-project-summary",
+          "filename": "deltas/core/get-project-summary/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:2c7a6f5341d0fa624e230e7436cfb9ae6bd9c4485bbacda259b57c00ece3cc61"
+        },
+        {
+          "key": "sdk:build-project-status-snapshot",
+          "filename": "deltas/sdk/build-project-status-snapshot/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:d19c219120f9841d4f5dad4a41c5007e12e2559da25e87a594e0807bbfab98ac"
+        },
+        {
+          "key": "cli:project-status",
+          "filename": "deltas/cli/project-status/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:8ea3802f20c83694e48ea8c6bd6c19bf0ff9b2527595eea47f079e68fdd49ee4"
+        },
+        {
+          "key": "cli:project-dashboard",
+          "filename": "deltas/cli/project-dashboard/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:de37cdff3e0c0e242e4f44a6d8c5c83f88dc9af6347e0eeff4990a45223c2939"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:get-project-summary",
+          "filename": "deltas/core/get-project-summary/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:30c0c2e47514432b279ee69381881ca6b7c8d29fd158e51924a4399ac49c44aa"
+        },
+        {
+          "key": "sdk:build-project-status-snapshot",
+          "filename": "deltas/sdk/build-project-status-snapshot/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:90a1df537baba839d1dec0323dbce3d6ed8ab4346605fc875bdd46e208749858"
+        },
+        {
+          "key": "cli:project-status",
+          "filename": "deltas/cli/project-status/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:dd74948cf418f63d9bbb8f8821d77fc972b1919f73351aa45ce69b6ad4497a9d"
+        },
+        {
+          "key": "cli:project-dashboard",
+          "filename": "deltas/cli/project-dashboard/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:3a846367027e9a8974b741fda12ee1e8841e0f995d3797ea665527b929ee9d5a"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:ca138a5981df6746cd4d949d46db826e84bf8a2b829f6dcccb4a49f41a5a9f8a"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:7906aca653d9eaf3cf7fa6b400e6485cccef7a8f4470fb0afba568179767813a"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-07-23T17:38:24.676Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": [
+        "core:get-project-summary",
+        "sdk:build-project-status-snapshot",
+        "cli:project-status"
+      ],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-23T17:38:24.692Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "core:get-project-summary"
+        },
+        {
+          "type": "specs",
+          "key": "sdk:build-project-status-snapshot"
+        },
+        {
+          "type": "specs",
+          "key": "cli:project-status"
+        },
+        {
+          "type": "verify",
+          "key": "core:get-project-summary"
+        },
+        {
+          "type": "verify",
+          "key": "sdk:build-project-status-snapshot"
+        },
+        {
+          "type": "verify",
+          "key": "cli:project-status"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-23T21:43:23.976Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-23T22:00:01.386Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:get-project-summary",
+            "sdk:build-project-status-snapshot",
+            "cli:project-status"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:get-project-summary",
+            "sdk:build-project-status-snapshot",
+            "cli:project-status"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-23T22:02:22.777Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:get-project-summary",
+            "sdk:build-project-status-snapshot",
+            "cli:project-status"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:get-project-summary",
+            "sdk:build-project-status-snapshot",
+            "cli:project-status"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-23T22:09:44.171Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:get-project-summary",
+            "sdk:build-project-status-snapshot",
+            "cli:project-status"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:get-project-summary",
+            "sdk:build-project-status-snapshot",
+            "cli:project-status"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-23T22:09:44.229Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:get-project-summary",
+            "sdk:build-project-status-snapshot",
+            "cli:project-status"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:get-project-summary",
+            "sdk:build-project-status-snapshot",
+            "cli:project-status"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-23T22:09:44.248Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "cli:project-dashboard"
+        },
+        {
+          "type": "verify",
+          "key": "cli:project-dashboard"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-24T08:17:26.465Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [sdk:build-project-status-snapshot]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["sdk:build-project-status-snapshot"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-24T08:27:00.158Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T13:27:21.091Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:get-project-summary",
+            "sdk:build-project-status-snapshot",
+            "cli:project-status",
+            "cli:project-dashboard"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:get-project-summary",
+            "sdk:build-project-status-snapshot",
+            "cli:project-status",
+            "cli:project-dashboard"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-25T13:27:21.091Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T17:45:22.488Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [core:get-project-summary]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:get-project-summary"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:get-project-summary",
+            "sdk:build-project-status-snapshot",
+            "cli:project-status",
+            "cli:project-dashboard"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-25T17:45:46.840Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-25T17:46:35.461Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-25T18:14:55.487Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:get-project-summary",
+            "sdk:build-project-status-snapshot",
+            "cli:project-status",
+            "cli:project-dashboard"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:get-project-summary",
+            "sdk:build-project-status-snapshot",
+            "cli:project-status",
+            "cli:project-dashboard"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-25T18:14:55.487Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-25T18:18:18.968Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-25T18:19:39.108Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-25T18:29:30.564Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-25T18:34:44.572Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-25T18:34:55.548Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-26T11:52:20.547Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-07-26T11:52:20.741Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

@@ -55,6 +55,17 @@ function setup() {
       archivedCount: 5,
       specsByWorkspace: { default: 2 },
       workspaceCount: 1,
+      active: [
+        { name: 'active-change', state: 'implementing', tasks: { incomplete: 2, total: 8 } },
+      ],
+      drafts: [],
+      specsHealth: {
+        totalSpecs: 2,
+        passed: 1,
+        failed: 1,
+        warned: 0,
+        issues: [],
+      },
     },
     graphHealth: {
       currentRef: 'abc1234',
@@ -196,6 +207,37 @@ describe('project dashboard', () => {
     expect(out).toContain('archived')
     expect(out).toContain('Graph')
     expect(out).toContain('freshness:')
+  })
+
+  it('always requests enrichment options from buildProjectStatusSnapshot', async () => {
+    setup()
+
+    const program = makeProgram()
+    registerProjectDashboard(program.command('project'))
+    await program.parseAsync(['node', 'specd', 'project', 'dashboard'])
+
+    expect(buildProjectStatusSnapshot).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        includeGraph: true,
+        includeChanges: true,
+        includeSpecsHealth: true,
+      }),
+    )
+  })
+
+  it('text output shows specs health header and active tasks progress line', async () => {
+    const { stdout } = setup()
+
+    const program = makeProgram()
+    registerProjectDashboard(program.command('project'))
+    await program.parseAsync(['node', 'specd', 'project', 'dashboard'])
+
+    const out = stdout()
+    expect(out).toContain('2 total')
+    expect(out).toMatch(/1✓/)
+    expect(out).toMatch(/1✗/)
+    expect(out).toContain('6/8 done')
   })
 
   it('text output uses "project dashboard" as boxen title', async () => {

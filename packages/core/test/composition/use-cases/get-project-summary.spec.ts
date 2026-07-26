@@ -109,6 +109,24 @@ describe('createGetProjectSummary', () => {
       changes,
       archive,
       listWorkspaces,
+      listChanges: {
+        execute: async () => ({ items: [], meta: { total: 0, count: 0, limit: 0 } }),
+      } as never,
+      listDrafts: {
+        execute: async () => ({ items: [], meta: { total: 0, count: 0, limit: 0 } }),
+      } as never,
+      countTasks: {
+        execute: async () => ({ total: { incomplete: 0, total: 0 }, byArtifact: {} }),
+      } as never,
+      getSpecsHealth: {
+        execute: async () => ({
+          totalSpecs: 0,
+          passed: 0,
+          failed: 0,
+          warned: 0,
+          issues: [],
+        }),
+      } as never,
     }
 
     expect(createGetProjectSummary(deps)).toBeInstanceOf(GetProjectSummary)
@@ -126,6 +144,24 @@ describe('createGetProjectSummary', () => {
       changes,
       archive,
       listWorkspaces,
+      listChanges: {
+        execute: async () => ({ items: [], meta: { total: 0, count: 0, limit: 0 } }),
+      } as never,
+      listDrafts: {
+        execute: async () => ({ items: [], meta: { total: 0, count: 0, limit: 0 } }),
+      } as never,
+      countTasks: {
+        execute: async () => ({ total: { incomplete: 0, total: 0 }, byArtifact: {} }),
+      } as never,
+      getSpecsHealth: {
+        execute: async () => ({
+          totalSpecs: 0,
+          passed: 0,
+          failed: 0,
+          warned: 0,
+          issues: [],
+        }),
+      } as never,
     }
 
     expect(() =>
@@ -138,6 +174,14 @@ describe('createGetProjectSummary', () => {
     const resolver = createCompositionResolver(config)
     const deps = resolveGetProjectSummaryDeps(resolver)
 
-    expect(Object.keys(deps).sort()).toEqual(['archive', 'changes', 'listWorkspaces'])
+    expect(Object.keys(deps).sort()).toEqual([
+      'archive',
+      'changes',
+      'countTasks',
+      'getSpecsHealth',
+      'listChanges',
+      'listDrafts',
+      'listWorkspaces',
+    ])
   })
 })

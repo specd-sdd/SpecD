@@ -39,7 +39,12 @@ export {
   type ValidateSchemaResult,
 } from './validate-schema.js'
 export { type ListWorkspaces, type ProjectWorkspace } from './list-workspaces.js'
-export { GetProjectSummary, type GetProjectSummaryResult } from './get-project-summary.js'
+export {
+  GetProjectSummary,
+  type GetProjectSummaryInput,
+  type GetProjectSummaryResult,
+  type ProjectChangeSummaryEntry,
+} from './get-project-summary.js'
 export {
   type GetProjectContext,
   type GetProjectContextInput,

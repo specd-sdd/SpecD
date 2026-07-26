@@ -7,9 +7,56 @@
 #### Scenario: Result contains all count fields without entities
 
 - **GIVEN** a configured project with active changes, drafts, discarded changes, archived changes, and specs across multiple workspaces
-- **WHEN** `GetProjectSummary.execute()` is called
+- **WHEN** `GetProjectSummary.execute()` is called without enrichment flags
 - **THEN** the result includes `activeCount`, `draftCount`, `discardedCount`, `archivedCount`, `specsByWorkspace`, and `workspaceCount`
+- **AND** the result does not include `active`, `drafts`, or `specsHealth` keys
 - **AND** the result does not include change entities, spec metadata, graph data, or context payloads
+
+### Requirement: Optional enrichment input flags
+
+#### Scenario: Omitted flags keep count-only behaviour
+
+- **WHEN** `GetProjectSummary.execute()` or `execute({})` is called
+- **THEN** list use cases are not invoked for enrichment
+- **AND** `GetSpecsHealth` is not invoked
+- **AND** enrichment keys are absent from the result
+
+### Requirement: Optional active and draft change listings with tasks
+
+#### Scenario: includeChanges returns active and drafts with task totals
+
+- **GIVEN** two active changes and one draft with known task checkbox counts
+- **WHEN** `GetProjectSummary.execute({ includeChanges: true })` is called
+- **THEN** `active` and `drafts` are present arrays matching those buckets
+- **AND** each entry has `name`, `state`, and `tasks.incomplete` / `tasks.total` from `CountTasks`
+- **AND** discarded and archived names do not appear in either array
+
+#### Scenario: Empty buckets yield empty arrays when includeChanges is true
+
+- **GIVEN** a project with zero active changes and zero drafts
+- **WHEN** `GetProjectSummary.execute({ includeChanges: true })` is called
+- **THEN** `active` is `[]`
+- **AND** `drafts` is `[]`
+
+#### Scenario: includeChanges false does not invoke CountTasks for enrichment
+
+- **WHEN** `GetProjectSummary.execute({ includeChanges: false })` is called
+- **THEN** `CountTasks.execute` is not invoked for summary enrichment
+- **AND** `active` and `drafts` keys are absent
+
+### Requirement: Optional specs health enrichment
+
+#### Scenario: includeSpecsHealth embeds GetSpecsHealthResult
+
+- **GIVEN** `GetSpecsHealth.execute({})` returns a health summary with issues
+- **WHEN** `GetProjectSummary.execute({ includeSpecsHealth: true })` is called
+- **THEN** `specsHealth` equals that result
+
+#### Scenario: includeSpecsHealth false does not invoke GetSpecsHealth
+
+- **WHEN** `GetProjectSummary.execute()` is called without `includeSpecsHealth`
+- **THEN** `GetSpecsHealth` is not invoked
+- **AND** `specsHealth` is absent
 
 ### Requirement: Orchestrates existing list use cases
 
@@ -73,13 +120,14 @@
 #### Scenario: Constructor requires count-capable dependencies
 
 - **WHEN** `GetProjectSummary` is instantiated
-- **THEN** it receives dependencies sufficient to call `ChangeRepository.count()`, `countDrafts()`, `countDiscarded()`, archive `count()` or `ListArchived` for `meta.total`, and `ListWorkspaces` for per-workspace `SpecRepository.count()`
+- **THEN** it receives dependencies sufficient to call `ChangeRepository.count()`, `countDrafts()`, `countDiscarded()`, archive `count()`, and `ListWorkspaces` for per-workspace `SpecRepository.count()`
 - **AND** it does not construct repositories or read configuration directly
 
-#### Scenario: Constructor does not require list use cases for counting
+#### Scenario: Constructor accepts enrichment collaborators
 
-- **WHEN** `GetProjectSummary` is instantiated for count-only summary assembly
-- **THEN** it is wired to repository count surfaces rather than `ListChanges.execute()` / `ListDrafts.execute()` / `ListDiscarded.execute()` / `ListSpecs.execute()` for measurement
+- **WHEN** `GetProjectSummary` is instantiated with enrichment support
+- **THEN** it receives dependencies sufficient to invoke `ListChanges`, `ListDrafts`, `CountTasks`, and `GetSpecsHealth`
+- **AND** count fields are still measured via repository `count*` surfaces rather than list `.length`
 
 ### Requirement: Factory wires from SpecdConfig
 
@@ -113,10 +161,5 @@
 - **WHEN** `createGetProjectSummary(config, options?)` is invoked
 - **THEN** it creates a composition resolver for that composition session
 - **AND** it derives `GetProjectSummaryDeps` through `resolveGetProjectSummaryDeps(resolver)`
-- **AND** `resolveGetProjectSummaryDeps(resolver)` resolves:
-- `listChanges: ListChanges`
-- `listDrafts: ListDrafts`
-- `listDiscarded: ListDiscarded`
-- `listArchived: ListArchived`
-- `listWorkspaces: ListWorkspaces`
+- **AND** `resolveGetProjectSummaryDeps(resolver)` resolves at least `changes`, `archive`, `listWorkspaces`, `listChanges`, `listDrafts`, `countTasks`, and `getSpecsHealth`
 - **AND** the factory delegates to canonical `createGetProjectSummary(deps)`

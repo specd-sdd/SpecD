@@ -1,6 +1,10 @@
 import { GetProjectSummary } from '../../application/use-cases/get-project-summary.js'
 import { type ChangeRepository } from '../../application/ports/change-repository.js'
 import { type ArchiveRepository } from '../../application/ports/archive-repository.js'
+import { type CountTasks } from '../../application/use-cases/count-tasks.js'
+import { type GetSpecsHealth } from '../../application/use-cases/get-specs-health.js'
+import { type ListChanges } from '../../application/use-cases/list-changes.js'
+import { type ListDrafts } from '../../application/use-cases/list-drafts.js'
 import { type ListWorkspaces } from '../../application/use-cases/list-workspaces.js'
 import { type SpecdConfig } from '../../application/specd-config.js'
 import {
@@ -9,6 +13,10 @@ import {
   type CompositionResolutionOptions,
 } from '../composition-resolver.js'
 import { normalizeCompositionFactoryArgs, type FactoryInput } from '../normalize-factory-args.js'
+import { createCountTasks, resolveCountTasksDeps } from './count-tasks.js'
+import { createGetSpecsHealth, resolveGetSpecsHealthDeps } from './get-specs-health.js'
+import { createListChanges, resolveListChangesDeps } from './list-changes.js'
+import { createListDrafts, resolveListDraftsDeps } from './list-drafts.js'
 
 /**
  * Explicit dependencies for {@link createGetProjectSummary}.
@@ -17,6 +25,10 @@ export interface GetProjectSummaryDeps {
   readonly changes: ChangeRepository
   readonly archive: ArchiveRepository
   readonly listWorkspaces: ListWorkspaces
+  readonly listChanges: ListChanges
+  readonly listDrafts: ListDrafts
+  readonly countTasks: CountTasks
+  readonly getSpecsHealth: GetSpecsHealth
 }
 
 /**
@@ -30,6 +42,10 @@ export function resolveGetProjectSummaryDeps(resolver: CompositionResolver): Get
     changes: resolver.getChangeRepository(),
     archive: resolver.getArchiveRepository(),
     listWorkspaces: resolver.getListWorkspaces(),
+    listChanges: createListChanges(resolveListChangesDeps(resolver)),
+    listDrafts: createListDrafts(resolveListDraftsDeps(resolver)),
+    countTasks: createCountTasks(resolveCountTasksDeps(resolver)),
+    getSpecsHealth: createGetSpecsHealth(resolveGetSpecsHealthDeps(resolver)),
   }
 }
 
@@ -81,8 +97,24 @@ function createGetProjectSummaryFromNormalized(
   input: FactoryInput<GetProjectSummaryDeps, CompositionResolutionOptions>,
 ): GetProjectSummary {
   if (input.kind === 'deps') {
-    const { changes, archive, listWorkspaces } = input.deps
-    return new GetProjectSummary(changes, archive, listWorkspaces)
+    const {
+      changes,
+      archive,
+      listWorkspaces,
+      listChanges,
+      listDrafts,
+      countTasks,
+      getSpecsHealth,
+    } = input.deps
+    return new GetProjectSummary(
+      changes,
+      archive,
+      listWorkspaces,
+      listChanges,
+      listDrafts,
+      countTasks,
+      getSpecsHealth,
+    )
   }
 
   const resolver = createCompositionResolver(input.config, input.options)
@@ -98,5 +130,13 @@ function createGetProjectSummaryFromNormalized(
 function isGetProjectSummaryDeps(
   value: GetProjectSummaryDeps | SpecdConfig,
 ): value is GetProjectSummaryDeps {
-  return 'changes' in value && 'archive' in value && 'listWorkspaces' in value
+  return (
+    'changes' in value &&
+    'archive' in value &&
+    'listWorkspaces' in value &&
+    'listChanges' in value &&
+    'listDrafts' in value &&
+    'countTasks' in value &&
+    'getSpecsHealth' in value
+  )
 }

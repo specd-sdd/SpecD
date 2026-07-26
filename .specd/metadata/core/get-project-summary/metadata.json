@@ -1,6 +1,6 @@
 {
   "title": "GetProjectSummary",
-  "description": "Delivery mechanisms (`project status`, SDK snapshot builders) need consolidated project counts without loading change entities, spec metadata, graph statistics, or compiled context. Today each caller orchestrates multiple list use cases and per-workspace counting independently. `GetProjectSummary` provides a single application use case that returns count-only aggregates for the default workspace change buckets and all configured workspaces' spec totals.",
+  "description": "Delivery mechanisms (`project status`, SDK snapshot builders) need consolidated project counts without loading change entities, spec metadata, graph statistics, or compiled context by default. Today each caller orchestrates multiple list use cases and per-workspace counting independently. `GetProjectSummary` provides a single application use case that returns count-only aggregates for the default workspace change buckets and all configured workspaces' spec totals.\n\nCallers that need agent-oriented detail MAY request optional enrichments via execute input flags: active/draft change listings with per-change task progress, and/or specs health. Without those flags, the use case MUST remain on the cheap count-only path.",
   "dependsOn": [
     "core:list-workspaces",
     "core:list-changes",
@@ -8,22 +8,42 @@
     "core:list-discarded",
     "core:list-archived",
     "core:kernel",
-    "core:composition-resolver"
+    "core:composition-resolver",
+    "core:get-specs-health",
+    "core:count-tasks"
   ],
   "context": [
-    "Delivery mechanisms (`project status`, SDK snapshot builders) need consolidated project counts without loading change entities, spec metadata, graph statistics, or compiled context. Today each caller orchestrates multiple list use cases and per-workspace counting independently. `GetProjectSummary` provides a single application use case that returns count-only aggregates for the default workspace change buckets and all configured workspaces' spec totals."
+    "Delivery mechanisms (`project status`, SDK snapshot builders) need consolidated project counts without loading change entities, spec metadata, graph statistics, or compiled context by default. Today each caller orchestrates multiple list use cases and per-workspace counting independently. `GetProjectSummary` provides a single application use case that returns count-only aggregates for the default workspace change buckets and all configured workspaces' spec totals.\n\nCallers that need agent-oriented detail MAY request optional enrichments via execute input flags: active/draft change listings with per-change task progress, and/or specs health. Without those flags, the use case MUST remain on the cheap count-only path."
   ],
   "rules": [
     {
       "requirement": "Returns count-only project summary",
       "rules": [
-        "`GetProjectSummary.execute()` MUST return a `GetProjectSummaryResult` with:\n\n- `activeCount` — number of active (non-drafted, non-discarded) changes\n- `draftCount` — number of drafted changes\n- `discardedCount` — number of discarded changes\n- `archivedCount` — number of archived changes\n- `specsByWorkspace` — map of workspace name to spec count\n- `workspaceCount` — number of configured workspaces\n\nThe result MUST NOT include change entities, spec metadata, graph data, or context payloads."
+        "`GetProjectSummary.execute(input?)` MUST always return the count fields of `GetProjectSummaryResult`:\n\n- `activeCount` — number of active (non-drafted, non-discarded) changes\n- `draftCount` — number of drafted changes\n- `discardedCount` — number of discarded changes\n- `archivedCount` — number of archived changes\n- `specsByWorkspace` — map of workspace name to spec count\n- `workspaceCount` — number of configured workspaces\n\nWhen enrichment flags are omitted or false, the result MUST NOT include `active`, `drafts`, or `specsHealth` keys (absent / TypeScript-optional omitted — not `null`).\n\nThe count-only path MUST NOT include change entities, spec metadata, graph data, or context payloads."
+      ]
+    },
+    {
+      "requirement": "Optional enrichment input flags",
+      "rules": [
+        "`GetProjectSummary.execute(input?)` MUST accept an optional input object with:\n\n- `includeChanges?: boolean` — default `false`\n- `includeSpecsHealth?: boolean` — default `false`\n\nWhen both flags are omitted or `false`, behaviour MUST match the count-only path (no list materialization, no specs validation for health)."
+      ]
+    },
+    {
+      "requirement": "Optional active and draft change listings with tasks",
+      "rules": [
+        "When `includeChanges` is `true`, the result MUST include:\n\n- `active` — array of entries for every active change\n- `drafts` — array of entries for every drafted change\n\nEach entry MUST contain:\n\n- `name` (string) — change slug\n- `state` (string) — current lifecycle state\n- `tasks` — `{ incomplete: number; total: number }` derived from `CountTasks.execute({ change }).total` (`incomplete` and `total` only; callers that need `complete` MAY compute `total - incomplete`)\n\nDiscarded and archived changes MUST NOT appear as listing entries (counts only).\n\nWhen `includeChanges` is `true` and a bucket is empty, the corresponding array MUST be present and empty (`[]`), not omitted.\n\nListing assembly MUST:\n\n1. Obtain active rows via `ListChanges.execute()` (or equivalent `ChangeRepository.list()` with the same bootstrap semantics)\n2. Obtain draft rows via `ListDrafts.execute()` (or equivalent `ChangeRepository.listDrafts()`)\n3. For each listed name, load the change detail required by `CountTasks` (`ChangeRepository.get` / `getDraft` as appropriate)\n4. Run `CountTasks.execute({ change })` and project `tasks` from `total`\n\nWhen `includeChanges` is `false` or omitted, the use case MUST NOT call list use cases, load change details for task counting, or invoke `CountTasks` solely for summary enrichment."
+      ]
+    },
+    {
+      "requirement": "Optional specs health enrichment",
+      "rules": [
+        "When `includeSpecsHealth` is `true`, the result MUST include `specsHealth` set to the `GetSpecsHealthResult` returned by `GetSpecsHealth.execute({})` (project-wide; no workspace filter unless a future input adds one).\n\nWhen `includeSpecsHealth` is `false` or omitted, the `specsHealth` key MUST be absent and `GetSpecsHealth` MUST NOT be invoked."
       ]
     },
     {
       "requirement": "Orchestrates existing list use cases",
       "rules": [
-        "`GetProjectSummary` MUST obtain change counts without materializing full list results:\n\n- `activeCount` — `ChangeRepository.count()` via the wired `ListChanges` repository (or direct `ChangeRepository` access with the same bootstrap path)\n- `draftCount` — `ChangeRepository.countDrafts()`\n- `discardedCount` — `ChangeRepository.countDiscarded()`\n- `archivedCount` — `ListArchived.execute().meta.total` (or `ArchiveRepository.count()` with equivalent bootstrap)\n\nIt MUST NOT call `ListChanges.execute()`, `ListDrafts.execute()`, or `ListDiscarded.execute()` solely to measure `.length` of returned arrays.\n\n`archivedCount` MUST NOT use `items.length` from a paginated list when `meta.total` is available."
+        "For the always-on count fields, `GetProjectSummary` MUST obtain change counts without materializing full list results:\n\n- `activeCount` — `ChangeRepository.count()`\n- `draftCount` — `ChangeRepository.countDrafts()`\n- `discardedCount` — `ChangeRepository.countDiscarded()`\n- `archivedCount` — `ArchiveRepository.count()` (or `ListArchived` `meta.total` with equivalent bootstrap)\n\nIt MUST NOT call `ListChanges.execute()`, `ListDrafts.execute()`, or `ListDiscarded.execute()` solely to measure `.length` of returned arrays for those counts.\n\n`archivedCount` MUST NOT use `items.length` from a paginated list when `meta.total` is available.\n\nList materialization for enrichment is governed exclusively by the `includeChanges` requirement above."
       ]
     },
     {
@@ -41,7 +61,7 @@
     {
       "requirement": "Constructor accepts orchestration dependencies",
       "rules": [
-        "`GetProjectSummary` MUST accept constructor dependencies sufficient to invoke `ChangeRepository.count()` / `countDrafts()` / `countDiscarded()`, `ArchiveRepository.count()` or `ListArchived` for `meta.total`, and `ListWorkspaces` for per-workspace `SpecRepository.count()`.\n\nIt MUST NOT construct repositories or read `specd.yaml` directly."
+        "`GetProjectSummary` MUST accept constructor dependencies sufficient to:\n\n- Invoke `ChangeRepository.count()` / `countDrafts()` / `countDiscarded()`\n- Invoke `ArchiveRepository.count()` (or equivalent) for archived totals\n- Invoke `ListWorkspaces` for per-workspace `SpecRepository.count()`\n- When enrichment is supported: invoke `ListChanges` / `ListDrafts` (or equivalent repository list surfaces), load change details for `CountTasks`, invoke `CountTasks`, and invoke `GetSpecsHealth`\n\nIt MUST NOT construct repositories or read `specd.yaml` directly."
       ]
     },
     {
@@ -65,13 +85,15 @@
     {
       "requirement": "Config-based factory delegates through resolveGetProjectSummaryDeps",
       "rules": [
-        "The config-based `createGetProjectSummary(config, options?)` form MUST derive `GetProjectSummaryDeps` through `resolveGetProjectSummaryDeps(resolver)` and then delegate to canonical `createGetProjectSummary(deps)`.\n\n`resolveGetProjectSummaryDeps(resolver)` MUST resolve:\n\n- `changes: ChangeRepository`\n- `archive: ArchiveRepository`\n- `listWorkspaces: ListWorkspaces`\n\nIt MUST NOT resolve `listChanges: ListChanges`, `listDrafts: ListDrafts`, `listDiscarded: ListDiscarded`, or `listArchived: ListArchived` — `GetProjectSummary` obtains counts directly from `ChangeRepository.count()` / `countDrafts()` / `countDiscarded()` and `ArchiveRepository.count()`, never by wiring the list use cases and measuring result length.\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
+        "The config-based `createGetProjectSummary(config, options?)` form MUST derive `GetProjectSummaryDeps` through `resolveGetProjectSummaryDeps(resolver)` and then delegate to canonical `createGetProjectSummary(deps)`.\n\n`resolveGetProjectSummaryDeps(resolver)` MUST resolve at least:\n\n- `changes: ChangeRepository`\n- `archive: ArchiveRepository`\n- `listWorkspaces: ListWorkspaces`\n- `listChanges: ListChanges`\n- `listDrafts: ListDrafts`\n- `countTasks: CountTasks`\n- `getSpecsHealth: GetSpecsHealth`\n\nCount fields MUST still be obtained from `ChangeRepository.count()` / `countDrafts()` / `countDiscarded()` and `ArchiveRepository.count()`, never by measuring list result length.\n\nThe helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline."
       ]
     }
   ],
   "constraints": [
     "The use case MUST NOT invoke code-graph providers or context compilation.",
-    "The use case MUST NOT load spec metadata, change artifact content, or materialize list entries.",
+    "On the count-only path (both enrichment flags false/omitted), the use case MUST NOT load spec metadata, change artifact content, or materialize list entries.",
+    "When includeChanges is true, the use case MAY materialize list entries and load change/task artifact content required by CountTasks.",
+    "When includeSpecsHealth is true, the use case MAY invoke GetSpecsHealth (which validates specs).",
     "The use case MUST NOT mutate configuration, repositories, or stored changes."
   ],
   "scenarios": [
@@ -81,11 +103,62 @@
       "given": [
         "a configured project with active changes, drafts, discarded changes, archived changes, and specs across multiple workspaces"
       ],
-      "when": ["GetProjectSummary.execute() is called"],
+      "when": ["GetProjectSummary.execute() is called without enrichment flags"],
       "then": [
         "the result includes activeCount, draftCount, discardedCount, archivedCount, specsByWorkspace, and workspaceCount",
+        "AND the result does not include active, drafts, or specsHealth keys",
         "AND the result does not include change entities, spec metadata, graph data, or context payloads"
       ]
+    },
+    {
+      "requirement": "Optional enrichment input flags",
+      "name": "Omitted flags keep count-only behaviour",
+      "when": ["GetProjectSummary.execute() or execute({}) is called"],
+      "then": [
+        "list use cases are not invoked for enrichment",
+        "AND GetSpecsHealth is not invoked",
+        "AND enrichment keys are absent from the result"
+      ]
+    },
+    {
+      "requirement": "Optional active and draft change listings with tasks",
+      "name": "includeChanges returns active and drafts with task totals",
+      "given": ["two active changes and one draft with known task checkbox counts"],
+      "when": ["GetProjectSummary.execute({ includeChanges: true }) is called"],
+      "then": [
+        "active and drafts are present arrays matching those buckets",
+        "AND each entry has name, state, and tasks.incomplete / tasks.total from CountTasks",
+        "AND discarded and archived names do not appear in either array"
+      ]
+    },
+    {
+      "requirement": "Optional active and draft change listings with tasks",
+      "name": "Empty buckets yield empty arrays when includeChanges is true",
+      "given": ["a project with zero active changes and zero drafts"],
+      "when": ["GetProjectSummary.execute({ includeChanges: true }) is called"],
+      "then": ["active is []", "AND drafts is []"]
+    },
+    {
+      "requirement": "Optional active and draft change listings with tasks",
+      "name": "includeChanges false does not invoke CountTasks for enrichment",
+      "when": ["GetProjectSummary.execute({ includeChanges: false }) is called"],
+      "then": [
+        "CountTasks.execute is not invoked for summary enrichment",
+        "AND active and drafts keys are absent"
+      ]
+    },
+    {
+      "requirement": "Optional specs health enrichment",
+      "name": "includeSpecsHealth embeds GetSpecsHealthResult",
+      "given": ["GetSpecsHealth.execute({}) returns a health summary with issues"],
+      "when": ["GetProjectSummary.execute({ includeSpecsHealth: true }) is called"],
+      "then": ["specsHealth equals that result"]
+    },
+    {
+      "requirement": "Optional specs health enrichment",
+      "name": "includeSpecsHealth false does not invoke GetSpecsHealth",
+      "when": ["GetProjectSummary.execute() is called without includeSpecsHealth"],
+      "then": ["GetSpecsHealth is not invoked", "AND specsHealth is absent"]
     },
     {
       "requirement": "Orchestrates existing list use cases",
@@ -160,16 +233,17 @@
       "name": "Constructor requires count-capable dependencies",
       "when": ["GetProjectSummary is instantiated"],
       "then": [
-        "it receives dependencies sufficient to call ChangeRepository.count(), countDrafts(), countDiscarded(), archive count() or ListArchived for meta.total, and ListWorkspaces for per-workspace SpecRepository.count()",
+        "it receives dependencies sufficient to call ChangeRepository.count(), countDrafts(), countDiscarded(), archive count(), and ListWorkspaces for per-workspace SpecRepository.count()",
         "AND it does not construct repositories or read configuration directly"
       ]
     },
     {
       "requirement": "Constructor accepts orchestration dependencies",
-      "name": "Constructor does not require list use cases for counting",
-      "when": ["GetProjectSummary is instantiated for count-only summary assembly"],
+      "name": "Constructor accepts enrichment collaborators",
+      "when": ["GetProjectSummary is instantiated with enrichment support"],
       "then": [
-        "it is wired to repository count surfaces rather than ListChanges.execute() / ListDrafts.execute() / ListDiscarded.execute() / ListSpecs.execute() for measurement"
+        "it receives dependencies sufficient to invoke ListChanges, ListDrafts, CountTasks, and GetSpecsHealth",
+        "AND count fields are still measured via repository count* surfaces rather than list .length"
       ]
     },
     {
@@ -205,7 +279,7 @@
       "then": [
         "it creates a composition resolver for that composition session",
         "AND it derives GetProjectSummaryDeps through resolveGetProjectSummaryDeps(resolver)",
-        "AND resolveGetProjectSummaryDeps(resolver) resolves:",
+        "AND resolveGetProjectSummaryDeps(resolver) resolves at least changes, archive, listWorkspaces, listChanges, listDrafts, countTasks, and getSpecsHealth",
         "AND the factory delegates to canonical createGetProjectSummary(deps)"
       ]
     }
@@ -215,31 +289,56 @@
       {
         "specId": "core:get-project-summary",
         "file": "core:src/application/use-cases/get-project-summary.ts",
+        "symbol": "GetProjectSummaryInput"
+      },
+      {
+        "specId": "core:get-project-summary",
+        "file": "core:src/application/use-cases/get-project-summary.ts",
+        "symbol": "ProjectChangeSummaryEntry"
+      },
+      {
+        "specId": "core:get-project-summary",
+        "file": "core:src/application/use-cases/get-project-summary.ts",
+        "symbol": "GetProjectSummaryResult"
+      },
+      {
+        "specId": "core:get-project-summary",
+        "file": "core:src/application/use-cases/get-project-summary.ts",
         "symbol": "GetProjectSummary"
       },
       {
         "specId": "core:get-project-summary",
         "file": "core:src/composition/use-cases/get-project-summary.ts",
+        "symbol": "GetProjectSummaryDeps"
+      },
+      {
+        "specId": "core:get-project-summary",
+        "file": "core:src/composition/use-cases/get-project-summary.ts",
         "symbol": "resolveGetProjectSummaryDeps"
+      },
+      {
+        "specId": "core:get-project-summary",
+        "file": "core:src/composition/use-cases/get-project-summary.ts",
+        "symbol": "createGetProjectSummary"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:b169003e2b4fdcae11618a3a8ac0fa4424e3f06ee9f97111ac469fdbd95af0e0",
-    "verify.md": "sha256:b7e582a880f95bf214fed616e65ff27363f747bcd29e4af968f8c7db5aeb816b"
+    "spec.md": "sha256:da5e8d115ea84818b321be68fcb45788419743a6812719ba0b75ffb9c2980a02",
+    "verify.md": "sha256:eb00add16d3c464cad3e4e753e79de94189d5c2fe13849597ae3c04ef7fa3ef8"
   },
   "provenance": {
     "artifacts": {
       "spec.md": {
-        "hash": "sha256:b169003e2b4fdcae11618a3a8ac0fa4424e3f06ee9f97111ac469fdbd95af0e0",
-        "lastModified": "2026-07-22T16:55:45.723Z"
+        "hash": "sha256:da5e8d115ea84818b321be68fcb45788419743a6812719ba0b75ffb9c2980a02",
+        "lastModified": "2026-07-26T11:52:20.566Z"
       },
       "verify.md": {
-        "hash": "sha256:b7e582a880f95bf214fed616e65ff27363f747bcd29e4af968f8c7db5aeb816b",
-        "lastModified": "2026-07-22T16:55:45.724Z"
+        "hash": "sha256:eb00add16d3c464cad3e4e753e79de94189d5c2fe13849597ae3c04ef7fa3ef8",
+        "lastModified": "2026-07-26T11:52:20.576Z"
       }
     },
-    "persistedStateHash": "sha256:3277efb2875ce728ca33aaae35f721057c250c5e2caada46da4f01599ec9b7d3",
+    "persistedStateHash": "sha256:d8e5060e16c878fba33566cec3f11b5552a7b8ef9705e88d80c743f0caae18ba",
     "schema": {
       "name": "schema-std",
       "version": 1

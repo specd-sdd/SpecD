@@ -160,7 +160,11 @@ JSON/TOON output schema:
               kernel: buildCliKernelOptions(),
             },
           })
-          const snapshot = await buildProjectStatusSnapshot(host, { includeGraph: true })
+          const snapshot = await buildProjectStatusSnapshot(host, {
+            includeGraph: true,
+            includeChanges: true,
+            includeSpecsHealth: true,
+          })
           const summary = snapshot.summary
           const graphHealth = snapshot.graphHealth
           const totalSpecs = Object.values(summary.specsByWorkspace).reduce((acc, c) => acc + c, 0)
@@ -180,6 +184,9 @@ JSON/TOON output schema:
                 discarded: summary.discardedCount,
                 archived: summary.archivedCount,
               },
+              active: summary.active ?? [],
+              drafts: summary.drafts ?? [],
+              ...(summary.specsHealth !== undefined ? { specsHealth: summary.specsHealth } : {}),
               graph: graphHealth
                 ? {
                     freshness: graphHealth.lastIndexedAt,
@@ -202,8 +209,14 @@ JSON/TOON output schema:
           },
         })
         const config = host.config
-        const snapshot = await buildProjectStatusSnapshot(host, { includeGraph: true })
+        const snapshot = await buildProjectStatusSnapshot(host, {
+          includeGraph: true,
+          includeChanges: true,
+          includeSpecsHealth: true,
+        })
         const { summary, graphHealth } = snapshot
+        const specsHealth = summary.specsHealth
+        const activeChanges = summary.active ?? []
 
         // ── Banner ────────────────────────────────────────────────────────────
         process.stdout.write(
@@ -264,7 +277,9 @@ JSON/TOON output schema:
         const totalSpecs = Object.values(summary.specsByWorkspace).reduce((acc, c) => acc + c, 0)
         const countColWidth = LEFT_COL_WIDTH - 6 - maxWsLen
         const specLines = [
-          `${chalk.bold.white(String(totalSpecs))} ${chalk.dim('total')}`,
+          specsHealth !== undefined
+            ? `${chalk.bold.white(String(specsHealth.totalSpecs))} ${chalk.dim('total')} · ${specsHealth.passed}✓ ${specsHealth.failed}✗ ${specsHealth.warned}w`
+            : `${chalk.bold.white(String(totalSpecs))} ${chalk.dim('total')}`,
           ...wsEntries.map(
             ([ws, n]) =>
               `  ${chalk.cyan(ws.padEnd(maxWsLen))}${chalk.white(String(n).padStart(countColWidth))}`,
@@ -279,10 +294,20 @@ JSON/TOON output schema:
         ] as const
         const changeLabelWidth = 12
         const changeCountWidth = RIGHT_COL_WIDTH - 6 - changeLabelWidth
-        const changeLines = changeStateLabels.map(
-          ([label, count]) =>
-            `  ${chalk.cyan(label.padEnd(changeLabelWidth))}${chalk.white(String(count).padStart(changeCountWidth))}`,
-        )
+        const changeLines = [
+          ...changeStateLabels.map(
+            ([label, count]) =>
+              `  ${chalk.cyan(label.padEnd(changeLabelWidth))}${chalk.white(String(count).padStart(changeCountWidth))}`,
+          ),
+          (() => {
+            const taskTotal = activeChanges.reduce((sum, entry) => sum + entry.tasks.total, 0)
+            const taskDone = activeChanges.reduce(
+              (sum, entry) => sum + (entry.tasks.total - entry.tasks.incomplete),
+              0,
+            )
+            return `  ${chalk.cyan('tasks'.padEnd(changeLabelWidth))}${chalk.white(`${taskDone}/${taskTotal} done`.padStart(changeCountWidth))}`
+          })(),
+        ]
 
         // Equalize content lines so bottom borders align on the exact same row
         const sideBySideMinLines = Math.max(specLines.length, changeLines.length)

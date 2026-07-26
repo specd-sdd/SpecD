@@ -9,13 +9,13 @@
     {
       "requirement": "buildProjectStatusSnapshot orchestration",
       "rules": [
-        "`buildProjectStatusSnapshot(ctx: SdkHostContext, options?: BuildProjectStatusSnapshotOptions): Promise<BuildProjectStatusSnapshotResult>` SHALL:\n\n1. Call `ctx.kernel.project.getProjectSummary.execute()` for workspace counts, change/draft/discarded/archive totals, and spec counts per workspace\n2. When `options.includeGraph` is `true` (default `false`), call `withOpenGraphProvider(ctx, async (provider) => { ... })`, construct `createGetGraphHealth()` from `@specd/code-graph`, and run `getGraphHealth.execute({ config, provider, codeGraphVersion, workspaces, assertUnlocked: false })` where `config` comes from `ctx.kernel.project.getConfig.execute()` and `workspaces` from `ctx.kernel.project.listWorkspaces.execute()`\n3. Return a merged result object containing summary fields plus optional `graphHealth` and `hotspots` when graph data was requested\n\nWhen graph loading fails (provider open, health query, or hotspots), the function MUST return `graphHealth: null` (and `hotspots: null` when requested) without throwing — hosts treat null as unavailable graph data.\n\nWhen `includeGraph` is `false`, the function MUST NOT open a graph provider."
+        "`buildProjectStatusSnapshot(ctx: SdkHostContext, options?: BuildProjectStatusSnapshotOptions): Promise<BuildProjectStatusSnapshotResult>` SHALL:\n\n1. Call `ctx.kernel.project.getProjectSummary.execute(summaryInput)` for workspace counts, change/draft/discarded/archive totals, and spec counts per workspace, where `summaryInput` is derived from snapshot options:\n   - `includeChanges` — forwarded when `options.includeChanges` is `true`\n   - `includeSpecsHealth` — forwarded when `options.includeSpecsHealth` is `true`\n   - When both are omitted/false, call `execute()` / `execute({})` so the summary stays count-only\n2. When `options.includeGraph` is `true` (default `false`), call `withOpenGraphProvider(ctx, async (provider) => { ... })`, construct `createGetGraphHealth()` from `@specd/code-graph`, and run `getGraphHealth.execute({ config, provider, codeGraphVersion, workspaces, assertUnlocked: false })` where `config` comes from `ctx.kernel.project.getConfig.execute()` and `workspaces` from `ctx.kernel.project.listWorkspaces.execute()`\n3. Return a merged result object containing summary fields plus optional `graphHealth` and `hotspots` when graph data was requested\n\nWhen graph loading fails (provider open, health query, or hotspots), the function MUST return `graphHealth: null` (and `hotspots: null` when requested) without throwing — hosts treat null as unavailable graph data.\n\nWhen `includeGraph` is `false`, the function MUST NOT open a graph provider."
       ]
     },
     {
       "requirement": "Result shape stability",
       "rules": [
-        "`BuildProjectStatusSnapshotResult` MUST expose:\n\n- `summary` — the `GetProjectSummaryResult` from core\n- `graphHealth` — `GetGraphHealthResult | null` (null when graph not requested or unavailable)\n- `approvals` — `{ specEnabled: boolean; signoffEnabled: boolean }` derived from `ctx.kernel.project.getConfig.execute()`\n- `llmOptimizedContext` — boolean from config\n\nHotspots MAY be included when `options.includeHotspots` is true and graph is loaded; otherwise omitted or null."
+        "`BuildProjectStatusSnapshotOptions` MUST accept:\n\n- `includeGraph?: boolean` (default `false`)\n- `includeHotspots?: boolean`\n- `includeChanges?: boolean` (default `false`) — forwarded to `GetProjectSummary`\n- `includeSpecsHealth?: boolean` (default `false`) — forwarded to `GetProjectSummary`\n\n`BuildProjectStatusSnapshotResult` MUST expose:\n\n- `summary` — the `GetProjectSummaryResult` from core (including optional `active` / `drafts` / `specsHealth` when requested)\n- `graphHealth` — `GetGraphHealthResult | null` (null when graph not requested or unavailable)\n- `approvals` — `{ specEnabled: boolean; signoffEnabled: boolean }` derived from `ctx.kernel.project.getConfig.execute()`\n- `llmOptimizedContext` — boolean from config\n\nHotspots MAY be included when `options.includeHotspots` is true and graph is loaded; otherwise omitted or null.\n\nThe snapshot MUST NOT duplicate enriched listing/health fields outside `summary`; hosts read them from `summary`."
       ]
     },
     {
@@ -37,9 +37,19 @@
       "name": "Summary only without graph",
       "when": ["buildProjectStatusSnapshot(ctx, { includeGraph: false }) is called"],
       "then": [
-        "kernel.project.getProjectSummary.execute() is invoked",
+        "kernel.project.getProjectSummary.execute() is invoked without requiring enrichment flags",
         "AND no graph provider is opened",
         "AND graphHealth is null"
+      ]
+    },
+    {
+      "requirement": "buildProjectStatusSnapshot orchestration",
+      "name": "Enrichment options forwarded to getProjectSummary",
+      "when": [
+        "buildProjectStatusSnapshot(ctx, { includeChanges: true, includeSpecsHealth: true }) is called"
+      ],
+      "then": [
+        "getProjectSummary.execute is invoked with includeChanges: true and includeSpecsHealth: true"
       ]
     },
     {
@@ -96,6 +106,15 @@
       "then": ["result llmOptimizedContext is true"]
     },
     {
+      "requirement": "Result shape stability",
+      "name": "Enriched fields live only under summary",
+      "when": ["snapshot is built with includeChanges and includeSpecsHealth"],
+      "then": [
+        "summary.active, summary.drafts, and summary.specsHealth are present when the use case returns them",
+        "AND the snapshot root does not duplicate those fields outside summary"
+      ]
+    },
+    {
       "requirement": "No presenter formatting",
       "name": "Returns structured object",
       "when": ["snapshot completes"],
@@ -116,13 +135,12 @@
     }
   ],
   "implementation": {
-    "files": [
+    "symbols": [
       {
         "specId": "sdk:build-project-status-snapshot",
-        "file": "sdk:test/orchestration/build-project-status-snapshot.spec.ts"
-      }
-    ],
-    "symbols": [
+        "file": "sdk:src/orchestration/build-project-status-snapshot.ts",
+        "symbol": "BuildProjectStatusSnapshotOptions"
+      },
       {
         "specId": "sdk:build-project-status-snapshot",
         "file": "sdk:src/orchestration/build-project-status-snapshot.ts",
@@ -131,21 +149,21 @@
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:9e02987a1a2b89ecf489e9c994f251d3cc956c9ed1afd6a8de0505a58ad5f7a3",
-    "verify.md": "sha256:1cce7f24b82f7740d5470b7737b312fe4133fc8ea422b8bd00ae5cae31429bf1"
+    "spec.md": "sha256:85d1392c2a2f599ed6443122ad4017cd203ef15f1b4a78ccfdfeb63a53ab074c",
+    "verify.md": "sha256:73ab2f77ff20c6eaf798f87a91adea7febb6ef441b1f8c120259a8b7ead141aa"
   },
   "provenance": {
     "artifacts": {
       "spec.md": {
-        "hash": "sha256:9e02987a1a2b89ecf489e9c994f251d3cc956c9ed1afd6a8de0505a58ad5f7a3",
-        "lastModified": "2026-07-06T14:22:55.466Z"
+        "hash": "sha256:85d1392c2a2f599ed6443122ad4017cd203ef15f1b4a78ccfdfeb63a53ab074c",
+        "lastModified": "2026-07-26T11:52:20.607Z"
       },
       "verify.md": {
-        "hash": "sha256:1cce7f24b82f7740d5470b7737b312fe4133fc8ea422b8bd00ae5cae31429bf1",
-        "lastModified": "2026-07-06T14:22:55.467Z"
+        "hash": "sha256:73ab2f77ff20c6eaf798f87a91adea7febb6ef441b1f8c120259a8b7ead141aa",
+        "lastModified": "2026-07-26T11:52:20.607Z"
       }
     },
-    "persistedStateHash": "sha256:225851ab8a4ebb6ef98cd452cfb3f1b1475b33feed3475b41abf1b06f1d21be1",
+    "persistedStateHash": "sha256:2ca60de9709e6814373766b4594843842a9edc583b455a681fe0c972819db9e7",
     "schema": {
       "name": "schema-std",
       "version": 1

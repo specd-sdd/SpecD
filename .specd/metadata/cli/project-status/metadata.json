@@ -1,6 +1,6 @@
 {
   "title": "project status command",
-  "description": "The specd entry skill and other downstream tools need a consolidated way to get project state. Currently they must call multiple CLI commands (config show, spec list, change list, drafts list, project context, graph stats), creating latency and scattered output. This spec defines a new `project status` command that consolidates this information.",
+  "description": "The specd entry skill and other downstream tools need a consolidated way to get project state. Currently they must call multiple CLI commands (config show, spec list, change list, drafts list, project context, graph stats), creating latency and scattered output. This spec defines a `project status` command that consolidates this information, including active/draft change listings with task progress and specs health for agent bootstrap.",
   "dependsOn": [
     "core:list-workspaces",
     "core:get-project-summary",
@@ -9,7 +9,7 @@
     "sdk:host-context"
   ],
   "context": [
-    "The specd entry skill and other downstream tools need a consolidated way to get project state. Currently they must call multiple CLI commands (config show, spec list, change list, drafts list, project context, graph stats), creating latency and scattered output. This spec defines a new `project status` command that consolidates this information."
+    "The specd entry skill and other downstream tools need a consolidated way to get project state. Currently they must call multiple CLI commands (config show, spec list, change list, drafts list, project context, graph stats), creating latency and scattered output. This spec defines a `project status` command that consolidates this information, including active/draft change listings with task progress and specs health for agent bootstrap."
   ],
   "rules": [
     {
@@ -33,7 +33,13 @@
     {
       "requirement": "includes change counts",
       "rules": [
-        "The command output MUST obtain change counts via `kernel.project.getProjectSummary.execute()`:\n\n- Number of active changes (`activeCount`)\n- Number of drafts (`draftCount`)\n- Number of discarded changes (`discardedCount`)\n- Number of archived changes (`archivedCount`)\n\nThe command MUST NOT call `kernel.changes.list`, `listDrafts`, or `listDiscarded` directly for counting."
+        "The command output MUST include change counts obtained via `buildProjectStatusSnapshot` / `GetProjectSummary`:\n\n- Active change count (`activeCount`)\n- Draft count (`draftCount`)\n- Discarded count (`discardedCount`)\n- Archived count (`archivedCount`)\n\nThe command MUST always request summary enrichment with `includeChanges: true` (via snapshot options). Output MUST include the `active` and `drafts` listings from `summary` (each entry: `name`, `state`, `tasks.incomplete`, `tasks.total`). There are no CLI flags to disable these listings.\n\nThe command MUST NOT call `listChanges`, `listDrafts`, `listDiscarded`, or `listArchived` directly for counting or for building these listings — enrichment comes from the summary path."
+      ]
+    },
+    {
+      "requirement": "includes specs health (always)",
+      "rules": [
+        "The command MUST always request summary enrichment with `includeSpecsHealth: true` (via snapshot options) and include `summary.specsHealth` in the output (`totalSpecs`, `passed`, `failed`, `warned`, and `issues`).\n\nThere is no CLI flag to disable specs health on `project status`.\n\nText mode is agent-oriented: the health summary line MUST use unambiguous word labels for the three counters — `ok` (from `passed`), `failed` (from `failed`), and `warning` (from `warned`) — for example `specsHealth: 265 total · 265 ok · 0 failed · 0 warning`. Issue rows MUST label severity as `failed` or `warning`. json/toon MAY keep the structured field names `passed` / `failed` / `warned`."
       ]
     },
     {
@@ -45,13 +51,13 @@
     {
       "requirement": "includes graph freshness (always)",
       "rules": [
-        "The command MUST obtain graph freshness fields via `buildProjectStatusSnapshot` from `@specd/sdk` with `{ includeGraph: true }`:\n\n- Whether the code graph is stale (boolean)\n- Last indexed timestamp (or null if never indexed)\n\nThe command MUST map `graphHealth.stale` and `graphHealth.lastIndexedAt` from the snapshot result. When graph health is unavailable (`graphHealth: null`), freshness fields MUST be emitted as `null`.\n\nGraph orchestration for this command MUST go through `@specd/sdk`; the handler obtains graph data exclusively via `buildProjectStatusSnapshot`.\n\nThis is included by default, not behind a flag."
+        "The command MUST obtain graph freshness fields via `buildProjectStatusSnapshot` from `@specd/sdk` with at least `{ includeGraph: true, includeChanges: true, includeSpecsHealth: true }`:\n\n- Whether the code graph is stale (boolean)\n- Last indexed timestamp (or null if never indexed)\n\nThe command MUST map `graphHealth.stale` and `graphHealth.lastIndexedAt` from the snapshot result. When graph health is unavailable (`graphHealth: null`), freshness fields MUST be emitted as `null`.\n\nGraph orchestration for this command MUST go through `@specd/sdk`; the handler obtains graph data exclusively via `buildProjectStatusSnapshot`.\n\nGraph freshness is included by default, not behind a flag. Summary change listings and specs health are also always requested (see their requirements)."
       ]
     },
     {
       "requirement": "supports --graph flag",
       "rules": [
-        "When `--graph` flag is provided, the command MUST call `buildProjectStatusSnapshot` with `{ includeGraph: true, includeHotspots: true }` and include extended graph statistics from the snapshot:\n\n- Number of indexed files (`graphHealth.fileCount`)\n- Number of indexed symbols (`graphHealth.symbolCount`)\n- Hotspots (from snapshot `hotspots` when available)\n\nPresenter formatting (text/json/toon) remains in the CLI command handler."
+        "When `--graph` flag is provided, the command MUST call `buildProjectStatusSnapshot` with `{ includeGraph: true, includeHotspots: true, includeChanges: true, includeSpecsHealth: true }` and include extended graph statistics from the snapshot:\n\n- Number of indexed files (`graphHealth.fileCount`)\n- Number of indexed symbols (`graphHealth.symbolCount`)\n- Hotspots (from snapshot `hotspots` when available)\n\nPresenter formatting (text/json/toon) remains in the CLI command handler."
       ]
     },
     {
@@ -130,20 +136,46 @@
     },
     {
       "requirement": "includes change counts",
-      "name": "Output includes active changes, drafts, discarded, and archived counts",
-      "given": ["a project with changes, drafts, discarded changes, and archived changes"],
-      "when": ["specd project status is run"],
+      "name": "Output shows active, drafts, discarded, and archived counts",
+      "given": ["a project with active changes, drafts, discarded, and archived entries"],
+      "when": ["specd project status runs"],
+      "then": ["output includes counts for active, drafts, discarded, and archived"]
+    },
+    {
+      "requirement": "includes change counts",
+      "name": "Counts obtained via enriched snapshot summary",
+      "when": ["specd project status runs"],
       "then": [
-        "output includes counts for active changes, drafts, discarded changes, and archived changes"
+        "change counts come from buildProjectStatusSnapshot / GetProjectSummary",
+        "AND the handler does not call list use cases directly for counting"
       ]
     },
     {
       "requirement": "includes change counts",
-      "name": "Counts obtained via GetProjectSummary",
-      "when": ["specd project status calculates change counts"],
+      "name": "Active and draft listings always present",
+      "given": ["a project with at least one active change that has task checkboxes"],
+      "when": ["specd project status runs"],
       "then": [
-        "it calls kernel.project.getProjectSummary.execute()",
-        "AND it does not call kernel.changes.list, listDrafts, or listDiscarded directly for counting"
+        "output includes active and drafts listings with name, state, and task incomplete/total",
+        "AND the snapshot was requested with includeChanges: true"
+      ]
+    },
+    {
+      "requirement": "includes specs health (always)",
+      "name": "Specs health always requested and shown",
+      "when": ["specd project status runs"],
+      "then": [
+        "the snapshot is requested with includeSpecsHealth: true",
+        "AND output includes specsHealth aggregates (totalSpecs, passed, failed, warned) and issues when present"
+      ]
+    },
+    {
+      "requirement": "includes specs health (always)",
+      "name": "Text mode uses word labels for health counters",
+      "when": ["specd project status runs with default text format"],
+      "then": [
+        "the specs-health summary line includes the labels ok, failed, and warning (not glyph-only markers such as ✓ / ✗ / ⚠)",
+        "AND json/toon still expose structured passed / failed / warned fields"
       ]
     },
     {
@@ -160,7 +192,7 @@
       "when": ["specd project status runs without --graph flag"],
       "then": [
         "graph staleness and last indexed timestamp are included",
-        "AND the command obtains them via buildProjectStatusSnapshot with { includeGraph: true }",
+        "AND the command obtains them via buildProjectStatusSnapshot with { includeGraph: true, includeChanges: true, includeSpecsHealth: true }",
         "AND graph data comes exclusively from @specd/sdk"
       ]
     },
@@ -171,7 +203,7 @@
       "when": ["specd project status --graph runs"],
       "then": [
         "indexed files count, symbols count, and hotspots are included",
-        "AND the command calls buildProjectStatusSnapshot with { includeGraph: true, includeHotspots: true }"
+        "AND the command calls buildProjectStatusSnapshot with { includeGraph: true, includeHotspots: true, includeChanges: true, includeSpecsHealth: true }"
       ]
     },
     {
@@ -281,21 +313,21 @@
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:5ab8011c1af6f23983827db4057ec0b4a89fbfe917b4d268a36bb95e1cf6111b",
-    "verify.md": "sha256:d9cb63db4520a7c3046534be36c0d36a24e093eb8ef2f755a69304b5a3eac70d"
+    "spec.md": "sha256:99dbdd2a62d17c1630b0ce2109677a6036d6e272d7d8ab092d4ee9fa2917fddc",
+    "verify.md": "sha256:6295d3f2a81ee1675b4740b920c0244ac2a107906d06652e1b2f68ba4db2260c"
   },
   "provenance": {
     "artifacts": {
       "spec.md": {
-        "hash": "sha256:5ab8011c1af6f23983827db4057ec0b4a89fbfe917b4d268a36bb95e1cf6111b",
-        "lastModified": "2026-07-03T08:53:29.898Z"
+        "hash": "sha256:99dbdd2a62d17c1630b0ce2109677a6036d6e272d7d8ab092d4ee9fa2917fddc",
+        "lastModified": "2026-07-26T11:52:20.656Z"
       },
       "verify.md": {
-        "hash": "sha256:d9cb63db4520a7c3046534be36c0d36a24e093eb8ef2f755a69304b5a3eac70d",
-        "lastModified": "2026-07-03T08:53:29.906Z"
+        "hash": "sha256:6295d3f2a81ee1675b4740b920c0244ac2a107906d06652e1b2f68ba4db2260c",
+        "lastModified": "2026-07-26T11:52:20.657Z"
       }
     },
-    "persistedStateHash": "sha256:2c665056ae2ac170bf27df5bc90a72e9d5a77cf4bdcabe009c7e648e28dd1e97",
+    "persistedStateHash": "sha256:4327328124c3873f2d79540483540f52f3a7531acd7d094b92964e1dfb65ec36",
     "schema": {
       "name": "schema-std",
       "version": 1

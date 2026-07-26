@@ -29,17 +29,38 @@
 
 ### Requirement: includes change counts
 
-#### Scenario: Output includes active changes, drafts, discarded, and archived counts
+#### Scenario: Output shows active, drafts, discarded, and archived counts
 
-- **GIVEN** a project with changes, drafts, discarded changes, and archived changes
-- **WHEN** `specd project status` is run
-- **THEN** output includes counts for active changes, drafts, discarded changes, and archived changes
+- **GIVEN** a project with active changes, drafts, discarded, and archived entries
+- **WHEN** `specd project status` runs
+- **THEN** output includes counts for active, drafts, discarded, and archived
 
-#### Scenario: Counts obtained via GetProjectSummary
+#### Scenario: Counts obtained via enriched snapshot summary
 
-- **WHEN** `specd project status` calculates change counts
-- **THEN** it calls `kernel.project.getProjectSummary.execute()`
-- **AND** it does not call `kernel.changes.list`, `listDrafts`, or `listDiscarded` directly for counting
+- **WHEN** `specd project status` runs
+- **THEN** change counts come from `buildProjectStatusSnapshot` / `GetProjectSummary`
+- **AND** the handler does not call list use cases directly for counting
+
+#### Scenario: Active and draft listings always present
+
+- **GIVEN** a project with at least one active change that has task checkboxes
+- **WHEN** `specd project status` runs
+- **THEN** output includes active and drafts listings with `name`, `state`, and task incomplete/total
+- **AND** the snapshot was requested with `includeChanges: true`
+
+### Requirement: includes specs health (always)
+
+#### Scenario: Specs health always requested and shown
+
+- **WHEN** `specd project status` runs
+- **THEN** the snapshot is requested with `includeSpecsHealth: true`
+- **AND** output includes `specsHealth` aggregates (`totalSpecs`, `passed`, `failed`, `warned`) and `issues` when present
+
+#### Scenario: Text mode uses word labels for health counters
+
+- **WHEN** `specd project status` runs with default text format
+- **THEN** the specs-health summary line includes the labels `ok`, `failed`, and `warning` (not glyph-only markers such as `✓` / `✗` / `⚠`)
+- **AND** json/toon still expose structured `passed` / `failed` / `warned` fields
 
 ### Requirement: includes approval gates
 
@@ -56,7 +77,7 @@
 - **GIVEN** a project with an indexed code graph
 - **WHEN** `specd project status` runs without --graph flag
 - **THEN** graph staleness and last indexed timestamp are included
-- **AND** the command obtains them via `buildProjectStatusSnapshot` with `{ includeGraph: true }`
+- **AND** the command obtains them via `buildProjectStatusSnapshot` with `{ includeGraph: true, includeChanges: true, includeSpecsHealth: true }`
 - **AND** graph data comes exclusively from `@specd/sdk`
 
 ### Requirement: supports --graph flag
@@ -66,7 +87,7 @@
 - **GIVEN** a project with indexed code
 - **WHEN** `specd project status --graph` runs
 - **THEN** indexed files count, symbols count, and hotspots are included
-- **AND** the command calls `buildProjectStatusSnapshot` with `{ includeGraph: true, includeHotspots: true }`
+- **AND** the command calls `buildProjectStatusSnapshot` with `{ includeGraph: true, includeHotspots: true, includeChanges: true, includeSpecsHealth: true }`
 
 ### Requirement: supports --context flag
 

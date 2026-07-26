@@ -7,10 +7,43 @@
   "implementation": [
     {
       "file": "sdk:src/orchestration/build-project-status-snapshot.ts",
-      "symbols": ["buildProjectStatusSnapshot"]
-    },
-    {
-      "file": "sdk:test/orchestration/build-project-status-snapshot.spec.ts"
+      "symbols": ["BuildProjectStatusSnapshotOptions", "buildProjectStatusSnapshot"]
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Orchestrates project summary + optional graph health/hotspots via SdkHostContext; null on graph fail, never throw.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:9e02987a1a2b89ecf489e9c994f251d3cc956c9ed1afd6a8de0505a58ad5f7a3",
+          "lastModified": "2026-07-06T14:22:55.466Z"
+        },
+        "verify.md": {
+          "hash": "sha256:1cce7f24b82f7740d5470b7737b312fe4133fc8ea422b8bd00ae5cae31429bf1",
+          "lastModified": "2026-07-06T14:22:55.467Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# SDK Build Project Status Snapshot\n## Rules\n### buildProjectStatusSnapshot orchestration\n- `buildProjectStatusSnapshot(ctx: SdkHostContext, options?: BuildProjectStatusSnapshotOptions): Promise<BuildProjectStatusSnapshotResult>`\n  1. `ctx.kernel.project.getProjectSummary.execute()` — workspace/change/draft/discarded/archive + per-workspace spec counts\n  2. If `options.includeGraph` true (default false): `withOpenGraphProvider(ctx, ...)`, `createGetGraphHealth()`, execute with `{ config, provider, codeGraphVersion, workspaces, assertUnlocked: false }` — config from `getConfig`, workspaces from `listWorkspaces`\n  3. Merge summary + optional `graphHealth`/`hotspots`\n- Graph fail (open/health/hotspots) → `graphHealth: null` (+ `hotspots: null` if requested); MUST NOT throw\n- `includeGraph: false` → MUST NOT open provider\n\n### Result shape stability\n- `summary`: `GetProjectSummaryResult`\n- `graphHealth`: `GetGraphHealthResult | null`\n- `approvals`: `{ specEnabled; signoffEnabled }` from `getConfig`\n- `llmOptimizedContext`: boolean from config\n- Hotspots only if `includeHotspots` + graph loaded; else omit/null\n\n### No presenter formatting\n- Structured data only; text/json/toon in CLI presenters\n\n### No direct repository bootstrap\n- Summary/workspaces ONLY via `SdkHostContext` project queries\n- MUST NOT construct `ChangeRepository`/`SpecRepository` or parallel bootstrap\n\n## Constraints\n- Cross-package read path lives in `@specd/sdk`; hosts treat null graph as unavailable",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:9e02987a1a2b89ecf489e9c994f251d3cc956c9ed1afd6a8de0505a58ad5f7a3",
+          "lastModified": "2026-07-06T14:22:55.466Z"
+        },
+        "verify.md": {
+          "hash": "sha256:1cce7f24b82f7740d5470b7737b312fe4133fc8ea422b8bd00ae5cae31429bf1",
+          "lastModified": "2026-07-06T14:22:55.467Z"
+        }
+      }
+    }
+  }
 }

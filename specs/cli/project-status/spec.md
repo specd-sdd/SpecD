@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The specd entry skill and other downstream tools need a consolidated way to get project state. Currently they must call multiple CLI commands (config show, spec list, change list, drafts list, project context, graph stats), creating latency and scattered output. This spec defines a new `project status` command that consolidates this information.
+The specd entry skill and other downstream tools need a consolidated way to get project state. Currently they must call multiple CLI commands (config show, spec list, change list, drafts list, project context, graph stats), creating latency and scattered output. This spec defines a `project status` command that consolidates this information, including active/draft change listings with task progress and specs health for agent bootstrap.
 
 ## Requirements
 
@@ -30,14 +30,24 @@ The command MUST NOT call `SpecRepository.count()` directly or orchestrate `List
 
 ### Requirement: includes change counts
 
-The command output MUST obtain change counts via `kernel.project.getProjectSummary.execute()`:
+The command output MUST include change counts obtained via `buildProjectStatusSnapshot` / `GetProjectSummary`:
 
-- Number of active changes (`activeCount`)
-- Number of drafts (`draftCount`)
-- Number of discarded changes (`discardedCount`)
-- Number of archived changes (`archivedCount`)
+- Active change count (`activeCount`)
+- Draft count (`draftCount`)
+- Discarded count (`discardedCount`)
+- Archived count (`archivedCount`)
 
-The command MUST NOT call `kernel.changes.list`, `listDrafts`, or `listDiscarded` directly for counting.
+The command MUST always request summary enrichment with `includeChanges: true` (via snapshot options). Output MUST include the `active` and `drafts` listings from `summary` (each entry: `name`, `state`, `tasks.incomplete`, `tasks.total`). There are no CLI flags to disable these listings.
+
+The command MUST NOT call `listChanges`, `listDrafts`, `listDiscarded`, or `listArchived` directly for counting or for building these listings — enrichment comes from the summary path.
+
+### Requirement: includes specs health (always)
+
+The command MUST always request summary enrichment with `includeSpecsHealth: true` (via snapshot options) and include `summary.specsHealth` in the output (`totalSpecs`, `passed`, `failed`, `warned`, and `issues`).
+
+There is no CLI flag to disable specs health on `project status`.
+
+Text mode is agent-oriented: the health summary line MUST use unambiguous word labels for the three counters — `ok` (from `passed`), `failed` (from `failed`), and `warning` (from `warned`) — for example `specsHealth: 265 total · 265 ok · 0 failed · 0 warning`. Issue rows MUST label severity as `failed` or `warning`. json/toon MAY keep the structured field names `passed` / `failed` / `warned`.
 
 ### Requirement: includes approval gates
 
@@ -48,7 +58,7 @@ The command output MUST include:
 
 ### Requirement: includes graph freshness (always)
 
-The command MUST obtain graph freshness fields via `buildProjectStatusSnapshot` from `@specd/sdk` with `{ includeGraph: true }`:
+The command MUST obtain graph freshness fields via `buildProjectStatusSnapshot` from `@specd/sdk` with at least `{ includeGraph: true, includeChanges: true, includeSpecsHealth: true }`:
 
 - Whether the code graph is stale (boolean)
 - Last indexed timestamp (or null if never indexed)
@@ -57,11 +67,11 @@ The command MUST map `graphHealth.stale` and `graphHealth.lastIndexedAt` from th
 
 Graph orchestration for this command MUST go through `@specd/sdk`; the handler obtains graph data exclusively via `buildProjectStatusSnapshot`.
 
-This is included by default, not behind a flag.
+Graph freshness is included by default, not behind a flag. Summary change listings and specs health are also always requested (see their requirements).
 
 ### Requirement: supports --graph flag
 
-When `--graph` flag is provided, the command MUST call `buildProjectStatusSnapshot` with `{ includeGraph: true, includeHotspots: true }` and include extended graph statistics from the snapshot:
+When `--graph` flag is provided, the command MUST call `buildProjectStatusSnapshot` with `{ includeGraph: true, includeHotspots: true, includeChanges: true, includeSpecsHealth: true }` and include extended graph statistics from the snapshot:
 
 - Number of indexed files (`graphHealth.fileCount`)
 - Number of indexed symbols (`graphHealth.symbolCount`)

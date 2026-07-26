@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Users joining a project or returning after time away need a quick snapshot of what exists and what is in flight. The `specd project dashboard` command displays a visual dashboard summarising the current state of a SpecD project — project metadata, spec counts per workspace, and change counts by state — as an ASCII box layout in text mode or a structured data object in `json`/`toon` mode. It is also the default output when `specd` is invoked with no subcommand and a valid config is present.
+Users joining a project or returning after time away need a quick snapshot of what exists and what is in flight. The `specd project dashboard` command displays a visual dashboard summarising the current state of a SpecD project — project metadata, spec counts per workspace with specs-health aggregates in the Specs header, change counts by state with an active-tasks progress line, and graph diagnostics — as an ASCII box layout in text mode or a structured data object in `json`/`toon` mode. It is also the default output when `specd` is invoked with no subcommand and a valid config is present.
 
 ## Requirements
 
@@ -26,8 +26,8 @@ In `text` mode the command outputs:
    - `root:` — absolute path to the project root. If the value would cause the row to overflow the inner box width, the value wraps to continuation lines indented to align with the start of the value column.
    - `schema:` — the schema reference from `specd.yaml`.
    - `workspaces:` — comma-separated list of workspace names. If the value exceeds available inner width, it wraps to continuation lines indented to align with the start of the value column, wrapping on word/comma boundaries without splitting workspace names mid-word.
-5. **Specs box** — an inner box labelled `Specs` rendering a 2-column aligned table of total spec count and per-workspace breakdown (including empty workspaces with 0 count), dynamically padded to the longest workspace name.
-6. **Changes box** — an inner box labelled `Changes` rendering a 2-column aligned table with each change state on its own line (`active`, `drafts`, `discarded`, `archived`).
+5. **Specs box** — an inner box labelled `Specs` whose first content line MUST show the total spec count together with specs-health aggregates from `summary.specsHealth` (for example `246 total · 240✓ 4✗ 2w` using `passed` / `failed` / `warned`). Below that line, render a 2-column aligned table of per-workspace breakdown (including empty workspaces with 0 count), dynamically padded to the longest workspace name. Per-workspace health badges are NOT required in v1.
+6. **Changes box** — an inner box labelled `Changes` rendering a 2-column aligned table with each change state on its own line (`active`, `drafts`, `discarded`, `archived`), plus one additional line for task progress over **active** changes only, derived by summing `tasks.complete` equivalents (`total - incomplete`) and `tasks.total` across `summary.active` (for example `tasks 12/48 done`). The Changes box MUST NOT list individual active/draft change rows (that detail belongs to `project status`).
 7. **Graph box** — an inner box labelled `Graph` showing graph freshness timestamp, staleness indicator, document count (`docs:`), file count (`files:`), symbol count (`symbols:`), relation count (`relations:`), and indexed languages (`languages:`) when graph diagnostics are available.
 8. **Layout** — the Project and Graph boxes span the full inner width of the dashboard; Specs and Changes sub-boxes are rendered side by side, matching the full container width.
 
@@ -37,7 +37,9 @@ In `json` or `toon` mode, `specd project dashboard` delegates execution directly
 
 ### Requirement: Data sources
 
-All metrics and diagnostics are fetched via `buildProjectStatusSnapshot(host, { includeGraph: true })` from `@specd/sdk` (or host composition), ensuring complete parity with `specd project status`.
+All metrics and diagnostics are fetched via `buildProjectStatusSnapshot(host, { includeGraph: true, includeChanges: true, includeSpecsHealth: true })` from `@specd/sdk` (or host composition), ensuring parity with enriched `specd project status` data sources.
+
+The text dashboard MUST read specs-health aggregates from `summary.specsHealth` and active task totals from `summary.active[*].tasks`. It MUST NOT call `GetSpecsHealth`, `ListChanges`, or `CountTasks` directly outside the snapshot/summary path.
 
 ### Requirement: Config dependency
 

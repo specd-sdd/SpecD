@@ -7,9 +7,14 @@
 #### Scenario: Summary only without graph
 
 - **WHEN** `buildProjectStatusSnapshot(ctx, { includeGraph: false })` is called
-- **THEN** `kernel.project.getProjectSummary.execute()` is invoked
+- **THEN** `kernel.project.getProjectSummary.execute()` is invoked without requiring enrichment flags
 - **AND** no graph provider is opened
 - **AND** `graphHealth` is null
+
+#### Scenario: Enrichment options forwarded to getProjectSummary
+
+- **WHEN** `buildProjectStatusSnapshot(ctx, { includeChanges: true, includeSpecsHealth: true })` is called
+- **THEN** `getProjectSummary.execute` is invoked with `includeChanges: true` and `includeSpecsHealth: true`
 
 #### Scenario: Graph health included when requested
 
@@ -50,6 +55,12 @@
 - **GIVEN** config has `llmOptimizedContext: true`
 - **WHEN** snapshot is built
 - **THEN** result `llmOptimizedContext` is `true`
+
+#### Scenario: Enriched fields live only under summary
+
+- **WHEN** snapshot is built with `includeChanges` and `includeSpecsHealth`
+- **THEN** `summary.active`, `summary.drafts`, and `summary.specsHealth` are present when the use case returns them
+- **AND** the snapshot root does not duplicate those fields outside `summary`
 
 ### Requirement: No presenter formatting
 

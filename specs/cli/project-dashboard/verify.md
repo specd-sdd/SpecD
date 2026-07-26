@@ -20,61 +20,61 @@
 
 #### Scenario: Dashboard outputs 'Using config:' line before the box
 
-- **GIVEN** a valid project with `specd.yaml` at `/some/project/specd.yaml`
-- **AND** CWD is `/some/project`
-- **WHEN** `specd project dashboard` is run
-- **THEN** stdout begins with `Using config: specd.yaml` before any box decoration
+- **WHEN** `specd project dashboard` runs in text mode
+- **THEN** stdout includes a `Using config:` line before the outer dashboard box
 
 #### Scenario: 'Using config:' path is relative to CWD
 
-- **GIVEN** CWD is `/home/user`
-- **AND** `specd.yaml` is at `/home/user/myproject/specd.yaml`
-- **WHEN** `specd project dashboard` is run
-- **THEN** stdout contains `Using config: myproject/specd.yaml`
+- **WHEN** `specd project dashboard` runs in text mode
+- **THEN** the config path shown is relative to `process.cwd()`
 
 #### Scenario: Dashboard includes banner above the box
 
-- **GIVEN** a valid project
-- **WHEN** `specd project dashboard` is run in text mode
-- **THEN** stdout contains the SpecD ASCII art logo between the config line and the boxen border
+- **WHEN** `specd project dashboard` runs in text mode
+- **THEN** the SpecD banner appears above the outer dashboard box
 
 #### Scenario: Dashboard contains project metadata
 
-- **GIVEN** a project with `schemaRef: '@specd/schema-std'` and workspace `default`
-- **WHEN** `specd project dashboard` is run
-- **THEN** stdout contains the project root path, `@specd/schema-std`, and `default`
+- **WHEN** `specd project dashboard` runs in text mode
+- **THEN** the Project box includes root, schema, and workspaces
+
+#### Scenario: Specs box header shows total with health aggregates
+
+- **GIVEN** `summary.specsHealth` reports passed, failed, and warned counts
+- **WHEN** `specd project dashboard` runs in text mode
+- **THEN** the Specs box first line includes the total spec count together with health aggregates
+- **AND** per-workspace rows still show counts without required per-workspace health badges
 
 #### Scenario: Specs box shows per-workspace counts
 
-- **GIVEN** a project with 2 specs in workspace `default` and 1 in workspace `billing`
-- **WHEN** `specd project dashboard` is run
-- **THEN** stdout contains `3` as total and per-workspace lines for `default` (2) and `billing` (1)
+- **WHEN** `specd project dashboard` runs in text mode
+- **THEN** the Specs box lists each workspace with its spec count
 
-#### Scenario: Changes box shows active, drafts, discarded, and archived
+#### Scenario: Changes box shows counts and active tasks line
 
-- **GIVEN** a project with 2 active changes, 1 draft, 1 discarded, and 5 archived changes
-- **WHEN** `specd project dashboard` is run
-- **THEN** stdout contains `active`, `drafts`, `discarded`, and `archived` as separate aligned table rows in the `Changes` box
+- **GIVEN** active changes with non-zero task totals in `summary.active`
+- **WHEN** `specd project dashboard` runs in text mode
+- **THEN** the Changes box shows active, drafts, discarded, and archived counts
+- **AND** one additional line shows summed active task progress as done/total
+- **AND** individual active/draft change names are not listed in the Changes box
 
 #### Scenario: Long project root wraps to value column
 
-- **GIVEN** the project root path is longer than the box's inner width
-- **WHEN** `specd project dashboard` is run
-- **THEN** the root path wraps to the next line indented to the value column start
-- **AND** the box border is not broken
+- **GIVEN** a project root path longer than the Project box value column
+- **WHEN** `specd project dashboard` runs in text mode
+- **THEN** the root value wraps on continuation lines aligned to the value column
 
 #### Scenario: Long workspaces list wraps to value column
 
-- **GIVEN** a project with 15 workspaces whose combined names exceed the inner box width
-- **WHEN** `specd project dashboard` is run
-- **THEN** the workspaces list wraps to continuation lines indented to the value column start
-- **AND** the box border remains intact
+- **GIVEN** a workspaces list longer than the Project box value column
+- **WHEN** `specd project dashboard` runs in text mode
+- **THEN** workspace names wrap on word/comma boundaries aligned to the value column
 
 #### Scenario: Graph box displays health diagnostics when graph is available
 
-- **GIVEN** a project with indexed code graph
-- **WHEN** `specd project dashboard` is run in text mode
-- **THEN** stdout contains a Graph box displaying graph freshness, document count (`docs:`), file/symbol counts, relation count (`relations:`), and indexed languages (`languages:`)
+- **GIVEN** graph diagnostics are available from the snapshot
+- **WHEN** `specd project dashboard` runs in text mode
+- **THEN** the Graph box shows freshness, counts, and languages
 
 ### Requirement: JSON and toon output
 
@@ -97,11 +97,12 @@
 
 ### Requirement: Data sources
 
-#### Scenario: Dashboard metrics match buildProjectStatusSnapshot
+#### Scenario: Dashboard metrics match enriched buildProjectStatusSnapshot
 
-- **GIVEN** a valid project
-- **WHEN** `specd project dashboard` is run
-- **THEN** the spec, change, and graph metrics match the data produced by `buildProjectStatusSnapshot`
+- **WHEN** `specd project dashboard` runs
+- **THEN** data is fetched via `buildProjectStatusSnapshot` with `{ includeGraph: true, includeChanges: true, includeSpecsHealth: true }`
+- **AND** Specs health and Changes tasks lines are derived from `summary.specsHealth` and `summary.active`
+- **AND** the command does not call `GetSpecsHealth`, `ListChanges`, or `CountTasks` directly
 
 ### Requirement: Config dependency
 

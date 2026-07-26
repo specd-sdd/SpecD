@@ -1114,7 +1114,7 @@ Display the full contents of the `project-metadata.json` file.
 specd project dashboard [options]
 ````
 
-Display a project-level dashboard showing schema, workspaces, spec counts, change activity (including archived changes), and Code Graph diagnostics. Also runs automatically when `specd` is invoked with no subcommand and a config is present (see [Invocation](#invocation)). In `json` or `toon` mode, execution delegates directly to `specd project status --format <fmt>`.
+Display a project-level dashboard showing schema, workspaces, spec counts, change activity (including archived changes), specs health aggregates in the Specs header, active-change task progress in the Changes box, and Code Graph diagnostics. Also runs automatically when `specd` is invoked with no subcommand and a config is present (see [Invocation](#invocation)). In `json` or `toon` mode, execution delegates directly to `specd project status --format <fmt>`.
 
 | Option                      | Description                                                    |
 | --------------------------- | -------------------------------------------------------------- |
@@ -1134,7 +1134,9 @@ By default, the output includes:
 - Project root path and schema reference
 - Workspaces with name, prefix, and ownership
 - Spec counts (total and per-workspace)
-- Change counts (active, drafts, discarded)
+- Change counts (active, drafts, discarded, archived)
+- Active and draft change listings with per-change task progress (`incomplete/total`)
+- Specs health aggregates (text: `ok` / `failed` / `warning` labels; json/toon: `passed` / `failed` / `warned` and issue list)
 - Graph freshness (stale boolean, last indexed timestamp) — always included
 - Approval gates (spec enabled, signoff enabled)
 - Config flags (llmOptimizedContext)

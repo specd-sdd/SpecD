@@ -1148,7 +1148,7 @@ Lifecycle state, requested-step readiness, blockers, and per-step availability a
 
 ### GetProjectSummary
 
-Returns consolidated project-level counts (active/draft/discarded/archived changes and specs per workspace) without loading change entities, spec metadata, graph statistics, or compiled context.
+Returns consolidated project-level counts (active/draft/discarded/archived changes and specs per workspace). By default it does not load change entities, spec metadata, graph statistics, or compiled context. Optional execute input flags can add active/draft listings with task progress and specs health.
 
 **Constructor:**
 
@@ -1157,10 +1157,14 @@ new GetProjectSummary(
   changes: ChangeRepository,
   archive: ArchiveRepository,
   listWorkspaces: ListWorkspaces,
+  listChanges: ListChanges,
+  listDrafts: ListDrafts,
+  countTasks: CountTasks,
+  getSpecsHealth: GetSpecsHealth,
 )
 ```
 
-**Input:** none — `execute()` accepts no parameters.
+**Input:** optional `GetProjectSummaryInput` with `includeChanges?` and `includeSpecsHealth?` (both default to false).
 
 **Returns:** `Promise<GetProjectSummaryResult>`
 
@@ -1172,12 +1176,17 @@ interface GetProjectSummaryResult {
   archivedCount: number
   specsByWorkspace: Readonly<Record<string, number>>
   workspaceCount: number
+  active?: readonly ProjectChangeSummaryEntry[]
+  drafts?: readonly ProjectChangeSummaryEntry[]
+  specsHealth?: GetSpecsHealthResult
 }
 ```
 
-Change counts use `ChangeRepository.count()` / `countDrafts()` / `countDiscarded()` and `ArchiveRepository.count()` — no full list materialization. Spec counts call `SpecRepository.count()` on each workspace from `ListWorkspaces`.
+When enrichment flags are omitted or false, `active`, `drafts`, and `specsHealth` are absent from the result. When `includeChanges` is true, `active` and `drafts` are always present (possibly empty arrays).
 
-**Composition factory:** `createGetProjectSummary(config: SpecdConfig)` wires `changes`, `archive`, and `listWorkspaces` from a resolved project configuration.
+Change counts use `ChangeRepository.count()` / `countDrafts()` / `countDiscarded()` and `ArchiveRepository.count()` — no full list materialization for counts. Spec counts call `SpecRepository.count()` on each workspace from `ListWorkspaces`.
+
+**Composition factory:** `createGetProjectSummary(config: SpecdConfig)` wires all constructor dependencies through `resolveGetProjectSummaryDeps`.
 
 **Kernel:** `kernel.project.getProjectSummary`
 

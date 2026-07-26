@@ -14,6 +14,10 @@ export interface BuildProjectStatusSnapshotOptions {
   readonly includeGraph?: boolean
   /** When true (and graph loaded), include hotspot entries. */
   readonly includeHotspots?: boolean
+  /** When true, include active/draft change listings with task totals on `summary`. */
+  readonly includeChanges?: boolean
+  /** When true, include specs health aggregates on `summary`. */
+  readonly includeSpecsHealth?: boolean
 }
 
 /** Merged project and optional graph status snapshot. */
@@ -43,8 +47,18 @@ export async function buildProjectStatusSnapshot(
 ): Promise<BuildProjectStatusSnapshotResult> {
   const includeGraph = options?.includeGraph ?? false
   const includeHotspots = options?.includeHotspots ?? false
+  const includeChanges = options?.includeChanges === true
+  const includeSpecsHealth = options?.includeSpecsHealth === true
 
-  const summary = await ctx.kernel.project.getProjectSummary.execute()
+  const summaryInput =
+    includeChanges || includeSpecsHealth
+      ? {
+          ...(includeChanges ? { includeChanges: true as const } : {}),
+          ...(includeSpecsHealth ? { includeSpecsHealth: true as const } : {}),
+        }
+      : undefined
+
+  const summary = await ctx.kernel.project.getProjectSummary.execute(summaryInput)
   const config = ctx.kernel.project.getConfig.execute()
 
   const approvals = {

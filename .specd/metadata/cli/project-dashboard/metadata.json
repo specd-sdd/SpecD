@@ -1,9 +1,9 @@
 {
   "title": "Project Dashboard",
-  "description": "Users joining a project or returning after time away need a quick snapshot of what exists and what is in flight. The `specd project dashboard` command displays a visual dashboard summarising the current state of a SpecD project — project metadata, spec counts per workspace, and change counts by state — as an ASCII box layout in text mode or a structured data object in `json`/`toon` mode. It is also the default output when `specd` is invoked with no subcommand and a valid config is present.",
+  "description": "Users joining a project or returning after time away need a quick snapshot of what exists and what is in flight. The `specd project dashboard` command displays a visual dashboard summarising the current state of a SpecD project — project metadata, spec counts per workspace with specs-health aggregates in the Specs header, change counts by state with an active-tasks progress line, and graph diagnostics — as an ASCII box layout in text mode or a structured data object in `json`/`toon` mode. It is also the default output when `specd` is invoked with no subcommand and a valid config is present.",
   "dependsOn": ["cli:entrypoint", "core:config"],
   "context": [
-    "Users joining a project or returning after time away need a quick snapshot of what exists and what is in flight. The `specd project dashboard` command displays a visual dashboard summarising the current state of a SpecD project — project metadata, spec counts per workspace, and change counts by state — as an ASCII box layout in text mode or a structured data object in `json`/`toon` mode. It is also the default output when `specd` is invoked with no subcommand and a valid config is present."
+    "Users joining a project or returning after time away need a quick snapshot of what exists and what is in flight. The `specd project dashboard` command displays a visual dashboard summarising the current state of a SpecD project — project metadata, spec counts per workspace with specs-health aggregates in the Specs header, change counts by state with an active-tasks progress line, and graph diagnostics — as an ASCII box layout in text mode or a structured data object in `json`/`toon` mode. It is also the default output when `specd` is invoked with no subcommand and a valid config is present."
   ],
   "rules": [
     {
@@ -15,7 +15,7 @@
     {
       "requirement": "Text dashboard",
       "rules": [
-        "In `text` mode the command outputs:\n\n1. **Banner** — the SpecD ASCII logo rendered above the dashboard box.\n2. **Config line** — a plain text line `Using config: <relative-path>` printed to stdout before any box decoration. `<relative-path>` is the path to the loaded `specd.yaml` relative to `process.cwd()`.\n3. **Outer container** — a rounded `boxen` box with the title `SpecD project dashboard` centred at the top and a cyan border.\n4. **Project box** — a full-width inner box labelled `Project` showing:\n   - `root:` — absolute path to the project root. If the value would cause the row to overflow the inner box width, the value wraps to continuation lines indented to align with the start of the value column.\n   - `schema:` — the schema reference from `specd.yaml`.\n   - `workspaces:` — comma-separated list of workspace names. If the value exceeds available inner width, it wraps to continuation lines indented to align with the start of the value column, wrapping on word/comma boundaries without splitting workspace names mid-word.\n5. **Specs box** — an inner box labelled `Specs` rendering a 2-column aligned table of total spec count and per-workspace breakdown (including empty workspaces with 0 count), dynamically padded to the longest workspace name.\n6. **Changes box** — an inner box labelled `Changes` rendering a 2-column aligned table with each change state on its own line (`active`, `drafts`, `discarded`, `archived`).\n7. **Graph box** — an inner box labelled `Graph` showing graph freshness timestamp, staleness indicator, document count (`docs:`), file count (`files:`), symbol count (`symbols:`), relation count (`relations:`), and indexed languages (`languages:`) when graph diagnostics are available.\n8. **Layout** — the Project and Graph boxes span the full inner width of the dashboard; Specs and Changes sub-boxes are rendered side by side, matching the full container width."
+        "In `text` mode the command outputs:\n\n1. **Banner** — the SpecD ASCII logo rendered above the dashboard box.\n2. **Config line** — a plain text line `Using config: <relative-path>` printed to stdout before any box decoration. `<relative-path>` is the path to the loaded `specd.yaml` relative to `process.cwd()`.\n3. **Outer container** — a rounded `boxen` box with the title `SpecD project dashboard` centred at the top and a cyan border.\n4. **Project box** — a full-width inner box labelled `Project` showing:\n   - `root:` — absolute path to the project root. If the value would cause the row to overflow the inner box width, the value wraps to continuation lines indented to align with the start of the value column.\n   - `schema:` — the schema reference from `specd.yaml`.\n   - `workspaces:` — comma-separated list of workspace names. If the value exceeds available inner width, it wraps to continuation lines indented to align with the start of the value column, wrapping on word/comma boundaries without splitting workspace names mid-word.\n5. **Specs box** — an inner box labelled `Specs` whose first content line MUST show the total spec count together with specs-health aggregates from `summary.specsHealth` (for example `246 total · 240✓ 4✗ 2w` using `passed` / `failed` / `warned`). Below that line, render a 2-column aligned table of per-workspace breakdown (including empty workspaces with 0 count), dynamically padded to the longest workspace name. Per-workspace health badges are NOT required in v1.\n6. **Changes box** — an inner box labelled `Changes` rendering a 2-column aligned table with each change state on its own line (`active`, `drafts`, `discarded`, `archived`), plus one additional line for task progress over **active** changes only, derived by summing `tasks.complete` equivalents (`total - incomplete`) and `tasks.total` across `summary.active` (for example `tasks 12/48 done`). The Changes box MUST NOT list individual active/draft change rows (that detail belongs to `project status`).\n7. **Graph box** — an inner box labelled `Graph` showing graph freshness timestamp, staleness indicator, document count (`docs:`), file count (`files:`), symbol count (`symbols:`), relation count (`relations:`), and indexed languages (`languages:`) when graph diagnostics are available.\n8. **Layout** — the Project and Graph boxes span the full inner width of the dashboard; Specs and Changes sub-boxes are rendered side by side, matching the full container width."
       ]
     },
     {
@@ -27,7 +27,7 @@
     {
       "requirement": "Data sources",
       "rules": [
-        "All metrics and diagnostics are fetched via `buildProjectStatusSnapshot(host, { includeGraph: true })` from `@specd/sdk` (or host composition), ensuring complete parity with `specd project status`."
+        "All metrics and diagnostics are fetched via `buildProjectStatusSnapshot(host, { includeGraph: true, includeChanges: true, includeSpecsHealth: true })` from `@specd/sdk` (or host composition), ensuring parity with enriched `specd project status` data sources.\n\nThe text dashboard MUST read specs-health aggregates from `summary.specsHealth` and active task totals from `summary.active[*].tasks`. It MUST NOT call `GetSpecsHealth`, `ListChanges`, or `CountTasks` directly outside the snapshot/summary path."
       ]
     },
     {
@@ -62,80 +62,74 @@
     {
       "requirement": "Text dashboard",
       "name": "Dashboard outputs 'Using config:' line before the box",
-      "given": [
-        "a valid project with specd.yaml at /some/project/specd.yaml",
-        "AND CWD is /some/project"
-      ],
-      "when": ["specd project dashboard is run"],
-      "then": ["stdout begins with Using config: specd.yaml before any box decoration"]
+      "when": ["specd project dashboard runs in text mode"],
+      "then": ["stdout includes a Using config: line before the outer dashboard box"]
     },
     {
       "requirement": "Text dashboard",
       "name": "'Using config:' path is relative to CWD",
-      "given": ["CWD is /home/user", "AND specd.yaml is at /home/user/myproject/specd.yaml"],
-      "when": ["specd project dashboard is run"],
-      "then": ["stdout contains Using config: myproject/specd.yaml"]
+      "when": ["specd project dashboard runs in text mode"],
+      "then": ["the config path shown is relative to process.cwd()"]
     },
     {
       "requirement": "Text dashboard",
       "name": "Dashboard includes banner above the box",
-      "given": ["a valid project"],
-      "when": ["specd project dashboard is run in text mode"],
-      "then": [
-        "stdout contains the SpecD ASCII art logo between the config line and the boxen border"
-      ]
+      "when": ["specd project dashboard runs in text mode"],
+      "then": ["the SpecD banner appears above the outer dashboard box"]
     },
     {
       "requirement": "Text dashboard",
       "name": "Dashboard contains project metadata",
-      "given": ["a project with schemaRef: '@specd/schema-std' and workspace default"],
-      "when": ["specd project dashboard is run"],
-      "then": ["stdout contains the project root path, @specd/schema-std, and default"]
+      "when": ["specd project dashboard runs in text mode"],
+      "then": ["the Project box includes root, schema, and workspaces"]
+    },
+    {
+      "requirement": "Text dashboard",
+      "name": "Specs box header shows total with health aggregates",
+      "given": ["summary.specsHealth reports passed, failed, and warned counts"],
+      "when": ["specd project dashboard runs in text mode"],
+      "then": [
+        "the Specs box first line includes the total spec count together with health aggregates",
+        "AND per-workspace rows still show counts without required per-workspace health badges"
+      ]
     },
     {
       "requirement": "Text dashboard",
       "name": "Specs box shows per-workspace counts",
-      "given": ["a project with 2 specs in workspace default and 1 in workspace billing"],
-      "when": ["specd project dashboard is run"],
-      "then": ["stdout contains 3 as total and per-workspace lines for default (2) and billing (1)"]
+      "when": ["specd project dashboard runs in text mode"],
+      "then": ["the Specs box lists each workspace with its spec count"]
     },
     {
       "requirement": "Text dashboard",
-      "name": "Changes box shows active, drafts, discarded, and archived",
-      "given": ["a project with 2 active changes, 1 draft, 1 discarded, and 5 archived changes"],
-      "when": ["specd project dashboard is run"],
+      "name": "Changes box shows counts and active tasks line",
+      "given": ["active changes with non-zero task totals in summary.active"],
+      "when": ["specd project dashboard runs in text mode"],
       "then": [
-        "stdout contains active, drafts, discarded, and archived as separate aligned table rows in the Changes box"
+        "the Changes box shows active, drafts, discarded, and archived counts",
+        "AND one additional line shows summed active task progress as done/total",
+        "AND individual active/draft change names are not listed in the Changes box"
       ]
     },
     {
       "requirement": "Text dashboard",
       "name": "Long project root wraps to value column",
-      "given": ["the project root path is longer than the box's inner width"],
-      "when": ["specd project dashboard is run"],
-      "then": [
-        "the root path wraps to the next line indented to the value column start",
-        "AND the box border is not broken"
-      ]
+      "given": ["a project root path longer than the Project box value column"],
+      "when": ["specd project dashboard runs in text mode"],
+      "then": ["the root value wraps on continuation lines aligned to the value column"]
     },
     {
       "requirement": "Text dashboard",
       "name": "Long workspaces list wraps to value column",
-      "given": ["a project with 15 workspaces whose combined names exceed the inner box width"],
-      "when": ["specd project dashboard is run"],
-      "then": [
-        "the workspaces list wraps to continuation lines indented to the value column start",
-        "AND the box border remains intact"
-      ]
+      "given": ["a workspaces list longer than the Project box value column"],
+      "when": ["specd project dashboard runs in text mode"],
+      "then": ["workspace names wrap on word/comma boundaries aligned to the value column"]
     },
     {
       "requirement": "Text dashboard",
       "name": "Graph box displays health diagnostics when graph is available",
-      "given": ["a project with indexed code graph"],
-      "when": ["specd project dashboard is run in text mode"],
-      "then": [
-        "stdout contains a Graph box displaying graph freshness, document count (docs:), file/symbol counts, relation count (relations:), and indexed languages (languages:)"
-      ]
+      "given": ["graph diagnostics are available from the snapshot"],
+      "when": ["specd project dashboard runs in text mode"],
+      "then": ["the Graph box shows freshness, counts, and languages"]
     },
     {
       "requirement": "JSON and toon output",
@@ -163,11 +157,12 @@
     },
     {
       "requirement": "Data sources",
-      "name": "Dashboard metrics match buildProjectStatusSnapshot",
-      "given": ["a valid project"],
-      "when": ["specd project dashboard is run"],
+      "name": "Dashboard metrics match enriched buildProjectStatusSnapshot",
+      "when": ["specd project dashboard runs"],
       "then": [
-        "the spec, change, and graph metrics match the data produced by buildProjectStatusSnapshot"
+        "data is fetched via buildProjectStatusSnapshot with { includeGraph: true, includeChanges: true, includeSpecsHealth: true }",
+        "AND Specs health and Changes tasks lines are derived from summary.specsHealth and summary.active",
+        "AND the command does not call GetSpecsHealth, ListChanges, or CountTasks directly"
       ]
     },
     {
@@ -188,21 +183,21 @@
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:8328d1c50619b6729b82ac0d5da2e96def5c3ec0ccbcd97991536975f7a8c2bf",
-    "verify.md": "sha256:2e6d9e8ebd17ff1d18caa5197c7c3e9f537df9b4f61f79f534d5b8de4748e6f8"
+    "spec.md": "sha256:cb1b7e790da1f9c69031bd069d85ed5b590d6d1b17904401fd43de5309cdcaf9",
+    "verify.md": "sha256:da023a89e360582295f3763df98103fc5bd72920cfadfb1d2b1a017669750c4a"
   },
   "provenance": {
     "artifacts": {
       "spec.md": {
-        "hash": "sha256:8328d1c50619b6729b82ac0d5da2e96def5c3ec0ccbcd97991536975f7a8c2bf",
-        "lastModified": "2026-07-20T21:57:20.001Z"
+        "hash": "sha256:cb1b7e790da1f9c69031bd069d85ed5b590d6d1b17904401fd43de5309cdcaf9",
+        "lastModified": "2026-07-26T11:52:20.698Z"
       },
       "verify.md": {
-        "hash": "sha256:2e6d9e8ebd17ff1d18caa5197c7c3e9f537df9b4f61f79f534d5b8de4748e6f8",
-        "lastModified": "2026-07-20T21:57:20.003Z"
+        "hash": "sha256:da023a89e360582295f3763df98103fc5bd72920cfadfb1d2b1a017669750c4a",
+        "lastModified": "2026-07-26T11:52:20.712Z"
       }
     },
-    "persistedStateHash": "sha256:4f8e4a63f4e0e3ec526280c56d82cd5fccc962171f86c4c8ec5ec0c1e0fb846d",
+    "persistedStateHash": "sha256:698953e05a04443b1980be6d57231dc73c93dac7e7a43b393cc9bbda938431d4",
     "schema": {
       "name": "schema-std",
       "version": 1

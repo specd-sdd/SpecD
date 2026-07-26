@@ -60,6 +60,7 @@ describe('buildProjectStatusSnapshot', () => {
   it('skips graph provider when includeGraph is false', async () => {
     const result = await buildProjectStatusSnapshot(ctx, { includeGraph: false })
     expect(withOpenGraphProvider).not.toHaveBeenCalled()
+    expect(getProjectSummary.execute).toHaveBeenCalledWith(undefined)
     expect(result.graphHealth).toBeNull()
     expect(result.approvals.specEnabled).toBe(true)
     expect(result.llmOptimizedContext).toBe(true)
@@ -128,5 +129,40 @@ describe('buildProjectStatusSnapshot', () => {
     const result = await buildProjectStatusSnapshot(ctx, { includeGraph: true })
     expect(result.graphHealth).toBeNull()
     expect(result.summary).toEqual({ activeCount: 1 })
+  })
+
+  it('forwards enrichment flags into getProjectSummary.execute', async () => {
+    await buildProjectStatusSnapshot(ctx, {
+      includeChanges: true,
+      includeSpecsHealth: true,
+    })
+
+    expect(getProjectSummary.execute).toHaveBeenCalledWith({
+      includeChanges: true,
+      includeSpecsHealth: true,
+    })
+  })
+
+  it('keeps enriched fields only under summary', async () => {
+    getProjectSummary.execute.mockResolvedValue({
+      activeCount: 1,
+      draftCount: 0,
+      discardedCount: 0,
+      archivedCount: 0,
+      specsByWorkspace: {},
+      workspaceCount: 0,
+      active: [{ name: 'foo', state: 'ready', tasks: { incomplete: 1, total: 2 } }],
+      specsHealth: { totalSpecs: 1, passed: 1, failed: 0, warned: 0, issues: [] },
+    })
+
+    const result = await buildProjectStatusSnapshot(ctx, {
+      includeChanges: true,
+      includeSpecsHealth: true,
+    })
+
+    expect(result.summary.active).toHaveLength(1)
+    expect(result.summary.specsHealth?.passed).toBe(1)
+    expect(result).not.toHaveProperty('active')
+    expect(result).not.toHaveProperty('specsHealth')
   })
 })
