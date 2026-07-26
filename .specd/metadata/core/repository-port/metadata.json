@@ -226,6 +226,8 @@
       }
     ]
   },
+  "optimizedDescription": "Abstract Repository base: workspace/ownership/isExternal/configPath accessors + shared list pagination types.",
+  "optimizedContext": "# Repository\n\n## Rules\n- `RepositoryConfig`: `workspace`, `ownership: owned|shared|readOnly`, `isExternal`, `configPath` (abs config dir).\n- Abstract class (not interface); ctor sets four invariants; accessors: `workspace()`, `ownership()`, `isExternal()`, `configPath()` — immutable, private fields.\n- Subclasses declare storage ops; base has none. Export `ReadOnlyWorkspaceError extends DomainError` (message-only ctor).\n- Shared types: `ListCursor { key, id? }`, `ListOptions { limit?, page?, after? }`, `ListMeta`, `ListResult<T>`.\n- Omit `limit` → full set; `meta.limit`=`meta.count`=`meta.total`. `page` 1-based XOR `after`; `page` without `limit` invalid. `after` exclusive keyset; with/without limit as specified.\n- `meta.after` = cursor of last returned item when more remain; omit at end. Never echo request cursor.\n- Cursor keys: Active/Drafts/Discarded/Archive ISO timestamps + change `name`; Specs capability path, no id.\n- `invalidateCache()`: default no-op; subclasses MAY invalidate adapter caches.\n\n## Constraints\n- No storage ops on base. Accessors are methods not props. `RepositoryConfig` plain interface. List types exported from module.",
   "contentHashes": {
     "spec.md": "sha256:67136846061ba0b0517b1527d6b4634b4fdf69dfb23383052e26e8f000624ed6",
     "verify.md": "sha256:3e4d91bd1ea9f300b64582c79dca3638e0e2fa791778e4fd2a0826ab5aa8fd87"
@@ -241,7 +243,7 @@
         "lastModified": "2026-07-22T19:10:28.108Z"
       }
     },
-    "persistedStateHash": "sha256:f9b1be23382826c9fd32d7af0d1592ac56e9b1b1dc16b9f58d528ec5fb0d5db3",
+    "persistedStateHash": "sha256:db23bdc6dcb2248541bd4f740be3a6c2b4e4bb7acd5bc3bedd01627d22d9ef88",
     "schema": {
       "name": "schema-std",
       "version": 1

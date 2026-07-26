@@ -17,5 +17,41 @@
     {
       "file": "core:test/domain/services/build-schema.spec.ts"
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "YAML schema format: artifacts, workflow, validations, plugins, extends, metadataExtraction, DAG.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:f3d49ebfc79bc5b977a584f81eb28e2bc6790c2c1c7b089d2d5a2293af0e6203",
+          "lastModified": "2026-07-23T17:26:17.414Z"
+        },
+        "verify.md": {
+          "hash": "sha256:bc0b442dbf8e5456ee9940d5877651700d9c3228c5d6c5a3e7876af37809db36",
+          "lastModified": "2026-07-23T17:26:17.415Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Schema Format\n## Rules\n### File structure\n- Top-level: `kind` (schema|schema-plugin), `name`, `version`, optional `description`/`extends`, `artifacts` (required for schema), optional `crossArtifactValidations`/`workflow`.\n### Kind / extends\n- `schema`: full. `schema-plugin`: merge ops only — no artifacts/workflow/metadataExtraction/extends.\n- Omit kind → SchemaValidationError. Extends chains root→leaf merge; cycles → SchemaValidationError (by resolved path).\n### Array entry identity\n- `id` on hooks, validations, deltaValidations, rules.pre/post, preHashCleanup, crossArtifactValidations, metadataExtraction array entries. Format `^[a-z][a-z0-9]*(-[a-z0-9]+)*$`, 1–64.\n- Hooks globally unique across ALL workflow steps. Others unique within immediate array. Workflow identity = `step`; participant local id = `as`.\n### Artifact definition (key fields)\n- Required: `id`, `scope` (spec|change), `output`. Optional: `optional` (default false), `hasTasks`, `template`, `instruction`, `requires`, `format`, `delta` (spec-only), `deltaInstruction`, `deltaValidations`, `validations`, `metadataExtraction`, `rules.pre/post`, `preHashCleanup`, `taskCompletionCheck`.\n- `delta:true` + `scope:change` → SchemaValidationError. Filename from last literal glob segment or template.\n### artifactDag()\n- Canonical API from `requires` only: `roots`, `childrenOf`, `topologicalOrder`, `descendantsOf`. Cached per Schema. Consumers MUST use `schema.artifactDag()` — no parallel rebuilds. `artifactDagFromChangeArtifacts` tests-only when schema available.\n### Validations / deltaValidations\n- Selector fields (core:selector-model) XOR `path` (JSONPath). Plus `required` (zero-match only), `count` (exactly/min/max/unique.by), `contentMatches`, `children`. deltaValidations same vs delta YAML AST; only when `delta:true`.\n### Cross-artifact validations\n- `id`, `scope`, `participants` (artifact/as/selector/keySelector?/key), `relation` (`kind`: all-equal|subset|superset, `between`, optional `ordering` ignore|strict). Same-scope artifacts only. Keys not raw AST.\n### Metadata extraction\n- Top-level field → MetadataExtractorEntry: artifact + extractor (selector, extract, capture, strip, groupBy, transform, fields). Transform via runtime registry. dependsOn: label value + href args. Fail normalize explicitly.\n### Workflow / external hooks\n- `step`, optional `requires`, `requiresTaskCompletion` (MUST hasTasks:true), `hooks.pre/post`. External hooks: `id` + `external.type` + `external.config`; unknown type rejected.\n### Schema resolution\n- `@scope/name` npm; `#workspace:name`; `#name`/bare → default workspace; path direct. Missing file → null (caller → SchemaNotFoundError). Zod validate; unknown top-level ignored.\n### verify.md\n- WHEN/THEN under `### Requirement:` mirroring spec. Schema verify should `requires: [spec]`.\n### Plugins\n- Inline ops: create/remove/set/append/prepend. Same ref conventions as schemas.\n## Constraints\n- kind required. Plugin cannot declare artifacts/workflow/metadataExtraction/extends.\n- artifact.id `/^[a-z][a-z0-9-]*$/`; scope required no default; optional default false.\n- Non-optional depends on optional forbidden; requires acyclic.\n- deltaValidations only with delta:true. Workflow order = display only (not sequential block).\n- Delta format/selectors/apply → core:delta-format.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:f3d49ebfc79bc5b977a584f81eb28e2bc6790c2c1c7b089d2d5a2293af0e6203",
+          "lastModified": "2026-07-23T17:26:17.414Z"
+        },
+        "verify.md": {
+          "hash": "sha256:bc0b442dbf8e5456ee9940d5877651700d9c3228c5d6c5a3e7876af37809db36",
+          "lastModified": "2026-07-23T17:26:17.415Z"
+        }
+      }
+    }
+  }
 }

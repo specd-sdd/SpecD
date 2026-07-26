@@ -309,6 +309,8 @@
       }
     ]
   },
+  "optimizedDescription": "manifest.json: Change identity, specs, artifacts, history; atomic write by FsChangeRepository only.",
+  "optimizedContext": "# Change Manifest\n\n## Rules\n- `manifest.json` in change dir: `name`, `createdAt`, `schema{name,version}`, `specIds`, `invalidationPolicy`, optional `trackedImplementationFiles`, `implementationLinks`, `specDependsOn`, `artifacts`, `history`.\n- `workspaces` load-only (compat); runtime from `parseSpecId(specIds)`. `schema` write-once.\n- `trackedImplementationFiles`: `file` + `state` (`open|resolved|ignored|removed`). Links: `specId`, `file`, `fileLinkExplicit`; `fileLinkExplicit:false` only with non-empty `symbols`.\n- `specDependsOn`: seed lock → legacy metadata.dependsOn → []. Archive-time input.\n- Artifact/file `state` = ArtifactStatus; file state SoT. `validatedHash`: null | sha256 | `\"skipped\"` — not presence proof. `hasDrift` per file.\n- History append-only; lifecycle from latest `transitioned`. `archive-failed`: `step`, `message`, `commitStarted`. Success via archive meta, not active history event.\n- Filenames = expected paths (`core:change-layout`). Existing delta-capable → `deltas/...`; new → `specs/...` at write time. Load MAY normalize stale `specs/`→`deltas/` preserving state/hash; reject representation-class change unless semantics proven.\n- Schema version mismatch → advisory warn; name mismatch → `SchemaMismatchError`. Atomic write: temp+rename.\n\n## Constraints\n- No top-level state field. Do not derive status from validatedHash alone. Missing state → `missing`. History immutable. Schema never updated post-create.",
   "contentHashes": {
     "spec.md": "sha256:789f698f76b842553aaf0e1269b5b4bd72b278e236a82a69edf2ee16f4df5324",
     "verify.md": "sha256:704a7cde1d6b5977a09370bca14a8a7c46158522f975ea1ba54f25b3e4a074ea"
@@ -324,7 +326,7 @@
         "lastModified": "2026-07-01T16:02:44.617Z"
       }
     },
-    "persistedStateHash": "sha256:67b66db52f995d6483463662d34fae7bb9e0186e88446f342bbdd2ee6b8bdd24",
+    "persistedStateHash": "sha256:2c59b763eaa7c01e7123c7a7597b79215df15d6f652a795e05caa374c9baf639",
     "schema": {
       "name": "schema-std",
       "version": 1

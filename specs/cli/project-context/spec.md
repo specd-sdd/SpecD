@@ -62,20 +62,19 @@ The command MUST suppress `stale-optimization` warnings when optimization is eff
 
 ### Requirement: Output
 
-The CLI MUST assemble the final output from the structured `GetProjectContextResult` returned by the use case.
+The CLI MUST obtain the structured `GetProjectContextResult` from the use case and MUST NOT assemble agent-facing markdown inline.
 
 **In `text` mode** (default):
 
-1. Project context entries are rendered first, each preceded by its source label. Entries are separated by `---`.
-2. Spec entries follow:
-   - Full entries are rendered under `## Spec content` with complete content.
-   - Summary entries are rendered under `## Available context specs` with spec ID, title, and description.
-   - List entries are rendered under `## Available context specs` with spec ID only plus an explicit list-mode label.
-3. If nothing is configured (no `context:` entries and no specs matched), the command prints `no project context configured` and exits with code 0.
+The CLI MUST call `projectContextToMarkdown(context)` from `@specd/sdk` (passing the `GetProjectContextResult` as `context`) and print the returned string to stdout. The helper owns project-entry formatting, full-spec content, and the catalogue for entries whose `mode` is not `full`.
+
+Catalogue sections MUST include prose instructing agents to run `specd specs context <specId>` to load full optimized context. The output MUST NEVER mention `changes spec-preview` or any change-scoped preview command.
+
+When the helper returns `no project context configured`, the CLI MUST print that string and exit with code 0.
 
 Section flags apply only to full entries. In `list` and `summary` modes, the output remains list/summary shaped even when `--rules`, `--constraints`, or `--scenarios` are passed.
 
-**In `json` or `toon` mode**, the output includes `contextEntries`, `specs`, and `warnings`. Spec entry fields vary by mode using the shared context entry shape: list entries omit title/description/content, summary entries omit content, and full entries include content.
+**In `json` or `toon` mode**, the output includes `contextEntries`, `specs`, and `warnings`. Spec entry fields vary by mode using the shared context entry shape: list entries omit title/description/content, summary entries omit content, and full entries include content. Structured formats MUST NOT invoke the markdown helper.
 
 ### Requirement: Warnings
 
@@ -95,6 +94,8 @@ When one or more section flags (`--rules`, `--constraints`, `--scenarios`) are p
 ## Constraints
 
 - This command is read-only
+- Text-mode rendering MUST come from `projectContextToMarkdown`; the CLI MUST NOT hardcode catalogue hints or markdown tables
+- Project context text output MUST NEVER suggest `changes spec-preview`
 - Only project-level `contextIncludeSpecs`/`contextExcludeSpecs` patterns are applied; workspace-level patterns are change-specific and not applied here
 - `dependsOn` traversal is opt-in via `--follow-deps`; without the flag, deps are not followed
 - `--depth` without `--follow-deps` is a CLI usage error (exit code 1)
@@ -139,6 +140,7 @@ $ specd project context --format json
 ## Spec Dependencies
 
 - [`cli:entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
-- [`core:get-project-context`](../../core/get-project-context/spec.md) — `GetProjectContext` use case, `GetProjectContextResult` structured shape
-- [`core:compile-context`](../../core/compile-context/spec.md) — `ContextSpecEntry` type definition
-- [`core:config`](../../core/config/spec.md) — `contextMode` field
+- [`sdk:context-markdown`](../../sdk/context-markdown/spec.md) — `projectContextToMarkdown` text presentation
+- [`core:get-project-context`](../../core/get-project-context/spec.md) — use case and result shape for project context entries
+- [`core:compile-context`](../../core/compile-context/spec.md) — shared context entry and warning types
+- [`core:config`](../../core/config/spec.md) — project context configuration

@@ -8,5 +8,41 @@
     {
       "file": "core:src/composition/use-cases/detect-overlap.ts"
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "detectSpecOverlap pure fn + DetectOverlap use case: multi-change shared specIds report.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:6d3c61eda5b205c5511fd18c5acd9ba03cee9abd0a7c1478693955a36963a47a",
+          "lastModified": "2026-07-06T14:22:55.228Z"
+        },
+        "verify.md": {
+          "hash": "sha256:8e4844e4f55df6b35eb9474e34161b172e71ebfca9684a0275cdcb7385cb9877",
+          "lastModified": "2026-07-06T14:22:55.229Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Spec Overlap\n\n## Rules\n- `detectSpecOverlap(changes): OverlapReport` pure in `domain/services/` — no I/O.\n- `OverlapReport`: `entries: OverlapEntry[]`, `hasOverlap`. Entry: `specId`, `changes[{name,state}]`.\n- Overlap = ≥2 active changes share `specIds`. Index → filter → sort entries by specId, changes by name (lex asc).\n- 0–1 changes → empty entries, `hasOverlap:false`, no throw.\n- `DetectOverlap`: `list()` → detectSpecOverlap → report. Optional `name` filters output only (all still participate); missing name → `ChangeNotFoundError`.\n- Ctor: ChangeRepository only. Config factory via `resolveDetectOverlapDeps`.\n\n## Constraints\n- Active only (list) — no drafts/discarded. Severity beyond Info OOS.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:6d3c61eda5b205c5511fd18c5acd9ba03cee9abd0a7c1478693955a36963a47a",
+          "lastModified": "2026-07-06T14:22:55.228Z"
+        },
+        "verify.md": {
+          "hash": "sha256:8e4844e4f55df6b35eb9474e34161b172e71ebfca9684a0275cdcb7385cb9877",
+          "lastModified": "2026-07-06T14:22:55.229Z"
+        }
+      }
+    }
+  }
 }

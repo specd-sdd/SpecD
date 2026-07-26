@@ -165,6 +165,8 @@
       }
     ]
   },
+  "optimizedDescription": "DraftedChangeView extends ReadOnlyChangeView with isDrafted=true; construct only via repo/GetDraft.",
+  "optimizedContext": "# DraftedChangeView\n\n## Rules\n- Extends `ReadOnlyChangeView`. Extra: `isDrafted` MUST be `true`.\n- No public unwrap to mutable `Change` (same as read-only-change-view).\n- Construct only via ChangeRepository / GetDraft using `toDraftedChangeView`. Callers: `getDraft`, `listDrafts`, `GetDraft.execute` — not arbitrary in-memory Change.\n- Artifact body via ChangeRepository.artifact with drafted storage context — not on view type.\n\n## Constraints\n- Narrowed projection for drafted storage, not Change replacement. Terminology: Draft/Drafted (not \"shelved\").",
   "contentHashes": {
     "spec.md": "sha256:85df8db77e8791716746b3b73484f45e37288cf54bb674ff85d135bcae45eb0c",
     "verify.md": "sha256:59861d2732e1e749b0da24c4073be305712e5678877705fc0b42b441219fbef9"
@@ -180,7 +182,7 @@
         "lastModified": "2026-05-26T16:37:22.612Z"
       }
     },
-    "persistedStateHash": "sha256:2a658c2da97074faabae71e0105f6818469257eaf74498364c1b51bc7e5b16d5",
+    "persistedStateHash": "sha256:8273b15f3bfdc5043ce16b8aab640867015185c32067127bdd43a6a311c47d58",
     "schema": {
       "name": "schema-std",
       "version": 1

@@ -11,5 +11,41 @@
     "core:composition-resolver",
     "core:materialize-spec-metadata"
   ],
-  "implementation": []
+  "implementation": [],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Only @specd/core layer importing infrastructure/; wires factories, CompositionResolver, kernel, ConfigLoader/Writer.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:a23d3295d75d8c9906e3095838f66581e8450b4569dd813742f1421faed2b381",
+          "lastModified": "2026-07-25T11:53:31.497Z"
+        },
+        "verify.md": {
+          "hash": "sha256:d1b527ab77d07c59ee2050e8e380c86ee3248ecf62cad81626385926aba71e94",
+          "lastModified": "2026-07-25T11:53:31.498Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Composition\n\n## Rules\n- One factory per domain UC; constructors not on `index.ts`. Config I/O: `createDefaultConfigLoader`/`createConfigWriter` return ports directly — no pass-through UC wrappers.\n- Public shapes: `createX(deps)` canonical (no fs paths); `createX(config, options?)` via resolver + `resolveXDeps` helper. Options only on config form; invalid → `InvalidCompositionFactoryArgumentsError`.\n- `CompositionResolver`: session-scoped, lazy, cacheable; no per-UC `XDeps` knowledge.\n- Registry/view/capability-merge primitives composition-owned; kernel reuses as facade.\n- Internal port impls not on `\".\"`; contracts on `\"./ports\"`; factories return port types.\n- VCS/actor via auto-detect factories; rootPath derived data not full adapter when port only needs root.\n- `FsChangeRepositoryOptions`: `artifactTypes` and/or `resolveArtifactTypes` (lazy cache); neither → sync no-op.\n- `createKernel(config)` mounts all UCs by domain; approvals under `kernel.changes`. Optional; standalone factories OK. Fluent `createKernelBuilder` ≡ same `KernelOptions` model.\n- `ConfigLoader`/`ConfigWriter` application ports; hosts use factory wrappers — never construct `Fs*` directly. `createConfigWriter()` / `createConfigWriter(options)` public.\n- `createKernel` MUST NOT wire ConfigWriter/InitProject/AddPlugin/RemovePlugin.\n- `SpecdConfig` plain typed object in domain/application; has `schemaPlugins`, `schemaOverrides` — not `artifactRules`/`workflow`.\n- Spec repo construction: use absolute `metadataPath` from adapter when present; else derive (VCS walk) — loader MUST NOT invent path.\n- `createResolveSchema` wires SchemaRegistry + schema ref + workspace schemas + plugins + overrides; `createGetActiveSchema` uses it.\n- Hosts bootstrap via `@specd/sdk`; CLI/MCP depend on sdk only for platform packages.\n- Public barrels: `\".\"`=`public.ts`, `\"./ports\"`, `\"./extensions\"`, `\"./internal\"`=`index.ts`. `\".\"` no `export *` from domain/application/composition.\n- `\".\"` exports Kernel, UC types, Input/Result, createX factories, port types (not impls), repo factories with adapter-id first arg (`'fs'` builtin).\n- Provide `*Deps`/`resolve*Deps`/`createX` for metadata materialization + persisted-state UCs; MUST NOT export Save/Update/InvalidateSpecMetadata or public PersistSpecMetadata.\n- `./extensions`: storage factories, CompositionRegistry*, KernelBuilder, providers, ExternalHookRunner, RegistryConflictError. No code-graph registration.\n\n## Constraints\n- Only `composition/` may import `infrastructure/`.\n- Concrete adapters never on public entry points.\n- Repo + kernel-mounted createX factories on `\".\"`.\n- Kernel namespaces by domain area.\n- Monorepo-only symbols on `\"./internal\"`.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:a23d3295d75d8c9906e3095838f66581e8450b4569dd813742f1421faed2b381",
+          "lastModified": "2026-07-25T11:53:31.497Z"
+        },
+        "verify.md": {
+          "hash": "sha256:d1b527ab77d07c59ee2050e8e380c86ee3248ecf62cad81626385926aba71e94",
+          "lastModified": "2026-07-25T11:53:31.498Z"
+        }
+      }
+    }
+  }
 }

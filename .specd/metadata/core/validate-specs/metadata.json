@@ -473,6 +473,8 @@
       }
     ]
   },
+  "optimizedDescription": "ValidateSpecs checks spec-scoped artifacts vs schema; three scopes; cache + GetSpecMetadata self-heal.",
+  "optimizedContext": "# ValidateSpecs\n## Rules\n### Schema / filter\n- `SchemaProvider.get()` (propagate SchemaNotFound/Validation). Keep only `scope === 'spec'` artifacts.\n### Modes\n- `specPath` (`workspace:capabilityPath`): parse → repo → `get` → validate one. Precedence over workspace.\n- `workspace` only: `list(undefined, { includeMeta: true })` then each.\n- Neither: all workspaces, same list Meta stamps.\n### Per-spec local + cross-artifact\n- Missing required → failure; missing optional → skip. Parse+evaluateRules when rules present. Reuse ValidateArtifacts cross-artifact engine for `scope:spec` rules; defer non-ready participants as non-failing notices.\n### Result\n- `ValidateSpecsResult`: `entries`, `totalSpecs`, `passed`, `failed`. Entry: `spec`, `passed`, `failures`, `warnings`.\n### Format inference\n- Infer via `inferFormat` if no format; no parser → skip silently.\n### Metadata via GetSpecMetadata\n- After artifact validation: `GetSpecMetadata.execute({ specId })` — NOT direct `readMetadataSnapshot` for pass/fail.\n- Missing/stale cache OK if materialization succeeds. Materialization impossible → failure. Validate materialized `dependsOn` vs `readPersistedState().dependsOn` (or `[]`). Extraction mismatch → failure. `metadata-cache-write-failed` → warning.\n### Optimization staleness\n- Independent: stale `optimizedDescription`/`optimizedContext` → ValidationFailure even if other checks pass. No opts / all fresh → OK.\n### ValidationResultCache\n- lookup before full validate; upsert on miss. Hard hit skips revalidation. Pass list Meta stamps. Supply `schemaFingerprint` (spec validations + cross + dependsOn extraction presence) + `engineVersion`.\n- Missing cache map entry → skip cache (tests/direct ctor only). Config factory MUST register per-workspace caches + GetSpecMetadata maps via `resolveValidateSpecsDeps`.\n## Constraints\n- ReadonlyMap of SpecRepositories — no mutation.\n- Rules only from schema. Shared ValidationFailure/Warning with ValidateArtifacts.\n- No own metadata freshness/gen/persist — only GetSpecMetadata.",
   "contentHashes": {
     "spec.md": "sha256:880fc0501a0fac11258c12b46fe7a4c74051d9097d458b2566c6724383e8fe93",
     "verify.md": "sha256:8f38971aacdc01c9abe8b72fedd7ca0dba85da675149f058ace5eb8d7b619729"
@@ -488,7 +490,7 @@
         "lastModified": "2026-07-25T11:53:31.182Z"
       }
     },
-    "persistedStateHash": "sha256:a7907d3813e32f72735f933c3f277b0b2fd6ff8dc01091e4b7c822111edef4a6",
+    "persistedStateHash": "sha256:6b91aeeb0312d84ae8f580b77cbbaaa81006a184d715233b17301d09870f57bd",
     "schema": {
       "name": "schema-std",
       "version": 1

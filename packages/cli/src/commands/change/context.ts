@@ -1,5 +1,5 @@
 import { type Command } from 'commander'
-import { type SpecSection } from '@specd/sdk'
+import { type SpecSection, changeContextToMarkdown } from '@specd/sdk'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError, cliError } from '../../handle-error.js'
@@ -10,9 +10,6 @@ import { handleError, cliError } from '../../handle-error.js'
  * @param parent - The parent Commander command to attach the subcommand to.
  */
 export function registerChangeContext(parent: Command): void {
-  const renderFingerprintLine = (fingerprint: string): string =>
-    `Context Fingerprint: ${fingerprint}`
-
   parent
     .command('context <name> <step>')
     .allowExcessArguments(false)
@@ -127,88 +124,8 @@ Lifecycle state and readiness are available from change status, not from this co
             process.stderr.write(`warning: ${w.message}\n`)
           }
 
-          if (result.status === 'unchanged') {
-            if (fmt === 'text') {
-              output(
-                [
-                  renderFingerprintLine(result.contextFingerprint),
-                  'Context unchanged since last call.',
-                ]
-                  .filter((p) => p !== '')
-                  .join('\n\n'),
-                'text',
-              )
-            } else {
-              output(result, fmt)
-            }
-            return
-          }
-
           if (fmt === 'text') {
-            const parts: string[] = []
-
-            parts.push(renderFingerprintLine(result.contextFingerprint))
-
-            // Project context entries
-            for (const entry of result.projectContext) {
-              if (entry.source === 'file' && entry.path !== undefined) {
-                parts.push(`**Source: ${entry.path}**\n\n${entry.content}`)
-              } else {
-                parts.push(`**Source: instruction**\n\n${entry.content}`)
-              }
-            }
-
-            // Full-mode specs
-            const fullSpecs = result.specs.filter((s) => s.mode === 'full')
-            if (fullSpecs.length > 0) {
-              const specParts = fullSpecs.map(
-                (s) => `### Spec: ${s.specId}\nMode: full\n\n${s.content ?? ''}`,
-              )
-              parts.push(`## Spec content\n\n${specParts.join('\n\n---\n\n')}`)
-            }
-
-            // Non-full specs (catalogue)
-            const nonFullSpecs = result.specs.filter((s) => s.mode !== 'full')
-            if (nonFullSpecs.length > 0) {
-              const includePatternSpecs = nonFullSpecs.filter(
-                (s) => s.source !== 'dependsOnTraversal',
-              )
-              const depTraversalSpecs = nonFullSpecs.filter(
-                (s) => s.source === 'dependsOnTraversal',
-              )
-
-              const catalogueParts: string[] = [
-                'Use `specd changes spec-preview <change-name> <specId>` to load the merged full content of any change spec you need.',
-                '',
-              ]
-
-              if (includePatternSpecs.length > 0) {
-                catalogueParts.push('| Spec ID | Mode | Source | Title | Description |')
-                catalogueParts.push('|---------|------|--------|-------|-------------|')
-                for (const s of includePatternSpecs) {
-                  catalogueParts.push(
-                    `| ${s.specId} | ${s.mode} | ${s.source} | ${s.title ?? '—'} | ${s.description ?? '—'} |`,
-                  )
-                }
-              }
-
-              if (depTraversalSpecs.length > 0) {
-                catalogueParts.push('')
-                catalogueParts.push('### Via dependencies')
-                catalogueParts.push('')
-                catalogueParts.push('| Spec ID | Mode | Source | Title | Description |')
-                catalogueParts.push('|---------|------|--------|-------|-------------|')
-                for (const s of depTraversalSpecs) {
-                  catalogueParts.push(
-                    `| ${s.specId} | ${s.mode} | ${s.source} | ${s.title ?? '—'} | ${s.description ?? '—'} |`,
-                  )
-                }
-              }
-
-              parts.push(`## Available context specs\n\n${catalogueParts.join('\n')}`)
-            }
-
-            output(parts.join('\n\n---\n\n'), 'text')
+            output(changeContextToMarkdown(result, { changeName: name }), 'text')
           } else {
             output(result, fmt)
           }

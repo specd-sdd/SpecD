@@ -4,5 +4,41 @@
     "version": 1
   },
   "dependsOn": ["core:config", "core:composition-resolver", "core:materialize-spec-metadata"],
-  "implementation": []
+  "implementation": [],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "project-metadata.json caches LLM-optimized project context with freshness hashes over config and specs.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:d39ac6857dd3254a747f3703f850a32448a11fe68f85f947abe23bd2222bf1f7",
+          "lastModified": "2026-07-25T11:53:31.723Z"
+        },
+        "verify.md": {
+          "hash": "sha256:bf7c420ca8337d4c1dcfa90718e655411421b97c0f7b9ba83248a074c535f1ac",
+          "lastModified": "2026-07-25T11:53:31.723Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Project Metadata\n## Rules\n### Persistence location\n- `project-metadata.json` under resolved `configPath`.\n### Data schema\n- `version`; `optimized` (LLM content e.g. `context`); `freshness` (SHA-256 of generation inputs); `generated` (timestamp/meta).\n### Input tracking (freshness)\n- Hash of `specd.yaml`; hashes of config `contextFiles`; per included spec: materialized `metadataFingerprint` from `MaterializeSpecMetadata` — NOT raw cache-file hash or storage revision.\n### Factory\n- `createGetProjectMetadata(config)` → `resolveGetProjectMetadataDeps` (`config`, `files`) → canonical `createGetProjectMetadata(deps)`. No inline fs wiring.\n## Constraints\n- (none beyond rules)",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:d39ac6857dd3254a747f3703f850a32448a11fe68f85f947abe23bd2222bf1f7",
+          "lastModified": "2026-07-25T11:53:31.723Z"
+        },
+        "verify.md": {
+          "hash": "sha256:bf7c420ca8337d4c1dcfa90718e655411421b97c0f7b9ba83248a074c535f1ac",
+          "lastModified": "2026-07-25T11:53:31.723Z"
+        }
+      }
+    }
+  }
 }

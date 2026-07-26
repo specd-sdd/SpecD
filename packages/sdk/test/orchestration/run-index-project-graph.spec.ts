@@ -9,15 +9,19 @@ import { InvalidProviderLifecycleError } from '../../src/domain/errors/invalid-p
 const {
   getConfig,
   listWorkspaces,
+  getSpecMetadata,
   createIndexProjectGraph,
   withOpenGraphProvider,
   createVcsAdapter,
+  indexExecute,
 } = vi.hoisted(() => ({
   getConfig: { execute: vi.fn() },
   listWorkspaces: { execute: vi.fn() },
+  getSpecMetadata: { execute: vi.fn() },
   createIndexProjectGraph: vi.fn(),
   withOpenGraphProvider: vi.fn(),
   createVcsAdapter: vi.fn(),
+  indexExecute: vi.fn(),
 }))
 
 vi.mock('../../src/composition/with-open-graph-provider.js', () => ({
@@ -49,6 +53,9 @@ const ctx = {
       getConfig,
       listWorkspaces,
     },
+    specs: {
+      getMetadata: getSpecMetadata,
+    },
   },
 } as unknown as SdkHostContext
 
@@ -61,19 +68,17 @@ describe('runIndexProjectGraph', () => {
       { name: 'cli', prefix: null },
     ])
     createVcsAdapter.mockResolvedValue({ ref: async () => 'abc123' })
-    const execute = vi.fn().mockResolvedValue({ filesIndexed: 3 })
-    createIndexProjectGraph.mockReturnValue({ execute })
+    indexExecute.mockResolvedValue({ filesIndexed: 3 })
+    createIndexProjectGraph.mockReturnValue({ execute: indexExecute })
     withOpenGraphProvider.mockImplementation(
-      async (_ctx: SdkHostContext, fn: (provider: object) => Promise<unknown>) => fn({}),
+      async (_ctx: SdkHostContext, fn: (provider: object) => Promise<unknown>) =>
+        fn({ index: indexExecute }),
     )
   })
 
   it('filters workspaces when a subset is requested', async () => {
     await runIndexProjectGraph(ctx, { workspaces: ['cli'] })
-    const execute = createIndexProjectGraph.mock.results[0]?.value.execute as ReturnType<
-      typeof vi.fn
-    >
-    expect(execute).toHaveBeenCalledWith(
+    expect(indexExecute).toHaveBeenCalledWith(
       expect.objectContaining({
         workspaces: [expect.objectContaining({ name: 'cli' })],
       }),
@@ -82,11 +87,8 @@ describe('runIndexProjectGraph', () => {
 
   it('indexes all workspaces when no filter is provided', async () => {
     await runIndexProjectGraph(ctx, { force: false })
-    const execute = createIndexProjectGraph.mock.results[0]?.value.execute as ReturnType<
-      typeof vi.fn
-    >
     expect(listWorkspaces.execute).toHaveBeenCalled()
-    expect(execute).toHaveBeenCalledWith(
+    expect(indexExecute).toHaveBeenCalledWith(
       expect.objectContaining({
         workspaces: [
           expect.objectContaining({ name: 'core' }),
@@ -99,10 +101,7 @@ describe('runIndexProjectGraph', () => {
   it('forwards onProgress to IndexProjectGraph', async () => {
     const onProgress = vi.fn()
     await runIndexProjectGraph(ctx, { onProgress })
-    const execute = createIndexProjectGraph.mock.results[0]?.value.execute as ReturnType<
-      typeof vi.fn
-    >
-    expect(execute).toHaveBeenCalledWith(expect.objectContaining({ onProgress }))
+    expect(indexExecute).toHaveBeenCalledWith(expect.objectContaining({ onProgress }))
   })
 
   it('forwards installed code-graph version to IndexProjectGraph', async () => {
@@ -114,10 +113,7 @@ describe('runIndexProjectGraph', () => {
     ) as { version: string }
 
     await runIndexProjectGraph(ctx, { force: false })
-    const execute = createIndexProjectGraph.mock.results[0]?.value.execute as ReturnType<
-      typeof vi.fn
-    >
-    expect(execute).toHaveBeenCalledWith(
+    expect(indexExecute).toHaveBeenCalledWith(
       expect.objectContaining({
         codeGraphVersion: codeGraphPackageJson.version,
       }),
@@ -139,21 +135,13 @@ describe('runIndexProjectGraph', () => {
 
   it('bypasses withOpenGraphProvider and does not close provider when existing provider is supplied', async () => {
     const closeSpy = vi.fn()
-    const mockProvider = { close: closeSpy } as unknown as CodeGraphProvider
+    const mockProvider = { close: closeSpy, index: indexExecute } as unknown as CodeGraphProvider
 
     const result = await runIndexProjectGraph(ctx, { provider: mockProvider })
 
     expect(withOpenGraphProvider).not.toHaveBeenCalled()
     expect(closeSpy).not.toHaveBeenCalled()
     expect(result).toEqual({ filesIndexed: 3 })
-    const execute = createIndexProjectGraph.mock.results[0]?.value.execute as ReturnType<
-      typeof vi.fn
-    >
-    expect(execute).toHaveBeenCalledWith(
-      expect.objectContaining({
-        provider: mockProvider,
-      }),
-    )
   })
 
   it('throws InvalidProviderLifecycleError when provider is passed together with beforeOpen or afterClose', async () => {

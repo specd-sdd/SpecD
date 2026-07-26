@@ -10,7 +10,8 @@
     "core:config",
     "core:get-artifact-instruction",
     "core:get-hook-instructions",
-    "core:refresh-implementation-tracking"
+    "core:refresh-implementation-tracking",
+    "sdk:context-markdown"
   ],
   "implementation": [
     {

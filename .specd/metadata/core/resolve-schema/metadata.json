@@ -227,6 +227,8 @@
       }
     ]
   },
+  "optimizedDescription": "ResolveSchema pipeline: base→extends→plugins→overrides→merge→buildSchema; construction-time config.",
+  "optimizedContext": "# ResolveSchema\n\n## Rules\n- Deps: SchemaRegistry, schemaRef, workspaceSchemasPaths, schemaPlugins[], schemaOverrides?. `execute()` no args.\n- Pipeline: (1) resolve base — null→SchemaNotFoundError; (2) recursive extends + cycle detect→SchemaValidationError; (3) extends layers root→parent `source:'extends'`; (4) plugins must `kind:schema-plugin` else SchemaValidationError; (5) normalize override hooks YAML→domain recursively, layer `source:'override'`; (6) mergeSchemaLayers; (7) if layers: pre-merge buildSchema on inherited for base-error attribution; (8) buildSchema — with layers ref `\"<schemaRef> (resolved)\"` else schemaRef. Child templates override parent same path.\n- Returns `Promise<Schema>`. Idempotent, deterministic. Config factory via `resolveResolveSchemaDeps`.\n\n## Constraints\n- application/use-cases/; domain services + SchemaRegistry only — no infra imports. Plugin miss = hard error. Extends unlimited depth, cycles detected.",
   "contentHashes": {
     "spec.md": "sha256:0b57840d11314533eced2b59fc70824768e6108d306beaa4638bc2e1760f86b5",
     "verify.md": "sha256:e0bc39911eb456cd9ae7cec500115e9cc5f02e506d833825ddab5a6548ffeb70"
@@ -242,7 +244,7 @@
         "lastModified": "2026-07-06T14:22:55.216Z"
       }
     },
-    "persistedStateHash": "sha256:8c783fef876f05053c3602b786208fe19121a1ec063785599b7856613c0ba7a8",
+    "persistedStateHash": "sha256:a52faaf87688bbb31fbed40802d3c484e2dd946fb2636783f31222509163193a",
     "schema": {
       "name": "schema-std",
       "version": 1

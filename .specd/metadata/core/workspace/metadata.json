@@ -355,6 +355,8 @@
       "then": ["a ConfigValidationError is thrown on startup"]
     }
   ],
+  "optimizedDescription": "Named organizational unit for specs/code/schemas/ownership; every spec belongs to exactly one workspace.",
+  "optimizedContext": "# Workspace\n\n## Rules\n- Unique name in `specd.yaml`; `/^[a-z][a-z0-9-]*$/`. Reserved: `default` (mandatory local), `root` (project-global graph).\n- Props: `specs` (always); `codeRoot` (required non-default; default ws → project root); `schemas`; `ownership` (default `owned` / non-default `readOnly`); `prefix`; `contextIncludeSpecs`/`contextExcludeSpecs`. Paths relative to `specd.yaml` dir.\n- `isExternal` inferred when specs path outside repo root — never declared.\n- Ownership: `owned`/`shared`/`readOnly`. `readOnly` rejects: change scope add, ArchiveChange, SpecRepository.save/saveMetadata → `ReadOnlyWorkspaceError` (state blocked op + why; MUST NOT suggest remediation). Reads allowed. `shared`≡`owned` for writes.\n- `prefix` prepended to capability paths; not unique ID. Invalid → `ConfigValidationError`.\n- Spec IDs `workspace:capabilityPath`; bare = `default:`. Internally always qualified.\n- Active workspaces = change `specIds` via `parseSpecId()`/`workspaces` getter — not persisted.\n- Primary workspace = first in `change.workspaces` (archive template / default metadata attribution).\n- Port-per-workspace: `ReadonlyMap<string, RepositoryInstance>`.\n- Workspace context patterns apply only when active; bare qualifier = this ws; excludes never apply to dependsOn-reached specs; evaluated after project patterns.\n- Cross-ws refs OK; unknown ws: config validate error; runtime context warn+skip.\n- Change artifacts always include workspace segment: `specs/<ws>/...`, `deltas/<ws>/...`.\n- Consuming project's `specd.yaml` sole SoT — never read external repo's config.\n\n## Constraints\n- Every project declares default workspace.\n- Name regex enforced; `codeRoot` required for non-default.\n- `isExternal` inferred; spec IDs always qualified internally.\n- Empty `specIds` → empty `workspaces`.\n- External configs never read.\n- ReadOnly blocks all writes; errors must not suggest remediation.",
   "contentHashes": {
     "spec.md": "sha256:e644179411adafb4a576ac8bcd8dc9f963766fd326b437fd14423a8e0a8a5617",
     "verify.md": "sha256:f524b926e2b055ef61a6d44e41817fef7fcee6dfa1e203714ae7c9b34a733c33"
@@ -370,7 +372,7 @@
         "lastModified": "2026-06-02T14:44:12.832Z"
       }
     },
-    "persistedStateHash": "sha256:7cb132b9c7eae1659554646b6b9175a5d4ee26724366eae163bd0ee7256da9f4",
+    "persistedStateHash": "sha256:35f7c031512abc32037992e4686466643eba89d5da9fec8ab1aa5312aa1e866a",
     "schema": {
       "name": "schema-std",
       "version": 1

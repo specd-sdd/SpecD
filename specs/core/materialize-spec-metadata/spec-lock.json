@@ -11,5 +11,41 @@
     "core:composition-resolver",
     "default:_global/logging"
   ],
-  "implementation": []
+  "implementation": [],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "MaterializeSpecMetadata: if-needed/force reuse-or-regenerate orchestration with bounded conflict retry.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:eb422efd4da8eeb36d0035bed7b2fe36d82ae2e56ce62a519d95de9d69569b1f",
+          "lastModified": "2026-07-25T11:53:31.653Z"
+        },
+        "verify.md": {
+          "hash": "sha256:ef6fdf419ff7072a08257fce80fa63154b757f2acf987921a86945629fbfadb1",
+          "lastModified": "2026-07-25T11:53:31.654Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# MaterializeSpecMetadata\n\n## Rules\n- Input: `specId`, `policy?: 'if-needed'|'force'` (default if-needed). Result: metadata, metadataFingerprint, source persisted|generated, regenerated, warnings.\n- if-needed: read snapshot+artifacts+lock; fresh → return persisted; else generate; re-read fingerprint before persist; mismatch → refuse write; PersistSpecMetadata with observed revision; return generated even if persist fails (non-conflict).\n- force: always regenerate+persist; persist failure reported to caller (for RegenerateSpecMetadata).\n- Revision conflict: re-read winner — if fresh return persisted; else ≤1 bounded retry; else typed conflict. Source change mid-flight → no write.\n- Reuse GenerateSpecMetadata hashes (no second hash). if-needed cache-write fail (non-conflict) → success + `metadata-cache-write-failed` warning + one Logger.warn; callers propagate warning.\n- No public missing/invalid/stale statuses. Composition: resolveMaterializeSpecMetadataDeps → SpecRepository, GenerateSpecMetadata, PersistSpecMetadata, Logger. On Kernel.specs as `materializeMetadata`.\n\n## Constraints\n- Sole freshness/regen orchestrator. No self-derived deps/opts/schema. Max one concurrency retry.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:eb422efd4da8eeb36d0035bed7b2fe36d82ae2e56ce62a519d95de9d69569b1f",
+          "lastModified": "2026-07-25T11:53:31.653Z"
+        },
+        "verify.md": {
+          "hash": "sha256:ef6fdf419ff7072a08257fce80fa63154b757f2acf987921a86945629fbfadb1",
+          "lastModified": "2026-07-25T11:53:31.654Z"
+        }
+      }
+    }
+  }
 }

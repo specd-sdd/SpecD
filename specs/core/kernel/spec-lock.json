@@ -57,5 +57,41 @@
     "core:initialize-persisted-spec-state",
     "core:generate-metadata"
   ],
-  "implementation": []
+  "implementation": [],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Facade wiring domain use cases from SpecdConfig into changes/specs/project groups; config mutation via createConfigWriter().",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:ea03e5b09b1431af2475f900d31013f25208db881953d065b8d4708a91d4373a",
+          "lastModified": "2026-07-25T13:14:44.911Z"
+        },
+        "verify.md": {
+          "hash": "sha256:a68d363a8f72f9b164d399c3a595777d7c938657c15ac81f334b2fd0c9847be6",
+          "lastModified": "2026-07-25T13:14:44.928Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Kernel\n\n## Rules\n- `Kernel` groups use cases: `changes`, `specs`, `project` — never top-level.\n- `kernel.specs` MUST NOT expose `SaveSpecMetadata`/`InvalidateSpecMetadata`; `PersistSpecMetadata` not mounted (internal to `MaterializeSpecMetadata`).\n- Every exported application use case (except `_shared/`) MUST have `Kernel` entry + `createKernel` wiring.\n- Entries typed as concrete use-case classes; callers use `kernel.<group>.<uc>.execute(...)`.\n- `createKernel(config, options?)` uses shared `CompositionResolver` path; one shared `ChangeRepository`, per-workspace `SpecRepository`, `SchemaRegistry`, lazy caching `SchemaProvider` (via `ResolveSchema`; failures not cached; never `null`), `HookRunner`, `RunStepHooks`, `ContentHasher`, `ArtifactParserRegistry`.\n- No use case calls `SchemaRegistry.resolve()` directly — only `SchemaProvider.get()`.\n- Hooks come from schema via `schemaOverrides`; kernel ignores `config.workflow`.\n- Registry/view helpers composition-owned; kernel facade only — no second merged-registry source.\n- VCS/actor via `createVcsAdapter`/`createVcsActorResolver` — no hardcoding `Git*`.\n- `FsChangeRepository.get()` auto-invalidates on artifact drift when past `designing` OR active approval; cause `artifact-drift`; legacy `\"artifact-change\"` normalized.\n- Expose `changes.repo` + `specs.repos`.\n- `KernelOptions.extraNodeModulesPaths` appends schema search paths; supports repo overrides + additive registries (storage/VCS/actor/parsers/external hooks). Graph-store NOT core.\n- Expose merged registries (final built-in+external); reject conflicts/unknown refs.\n- Binding map: `changes.*` (create/status/countTasks/transition/approveSpec/approveSignoff/draft/restore/discard/archive/validate/compile/list/listDrafts/listDiscarded/edit/skipArtifact/updateSpecDeps/listArchived/getArchived/runStepHooks/getHookInstructions/getArtifactInstruction/detectOverlap + repo); `specs.*` (list/search/get/getActiveSchema/validate/generateMetadata/materializeMetadata/getMetadata/regenerateMetadata/initializePersistedState/getPersistedSchema/updatePersistedSchema/getPersistedDeps/updatePersistedDeps/getPersistedImplementation/updatePersistedImplementation/getPersistedOptimizations/updatePersistedOptimizations/getContext/resolveSchema/getHealth + repos); `project.*` (listWorkspaces/getProjectContext/getConfig/getMetadata/updateMetadata).\n- No `listPlugins` / skills-manifest / config-mutation on kernel — plugins via `getConfig().plugins`; writes via `createConfigWriter()`.\n- `execute()` inputs MUST NOT re-pass construction-time config. Allowed overrides only: `CompileContext`, `GetProjectContext`, `GetSpecContext`, `TransitionChange`, `ArchiveChange`, `RunStepHooks`, `GetStatus`, `CreateChange`, `ValidateArtifacts` (fields per full spec).\n- `createKernel` returns plain immutable object, not class.\n\n## Constraints\n- Kernel = mandatory domain use-case entry; config mutation = `createConfigWriter()`.\n- Missing Kernel entry for exported domain UC = violation (except ConfigWriter ops).\n- Removing Kernel entry = breaking change.\n- No business logic in kernel — wiring/grouping only.\n- `createKernelInternals` not exported; `Kernel` + `createKernel` public.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:ea03e5b09b1431af2475f900d31013f25208db881953d065b8d4708a91d4373a",
+          "lastModified": "2026-07-25T13:14:44.911Z"
+        },
+        "verify.md": {
+          "hash": "sha256:a68d363a8f72f9b164d399c3a595777d7c938657c15ac81f334b2fd0c9847be6",
+          "lastModified": "2026-07-25T13:14:44.928Z"
+        }
+      }
+    }
+  }
 }

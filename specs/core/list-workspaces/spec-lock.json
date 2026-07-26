@@ -13,5 +13,41 @@
     {
       "file": "core:src/composition/use-cases/list-workspaces.ts"
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "ListWorkspaces pairs each config workspace with SpecRepository as ordered ProjectWorkspace read-only views.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:ca6a70c6ee0f050a401ace3d822500c1f4e6d511034a9af89e5362fc7b09dfbc",
+          "lastModified": "2026-07-06T14:22:55.091Z"
+        },
+        "verify.md": {
+          "hash": "sha256:3ca4f6036edfa4937087d64fc95802fe2ca882e9ed199a8ce602f2937b47d43d",
+          "lastModified": "2026-07-06T14:22:55.091Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# List Workspaces\n\n## Rules\n- `ListWorkspaces.execute()` iterate all config workspaces; pair each with `SpecRepository`; return `ProjectWorkspace[]` in config declaration order\n- `ProjectWorkspace` immutable props: `name`, `codeRoot`, `isExternal`, `ownership` (`owned`|`shared`|`readOnly`), `specRepo`\n- MUST include every workspace from `specd.yaml` (+ local overrides); init failure MAY mark repo unavailable or throw by severity\n- `createListWorkspaces(config)` MUST bootstrap each `SpecRepository` with canonical metadata-path semantics; MUST NOT weaker lookup than composition layer\n- Config form MUST derive `ListWorkspacesDeps` via `resolveListWorkspacesDeps(resolver)` then delegate `createListWorkspaces(deps)`; resolve `config: SpecdConfig`, `specRepos: ReadonlyMap<string, SpecRepository>`; MUST NOT inline fs wiring\n\n## Constraints\n- MUST NOT modify config or repository state\n- `ProjectWorkspace` read-only project-structure view\n- MUST NOT pre-load spec content/metadata; only expose repository ports",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:ca6a70c6ee0f050a401ace3d822500c1f4e6d511034a9af89e5362fc7b09dfbc",
+          "lastModified": "2026-07-06T14:22:55.091Z"
+        },
+        "verify.md": {
+          "hash": "sha256:3ca4f6036edfa4937087d64fc95802fe2ca882e9ed199a8ce602f2937b47d43d",
+          "lastModified": "2026-07-06T14:22:55.091Z"
+        }
+      }
+    }
+  }
 }

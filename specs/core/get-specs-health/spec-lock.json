@@ -12,5 +12,41 @@
     {
       "file": "core:test/application/use-cases/get-specs-health.spec.ts"
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "GetSpecsHealth wraps ValidateSpecs: aggregate counts + issues only for failed/warned specs.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:1b44d784459e9874f595a7bbf4202df1de645006c34493a2a1ec556350d2cc43",
+          "lastModified": "2026-07-23T07:56:44.077Z"
+        },
+        "verify.md": {
+          "hash": "sha256:d51b1b2caa9501a8dea30ff986044681423abbbb4fa9cd33fb8054c7353ae20a",
+          "lastModified": "2026-07-23T07:28:57.565Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Get Specs Health\n\n## Rules\n- MUST invoke `ValidateSpecs.execute()` internally\n- `GetSpecsHealthResult` MUST exclude clean passes (0 failures, 0 warnings); report only `passed === false` OR `warnings.length > 0`\n- Aggregate: `totalSpecs`, `passed` (clean), `failed` (≥1 failure), `warned` (warnings, no failures)\n- Mutually exclusive invariant: `totalSpecs = passed + failed + warned`\n- `issues[]` for failed/warned: `spec` (canonical path), `passed` (true if warnings-only), `failures[]`, `warnings[]`\n- Optional `workspace` filter in input → forward to `ValidateSpecs`\n\n## Constraints\n- Payload excludes successful validations; stats still count all specs",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:1b44d784459e9874f595a7bbf4202df1de645006c34493a2a1ec556350d2cc43",
+          "lastModified": "2026-07-23T07:56:44.077Z"
+        },
+        "verify.md": {
+          "hash": "sha256:d51b1b2caa9501a8dea30ff986044681423abbbb4fa9cd33fb8054c7353ae20a",
+          "lastModified": "2026-07-23T07:28:57.565Z"
+        }
+      }
+    }
+  }
 }

@@ -4,5 +4,41 @@
     "version": 1
   },
   "dependsOn": ["core:change"],
-  "implementation": []
+  "implementation": [],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "ReadOnlyChangeView: shared read accessors for drafted/discarded; no mutate or Change unwrap.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:87f4addaba1b18f315eeeaf2411fbef0588f9a81843a524a970e7492fa0da732",
+          "lastModified": "2026-05-28T12:32:43.790Z"
+        },
+        "verify.md": {
+          "hash": "sha256:c1fd442d26af47e3e6bef4b903e54c20d79f42db532c37f1c9f1fecc94585317",
+          "lastModified": "2026-05-28T12:32:43.791Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# ReadOnlyChangeView\n\n## Rules\n- Shared accessors: `name`, `createdAt`, `description`, `state`, `specIds`, `workspaces`, `schemaName`, `schemaVersion`, `artifacts` (status/keys, not body), `history`.\n- No mutating methods (`transition`, `updateSpecIds`, `draft`, `restore`, `discard`, `invalidate`, approval mutators, etc.).\n- No public `change`/`unwrap`/`toChange` escape hatch. Only ChangeRepository internals + facade factory hold mutable aggregate.\n- Internal facade implements Drafted+Discarded; factories: `toDraftedChangeView` (requires `isDrafted`), `toDiscardedChangeView` (latest event `discarded`). `getDraft`/`getDiscarded`/`list*` map via factories.\n- Artifact body via `ChangeRepository.artifact` — not on view.\n\n## Constraints\n- Interface contract, not Change replacement. Active changes still use Change via get/mutate.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:87f4addaba1b18f315eeeaf2411fbef0588f9a81843a524a970e7492fa0da732",
+          "lastModified": "2026-05-28T12:32:43.790Z"
+        },
+        "verify.md": {
+          "hash": "sha256:c1fd442d26af47e3e6bef4b903e54c20d79f42db532c37f1c9f1fecc94585317",
+          "lastModified": "2026-05-28T12:32:43.791Z"
+        }
+      }
+    }
+  }
 }

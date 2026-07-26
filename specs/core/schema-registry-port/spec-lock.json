@@ -9,5 +9,41 @@
     "core:resolve-schema",
     "core:schema-repository-port"
   ],
-  "implementation": []
+  "implementation": [],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "SchemaRegistry port: resolve/resolveRaw/list with npm, workspace, and path prefix routing.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:a51f79669eb561c5ee906c1d85cd47c7fa61899885ca7e49f5d7dd0f14e14158",
+          "lastModified": "2026-05-25T06:02:58.479Z"
+        },
+        "verify.md": {
+          "hash": "sha256:ed0e79a16f7db9745d13c16518987c9563adf1664b312210cfe8934561860903",
+          "lastModified": "2026-05-25T06:02:58.479Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# SchemaRegistry\n\n## Rules\n- Interface (not abstract): `resolve`, `resolveRaw`, `list`. Ctor: `ReadonlyMap<string, SchemaRepository>`.\n- `resolve(ref) → Promise<Schema|null>`. Routing: `@scope/name` → node_modules schema.yaml; `#workspace:name` → SchemaRepository; `#name`/bare → default workspace; fs path → direct. No multi-strategy fallback. Missing workspace repo → null. Caller maps null→SchemaNotFoundError.\n- `resolveRaw(ref) → Promise<SchemaRawResult|null>`: data SchemaYamlData, templates map, resolvedPath (cycle detect). Same routing. For ResolveSchema merge pipeline.\n- `list() → SchemaEntry[]` — discover only, no load/validate. Group: workspaces (declaration order) then npm. Entry: ref, name, source npm|workspace, workspace? if workspace.\n- Re-export Schema from domain value-object.\n\n## Constraints\n- application/ports/; no I/O at port level. Schema defined in domain, re-exported here.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:a51f79669eb561c5ee906c1d85cd47c7fa61899885ca7e49f5d7dd0f14e14158",
+          "lastModified": "2026-05-25T06:02:58.479Z"
+        },
+        "verify.md": {
+          "hash": "sha256:ed0e79a16f7db9745d13c16518987c9563adf1664b312210cfe8934561860903",
+          "lastModified": "2026-05-25T06:02:58.479Z"
+        }
+      }
+    }
+  }
 }

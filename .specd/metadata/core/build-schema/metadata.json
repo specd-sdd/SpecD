@@ -521,6 +521,8 @@
       "then": ["it returns false"]
     }
   ],
+  "optimizedDescription": "Pure buildSchema: SchemaYamlData+templates → Schema with ID/DAG/template/workflow semantic validation.",
+  "optimizedContext": "# buildSchema\n\n## Rules\n- Sync pure fn: `buildSchema(ref, data: SchemaYamlData, templates) → Schema` in `domain/services/build-schema.ts`. No I/O.\n- SchemaYamlData plain interface (not Zod): name, version, description?, kind schema|schema-plugin, extends?, artifacts, workflow?, metadataExtraction?.\n- Validate artifact.id `/^[a-z][a-z0-9-]*$/`; array entry ids `/^[a-z][a-z0-9]*(-[a-z0-9]+)*$/` unique in array; hooks unique across ALL workflow steps. Dup artifact/step → SchemaValidationError.\n- Template path must exist in templates map. requiresTaskCompletion ⊂ requires + taskCompletionCheck on type.\n- Artifact DAG: known requires refs; non-optional must not depend on optional; acyclic (detectCycle DFS).\n- Helpers: buildSelector, buildValidationRule, buildFieldMapping, buildExtractor, buildMetadataExtractorEntry, buildMetadataExtraction, buildArtifactType (defaults optional/delta false, requires []). Relocate buildSelector from infra Zod module.\n- Construct `new Schema(name, version, artifacts, workflow, metadataExtraction)` + kind/extends.\n\n## Constraints\n- Pure: no fs/yaml/zod. domain/services only. Intermediate types plain TS. Errors: SchemaValidationError. Templates pre-loaded.",
   "contentHashes": {
     "spec.md": "sha256:7091e2e7cb0eb7fd4a1e68d7c75a9fef48734bcf194d9ef1e35dc02fc76a0639",
     "verify.md": "sha256:62918b5d6ac173f0f363488ea6d3f5bf8b491fac541d27a6f4d7000398fda9a7"
@@ -536,7 +538,7 @@
         "lastModified": "2026-05-25T06:02:58.413Z"
       }
     },
-    "persistedStateHash": "sha256:c50900f32f49956fdb1ae35344b6cfe77d755180a028f27400553faff6b79e1a",
+    "persistedStateHash": "sha256:e528ab19e39319625f6b9568f5e10f2d7e53ff514bef38cef81d35299bd44ea3",
     "schema": {
       "name": "schema-std",
       "version": 1

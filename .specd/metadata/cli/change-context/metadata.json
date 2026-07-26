@@ -8,7 +8,8 @@
     "core:config",
     "core:get-artifact-instruction",
     "core:get-hook-instructions",
-    "core:refresh-implementation-tracking"
+    "core:refresh-implementation-tracking",
+    "sdk:context-markdown"
   ],
   "context": [
     "AI agents need a single command to retrieve relevant working context — spec content and project context entries — so they can operate on a change without manual assembly. `specd change context <name> <step>` compiles and prints the context block an agent receives when entering a lifecycle step for a named change. Lifecycle state and readiness are separate concerns retrieved through `specd change status`; artifact instructions and step hook instructions remain separate concerns retrieved via `specd change artifact-instruction` and `specd change hook-instruction` respectively."
@@ -41,7 +42,7 @@
     {
       "requirement": "Output",
       "rules": [
-        "The CLI MUST assemble the final output from the structured `CompileContextResult` returned by the use case.\n\n**In `text` mode** (default):\n\n1. The first rendered line is `Context Fingerprint: <sha256...>`, before any project context or spec content.\n2. Project context entries are rendered next, each preceded by its source label (for example `**Source: <path>**` for file entries and `**Source: instruction**` for instruction entries). Entries are separated by `---`.\n3. Spec entries follow with explicit mode labels:\n   - **Full-mode specs** (`mode: 'full'`) are rendered under a `### Spec: <specId>` heading and MUST include an explicit mode label.\n   - **Summary-mode specs** (`mode: 'summary'`) are rendered under `## Available context specs` with spec ID, title, description, source, and an explicit summary label.\n   - **List-mode specs** (`mode: 'list'`) are rendered under `## Available context specs` with spec ID, source, and an explicit list label.\n   - Non-full sections include this instruction: `Use \\`specd change spec-preview <change-name> <specId>\\` to load the merged full content of any change spec you need.\\`\n   - Specs from `dependsOnTraversal` source MUST be visually distinguished from `includePattern` specs.\n\nWhen `--fingerprint` is provided and matches the current fingerprint, text mode still begins with `Context Fingerprint: <sha256...>` and then outputs a brief unchanged message. The full context is not printed.\n\n**In `json` or `toon` mode**, the output is the structured context-only result directly. List entries include `specId`, `source`, and `mode`. Summary entries additionally include `title` and `description`. Full entries additionally include `content`. The output MUST NOT include lifecycle state, requested-step availability, blocking artifacts, or per-step availability."
+        "The CLI MUST obtain the structured `CompileContextResult` from the use case and MUST NOT assemble agent-facing markdown inline.\n\n**In `text` mode** (default):\n\nThe CLI MUST call `changeContextToMarkdown(context, { changeName: <name> })` from `@specd/sdk` (passing the `CompileContextResult` as `context`) and print the returned string to stdout. The helper owns fingerprint rendering, project-context formatting, full-spec content, catalogue tables, and source-aware load hints:\n\n- Catalogue entries with `source: 'specIds'` (change-scoped; may have deltas or be new) → guide agents to `specd changes spec-preview <name> <specId>` for merged full content. These MUST NOT be loaded via `specs context`.\n- Catalogue entries with any other `source` (canonical specs) → guide agents to `specd specs context <specId>` for optimized context.\n- Catalogue layout partitions by hint group: `specIds` table first (with preview prose when non-empty), then other sources with a shared `specs context` prose, with `dependsOnTraversal` under `### Via dependencies`.\n\nFingerprint comparison remains in `CompileContext`. When `status` is `'unchanged'`, the CLI still calls the helper; the helper emits the fingerprint line plus `Context unchanged since last call.` The CLI MUST NOT assemble that message inline.\n\n**In `json` or `toon` mode**, the output is the structured context-only result directly. List entries include `specId`, `source`, and `mode`. Summary entries additionally include `title` and `description`. Full entries additionally include `content`. The output MUST NOT include lifecycle state, requested-step availability, blocking artifacts, or per-step availability. Structured formats MUST NOT invoke the markdown helper."
       ]
     },
     {
@@ -58,11 +59,8 @@
     }
   ],
   "constraints": [
-    "In text mode, the first line is Context Fingerprint: <sha256...>, before project context entries.",
-    "In text mode, project context entries appear before spec entries.",
-    "Text output MUST label each rendered spec entry explicitly as list, summary, or full content without relying on title rewriting.",
-    "Non-full specs in text output MUST include a note instructing the agent to use specd change spec-preview <change-name> <specId> for merged full content when applicable.",
-    "Summary-mode and list-mode specs from dependsOnTraversal MUST be rendered under a separate sub-heading from includePattern specs.",
+    "In text mode, rendering MUST come from changeContextToMarkdown; the CLI MUST NOT hardcode catalogue hints or markdown tables.",
+    "Catalogue hints MUST be source-aware: spec-preview only for change-scoped catalogue entries (source: 'specIds'); specs context for canonical catalogue entries.",
     "Section flags apply only to full-mode spec content.",
     "All warnings go to stderr; the assembled output goes to stdout.",
     "dependsOn traversal is opt-in via --follow-deps; without the flag, deps are not followed.",
@@ -189,12 +187,43 @@
     },
     {
       "requirement": "Output",
-      "name": "Non-full output instructs spec-preview usage",
-      "given": ["the output contains summary-mode or list-mode entries"],
+      "name": "Text output delegates to changeContextToMarkdown",
+      "when": ["specd change context <name> <step> --format text is called"],
+      "then": [
+        "stdout matches changeContextToMarkdown(context, { changeName: <name> })",
+        "AND the CLI does not assemble catalogue markdown inline"
+      ]
+    },
+    {
+      "requirement": "Output",
+      "name": "Change-scoped catalogue entries hint at spec-preview",
+      "given": ["the output contains a catalogue entry (mode is not full) with source: 'specIds'"],
       "when": ["text output is rendered"],
       "then": [
-        "it includes guidance to run specd change spec-preview <change-name> <specId> for merged full content"
+        "it includes guidance to run specd changes spec-preview <name> <specId>",
+        "AND that guidance appears because change-scoped specs may have deltas or be new"
       ]
+    },
+    {
+      "requirement": "Output",
+      "name": "Canonical catalogue entries hint at specs context",
+      "given": [
+        "the output contains a catalogue entry with source: 'specDependsOn' or includePattern"
+      ],
+      "when": ["text output is rendered"],
+      "then": [
+        "it includes guidance to run specd specs context <specId>",
+        "AND it does not suggest spec-preview for that entry"
+      ]
+    },
+    {
+      "requirement": "Output",
+      "name": "No preview hint when no change-scoped catalogue entries",
+      "given": [
+        "the catalogue has only includePattern, specDependsOn, and/or dependsOnTraversal entries"
+      ],
+      "when": ["text output is rendered"],
+      "then": ["stdout does not include a spec-preview guidance line"]
     },
     {
       "requirement": "Output",
@@ -341,21 +370,21 @@
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:ffc11b43019c37f89483db22bf064a846a4cebb3567384c0ae6b512cc1976611",
-    "verify.md": "sha256:e0d007cd8d307daea0c071c1e66f267e953fae55e778e1ee54cfe99b85b03bdd"
+    "spec.md": "sha256:7f8402391e0bbd936bad68fada64bf66dd2d79353e88f615d1d625b1ce6ffede",
+    "verify.md": "sha256:98bd9075288dd69572b66274a489fbd36d8a30b3077c4760060ad393ffda2db1"
   },
   "provenance": {
     "artifacts": {
       "spec.md": {
-        "hash": "sha256:ffc11b43019c37f89483db22bf064a846a4cebb3567384c0ae6b512cc1976611",
-        "lastModified": "2026-07-21T16:56:51.104Z"
+        "hash": "sha256:7f8402391e0bbd936bad68fada64bf66dd2d79353e88f615d1d625b1ce6ffede",
+        "lastModified": "2026-07-26T18:50:55.552Z"
       },
       "verify.md": {
-        "hash": "sha256:e0d007cd8d307daea0c071c1e66f267e953fae55e778e1ee54cfe99b85b03bdd",
-        "lastModified": "2026-07-21T16:56:51.104Z"
+        "hash": "sha256:98bd9075288dd69572b66274a489fbd36d8a30b3077c4760060ad393ffda2db1",
+        "lastModified": "2026-07-26T18:50:55.554Z"
       }
     },
-    "persistedStateHash": "sha256:17911540080e2a773bba1ff6c760a244927edb52a4704591ce4e8934b4ced0c1",
+    "persistedStateHash": "sha256:037f138a340b6deb5aabb85d871a03d251ac4fe5918f392caf21c5f6c527c7b2",
     "schema": {
       "name": "schema-std",
       "version": 1

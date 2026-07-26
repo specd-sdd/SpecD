@@ -326,11 +326,7 @@ The fingerprint follows the compiled logical result, not the presentation format
 
 When no section flags are provided, a full spec renders all schema artifacts with `scope: spec` in stable order: `spec.md` first when present, then the remaining files alphabetically, each labeled with its filename. When `--rules`, `--constraints`, or `--scenarios` is used, raw file rendering is replaced by metadata-derived section output; for specs in the change, those sections are derived from the merged preview artifacts so delta changes in files like `verify.md` affect the compiled context. In `list` and `summary` modes, section flags are accepted but do not change output shape.
 
-When non-full entries are present, the command prints guidance to use:
-
-`specd changes spec-preview <change-name> <specId>`
-
-to inspect merged full content for a specific spec in this change.
+When non-full entries are present, the command partitions them by source and prints drill-down guidance: `specd changes spec-preview <change-name> <specId>` for change-scoped specs (`source: 'specIds'`), and `specd specs context <specId>` for canonical workspace specs (`source: 'specDependsOn'`, `'includePattern'`, or `'dependsOnTraversal'`).
 
 | Option                      | Description                                                                                                                                                         |
 | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -1062,7 +1058,7 @@ specd project context [options]
 
 Compile the project-level context block. This is the context an agent receives when asked about the project as a whole, rather than a specific change or spec.
 
-Rendering mode is controlled by `contextMode` in `specd.yaml` (`list`, `summary`, `full`, `hybrid`; default `summary`). `hybrid` behaves as `full` for this command.
+Rendering mode is controlled by `contextMode` in `specd.yaml` (`list`, `summary`, `full`, `hybrid`; default `summary`). `hybrid` behaves as `full` for this command. When non-full catalogue specs are present, the command prints guidance to use `specd specs context <specId>` to load full context for any listed spec. It never suggests `spec-preview` (project context has no change scope).
 
 | Option                      | Description                                                    |
 | --------------------------- | -------------------------------------------------------------- |

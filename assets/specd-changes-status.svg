@@ -1,0 +1,146 @@
+<svg height="682.4" width="1091.2" xmlns="http://www.w3.org/2000/svg">
+<g transform="translate(32,16)">
+<filter filterUnits="userSpaceOnUse" height="690.4" id="shadow" width="1099.2" x="-32" y="-24">
+<feGaussianBlur stdDeviation="12"/>
+</filter>
+<rect fill="#000000c0" filter="url(#shadow)" height="618.4" rx="10" ry="10" width="1027.2" x="4" y="12"/>
+<rect fill="#282c34" height="618.4" rx="10" ry="10" width="1027.2"/>
+<clipPath id="header">
+<rect height="28" width="1027.2"/>
+</clipPath>
+<rect clip-path="url(#header)" fill="#383837" height="56" rx="10" ry="10" width="1027.2"/>
+<line stroke="#000000c0" stroke-width="0.5" x1="0" x2="1027.2" y1="28" y2="28"/><text dominant-baseline="central" fill="#b3b3b3" font-family="system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica Neue, Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle" x="513.6" y="14">specd changes status fix-project-dashboard-snapshot</text>
+<g>
+<circle cx="14" cy="14" fill="#ff5f56" r="6" stroke="#ff5f56" stroke-width="0.5"/>
+<circle cx="34" cy="14" fill="#ffbd2e" r="6" stroke="#ffbd2e" stroke-width="0.5"/>
+<circle cx="54" cy="14" fill="#28c941" r="6" stroke="#28c941" stroke-width="0.5"/>
+</g>
+<svg class="terminal" font-family="JetBrains Mono, Fira Code, Source Code Pro, Cascadia Code, Consolas, Menlo, Monaco, DejaVu Sans Mono, monospace, Symbols Nerd Font Mono, Cascadia Mono" font-size="12" height="590.4" width="1027.2" y="28">
+<svg fill="#dcdfe4" x="9.6" y="7.2">
+<g>
+<svg height="576" viewBox="0 0 84 48" width="1008">
+<g stroke-width="0.025"/>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="0">
+<text xml:space="preserve" y="0.96em"><tspan fill="#c678dd">% </tspan><tspan fill="#ea9a97">specd</tspan><tspan> </tspan><tspan fill="#c4a7e7" font-style="italic">changes</tspan><tspan> </tspan><tspan fill="#c4a7e7" font-style="italic">status</tspan><tspan> </tspan><tspan fill="#c4a7e7" font-style="italic">fix-project-dashboard-snapshot</tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="14.4">
+<text xml:space="preserve" y="0.96em"><tspan fill="#dcdfe4">change: </tspan><tspan>     </tspan><tspan fill="#dcdfe4">fix-project-dashboard-snapshot </tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="28.8">
+<text xml:space="preserve" y="0.96em"><tspan fill="#dcdfe4">state: </tspan><tspan>      </tspan><tspan fill="#dcdfe4">archivable </tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="43.2">
+<text xml:space="preserve" y="0.96em"><tspan fill="#dcdfe4">description: </tspan><tspan fill="#dcdfe4">Refactor </tspan><tspan fill="#dcdfe4">specd </tspan><tspan fill="#dcdfe4">project </tspan><tspan fill="#dcdfe4">dashboard </tspan><tspan fill="#dcdfe4">to </tspan><tspan fill="#dcdfe4">use </tspan><tspan fill="#dcdfe4">buildProjectStatusSnapshot </tspan><tspan fill="#dcdfe4">and </tspan><tspan fill="#dcdfe4">improve </tspan><tspan fill="#dcdfe4">TUI </tspan><tspan fill="#dcdfe4">wrapping </tspan><tspan fill="#dcdfe4">for </tspan><tspan fill="#dcdfe4">workspaces </tspan><tspan fill="#dcdfe4">and </tspan><tspan fill="#dcdfe4">graph </tspan><tspan fill="#dcdfe4">stats </tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="72">
+<text xml:space="preserve" y="0.96em"><tspan fill="#dcdfe4">artifacts </tspan><tspan fill="#dcdfe4">(DAG): </tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="86.4">
+<text xml:space="preserve" y="0.96em"><tspan>  </tspan><tspan fill="#dcdfe4">[✓] </tspan><tspan fill="#dcdfe4">complete </tspan><tspan> </tspan><tspan fill="#dcdfe4">[ </tspan><tspan fill="#dcdfe4">] </tspan><tspan fill="#dcdfe4">missing </tspan><tspan> </tspan><tspan fill="#dcdfe4">[!] </tspan><tspan fill="#dcdfe4">drifted </tspan><tspan> </tspan><tspan fill="#dcdfe4">[~] </tspan><tspan fill="#dcdfe4">needs </tspan><tspan fill="#dcdfe4">review </tspan><tspan> </tspan><tspan fill="#dcdfe4">[?] </tspan><tspan fill="#dcdfe4">in-progress </tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="115.2">
+<text xml:space="preserve" y="0.96em"><tspan>  </tspan><tspan fill="#dcdfe4">[✓] </tspan><tspan fill="#dcdfe4">proposal </tspan><tspan fill="#dcdfe4">[scope: </tspan><tspan fill="#dcdfe4">change] </tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="129.6">
+<text xml:space="preserve" y="0.96em"><tspan>  </tspan><tspan fill="#dcdfe4">├── </tspan><tspan fill="#dcdfe4">[✓] </tspan><tspan fill="#dcdfe4">specs </tspan><tspan fill="#dcdfe4">[scope: </tspan><tspan fill="#dcdfe4">spec] </tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="144">
+<text xml:space="preserve" y="0.96em"><tspan>  </tspan><tspan fill="#dcdfe4">│ </tspan><tspan>  </tspan><tspan fill="#dcdfe4">├── </tspan><tspan fill="#dcdfe4">[✓] </tspan><tspan fill="#dcdfe4">verify </tspan><tspan fill="#dcdfe4">[scope: </tspan><tspan fill="#dcdfe4">spec] </tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="158.4">
+<text xml:space="preserve" y="0.96em"><tspan>  </tspan><tspan fill="#dcdfe4">│ </tspan><tspan>  </tspan><tspan fill="#dcdfe4">│ </tspan><tspan>  </tspan><tspan fill="#dcdfe4">└── </tspan><tspan fill="#dcdfe4">[✓] </tspan><tspan fill="#dcdfe4">design </tspan><tspan fill="#dcdfe4">[scope: </tspan><tspan fill="#dcdfe4">change] </tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="172.8">
+<text xml:space="preserve" y="0.96em"><tspan>  </tspan><tspan fill="#dcdfe4">│ </tspan><tspan>  </tspan><tspan fill="#dcdfe4">│ </tspan><tspan>      </tspan><tspan fill="#dcdfe4">└── </tspan><tspan fill="#dcdfe4">[✓] </tspan><tspan fill="#dcdfe4">tasks </tspan><tspan fill="#dcdfe4">[scope: </tspan><tspan fill="#dcdfe4">change] </tspan><tspan fill="#dcdfe4">[hasTasks </tspan><tspan fill="#dcdfe4">- </tspan><tspan fill="#dcdfe4">7/7 </tspan><tspan fill="#dcdfe4">done] </tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="201.6">
+<text xml:space="preserve" y="0.96em"><tspan fill="#dcdfe4">specs </tspan><tspan fill="#dcdfe4">and </tspan><tspan fill="#dcdfe4">dependencies: </tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="216">
+<text xml:space="preserve" y="0.96em"><tspan>  </tspan><tspan fill="#dcdfe4">cli:project-dashboard: </tspan><tspan fill="#dcdfe4">cli:entrypoint, </tspan><tspan fill="#dcdfe4">core:config </tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="244.8">
+<text xml:space="preserve" y="0.96em"><tspan fill="#dcdfe4">next </tspan><tspan fill="#dcdfe4">action: </tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="259.2">
+<text xml:space="preserve" y="0.96em"><tspan>  </tspan><tspan fill="#dcdfe4">target: </tspan><tspan> </tspan><tspan fill="#dcdfe4">archivable </tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="273.6">
+<text xml:space="preserve" y="0.96em"><tspan>  </tspan><tspan fill="#dcdfe4">command: </tspan><tspan fill="#dcdfe4">(none) </tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="288">
+<text xml:space="preserve" y="0.96em"><tspan>  </tspan><tspan fill="#dcdfe4">reason: </tspan><tspan> </tspan><tspan fill="#dcdfe4">Proceed </tspan><tspan fill="#dcdfe4">to </tspan><tspan fill="#dcdfe4">next </tspan><tspan fill="#dcdfe4">lifecycle </tspan><tspan fill="#dcdfe4">step </tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="316.8">
+<text xml:space="preserve" y="0.96em"><tspan fill="#dcdfe4">lifecycle: </tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="331.2">
+<text xml:space="preserve" y="0.96em"><tspan>  </tspan><tspan fill="#dcdfe4">transitions: </tspan><tspan> </tspan><tspan fill="#dcdfe4">archiving, </tspan><tspan fill="#dcdfe4">designing </tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="345.6">
+<text xml:space="preserve" y="0.96em"><tspan>  </tspan><tspan fill="#dcdfe4">approvals: </tspan><tspan>    </tspan><tspan fill="#dcdfe4">spec=off </tspan><tspan> </tspan><tspan fill="#dcdfe4">signoff=off </tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="360">
+<text xml:space="preserve" y="0.96em"><tspan>  </tspan><tspan fill="#dcdfe4">path: </tspan><tspan>         </tspan><tspan fill="#dcdfe4">/projects/specd/specd-sdd/changes/20260720-163222-fix-project-dashboard-snapshot </tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="388.8">
+<text xml:space="preserve" y="0.96em"><tspan fill="#dcdfe4">artifacts </tspan><tspan fill="#dcdfe4">(details): </tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="403.2">
+<text xml:space="preserve" y="0.96em"><tspan>  </tspan><tspan fill="#dcdfe4">proposal </tspan><tspan> </tspan><tspan fill="#dcdfe4">complete </tspan><tspan> </tspan><tspan fill="#dcdfe4">(effective: </tspan><tspan fill="#dcdfe4">complete) </tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="417.6">
+<text xml:space="preserve" y="0.96em"><tspan>    </tspan><tspan fill="#dcdfe4">- </tspan><tspan fill="#dcdfe4">proposal </tspan><tspan> </tspan><tspan fill="#dcdfe4">complete </tspan><tspan> </tspan><tspan fill="#dcdfe4">proposal.md </tspan><tspan> </tspan><tspan fill="#dcdfe4">sha256:2b4e351f84ed8d73e9c0681c134687b7b33e23f44cef19f4b3f34526e2111154 </tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="432">
+<text xml:space="preserve" y="0.96em"><tspan>  </tspan><tspan fill="#dcdfe4">specs </tspan><tspan> </tspan><tspan fill="#dcdfe4">complete </tspan><tspan> </tspan><tspan fill="#dcdfe4">(effective: </tspan><tspan fill="#dcdfe4">complete) </tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="446.4">
+<text xml:space="preserve" y="0.96em"><tspan>    </tspan><tspan fill="#dcdfe4">- </tspan><tspan fill="#dcdfe4">cli:project-dashboard </tspan><tspan> </tspan><tspan fill="#dcdfe4">complete </tspan><tspan> </tspan><tspan fill="#dcdfe4">deltas/cli/project-dashboard/spec.md.delta.yaml </tspan><tspan> </tspan><tspan fill="#dcdfe4">sha256:f3ced27ec3c0d8f2e549a690f1f1894ad4349dd37905e</tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="460.8">
+<text xml:space="preserve" y="0.96em"><tspan fill="#dcdfe4">7aa0bc93679d1ba5fe7 </tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="475.2">
+<text xml:space="preserve" y="0.96em"><tspan>  </tspan><tspan fill="#dcdfe4">verify </tspan><tspan> </tspan><tspan fill="#dcdfe4">complete </tspan><tspan> </tspan><tspan fill="#dcdfe4">(effective: </tspan><tspan fill="#dcdfe4">complete) </tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="489.6">
+<text xml:space="preserve" y="0.96em"><tspan>    </tspan><tspan fill="#dcdfe4">- </tspan><tspan fill="#dcdfe4">cli:project-dashboard </tspan><tspan> </tspan><tspan fill="#dcdfe4">complete </tspan><tspan> </tspan><tspan fill="#dcdfe4">deltas/cli/project-dashboard/verify.md.delta.yaml </tspan><tspan> </tspan><tspan fill="#dcdfe4">sha256:feda49abc3f2a4a8be9ed4611c3c4d241cdf036e8e6</tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="504">
+<text xml:space="preserve" y="0.96em"><tspan fill="#dcdfe4">17f2403bf2a24c0c5214d </tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="518.4">
+<text xml:space="preserve" y="0.96em"><tspan>  </tspan><tspan fill="#dcdfe4">design </tspan><tspan> </tspan><tspan fill="#dcdfe4">complete </tspan><tspan> </tspan><tspan fill="#dcdfe4">(effective: </tspan><tspan fill="#dcdfe4">complete) </tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="532.8">
+<text xml:space="preserve" y="0.96em"><tspan>    </tspan><tspan fill="#dcdfe4">- </tspan><tspan fill="#dcdfe4">design </tspan><tspan> </tspan><tspan fill="#dcdfe4">complete </tspan><tspan> </tspan><tspan fill="#dcdfe4">design.md </tspan><tspan> </tspan><tspan fill="#dcdfe4">sha256:936a59ba21b22fb3c7c700c527b8ef0940b120d8dc71e5a3f03b7f6a4c657c52 </tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="547.2">
+<text xml:space="preserve" y="0.96em"><tspan>  </tspan><tspan fill="#dcdfe4">tasks </tspan><tspan> </tspan><tspan fill="#dcdfe4">complete </tspan><tspan> </tspan><tspan fill="#dcdfe4">(effective: </tspan><tspan fill="#dcdfe4">complete) </tspan><tspan> </tspan><tspan fill="#dcdfe4">tasks: </tspan><tspan fill="#dcdfe4">7/7 </tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="561.6">
+<text xml:space="preserve" y="0.96em"><tspan>    </tspan><tspan fill="#dcdfe4">- </tspan><tspan fill="#dcdfe4">tasks </tspan><tspan> </tspan><tspan fill="#dcdfe4">complete </tspan><tspan> </tspan><tspan fill="#dcdfe4">tasks.md </tspan><tspan> </tspan><tspan fill="#dcdfe4">sha256:a2b4cb1ee8381b9affb91a0e51ccfeb6d1a9e11ae5b9d43948194e0668bc76de </tspan></text>
+</svg>
+</g>
+</svg>
+</svg>
+<rect fill="none" height="618.4" rx="10" ry="10" stroke="#000000" stroke-width="0.5" width="1027.2"/>
+<rect fill="none" height="616.4" rx="9" ry="9" stroke="#f0f0f080" stroke-width="0.5" width="1025.2" x="1" y="1"/>
+</g>
+<style>
+@font-face {
+	font-family: JetBrains Mono;
+	font-weight: 100 800;
+	font-style: italic;
+	src: url(https://raw.githubusercontent.com/pamburus/fonts/refs/heads/main/JetBrainsMono/fonts/variable/JetBrainsMono-Italic%5Bwght%5D.woff2) format('woff2');
+}
+@font-face {
+	font-family: JetBrains Mono;
+	font-weight: 100 800;
+	font-style: normal;
+	src: url(https://raw.githubusercontent.com/pamburus/fonts/refs/heads/main/JetBrainsMono/fonts/variable/JetBrainsMono%5Bwght%5D.woff2) format('woff2');
+}
+</style>
+</svg>

@@ -311,21 +311,21 @@
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:1c72e7f88b2c2c8f85f017057b9959fcb5afeffcbd95ee006aa4ad80f1ca1f3a",
+    "spec.md": "sha256:860adb764485498935f7e9b8f6e5f52d03713a40eeace54c532500ba977ebce3",
     "verify.md": "sha256:9360f53951dac16616927f6fcfc3f9955565e52b841600d86771c89e642da090"
   },
   "provenance": {
     "artifacts": {
       "spec.md": {
-        "hash": "sha256:1c72e7f88b2c2c8f85f017057b9959fcb5afeffcbd95ee006aa4ad80f1ca1f3a",
-        "lastModified": "2026-07-25T11:53:31.849Z"
+        "hash": "sha256:860adb764485498935f7e9b8f6e5f52d03713a40eeace54c532500ba977ebce3",
+        "lastModified": "2026-07-25T13:14:45.394Z"
       },
       "verify.md": {
         "hash": "sha256:9360f53951dac16616927f6fcfc3f9955565e52b841600d86771c89e642da090",
         "lastModified": "2026-07-25T11:53:31.850Z"
       }
     },
-    "persistedStateHash": "sha256:e3a633c1ef42388a34a5042afa487f297e116faf42c10540fd912061e9b63468",
+    "persistedStateHash": "sha256:4d80654bc8ade90407584b14eba4163ab43ab1528dbf1c915e18d8570c23a2fc",
     "schema": {
       "name": "schema-std",
       "version": 1

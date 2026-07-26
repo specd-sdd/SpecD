@@ -7,7 +7,48 @@
     "default:_global/architecture",
     "core:composition",
     "code-graph:composition",
-    "cli:host-context"
+    "cli:host-context",
+    "sdk:context-markdown"
   ],
-  "implementation": []
+  "implementation": [
+    {
+      "file": "sdk:src/index.ts"
+    }
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Thin `@specd/sdk` composition: wire core+code-graph, curated barrels, host orchestration; delivery hosts depend on SDK only.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:fc065b78b23d9a9fbc402684d19fb63afea8bc387989ac727965533888b23537",
+          "lastModified": "2026-07-25T11:53:31.594Z"
+        },
+        "verify.md": {
+          "hash": "sha256:d42351b2206851c0c499ecd183887a3b75f9f8cb3c71e848e084ae4b43a94277",
+          "lastModified": "2026-07-25T13:14:45.443Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# SDK Composition\n## Rules\n### Package identity and dependencies\n- Path `packages/sdk/`, workspace name `sdk`\n- Runtime deps ONLY `@specd/core` + `@specd/code-graph`\n- MUST NOT depend on `@specd/cli`, `@specd/mcp`, plugins\n\n### Layer structure\n- Hexagonal per `default:_global/architecture`:\n  - `src/composition/` — `openSpecdHost`, `createSdkContext`, `withOpenGraphProvider`\n  - `src/orchestration/` — `buildProjectStatusSnapshot`, `runIndexProjectGraph`\n  - `src/shared/` — internal helpers; NOT re-exported\n  - `src/index.ts` — public barrel only\n- No domain entities, application ports, or infrastructure adapters\n\n### Public barrel exports\n- `exports`: `\".\"`→`src/index.ts`; `\"./ports\"`→`@specd/core/ports`; `\"./extensions\"`→`@specd/core/extensions`\n- Explicit exports (no `export * from '@specd/core'`):\n  - Composition: `openSpecdHost`, `createSdkContext`, `withOpenGraphProvider`, `SdkHostContext`, `OpenSpecdHostInput`, `OpenSpecdHostResult`, `WithOpenGraphProviderOptions`\n  - Orchestration: `buildProjectStatusSnapshot`, `runIndexProjectGraph` + I/O types\n  - Core re-exports: bootstrap, `Kernel`, `createX` factories, repos, use-case I/O, entities, errors — track `kernel.specs` incl. `MaterializeSpecMetadata`, `GetSpecMetadata`, `RegenerateSpecMetadata`, `InitializePersistedSpecState`, schema inspect/reassign, dep/impl/opt use cases + `create*`\n  - Code-graph `\".\"` re-exports (provider, host use cases, host-adapter symbols)\n  - `SDK_VERSION`, `codeGraphVersion`, `getCodeGraphVersion`\n- MUST NOT export infra/`./internal` symbols\n- MUST NOT export `SaveSpecMetadata`, `UpdateSpecMetadata`, `InvalidateSpecMetadata` or their `create*` factories; MUST NOT export `PersistSpecMetadata`\n\n### Public barrel exports for host adapters\n- Re-export from `@specd/code-graph`: `acquireGraphIndexLock`, `assertGraphIndexUnlocked`, `createGetGraphHealth`, `GetGraphHealthInput`, `GetGraphHealthResult`, `IndexResult`, `HotspotResult`, `ImpactResult`, `FileImpactResult`, `codeGraphVersion`, `getCodeGraphVersion`, `GraphSpecNotFoundError`, `SymbolKind`, `SearchOptions`, `HotspotOptions`, `RiskLevel`, `normalizeFileSelectorPath`, `createBootstrapGraphConfig`, `isGraphStale`, `detectFingerprintMismatch`, `parseFingerprintMap`, `buildProjectGraphConfig`\n- Delivery hosts MUST import these from `@specd/sdk`, not `@specd/code-graph`\n\n### Import policy for integrators\n- CLI/MCP/API/IPC using core+code-graph → depend `@specd/sdk` only\n- Core-only packages (`plugin-*`, `skills`) MAY import `@specd/core`\n- Storage implementers MAY use `@specd/core/ports` or `@specd/sdk/ports`; extensions similarly\n\n### Version constant\n- Export `SDK_VERSION` matching `package.json` version\n\n## Constraints\n- Thin composition + orchestration only; no infra duplication in hosts",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:fc065b78b23d9a9fbc402684d19fb63afea8bc387989ac727965533888b23537",
+          "lastModified": "2026-07-25T11:53:31.594Z"
+        },
+        "verify.md": {
+          "hash": "sha256:d42351b2206851c0c499ecd183887a3b75f9f8cb3c71e848e084ae4b43a94277",
+          "lastModified": "2026-07-25T13:14:45.443Z"
+        }
+      }
+    }
+  }
 }

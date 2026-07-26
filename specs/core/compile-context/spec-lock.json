@@ -26,5 +26,41 @@
       "file": "core:src/application/use-cases/compile-context.ts",
       "symbols": ["CompileContext"]
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "CompileContext assembles project+spec context for a change step; modes, deps traversal, GetSpecMetadata.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:ed62784abf90d6676ed8789af3882500722c410872aa6aaa19a4763520f696a9",
+          "lastModified": "2026-07-25T11:53:31.190Z"
+        },
+        "verify.md": {
+          "hash": "sha256:1a079f10b14e04ef42ccc6852e1bae21436694d8543a20288c63e257209b25e1",
+          "lastModified": "2026-07-25T11:53:31.190Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# CompileContext\n## Rules\n### Ports\n- Inject: ChangeRepository, ListWorkspaces, SchemaProvider, FileReader, ArtifactParserRegistry, ContentHasher, PreviewSpec, GetSpecMetadata, baked `CompileContextConfig`.\n- No LifecycleEngine/ImplementationDetector. No direct `readMetadataSnapshot`. Metadata via GetSpecMetadata (`if-needed`).\n### Input\n- `name`, `step` (entry point only — no readiness). Overrides: `contextMode`, `llmOptimizedContext`. `includeChangeSpecs` (default false), `followDeps` (default false), `depth`, `sections`, `fingerprint`. No per-call `config`.\n### Effective config\n- Shallow-merge baked defaults with runtime overrides for contextMode/llmOptimizedContext only.\n### Guards / workspace qualifiers\n- Schema name mismatch → SchemaMismatchError. Unknown workspace in patterns/dependsOn → warn+skip.\n- Unqualified: project patterns→default; workspace patterns→that ws; dependsOn→declaring spec's ws.\n### Spec collection\n- Seed: `change.specIds` if includeChangeSpecs (mandatory vs excludes); always `change.specDependsOn` values.\n- Then config five-step: project include → project exclude → active-ws include → active-ws exclude → dependsOn traversal iff followDeps. Traversal adds not subject to excludes. Deduplicate; first-match position.\n### Display modes\n- list / summary / full / hybrid (default summary). Hybrid: full only for includeChangeSpecs seeds; else summary. `sections` only full-mode metadata sections.\n### dependsOn resolution\n- Tier: change.specDependsOn → GetSpecMetadata → schema metadataExtraction.dependsOn. Cycles: break edge, no warn.\n### Content materialization\n- Summary/section full via GetSpecMetadata. Only materialize rendered specs. change.specIds + sections → merged PreviewSpec content. No sections → render scope:spec artifacts (spec.md first, then alpha). Preview fail → base fallback.\n### Result\n- `contextFingerprint`, `status` changed|unchanged, `projectContext`, `specs`, `warnings`. No lifecycle fields. Fingerprint match → empty arrays + unchanged.\n### LLM optimized\n- Prefer optimizedContext when enabled+nonempty. Bypass if sections omit both rules+constraints. Append scenarios if requested. stale-optimization warn: \"Launch specd-spec-context-optimizer agent to refresh\".\n### Factory\n- resolveCompileContextDeps → createCompileContext(deps). MUST NOT resolve LifecycleEngine.\n## Constraints\n- Project context first. Missing files/specs → warn+skip. Traversal opt-in. Max one entry per spec (priority: specIds>specDependsOn>dependsOnTraversal>includePattern).\n- File access via SpecRepository/FileReader only. Instructions/hooks via GetArtifactInstruction/GetHookInstructions — not in result.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:ed62784abf90d6676ed8789af3882500722c410872aa6aaa19a4763520f696a9",
+          "lastModified": "2026-07-25T11:53:31.190Z"
+        },
+        "verify.md": {
+          "hash": "sha256:1a079f10b14e04ef42ccc6852e1bae21436694d8543a20288c63e257209b25e1",
+          "lastModified": "2026-07-25T11:53:31.190Z"
+        }
+      }
+    }
+  }
 }

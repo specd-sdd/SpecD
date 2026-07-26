@@ -10,5 +10,41 @@
     "core:compile-context",
     "core:workspace"
   ],
-  "implementation": []
+  "implementation": [],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Canonical spec ID: workspace:capabilityPath; bare path → default workspace; reject unknown workspace.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:2d1cedb994fda0e4439c76a3aa860a17a85c3fbf790bf15616a6d8785734e34c",
+          "lastModified": "2026-05-25T06:02:58.480Z"
+        },
+        "verify.md": {
+          "hash": "sha256:f9023f0a7de7d50e232e3a5d07456bc5ad2a86f29167e5ec10017e490d9d989a",
+          "lastModified": "2026-05-09T10:25:58.610Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Spec ID Format\n\n## Rules\n- Format: `workspace:capabilityPath` (colon sep; all `/` in path). Single format everywhere.\n- No colon → workspace `default`, whole string = capability path.\n- Unknown workspace (colon-qualified) → reject.\n- Parse: first `:` → workspace + path (validate workspace); else default + full string. Never slash-as-workspace.\n- Normalize bare → fully-qualified at boundary. `specDependsOn` MUST use fully-qualified IDs.\n\n## Constraints\n- Workspace: no `/` or `:`. Capability path: no `:`. Separator always `:`.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:2d1cedb994fda0e4439c76a3aa860a17a85c3fbf790bf15616a6d8785734e34c",
+          "lastModified": "2026-05-25T06:02:58.480Z"
+        },
+        "verify.md": {
+          "hash": "sha256:f9023f0a7de7d50e232e3a5d07456bc5ad2a86f29167e5ec10017e490d9d989a",
+          "lastModified": "2026-05-09T10:25:58.610Z"
+        }
+      }
+    }
+  }
 }

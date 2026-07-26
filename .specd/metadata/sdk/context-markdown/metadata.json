@@ -1,0 +1,213 @@
+{
+  "title": "Context Markdown Presentation",
+  "description": "Delivery hosts (CLI, MCP, future API/IPC) need a shared, agent-facing markdown rendering of compiled change and project context — including correct drill-down hints — without each host reimplementing catalogue tables and load guidance. This spec defines pure presentation helpers in `@specd/sdk` that turn structured core context results into markdown.\n\nLoad hints exist because change-scoped specs (`source: 'specIds'`) may carry deltas or be newly introduced in the change, so they cannot be read correctly via `specs context` (which shows the canonical workspace spec). Those specs MUST be loaded through `changes spec-preview`. All other catalogue specs are canonical and MUST be loaded through `specs context`.",
+  "dependsOn": ["core:compile-context", "core:get-project-context"],
+  "context": [
+    "Delivery hosts (CLI, MCP, future API/IPC) need a shared, agent-facing markdown rendering of compiled change and project context — including correct drill-down hints — without each host reimplementing catalogue tables and load guidance. This spec defines pure presentation helpers in `@specd/sdk` that turn structured core context results into markdown.\n\nLoad hints exist because change-scoped specs (`source: 'specIds'`) may carry deltas or be newly introduced in the change, so they cannot be read correctly via `specs context` (which shows the canonical workspace spec). Those specs MUST be loaded through `changes spec-preview`. All other catalogue specs are canonical and MUST be loaded through `specs context`."
+  ],
+  "rules": [
+    {
+      "requirement": "changeContextToMarkdown",
+      "rules": [
+        "`@specd/sdk` MUST export a pure function:\n\n```typescript\nfunction changeContextToMarkdown(\n  context: CompileContextResult,\n  options: ChangeContextToMarkdownOptions,\n): string\n```\n\n`ChangeContextToMarkdownOptions` MUST include:\n\n- `changeName` (string, required) — the change name used in `spec-preview` hints\n- `includeFingerprint` (boolean, optional, default `true`) — when `true`, emit the fingerprint line\n\nBehaviour:\n\n1. When `context.status` is `'unchanged'`, the function MUST return markdown that includes the fingerprint line (when `includeFingerprint` is true) and exactly the message `Context unchanged since last call.`, and MUST NOT render project context or spec catalogues.\n2. When `context.status` is `'changed'`:\n   - If `includeFingerprint` is true, the first rendered line MUST be `Context Fingerprint: <context.contextFingerprint>`.\n   - Project context entries MUST be rendered next: file entries as `**Source: <path>**` followed by content; instruction entries as `**Source: instruction**` followed by content. Entries MUST be separated by `---`.\n   - Specs with `mode: 'full'` MUST be rendered under `## Spec content` with `### Spec: <specId>`, an explicit `Mode: full` label, and `content`.\n   - Specs with `mode` other than `'full'` (`summary` or `list`) MUST be rendered under `## Available context specs` according to the catalogue grouping rules below."
+      ]
+    },
+    {
+      "requirement": "Change catalogue grouping and load hints",
+      "rules": [
+        "Under `## Available context specs`, the helper MUST partition catalogue entries (`mode !== 'full'`) by `source` and render them in this order:\n\n1. **Change specs** — `source: 'specIds'`\n   - When this group is non-empty, emit this prose (once, above the group's table):\n     `Use \\`specd changes spec-preview <changeName> <specId>\\` to load the merged full content of any change spec you need.\\`\n   - Then a markdown table for that group.\n   - Rationale: these specs belong to the change — they may have deltas or be new — so `specs context` cannot show the correct content.\n2. **Other context specs** — `source: 'specDependsOn'` or `'includePattern'`\n   - When this group **or** the dependency-traversal group is non-empty, emit this prose once (before the first of those tables):\n     `Use \\`specd specs context <specId>\\` to load the full optimized context of any listed spec.\\`\n   - Then a markdown table for this group when non-empty.\n3. **Via dependencies** — `source: 'dependsOnTraversal'`\n   - When non-empty, render under a `### Via dependencies` sub-heading, then a markdown table.\n   - Do not emit a second `specs context` prose line if it was already emitted for group 2.\n\nOmit any empty group entirely. Do not emit the `spec-preview` prose when group 1 is empty. Do not emit the `specs context` prose when groups 2 and 3 are both empty.\n\nThe function MUST NOT suggest `spec-preview` for specs whose `source` is not `'specIds'`.\n\nCatalogue table columns:\n\n- `summary` mode: `| Spec ID | Mode | Source | Title | Description |`\n- `list` mode: `| Spec ID | Mode | Source |` (omit Title and Description)\n\nThe same grouping and hint rules apply whether catalogue entries are `summary` or `list`."
+      ]
+    },
+    {
+      "requirement": "projectContextToMarkdown",
+      "rules": [
+        "`@specd/sdk` MUST export a pure function:\n\n```typescript\nfunction projectContextToMarkdown(context: GetProjectContextResult): string\n```\n\nBehaviour:\n\n1. Render `context.contextEntries` first (already pre-rendered strings from the use case), separated by `---`.\n2. Specs with `mode: 'full'` under `## Spec content` with `### Spec: <specId>`, `Mode: full`, and content.\n3. Specs with `mode` other than `'full'` under `## Available context specs` with this prose (when the catalogue is non-empty):\n   `Use \\`specd specs context <specId>\\` to load the full optimized context of any listed spec.\\`\n4. The function MUST NEVER mention `changes spec-preview` or any change-scoped preview command (project context has no change scope; every listed spec is canonical).\n5. When both `contextEntries` and `specs` are empty, the function MUST return exactly `no project context configured`.\n\nProject catalogue table columns:\n\n- `summary` mode: `| Spec ID | Mode | Title | Description |`\n- `list` mode: `| Spec ID | Mode |`"
+      ]
+    },
+    {
+      "requirement": "Purity and host reuse",
+      "rules": [
+        "Both helpers MUST be synchronous pure functions: no I/O, no kernel access, no process side effects. Hosts MAY call them for text-mode presentation; structured formats (JSON/TOON) remain the host's responsibility to emit from the raw use-case result.\n\nFingerprint short-circuit comparison remains the responsibility of `CompileContext` (via the caller's `--fingerprint` / `fingerprint` input). The helper only formats whatever `CompileContextResult` it receives — including `status: 'unchanged'`."
+      ]
+    },
+    {
+      "requirement": "Module location",
+      "rules": [
+        "Helpers MUST live under `packages/sdk/src/presentation/` and MUST be re-exported from the SDK public barrel (`src/index.ts`). Shared catalogue/table helpers MAY live in `presentation/` internals but MUST NOT be required exports unless needed by hosts."
+      ]
+    }
+  ],
+  "constraints": [
+    "Helpers MUST accept core context types (CompileContextResult, GetProjectContextResult) already re-exported by @specd/sdk.",
+    "Helpers MUST NOT invent optimized content; they only format fields present on the context argument.",
+    "Command strings in hints MUST use plural groups (changes, specs) for agent-facing guidance.",
+    "This spec MUST NOT declare a dependency on sdk:composition — composition exports these helpers; the presentation helpers do not depend on the composition barrel contract."
+  ],
+  "scenarios": [
+    {
+      "requirement": "changeContextToMarkdown",
+      "name": "Unchanged status emits fingerprint and skip message",
+      "given": ["a CompileContextResult with status: 'unchanged' and a fingerprint"],
+      "when": ["changeContextToMarkdown(context, { changeName: 'feat' }) is called"],
+      "then": [
+        "the string includes Context Fingerprint: and exactly Context unchanged since last call.",
+        "AND it does not include ## Spec content or ## Available context specs"
+      ]
+    },
+    {
+      "requirement": "changeContextToMarkdown",
+      "name": "Changed status renders fingerprint and full specs",
+      "given": [
+        "a changed CompileContextResult with fingerprint, project context entries, and a full-mode spec"
+      ],
+      "when": ["changeContextToMarkdown is called with default options"],
+      "then": [
+        "the first line is the fingerprint",
+        "AND full specs appear under ## Spec content with Mode: full"
+      ]
+    },
+    {
+      "requirement": "Change catalogue grouping and load hints",
+      "name": "Change-scoped catalogue specs hint at spec-preview",
+      "given": ["a catalogue entry (mode is not full) with source: 'specIds'"],
+      "when": ["changeContextToMarkdown(context, { changeName: 'feat' }) is called"],
+      "then": [
+        "the catalogue includes guidance to run specd changes spec-preview feat <specId>",
+        "AND that entry appears in a table before any non-specIds catalogue tables"
+      ]
+    },
+    {
+      "requirement": "Change catalogue grouping and load hints",
+      "name": "Canonical catalogue specs hint at specs context",
+      "given": ["a catalogue entry with source: 'specDependsOn' or includePattern"],
+      "when": ["changeContextToMarkdown is called"],
+      "then": [
+        "the catalogue includes guidance to run specd specs context <specId>",
+        "AND it does not mention spec-preview for that entry"
+      ]
+    },
+    {
+      "requirement": "Change catalogue grouping and load hints",
+      "name": "dependsOnTraversal specs are under Via dependencies",
+      "given": ["catalogue entries including source: 'dependsOnTraversal'"],
+      "when": ["changeContextToMarkdown is called"],
+      "then": [
+        "those entries appear under a ### Via dependencies sub-heading",
+        "AND they use the specs context hint shared with other non-specIds groups"
+      ]
+    },
+    {
+      "requirement": "Change catalogue grouping and load hints",
+      "name": "No preview hint when change-spec catalogue group is empty",
+      "given": [
+        "catalogue entries only from includePattern, specDependsOn, and/or dependsOnTraversal"
+      ],
+      "when": ["changeContextToMarkdown is called"],
+      "then": ["the output does not include a spec-preview guidance line"]
+    },
+    {
+      "requirement": "Change catalogue grouping and load hints",
+      "name": "Summary catalogue tables include Source column",
+      "given": ["summary-mode catalogue entries"],
+      "when": ["changeContextToMarkdown is called"],
+      "then": [
+        "each catalogue table includes columns Spec ID, Mode, Source, Title, and Description"
+      ]
+    },
+    {
+      "requirement": "projectContextToMarkdown",
+      "name": "Empty context returns configured message",
+      "given": ["empty contextEntries and empty specs"],
+      "when": ["projectContextToMarkdown(context) is called"],
+      "then": ["it returns exactly no project context configured"]
+    },
+    {
+      "requirement": "projectContextToMarkdown",
+      "name": "Catalogue hints only at specs context",
+      "given": ["catalogue entries (mode is not full)"],
+      "when": ["projectContextToMarkdown is called"],
+      "then": [
+        "the catalogue includes guidance to run specd specs context <specId>",
+        "AND the output never contains spec-preview"
+      ]
+    },
+    {
+      "requirement": "Purity and host reuse",
+      "name": "Helpers are synchronous and side-effect free",
+      "when": ["either helper is invoked with a valid context argument"],
+      "then": ["it returns a string without performing I/O or accessing a kernel"]
+    },
+    {
+      "requirement": "Module location",
+      "name": "Helpers are exported from the SDK barrel",
+      "when": ["importing from @specd/sdk"],
+      "then": ["changeContextToMarkdown and projectContextToMarkdown are available"]
+    }
+  ],
+  "implementation": {
+    "files": [
+      {
+        "specId": "sdk:context-markdown",
+        "file": "sdk:src/presentation/index.ts"
+      },
+      {
+        "specId": "sdk:context-markdown",
+        "file": "sdk:test/presentation/change-context-to-markdown.spec.ts"
+      },
+      {
+        "specId": "sdk:context-markdown",
+        "file": "sdk:test/presentation/project-context-to-markdown.spec.ts"
+      }
+    ],
+    "symbols": [
+      {
+        "specId": "sdk:context-markdown",
+        "file": "sdk:src/presentation/_shared/catalogue.ts",
+        "symbol": "renderFullSpecs"
+      },
+      {
+        "specId": "sdk:context-markdown",
+        "file": "sdk:src/presentation/_shared/catalogue.ts",
+        "symbol": "renderChangeCatalogue"
+      },
+      {
+        "specId": "sdk:context-markdown",
+        "file": "sdk:src/presentation/_shared/catalogue.ts",
+        "symbol": "renderProjectCatalogue"
+      },
+      {
+        "specId": "sdk:context-markdown",
+        "file": "sdk:src/presentation/change-context-to-markdown.ts",
+        "symbol": "changeContextToMarkdown"
+      },
+      {
+        "specId": "sdk:context-markdown",
+        "file": "sdk:src/presentation/project-context-to-markdown.ts",
+        "symbol": "projectContextToMarkdown"
+      }
+    ]
+  },
+  "contentHashes": {
+    "spec.md": "sha256:0adecef814c8ac6948400a119636f159a7ed754fec5997083601bb280978bdd8",
+    "verify.md": "sha256:80c9820e28b523a8d04830e53f00e4173bb968336a36c360075cb2b17df6155d"
+  },
+  "provenance": {
+    "artifacts": {
+      "spec.md": {
+        "hash": "sha256:0adecef814c8ac6948400a119636f159a7ed754fec5997083601bb280978bdd8",
+        "lastModified": "2026-07-26T18:50:55.602Z"
+      },
+      "verify.md": {
+        "hash": "sha256:80c9820e28b523a8d04830e53f00e4173bb968336a36c360075cb2b17df6155d",
+        "lastModified": "2026-07-26T18:50:55.603Z"
+      }
+    },
+    "persistedStateHash": "sha256:8dc11cef90dfd53f27decce193b4e0cde2b5b5326276467144a319cf8f00b859",
+    "schema": {
+      "name": "schema-std",
+      "version": 1
+    },
+    "projectionVersion": 1,
+    "projectionFingerprint": "sha256:e4a28a2db6a35ed39b8308518337235b1490c2948cd839db25866ad79b22404b"
+  }
+}

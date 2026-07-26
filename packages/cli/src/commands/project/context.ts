@@ -1,5 +1,5 @@
 import { type Command } from 'commander'
-import { type SpecSection } from '@specd/sdk'
+import { type SpecSection, projectContextToMarkdown } from '@specd/sdk'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError, cliError } from '../../handle-error.js'
@@ -104,37 +104,7 @@ JSON/TOON output schema:
           }
 
           if (fmt === 'text') {
-            const parts: string[] = []
-
-            parts.push(...result.contextEntries)
-            const fullSpecs = result.specs.filter((s) => s.mode === 'full')
-            const nonFullSpecs = result.specs.filter((s) => s.mode !== 'full')
-
-            if (fullSpecs.length > 0) {
-              const specParts = fullSpecs.map(
-                (s) => `### Spec: ${s.specId}\nMode: full\n\n${s.content ?? ''}`,
-              )
-              parts.push(`## Spec content\n\n${specParts.join('\n\n---\n\n')}`)
-            }
-
-            if (nonFullSpecs.length > 0) {
-              const rows: string[] = [
-                '| Spec ID | Mode | Title | Description |',
-                '|---------|------|-------|-------------|',
-              ]
-              for (const spec of nonFullSpecs) {
-                rows.push(
-                  `| ${spec.specId} | ${spec.mode} | ${spec.title ?? '—'} | ${spec.description ?? '—'} |`,
-                )
-              }
-              parts.push(`## Available context specs\n\n${rows.join('\n')}`)
-            }
-
-            if (parts.length === 0) {
-              output('no project context configured', 'text')
-            } else {
-              output(parts.join('\n\n---\n\n'), 'text')
-            }
+            output(projectContextToMarkdown(result), 'text')
           } else {
             output(result, fmt)
           }

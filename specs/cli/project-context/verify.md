@@ -124,6 +124,19 @@
 - **WHEN** `specd project context --format text` is called
 - **THEN** output renders list entries under `## Available context specs`
 
+#### Scenario: Text output delegates to projectContextToMarkdown
+
+- **WHEN** `specd project context --format text` is called
+- **THEN** stdout matches `projectContextToMarkdown(context)`
+- **AND** the CLI does not assemble catalogue markdown inline
+
+#### Scenario: Non-full catalogue hints at specs context
+
+- **GIVEN** the output contains summary-mode or list-mode entries
+- **WHEN** text output is rendered
+- **THEN** it includes guidance to run `specd specs context <specId>`
+- **AND** it never mentions `spec-preview`
+
 #### Scenario: JSON output — structured spec entries with mode
 
 - **GIVEN** `GetProjectContext` returns structured entries

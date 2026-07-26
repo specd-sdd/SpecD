@@ -363,6 +363,31 @@ describe('Output', () => {
     expect(stdout()).toContain('no project context configured')
   })
 
+  it('Catalogue specs include specs context hint and never spec-preview', async () => {
+    const { kernel, stdout } = setup()
+    kernel.project.getProjectContext.execute.mockResolvedValue({
+      contextEntries: [],
+      specs: [
+        {
+          specId: 'default:auth/login',
+          title: 'Auth Login',
+          description: 'Login spec',
+          source: 'includePattern' as const,
+          mode: 'summary' as const,
+        },
+      ],
+      warnings: [],
+    })
+
+    const program = makeProgram()
+    registerProjectContext(program.command('project'))
+    await program.parseAsync(['node', 'specd', 'project', 'context'])
+
+    expect(stdout()).toContain('## Available context specs')
+    expect(stdout()).toContain('Use `specd specs context <specId>`')
+    expect(stdout()).not.toContain('spec-preview')
+  })
+
   it('JSON output structure', async () => {
     const { config, kernel, stdout } = setup()
     Object.assign(config, {

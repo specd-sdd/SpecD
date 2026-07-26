@@ -163,6 +163,8 @@
       ]
     }
   ],
+  "optimizedDescription": "ListDiscarded returns discarded ChangeRepository list entries unchanged; default limit 100; no content.",
+  "optimizedContext": "# List Discarded\n\n## Rules\n- `ListDiscarded.execute(options?)` MUST return `ListResult<DiscardedChangeListEntry>` for discarded changes\n- Forward `ListOptions`, `includeDescription`, `includeReason`, `includeSupersededBy` to `ChangeRepository.listDiscarded()` unchanged; no re-sort/filter/paginate; order=`discardedAt` desc owned by repo index\n- Default `limit` **100** when options omitted\n- Return `DiscardedChangeListEntry` — NOT `DiscardedChangeView`, NOT mutable `Change`\n- Entries MUST NOT include artifact content, history, derived artifact state maps; detail via `getDiscarded(name)`\n- Optional `description`/`reason`/`supersededBy` only when include flags set and repo projected them\n- Constructor sole dep: `ChangeRepository`; return `listDiscarded(options)` unchanged\n- Empty → `{ items: [], meta: { total: 0, count: 0, limit: <resolved> } }`; MUST NOT throw\n- `createListDiscarded(config)` MUST preserve complete artifact-type + spec-existence bootstrap; MUST NOT weaker variant\n- Config form → `resolveListDiscardedDeps(resolver)` → `createListDiscarded(deps)`; resolve `changes: ChangeRepository`; MUST NOT inline fs wiring\n\n## Constraints\n- Read-only list pass-through; repository owns order/filter/pagination",
   "contentHashes": {
     "spec.md": "sha256:a7f3266d8484113b93f134d331a9bba19ffa61cd523188189d43e1b995fbb76a",
     "verify.md": "sha256:901607c22e37cab24b300670f6dc9f0cd2525c64ce447a28bec08fcd70c9ba51"
@@ -178,7 +180,7 @@
         "lastModified": "2026-07-22T16:55:45.688Z"
       }
     },
-    "persistedStateHash": "sha256:5d218f3624152aa369a41f02b50da415d839783493f0cfed31fc7647537658b2",
+    "persistedStateHash": "sha256:bbd90d8333226eab18ed527fd07d2c8680ef74234b40267f2efa319b5f90d914",
     "schema": {
       "name": "schema-std",
       "version": 1

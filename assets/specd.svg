@@ -1,0 +1,157 @@
+<svg height="696.8" width="1091.2" xmlns="http://www.w3.org/2000/svg">
+<g transform="translate(32,16)">
+<filter filterUnits="userSpaceOnUse" height="704.8" id="shadow" width="1099.2" x="-32" y="-24">
+<feGaussianBlur stdDeviation="12"/>
+</filter>
+<rect fill="#000000c0" filter="url(#shadow)" height="632.8" rx="10" ry="10" width="1027.2" x="4" y="12"/>
+<rect fill="#282c34" height="632.8" rx="10" ry="10" width="1027.2"/>
+<clipPath id="header">
+<rect height="28" width="1027.2"/>
+</clipPath>
+<rect clip-path="url(#header)" fill="#383837" height="56" rx="10" ry="10" width="1027.2"/>
+<line stroke="#000000c0" stroke-width="0.5" x1="0" x2="1027.2" y1="28" y2="28"/><text dominant-baseline="central" fill="#b3b3b3" font-family="system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica Neue, Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle" x="513.6" y="14">specd</text>
+<g>
+<circle cx="14" cy="14" fill="#ff5f56" r="6" stroke="#ff5f56" stroke-width="0.5"/>
+<circle cx="34" cy="14" fill="#ffbd2e" r="6" stroke="#ffbd2e" stroke-width="0.5"/>
+<circle cx="54" cy="14" fill="#28c941" r="6" stroke="#28c941" stroke-width="0.5"/>
+</g>
+<svg class="terminal" font-family="JetBrains Mono, Fira Code, Source Code Pro, Cascadia Code, Consolas, Menlo, Monaco, DejaVu Sans Mono, monospace, Symbols Nerd Font Mono, Cascadia Mono" font-size="12" height="604.8" width="1027.2" y="28">
+<svg fill="#dcdfe4" x="9.6" y="7.2">
+<g>
+<svg height="590.4" viewBox="0 0 84 49.2" width="1008">
+<g stroke-width="0.025">
+<path d="M0,4.8 H19.2 V6 H0 Z" fill="#98c379" stroke="#98c379"/>
+</g>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="0">
+<text xml:space="preserve" y="0.96em"><tspan fill="#c678dd">% </tspan><tspan fill="#ea9a97">specd</tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="14.4">
+<text xml:space="preserve" y="0.96em"><tspan fill="#61afef">┌─┐┌─┐┌─┐┌─┐</tspan><tspan fill="#98c379">┌┬┐</tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="28.8">
+<text xml:space="preserve" y="0.96em"><tspan fill="#61afef">└─┐├─┘├┤ </tspan><tspan fill="#61afef">│ </tspan><tspan>  </tspan><tspan fill="#98c379">││</tspan><tspan>   </tspan><tspan fill="#dcdfe4" opacity="0.5">cli </tspan><tspan> </tspan><tspan fill="#dcdfe4" opacity="0.5">v0.2.0</tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="43.2">
+<text xml:space="preserve" y="0.96em"><tspan fill="#61afef">└─┘┴ </tspan><tspan> </tspan><tspan fill="#61afef">└─┘└─┘</tspan><tspan fill="#98c379">─┴┘</tspan><tspan>   </tspan><tspan fill="#dcdfe4" opacity="0.5">sdk </tspan><tspan>  </tspan><tspan fill="#dcdfe4" opacity="0.5">v0.1.0 </tspan><tspan> </tspan><tspan fill="#dcdfe4" opacity="0.5">core </tspan><tspan> </tspan><tspan fill="#dcdfe4" opacity="0.5">v0.2.0 </tspan><tspan> </tspan><tspan fill="#dcdfe4" opacity="0.5">graph </tspan><tspan fill="#dcdfe4" opacity="0.5">v0.1.0</tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="57.6">
+<text xml:space="preserve" y="0.96em"><tspan>  </tspan><tspan fill="#3e4451" font-weight="bold">The </tspan><tspan fill="#3e4451" font-weight="bold">spec-driven </tspan><tspan fill="#3e4451" font-weight="bold">platform </tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="86.4">
+<text xml:space="preserve" y="0.96em"><tspan fill="#dcdfe4">Using </tspan><tspan fill="#dcdfe4">config: </tspan><tspan fill="#dcdfe4">specd.yaml </tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="115.2">
+<text xml:space="preserve" y="0.96em"><tspan fill="#56b6c2">╭─────────────────────────────────────────────────────── </tspan><tspan fill="#dcdfe4" font-weight="bold">SpecD</tspan><tspan> </tspan><tspan fill="#56b6c2" opacity="0.5">project </tspan><tspan fill="#56b6c2" opacity="0.5">dashboard</tspan><tspan> </tspan><tspan fill="#56b6c2">────────────────────────────────────────────────────────╮</tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="129.6">
+<text xml:space="preserve" y="0.96em"><tspan fill="#56b6c2">│</tspan><tspan> </tspan><tspan fill="#dcdfe4" opacity="0.5">╭─ </tspan><tspan fill="#dcdfe4" opacity="0.5">Project </tspan><tspan fill="#dcdfe4" opacity="0.5">──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮</tspan><tspan> </tspan><tspan fill="#56b6c2">│</tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="144">
+<text xml:space="preserve" y="0.96em"><tspan fill="#56b6c2">│</tspan><tspan> </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan> </tspan><tspan fill="#dcdfe4" opacity="0.5">root:</tspan><tspan>       </tspan><tspan fill="#dcdfe4">/Users/monki/Documents/Proyectos/specd</tspan><tspan>                                                                                 </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan> </tspan><tspan fill="#56b6c2">│</tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="158.4">
+<text xml:space="preserve" y="0.96em"><tspan fill="#56b6c2">│</tspan><tspan> </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan> </tspan><tspan fill="#dcdfe4" opacity="0.5">schema:</tspan><tspan>     </tspan><tspan fill="#56b6c2">@specd/schema-std</tspan><tspan>                                                                                                      </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan> </tspan><tspan fill="#56b6c2">│</tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="172.8">
+<text xml:space="preserve" y="0.96em"><tspan fill="#56b6c2">│</tspan><tspan> </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan> </tspan><tspan fill="#dcdfe4" opacity="0.5">workspaces:</tspan><tspan> </tspan><tspan fill="#dcdfe4">default, </tspan><tspan fill="#dcdfe4">core, </tspan><tspan fill="#dcdfe4">schema-std, </tspan><tspan fill="#dcdfe4">cli, </tspan><tspan fill="#dcdfe4">code-graph, </tspan><tspan fill="#dcdfe4">sdk, </tspan><tspan fill="#dcdfe4">skills, </tspan><tspan fill="#dcdfe4">plugin-manager, </tspan><tspan fill="#dcdfe4">plugin-agent-claude, </tspan><tspan fill="#dcdfe4">plugin-agent-copilot,</tspan><tspan>    </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan> </tspan><tspan fill="#56b6c2">│</tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="187.2">
+<text xml:space="preserve" y="0.96em"><tspan fill="#56b6c2">│</tspan><tspan> </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan>             </tspan><tspan fill="#dcdfe4">plugin-agent-codex, </tspan><tspan fill="#dcdfe4">plugin-agent-opencode, </tspan><tspan fill="#dcdfe4">plugin-agent-standard, </tspan><tspan fill="#dcdfe4">specd-metapackage, </tspan><tspan fill="#dcdfe4">public-web</tspan><tspan>                        </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan> </tspan><tspan fill="#56b6c2">│</tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="201.6">
+<text xml:space="preserve" y="0.96em"><tspan fill="#56b6c2">│</tspan><tspan> </tspan><tspan fill="#dcdfe4" opacity="0.5">╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯</tspan><tspan> </tspan><tspan fill="#56b6c2">│</tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="216">
+<text xml:space="preserve" y="0.96em"><tspan fill="#56b6c2">│</tspan><tspan>                                                                                                                                        </tspan><tspan fill="#56b6c2">│</tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="230.4">
+<text xml:space="preserve" y="0.96em"><tspan fill="#56b6c2">│</tspan><tspan> </tspan><tspan fill="#dcdfe4" opacity="0.5">╭─ </tspan><tspan fill="#dcdfe4" opacity="0.5">Specs </tspan><tspan fill="#dcdfe4" opacity="0.5">────────────────────────────────────────────────────────╮</tspan><tspan>  </tspan><tspan fill="#dcdfe4" opacity="0.5">╭─ </tspan><tspan fill="#dcdfe4" opacity="0.5">Changes </tspan><tspan fill="#dcdfe4" opacity="0.5">──────────────────────────────────────────────────────╮</tspan><tspan> </tspan><tspan fill="#56b6c2">│</tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="244.8">
+<text xml:space="preserve" y="0.96em"><tspan fill="#56b6c2">│</tspan><tspan> </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan> </tspan><tspan fill="#dcdfe4" font-weight="bold">243</tspan><tspan> </tspan><tspan fill="#dcdfe4" opacity="0.5">total</tspan><tspan>                                                      </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan>  </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan>   </tspan><tspan fill="#56b6c2">active </tspan><tspan>                                                    </tspan><tspan fill="#dcdfe4">9</tspan><tspan> </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan> </tspan><tspan fill="#56b6c2">│</tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="259.2">
+<text xml:space="preserve" y="0.96em"><tspan fill="#56b6c2">│</tspan><tspan> </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan>   </tspan><tspan fill="#56b6c2">default </tspan><tspan>                                                   </tspan><tspan fill="#dcdfe4">9</tspan><tspan> </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan>  </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan>   </tspan><tspan fill="#56b6c2">drafts </tspan><tspan>                                                    </tspan><tspan fill="#dcdfe4">2</tspan><tspan> </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan> </tspan><tspan fill="#56b6c2">│</tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="273.6">
+<text xml:space="preserve" y="0.96em"><tspan fill="#56b6c2">│</tspan><tspan> </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan>   </tspan><tspan fill="#56b6c2">core </tspan><tspan>                                                    </tspan><tspan fill="#dcdfe4">117</tspan><tspan> </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan>  </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan>   </tspan><tspan fill="#56b6c2">discarded </tspan><tspan>                                                 </tspan><tspan fill="#dcdfe4">5</tspan><tspan> </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan> </tspan><tspan fill="#56b6c2">│</tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="288">
+<text xml:space="preserve" y="0.96em"><tspan fill="#56b6c2">│</tspan><tspan> </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan>   </tspan><tspan fill="#56b6c2">schema-std </tspan><tspan>                                                </tspan><tspan fill="#dcdfe4">0</tspan><tspan> </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan>  </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan>   </tspan><tspan fill="#56b6c2">archived </tspan><tspan>                                                </tspan><tspan fill="#dcdfe4">163</tspan><tspan> </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan> </tspan><tspan fill="#56b6c2">│</tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="302.4">
+<text xml:space="preserve" y="0.96em"><tspan fill="#56b6c2">│</tspan><tspan> </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan>   </tspan><tspan fill="#56b6c2">cli </tspan><tspan>                                                      </tspan><tspan fill="#dcdfe4">67</tspan><tspan> </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan>  </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan>                                                                </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan> </tspan><tspan fill="#56b6c2">│</tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="316.8">
+<text xml:space="preserve" y="0.96em"><tspan fill="#56b6c2">│</tspan><tspan> </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan>   </tspan><tspan fill="#56b6c2">code-graph </tspan><tspan>                                               </tspan><tspan fill="#dcdfe4">16</tspan><tspan> </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan>  </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan>                                                                </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan> </tspan><tspan fill="#56b6c2">│</tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="331.2">
+<text xml:space="preserve" y="0.96em"><tspan fill="#56b6c2">│</tspan><tspan> </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan>   </tspan><tspan fill="#56b6c2">sdk </tspan><tspan>                                                       </tspan><tspan fill="#dcdfe4">6</tspan><tspan> </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan>  </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan>                                                                </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan> </tspan><tspan fill="#56b6c2">│</tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="345.6">
+<text xml:space="preserve" y="0.96em"><tspan fill="#56b6c2">│</tspan><tspan> </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan>   </tspan><tspan fill="#56b6c2">skills </tspan><tspan>                                                   </tspan><tspan fill="#dcdfe4">11</tspan><tspan> </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan>  </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan>                                                                </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan> </tspan><tspan fill="#56b6c2">│</tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="360">
+<text xml:space="preserve" y="0.96em"><tspan fill="#56b6c2">│</tspan><tspan> </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan>   </tspan><tspan fill="#56b6c2">plugin-manager </tspan><tspan>                                           </tspan><tspan fill="#dcdfe4">10</tspan><tspan> </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan>  </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan>                                                                </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan> </tspan><tspan fill="#56b6c2">│</tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="374.4">
+<text xml:space="preserve" y="0.96em"><tspan fill="#56b6c2">│</tspan><tspan> </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan>   </tspan><tspan fill="#56b6c2">plugin-agent-claude </tspan><tspan>                                       </tspan><tspan fill="#dcdfe4">1</tspan><tspan> </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan>  </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan>                                                                </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan> </tspan><tspan fill="#56b6c2">│</tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="388.8">
+<text xml:space="preserve" y="0.96em"><tspan fill="#56b6c2">│</tspan><tspan> </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan>   </tspan><tspan fill="#56b6c2">plugin-agent-copilot </tspan><tspan>                                      </tspan><tspan fill="#dcdfe4">1</tspan><tspan> </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan>  </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan>                                                                </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan> </tspan><tspan fill="#56b6c2">│</tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="403.2">
+<text xml:space="preserve" y="0.96em"><tspan fill="#56b6c2">│</tspan><tspan> </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan>   </tspan><tspan fill="#56b6c2">plugin-agent-codex </tspan><tspan>                                        </tspan><tspan fill="#dcdfe4">1</tspan><tspan> </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan>  </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan>                                                                </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan> </tspan><tspan fill="#56b6c2">│</tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="417.6">
+<text xml:space="preserve" y="0.96em"><tspan fill="#56b6c2">│</tspan><tspan> </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan>   </tspan><tspan fill="#56b6c2">plugin-agent-opencode</tspan><tspan>                                      </tspan><tspan fill="#dcdfe4">1</tspan><tspan> </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan>  </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan>                                                                </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan> </tspan><tspan fill="#56b6c2">│</tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="432">
+<text xml:space="preserve" y="0.96em"><tspan fill="#56b6c2">│</tspan><tspan> </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan>   </tspan><tspan fill="#56b6c2">plugin-agent-standard</tspan><tspan>                                      </tspan><tspan fill="#dcdfe4">1</tspan><tspan> </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan>  </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan>                                                                </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan> </tspan><tspan fill="#56b6c2">│</tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="446.4">
+<text xml:space="preserve" y="0.96em"><tspan fill="#56b6c2">│</tspan><tspan> </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan>   </tspan><tspan fill="#56b6c2">specd-metapackage </tspan><tspan>                                         </tspan><tspan fill="#dcdfe4">0</tspan><tspan> </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan>  </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan>                                                                </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan> </tspan><tspan fill="#56b6c2">│</tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="460.8">
+<text xml:space="preserve" y="0.96em"><tspan fill="#56b6c2">│</tspan><tspan> </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan>   </tspan><tspan fill="#56b6c2">public-web </tspan><tspan>                                                </tspan><tspan fill="#dcdfe4">2</tspan><tspan> </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan>  </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan>                                                                </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan> </tspan><tspan fill="#56b6c2">│</tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="475.2">
+<text xml:space="preserve" y="0.96em"><tspan fill="#56b6c2">│</tspan><tspan> </tspan><tspan fill="#dcdfe4" opacity="0.5">╰────────────────────────────────────────────────────────────────╯</tspan><tspan>  </tspan><tspan fill="#dcdfe4" opacity="0.5">╰────────────────────────────────────────────────────────────────╯</tspan><tspan> </tspan><tspan fill="#56b6c2">│</tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="489.6">
+<text xml:space="preserve" y="0.96em"><tspan fill="#56b6c2">│</tspan><tspan>                                                                                                                                        </tspan><tspan fill="#56b6c2">│</tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="504">
+<text xml:space="preserve" y="0.96em"><tspan fill="#56b6c2">│</tspan><tspan> </tspan><tspan fill="#dcdfe4" opacity="0.5">╭─ </tspan><tspan fill="#dcdfe4" opacity="0.5">Graph </tspan><tspan fill="#dcdfe4" opacity="0.5">────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮</tspan><tspan> </tspan><tspan fill="#56b6c2">│</tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="518.4">
+<text xml:space="preserve" y="0.96em"><tspan fill="#56b6c2">│</tspan><tspan> </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan> </tspan><tspan fill="#dcdfe4" opacity="0.5">freshness:</tspan><tspan> </tspan><tspan fill="#dcdfe4">2026-07-20 </tspan><tspan fill="#dcdfe4">(fresh)</tspan><tspan>                                                                                                      </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan> </tspan><tspan fill="#56b6c2">│</tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="532.8">
+<text xml:space="preserve" y="0.96em"><tspan fill="#56b6c2">│</tspan><tspan> </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan> </tspan><tspan fill="#dcdfe4" opacity="0.5">docs:</tspan><tspan> </tspan><tspan fill="#dcdfe4">235 </tspan><tspan>   </tspan><tspan fill="#dcdfe4" opacity="0.5">files:</tspan><tspan> </tspan><tspan fill="#dcdfe4">926 </tspan><tspan>   </tspan><tspan fill="#dcdfe4" opacity="0.5">symbols:</tspan><tspan> </tspan><tspan fill="#dcdfe4">4109 </tspan><tspan>  </tspan><tspan fill="#dcdfe4" opacity="0.5">relations:</tspan><tspan> </tspan><tspan fill="#dcdfe4">23925</tspan><tspan>                                                                        </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan> </tspan><tspan fill="#56b6c2">│</tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="547.2">
+<text xml:space="preserve" y="0.96em"><tspan fill="#56b6c2">│</tspan><tspan> </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan> </tspan><tspan fill="#dcdfe4" opacity="0.5">languages:</tspan><tspan> </tspan><tspan fill="#dcdfe4">javascript, </tspan><tspan fill="#dcdfe4">typescript</tspan><tspan>                                                                                                  </tspan><tspan fill="#dcdfe4" opacity="0.5">│</tspan><tspan> </tspan><tspan fill="#56b6c2">│</tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="561.6">
+<text xml:space="preserve" y="0.96em"><tspan fill="#56b6c2">│</tspan><tspan> </tspan><tspan fill="#dcdfe4" opacity="0.5">╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯</tspan><tspan> </tspan><tspan fill="#56b6c2">│</tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="576">
+<text xml:space="preserve" y="0.96em"><tspan fill="#56b6c2">╰────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯</tspan></text>
+</svg>
+</g>
+</svg>
+</svg>
+<rect fill="none" height="632.8" rx="10" ry="10" stroke="#000000" stroke-width="0.5" width="1027.2"/>
+<rect fill="none" height="630.8" rx="9" ry="9" stroke="#f0f0f080" stroke-width="0.5" width="1025.2" x="1" y="1"/>
+</g>
+<style>
+@font-face {
+	font-family: JetBrains Mono;
+	font-weight: 100 800;
+	font-style: normal;
+	src: url(https://raw.githubusercontent.com/pamburus/fonts/refs/heads/main/JetBrainsMono/fonts/variable/JetBrainsMono%5Bwght%5D.woff2) format('woff2');
+}
+</style>
+</svg>

@@ -191,6 +191,8 @@
       }
     ]
   },
+  "optimizedDescription": "detectSpecOverlap pure fn + DetectOverlap use case: multi-change shared specIds report.",
+  "optimizedContext": "# Spec Overlap\n\n## Rules\n- `detectSpecOverlap(changes): OverlapReport` pure in `domain/services/` — no I/O.\n- `OverlapReport`: `entries: OverlapEntry[]`, `hasOverlap`. Entry: `specId`, `changes[{name,state}]`.\n- Overlap = ≥2 active changes share `specIds`. Index → filter → sort entries by specId, changes by name (lex asc).\n- 0–1 changes → empty entries, `hasOverlap:false`, no throw.\n- `DetectOverlap`: `list()` → detectSpecOverlap → report. Optional `name` filters output only (all still participate); missing name → `ChangeNotFoundError`.\n- Ctor: ChangeRepository only. Config factory via `resolveDetectOverlapDeps`.\n\n## Constraints\n- Active only (list) — no drafts/discarded. Severity beyond Info OOS.",
   "contentHashes": {
     "spec.md": "sha256:6d3c61eda5b205c5511fd18c5acd9ba03cee9abd0a7c1478693955a36963a47a",
     "verify.md": "sha256:8e4844e4f55df6b35eb9474e34161b172e71ebfca9684a0275cdcb7385cb9877"
@@ -206,7 +208,7 @@
         "lastModified": "2026-07-06T14:22:55.229Z"
       }
     },
-    "persistedStateHash": "sha256:2c2d3a020fd24dfe41d0d6d6f1f09ec92dbf57befd8c114849c4971087e4e23c",
+    "persistedStateHash": "sha256:2a4a483d524957246d367117f184c56603d5584fcd6ad211ec54e6e775ec2304",
     "schema": {
       "name": "schema-std",
       "version": 1

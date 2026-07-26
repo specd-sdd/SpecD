@@ -322,7 +322,7 @@ describe('change context', () => {
     expect(call.sections).toBeUndefined()
   })
 
-  it('renders summary specs as catalogue in summary mode', async () => {
+  it('renders summary specs as catalogue in summary mode with specs context hint for canonical specs', async () => {
     const { kernel, stdout } = setup()
     kernel.changes.compile.execute.mockResolvedValue({
       ...mockResult,
@@ -359,10 +359,46 @@ describe('change context', () => {
     ])
 
     expect(stdout()).toContain('## Available context specs')
-    expect(stdout()).toContain('specd changes spec-preview')
+    expect(stdout()).toContain('specd specs context <specId>')
+    expect(stdout()).not.toContain('specd changes spec-preview')
     expect(stdout()).toContain('Architecture')
     expect(stdout()).toContain('Hexagonal architecture')
-    expect(stdout()).toContain('| default:_global/architecture | summary |')
+    expect(stdout()).toContain(
+      '| default:_global/architecture | summary | includePattern | Architecture | Hexagonal architecture |',
+    )
+  })
+
+  it('renders change specs (source: specIds) in catalogue with spec-preview hint', async () => {
+    const { kernel, stdout } = setup()
+    kernel.changes.compile.execute.mockResolvedValue({
+      ...mockResult,
+      specs: [
+        {
+          specId: 'default:auth/login',
+          title: 'Auth Login',
+          description: 'Login spec',
+          source: 'specIds' as const,
+          mode: 'summary' as const,
+        },
+      ],
+    })
+
+    const program = makeProgram()
+    registerChangeContext(program.command('change'))
+    await program.parseAsync([
+      'node',
+      'specd',
+      'change',
+      'context',
+      'my-change',
+      'designing',
+      '--format',
+      'text',
+    ])
+
+    expect(stdout()).toContain('## Available context specs')
+    expect(stdout()).toContain('specd changes spec-preview my-change <specId>')
+    expect(stdout()).not.toContain('specd specs context')
   })
 
   it('renders dependsOnTraversal summary specs under Via dependencies heading', async () => {
@@ -396,7 +432,9 @@ describe('change context', () => {
     expect(stdout()).toContain('### Via dependencies')
     expect(stdout()).toContain('Database')
     expect(stdout()).toContain('Database layer')
-    expect(stdout()).toContain('| default:infra/database | summary |')
+    expect(stdout()).toContain(
+      '| default:infra/database | summary | dependsOnTraversal | Database | Database layer |',
+    )
   })
 
   it('JSON output includes projectContext and specs with mode and source', async () => {

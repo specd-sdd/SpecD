@@ -1,0 +1,48 @@
+- op: modified
+  description: 'Add SDK delegation and specs-context hint scenarios; forbid spec-preview'
+  selector:
+    type: section
+    matches: 'Requirement: Output'
+  content: |
+    #### Scenario: Text output — full mode renders complete spec content
+
+    - **GIVEN** `GetProjectContext` returns full-mode specs
+    - **WHEN** `specd project context --format text` is called
+    - **THEN** output renders complete spec content under `## Spec content`
+
+    #### Scenario: Text output — summary mode renders catalogue entries
+
+    - **GIVEN** `GetProjectContext` returns summary-mode specs
+    - **WHEN** `specd project context --format text` is called
+    - **THEN** output renders a summary catalogue under `## Available context specs`
+
+    #### Scenario: Text output — list mode renders list entries
+
+    - **GIVEN** `GetProjectContext` returns list-mode specs
+    - **WHEN** `specd project context --format text` is called
+    - **THEN** output renders list entries under `## Available context specs`
+
+    #### Scenario: Text output delegates to projectContextToMarkdown
+
+    - **WHEN** `specd project context --format text` is called
+    - **THEN** stdout matches `projectContextToMarkdown(context)`
+    - **AND** the CLI does not assemble catalogue markdown inline
+
+    #### Scenario: Non-full catalogue hints at specs context
+
+    - **GIVEN** the output contains summary-mode or list-mode entries
+    - **WHEN** text output is rendered
+    - **THEN** it includes guidance to run `specd specs context <specId>`
+    - **AND** it never mentions `spec-preview`
+
+    #### Scenario: JSON output — structured spec entries with mode
+
+    - **GIVEN** `GetProjectContext` returns structured entries
+    - **WHEN** `specd project context --format json` is called
+    - **THEN** JSON includes each entry mode and the fields allowed by that mode
+
+    #### Scenario: No project context configured
+
+    - **GIVEN** no `context:` entries and no specs match include patterns
+    - **WHEN** `specd project context` is called
+    - **THEN** the command prints `no project context configured` and exits with code 0

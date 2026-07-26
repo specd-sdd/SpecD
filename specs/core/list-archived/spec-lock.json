@@ -12,5 +12,41 @@
     "core:composition-resolver",
     "core:archive-repository-port"
   ],
-  "implementation": []
+  "implementation": [],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "ListArchived read-only ArchiveRepository.list wrapper; default limit 100; archivedAt desc; no side effects.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:7a8c4d52fb5170b529dd28d2d2473841893f1997a6801734e5e1ed8f14bc5636",
+          "lastModified": "2026-07-22T16:55:45.702Z"
+        },
+        "verify.md": {
+          "hash": "sha256:75f33b3d5fdd1efcc16378b9968a0d4f0dad18dbb50a4b379eb8cb9799845198",
+          "lastModified": "2026-07-22T16:55:45.702Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# List Archived\n\n## Rules\n- Constructor sole dep: `ArchiveRepository` (default workspace, kernel-injected)\n- `ListArchived.execute(options?)` forward optional `limit`/`page`/`after`/`includeArchivedBy` to `ArchiveRepository.list(options)`\n- Default `limit` **100**; `page` and `after` mutually exclusive per `ListOptions`\n- Return `Promise<ListResult<ArchiveListEntry>>` (alias `ListArchivedResult`)\n- Order=`archivedAt` desc; `meta.total`=full count; `meta.count`=page size\n- Keyset `after: { key: archivedAt ISO-8601, id: change name }` — not legacy `startAt`\n- Delegate entirely to `ArchiveRepository.list(options)`; MUST NOT re-filter/sort/paginate/transform\n- MUST NOT mutate state, write repos, run hooks, or trigger lifecycle\n- Config form → `resolveListArchivedDeps(resolver)` → `createListArchived(deps)`; resolve `archive: ArchiveRepository`; MUST NOT inline fs wiring\n\n## Constraints\n- No own error cases — errors from `ArchiveRepository` infra\n- No workspace selection — uses injected `ArchiveRepository` only\n- `ArchiveListEntry` immutable read-only\n- Optional `archivedBy` only when `includeArchivedBy` set",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:7a8c4d52fb5170b529dd28d2d2473841893f1997a6801734e5e1ed8f14bc5636",
+          "lastModified": "2026-07-22T16:55:45.702Z"
+        },
+        "verify.md": {
+          "hash": "sha256:75f33b3d5fdd1efcc16378b9968a0d4f0dad18dbb50a4b379eb8cb9799845198",
+          "lastModified": "2026-07-22T16:55:45.702Z"
+        }
+      }
+    }
+  }
 }

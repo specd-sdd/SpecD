@@ -15,7 +15,7 @@
 #### Scenario: No infrastructure in SDK source tree
 
 - **WHEN** listing `packages/sdk/src/`
-- **THEN** directories are limited to `composition/`, `orchestration/`, `shared/`, and `index.ts`
+- **THEN** directories are limited to `composition/`, `orchestration/`, `presentation/`, `shared/`, and `index.ts`
 - **AND** no `infrastructure/` or `domain/` directories exist
 
 ### Requirement: Public barrel exports
@@ -29,6 +29,11 @@
 
 - **WHEN** importing from `@specd/sdk`
 - **THEN** `openSpecdHost`, `createKernel`, and `buildProjectStatusSnapshot` are available
+
+#### Scenario: SDK exports context markdown presentation helpers
+
+- **WHEN** importing from `@specd/sdk`
+- **THEN** `changeContextToMarkdown` and `projectContextToMarkdown` are available
 
 #### Scenario: SDK re-exports kernel-equivalent factories from core
 

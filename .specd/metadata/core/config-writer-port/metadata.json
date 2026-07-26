@@ -227,6 +227,8 @@
       ]
     }
   ],
+  "optimizedDescription": "ConfigWriter port: initProject, addPlugin, removePlugin, listPlugins for specd.yaml mutation.",
+  "optimizedContext": "# ConfigWriter\n\n## Rules\n- Interface (not abstract): `initProject`, `addPlugin`, `removePlugin`, `listPlugins`.\n- `initProject(InitProjectOptions)` → `InitProjectResult`. Options: projectRoot, schemaRef, workspaceId, specsPath, force?. Result: configPath, schemaRef, workspaces, metadataCachePath.\n- Behaviour: write specd.yaml (omit storage by default); create specs + `.specd/{changes,drafts,discarded,archive}`; ensure metadata cache; append `/.specd/metadata/` to root .gitignore (default fs layout only); `{configPath}/tmp/.gitignore`; ignore `specd.local.yaml` + `specd.local.*.yaml`.\n- Exists + !force → `AlreadyInitialisedError`; force overwrites.\n- `addPlugin(configPath, type, name, config?)` — no dupes; write config with name. `removePlugin(configPath, type, name)`.\n- Delivery: `createConfigWriter()` from @specd/core only — no FsConfigWriter import. Prefer SpecdConfig snapshot over listPlugins for reads.\n\n## Constraints\n- application/ports/; no fs/yaml at port. AlreadyInitialisedError application-layer. plugins shape: `{ agents: Array<{name, config?}> }`.",
   "contentHashes": {
     "spec.md": "sha256:ab37ae28fbae97886c2b5b39c5dba7ff21495da30fd43be4b8eb7f046035d013",
     "verify.md": "sha256:2582e2f73124ca0287186ca7c6c5d9e5f84691aa96ee03038d198bf8e3a2d97f"
@@ -242,7 +244,7 @@
         "lastModified": "2026-07-25T11:53:31.663Z"
       }
     },
-    "persistedStateHash": "sha256:8d6cc465a639b915fe68b7f1aed1947a4db9960fae4bd7610fa48c6946ecebd0",
+    "persistedStateHash": "sha256:9fd51abecab2cecde9dcf3a34c2cf8d35256be630f39a9671684ee230ba7b5bc",
     "schema": {
       "name": "schema-std",
       "version": 1

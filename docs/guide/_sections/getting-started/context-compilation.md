@@ -20,11 +20,7 @@ The compilation process:
 - **`full`** — full content for all collected specs.
 - **`hybrid`** — tiered rendering for `change context` (direct `specIds` in full, others as summary); for `project context` and `spec context`, it behaves as `full`.
 
-When output includes non-full specs, the CLI marks them explicitly as list/summary entries and points to:
-
-`specd changes spec-preview <change-name> <specId>`
-
-Use that command to inspect merged full content for a specific spec in the current change.
+When output includes non-full specs, the CLI marks them explicitly as list/summary entries and provides source-aware drill-down guidance: `specd changes spec-preview <change-name> <specId>` for change specs (`source: 'specIds'`), and `specd specs context <specId>` for canonical workspace specs (`source: 'specDependsOn'`, `'includePattern'`, or `'dependsOnTraversal'`).
 
 Section flags (`--rules`, `--constraints`, `--scenarios`) only affect full-mode output. In `list` and `summary`, those flags are accepted but do not change the rendered shape.
 

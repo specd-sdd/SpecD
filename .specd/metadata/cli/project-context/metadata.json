@@ -5,7 +5,8 @@
     "cli:entrypoint",
     "core:get-project-context",
     "core:compile-context",
-    "core:config"
+    "core:config",
+    "sdk:context-markdown"
   ],
   "context": [
     "Agents need a way to retrieve the baseline project context -- instructions and specs that apply regardless of which change they are working on. The `specd project context` command compiles and prints the full project-level context: the `context:` entries from `specd.yaml` followed by all specs matched by the project-level `contextIncludeSpecs`/`contextExcludeSpecs` patterns."
@@ -32,7 +33,7 @@
     {
       "requirement": "Output",
       "rules": [
-        "The CLI MUST assemble the final output from the structured `GetProjectContextResult` returned by the use case.\n\n**In `text` mode** (default):\n\n1. Project context entries are rendered first, each preceded by its source label. Entries are separated by `---`.\n2. Spec entries follow:\n   - Full entries are rendered under `## Spec content` with complete content.\n   - Summary entries are rendered under `## Available context specs` with spec ID, title, and description.\n   - List entries are rendered under `## Available context specs` with spec ID only plus an explicit list-mode label.\n3. If nothing is configured (no `context:` entries and no specs matched), the command prints `no project context configured` and exits with code 0.\n\nSection flags apply only to full entries. In `list` and `summary` modes, the output remains list/summary shaped even when `--rules`, `--constraints`, or `--scenarios` are passed.\n\n**In `json` or `toon` mode**, the output includes `contextEntries`, `specs`, and `warnings`. Spec entry fields vary by mode using the shared context entry shape: list entries omit title/description/content, summary entries omit content, and full entries include content."
+        "The CLI MUST obtain the structured `GetProjectContextResult` from the use case and MUST NOT assemble agent-facing markdown inline.\n\n**In `text` mode** (default):\n\nThe CLI MUST call `projectContextToMarkdown(context)` from `@specd/sdk` (passing the `GetProjectContextResult` as `context`) and print the returned string to stdout. The helper owns project-entry formatting, full-spec content, and the catalogue for entries whose `mode` is not `full`.\n\nCatalogue sections MUST include prose instructing agents to run `specd specs context <specId>` to load full optimized context. The output MUST NEVER mention `changes spec-preview` or any change-scoped preview command.\n\nWhen the helper returns `no project context configured`, the CLI MUST print that string and exit with code 0.\n\nSection flags apply only to full entries. In `list` and `summary` modes, the output remains list/summary shaped even when `--rules`, `--constraints`, or `--scenarios` are passed.\n\n**In `json` or `toon` mode**, the output includes `contextEntries`, `specs`, and `warnings`. Spec entry fields vary by mode using the shared context entry shape: list entries omit title/description/content, summary entries omit content, and full entries include content. Structured formats MUST NOT invoke the markdown helper."
       ]
     },
     {
@@ -56,6 +57,8 @@
   ],
   "constraints": [
     "This command is read-only",
+    "Text-mode rendering MUST come from projectContextToMarkdown; the CLI MUST NOT hardcode catalogue hints or markdown tables",
+    "Project context text output MUST NEVER suggest changes spec-preview",
     "Only project-level contextIncludeSpecs/contextExcludeSpecs patterns are applied; workspace-level patterns are change-specific and not applied here",
     "dependsOn traversal is opt-in via --follow-deps; without the flag, deps are not followed",
     "--depth without --follow-deps is a CLI usage error (exit code 1)",
@@ -208,6 +211,25 @@
     },
     {
       "requirement": "Output",
+      "name": "Text output delegates to projectContextToMarkdown",
+      "when": ["specd project context --format text is called"],
+      "then": [
+        "stdout matches projectContextToMarkdown(context)",
+        "AND the CLI does not assemble catalogue markdown inline"
+      ]
+    },
+    {
+      "requirement": "Output",
+      "name": "Non-full catalogue hints at specs context",
+      "given": ["the output contains summary-mode or list-mode entries"],
+      "when": ["text output is rendered"],
+      "then": [
+        "it includes guidance to run specd specs context <specId>",
+        "AND it never mentions spec-preview"
+      ]
+    },
+    {
+      "requirement": "Output",
       "name": "JSON output — structured spec entries with mode",
       "given": ["GetProjectContext returns structured entries"],
       "when": ["specd project context --format json is called"],
@@ -285,30 +307,33 @@
     "files": [
       {
         "specId": "cli:project-context",
-        "file": "cli:src/commands/project/context.ts"
-      },
+        "file": "cli:test/commands/project-context.spec.ts"
+      }
+    ],
+    "symbols": [
       {
         "specId": "cli:project-context",
-        "file": "cli:test/commands/project-context.spec.ts"
+        "file": "cli:src/commands/project/context.ts",
+        "symbol": "registerProjectContext"
       }
     ]
   },
   "contentHashes": {
-    "spec.md": "sha256:cb14cbc467e9710517e70aeda72bd5c5576aa5e2e08dc1a3dc62fe86167fa733",
-    "verify.md": "sha256:f3edefc65ec268b32cb12d93a1cc48169f25481a70d7b2ef88ff02b4e18e6ee6"
+    "spec.md": "sha256:1723aa56d6dce64276f5488e00ae559197fe130ff01dcf57d6021bd7be6ff528",
+    "verify.md": "sha256:8028dca04ae813fa36db39efa410127ada0fe39a99522c4aaf54332ba98e8f17"
   },
   "provenance": {
     "artifacts": {
       "spec.md": {
-        "hash": "sha256:cb14cbc467e9710517e70aeda72bd5c5576aa5e2e08dc1a3dc62fe86167fa733",
-        "lastModified": "2026-06-26T06:51:01.817Z"
+        "hash": "sha256:1723aa56d6dce64276f5488e00ae559197fe130ff01dcf57d6021bd7be6ff528",
+        "lastModified": "2026-07-26T18:50:55.583Z"
       },
       "verify.md": {
-        "hash": "sha256:f3edefc65ec268b32cb12d93a1cc48169f25481a70d7b2ef88ff02b4e18e6ee6",
-        "lastModified": "2026-06-26T06:51:01.817Z"
+        "hash": "sha256:8028dca04ae813fa36db39efa410127ada0fe39a99522c4aaf54332ba98e8f17",
+        "lastModified": "2026-07-26T18:50:55.586Z"
       }
     },
-    "persistedStateHash": "sha256:af2d028aa452ed8df7855bf6ec9d12ffbe293e989c2be1412dcb4542434b2311",
+    "persistedStateHash": "sha256:b018d907fbe2c4a5670737d5616c024ed2b95bd2e45f0b5ddb747401195bf02b",
     "schema": {
       "name": "schema-std",
       "version": 1

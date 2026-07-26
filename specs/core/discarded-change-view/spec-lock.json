@@ -9,5 +9,41 @@
       "file": "core:src/domain/read-only-change-view.ts",
       "symbols": ["toDiscardedChangeView"]
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Read-only DiscardedChangeView for terminal discarded/ changes; audit/display only, no mutation.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:460025326a9da29998ab5569b07eeb3ba205c5de34515c991bc9d10980daa3bb",
+          "lastModified": "2026-05-26T16:37:22.778Z"
+        },
+        "verify.md": {
+          "hash": "sha256:4ea63423c8cfb4a64326f94c15d5cf55c2467aaeb6ff48bbef75690bd06988c7",
+          "lastModified": "2026-05-26T16:37:22.779Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# DiscardedChangeView\n## Rules\n### Extends ReadOnlyChangeView\n- `DiscardedChangeView` MUST extend `ReadOnlyChangeView` (all shared read accessors).\n### Discarded-specific surface\n- Extra accessors from latest `discarded` history event: `discardReason` (`reason`), `discardedAt` (`at`), `discardedBy` (`by`), optional `supersededBy`.\n- Instance MUST correspond to change whose latest history event is `discarded`.\n### Construction\n- Only `ChangeRepository` (or port doubles) and `GetDiscarded` MAY construct via `toDiscardedChangeView`.\n- Callers obtain via `getDiscarded`, `listDiscarded`, or `GetDiscarded.execute` — not ad-hoc `Change` instantiation in production.\n### No mutation path\n- No `mutateDiscarded`. Irreversible. Audit/CLI display only.\n## Constraints\n- Terminology: Discard / Discarded (see core:change).\n- Name reuse for new active changes unaffected; collision checks ignore discarded storage.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:460025326a9da29998ab5569b07eeb3ba205c5de34515c991bc9d10980daa3bb",
+          "lastModified": "2026-05-26T16:37:22.778Z"
+        },
+        "verify.md": {
+          "hash": "sha256:4ea63423c8cfb4a64326f94c15d5cf55c2467aaeb6ff48bbef75690bd06988c7",
+          "lastModified": "2026-05-26T16:37:22.779Z"
+        }
+      }
+    }
+  }
 }

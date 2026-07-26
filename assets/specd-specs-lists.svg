@@ -1,0 +1,121 @@
+<svg height="466.4" width="1091.2" xmlns="http://www.w3.org/2000/svg">
+<g transform="translate(32,16)">
+<filter filterUnits="userSpaceOnUse" height="474.4" id="shadow" width="1099.2" x="-32" y="-24">
+<feGaussianBlur stdDeviation="12"/>
+</filter>
+<rect fill="#000000c0" filter="url(#shadow)" height="402.4" rx="10" ry="10" width="1027.2" x="4" y="12"/>
+<rect fill="#282c34" height="402.4" rx="10" ry="10" width="1027.2"/>
+<clipPath id="header">
+<rect height="28" width="1027.2"/>
+</clipPath>
+<rect clip-path="url(#header)" fill="#383837" height="56" rx="10" ry="10" width="1027.2"/>
+<line stroke="#000000c0" stroke-width="0.5" x1="0" x2="1027.2" y1="28" y2="28"/><text dominant-baseline="central" fill="#b3b3b3" font-family="system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica Neue, Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle" x="513.6" y="14">specd specs list --workspace default --summary</text>
+<g>
+<circle cx="14" cy="14" fill="#ff5f56" r="6" stroke="#ff5f56" stroke-width="0.5"/>
+<circle cx="34" cy="14" fill="#ffbd2e" r="6" stroke="#ffbd2e" stroke-width="0.5"/>
+<circle cx="54" cy="14" fill="#28c941" r="6" stroke="#28c941" stroke-width="0.5"/>
+</g>
+<svg class="terminal" font-family="JetBrains Mono, Fira Code, Source Code Pro, Cascadia Code, Consolas, Menlo, Monaco, DejaVu Sans Mono, monospace, Symbols Nerd Font Mono, Cascadia Mono" font-size="12" height="374.4" width="1027.2" y="28">
+<svg fill="#dcdfe4" x="9.6" y="7.2">
+<g>
+<svg height="360" viewBox="0 0 84 30" width="1008">
+<g stroke-width="0.025">
+<path d="M0,1.2 H40.2 V2.4 H48.6 V3.6 H0 Z" fill="#dcdfe4" stroke="#dcdfe4"/>
+</g>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="0">
+<text xml:space="preserve" y="0.96em"><tspan fill="#c678dd">% </tspan><tspan fill="#ea9a97">specd</tspan><tspan> </tspan><tspan fill="#c4a7e7" font-style="italic">specs</tspan><tspan> </tspan><tspan fill="#c4a7e7" font-style="italic">list</tspan><tspan> </tspan><tspan fill="#c4a7e7" font-style="italic">--workspace</tspan><tspan> </tspan><tspan fill="#c4a7e7" font-style="italic">default</tspan><tspan> </tspan><tspan fill="#c4a7e7" font-style="italic">--summary</tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="14.4">
+<text xml:space="preserve" y="0.96em"><tspan>  </tspan><tspan fill="#282c34" font-weight="bold">workspace: </tspan><tspan fill="#282c34" font-weight="bold">default </tspan><tspan fill="#282c34" font-weight="bold">(root: </tspan><tspan fill="#282c34" font-weight="bold">/projects/specd)</tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="28.8">
+<text xml:space="preserve" y="0.96em"><tspan>  </tspan><tspan fill="#282c34" font-weight="bold">PATH </tspan><tspan>                                       </tspan><tspan fill="#282c34" font-weight="bold">TITLE </tspan><tspan>                      </tspan><tspan fill="#282c34" font-weight="bold">SUMMARY</tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="43.2">
+<text xml:space="preserve" y="0.96em"><tspan>  </tspan><tspan fill="#dcdfe4">default:_global/architecture </tspan><tspan>               </tspan><tspan fill="#dcdfe4">Architecture </tspan><tspan>               </tspan><tspan fill="#dcdfe4">Hexagonal </tspan><tspan fill="#dcdfe4">+ </tspan><tspan fill="#dcdfe4">DDD </tspan><tspan fill="#dcdfe4">contract </tspan><tspan fill="#dcdfe4">for </tspan><tspan fill="#dcdfe4">specd </tspan><tspan fill="#dcdfe4">packages: </tspan><tspan fill="#dcdfe4">pure </tspan><tspan fill="#dcdfe4">domain, </tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="57.6">
+<text xml:space="preserve" y="0.96em"><tspan>                                                                          </tspan><tspan fill="#dcdfe4">port-only </tspan><tspan fill="#dcdfe4">application, </tspan><tspan fill="#dcdfe4">composition </tspan><tspan fill="#dcdfe4">wiring, </tspan><tspan fill="#dcdfe4">curated </tspan><tspan fill="#dcdfe4">public </tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="72">
+<text xml:space="preserve" y="0.96em"><tspan>                                                                          </tspan><tspan fill="#dcdfe4">surfaces. </tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="86.4">
+<text xml:space="preserve" y="0.96em"><tspan>  </tspan><tspan fill="#dcdfe4">default:_global/commits </tspan><tspan>                    </tspan><tspan fill="#dcdfe4">Commit </tspan><tspan fill="#dcdfe4">Conventions </tspan><tspan>         </tspan><tspan fill="#dcdfe4">Inconsistent </tspan><tspan fill="#dcdfe4">commit </tspan><tspan fill="#dcdfe4">messages </tspan><tspan fill="#dcdfe4">make </tspan><tspan fill="#dcdfe4">changelogs </tspan><tspan fill="#dcdfe4">unreliable </tspan><tspan fill="#dcdfe4">and </tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="100.8">
+<text xml:space="preserve" y="0.96em"><tspan>                                                                          </tspan><tspan fill="#dcdfe4">automated </tspan><tspan fill="#dcdfe4">releases </tspan><tspan fill="#dcdfe4">impossible. </tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="115.2">
+<text xml:space="preserve" y="0.96em"><tspan>  </tspan><tspan fill="#dcdfe4">default:_global/conventions </tspan><tspan>                </tspan><tspan fill="#dcdfe4">Coding </tspan><tspan fill="#dcdfe4">Conventions </tspan><tspan>         </tspan><tspan fill="#dcdfe4">TypeScript </tspan><tspan fill="#dcdfe4">conventions </tspan><tspan fill="#dcdfe4">for </tspan><tspan fill="#dcdfe4">specd </tspan><tspan fill="#dcdfe4">monorepo: </tspan><tspan fill="#dcdfe4">strict </tspan><tspan fill="#dcdfe4">mode, </tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="129.6">
+<text xml:space="preserve" y="0.96em"><tspan>                                                                          </tspan><tspan fill="#dcdfe4">ESM-only, </tspan><tspan fill="#dcdfe4">named </tspan><tspan fill="#dcdfe4">exports, </tspan><tspan fill="#dcdfe4">kebab-case, </tspan><tspan fill="#dcdfe4">error </tspan><tspan fill="#dcdfe4">types, </tspan><tspan fill="#dcdfe4">and </tspan><tspan fill="#dcdfe4">lazy </tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="144">
+<text xml:space="preserve" y="0.96em"><tspan>                                                                          </tspan><tspan fill="#dcdfe4">loading. </tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="158.4">
+<text xml:space="preserve" y="0.96em"><tspan>  </tspan><tspan fill="#dcdfe4">default:_global/docs </tspan><tspan>                       </tspan><tspan fill="#dcdfe4">Documentation </tspan><tspan fill="#dcdfe4">Conventions </tspan><tspan>  </tspan><tspan fill="#dcdfe4">Docs </tspan><tspan fill="#dcdfe4">contract </tspan><tspan fill="#dcdfe4">for </tspan><tspan fill="#dcdfe4">`docs/`, </tspan><tspan fill="#dcdfe4">ADRs, </tspan><tspan fill="#dcdfe4">SDK-first </tspan><tspan fill="#dcdfe4">host </tspan><tspan fill="#dcdfe4">guidance, </tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="172.8">
+<text xml:space="preserve" y="0.96em"><tspan>                                                                          </tspan><tspan fill="#dcdfe4">command </tspan><tspan fill="#dcdfe4">references, </tspan><tspan fill="#dcdfe4">and </tspan><tspan fill="#dcdfe4">composition-surface </tspan><tspan fill="#dcdfe4">alignment. </tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="187.2">
+<text xml:space="preserve" y="0.96em"><tspan>  </tspan><tspan fill="#dcdfe4">default:_global/error-handling-conventions </tspan><tspan> </tspan><tspan fill="#dcdfe4">Error </tspan><tspan fill="#dcdfe4">Handling </tspan><tspan fill="#dcdfe4">Conventions </tspan><tspan> </tspan><tspan fill="#dcdfe4">Standardized </tspan><tspan fill="#dcdfe4">error </tspan><tspan fill="#dcdfe4">handling </tspan><tspan fill="#dcdfe4">across </tspan><tspan fill="#dcdfe4">specd: </tspan><tspan fill="#dcdfe4">every </tspan><tspan fill="#dcdfe4">user-facing </tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="201.6">
+<text xml:space="preserve" y="0.96em"><tspan>                                                                          </tspan><tspan fill="#dcdfe4">error </tspan><tspan fill="#dcdfe4">must </tspan><tspan fill="#dcdfe4">be </tspan><tspan fill="#dcdfe4">machine-readable, </tspan><tspan fill="#dcdfe4">actionable, </tspan><tspan fill="#dcdfe4">and </tspan><tspan fill="#dcdfe4">consistent. </tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="216">
+<text xml:space="preserve" y="0.96em"><tspan>  </tspan><tspan fill="#dcdfe4">default:_global/eslint </tspan><tspan>                     </tspan><tspan fill="#dcdfe4">ESLint </tspan><tspan fill="#dcdfe4">Rules </tspan><tspan>               </tspan><tspan fill="#dcdfe4">ESLint </tspan><tspan fill="#dcdfe4">contract: </tspan><tspan fill="#dcdfe4">enforce </tspan><tspan fill="#dcdfe4">core </tspan><tspan fill="#dcdfe4">TS </tspan><tspan fill="#dcdfe4">conventions </tspan><tspan fill="#dcdfe4">and </tspan><tspan fill="#dcdfe4">layer </tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="230.4">
+<text xml:space="preserve" y="0.96em"><tspan>                                                                          </tspan><tspan fill="#dcdfe4">boundaries </tspan><tspan fill="#dcdfe4">with </tspan><tspan fill="#dcdfe4">type-aware </tspan><tspan fill="#dcdfe4">rules </tspan><tspan fill="#dcdfe4">across </tspan><tspan fill="#dcdfe4">monorepo. </tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="244.8">
+<text xml:space="preserve" y="0.96em"><tspan>  </tspan><tspan fill="#dcdfe4">default:_global/logging </tspan><tspan>                    </tspan><tspan fill="#dcdfe4">default:_global/logging </tspan><tspan>    </tspan><tspan fill="#dcdfe4">Shared </tspan><tspan fill="#dcdfe4">logging </tspan><tspan fill="#dcdfe4">contract: </tspan><tspan fill="#dcdfe4">console-compatible </tspan><tspan fill="#dcdfe4">methods, </tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="259.2">
+<text xml:space="preserve" y="0.96em"><tspan>                                                                          </tspan><tspan fill="#dcdfe4">aliases, </tspan><tspan fill="#dcdfe4">level </tspan><tspan fill="#dcdfe4">semantics, </tspan><tspan fill="#dcdfe4">minimal </tspan><tspan fill="#dcdfe4">implementation </tspan><tspan fill="#dcdfe4">mapping. </tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="273.6">
+<text xml:space="preserve" y="0.96em"><tspan>  </tspan><tspan fill="#dcdfe4">default:_global/spec-layout </tspan><tspan>                </tspan><tspan fill="#dcdfe4">Spec </tspan><tspan fill="#dcdfe4">Layout </tspan><tspan>                </tspan><tspan fill="#dcdfe4">Spec </tspan><tspan fill="#dcdfe4">layout </tspan><tspan fill="#dcdfe4">contract: </tspan><tspan fill="#dcdfe4">every </tspan><tspan fill="#dcdfe4">spec </tspan><tspan fill="#dcdfe4">uses </tspan><tspan fill="#dcdfe4">fixed </tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="288">
+<text xml:space="preserve" y="0.96em"><tspan>                                                                          </tspan><tspan fill="#dcdfe4">`spec.md`/`verify.md` </tspan><tspan fill="#dcdfe4">structure, </tspan><tspan fill="#dcdfe4">canonical </tspan><tspan fill="#dcdfe4">paths, </tspan><tspan fill="#dcdfe4">and </tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="302.4">
+<text xml:space="preserve" y="0.96em"><tspan>                                                                          </tspan><tspan fill="#dcdfe4">explicit </tspan><tspan fill="#dcdfe4">dependencies. </tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="316.8">
+<text xml:space="preserve" y="0.96em"><tspan>  </tspan><tspan fill="#dcdfe4">default:_global/testing </tspan><tspan>                    </tspan><tspan fill="#dcdfe4">Testing </tspan><tspan fill="#dcdfe4">Conventions </tspan><tspan>        </tspan><tspan fill="#dcdfe4">Testing </tspan><tspan fill="#dcdfe4">policy: </tspan><tspan fill="#dcdfe4">Vitest </tspan><tspan fill="#dcdfe4">only, </tspan><tspan fill="#dcdfe4">unit </tspan><tspan fill="#dcdfe4">tests </tspan><tspan fill="#dcdfe4">isolate </tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="331.2">
+<text xml:space="preserve" y="0.96em"><tspan>                                                                          </tspan><tspan fill="#dcdfe4">domain/application </tspan><tspan fill="#dcdfe4">logic, </tspan><tspan fill="#dcdfe4">integration </tspan><tspan fill="#dcdfe4">tests </tspan><tspan fill="#dcdfe4">cover </tspan><tspan fill="#dcdfe4">real </tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="345.6">
+<text xml:space="preserve" y="0.96em"><tspan>                                                                          </tspan><tspan fill="#dcdfe4">adapters. </tspan></text>
+</svg>
+</g>
+</svg>
+</svg>
+<rect fill="none" height="402.4" rx="10" ry="10" stroke="#000000" stroke-width="0.5" width="1027.2"/>
+<rect fill="none" height="400.4" rx="9" ry="9" stroke="#f0f0f080" stroke-width="0.5" width="1025.2" x="1" y="1"/>
+</g>
+<style>
+@font-face {
+	font-family: JetBrains Mono;
+	font-weight: 100 800;
+	font-style: italic;
+	src: url(https://raw.githubusercontent.com/pamburus/fonts/refs/heads/main/JetBrainsMono/fonts/variable/JetBrainsMono-Italic%5Bwght%5D.woff2) format('woff2');
+}
+@font-face {
+	font-family: JetBrains Mono;
+	font-weight: 100 800;
+	font-style: normal;
+	src: url(https://raw.githubusercontent.com/pamburus/fonts/refs/heads/main/JetBrainsMono/fonts/variable/JetBrainsMono%5Bwght%5D.woff2) format('woff2');
+}
+</style>
+</svg>

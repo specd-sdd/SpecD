@@ -108,6 +108,8 @@
       }
     ]
   },
+  "optimizedDescription": "ImplementationDetector port: demand-driven project-relative modified-file candidates; backend-agnostic.",
+  "optimizedContext": "# ImplementationDetector\n\n## Rules\n- `detectModifiedFiles(change, options?)` → project-relative candidate paths. `excludePaths?` = portable dir prefixes to exclude.\n- Detector owns baseline policy; callers pass Change only. No link/resolved/ignored classification.\n- Demand-driven: invoked by `RefreshImplementationTracking` only. NOT by GetStatus, TransitionChange, CompileContext, or Change entity.\n- Backend-agnostic; VCS first but not required.\n\n## Constraints\n- Paths: forward-slash, project-root-relative. No workspace identity assignment. excludePaths same normalization.",
   "contentHashes": {
     "spec.md": "sha256:3ebb454526456dc3e625228430e40326684816283a2640668b781f281c8325d7",
     "verify.md": "sha256:49f85123f2d2dc67c3e587a54baa841728d272e7b88fcd42a64eb37a77320526"
@@ -123,7 +125,7 @@
         "lastModified": "2026-06-23T06:10:27.820Z"
       }
     },
-    "persistedStateHash": "sha256:241a3fd4b6f8cbef8bfef3d3d29cd0ff9b7c43ba387ee25f0a800a7210e6650a",
+    "persistedStateHash": "sha256:dc06d4f5c9bade127206c6a007ed08330db3b6f80402702d903d9eb983e9ae51",
     "schema": {
       "name": "schema-std",
       "version": 1

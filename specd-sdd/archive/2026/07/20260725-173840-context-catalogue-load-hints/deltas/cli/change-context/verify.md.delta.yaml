@@ -1,0 +1,100 @@
+- op: modified
+  description: 'Replace blanket spec-preview scenario with source-aware hint scenarios; keep fingerprint/mode coverage'
+  selector:
+    type: section
+    matches: 'Requirement: Output'
+  content: |
+    #### Scenario: Text output begins with fingerprint before context sections
+
+    - **GIVEN** the current context fingerprint is `sha256:abc123...`
+    - **WHEN** `specd change context my-change designing --format text` is called
+    - **THEN** the first rendered line is `Context Fingerprint: sha256:abc123...`
+
+    #### Scenario: Text output shows unchanged message when fingerprint matches
+
+    - **GIVEN** the current context fingerprint is `sha256:abc123...`
+    - **WHEN** `specd change context my-change designing --fingerprint sha256:abc123... --format text` is called
+    - **THEN** the output includes `Context unchanged since last call.`
+    - **AND** no spec content is printed
+
+    #### Scenario: Text output labels full-mode specs explicitly
+
+    - **GIVEN** `CompileContext` returns a full-mode spec entry
+    - **WHEN** `specd change context <name> <step> --format text` is called
+    - **THEN** the rendered block includes an explicit full-mode label
+
+    #### Scenario: Text output labels summary-mode specs explicitly
+
+    - **GIVEN** `CompileContext` returns a summary-mode spec entry
+    - **WHEN** `specd change context <name> <step> --format text` is called
+    - **THEN** the rendered block includes an explicit summary-mode label
+
+    #### Scenario: Text output labels list-mode specs explicitly
+
+    - **GIVEN** `CompileContext` returns a list-mode spec entry
+    - **WHEN** `specd change context <name> <step> --format text` is called
+    - **THEN** the rendered block includes an explicit list-mode label
+
+    #### Scenario: Text output omits lifecycle availability
+
+    - **GIVEN** the change has unavailable workflow steps
+    - **WHEN** `specd change context <name> <step> --format text` is called
+    - **THEN** stdout contains no available-step section, lifecycle state, or blocker list
+    - **AND** stderr contains no lifecycle-availability warning
+
+    #### Scenario: Structured output omits lifecycle fields
+
+    - **WHEN** `specd change context <name> <step> --format toon` is called
+    - **THEN** the result contains context fingerprint, context entries, specs, and context warnings
+    - **AND** it omits `stepAvailable`, `blockingArtifacts`, and `availableSteps`
+
+    #### Scenario: Text output delegates to changeContextToMarkdown
+
+    - **WHEN** `specd change context <name> <step> --format text` is called
+    - **THEN** stdout matches `changeContextToMarkdown(context, { changeName: <name> })`
+    - **AND** the CLI does not assemble catalogue markdown inline
+
+    #### Scenario: Change-scoped catalogue entries hint at spec-preview
+
+    - **GIVEN** the output contains a catalogue entry (`mode` is not `full`) with `source: 'specIds'`
+    - **WHEN** text output is rendered
+    - **THEN** it includes guidance to run `specd changes spec-preview <name> <specId>`
+    - **AND** that guidance appears because change-scoped specs may have deltas or be new
+
+    #### Scenario: Canonical catalogue entries hint at specs context
+
+    - **GIVEN** the output contains a catalogue entry with `source: 'specDependsOn'` or `includePattern`
+    - **WHEN** text output is rendered
+    - **THEN** it includes guidance to run `specd specs context <specId>`
+    - **AND** it does not suggest `spec-preview` for that entry
+
+    #### Scenario: No preview hint when no change-scoped catalogue entries
+
+    - **GIVEN** the catalogue has only `includePattern`, `specDependsOn`, and/or `dependsOnTraversal` entries
+    - **WHEN** text output is rendered
+    - **THEN** stdout does not include a `spec-preview` guidance line
+
+    #### Scenario: JSON output includes list-mode entries
+
+    - **GIVEN** `CompileContext` returns `mode: "list"` entries
+    - **WHEN** `specd change context <name> <step> --format json` is called
+    - **THEN** JSON includes those entries with mode and source fields
+
+    #### Scenario: Section flags have no effect on list and summary entries
+
+    - **GIVEN** the result is rendered in list mode or summary mode
+    - **WHEN** `--rules` or `--constraints` are passed
+    - **THEN** output remains list/summary shaped without full content blocks
+
+    #### Scenario: include-change-specs false still allows reinjection
+
+    - **GIVEN** `--include-change-specs` is omitted
+    - **AND** a change spec matches include patterns or traversal
+    - **WHEN** the command is executed
+    - **THEN** that spec can still appear in emitted context entries
+
+    #### Scenario: Full mode defaults to Description + Rules + Constraints
+
+    - **GIVEN** a spec is rendered in `full` mode
+    - **WHEN** `specd change context` is run without section flags
+    - **THEN** output includes Description, Rules, and Constraints for that spec

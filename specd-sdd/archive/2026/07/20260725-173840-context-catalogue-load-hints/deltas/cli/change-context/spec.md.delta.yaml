@@ -1,0 +1,50 @@
+- op: modified
+  description: 'Delegate text-mode rendering to SDK changeContextToMarkdown with source-aware hints'
+  selector:
+    type: section
+    matches: 'Requirement: Output'
+  content: |
+    The CLI MUST obtain the structured `CompileContextResult` from the use case and MUST NOT assemble agent-facing markdown inline.
+
+    **In `text` mode** (default):
+
+    The CLI MUST call `changeContextToMarkdown(context, { changeName: <name> })` from `@specd/sdk` (passing the `CompileContextResult` as `context`) and print the returned string to stdout. The helper owns fingerprint rendering, project-context formatting, full-spec content, catalogue tables, and source-aware load hints:
+
+    - Catalogue entries with `source: 'specIds'` (change-scoped; may have deltas or be new) → guide agents to `specd changes spec-preview <name> <specId>` for merged full content. These MUST NOT be loaded via `specs context`.
+    - Catalogue entries with any other `source` (canonical specs) → guide agents to `specd specs context <specId>` for optimized context.
+    - Catalogue layout partitions by hint group: `specIds` table first (with preview prose when non-empty), then other sources with a shared `specs context` prose, with `dependsOnTraversal` under `### Via dependencies`.
+
+    Fingerprint comparison remains in `CompileContext`. When `status` is `'unchanged'`, the CLI still calls the helper; the helper emits the fingerprint line plus `Context unchanged since last call.` The CLI MUST NOT assemble that message inline.
+
+    **In `json` or `toon` mode**, the output is the structured context-only result directly. List entries include `specId`, `source`, and `mode`. Summary entries additionally include `title` and `description`. Full entries additionally include `content`. The output MUST NOT include lifecycle state, requested-step availability, blocking artifacts, or per-step availability. Structured formats MUST NOT invoke the markdown helper.
+
+- op: modified
+  description: 'Update constraints to match SDK-delegated text output and source-aware hints'
+  selector:
+    type: section
+    matches: '^Constraints$'
+  content: |
+    - In text mode, rendering MUST come from `changeContextToMarkdown`; the CLI MUST NOT hardcode catalogue hints or markdown tables.
+    - Catalogue hints MUST be source-aware: `spec-preview` only for change-scoped catalogue entries (`source: 'specIds'`); `specs context` for canonical catalogue entries.
+    - Section flags apply only to full-mode spec content.
+    - All warnings go to stderr; the assembled output goes to stdout.
+    - `dependsOn` traversal is opt-in via `--follow-deps`; without the flag, deps are not followed.
+    - `--include-change-specs` is opt-in; without the flag, `change.specIds` are not direct seeds.
+    - `--depth` without `--follow-deps` is a CLI usage error (exit code 1).
+    - The CLI MUST NOT derive or render lifecycle readiness; callers MUST use `change status` for lifecycle state and blockers.
+    - Optimization warnings for missing or stale optimized fields are suppressed whenever the effective `llmOptimizedContext` is `false`.
+
+- op: modified
+  description: 'Add sdk:context-markdown dependency for text presentation'
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`cli:entrypoint`](../entrypoint/spec.md) — CLI config discovery, exit codes, and output conventions
+    - [`cli:change-spec-preview`](../change-spec-preview/spec.md) — merged preview for change specs (`source: specIds`)
+    - [`sdk:context-markdown`](../../sdk/context-markdown/spec.md) — `changeContextToMarkdown` text presentation
+    - [`core:compile-context`](../../core/compile-context/spec.md) — `CompileContext` use case, `CompileContextResult` structured shape, `ContextSpecEntry` type
+    - [`core:config`](../../core/config/spec.md) — project context configuration
+    - [`core:get-artifact-instruction`](../../core/get-artifact-instruction/spec.md) — separate artifact instruction retrieval
+    - [`core:get-hook-instructions`](../../core/get-hook-instructions/spec.md) — separate hook instruction retrieval
+    - [`core:refresh-implementation-tracking`](../../core/refresh-implementation-tracking/spec.md) — VCS-backed refresh before context compilation

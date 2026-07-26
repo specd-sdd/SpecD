@@ -97,11 +97,31 @@
 - **THEN** the result contains context fingerprint, context entries, specs, and context warnings
 - **AND** it omits `stepAvailable`, `blockingArtifacts`, and `availableSteps`
 
-#### Scenario: Non-full output instructs spec-preview usage
+#### Scenario: Text output delegates to changeContextToMarkdown
 
-- **GIVEN** the output contains summary-mode or list-mode entries
+- **WHEN** `specd change context <name> <step> --format text` is called
+- **THEN** stdout matches `changeContextToMarkdown(context, { changeName: <name> })`
+- **AND** the CLI does not assemble catalogue markdown inline
+
+#### Scenario: Change-scoped catalogue entries hint at spec-preview
+
+- **GIVEN** the output contains a catalogue entry (`mode` is not `full`) with `source: 'specIds'`
 - **WHEN** text output is rendered
-- **THEN** it includes guidance to run `specd change spec-preview <change-name> <specId>` for merged full content
+- **THEN** it includes guidance to run `specd changes spec-preview <name> <specId>`
+- **AND** that guidance appears because change-scoped specs may have deltas or be new
+
+#### Scenario: Canonical catalogue entries hint at specs context
+
+- **GIVEN** the output contains a catalogue entry with `source: 'specDependsOn'` or `includePattern`
+- **WHEN** text output is rendered
+- **THEN** it includes guidance to run `specd specs context <specId>`
+- **AND** it does not suggest `spec-preview` for that entry
+
+#### Scenario: No preview hint when no change-scoped catalogue entries
+
+- **GIVEN** the catalogue has only `includePattern`, `specDependsOn`, and/or `dependsOnTraversal` entries
+- **WHEN** text output is rendered
+- **THEN** stdout does not include a `spec-preview` guidance line
 
 #### Scenario: JSON output includes list-mode entries
 

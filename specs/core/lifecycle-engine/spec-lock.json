@@ -14,5 +14,41 @@
       "file": "core:src/domain/services/lifecycle-engine.ts",
       "symbols": ["LifecycleEngine"]
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "LifecycleEngine: sole DAG-aware authority for effective status, blockers, transitions, nextAction.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:55f5980387125a4f5647c5d3f534404d8068c2ff4dce35ac5605cbdd7e3071c9",
+          "lastModified": "2026-05-25T06:02:58.467Z"
+        },
+        "verify.md": {
+          "hash": "sha256:5cd035c7607622ac483c5cf53c50f70eb37369d2c4a3681ab486ef6b4f3c9658",
+          "lastModified": "2026-05-25T06:02:58.467Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# LifecycleEngine\n\n## Rules\n- Sole authority unifying protocol, artifact, and content validation. Public: `evaluate(...)` — no separate public `computeEffectiveStatus`.\n- Effective status: drifted-pending-review/pending-review sticky; complete + unsatisfied upstream → `pending-parent-artifact-review`; else match aggregate. Recursive parent blocks.\n- Canonical states only — ignore display `complete-with-drift` / diagnostic `hasDrift` as lifecycle states.\n- Blocker: `code`, `message`, `isSkippable`, optional `bypassFlag`, optional `affectedArtifacts`. Skippable+active bypass → warning.\n- Codes: MISSING_ARTIFACT, INCOMPLETE_ARTIFACT, ARTIFACT_DRIFT, REVIEW_REQUIRED, PENDING_PARENT_REVIEW, INCOMPLETE_TASKS, OVERLAP_CONFLICT, INVALID_TRANSITION, APPROVAL_REQUIRED.\n- AvailableStep: `isReady`, `isPermitted` (VALID_TRANSITIONS + approvals + blockers). Approval gates route to pending-*; disabled gate → INVALID_TRANSITION to pending/approved.\n- Archiving: validTransitions include `archivable`+`designing`. `archiving→archivable` no workflow requires. archive-failed+`commitStarted` → prefer designing review over blind retry.\n- Next artifact: scan `schema.artifactDag().topologicalOrder()`, first not complete/skipped with deps satisfied; else null. Not declaration order.\n- Consumers MUST use engine — no local schema reimplementation.\n\n## Constraints\n- Persisted aggregates on Change; DAG-aware effective status derived here.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:55f5980387125a4f5647c5d3f534404d8068c2ff4dce35ac5605cbdd7e3071c9",
+          "lastModified": "2026-05-25T06:02:58.467Z"
+        },
+        "verify.md": {
+          "hash": "sha256:5cd035c7607622ac483c5cf53c50f70eb37369d2c4a3681ab486ef6b4f3c9658",
+          "lastModified": "2026-05-25T06:02:58.467Z"
+        }
+      }
+    }
+  }
 }

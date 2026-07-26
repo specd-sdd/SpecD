@@ -76,22 +76,19 @@ When `--fingerprint` is provided, the CLI first checks whether the provided fing
 
 ### Requirement: Output
 
-The CLI MUST assemble the final output from the structured `CompileContextResult` returned by the use case.
+The CLI MUST obtain the structured `CompileContextResult` from the use case and MUST NOT assemble agent-facing markdown inline.
 
 **In `text` mode** (default):
 
-1. The first rendered line is `Context Fingerprint: <sha256...>`, before any project context or spec content.
-2. Project context entries are rendered next, each preceded by its source label (for example `**Source: <path>**` for file entries and `**Source: instruction**` for instruction entries). Entries are separated by `---`.
-3. Spec entries follow with explicit mode labels:
-   - **Full-mode specs** (`mode: 'full'`) are rendered under a `### Spec: <specId>` heading and MUST include an explicit mode label.
-   - **Summary-mode specs** (`mode: 'summary'`) are rendered under `## Available context specs` with spec ID, title, description, source, and an explicit summary label.
-   - **List-mode specs** (`mode: 'list'`) are rendered under `## Available context specs` with spec ID, source, and an explicit list label.
-   - Non-full sections include this instruction: `Use \`specd change spec-preview <change-name> <specId>\` to load the merged full content of any change spec you need.\`
-   - Specs from `dependsOnTraversal` source MUST be visually distinguished from `includePattern` specs.
+The CLI MUST call `changeContextToMarkdown(context, { changeName: <name> })` from `@specd/sdk` (passing the `CompileContextResult` as `context`) and print the returned string to stdout. The helper owns fingerprint rendering, project-context formatting, full-spec content, catalogue tables, and source-aware load hints:
 
-When `--fingerprint` is provided and matches the current fingerprint, text mode still begins with `Context Fingerprint: <sha256...>` and then outputs a brief unchanged message. The full context is not printed.
+- Catalogue entries with `source: 'specIds'` (change-scoped; may have deltas or be new) → guide agents to `specd changes spec-preview <name> <specId>` for merged full content. These MUST NOT be loaded via `specs context`.
+- Catalogue entries with any other `source` (canonical specs) → guide agents to `specd specs context <specId>` for optimized context.
+- Catalogue layout partitions by hint group: `specIds` table first (with preview prose when non-empty), then other sources with a shared `specs context` prose, with `dependsOnTraversal` under `### Via dependencies`.
 
-**In `json` or `toon` mode**, the output is the structured context-only result directly. List entries include `specId`, `source`, and `mode`. Summary entries additionally include `title` and `description`. Full entries additionally include `content`. The output MUST NOT include lifecycle state, requested-step availability, blocking artifacts, or per-step availability.
+Fingerprint comparison remains in `CompileContext`. When `status` is `'unchanged'`, the CLI still calls the helper; the helper emits the fingerprint line plus `Context unchanged since last call.` The CLI MUST NOT assemble that message inline.
+
+**In `json` or `toon` mode**, the output is the structured context-only result directly. List entries include `specId`, `source`, and `mode`. Summary entries additionally include `title` and `description`. Full entries additionally include `content`. The output MUST NOT include lifecycle state, requested-step availability, blocking artifacts, or per-step availability. Structured formats MUST NOT invoke the markdown helper.
 
 ### Requirement: Context warnings
 
@@ -104,11 +101,8 @@ Any warnings from the `CompileContext` use case (for example stale metadata, mis
 
 ## Constraints
 
-- In text mode, the first line is `Context Fingerprint: <sha256...>`, before project context entries.
-- In text mode, project context entries appear before spec entries.
-- Text output MUST label each rendered spec entry explicitly as list, summary, or full content without relying on title rewriting.
-- Non-full specs in text output MUST include a note instructing the agent to use `specd change spec-preview <change-name> <specId>` for merged full content when applicable.
-- Summary-mode and list-mode specs from `dependsOnTraversal` MUST be rendered under a separate sub-heading from `includePattern` specs.
+- In text mode, rendering MUST come from `changeContextToMarkdown`; the CLI MUST NOT hardcode catalogue hints or markdown tables.
+- Catalogue hints MUST be source-aware: `spec-preview` only for change-scoped catalogue entries (`source: 'specIds'`); `specs context` for canonical catalogue entries.
 - Section flags apply only to full-mode spec content.
 - All warnings go to stderr; the assembled output goes to stdout.
 - `dependsOn` traversal is opt-in via `--follow-deps`; without the flag, deps are not followed.
@@ -129,7 +123,8 @@ specd change context add-oauth-login implementing --follow-deps --depth 1
 ## Spec Dependencies
 
 - [`cli:entrypoint`](../entrypoint/spec.md) — CLI config discovery, exit codes, and output conventions
-- [`cli:change-spec-preview`](../change-spec-preview/spec.md) — optional spec preview integration
+- [`cli:change-spec-preview`](../change-spec-preview/spec.md) — merged preview for change specs (`source: specIds`)
+- [`sdk:context-markdown`](../../sdk/context-markdown/spec.md) — `changeContextToMarkdown` text presentation
 - [`core:compile-context`](../../core/compile-context/spec.md) — `CompileContext` use case, `CompileContextResult` structured shape, `ContextSpecEntry` type
 - [`core:config`](../../core/config/spec.md) — project context configuration
 - [`core:get-artifact-instruction`](../../core/get-artifact-instruction/spec.md) — separate artifact instruction retrieval

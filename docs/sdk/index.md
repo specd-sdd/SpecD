@@ -112,6 +112,15 @@ await provider.close()
 Provider creation is synchronous. Runtime-native backend loading happens in
 `provider.open()`, not when `createGraphProvider()` is called.
 
+## Presentation
+
+| Function                   | Purpose                                                                                                         |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `changeContextToMarkdown`  | Renders agent-facing markdown for compiled change context (`CompileContextResult`) with source-aware load hints |
+| `projectContextToMarkdown` | Renders agent-facing markdown for project context (`GetProjectContextResult`) with `specs context` load hints   |
+
+Both are pure synchronous functions: no I/O, no kernel access, no process side effects. Delivery hosts (CLI, MCP, API) consume them for text-mode presentation while structured formats (JSON/TOON) remain the host's responsibility.
+
 ## Orchestration
 
 | Function                     | Purpose                                                    |

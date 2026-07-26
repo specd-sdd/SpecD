@@ -9,5 +9,41 @@
       "file": "core:src/domain/read-only-change-view.ts",
       "symbols": ["toDraftedChangeView"]
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "DraftedChangeView extends ReadOnlyChangeView with isDrafted=true; construct only via repo/GetDraft.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:85df8db77e8791716746b3b73484f45e37288cf54bb674ff85d135bcae45eb0c",
+          "lastModified": "2026-05-26T16:37:22.612Z"
+        },
+        "verify.md": {
+          "hash": "sha256:59861d2732e1e749b0da24c4073be305712e5678877705fc0b42b441219fbef9",
+          "lastModified": "2026-05-26T16:37:22.612Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# DraftedChangeView\n\n## Rules\n- Extends `ReadOnlyChangeView`. Extra: `isDrafted` MUST be `true`.\n- No public unwrap to mutable `Change` (same as read-only-change-view).\n- Construct only via ChangeRepository / GetDraft using `toDraftedChangeView`. Callers: `getDraft`, `listDrafts`, `GetDraft.execute` — not arbitrary in-memory Change.\n- Artifact body via ChangeRepository.artifact with drafted storage context — not on view type.\n\n## Constraints\n- Narrowed projection for drafted storage, not Change replacement. Terminology: Draft/Drafted (not \"shelved\").",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:85df8db77e8791716746b3b73484f45e37288cf54bb674ff85d135bcae45eb0c",
+          "lastModified": "2026-05-26T16:37:22.612Z"
+        },
+        "verify.md": {
+          "hash": "sha256:59861d2732e1e749b0da24c4073be305712e5678877705fc0b42b441219fbef9",
+          "lastModified": "2026-05-26T16:37:22.612Z"
+        }
+      }
+    }
+  }
 }

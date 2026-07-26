@@ -9,5 +9,41 @@
       "file": "core:src/domain/errors/drafted-change-read-only-error.ts",
       "symbols": ["DraftedChangeReadOnlyError"]
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "DraftedChangeReadOnlyError: DomainError when active-only APIs hit drafted changes.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:5ade877b45c99ae35e21a74a80605a39bf83502435d8f20ff9cc275877285427",
+          "lastModified": "2026-05-26T16:37:22.613Z"
+        },
+        "verify.md": {
+          "hash": "sha256:6aca359cade3469b29311ad2aa6636058f8c236fd52a53fac05160d6b520d3f7",
+          "lastModified": "2026-05-26T16:37:22.614Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# DraftedChangeReadOnlyError\n\n## Rules\n- Export `DraftedChangeReadOnlyError extends DomainError`.\n- Throw when: `save`/`saveArtifact` on `isDrafted`; `mutate` resolves drafted; entity mutator while drafted (if guards on).\n- MUST NOT throw for correctly scoped `mutateDraft`, `RestoreChange`, `DiscardChange`.\n- Payload: `changeName`, `operation` (e.g. mutate/save/saveArtifact/transition). Message: drafted+read-only until restored; use draft/drafted terms.\n- Stable `code` e.g. `DRAFTED_CHANGE_READ_ONLY`.\n\n## Constraints\n- Prefer active-only get/mutate prevention; this error exceptional. CLI presentation per error-handling-conventions.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:5ade877b45c99ae35e21a74a80605a39bf83502435d8f20ff9cc275877285427",
+          "lastModified": "2026-05-26T16:37:22.613Z"
+        },
+        "verify.md": {
+          "hash": "sha256:6aca359cade3469b29311ad2aa6636058f8c236fd52a53fac05160d6b520d3f7",
+          "lastModified": "2026-05-26T16:37:22.614Z"
+        }
+      }
+    }
+  }
 }

@@ -10,5 +10,41 @@
     "core:change-list-entry",
     "core:change-repository-port"
   ],
-  "implementation": []
+  "implementation": [],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "ListChanges returns active ChangeRepository list entries unchanged; default limit 100; no content.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:ef5017f3724a01dabd342c8a82b147a5953e6d01ba7ca004fea07245195d258d",
+          "lastModified": "2026-07-22T16:55:45.627Z"
+        },
+        "verify.md": {
+          "hash": "sha256:246646766ded8270f7a4caf275b88ce48f492e863490742f37c10e1a1d1709e3",
+          "lastModified": "2026-07-22T16:55:45.628Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# List Changes\n\n## Rules\n- `ListChanges.execute(options?)` MUST return `ListResult<ActiveChangeListEntry>` for active (non-drafted, non-discarded) changes\n- Forward `ListOptions` + `includeDescription` to `ChangeRepository.list()` unchanged; no re-sort/filter/paginate; order=`createdAt` asc owned by repo index\n- Default `limit` **100** when options omitted\n- Entries MUST NOT include artifact content, history, validated hashes, artifact state maps; detail via `get(name)`\n- Optional `description` only when `includeDescription` set and repo projected it\n- Constructor sole dep: `ChangeRepository`; return `list(options)` result unchanged\n- Empty repo → `{ items: [], meta: { total: 0, count: 0, limit: <resolved> } }`; MUST NOT throw\n- `createListChanges(config)` MUST preserve complete artifact-type + spec-existence bootstrap; MUST NOT weaker variant\n- Config form → `resolveListChangesDeps(resolver)` → `createListChanges(deps)`; resolve `changes: ChangeRepository`; MUST NOT inline fs wiring\n\n## Constraints\n- Read-only list pass-through; repository owns order/filter/pagination",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:ef5017f3724a01dabd342c8a82b147a5953e6d01ba7ca004fea07245195d258d",
+          "lastModified": "2026-07-22T16:55:45.627Z"
+        },
+        "verify.md": {
+          "hash": "sha256:246646766ded8270f7a4caf275b88ce48f492e863490742f37c10e1a1d1709e3",
+          "lastModified": "2026-07-22T16:55:45.628Z"
+        }
+      }
+    }
+  }
 }

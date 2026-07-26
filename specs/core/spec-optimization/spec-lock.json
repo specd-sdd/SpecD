@@ -17,5 +17,41 @@
       "file": "core:src/domain/services/spec-optimization-freshness.ts",
       "symbols": ["classifyOptimizationFieldFreshness"]
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Per-field optimizedDescription/Context in spec-lock with independent artifact+schema baselines and freshness.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:8626897901e2674591cc752682bd27690d0fa148391ec2d46e3246cf68b7df91",
+          "lastModified": "2026-07-25T11:53:31.261Z"
+        },
+        "verify.md": {
+          "hash": "sha256:3a37e08b2476063dfd6509109823c4f0d94ca6c7586ad6472158e277441990fb",
+          "lastModified": "2026-07-25T11:53:31.262Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Spec Optimization\n## Rules\n### Independent fields\n- `PersistedSpecOptimizations`: optional `optimizedDescription`, `optimizedContext` — each own `PersistedOptimizationField` (value, schema, artifactState). Mutating one MUST NOT touch the other.\n### Field shape / baseline\n- artifactState: map filename → `{ hash, lastModified }`. Exactly present `scope:spec` artifacts at capture. Exclude metadata.json, spec-lock.json, change-scoped, absent optionals, undeclared files. Persist filename-ascending.\n### Hash identity\n- hash = SHA-256 raw UTF-8 bytes. lastModified diagnostic only — not freshness.\n### Freshness reasons\n- Per artifact: artifact-added|removed|changed|unchanged. Equal hash + different lastModified = diagnostic only.\n- No value → `missing` (not validation error). Stale if any add/remove/change OR schema identity ≠ current persisted schema.\n### Schema reassignment / clear / compat\n- Schema reassignment → all optimization fields stale.\n- Clearing last field → omit `optimizations` entirely (no empty object).\n- Lock without optimizations ≡ empty block. NEVER migrate from metadata.json into PersistedSpecOptimizations.\n## Constraints\n- When present, optimizations MUST have ≥1 field.\n- Same raw UTF-8 SHA-256 as other artifact identity. Unequal lastModified + equal hash ≠ stale.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:8626897901e2674591cc752682bd27690d0fa148391ec2d46e3246cf68b7df91",
+          "lastModified": "2026-07-25T11:53:31.261Z"
+        },
+        "verify.md": {
+          "hash": "sha256:3a37e08b2476063dfd6509109823c4f0d94ca6c7586ad6472158e277441990fb",
+          "lastModified": "2026-07-25T11:53:31.262Z"
+        }
+      }
+    }
+  }
 }

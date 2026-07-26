@@ -65,7 +65,7 @@
 
 - [ ] 4.1 Regenerate installed skill copies
       `.agents/skills/` and `.codex/skills/`: rendered skill directories — run the repository skills synchronization workflow
-      Approach: regenerate from canonical templates, then confirm `specd-metadata` directories are absent and archive/commit guidance has no legacy invocation.
+      Approach: regenerate from canonical templates, then confirm `specd-metadata` directories are absent and archive/commit guidance has no legacy invocation. Note: `.agents/skills/specd-metadata/` is already absent (cleaned by a previous sync); only `.codex/skills/specd-metadata/` requires directory removal.
       (Req: Template migration, Optimizer agents)
 - [ ] 4.2 Update Claude installation expectations
       `packages/plugin-agent-claude/test/install-skills.spec.ts`: installed bundle inventory assertions — remove `specd-metadata` expectations
@@ -89,5 +89,5 @@
       (Req: Template migration, scenario: Obsolete metadata skill is absent)
 - [ ] 4.7 Run focused validation and active-reference checks
       `packages/skills`, all five plugin test suites, `.agents/skills/`, `.codex/skills/`, and `dev/ai-agents/skills/`: test and rendered outputs — prove the removed identifiers are absent
-      Approach: run affected package tests and search active source/rendered skill instructions for `specd-metadata` and `specd-spec-metadata`, excluding metadata file-name references and historical archives.
+      Approach: run affected package tests and search active source/rendered skill instructions for `specd-metadata` and `specd-spec-metadata`. Exclude: `.specd/changes/*/` and `specd-sdd/changes/*/` (historical archives and this change's own artifacts), files named `.specd-metadata.yaml` (metadata sidecar mechanism), and `node_modules/`.
       (Req: Template migration, Optimizer agents)

@@ -25,8 +25,9 @@ Remove every active invocation path for the obsolete standard `specd-metadata` s
   - Update expected installed skill inventories so no plugin emits `specd-metadata`; retain assertions for the specialized agents according to each plugin capability.
 - `dev/ai-agents/skills/specd-spec-metadata/SKILL.md` and `dev/ai-agents/skills/specd-archive/SKILL.md`
   - Delete the legacy metadata skill and replace its archive reference with the specialized spec-context optimizer.
-- `.agents/skills/specd-metadata/SKILL.md`, `.codex/skills/specd-metadata/SKILL.md`, `.agents/skills/specd-archive/SKILL.md`, `.codex/skills/specd-archive/SKILL.md`, `.agents/skills/commit/SKILL.md`, and `.codex/skills/commit/SKILL.md`
+- `.codex/skills/specd-metadata/SKILL.md`, `.agents/skills/specd-archive/SKILL.md`, `.codex/skills/specd-archive/SKILL.md`, `.agents/skills/commit/SKILL.md`, and `.codex/skills/commit/SKILL.md`
   - Regenerate or update these installed/project skill copies through the repository skills synchronization workflow. They must contain no invocation of `specd-metadata` or `specd-spec-metadata`; references to the metadata persistence sidecar itself remain valid.
+  - Note: `.agents/skills/specd-metadata/` is already absent (cleaned by a previous sync). Only `.codex/skills/specd-metadata/` still exists and requires directory removal.
 - `specs/skills/skill-templates-source/{spec.md,verify.md}`
   - Remove `specd-metadata` from the canonical standard-template inventory and add verification that discovery omits it while specialized optimizer agents remain available.
 - `specs/skills/agents/{spec.md,verify.md}`
@@ -41,7 +42,7 @@ None. This change removes registrations and content; it introduces no new runtim
 1. Delete the canonical `specd-metadata` skill template directory so `@specd/skills` discovery can no longer resolve it.
 2. Remove the matching standard-skill frontmatter record from each plugin. Leave each optimizer-agent record intact so capability-aware agent rendering continues to work.
 3. Replace every active workflow instruction that names the legacy skill with the specialized optimizer appropriate to per-spec metadata (`specd-spec-context-optimizer`). Remove the separate legacy development skill rather than renaming it.
-4. Run the project skills synchronization path to refresh `.agents` and `.codex` generated copies, then verify that the old skill directories and invocations are absent.
+4. Run the project skills synchronization path to refresh `.agents` and `.codex` generated copies, then verify that the old skill directories and invocations are absent. Note: `.agents/skills/specd-metadata/` is already absent; only `.codex/skills/specd-metadata/` requires directory removal.
 5. Update plugin installation tests and run the package tests so installed bundles prove the removal across all supported plugin runtimes.
 
 The implementation satisfies both modified requirements: the template inventory explicitly excludes the standard skill, and only the two specialized agents remain discoverable for metadata optimization. The new verification scenarios map to bundle discovery and agent discovery assertions in the skills/package and plugin installation tests.

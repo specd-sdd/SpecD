@@ -152,6 +152,8 @@
       "then": ["artifact file content may be loaded separately from the view"]
     }
   ],
+  "optimizedDescription": "ReadOnlyChangeView: shared read accessors for drafted/discarded; no mutate or Change unwrap.",
+  "optimizedContext": "# ReadOnlyChangeView\n\n## Rules\n- Shared accessors: `name`, `createdAt`, `description`, `state`, `specIds`, `workspaces`, `schemaName`, `schemaVersion`, `artifacts` (status/keys, not body), `history`.\n- No mutating methods (`transition`, `updateSpecIds`, `draft`, `restore`, `discard`, `invalidate`, approval mutators, etc.).\n- No public `change`/`unwrap`/`toChange` escape hatch. Only ChangeRepository internals + facade factory hold mutable aggregate.\n- Internal facade implements Drafted+Discarded; factories: `toDraftedChangeView` (requires `isDrafted`), `toDiscardedChangeView` (latest event `discarded`). `getDraft`/`getDiscarded`/`list*` map via factories.\n- Artifact body via `ChangeRepository.artifact` — not on view.\n\n## Constraints\n- Interface contract, not Change replacement. Active changes still use Change via get/mutate.",
   "contentHashes": {
     "spec.md": "sha256:87f4addaba1b18f315eeeaf2411fbef0588f9a81843a524a970e7492fa0da732",
     "verify.md": "sha256:c1fd442d26af47e3e6bef4b903e54c20d79f42db532c37f1c9f1fecc94585317"
@@ -167,7 +169,7 @@
         "lastModified": "2026-05-28T12:32:43.791Z"
       }
     },
-    "persistedStateHash": "sha256:342d2ce18338f2dc7a10ad6a27711b3f52b66294531d11b1e67594ace4814ef4",
+    "persistedStateHash": "sha256:fd59aad41029ec2eb1108fbb68bc003eb6ab8fe092575ad072f536673c8caaa6",
     "schema": {
       "name": "schema-std",
       "version": 1

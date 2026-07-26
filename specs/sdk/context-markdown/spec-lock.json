@@ -1,0 +1,30 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["core:compile-context", "core:get-project-context"],
+  "implementation": [
+    {
+      "file": "sdk:src/presentation/_shared/catalogue.ts",
+      "symbols": ["renderFullSpecs", "renderChangeCatalogue", "renderProjectCatalogue"]
+    },
+    {
+      "file": "sdk:src/presentation/change-context-to-markdown.ts",
+      "symbols": ["changeContextToMarkdown"]
+    },
+    {
+      "file": "sdk:src/presentation/project-context-to-markdown.ts",
+      "symbols": ["projectContextToMarkdown"]
+    },
+    {
+      "file": "sdk:src/presentation/index.ts"
+    },
+    {
+      "file": "sdk:test/presentation/change-context-to-markdown.spec.ts"
+    },
+    {
+      "file": "sdk:test/presentation/project-context-to-markdown.spec.ts"
+    }
+  ]
+}

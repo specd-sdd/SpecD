@@ -13,5 +13,41 @@
     "default:_global/logging",
     "core:implementation-detector-port"
   ],
-  "implementation": []
+  "implementation": [],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Central domain entity for in-progress spec work: lifecycle, approvals, artifacts, append-only history, invalidation.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:10c6b2724c0c6ea675173702666030de6a7bcde85ff5c2ade6097e3036082488",
+          "lastModified": "2026-07-22T16:56:53.181Z"
+        },
+        "verify.md": {
+          "hash": "sha256:c01702fcb5a0da86422bdaf6a32cbeedff8ea956942200436e78796673d9cff7",
+          "lastModified": "2026-07-22T16:55:46.176Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Change\n\n## Rules\n- Immutable `name` + `createdAt`. Actors: `ActorIdentity` {name,email,provider?,providerId?,metadata?}.\n- `specIds` mutable (empty OK); workspace validated at create. `workspaces` computed via `parseSpecId()` — plural touched set, NOT primary/home workspace (no `workspaces[0]` for templates/archive). `specDependsOn` optional map; not approval-invalidating; pruned on `updateSpecIds()`. Spec list edits DO invalidate approvals.\n- Lifecycle: drafting→designing→ready→[pending-spec-approval→spec-approved]→implementing⇄verifying→done→[pending-signoff→signed-off]→archivable→archiving. Gates from `approvals.spec`/`signoff` (default false). `designing→designing` no invalidate/downgrade. From `archiving` only →`archivable` or →`designing`.\n- implementing→verifying gated by task completion; verifying→implementing = implementation-failure only; artifact-review-required → designing.\n- Implementation tracking + historical guard: ever `transitioned` to `implementing` → draft/discard fail by default (need force).\n- Spec approval / signoff gates when enabled. Schema name mismatch → `SchemaMismatchError`; version mismatch = warning only.\n- Artifacts: `ChangeArtifact` {type,optional,requires,state,files:Map}. File states: missing|in-progress|complete|skipped|pending-review|drifted-pending-review. Aggregate from files. `skipped` only optional. `markComplete`/`markSkipped` only ValidateArtifacts/skip UC. Return to designing → pending-review (keep drifted). Only complete|skipped satisfy requires.\n- `syncArtifacts(artifactTypes)` reconciles map; appends `artifacts-synced` with `SYSTEM_ACTOR`.\n- Append-only history; state = last `transitioned.to` (else drafting). Events: created, transitioned, spec-approved, signed-off, invalidated (causes: spec-change|artifact-drift|artifact-review-required|spec-overlap-conflict), drafted, restored, artifact-skipped, artifacts-synced, description-updated, discarded, archive-failed.\n- Draft/restore/discard storage moves; drafted = read-only except Restore/Discard via `mutateDraft`.\n- LifecycleEngine interprets schema/workflow/gates; Change owns persisted facts only.\n- `invalidate()`: cause, message, affectedArtifacts, optional policy override, required `artifactDag`. Policies none|surgical|downstream|global. Always → designing if was elsewhere. `hasDrift` set only for artifact-drift focused files.\n\n## Constraints\n- name/createdAt immutable; workspaces derived not persisted; no singular primary workspace.\n- State from history only; scope/artifact mods append invalidated + transition designing (except designing→designing).\n- validatedHash = last validated baseline only; hasDrift persisted per file.\n- skipped optional-only; satisfies requires.\n- Policy-driven reopen on invalidate; verifying→implementing resets only implementing.requires.\n- Archive only from archivable.\n- History never modified/deleted; draft/discard after implementing needs force; discard irreversible + mandatory reason/by.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:10c6b2724c0c6ea675173702666030de6a7bcde85ff5c2ade6097e3036082488",
+          "lastModified": "2026-07-22T16:56:53.181Z"
+        },
+        "verify.md": {
+          "hash": "sha256:c01702fcb5a0da86422bdaf6a32cbeedff8ea956942200436e78796673d9cff7",
+          "lastModified": "2026-07-22T16:55:46.176Z"
+        }
+      }
+    }
+  }
 }

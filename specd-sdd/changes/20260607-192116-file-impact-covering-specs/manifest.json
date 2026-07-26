@@ -1,6 +1,7 @@
 {
   "name": "file-impact-covering-specs",
   "createdAt": "2026-06-07T19:21:16.735Z",
+  "updatedAt": "2026-07-25T13:46:33.765Z",
   "description": "Extend graph file impact output to include covering specs derived from reverse spec↔code coverage links.",
   "schema": {
     "name": "schema-std",

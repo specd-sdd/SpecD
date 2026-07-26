@@ -215,6 +215,8 @@
       }
     ]
   },
+  "optimizedDescription": "GetActiveSchema: project ResolveSchema, or ref/file via SchemaRegistry+buildSchema; optional raw.",
+  "optimizedContext": "# GetActiveSchema\n\n## Rules\n- Input optional: none → project active via ResolveSchema; `{mode:'ref',ref}` / `{mode:'file',filePath}` → SchemaRegistry + extends + buildSchema (no project plugins/overrides).\n- Options: `raw?`, `resolveTemplates?` (only with raw).\n- `raw` false/absent → `Promise<Schema>`. `raw` true → `SchemaRawResult` (`data` + templates map). Result discriminated union `raw` false|true.\n- Deps: `resolveSchema`, `schemas`, `buildSchemaFn`. Config factory via `resolveGetActiveSchemaDeps` only.\n- Raw any mode: resolveRaw only — no extends, no buildSchema.\n\n## Constraints\n- Project non-raw: thin ResolveSchema delegate. Ref/file non-raw: registry+extends+templates+buildSchema. Async. Project ref fixed at construction.",
   "contentHashes": {
     "spec.md": "sha256:543072cc83d087e63c623754bd2ce2cc6e2536a80c9e5366142873156ad02c70",
     "verify.md": "sha256:2476d5f22774d6bc6cf7d66528a56054d9e52d726035f1043e528649c80ad148"
@@ -230,7 +232,7 @@
         "lastModified": "2026-07-06T14:22:55.040Z"
       }
     },
-    "persistedStateHash": "sha256:38f872313a6907b50712864c7e751590c736e063af3e0fea90f57e149c441d68",
+    "persistedStateHash": "sha256:ae86b2b28e48e4764e6da3defe9642507e9a8a238ad6832a0981f1c7c5e0899f",
     "schema": {
       "name": "schema-std",
       "version": 1

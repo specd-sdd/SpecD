@@ -6,12 +6,934 @@
     "name": "schema-std",
     "version": 1
   },
-  "specIds": ["skills:skill-templates-source", "skills:agents"],
+  "specIds": [
+    "skills:skill-templates-source",
+    "skills:agents"
+  ],
   "specDependsOn": {
-    "skills:skill-templates-source": ["skills:skill"],
-    "skills:agents": ["skills:skill", "skills:workflow-automation"]
+    "skills:skill-templates-source": [
+      "skills:skill"
+    ],
+    "skills:agents": [
+      "skills:skill",
+      "skills:workflow-automation"
+    ]
   },
   "invalidationPolicy": "downstream",
+  "trackedImplementationFiles": [
+    {
+      "file": ".changeset/20260726-context-catalogue-load-hints-specd.md",
+      "state": "open"
+    },
+    {
+      "file": ".changeset/20260726-context-catalogue-load-hints.md",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/cli/change-artifact-instruction/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/cli/change-check-overlap/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/cli/change-context/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/cli/change-discard/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/cli/change-edit/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/cli/change-hook-instruction/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/cli/change-skip-artifact/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/cli/command-resource-naming/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/cli/drafts-restore/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/cli/entrypoint/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/cli/logging-integration/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/cli/plugins-show/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/cli/project-context/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/cli/project-dashboard/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/cli/project-init/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/cli/project-status/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/cli/project-update/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/cli/schema-extend/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/cli/schema-fork/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/cli/schema-show/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/cli/schema-validate/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/cli/spec-generate-metadata/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/cli/spec-init/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/cli/spec-invalidate-metadata/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/cli/spec-metadata/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/cli/spec-optimizations/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/cli/spec-outline/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/cli/spec-resolve-path/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/cli/spec-show/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/cli/spec-update-metadata/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/cli/spec-validate/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/code-graph/composition/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/code-graph/get-graph-health/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/code-graph/hotspots/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/code-graph/indexer/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/code-graph/staleness-detection/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/actor-resolver-null/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/actor-resolver-privacy/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/archive-change/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/archive-repository-port/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/archived-change-index-entry/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/artifact-ast/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/build-schema/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/change-list-entry/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/change-manifest/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/change-repository-port/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/change/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/compile-context/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/composition-resolver/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/composition/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/config-writer-port/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/config/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/content-extraction/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/content-hasher-port/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/count-tasks/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/create-change/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/delta-format/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/discarded-change-view/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/drafted-change-read-only-error/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/drafted-change-view/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/external-hook-runner-port/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/file-reader-port/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/fs-change-repository/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/fs-spec-repository/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/generate-metadata/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/get-active-schema/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/get-persisted-spec-deps/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/get-persisted-spec-implementation/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/get-persisted-spec-optimizations/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/get-persisted-spec-schema/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/get-project-context/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/get-spec-metadata/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/get-specs-health/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/implementation-detector-port/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/invalidate-spec-metadata/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/kernel-builder/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/kernel/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/lifecycle-engine/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/list-archived/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/list-changes/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/list-discarded/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/list-drafts/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/list-workspaces/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/logger-port/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/materialize-spec-metadata/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/parse-schema-yaml/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/pino-logger/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/project-metadata/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/read-only-change-view/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/regenerate-spec-metadata/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/repository-port/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/resolve-schema/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/save-spec-metadata/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/schema-format/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/schema-merge/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/schema-registry-port/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/selector-model/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/snapshot-hasher/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/spec-id-format/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/spec-lock/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/spec-metadata/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/spec-optimization/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/spec-overlap/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/spec-repository-port/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/storage/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/update-persisted-spec-optimizations/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/update-project-metadata/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/update-spec-metadata/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/validate-specs/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/validation-result-cache-port/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/workflow-model/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/workspace/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/core/yaml-serializer-port/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/default/_global/conventions/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/default/_global/docs/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/default/_global/error-handling-conventions/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/default/_global/eslint/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/default/_global/spec-layout/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/default/_global/testing/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/plugin-manager/install-plugin-use-case/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/plugin-manager/list-plugins-use-case/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/plugin-manager/load-plugin-use-case/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/plugin-manager/plugin-errors/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/plugin-manager/plugin-loader/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/plugin-manager/plugin-repository-port/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/plugin-manager/specd-plugin-type/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/plugin-manager/uninstall-plugin-use-case/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/plugin-manager/update-plugin-use-case/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/public-web/public-site/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/sdk/build-project-status-snapshot/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/sdk/composition/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/sdk/context-markdown/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/sdk/host-context/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/skills/agents/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/skills/get-skill/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/skills/list-skills/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/skills/skill-bundle/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/skills/skill-repository-port/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": ".specd/metadata/skills/skill-templates-source/metadata.json",
+      "state": "open"
+    },
+    {
+      "file": "EXPLORATION_EVENT_BUS.md",
+      "state": "open"
+    },
+    {
+      "file": "EXPLORATION_LIFECYCLE_TRANSITIONS_UX.md",
+      "state": "open"
+    },
+    {
+      "file": "EXPLORATION_SPECD_BRANCH_MERGE_SKILL.md",
+      "state": "open"
+    },
+    {
+      "file": "EXPLORATION_STORAGE_ABSTRACTION.md",
+      "state": "open"
+    },
+    {
+      "file": "assets/specd-changes-hooks.svg",
+      "state": "open"
+    },
+    {
+      "file": "assets/specd-changes-status.svg",
+      "state": "open"
+    },
+    {
+      "file": "assets/specd-changes-validate.svg",
+      "state": "open"
+    },
+    {
+      "file": "assets/specd-specs-lists.svg",
+      "state": "open"
+    },
+    {
+      "file": "assets/specd.svg",
+      "state": "open"
+    },
+    {
+      "file": "docs/cli/cli-reference.md",
+      "state": "open"
+    },
+    {
+      "file": "docs/guide/_sections/getting-started/context-compilation.md",
+      "state": "open"
+    },
+    {
+      "file": "docs/sdk/index.md",
+      "state": "open"
+    },
+    {
+      "file": "packages/cli/src/commands/change/context.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/cli/src/commands/project/context.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/cli/test/commands/change-context.spec.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/cli/test/commands/project-context.spec.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/sdk/src/index.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/sdk/src/presentation/_shared/catalogue.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/sdk/src/presentation/change-context-to-markdown.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/sdk/src/presentation/index.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/sdk/src/presentation/project-context-to-markdown.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/sdk/test/orchestration/run-index-project-graph.spec.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/sdk/test/presentation/change-context-to-markdown.spec.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/sdk/test/presentation/project-context-to-markdown.spec.ts",
+      "state": "open"
+    },
+    {
+      "file": "specs/cli/change-context/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/cli/change-context/spec.md",
+      "state": "open"
+    },
+    {
+      "file": "specs/cli/change-context/verify.md",
+      "state": "open"
+    },
+    {
+      "file": "specs/cli/entrypoint/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/cli/project-context/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/cli/project-context/spec.md",
+      "state": "open"
+    },
+    {
+      "file": "specs/cli/project-context/verify.md",
+      "state": "open"
+    },
+    {
+      "file": "specs/code-graph/composition/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/code-graph/get-graph-health/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/code-graph/staleness-detection/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/archive-change/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/archive-repository-port/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/archived-change-index-entry/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/build-schema/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/change-list-entry/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/change-manifest/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/change-repository-port/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/change/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/compile-context/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/composition-resolver/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/composition/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/config-writer-port/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/config/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/count-tasks/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/discarded-change-view/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/drafted-change-read-only-error/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/drafted-change-view/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/get-active-schema/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/get-project-context/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/get-spec-metadata/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/get-specs-health/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/implementation-detector-port/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/kernel-builder/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/kernel/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/lifecycle-engine/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/list-archived/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/list-changes/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/list-discarded/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/list-drafts/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/list-workspaces/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/materialize-spec-metadata/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/project-metadata/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/read-only-change-view/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/repository-port/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/resolve-schema/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/schema-format/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/schema-registry-port/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/spec-id-format/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/spec-metadata/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/spec-optimization/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/spec-overlap/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/spec-repository-port/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/storage/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/validate-specs/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/workflow-model/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/workspace/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/sdk/composition/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/sdk/composition/spec.md",
+      "state": "open"
+    },
+    {
+      "file": "specs/sdk/composition/verify.md",
+      "state": "open"
+    },
+    {
+      "file": "specs/sdk/context-markdown/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/sdk/context-markdown/spec.md",
+      "state": "open"
+    },
+    {
+      "file": "specs/sdk/context-markdown/verify.md",
+      "state": "open"
+    },
+    {
+      "file": "specs/sdk/host-context/spec-lock.json",
+      "state": "open"
+    }
+  ],
   "artifacts": [
     {
       "type": "proposal",
@@ -30,19 +952,21 @@
     {
       "type": "specs",
       "optional": false,
-      "requires": ["proposal"],
-      "state": "pending-review",
+      "requires": [
+        "proposal"
+      ],
+      "state": "complete",
       "files": [
         {
           "key": "skills:skill-templates-source",
           "filename": "deltas/skills/skill-templates-source/spec.md.delta.yaml",
-          "state": "pending-review",
+          "state": "complete",
           "validatedHash": "sha256:8d549ceec2540cff13e1aa53e2529537454c93a60660a5b7dd2c374cfadcc2db"
         },
         {
           "key": "skills:agents",
           "filename": "deltas/skills/agents/spec.md.delta.yaml",
-          "state": "pending-review",
+          "state": "complete",
           "validatedHash": "sha256:a4b1bea5a1751a9a1890b6e116bd7e6a0acc22b9b2f483dd88340785f89b78f0"
         }
       ]
@@ -50,19 +974,21 @@
     {
       "type": "verify",
       "optional": false,
-      "requires": ["specs"],
-      "state": "pending-review",
+      "requires": [
+        "specs"
+      ],
+      "state": "complete",
       "files": [
         {
           "key": "skills:skill-templates-source",
           "filename": "deltas/skills/skill-templates-source/verify.md.delta.yaml",
-          "state": "pending-review",
+          "state": "complete",
           "validatedHash": "sha256:b9b2c5ae9f14b6d131cc9af52a49ac78cb136a5d08329240f408224aa41c6670"
         },
         {
           "key": "skills:agents",
           "filename": "deltas/skills/agents/verify.md.delta.yaml",
-          "state": "pending-review",
+          "state": "complete",
           "validatedHash": "sha256:87311d8a3dee6ebc42929cae86ebc72c53588ca1f71686b7eff984472a773412"
         }
       ]
@@ -70,28 +996,35 @@
     {
       "type": "design",
       "optional": false,
-      "requires": ["proposal", "specs", "verify"],
-      "state": "pending-review",
+      "requires": [
+        "proposal",
+        "specs",
+        "verify"
+      ],
+      "state": "complete",
       "files": [
         {
           "key": "design",
           "filename": "design.md",
-          "state": "pending-review",
-          "validatedHash": "sha256:7db40620f84509705064436a40de1ccc41b1a578cd77b0f82e7d5080ae2aeb9e"
+          "state": "complete",
+          "validatedHash": "sha256:bf535b196d1d31c68fd15414c9594b3ebb24198df4da4ee24555cea83344eb05"
         }
       ]
     },
     {
       "type": "tasks",
       "optional": false,
-      "requires": ["specs", "design"],
-      "state": "pending-review",
+      "requires": [
+        "specs",
+        "design"
+      ],
+      "state": "complete",
       "files": [
         {
           "key": "tasks",
           "filename": "tasks.md",
-          "state": "pending-review",
-          "validatedHash": "sha256:c8e96e29c907738065a0eb30ec52ce5a7725027470109e6f722b83167eef7d9e"
+          "state": "complete",
+          "validatedHash": "sha256:450bd21aea8eb37ab429231b3fc56caae398e7a96bf88eb8c84465962b49fe2e"
         }
       ]
     }
@@ -105,7 +1038,10 @@
         "email": "1***i@u***.com",
         "provider": "git"
       },
-      "specIds": ["skills:skill-templates-source", "skills:agents"],
+      "specIds": [
+        "skills:skill-templates-source",
+        "skills:agents"
+      ],
       "schemaName": "schema-std",
       "schemaVersion": 1
     },
@@ -117,7 +1053,13 @@
         "email": "system@getspecd.dev",
         "provider": "system"
       },
-      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesAdded": [
+        "proposal",
+        "specs",
+        "verify",
+        "design",
+        "tasks"
+      ],
       "typesRemoved": [],
       "filesAdded": [
         {
@@ -186,19 +1128,29 @@
       "affectedArtifacts": [
         {
           "type": "specs",
-          "files": ["skills:skill-templates-source", "skills:agents"]
+          "files": [
+            "skills:skill-templates-source",
+            "skills:agents"
+          ]
         },
         {
           "type": "verify",
-          "files": ["skills:skill-templates-source", "skills:agents"]
+          "files": [
+            "skills:skill-templates-source",
+            "skills:agents"
+          ]
         },
         {
           "type": "design",
-          "files": ["design"]
+          "files": [
+            "design"
+          ]
         },
         {
           "type": "tasks",
-          "files": ["tasks"]
+          "files": [
+            "tasks"
+          ]
         }
       ]
     },
@@ -226,19 +1178,29 @@
       "affectedArtifacts": [
         {
           "type": "specs",
-          "files": ["skills:skill-templates-source", "skills:agents"]
+          "files": [
+            "skills:skill-templates-source",
+            "skills:agents"
+          ]
         },
         {
           "type": "verify",
-          "files": ["skills:skill-templates-source", "skills:agents"]
+          "files": [
+            "skills:skill-templates-source",
+            "skills:agents"
+          ]
         },
         {
           "type": "design",
-          "files": ["design"]
+          "files": [
+            "design"
+          ]
         },
         {
           "type": "tasks",
-          "files": ["tasks"]
+          "files": [
+            "tasks"
+          ]
         }
       ]
     },
@@ -255,19 +1217,29 @@
       "affectedArtifacts": [
         {
           "type": "specs",
-          "files": ["skills:skill-templates-source", "skills:agents"]
+          "files": [
+            "skills:skill-templates-source",
+            "skills:agents"
+          ]
         },
         {
           "type": "verify",
-          "files": ["skills:skill-templates-source", "skills:agents"]
+          "files": [
+            "skills:skill-templates-source",
+            "skills:agents"
+          ]
         },
         {
           "type": "design",
-          "files": ["design"]
+          "files": [
+            "design"
+          ]
         },
         {
           "type": "tasks",
-          "files": ["tasks"]
+          "files": [
+            "tasks"
+          ]
         }
       ]
     },
@@ -284,19 +1256,29 @@
       "affectedArtifacts": [
         {
           "type": "specs",
-          "files": ["skills:skill-templates-source", "skills:agents"]
+          "files": [
+            "skills:skill-templates-source",
+            "skills:agents"
+          ]
         },
         {
           "type": "verify",
-          "files": ["skills:skill-templates-source", "skills:agents"]
+          "files": [
+            "skills:skill-templates-source",
+            "skills:agents"
+          ]
         },
         {
           "type": "design",
-          "files": ["design"]
+          "files": [
+            "design"
+          ]
         },
         {
           "type": "tasks",
-          "files": ["tasks"]
+          "files": [
+            "tasks"
+          ]
         }
       ]
     },
@@ -313,19 +1295,29 @@
       "affectedArtifacts": [
         {
           "type": "specs",
-          "files": ["skills:skill-templates-source", "skills:agents"]
+          "files": [
+            "skills:skill-templates-source",
+            "skills:agents"
+          ]
         },
         {
           "type": "verify",
-          "files": ["skills:skill-templates-source", "skills:agents"]
+          "files": [
+            "skills:skill-templates-source",
+            "skills:agents"
+          ]
         },
         {
           "type": "design",
-          "files": ["design"]
+          "files": [
+            "design"
+          ]
         },
         {
           "type": "tasks",
-          "files": ["tasks"]
+          "files": [
+            "tasks"
+          ]
         }
       ]
     },
@@ -342,19 +1334,29 @@
       "affectedArtifacts": [
         {
           "type": "specs",
-          "files": ["skills:skill-templates-source", "skills:agents"]
+          "files": [
+            "skills:skill-templates-source",
+            "skills:agents"
+          ]
         },
         {
           "type": "verify",
-          "files": ["skills:skill-templates-source", "skills:agents"]
+          "files": [
+            "skills:skill-templates-source",
+            "skills:agents"
+          ]
         },
         {
           "type": "design",
-          "files": ["design"]
+          "files": [
+            "design"
+          ]
         },
         {
           "type": "tasks",
-          "files": ["tasks"]
+          "files": [
+            "tasks"
+          ]
         }
       ]
     },
@@ -371,19 +1373,29 @@
       "affectedArtifacts": [
         {
           "type": "specs",
-          "files": ["skills:skill-templates-source", "skills:agents"]
+          "files": [
+            "skills:skill-templates-source",
+            "skills:agents"
+          ]
         },
         {
           "type": "verify",
-          "files": ["skills:skill-templates-source", "skills:agents"]
+          "files": [
+            "skills:skill-templates-source",
+            "skills:agents"
+          ]
         },
         {
           "type": "design",
-          "files": ["design"]
+          "files": [
+            "design"
+          ]
         },
         {
           "type": "tasks",
-          "files": ["tasks"]
+          "files": [
+            "tasks"
+          ]
         }
       ]
     },
@@ -400,19 +1412,29 @@
       "affectedArtifacts": [
         {
           "type": "specs",
-          "files": ["skills:skill-templates-source", "skills:agents"]
+          "files": [
+            "skills:skill-templates-source",
+            "skills:agents"
+          ]
         },
         {
           "type": "verify",
-          "files": ["skills:skill-templates-source", "skills:agents"]
+          "files": [
+            "skills:skill-templates-source",
+            "skills:agents"
+          ]
         },
         {
           "type": "design",
-          "files": ["design"]
+          "files": [
+            "design"
+          ]
         },
         {
           "type": "tasks",
-          "files": ["tasks"]
+          "files": [
+            "tasks"
+          ]
         }
       ]
     },
@@ -429,19 +1451,29 @@
       "affectedArtifacts": [
         {
           "type": "specs",
-          "files": ["skills:skill-templates-source", "skills:agents"]
+          "files": [
+            "skills:skill-templates-source",
+            "skills:agents"
+          ]
         },
         {
           "type": "verify",
-          "files": ["skills:skill-templates-source", "skills:agents"]
+          "files": [
+            "skills:skill-templates-source",
+            "skills:agents"
+          ]
         },
         {
           "type": "design",
-          "files": ["design"]
+          "files": [
+            "design"
+          ]
         },
         {
           "type": "tasks",
-          "files": ["tasks"]
+          "files": [
+            "tasks"
+          ]
         }
       ]
     },
@@ -458,19 +1490,29 @@
       "affectedArtifacts": [
         {
           "type": "specs",
-          "files": ["skills:skill-templates-source", "skills:agents"]
+          "files": [
+            "skills:skill-templates-source",
+            "skills:agents"
+          ]
         },
         {
           "type": "verify",
-          "files": ["skills:skill-templates-source", "skills:agents"]
+          "files": [
+            "skills:skill-templates-source",
+            "skills:agents"
+          ]
         },
         {
           "type": "design",
-          "files": ["design"]
+          "files": [
+            "design"
+          ]
         },
         {
           "type": "tasks",
-          "files": ["tasks"]
+          "files": [
+            "tasks"
+          ]
         }
       ]
     },
@@ -487,19 +1529,29 @@
       "affectedArtifacts": [
         {
           "type": "specs",
-          "files": ["skills:skill-templates-source", "skills:agents"]
+          "files": [
+            "skills:skill-templates-source",
+            "skills:agents"
+          ]
         },
         {
           "type": "verify",
-          "files": ["skills:skill-templates-source", "skills:agents"]
+          "files": [
+            "skills:skill-templates-source",
+            "skills:agents"
+          ]
         },
         {
           "type": "design",
-          "files": ["design"]
+          "files": [
+            "design"
+          ]
         },
         {
           "type": "tasks",
-          "files": ["tasks"]
+          "files": [
+            "tasks"
+          ]
         }
       ]
     },
@@ -516,19 +1568,29 @@
       "affectedArtifacts": [
         {
           "type": "specs",
-          "files": ["skills:skill-templates-source", "skills:agents"]
+          "files": [
+            "skills:skill-templates-source",
+            "skills:agents"
+          ]
         },
         {
           "type": "verify",
-          "files": ["skills:skill-templates-source", "skills:agents"]
+          "files": [
+            "skills:skill-templates-source",
+            "skills:agents"
+          ]
         },
         {
           "type": "design",
-          "files": ["design"]
+          "files": [
+            "design"
+          ]
         },
         {
           "type": "tasks",
-          "files": ["tasks"]
+          "files": [
+            "tasks"
+          ]
         }
       ]
     },
@@ -545,19 +1607,29 @@
       "affectedArtifacts": [
         {
           "type": "specs",
-          "files": ["skills:skill-templates-source", "skills:agents"]
+          "files": [
+            "skills:skill-templates-source",
+            "skills:agents"
+          ]
         },
         {
           "type": "verify",
-          "files": ["skills:skill-templates-source", "skills:agents"]
+          "files": [
+            "skills:skill-templates-source",
+            "skills:agents"
+          ]
         },
         {
           "type": "design",
-          "files": ["design"]
+          "files": [
+            "design"
+          ]
         },
         {
           "type": "tasks",
-          "files": ["tasks"]
+          "files": [
+            "tasks"
+          ]
         }
       ]
     },
@@ -574,19 +1646,29 @@
       "affectedArtifacts": [
         {
           "type": "specs",
-          "files": ["skills:skill-templates-source", "skills:agents"]
+          "files": [
+            "skills:skill-templates-source",
+            "skills:agents"
+          ]
         },
         {
           "type": "verify",
-          "files": ["skills:skill-templates-source", "skills:agents"]
+          "files": [
+            "skills:skill-templates-source",
+            "skills:agents"
+          ]
         },
         {
           "type": "design",
-          "files": ["design"]
+          "files": [
+            "design"
+          ]
         },
         {
           "type": "tasks",
-          "files": ["tasks"]
+          "files": [
+            "tasks"
+          ]
         }
       ]
     },
@@ -603,19 +1685,29 @@
       "affectedArtifacts": [
         {
           "type": "specs",
-          "files": ["skills:skill-templates-source", "skills:agents"]
+          "files": [
+            "skills:skill-templates-source",
+            "skills:agents"
+          ]
         },
         {
           "type": "verify",
-          "files": ["skills:skill-templates-source", "skills:agents"]
+          "files": [
+            "skills:skill-templates-source",
+            "skills:agents"
+          ]
         },
         {
           "type": "design",
-          "files": ["design"]
+          "files": [
+            "design"
+          ]
         },
         {
           "type": "tasks",
-          "files": ["tasks"]
+          "files": [
+            "tasks"
+          ]
         }
       ]
     },
@@ -632,19 +1724,29 @@
       "affectedArtifacts": [
         {
           "type": "specs",
-          "files": ["skills:skill-templates-source", "skills:agents"]
+          "files": [
+            "skills:skill-templates-source",
+            "skills:agents"
+          ]
         },
         {
           "type": "verify",
-          "files": ["skills:skill-templates-source", "skills:agents"]
+          "files": [
+            "skills:skill-templates-source",
+            "skills:agents"
+          ]
         },
         {
           "type": "design",
-          "files": ["design"]
+          "files": [
+            "design"
+          ]
         },
         {
           "type": "tasks",
-          "files": ["tasks"]
+          "files": [
+            "tasks"
+          ]
         }
       ]
     },
@@ -661,19 +1763,29 @@
       "affectedArtifacts": [
         {
           "type": "specs",
-          "files": ["skills:skill-templates-source", "skills:agents"]
+          "files": [
+            "skills:skill-templates-source",
+            "skills:agents"
+          ]
         },
         {
           "type": "verify",
-          "files": ["skills:skill-templates-source", "skills:agents"]
+          "files": [
+            "skills:skill-templates-source",
+            "skills:agents"
+          ]
         },
         {
           "type": "design",
-          "files": ["design"]
+          "files": [
+            "design"
+          ]
         },
         {
           "type": "tasks",
-          "files": ["tasks"]
+          "files": [
+            "tasks"
+          ]
         }
       ]
     },
@@ -690,19 +1802,29 @@
       "affectedArtifacts": [
         {
           "type": "specs",
-          "files": ["skills:skill-templates-source", "skills:agents"]
+          "files": [
+            "skills:skill-templates-source",
+            "skills:agents"
+          ]
         },
         {
           "type": "verify",
-          "files": ["skills:skill-templates-source", "skills:agents"]
+          "files": [
+            "skills:skill-templates-source",
+            "skills:agents"
+          ]
         },
         {
           "type": "design",
-          "files": ["design"]
+          "files": [
+            "design"
+          ]
         },
         {
           "type": "tasks",
-          "files": ["tasks"]
+          "files": [
+            "tasks"
+          ]
         }
       ]
     },
@@ -719,19 +1841,29 @@
       "affectedArtifacts": [
         {
           "type": "specs",
-          "files": ["skills:skill-templates-source", "skills:agents"]
+          "files": [
+            "skills:skill-templates-source",
+            "skills:agents"
+          ]
         },
         {
           "type": "verify",
-          "files": ["skills:skill-templates-source", "skills:agents"]
+          "files": [
+            "skills:skill-templates-source",
+            "skills:agents"
+          ]
         },
         {
           "type": "design",
-          "files": ["design"]
+          "files": [
+            "design"
+          ]
         },
         {
           "type": "tasks",
-          "files": ["tasks"]
+          "files": [
+            "tasks"
+          ]
         }
       ]
     },
@@ -748,19 +1880,29 @@
       "affectedArtifacts": [
         {
           "type": "specs",
-          "files": ["skills:skill-templates-source", "skills:agents"]
+          "files": [
+            "skills:skill-templates-source",
+            "skills:agents"
+          ]
         },
         {
           "type": "verify",
-          "files": ["skills:skill-templates-source", "skills:agents"]
+          "files": [
+            "skills:skill-templates-source",
+            "skills:agents"
+          ]
         },
         {
           "type": "design",
-          "files": ["design"]
+          "files": [
+            "design"
+          ]
         },
         {
           "type": "tasks",
-          "files": ["tasks"]
+          "files": [
+            "tasks"
+          ]
         }
       ]
     },
@@ -777,19 +1919,29 @@
       "affectedArtifacts": [
         {
           "type": "specs",
-          "files": ["skills:skill-templates-source", "skills:agents"]
+          "files": [
+            "skills:skill-templates-source",
+            "skills:agents"
+          ]
         },
         {
           "type": "verify",
-          "files": ["skills:skill-templates-source", "skills:agents"]
+          "files": [
+            "skills:skill-templates-source",
+            "skills:agents"
+          ]
         },
         {
           "type": "design",
-          "files": ["design"]
+          "files": [
+            "design"
+          ]
         },
         {
           "type": "tasks",
-          "files": ["tasks"]
+          "files": [
+            "tasks"
+          ]
         }
       ]
     },
@@ -806,19 +1958,29 @@
       "affectedArtifacts": [
         {
           "type": "specs",
-          "files": ["skills:skill-templates-source", "skills:agents"]
+          "files": [
+            "skills:skill-templates-source",
+            "skills:agents"
+          ]
         },
         {
           "type": "verify",
-          "files": ["skills:skill-templates-source", "skills:agents"]
+          "files": [
+            "skills:skill-templates-source",
+            "skills:agents"
+          ]
         },
         {
           "type": "design",
-          "files": ["design"]
+          "files": [
+            "design"
+          ]
         },
         {
           "type": "tasks",
-          "files": ["tasks"]
+          "files": [
+            "tasks"
+          ]
         }
       ]
     },
@@ -835,19 +1997,29 @@
       "affectedArtifacts": [
         {
           "type": "specs",
-          "files": ["skills:skill-templates-source", "skills:agents"]
+          "files": [
+            "skills:skill-templates-source",
+            "skills:agents"
+          ]
         },
         {
           "type": "verify",
-          "files": ["skills:skill-templates-source", "skills:agents"]
+          "files": [
+            "skills:skill-templates-source",
+            "skills:agents"
+          ]
         },
         {
           "type": "design",
-          "files": ["design"]
+          "files": [
+            "design"
+          ]
         },
         {
           "type": "tasks",
-          "files": ["tasks"]
+          "files": [
+            "tasks"
+          ]
         }
       ]
     },
@@ -864,19 +2036,29 @@
       "affectedArtifacts": [
         {
           "type": "specs",
-          "files": ["skills:skill-templates-source", "skills:agents"]
+          "files": [
+            "skills:skill-templates-source",
+            "skills:agents"
+          ]
         },
         {
           "type": "verify",
-          "files": ["skills:skill-templates-source", "skills:agents"]
+          "files": [
+            "skills:skill-templates-source",
+            "skills:agents"
+          ]
         },
         {
           "type": "design",
-          "files": ["design"]
+          "files": [
+            "design"
+          ]
         },
         {
           "type": "tasks",
-          "files": ["tasks"]
+          "files": [
+            "tasks"
+          ]
         }
       ]
     },
@@ -893,19 +2075,29 @@
       "affectedArtifacts": [
         {
           "type": "specs",
-          "files": ["skills:skill-templates-source", "skills:agents"]
+          "files": [
+            "skills:skill-templates-source",
+            "skills:agents"
+          ]
         },
         {
           "type": "verify",
-          "files": ["skills:skill-templates-source", "skills:agents"]
+          "files": [
+            "skills:skill-templates-source",
+            "skills:agents"
+          ]
         },
         {
           "type": "design",
-          "files": ["design"]
+          "files": [
+            "design"
+          ]
         },
         {
           "type": "tasks",
-          "files": ["tasks"]
+          "files": [
+            "tasks"
+          ]
         }
       ]
     },
@@ -922,19 +2114,29 @@
       "affectedArtifacts": [
         {
           "type": "specs",
-          "files": ["skills:skill-templates-source", "skills:agents"]
+          "files": [
+            "skills:skill-templates-source",
+            "skills:agents"
+          ]
         },
         {
           "type": "verify",
-          "files": ["skills:skill-templates-source", "skills:agents"]
+          "files": [
+            "skills:skill-templates-source",
+            "skills:agents"
+          ]
         },
         {
           "type": "design",
-          "files": ["design"]
+          "files": [
+            "design"
+          ]
         },
         {
           "type": "tasks",
-          "files": ["tasks"]
+          "files": [
+            "tasks"
+          ]
         }
       ]
     },
@@ -951,19 +2153,29 @@
       "affectedArtifacts": [
         {
           "type": "specs",
-          "files": ["skills:skill-templates-source", "skills:agents"]
+          "files": [
+            "skills:skill-templates-source",
+            "skills:agents"
+          ]
         },
         {
           "type": "verify",
-          "files": ["skills:skill-templates-source", "skills:agents"]
+          "files": [
+            "skills:skill-templates-source",
+            "skills:agents"
+          ]
         },
         {
           "type": "design",
-          "files": ["design"]
+          "files": [
+            "design"
+          ]
         },
         {
           "type": "tasks",
-          "files": ["tasks"]
+          "files": [
+            "tasks"
+          ]
         }
       ]
     },
@@ -980,21 +2192,53 @@
       "affectedArtifacts": [
         {
           "type": "specs",
-          "files": ["skills:skill-templates-source", "skills:agents"]
+          "files": [
+            "skills:skill-templates-source",
+            "skills:agents"
+          ]
         },
         {
           "type": "verify",
-          "files": ["skills:skill-templates-source", "skills:agents"]
+          "files": [
+            "skills:skill-templates-source",
+            "skills:agents"
+          ]
         },
         {
           "type": "design",
-          "files": ["design"]
+          "files": [
+            "design"
+          ]
         },
         {
           "type": "tasks",
-          "files": ["tasks"]
+          "files": [
+            "tasks"
+          ]
         }
       ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-26T18:54:26.603Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-26T18:54:34.295Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
     }
   ]
 }

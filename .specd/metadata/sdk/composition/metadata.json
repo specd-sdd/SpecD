@@ -5,7 +5,8 @@
     "default:_global/architecture",
     "core:composition",
     "code-graph:composition",
-    "cli:host-context"
+    "cli:host-context",
+    "sdk:context-markdown"
   ],
   "context": [
     "Delivery hosts (CLI, MCP, API, IPC) need a single package that wires `@specd/core` and `@specd/code-graph` without importing infrastructure or duplicating bootstrap logic. `@specd/sdk` is that package: a thin composition layer that re-exports curated factories and hosts cross-package orchestration helpers defined in sibling specs."
@@ -20,13 +21,13 @@
     {
       "requirement": "Layer structure",
       "rules": [
-        "`@specd/sdk` SHALL follow hexagonal boundaries from `default:_global/architecture`:\n\n- `src/composition/` — host bootstrap (`openSpecdHost`, `createSdkContext`) and graph lifecycle (`withOpenGraphProvider`)\n- `src/orchestration/` — cross-package workflows (`buildProjectStatusSnapshot`, `runIndexProjectGraph`)\n- `src/shared/` — internal cross-cutting helpers (e.g. package version constants) not exported from the public barrel\n- `src/index.ts` — public barrel only\n\nThe package MUST NOT contain domain entities, application ports, or infrastructure adapters. Files under `src/shared/` MUST NOT be re-exported from `src/index.ts`."
+        "`@specd/sdk` SHALL follow hexagonal boundaries from `default:_global/architecture`:\n\n- `src/composition/` — host bootstrap (`openSpecdHost`, `createSdkContext`) and graph lifecycle (`withOpenGraphProvider`)\n- `src/orchestration/` — cross-package workflows (`buildProjectStatusSnapshot`, `runIndexProjectGraph`)\n- `src/presentation/` — pure agent-facing formatters (`changeContextToMarkdown`, `projectContextToMarkdown`) over structured core results\n- `src/shared/` — internal cross-cutting helpers (e.g. package version constants) not exported from the public barrel\n- `src/index.ts` — public barrel only\n\nThe package MUST NOT contain domain entities, application ports, or infrastructure adapters. Files under `src/shared/` MUST NOT be re-exported from `src/index.ts`. Presentation helpers MUST remain pure (no I/O); they MAY be exported from the public barrel."
       ]
     },
     {
       "requirement": "Public barrel exports",
       "rules": [
-        "`package.json` `exports` MUST include:\n\n- `\".\"` → `src/index.ts` (curated host surface)\n- `\"./ports\"` → re-export `@specd/core/ports`\n- `\"./extensions\"` → re-export `@specd/core/extensions`\n\n`src/index.ts` SHALL export explicitly (no `export * from '@specd/core'`):\n\n- SDK composition: `openSpecdHost`, `createSdkContext`, `withOpenGraphProvider`, `SdkHostContext`, `OpenSpecdHostInput`, `OpenSpecdHostResult`, `WithOpenGraphProviderOptions`\n- SDK orchestration: `buildProjectStatusSnapshot`, `runIndexProjectGraph`, and their input/result types\n- Explicit re-exports from `@specd/core` `\".\"` public barrel (bootstrap, `Kernel`, kernel-equivalent `createX` factories, repository factories, kernel use-case I/O types, domain entities, errors). This MUST track the revised `kernel.specs` surface — including `MaterializeSpecMetadata`, `GetSpecMetadata`, `RegenerateSpecMetadata`, `InitializePersistedSpecState`, persisted schema inspection/reassignment, and persisted dependency/implementation/optimization use cases — and their `create*` factories.\n- Explicit re-exports from `@specd/code-graph` `\".\"` public barrel (provider factory, host use cases, graph host-adapter symbols listed under **Public barrel exports for host adapters**)\n- `SDK_VERSION`, `codeGraphVersion`, `getCodeGraphVersion`\n\nThe `\".\"` barrel MUST NOT export infrastructure adapters, internal composition helpers, or symbols that are only available from `\"./internal\"` entry points of dependency packages.\n\nThe `\".\"` barrel MUST NOT re-export `SaveSpecMetadata`, `UpdateSpecMetadata`, `InvalidateSpecMetadata`, or their `createSaveSpecMetadata` / `createUpdateSpecMetadata` / `createInvalidateSpecMetadata` factories — those use cases are removed from `@specd/core` and MUST NOT be restored at the SDK layer. `PersistSpecMetadata` MUST NOT be exported — it is an internal collaborator of `MaterializeSpecMetadata` only."
+        "`package.json` `exports` MUST include:\n\n- `\".\"` → `src/index.ts` (curated host surface)\n- `\"./ports\"` → re-export `@specd/core/ports`\n- `\"./extensions\"` → re-export `@specd/core/extensions`\n\n`src/index.ts` SHALL export explicitly (no `export * from '@specd/core'`):\n\n- SDK composition: `openSpecdHost`, `createSdkContext`, `withOpenGraphProvider`, `SdkHostContext`, `OpenSpecdHostInput`, `OpenSpecdHostResult`, `WithOpenGraphProviderOptions`\n- SDK orchestration: `buildProjectStatusSnapshot`, `runIndexProjectGraph`, and their input/result types\n- SDK presentation: `changeContextToMarkdown`, `projectContextToMarkdown`, `ChangeContextToMarkdownOptions`\n- Explicit re-exports from `@specd/core` `\".\"` public barrel (bootstrap, `Kernel`, kernel-equivalent `createX` factories, repository factories, kernel use-case I/O types, domain entities, errors). This MUST track the revised `kernel.specs` surface — including `MaterializeSpecMetadata`, `GetSpecMetadata`, `RegenerateSpecMetadata`, `InitializePersistedSpecState`, persisted schema inspection/reassignment, and persisted dependency/implementation/optimization use cases — and their `create*` factories.\n- Explicit re-exports from `@specd/code-graph` `\".\"` public barrel (provider factory, host use cases, graph host-adapter symbols listed under **Public barrel exports for host adapters**)\n- `SDK_VERSION`, `codeGraphVersion`, `getCodeGraphVersion`\n\nThe `\".\"` barrel MUST NOT export infrastructure adapters, internal composition helpers, or symbols that are only available from `\"./internal\"` entry points of dependency packages.\n\nThe `\".\"` barrel MUST NOT re-export `SaveSpecMetadata`, `UpdateSpecMetadata`, `InvalidateSpecMetadata`, or their `createSaveSpecMetadata` / `createUpdateSpecMetadata` / `createInvalidateSpecMetadata` factories — those use cases are removed from `@specd/core` and MUST NOT be restored at the SDK layer. `PersistSpecMetadata` MUST NOT be exported — it is an internal collaborator of `MaterializeSpecMetadata` only."
       ]
     },
     {
@@ -63,7 +64,7 @@
       "name": "No infrastructure in SDK source tree",
       "when": ["listing packages/sdk/src/"],
       "then": [
-        "directories are limited to composition/, orchestration/, shared/, and index.ts",
+        "directories are limited to composition/, orchestration/, presentation/, shared/, and index.ts",
         "AND no infrastructure/ or domain/ directories exist"
       ]
     },
@@ -78,6 +79,12 @@
       "name": "SDK exports orchestration and bootstrap symbols",
       "when": ["importing from @specd/sdk"],
       "then": ["openSpecdHost, createKernel, and buildProjectStatusSnapshot are available"]
+    },
+    {
+      "requirement": "Public barrel exports",
+      "name": "SDK exports context markdown presentation helpers",
+      "when": ["importing from @specd/sdk"],
+      "then": ["changeContextToMarkdown and projectContextToMarkdown are available"]
     },
     {
       "requirement": "Public barrel exports",
@@ -137,22 +144,30 @@
       "then": ["it equals the version field in packages/sdk/package.json"]
     }
   ],
+  "implementation": {
+    "files": [
+      {
+        "specId": "sdk:composition",
+        "file": "sdk:src/index.ts"
+      }
+    ]
+  },
   "contentHashes": {
-    "spec.md": "sha256:fc065b78b23d9a9fbc402684d19fb63afea8bc387989ac727965533888b23537",
-    "verify.md": "sha256:053f26e9d5fa57a608acbad2c092a7785b29efbe6c24a9bbaff8db056bf6f294"
+    "spec.md": "sha256:5e6a6b3b9a31b9379cd36d3c657a68c2dc1984363f0122191e9e83eccfe3ecd4",
+    "verify.md": "sha256:cf1c873157e64b1e513fefd1aa8e15d4978bbb04c1a99cda3aeaa8d62d6fe5ae"
   },
   "provenance": {
     "artifacts": {
       "spec.md": {
-        "hash": "sha256:fc065b78b23d9a9fbc402684d19fb63afea8bc387989ac727965533888b23537",
-        "lastModified": "2026-07-25T11:53:31.594Z"
+        "hash": "sha256:5e6a6b3b9a31b9379cd36d3c657a68c2dc1984363f0122191e9e83eccfe3ecd4",
+        "lastModified": "2026-07-26T18:50:55.625Z"
       },
       "verify.md": {
-        "hash": "sha256:053f26e9d5fa57a608acbad2c092a7785b29efbe6c24a9bbaff8db056bf6f294",
-        "lastModified": "2026-07-25T11:53:31.594Z"
+        "hash": "sha256:cf1c873157e64b1e513fefd1aa8e15d4978bbb04c1a99cda3aeaa8d62d6fe5ae",
+        "lastModified": "2026-07-26T18:50:55.627Z"
       }
     },
-    "persistedStateHash": "sha256:4e25cd61d59bbc6afaf202f53dc095fe017025bcf401f34296f0e17032680ead",
+    "persistedStateHash": "sha256:aa8fb76d550b5191e836f9bc0f1949fd4c6b17c489f742ccb890eeec635a849b",
     "schema": {
       "name": "schema-std",
       "version": 1

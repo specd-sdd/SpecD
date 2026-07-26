@@ -24,6 +24,12 @@ export { InvalidProviderLifecycleError } from './domain/errors/index.js'
 export * from './core-reexports.js'
 
 export {
+  changeContextToMarkdown,
+  projectContextToMarkdown,
+  type ChangeContextToMarkdownOptions,
+} from './presentation/index.js'
+
+export {
   createGetGraphHealth,
   createBootstrapGraphConfig,
   createCodeGraphProvider,

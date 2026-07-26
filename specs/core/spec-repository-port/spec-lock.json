@@ -28,5 +28,41 @@
         "SpecRepository"
       ]
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Per-workspace SpecRepository port: get/list/artifact/save + metadata/persisted-state snapshots without storage coupling.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:96ded22ba3b301aed6fe783884db8bb14af5c954fef8e70d0396b54da313dfc8",
+          "lastModified": "2026-07-25T11:53:31.128Z"
+        },
+        "verify.md": {
+          "hash": "sha256:3c75c026972938c761d61c797be48623a5be50a010fcc3c1bce003f8c4b35ae2",
+          "lastModified": "2026-07-25T11:53:31.128Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# SpecRepository Port\n\n## Rules\n- Extends `Repository`; immutable `workspace()`/`ownership()`/`isExternal()` from construction. One instance per workspace.\n- `get(name)` → `Spec|null` (no content): workspace, name, `artifacts[]` ({filename,lastModified}), `persistedStateStamp`, `generatedMetadataStamp`; helpers `filenames`/`hasArtifact`. No hashes/fingerprint.\n- `list(prefix?, options?)` → `ListResult<SpecListEntry>`; sort capability path asc; no default limit. Options: `includeSummary`, `includeMeta` (never hash on Meta).\n- `SpecListEntry` required: workspace, path, title (metadata title → last path segment). Summary: optimizedDescription → description → extract from spec.md. `includeMeta` adds artifacts/persistedStateMeta/generatedMetadataMeta without hash. include* = projection only; no extra I/O. Per-entry resolve errors swallowed.\n- `artifact`/`save` only schema-valid artifact filenames; `spec-lock.json` NOT via artifact API — use persisted-state ops. Path confinement to spec dir.\n- `save`: `readOnly` → `ReadOnlyWorkspaceError` before I/O; else conflict via `originalHash` → `ArtifactConflictError` unless `force`.\n- `delete` removes entire spec dir. `resolveFromPath` → `{specPath,specId}` | `{crossWorkspaceHint}` | null; relative needs `from`, pure.\n- `readMetadataSnapshot` kinds: present|missing|invalid — NOT freshness. `writeMetadataSnapshot` full replace with `expectedRevision` (null=create). Replaces old metadata()/saveMetadata(). No generate/freshness here.\n- Aggregate: `readPersistedState`/`writePersistedState` (atomic, expectedRevision); `persistedStateMeta`/`generatedMetadataMeta` (hash opt-in); `specFingerprint` = hash of sorted JSON {artifacts contentHashes, persistedStateHash or `__absent__`}; `artifactMeta`. No raw SpecLockData; no separate `persistedStateHash` method. `metadata.json` not fingerprint input.\n- `search(query)` → SpecSearchResult[] (spec, score, matches{filename,line,snippet≤120}); score desc.\n- Abstract class; abstract storage methods listed in full spec. `count()` = list.meta.total from index. `reindex()` rebuilds `{configPath}/tmp/fs-cache/specs/<workspace>/`. FS adapters expose absolute `specsPath`.\n\n## Constraints\n- Single workspace, immutable binding.\n- get/list never load artifact content; search may.\n- ArtifactConflictError sole concurrency error for save/writePersistedState/writeMetadataSnapshot.\n- writeMetadataSnapshot NOT readOnly-guarded (cache vs canonical ownership distinct); save/writePersistedState ARE.\n- Reads always allowed on readOnly.\n- No direct sidecar access by app logic; no validate-cache helpers; no freshness classification on port.\n- list includeMeta NEVER returns hashes.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:96ded22ba3b301aed6fe783884db8bb14af5c954fef8e70d0396b54da313dfc8",
+          "lastModified": "2026-07-25T11:53:31.128Z"
+        },
+        "verify.md": {
+          "hash": "sha256:3c75c026972938c761d61c797be48623a5be50a010fcc3c1bce003f8c4b35ae2",
+          "lastModified": "2026-07-25T11:53:31.128Z"
+        }
+      }
+    }
+  }
 }

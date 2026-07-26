@@ -435,6 +435,8 @@
       }
     ]
   },
+  "optimizedDescription": "Append-only ArchiveRepository port: archive, list/count via fs-cache index, get full ArchivedChange.",
+  "optimizedContext": "# ArchiveRepository\n## Rules\n### Inheritance\n- Extends `Repository`. `workspace()`/`ownership()`/`isExternal()` fixed at construction.\n### archive(change, options?)\n- Move to archive, create `ArchivedChange`, persist manifest, append index; return `{ ArchivedChange, archiveDirPath }`.\n- Require `archivable` unless `options.force`; record `options.actor` as `archivedBy`.\n- Staged commit; path confined to archive root.\n- Non-archivable without force → `InvalidStateTransitionError`; no move/index write.\n### list / count\n- Sort: `archivedAt` descending. `includeArchivedBy` projection only.\n- Pagination: `after: { key, id? }` (`archivedAt` ISO + `name` tiebreak); no default `limit` (omit → full; `meta.limit === meta.total`).\n- Return `ListResult<ArchiveListEntry>` without reading every `manifest.json`. `count()` same index source as `meta.total`.\n### get(name)\n- Full `ArchivedChange` or null. Search index end-first; fallback filesystem scan + append recovered entry. Load from archived `manifest.json`.\n### archivePath / internalPaths / reindex\n- `archivePath(entry)` from `name`/`archivedName`/`archivedAt` + pattern — no `workspaces` / `{{change.workspace}}`.\n- `internalPaths()`: absolute paths or `undefined` (not empty array for N/A). Fs includes archive root.\n- `reindex()`: rebuild `{configPath}/tmp/fs-cache/archive/` atomic publish; delete legacy root indexes on migrate.\n### Index meta / ignore / abstract\n- Meta: `totalCount`, `generatedAt`, `isInvalidated`. `archive()` upserts via helper.\n- Fs: archive root `.gitignore` includes `.staging`.\n- Abstract class; abstract `archive`, `list`, `count`, `get`, `reindex`. Append-only — no mutate of archived entries.\n## Constraints\n- Append-only; indexes under fs-cache not archive root.\n- Canonical sort archivedAt desc; no default list limit.\n- get = full manifest; list/count = index only. `force` bypasses state check. `ArchivedChange` immutable.",
   "contentHashes": {
     "spec.md": "sha256:d3e0c531c1dbb0e6419ebfab9e1a3d2acceab39a6623bf2cc8f64738edb106fd",
     "verify.md": "sha256:3f18602b3914129c0744e5edd26ba6e40b7b5f0b3e44f20f054ec332997f547e"
@@ -450,7 +452,7 @@
         "lastModified": "2026-07-22T19:10:28.318Z"
       }
     },
-    "persistedStateHash": "sha256:7eaa088f227f251f4660b90d6c398dc8709c2c1363379e5d032dcf10b3866219",
+    "persistedStateHash": "sha256:74ad394646e8befebd65b18fd9b7654c1690d7d10df6c32cf55c7bd5b00881bf",
     "schema": {
       "name": "schema-std",
       "version": 1

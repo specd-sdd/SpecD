@@ -733,18 +733,18 @@
     }
   ],
   "contentHashes": {
-    "spec.md": "sha256:2be4cdc21b0f9ed7a07a89b88cf17aa210791747ef70c95df2a7b863280f41ce",
-    "verify.md": "sha256:37671464dad1b30caa904fc73a9324274698f3806ec03dfe054d2a8455c4cff2"
+    "spec.md": "sha256:dfde702218356f3296e9c797b13b70833a79f07a03590e622e5733c5d6e8feb5",
+    "verify.md": "sha256:80a236b8c934679e17fdf464f0551b77a4b3bdc9efab884d948ce618e074c16c"
   },
   "provenance": {
     "artifacts": {
       "spec.md": {
-        "hash": "sha256:2be4cdc21b0f9ed7a07a89b88cf17aa210791747ef70c95df2a7b863280f41ce",
-        "lastModified": "2026-07-25T11:53:31.760Z"
+        "hash": "sha256:dfde702218356f3296e9c797b13b70833a79f07a03590e622e5733c5d6e8feb5",
+        "lastModified": "2026-07-25T13:14:44.434Z"
       },
       "verify.md": {
-        "hash": "sha256:37671464dad1b30caa904fc73a9324274698f3806ec03dfe054d2a8455c4cff2",
-        "lastModified": "2026-07-25T11:53:31.760Z"
+        "hash": "sha256:80a236b8c934679e17fdf464f0551b77a4b3bdc9efab884d948ce618e074c16c",
+        "lastModified": "2026-07-25T13:14:44.459Z"
       }
     },
     "persistedStateHash": "sha256:971915fb5a4427c7325938888ffc4f65ed36b218d626b4c132122e6464435768",

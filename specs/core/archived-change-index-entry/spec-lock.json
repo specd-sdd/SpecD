@@ -4,5 +4,41 @@
     "version": 1
   },
   "dependsOn": ["core:change", "core:storage", "core:repository-port"],
-  "implementation": []
+  "implementation": [],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "ArchiveListEntry: lightweight index row for fast archive listing without per-entry manifest reads.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:6069476a4256c04c9689e844e9884f9f78d2e7352470912dff515de8f1037749",
+          "lastModified": "2026-07-22T16:55:45.261Z"
+        },
+        "verify.md": {
+          "hash": "sha256:6d124738c199123f1d5e0f899ce00f235f3dafbbd73194aea6200fcf7d205458",
+          "lastModified": "2026-07-22T16:55:45.261Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# ArchiveListEntry\n## Rules\n### Index entry fields\n- Required: `name`, `archivedName`, `archivedAt`, `specIds`, `schemaName`, `schemaVersion`.\n- Optional `archivedBy` only when `includeArchivedBy` set; else MUST NOT appear.\n- MUST NOT include `artifacts` (use `get(name)`) or `workspaces` (derive from `specIds` prefix before `: `).\n- Public name `ArchiveListEntry` replaces `ArchivedChangeIndexEntry` (deprecated alias OK).\n### No manifest-only data\n- MUST NOT require manifest-only fields (artifact maps, full history, type lists). Detail via `get(name)`.\n## Constraints\n- Read-only; no mutators. Intentionally incomplete vs `ArchivedChange`.\n- `includeArchivedBy` is projection-only; index stores full payload.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:6069476a4256c04c9689e844e9884f9f78d2e7352470912dff515de8f1037749",
+          "lastModified": "2026-07-22T16:55:45.261Z"
+        },
+        "verify.md": {
+          "hash": "sha256:6d124738c199123f1d5e0f899ce00f235f3dafbbd73194aea6200fcf7d205458",
+          "lastModified": "2026-07-22T16:55:45.261Z"
+        }
+      }
+    }
+  }
 }

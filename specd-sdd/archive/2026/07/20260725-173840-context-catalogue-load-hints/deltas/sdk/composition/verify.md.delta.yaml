@@ -1,0 +1,24 @@
+- op: modified
+  description: 'Allow presentation/ in the allowed SDK src directories list'
+  selector:
+    type: section
+    matches: 'Scenario: No infrastructure in SDK source tree'
+  content: |
+    - **WHEN** listing `packages/sdk/src/`
+    - **THEN** directories are limited to `composition/`, `orchestration/`, `presentation/`, `shared/`, and `index.ts`
+    - **AND** no `infrastructure/` or `domain/` directories exist
+
+- op: added
+  description: 'Assert presentation helpers are exported from the SDK barrel'
+  position:
+    parent:
+      type: section
+      matches: '^Requirement: Public barrel exports$'
+    after:
+      type: section
+      matches: 'Scenario: SDK exports orchestration and bootstrap symbols'
+  content: |
+    #### Scenario: SDK exports context markdown presentation helpers
+
+    - **WHEN** importing from `@specd/sdk`
+    - **THEN** `changeContextToMarkdown` and `projectContextToMarkdown` are available

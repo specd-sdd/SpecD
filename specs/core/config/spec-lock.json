@@ -39,5 +39,41 @@
       "file": "core:src/composition/composition-resolver.ts",
       "symbols": ["resolveMetadataPathForWorkspace"]
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Authoritative project config via specd.yaml: schema, workspaces, storage, plugins, context, approvals, layered cascade.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:bccf7ef7954faec0e00b381907d30b69bdd3a7c8e46b4a7eaca57329eb0ac023",
+          "lastModified": "2026-07-23T10:30:09.089Z"
+        },
+        "verify.md": {
+          "hash": "sha256:de2b436010b6e5bb7aa3085e4cd89af29305e089faf971b522419fd3d5f9b143",
+          "lastModified": "2026-07-23T10:28:25.652Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Config\n\n## Rules\n- Discovery: (1) `--config` = explicit file + its `extends` only; (2) walk CWD→VCS root, stop at first dir with candidates; (3) no VCS → CWD only. Candidates order: `specd.yaml`, `specd.*.yaml` alpha, `specd.local.yaml`, `specd.local.*.yaml` alpha. `extends: true` inherits previous layer; `extends: <path>` only if base already in chain. Never above VCS root.\n- `privacy`: `mode` `hash|mask|anonymous`; optional `salt`, `excludeActors` (default `[\"specd\",\"system@getspecd.dev\"]`), `allowedMetadataKeys`.\n- Env overrides win: `SPECD_ACTOR_PROVIDER`, `SPECD_PRIVACY_SALT`, `SPECD_PRIVACY_MODE` (+ `.env`/`.env.local`).\n- Optional `actorProvider` forces named registry provider.\n- Cascade: scalars last-wins; objects deep-merge; arrays append unless `remove`. `remove` only with `extends`. Identity: `context[].id`, `plugins.agents[].name`, map keys for workspaces/storage. Required fields (e.g. `schema`) not removable. `specd init` gitignores local variants.\n- Required `schema` prefixes: `@pkg`, `#ws:name`, `#name`/bare (=default), path. Resolve at command dispatch; skip for help/version/init/config validate/plugin cmds. Distinct `ConfigValidationError` vs `SchemaNotFoundError`/`SchemaValidationError`.\n- Optional `invalidationPolicy`: `none|surgical|downstream|global` — project default for new changes.\n- Workspaces: mandatory `default`; names `/^[a-z][a-z0-9-]*$/`; props `specs` (always), `codeRoot` (required non-default), `schemas`, `ownership` (default owned/readOnly), `prefix`, context patterns, graph filters. `isExternal` inferred.\n- Workspace `graph`: `allowedPaths`, `respectGitignore` (default true, absolute priority), `excludePaths` (replaces builtins when set).\n- Optional `storage` adapters for changes/drafts/discarded/archive; omit → fs defaults under `specdPath`. Named adapters via registry.\n- `specdPath` default `.specd`; derive graph/tmp/change-locks. Missing dirs → `StorageDirectoryNotFoundError`.\n- Unresolved `{{namespace.key}}` tokens preserved + warning.\n- `schemaPlugins` (same ref conventions, `kind: schema-plugin`); `schemaOverrides` = `SchemaOperations` after plugins.\n- Context patterns project vs workspace-level; active ws = change has its specs. Order: project context entries → project include/exclude → active ws include/exclude → dependsOn (excludes never apply to deps). Defaults: project include `['default:*']`, ws include `['*']`. Unknown qualifier: warn at runtime, error on `config validate`.\n- `contextMode`: `list|summary` (default)|`full|hybrid`; project-level only; no legacy `lazy`.\n- `context[]`: instruction or file (+ optional `id`).\n- `approvals.spec`/`approvals.signoff` default false.\n- Optional `logging.level` (default `info`); `llmOptimizedContext` default false.\n- `plugins.agents[]` validated by Zod; `ConfigWriter`: `initProject`, `addPlugin`, `removePlugin`, `listPlugins`.\n- Cascade validation failures → `ConfigValidationError`. Legacy shape → non-fatal `SpecdConfig.warnings`.\n- Project `graph.includePaths`/`excludePaths`; includePaths → `root:` unless owned by workspace codeRoot.\n\n## Constraints\n- Every field Zod-validated at load.\n- `privacy.mode=hash` requires salt (config or env) or validation fails.\n- Unknown top-level fields rejected (strict Zod).",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:bccf7ef7954faec0e00b381907d30b69bdd3a7c8e46b4a7eaca57329eb0ac023",
+          "lastModified": "2026-07-23T10:30:09.089Z"
+        },
+        "verify.md": {
+          "hash": "sha256:de2b436010b6e5bb7aa3085e4cd89af29305e089faf971b522419fd3d5f9b143",
+          "lastModified": "2026-07-23T10:28:25.652Z"
+        }
+      }
+    }
+  }
 }

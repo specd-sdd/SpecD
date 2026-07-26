@@ -1,0 +1,107 @@
+<svg height="452" width="1091.2" xmlns="http://www.w3.org/2000/svg">
+<g transform="translate(32,16)">
+<filter filterUnits="userSpaceOnUse" height="460" id="shadow" width="1099.2" x="-32" y="-24">
+<feGaussianBlur stdDeviation="12"/>
+</filter>
+<rect fill="#000000c0" filter="url(#shadow)" height="388" rx="10" ry="10" width="1027.2" x="4" y="12"/>
+<rect fill="#282c34" height="388" rx="10" ry="10" width="1027.2"/>
+<clipPath id="header">
+<rect height="28" width="1027.2"/>
+</clipPath>
+<rect clip-path="url(#header)" fill="#383837" height="56" rx="10" ry="10" width="1027.2"/>
+<line stroke="#000000c0" stroke-width="0.5" x1="0" x2="1027.2" y1="28" y2="28"/><text dominant-baseline="central" fill="#b3b3b3" font-family="system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica Neue, Arial, sans-serif" font-size="14" font-weight="bold" text-anchor="middle" x="513.6" y="14">specd changes run-hooks fix-project-dashboard-snapshot implementing --phase post</text>
+<g>
+<circle cx="14" cy="14" fill="#ff5f56" r="6" stroke="#ff5f56" stroke-width="0.5"/>
+<circle cx="34" cy="14" fill="#ffbd2e" r="6" stroke="#ffbd2e" stroke-width="0.5"/>
+<circle cx="54" cy="14" fill="#28c941" r="6" stroke="#28c941" stroke-width="0.5"/>
+</g>
+<svg class="terminal" font-family="JetBrains Mono, Fira Code, Source Code Pro, Cascadia Code, Consolas, Menlo, Monaco, DejaVu Sans Mono, monospace, Symbols Nerd Font Mono, Cascadia Mono" font-size="12" height="360" width="1027.2" y="28">
+<svg fill="#dcdfe4" x="9.6" y="7.2">
+<g>
+<svg height="345.6" viewBox="0 0 84 28.8" width="1008">
+<g stroke-width="0.025"/>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="0">
+<text xml:space="preserve" y="0.96em"><tspan fill="#c678dd">% </tspan><tspan fill="#ea9a97">specd </tspan><tspan fill="#c4a7e7" font-style="italic">changes </tspan><tspan fill="#c4a7e7" font-style="italic">run-hooks </tspan><tspan fill="#c4a7e7" font-style="italic">fix-project-dashboard-snapshot </tspan><tspan fill="#c4a7e7" font-style="italic">implementing </tspan><tspan fill="#c4a7e7" font-style="italic">--phase </tspan><tspan fill="#c4a7e7" font-style="italic">post</tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="14.4">
+<text xml:space="preserve" y="0.96em"><tspan fill="#dcdfe4">[running] </tspan><tspan fill="#dcdfe4">implementing-run-tests </tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="28.8">
+<text xml:space="preserve" y="0.96em"><tspan>  </tspan><tspan fill="#dcdfe4">command: </tspan><tspan fill="#dcdfe4">pnpm </tspan><tspan fill="#dcdfe4">test </tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="43.2">
+<text xml:space="preserve" y="0.96em"><tspan>  </tspan><tspan fill="#dcdfe4">| </tspan><tspan fill="#dcdfe4">&gt; </tspan><tspan fill="#dcdfe4">specd@0.0.1 </tspan><tspan fill="#dcdfe4">test </tspan><tspan fill="#dcdfe4">/projects/specd </tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="57.6">
+<text xml:space="preserve" y="0.96em"><tspan>  </tspan><tspan fill="#dcdfe4">| </tspan><tspan fill="#dcdfe4">&gt; </tspan><tspan fill="#dcdfe4">turbo </tspan><tspan fill="#dcdfe4">test </tspan><tspan fill="#dcdfe4">--filter=@specd/core </tspan><tspan fill="#dcdfe4">--filter=@specd/cli </tspan><tspan fill="#dcdfe4">--filter=@specd/code-graph </tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="72">
+<text xml:space="preserve" y="0.96em"><tspan>  </tspan><tspan fill="#dcdfe4">! </tspan><tspan fill="#dcdfe4">• </tspan><tspan fill="#dcdfe4">turbo </tspan><tspan fill="#dcdfe4">2.9.6 </tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="86.4">
+<text xml:space="preserve" y="0.96em"><tspan>  </tspan><tspan fill="#dcdfe4">| </tspan><tspan>   </tspan><tspan fill="#dcdfe4">• </tspan><tspan fill="#dcdfe4">Packages </tspan><tspan fill="#dcdfe4">in </tspan><tspan fill="#dcdfe4">scope: </tspan><tspan fill="#dcdfe4">@specd/cli, </tspan><tspan fill="#dcdfe4">@specd/code-graph, </tspan><tspan fill="#dcdfe4">@specd/core </tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="100.8">
+<text xml:space="preserve" y="0.96em"><tspan>  </tspan><tspan fill="#dcdfe4">| </tspan><tspan>   </tspan><tspan fill="#dcdfe4">• </tspan><tspan fill="#dcdfe4">Running </tspan><tspan fill="#dcdfe4">test </tspan><tspan fill="#dcdfe4">in </tspan><tspan fill="#dcdfe4">3 </tspan><tspan fill="#dcdfe4">packages </tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="115.2">
+<text xml:space="preserve" y="0.96em"><tspan>  </tspan><tspan fill="#dcdfe4">| </tspan><tspan>   </tspan><tspan fill="#dcdfe4">• </tspan><tspan fill="#dcdfe4">Remote </tspan><tspan fill="#dcdfe4">caching </tspan><tspan fill="#dcdfe4">disabled </tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="129.6">
+<text xml:space="preserve" y="0.96em"><tspan>  </tspan><tspan fill="#dcdfe4">| </tspan><tspan fill="#dcdfe4">@specd/core:build: </tspan><tspan fill="#dcdfe4">cache </tspan><tspan fill="#dcdfe4">hit, </tspan><tspan fill="#dcdfe4">replaying </tspan><tspan fill="#dcdfe4">logs </tspan><tspan fill="#dcdfe4">1bd7fa9c10b7da7a </tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="144">
+<text xml:space="preserve" y="0.96em"><tspan>  </tspan><tspan fill="#dcdfe4">| </tspan><tspan fill="#dcdfe4">@specd/core:build: </tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="158.4">
+<text xml:space="preserve" y="0.96em"><tspan>  </tspan><tspan fill="#dcdfe4">| </tspan><tspan fill="#dcdfe4">@specd/core:build: </tspan><tspan fill="#dcdfe4">&gt; </tspan><tspan fill="#dcdfe4">@specd/core@0.2.0 </tspan><tspan fill="#dcdfe4">build </tspan><tspan fill="#dcdfe4">/projects/specd/packages/core </tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="172.8">
+<text xml:space="preserve" y="0.96em"><tspan>  </tspan><tspan fill="#dcdfe4">| </tspan><tspan fill="#dcdfe4">@specd/core:build: </tspan><tspan fill="#dcdfe4">&gt; </tspan><tspan fill="#dcdfe4">tsup </tspan><tspan fill="#dcdfe4">src/public.ts </tspan><tspan fill="#dcdfe4">src/ports.ts </tspan><tspan fill="#dcdfe4">src/extensions.ts </tspan><tspan fill="#dcdfe4">src/index.ts </tspan><tspan fill="#dcdfe4">--format </tspan><tspan fill="#dcdfe4">esm </tspan><tspan fill="#dcdfe4">--dts </tspan><tspan fill="#dcdfe4">--clean </tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="187.2">
+<text xml:space="preserve" y="0.96em"><tspan>  </tspan><tspan fill="#dcdfe4">| </tspan><tspan fill="#dcdfe4">@specd/core:build: </tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="201.6">
+<text xml:space="preserve" y="0.96em"><tspan>  </tspan><tspan fill="#dcdfe4">| </tspan><tspan fill="#dcdfe4">@specd/core:build: </tspan><tspan fill="#dcdfe4">CLI </tspan><tspan fill="#dcdfe4">Building </tspan><tspan fill="#dcdfe4">entry: </tspan><tspan fill="#dcdfe4">src/extensions.ts, </tspan><tspan fill="#dcdfe4">src/index.ts, </tspan><tspan fill="#dcdfe4">src/ports.ts, </tspan><tspan fill="#dcdfe4">src/public.ts </tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="216">
+<text xml:space="preserve" y="0.96em"><tspan>  </tspan><tspan fill="#dcdfe4">| </tspan><tspan fill="#dcdfe4">@specd/core:build: </tspan><tspan fill="#dcdfe4">CLI </tspan><tspan fill="#dcdfe4">Using </tspan><tspan fill="#dcdfe4">tsconfig: </tspan><tspan fill="#dcdfe4">tsconfig.json </tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="230.4">
+<text xml:space="preserve" y="0.96em"><tspan>  </tspan><tspan fill="#dcdfe4">| </tspan><tspan fill="#dcdfe4">@specd/core:build: </tspan><tspan fill="#dcdfe4">CLI </tspan><tspan fill="#dcdfe4">tsup </tspan><tspan fill="#dcdfe4">v8.5.1 </tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="244.8">
+<text xml:space="preserve" y="0.96em"><tspan>  </tspan><tspan fill="#dcdfe4">| </tspan><tspan fill="#dcdfe4">@specd/core:build: </tspan><tspan fill="#dcdfe4">CLI </tspan><tspan fill="#dcdfe4">Target: </tspan><tspan fill="#dcdfe4">es2022 </tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="259.2">
+<text xml:space="preserve" y="0.96em"><tspan>  </tspan><tspan fill="#dcdfe4">| </tspan><tspan fill="#dcdfe4">@specd/core:build: </tspan><tspan fill="#dcdfe4">CLI </tspan><tspan fill="#dcdfe4">Cleaning </tspan><tspan fill="#dcdfe4">output </tspan><tspan fill="#dcdfe4">folder </tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="273.6">
+<text xml:space="preserve" y="0.96em"><tspan>  </tspan><tspan fill="#dcdfe4">| </tspan><tspan fill="#dcdfe4">@specd/core:build: </tspan><tspan fill="#dcdfe4">ESM </tspan><tspan fill="#dcdfe4">Build </tspan><tspan fill="#dcdfe4">start </tspan></text>
+</svg>
+<svg height="14.4" overflow="hidden" width="1008" y="288">
+<text xml:space="preserve" y="0.96em"><tspan>  </tspan><tspan fill="#dcdfe4">| </tspan><tspan fill="#dcdfe4">@specd/core:build: </tspan><tspan fill="#dcdfe4">ESM </tspan><tspan fill="#dcdfe4">dist/chunk-QSXCNGLX.js </tspan><tspan>         </tspan><tspan fill="#dcdfe4">5.57 </tspan><tspan fill="#dcdfe4">KB </tspan></text>
+</svg>
+</g>
+</svg>
+</svg>
+<rect fill="none" height="388" rx="10" ry="10" stroke="#000000" stroke-width="0.5" width="1027.2"/>
+<rect fill="none" height="386" rx="9" ry="9" stroke="#f0f0f080" stroke-width="0.5" width="1025.2" x="1" y="1"/>
+</g>
+<style>
+@font-face {
+	font-family: JetBrains Mono;
+	font-weight: 100 800;
+	font-style: italic;
+	src: url(https://raw.githubusercontent.com/pamburus/fonts/refs/heads/main/JetBrainsMono/fonts/variable/JetBrainsMono-Italic%5Bwght%5D.woff2) format('woff2');
+}
+@font-face {
+	font-family: JetBrains Mono;
+	font-weight: 100 800;
+	font-style: normal;
+	src: url(https://raw.githubusercontent.com/pamburus/fonts/refs/heads/main/JetBrainsMono/fonts/variable/JetBrainsMono%5Bwght%5D.woff2) format('woff2');
+}
+</style>
+</svg>

@@ -161,6 +161,8 @@
       }
     ]
   },
+  "optimizedDescription": "CountTasks reads Change task artifacts via schema patterns; returns per-artifact + aggregate TaskCompletionStatus.",
+  "optimizedContext": "# Count Tasks\n\n## Rules\n- `CountTasks.execute()` accept `Change`; resolve schema via `SchemaProvider`\n- Artifact task-capable only if schema type has `hasTasks: true` AND `taskCompletionCheck`\n- Read files via `ChangeRepository.artifact()`; aggregate matches across existing non-empty files\n- For `hasTasks: true` types, schema MUST materialize `taskCompletionCheck` before inspect\n- Consume resolved `incompletePattern`/`completePattern`; MUST NOT define/substitute fallbacks\n- Schema defaults: incomplete `^\\s*-\\s+\\[ \\]`, complete `^\\s*-\\s+\\[[xX]\\]`\n- Compile with `safeRegex` + `gm`; unsafe pattern → no matches, MUST NOT throw; still emit zero-valued entry for qualifying non-empty artifact\n- Return `CountTasksResult`: `byArtifact` (readonly map artifact-type-ID → `TaskCompletionStatus` only for qualifying artifacts with ≥1 non-empty file); `total` sums all `byArtifact`\n- Each `TaskCompletionStatus`: `complete`, `incomplete`, `total`; `total = complete + incomplete`\n- No qualifying content → empty `byArtifact`, zero `total`\n- Absent `byArtifact` entry ≠ missing capability; consumers check schema themselves\n- Deps: `ChangeRepository` + `SchemaProvider`; `createCountTasks(deps|config)` via `resolveCountTasksDeps(resolver)`\n- Exposed as `kernel.changes.countTasks` with same resolver-backed deps\n\n## Constraints\n- Read-only; MUST NOT mutate change/artifact files\n- MUST NOT decide lifecycle transition permission\n- Omit empty/missing artifacts from `byArtifact`",
   "contentHashes": {
     "spec.md": "sha256:0e2312c41d00651146e5b076f2b7a9d89cbc87f884ddecb2d4320451bdd279fe",
     "verify.md": "sha256:94034ebef28bba172b9b9770f2129ca267817ce3f0a3908b086d2d88f817de84"
@@ -176,7 +178,7 @@
         "lastModified": "2026-07-23T17:26:17.384Z"
       }
     },
-    "persistedStateHash": "sha256:86c22d621a76fb8aaa698c6db3d51d80af6516d22aad66bbf6a4f48e69e62fb6",
+    "persistedStateHash": "sha256:4d8fd9341f48b2328ffd806a27571898ffd0b8696f71a8d9ec6126ce05166953",
     "schema": {
       "name": "schema-std",
       "version": 1

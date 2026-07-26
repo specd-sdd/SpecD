@@ -129,6 +129,8 @@
       }
     ]
   },
+  "optimizedDescription": "DraftedChangeReadOnlyError: DomainError when active-only APIs hit drafted changes.",
+  "optimizedContext": "# DraftedChangeReadOnlyError\n\n## Rules\n- Export `DraftedChangeReadOnlyError extends DomainError`.\n- Throw when: `save`/`saveArtifact` on `isDrafted`; `mutate` resolves drafted; entity mutator while drafted (if guards on).\n- MUST NOT throw for correctly scoped `mutateDraft`, `RestoreChange`, `DiscardChange`.\n- Payload: `changeName`, `operation` (e.g. mutate/save/saveArtifact/transition). Message: drafted+read-only until restored; use draft/drafted terms.\n- Stable `code` e.g. `DRAFTED_CHANGE_READ_ONLY`.\n\n## Constraints\n- Prefer active-only get/mutate prevention; this error exceptional. CLI presentation per error-handling-conventions.",
   "contentHashes": {
     "spec.md": "sha256:5ade877b45c99ae35e21a74a80605a39bf83502435d8f20ff9cc275877285427",
     "verify.md": "sha256:6aca359cade3469b29311ad2aa6636058f8c236fd52a53fac05160d6b520d3f7"
@@ -144,7 +146,7 @@
         "lastModified": "2026-05-26T16:37:22.614Z"
       }
     },
-    "persistedStateHash": "sha256:5e37874f5bb08e8415e1ed1074deb3601d39431358e6872f839337c4294d38d4",
+    "persistedStateHash": "sha256:0982a19dc36f2fd2a2b8aa25ff33c50c38fc807d53f33012520ec61c2ebdb113",
     "schema": {
       "name": "schema-std",
       "version": 1

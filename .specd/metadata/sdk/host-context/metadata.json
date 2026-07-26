@@ -186,6 +186,8 @@
       }
     ]
   },
+  "optimizedDescription": "Host bootstrap: load SpecdConfig, await createKernel, expose sync createGraphProvider closing over same config.",
+  "optimizedContext": "# SDK Host Context\n## Rules\n### SdkHostContext shape\n- Readonly `{ kernel: Kernel; createGraphProvider: () => CodeGraphProvider }`\n- MUST NOT duplicate `SpecdConfig`; reads via `kernel.project.getConfig.execute()`\n- `createGraphProvider` sync; fresh `CodeGraphProvider` each call\n\n### createSdkContext\n- `createSdkContext(config: SpecdConfig, options?: SdkContextOptions): Promise<SdkHostContext>`\n  1. Await `createKernel(config, options?.kernel)` from `@specd/core`\n  2. Return `{ kernel, createGraphProvider: () => createCodeGraphProvider(config, options?.graph) }`\n- `SdkContextOptions`: `{ kernel?: KernelOptions; graph?: CodeGraphCompositionOptions }`\n- Factory MUST close over same `config` as kernel\n- Omit `options?.graph` → default `@specd/code-graph` composition\n\n### openSpecdHost\n- `openSpecdHost(input?: OpenSpecdHostInput): Promise<OpenSpecdHostResult>`\n  1. Reject both `configPath` + `startDir`\n  2. `createDefaultConfigLoader()`: forced=`configPath`, else discovery=`startDir` or `process.cwd()`\n  3. Await `createSdkContext(config, input.options)`\n  4. Return `{ config, configFilePath, ...ctx }` (`configFilePath` abs path or `null`)\n- Warnings stay on `config.warnings`; no top-level duplicate\n- `allowBootstrapFallback?: boolean` default `false`: if true + no config, resolve VCS root → synthetic graph-capable config; fail if no VCS root; NEVER fallback for explicit `configPath`\n\n### Config mutation boundary\n- No config writes on bootstrap; `initProject`/`addPlugin`/`removePlugin` stay on `createConfigWriter()` — not `SdkHostContext` or `kernel.project`\n\n## Constraints\n- Kernel + graph share same resolved config instance",
   "contentHashes": {
     "spec.md": "sha256:0982bcba7411d5de34e13d0865fd04cf85b886645e5f6aa331b340067311a736",
     "verify.md": "sha256:9a2f5dddbb0e993553eef8bcc7f8ab1235981ee3fdeb2dc8a0e4e8b750f1eda2"
@@ -201,7 +203,7 @@
         "lastModified": "2026-07-20T16:47:44.258Z"
       }
     },
-    "persistedStateHash": "sha256:629e2773aa2dc1d4d67ebff296f9f389013011f935cc3b09cbe79604ed1a7ee1",
+    "persistedStateHash": "sha256:f037702144f54aac5dbcd67538d83e885a4ee72b569863b485d452e7a8625a22",
     "schema": {
       "name": "schema-std",
       "version": 1

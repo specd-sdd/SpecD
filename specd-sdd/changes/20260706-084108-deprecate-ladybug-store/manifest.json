@@ -3117,6 +3117,180 @@
           "files": ["tasks"]
         }
       ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-26T11:52:20.308Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'enrich-project-summary' was archived with overlapping specs: sdk:build-project-status-snapshot",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["sdk:build-project-status-snapshot"]
+        },
+        {
+          "type": "verify",
+          "files": ["sdk:build-project-status-snapshot"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-26T18:49:39.348Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'context-catalogue-load-hints' was archived with overlapping specs: sdk:composition",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["sdk:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["sdk:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-26T18:49:48.534Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'context-catalogue-load-hints' was archived with overlapping specs: sdk:composition",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["sdk:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["sdk:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-26T18:50:30.858Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'context-catalogue-load-hints' was archived with overlapping specs: sdk:composition",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["sdk:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["sdk:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-26T18:50:39.179Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'context-catalogue-load-hints' was archived with overlapping specs: sdk:composition",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["sdk:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["sdk:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-26T18:50:55.212Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'context-catalogue-load-hints' was archived with overlapping specs: sdk:composition",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["sdk:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["sdk:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
     }
   ]
 }

@@ -169,6 +169,8 @@
       }
     ]
   },
+  "optimizedDescription": "Scoped lazy CompositionResolver turns SpecdConfig+options into shared deps for config-based createX factories and kernel.",
+  "optimizedContext": "# CompositionResolver\n\n## Rules\n- Created from one `SpecdConfig` + options; one composition session only — NOT process singleton; NOT reuse across unrelated inputs.\n- Exposes normalized shared deps (repos, schema services, actor, VCS, hooks, parsers, etc.) independent of fs-shaped factory inputs.\n- Registry/merged-view/built-in-capability primitives = composition infrastructure, NOT kernel-owned.\n- For `ChangeRepository`, assemble nested drafts/discarded options from separate YAML configs → unified options → storage factory.\n- Lazy resolve; MUST NOT eager full-kernel graph for one standalone factory. MAY cache within session.\n- MUST NOT centralize every `XDeps` — per-UC helpers e.g. `resolveCreateChangeDeps(resolver)` near `createX`.\n- Config form `createX(config, options?)`: (1) create resolver (2) assemble `XDeps` via helper (3) delegate `createX(deps)`.\n- Canonical contract remains `createX(deps)` — resolver supports, does not replace.\n- Invalid arg combos → shared `InvalidCompositionFactoryArgumentsError` identifying target factory/UC name.\n\n## Constraints\n- Composition infrastructure, not domain/application service.\n- MAY reuse registry helpers shared with kernel/builder; those remain composition-owned.\n- MUST NOT be mandatory third public call shape for every `createX`.\n- MUST NOT require eager full-kernel construction for standalone factory.",
   "contentHashes": {
     "spec.md": "sha256:7d12c6936b3325a9476b13d50e4edc330a397220aa0aae09b43e254ce0a5beab",
     "verify.md": "sha256:2eeb462004191e2418ab199628f42eac525fd42600f372a309cb70110ad3bcec"
@@ -184,7 +186,7 @@
         "lastModified": "2026-07-10T14:09:15.338Z"
       }
     },
-    "persistedStateHash": "sha256:ed68af8f7e6382daf46230508cd338783ba14e6b64a72a23f46faeae8be22b0c",
+    "persistedStateHash": "sha256:ea9a4b528bc507ca41ebdd44b65a559ce733b5f693a8e631b40d10b86365a5e1",
     "schema": {
       "name": "schema-std",
       "version": 1

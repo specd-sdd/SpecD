@@ -1,0 +1,5 @@
+releases:
+  cli:cli/change-context: minor
+  cli:cli/project-context: minor
+  sdk:sdk/context-markdown: minor
+  sdk:sdk/composition: minor

@@ -156,6 +156,8 @@
       ]
     }
   ],
+  "optimizedDescription": "Fluent kernel builder: accumulate additive KernelOptions registries; build() ≡ createKernel.",
+  "optimizedContext": "# Kernel Builder\n\n## Rules\n- Public fluent composition for additive KernelOptions (storage factories, parsers, VCS, actors, external hooks). Pre-construction only — no mutate built kernel. No code-graph backend ownership.\n- Fluent register: spec/schema/change/archive storage, parsers, external hooks, VCS, actors — each returns builder.\n- `build()` ≡ `createKernel(config, options)`: builtins remain, externals extend, shared adapters once, immutable kernel, full `kernel.specs` use-case set (incl. metadata/optimize/deps) — no drifted second list.\n- Conflicting capability names → error (no silent overwrite). Accept base registration state from resolved config.\n- Reuse CompositionResolver / createKernel registry primitives — no second composition model.\n\n## Constraints\n- Composition layer only. No post-build mutation. Conflict = error.",
   "contentHashes": {
     "spec.md": "sha256:bcd53b9153181e9b508d23523bb63f16cea938ae1082027f8d24b7ad3c7ffb06",
     "verify.md": "sha256:93834e5174ffa9dcf50ddc5b4e4b56ed8686bd025a57c56412728a4baac141b5"
@@ -171,7 +173,7 @@
         "lastModified": "2026-07-25T11:53:31.486Z"
       }
     },
-    "persistedStateHash": "sha256:279eab1b69a3f171701f7326fd32d9eab7e9129d85dfe69285f21779e54b12ae",
+    "persistedStateHash": "sha256:f539b3961c0dd47761592661d75a0983cd3cf07dc0046afc1e24b07ca20df76c",
     "schema": {
       "name": "schema-std",
       "version": 1

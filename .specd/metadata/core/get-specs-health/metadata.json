@@ -104,6 +104,8 @@
       }
     ]
   },
+  "optimizedDescription": "GetSpecsHealth wraps ValidateSpecs: aggregate counts + issues only for failed/warned specs.",
+  "optimizedContext": "# Get Specs Health\n\n## Rules\n- MUST invoke `ValidateSpecs.execute()` internally\n- `GetSpecsHealthResult` MUST exclude clean passes (0 failures, 0 warnings); report only `passed === false` OR `warnings.length > 0`\n- Aggregate: `totalSpecs`, `passed` (clean), `failed` (≥1 failure), `warned` (warnings, no failures)\n- Mutually exclusive invariant: `totalSpecs = passed + failed + warned`\n- `issues[]` for failed/warned: `spec` (canonical path), `passed` (true if warnings-only), `failures[]`, `warnings[]`\n- Optional `workspace` filter in input → forward to `ValidateSpecs`\n\n## Constraints\n- Payload excludes successful validations; stats still count all specs",
   "contentHashes": {
     "spec.md": "sha256:1b44d784459e9874f595a7bbf4202df1de645006c34493a2a1ec556350d2cc43",
     "verify.md": "sha256:d51b1b2caa9501a8dea30ff986044681423abbbb4fa9cd33fb8054c7353ae20a"
@@ -119,7 +121,7 @@
         "lastModified": "2026-07-23T07:28:57.565Z"
       }
     },
-    "persistedStateHash": "sha256:5545c1f2e747182a2798035bc4b9af0329ca812895ad989e8376da8714f8f97d",
+    "persistedStateHash": "sha256:5b613cd414d5b455d091d97c87c824a7243cfe85ce3fb72d029709ba993d3f28",
     "schema": {
       "name": "schema-std",
       "version": 1

@@ -21,5 +21,41 @@
       "file": "core:src/domain/services/assess-metadata-freshness.ts",
       "symbols": ["assessMetadataFreshness"]
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "metadata.json: deterministic normalized projection of spec; provenance freshness; lock owns truth.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:dac1bf779c810ceaa16396bd66bc9b3f259366ddb55ae90c88cbbbfd718c9c34",
+          "lastModified": "2026-07-25T11:53:31.147Z"
+        },
+        "verify.md": {
+          "hash": "sha256:d70a500cd45538e2069183858db04535f4dfd690686600a4500c96c591c3b3d1",
+          "lastModified": "2026-07-25T11:53:31.147Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Spec Metadata\n## Rules\n### Location\n- `.specd/metadata/<workspace>/<capability-path>/metadata.json` via `specs.fs.metadataPath` or VCS-root derive / NullVcs fallback.\n- Absence = no deps / no hash — not error.\n### Sidecar / stamp\n- Get schema/deps/impl via SpecRepository semantic ops — not raw sidecar files.\n- `generatedMetadataStamp` = `{ present, lastModified }` only — not substitute for `metadata()`.\n### Format (optional fields; empty/absent OK)\n- title, description, keywords, dependsOn (projection of persisted deps), contentHashes, rules, constraints, scenarios, context, optimizedDescription/Context (from lock optimizations when fresh — omit if stale/absent), generatedBy always `\"core\"`, provenance.\n### Provenance\n- artifacts{hash,lastModified}, persistedStateHash, schema{name,version}, projectionVersion, projectionFingerprint. Freshness uses hashes/schema/version/fingerprint — never lastModified alone. contentHashes MUST match provenance.artifacts.\n### Persist guard\n- `PersistSpecMetadata` validates `strictSpecMetadataSchema` before write (title/description/contentHashes required). Internal only. Unknown keys passthrough.\n### Archive-time generation\n- Preflight extract+dependsOn consistency before any publish; post-publish GenerateSpecMetadata + persist. dependsOn from change.specDependsOn; extraction must match or fail.\n### Freshness\n- Only `assessMetadataFreshness(persisted, current)` — SpecRepository does not classify freshness. MaterializeSpecMetadata decides reuse vs regen.\n### Consumers\n- CompileContext etc. via GetSpecMetadata/MaterializeSpecMetadata — not raw readMetadataSnapshot for usability.\n### VCS / implementation\n- Disposable cache; default `/.specd/metadata/` gitignored. implementation.files / .symbols projected from persisted links when present.\n## Constraints\n- Not a schema artifact; never ValidateArtifacts/manifest-tracked.\n- dependsOn projection only — never independently authored. No self-deps; cycles broken+warn on traversal.\n- Access via readMetadataSnapshot/writeMetadataSnapshot — not artifact()/save(). Lock owns deps/impl/optimizations; metadata regenerable projection.\n- parseMetadata lenient → {} on invalid.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:dac1bf779c810ceaa16396bd66bc9b3f259366ddb55ae90c88cbbbfd718c9c34",
+          "lastModified": "2026-07-25T11:53:31.147Z"
+        },
+        "verify.md": {
+          "hash": "sha256:d70a500cd45538e2069183858db04535f4dfd690686600a4500c96c591c3b3d1",
+          "lastModified": "2026-07-25T11:53:31.147Z"
+        }
+      }
+    }
+  }
 }

@@ -7,11 +7,13 @@
     "cli:entrypoint",
     "core:get-project-context",
     "core:compile-context",
-    "core:config"
+    "core:config",
+    "sdk:context-markdown"
   ],
   "implementation": [
     {
-      "file": "cli:src/commands/project/context.ts"
+      "file": "cli:src/commands/project/context.ts",
+      "symbols": ["registerProjectContext"]
     },
     {
       "file": "cli:test/commands/project-context.spec.ts"

@@ -16,10 +16,11 @@ The `@specd/sdk` package SHALL live at `packages/sdk/` in the monorepo with work
 
 - `src/composition/` — host bootstrap (`openSpecdHost`, `createSdkContext`) and graph lifecycle (`withOpenGraphProvider`)
 - `src/orchestration/` — cross-package workflows (`buildProjectStatusSnapshot`, `runIndexProjectGraph`)
+- `src/presentation/` — pure agent-facing formatters (`changeContextToMarkdown`, `projectContextToMarkdown`) over structured core results
 - `src/shared/` — internal cross-cutting helpers (e.g. package version constants) not exported from the public barrel
 - `src/index.ts` — public barrel only
 
-The package MUST NOT contain domain entities, application ports, or infrastructure adapters. Files under `src/shared/` MUST NOT be re-exported from `src/index.ts`.
+The package MUST NOT contain domain entities, application ports, or infrastructure adapters. Files under `src/shared/` MUST NOT be re-exported from `src/index.ts`. Presentation helpers MUST remain pure (no I/O); they MAY be exported from the public barrel.
 
 ### Requirement: Public barrel exports
 
@@ -33,6 +34,7 @@ The package MUST NOT contain domain entities, application ports, or infrastructu
 
 - SDK composition: `openSpecdHost`, `createSdkContext`, `withOpenGraphProvider`, `SdkHostContext`, `OpenSpecdHostInput`, `OpenSpecdHostResult`, `WithOpenGraphProviderOptions`
 - SDK orchestration: `buildProjectStatusSnapshot`, `runIndexProjectGraph`, and their input/result types
+- SDK presentation: `changeContextToMarkdown`, `projectContextToMarkdown`, `ChangeContextToMarkdownOptions`
 - Explicit re-exports from `@specd/core` `"."` public barrel (bootstrap, `Kernel`, kernel-equivalent `createX` factories, repository factories, kernel use-case I/O types, domain entities, errors). This MUST track the revised `kernel.specs` surface — including `MaterializeSpecMetadata`, `GetSpecMetadata`, `RegenerateSpecMetadata`, `InitializePersistedSpecState`, persisted schema inspection/reassignment, and persisted dependency/implementation/optimization use cases — and their `create*` factories.
 - Explicit re-exports from `@specd/code-graph` `"."` public barrel (provider factory, host use cases, graph host-adapter symbols listed under **Public barrel exports for host adapters**)
 - `SDK_VERSION`, `codeGraphVersion`, `getCodeGraphVersion`
@@ -70,7 +72,8 @@ The package SHALL export `SDK_VERSION` as a string constant matching `package.js
 
 ## Spec Dependencies
 
-- [`default:_global/architecture`](../../../../specs/_global/architecture/spec.md) — hexagonal layer rules for the new package
-- [`core:composition`](../../../../specs/core/composition/spec.md) — kernel and config factory sources
-- [`code-graph:composition`](../../../../specs/code-graph/composition/spec.md) — graph provider factory source
-- [`cli:host-context`](../../../../specs/cli/host-context/spec.md) — consumer of host-adapter barrel re-exports
+- [`default:_global/architecture`](../../_global/architecture/spec.md) — hexagonal layering applied to the SDK package
+- [`core:composition`](../../core/composition/spec.md) — core composition surface the SDK re-exports and wraps
+- [`code-graph:composition`](../../code-graph/composition/spec.md) — code-graph composition surface the SDK re-exports and wraps
+- [`cli:host-context`](../../cli/host-context/spec.md) — consumer of host-adapter barrel re-exports
+- [`sdk:context-markdown`](../context-markdown/spec.md) — presentation helpers exported from the public barrel

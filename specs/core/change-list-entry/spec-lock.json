@@ -14,5 +14,41 @@
         "DiscardedChangeListEntry"
       ]
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Lightweight ChangeRepository.list* row shapes: shared base plus draft/discard extras; detail stays on get*.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:e26b9cdbdda8520873b8af1384e1fd13686f07b560652865479a1bed4553d863",
+          "lastModified": "2026-07-22T16:55:45.246Z"
+        },
+        "verify.md": {
+          "hash": "sha256:e8a4d4726f2da8198f6179a8a1ab898f6d2a85bea9fdd9d230330da68e29cf65",
+          "lastModified": "2026-07-22T16:55:45.247Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# ChangeListEntry\n\n## Rules\n- Shared base required: `name`, `createdAt`, `state` (from history), `specIds`, `schemaName`, `schemaVersion`.\n- `ActiveChangeListEntry`: base only; optional `description` iff `includeDescription`.\n- `DraftedChangeListEntry`: + required `draftedAt`, `draftedBy` (history); optional `description`/`reason` via include flags.\n- `DiscardedChangeListEntry`: + required `discardedAt`, `discardedBy`; optional `description`/`reason`/`supersededBy` via include flags.\n- Three distinct types — MUST NOT be single discriminated union at port layer.\n- MUST NOT include history, artifact maps, hashes, approvals, content (detail ops only).\n\n## Constraints\n- Read-only data shapes; no mutators.\n- Optional fields only when matching include* set; flags = response projection — index holds full payload; no extra get/file reads.\n- History-derived fields projected at build time, not opaque manifest snapshots.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:e26b9cdbdda8520873b8af1384e1fd13686f07b560652865479a1bed4553d863",
+          "lastModified": "2026-07-22T16:55:45.246Z"
+        },
+        "verify.md": {
+          "hash": "sha256:e8a4d4726f2da8198f6179a8a1ab898f6d2a85bea9fdd9d230330da68e29cf65",
+          "lastModified": "2026-07-22T16:55:45.247Z"
+        }
+      }
+    }
+  }
 }

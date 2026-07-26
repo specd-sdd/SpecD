@@ -60,6 +60,8 @@
       ]
     }
   ],
+  "optimizedDescription": "ArchiveListEntry: lightweight index row for fast archive listing without per-entry manifest reads.",
+  "optimizedContext": "# ArchiveListEntry\n## Rules\n### Index entry fields\n- Required: `name`, `archivedName`, `archivedAt`, `specIds`, `schemaName`, `schemaVersion`.\n- Optional `archivedBy` only when `includeArchivedBy` set; else MUST NOT appear.\n- MUST NOT include `artifacts` (use `get(name)`) or `workspaces` (derive from `specIds` prefix before `: `).\n- Public name `ArchiveListEntry` replaces `ArchivedChangeIndexEntry` (deprecated alias OK).\n### No manifest-only data\n- MUST NOT require manifest-only fields (artifact maps, full history, type lists). Detail via `get(name)`.\n## Constraints\n- Read-only; no mutators. Intentionally incomplete vs `ArchivedChange`.\n- `includeArchivedBy` is projection-only; index stores full payload.",
   "contentHashes": {
     "spec.md": "sha256:6069476a4256c04c9689e844e9884f9f78d2e7352470912dff515de8f1037749",
     "verify.md": "sha256:6d124738c199123f1d5e0f899ce00f235f3dafbbd73194aea6200fcf7d205458"
@@ -75,7 +77,7 @@
         "lastModified": "2026-07-22T16:55:45.261Z"
       }
     },
-    "persistedStateHash": "sha256:b639db9a82688a187a665eb64bd2e96fdb75dd52fa20f9b1e0457455c99a411d",
+    "persistedStateHash": "sha256:45d501f7f60ed1375d72bc6b83c107f95ce4c43055d8f648b063cbb71e8f3e4c",
     "schema": {
       "name": "schema-std",
       "version": 1

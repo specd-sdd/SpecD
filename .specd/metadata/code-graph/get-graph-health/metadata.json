@@ -138,6 +138,8 @@
       }
     ]
   },
+  "optimizedDescription": "Use case: GraphStatistics + VCS stale/currentRef + fingerprintMismatch on already-open CodeGraphProvider; no lock/open/close.",
+  "optimizedContext": "# GetGraphHealth\n## Rules\n### Returns enriched graph health\n- `GetGraphHealth.execute(input)` → `GetGraphHealthResult` = all `GraphStatistics` +\n  - `stale: boolean | null` — per `code-graph:staleness-detection`\n  - `currentRef: string | null` — `createVcsAdapter(config.projectRoot)` or null\n  - `fingerprintMismatch: boolean | null` — when workspaces + `codeGraphVersion` allow, else null\n\n### Provider-owned availability and error propagation\n- Availability via `provider.getStatistics()` only\n- MUST NOT call external lock helpers or accept lock-assertion escape hatch\n- Busy/stale provider errors propagate unchanged\n\n### Computes VCS staleness\n- Resolve ref via `createVcsAdapter`; apply `isGraphStale(lastIndexedRef, currentRef)`\n- `lastIndexedRef === null` → `stale: null` (not true)\n\n### Computes derivation fingerprint mismatch\n- If `input.workspaces` + `stats.graphFingerprint != null`: parse map, build effective graph config from `input.config`, call `detectFingerprintMismatch` with `codeGraphVersion`, `projectRoot`, workspaces, graph config\n- Else `fingerprintMismatch: null`\n\n### Accepts open provider and project inputs\n- `GetGraphHealthInput`: `config: SpecdConfig`, `provider: CodeGraphProvider` (open), `codeGraphVersion: string`, optional workspaces\n- MUST NOT open/close provider\n\n### Factory wires dependencies\n- `createGetGraphHealth()` → stateless instance; no config capture; all inputs per `execute()`\n\n## Constraints\n- MUST NOT mutate store or trigger indexing\n- MUST NOT load change entities or compile project context\n- Statistics via `provider.getStatistics()` only",
   "contentHashes": {
     "spec.md": "sha256:1e02ae06c74070365fb1ac3158fc1e786ec4402e14515cdb57f47871e67d8abe",
     "verify.md": "sha256:3f64ffe19bd4b2fa5e562b6deddea8ab9947745c671ec4e35d602cbde624c5c3"
@@ -153,7 +155,7 @@
         "lastModified": "2026-07-20T16:47:44.371Z"
       }
     },
-    "persistedStateHash": "sha256:bbe7e79e0793b48b1d77156948eb5671a4f34bb7cee9c2321f2f2b01961b466c",
+    "persistedStateHash": "sha256:4e40300dcccef13680f7c929e9ad58e00c706cf97db32ad2554625a82aeb1a2d",
     "schema": {
       "name": "schema-std",
       "version": 1

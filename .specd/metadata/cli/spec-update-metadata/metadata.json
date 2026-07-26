@@ -32,14 +32,14 @@
   ],
   "dependsOn": [],
   "contentHashes": {
-    "spec.md": "sha256:4dfd1232517f2e6aa0aef2e166a952ca7ed6464576012753d2e07a0ef4b6bd76",
+    "spec.md": "sha256:0b02f30df76aad9391f76368a2e8d990c61fcc8573cb80d988b082943fa767df",
     "verify.md": "sha256:0d21d580eb53e69b2475754f6894f139c6faa39dc3fd1ef9301a353a748638a3"
   },
   "provenance": {
     "artifacts": {
       "spec.md": {
-        "hash": "sha256:4dfd1232517f2e6aa0aef2e166a952ca7ed6464576012753d2e07a0ef4b6bd76",
-        "lastModified": "2026-07-25T11:53:31.207Z"
+        "hash": "sha256:0b02f30df76aad9391f76368a2e8d990c61fcc8573cb80d988b082943fa767df",
+        "lastModified": "2026-07-25T13:14:44.396Z"
       },
       "verify.md": {
         "hash": "sha256:0d21d580eb53e69b2475754f6894f139c6faa39dc3fd1ef9301a353a748638a3",

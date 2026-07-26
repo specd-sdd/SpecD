@@ -14,5 +14,41 @@
     {
       "file": "cli:src/commands/change/validate.ts"
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Global CLI contract: config discovery/--config, stdout/stderr, --format text|json|toon, exit 0-3, banner, bare→dashboard.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:e5293050d50b803eaf2e0202e5b3e9fe7e7cec37fa03eb508acb3190d57bc638",
+          "lastModified": "2026-07-22T16:55:46.420Z"
+        },
+        "verify.md": {
+          "hash": "sha256:f90b6ed89df73a690148b0ece6f836854c2090a170837b8bae186bccd79a56e2",
+          "lastModified": "2026-07-22T16:55:46.418Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# CLI Entrypoint\n## Rules\n### Configuration discovery\n- No `--config`: walk CWD→git root for first `specd.yaml`; none → exit 1 + stderr error\n- Halts at git root (or FS root if no git)\n\n### Config flag override\n- Global `--config <path>` on root; before or after subcommand\n- Root `preAction` propagates to subcommand lacking own `--config`\n- Explicit path skips discovery; missing/unparseable → exit 1\n- Duplicate `--config` → Commander last-wins\n\n### Output conventions\n- Normal → stdout; errors/warnings/diagnostics → stderr; never mix\n\n### Exit codes\n- 0 success; 1 user/domain; 2 hook failure (`run:` non-zero, forward hook streams); 3 system\n- No other codes\n\n### Error message format\n- Exit 1: stderr `error:` line\n- Exit 3: stderr `fatal:`; stack only if `Logger.isLevelEnabled('debug')`\n\n### Output format flag\n- `--format text|json|toon` default `text`; json/toon → stdout same data model\n- Errors always plain `error:`/`fatal:` on stderr\n\n### Structured error output\n- Typed errors per Specd Error Contract (`default:_global/error-handling-conventions`)\n- `SpecdCliError` extends `SpecdError`; no bare `Error` in formatters/helpers/validation\n- `handleError` emits structured JSON/TOON without stack on stdout when format json/toon\n\n### JSON/TOON output schema in help\n- Commands w/ `--format json|toon`: `addHelpText('after', ...)` block starting `\\nJSON/TOON output schema:`\n- TS-style shape; `//` only if needed; `?` optional; inline array element types\n\n### Host package SDK dependency boundary\n- `@specd/cli` + `@specd/mcp`: only `@specd/sdk` among platform pkgs (`core`/`code-graph`/`sdk`)\n\n### Banner version labels\n- Root help: versions for `@specd/cli`, `@specd/sdk`, `CORE_VERSION`, `codeGraphVersion` via SDK re-exports\n\n### Excess arguments rejected\n- Leaf cmds reject unexpected positionals → exit 1 + usage stderr\n- `.allowExcessArguments(false)` required\n\n### Banner in help\n- `specd --help`: ASCII banner via `addHelpText('before', ...)`; NOT on subcommand help\n\n### Auto-show dashboard\n- Bare `specd` or `specd --config <path>`: if config found → `project dashboard`; else help\n\n### Top-level init alias\n- `specd init` ≡ `specd project init` (flags/wizard/exits/formats); listed in root help\n\n## Constraints\n- Stdout/stderr independent\n- Exit 2 exclusive to hooks\n- `--format` never changes stderr text; json/toon also write structured error to stdout\n- Banner root-help only",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:e5293050d50b803eaf2e0202e5b3e9fe7e7cec37fa03eb508acb3190d57bc638",
+          "lastModified": "2026-07-22T16:55:46.420Z"
+        },
+        "verify.md": {
+          "hash": "sha256:f90b6ed89df73a690148b0ece6f836854c2090a170837b8bae186bccd79a56e2",
+          "lastModified": "2026-07-22T16:55:46.418Z"
+        }
+      }
+    }
+  }
 }
