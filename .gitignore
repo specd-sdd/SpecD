@@ -10,7 +10,6 @@ apps/public-web/.generated/
 
 # Runtime state (specd tool — plans, plugins, hooks state)
 .specd/*
-!.specd/metadata/
 
 # AI Agents
 .agents/
