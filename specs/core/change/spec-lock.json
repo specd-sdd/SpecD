@@ -13,7 +13,16 @@
     "default:_global/logging",
     "core:implementation-detector-port"
   ],
-  "implementation": [],
+  "implementation": [
+    {
+      "file": "core:src/domain/entities/change.ts",
+      "symbols": ["Change", "touchUpdatedAt"]
+    },
+    {
+      "file": "core:src/application/use-cases/save-change-artifact.ts",
+      "symbols": ["SaveChangeArtifact", "SaveChangeArtifactResult"]
+    }
+  ],
   "optimizations": {
     "optimizedDescription": {
       "value": "Central domain entity for in-progress spec work: lifecycle, approvals, artifacts, append-only history, invalidation.",

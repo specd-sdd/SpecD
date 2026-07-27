@@ -682,6 +682,7 @@ export class FsChangeRepository extends ChangeRepository {
     if (artifactTypes.length > 0) {
       change.syncArtifacts(artifactTypes, specExistence)
     }
+    change.touchUpdatedAt()
     const manifest = changeToManifest(change)
     const dirName = changeDirName(change.name, change.createdAt)
 
@@ -1455,6 +1456,7 @@ export class FsChangeRepository extends ChangeRepository {
     const change = new Change({
       name: manifest.name,
       createdAt: new Date(manifest.createdAt),
+      updatedAt: deriveManifestUpdatedAt(manifest),
       ...(manifest.description !== undefined ? { description: manifest.description } : {}),
       specIds: manifest.specIds,
       ...(manifest.trackedImplementationFiles !== undefined
@@ -1622,6 +1624,25 @@ export class FsChangeRepository extends ChangeRepository {
 // ---- Serialization helpers ----
 
 /**
+ * Derives the revision timestamp for a manifest, supporting legacy manifests
+ * that predate the `updatedAt` field.
+ *
+ * @param manifest - Parsed manifest data
+ * @returns The derived revision timestamp
+ */
+function deriveManifestUpdatedAt(manifest: ChangeManifest): Date {
+  if (manifest.updatedAt !== undefined) {
+    return new Date(manifest.updatedAt)
+  }
+  let max = new Date(manifest.createdAt).getTime()
+  for (const event of manifest.history) {
+    const at = new Date(event.at).getTime()
+    if (at > max) max = at
+  }
+  return new Date(max)
+}
+
+/**
  * Serializes a `Change` entity into the `ChangeManifest` JSON structure.
  *
  * @param change - The change to serialize
@@ -1655,6 +1676,7 @@ function changeToManifest(change: Change): ChangeManifest {
   return {
     name: change.name,
     createdAt: change.createdAt.toISOString(),
+    updatedAt: change.updatedAt.toISOString(),
     ...(change.description !== undefined ? { description: change.description } : {}),
     schema,
     specIds: [...change.specIds],

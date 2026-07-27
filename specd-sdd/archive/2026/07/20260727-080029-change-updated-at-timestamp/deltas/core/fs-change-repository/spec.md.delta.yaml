@@ -1,0 +1,14 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: FsChangeIndexCache helper'
+  content: |
+    ### Requirement: Revision timestamp serialization and backward compatibility
+
+    `FsChangeRepository` SHALL serialize `change.updatedAt` to `manifest.json`.
+
+    For legacy manifests where `updatedAt` is missing, `FsChangeRepository` SHALL derive `updatedAt` as the maximum timestamp among `createdAt` and all event timestamps in `history`.

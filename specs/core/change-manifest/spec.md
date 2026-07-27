@@ -14,6 +14,7 @@ Each change is persisted as a manifest.json file inside its change directory. It
 {
   "name": "add-oauth-login",
   "createdAt": "2026-05-15T10:00:00.000Z",
+  "updatedAt": "2026-05-15T12:30:00.000Z",
   "schema": { "name": "schema-std", "version": 1 },
   "specIds": ["core:change"],
   "invalidationPolicy": "downstream",
@@ -52,6 +53,7 @@ Each change is persisted as a manifest.json file inside its change directory. It
 
 Field definitions:
 
+- `updatedAt` — optional ISO 8601 timestamp string representing the timestamp when the change was last updated.
 - `name` — the change slug; immutable after creation
 - `createdAt` — ISO 8601 timestamp; immutable after creation; source of truth for the directory prefix
 - `schema` — name (string) and version (integer) of the schema active at creation; written once, never updated

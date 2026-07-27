@@ -54,6 +54,20 @@
 - **THEN** the corresponding bucket helper performs a full rebuild
 - **AND** `reindex()` rebuilds all three buckets
 
+### Requirement: Revision timestamp serialization and backward compatibility
+
+#### Scenario: Persisting updatedAt to manifest
+
+- **GIVEN** a `Change` with a specific `updatedAt`
+- **WHEN** `save` is called on `FsChangeRepository`
+- **THEN** `manifest.json` contains `updatedAt` matching `change.updatedAt.toISOString()`
+
+#### Scenario: Deriving updatedAt for legacy manifest
+
+- **GIVEN** a legacy `manifest.json` without an `updatedAt` property
+- **WHEN** `FsChangeRepository` loads the change
+- **THEN** `loadedChange.updatedAt` equals the maximum timestamp found in `createdAt` or `history` events
+
 ### Requirement: Index helper mutate and lock
 
 #### Scenario: Index writes go through mutate under bucket lock

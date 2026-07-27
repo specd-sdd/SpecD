@@ -64,6 +64,12 @@
 - **AND** `symbols` is omitted for file-level-only links
 - **AND** `fileLinkExplicit: false` is only valid when `symbols` is present and non-empty
 
+#### Scenario: Valid manifest containing updatedAt
+
+- **GIVEN** a `manifest.json` file containing a valid `updatedAt` ISO string
+- **WHEN** the manifest is validated against the schema
+- **THEN** validation succeeds
+
 ### Requirement: Archive outcome history events
 
 #### Scenario: Failed archive attempt appends archive-failed event

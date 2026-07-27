@@ -1,0 +1,16 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Identity'
+  content: |
+    ### Requirement: Revision timestamp
+
+    The `Change` entity SHALL maintain a `updatedAt` property representing its last modification timestamp.
+
+    - `updatedAt` MUST NOT be prior to `createdAt`.
+    - If `updatedAt` is omitted at construction, it SHALL default to `createdAt`.
+    - `Change` SHALL provide a `touchUpdatedAt(at: Date = new Date())` method to set or advance `updatedAt` (defaulting to current date/time when omitted).

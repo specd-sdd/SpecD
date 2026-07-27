@@ -1372,4 +1372,44 @@ describe('Change', () => {
       expect([...c.specDependsOn.get('auth/login')!]).toEqual(['auth/shared'])
     })
   })
+
+  describe('updatedAt', () => {
+    it('defaults updatedAt to createdAt when omitted', () => {
+      const createdAt = new Date('2024-01-01T00:00:00Z')
+      const c = makeChange()
+      expect(c.updatedAt).toEqual(createdAt)
+    })
+
+    it('throws InvalidChangeError when updatedAt is before createdAt', () => {
+      expect(
+        () =>
+          new Change({
+            name: 'add-oauth-login',
+            createdAt: new Date('2024-01-02T00:00:00Z'),
+            updatedAt: new Date('2024-01-01T00:00:00Z'),
+            specIds: ['auth/login'],
+            history: [],
+          }),
+      ).toThrow(InvalidChangeError)
+    })
+
+    it('touchUpdatedAt without arguments advances updatedAt to a later timestamp', () => {
+      const c = makeChange()
+      const before = c.updatedAt.getTime()
+      c.touchUpdatedAt()
+      expect(c.updatedAt.getTime()).toBeGreaterThanOrEqual(before)
+    })
+
+    it('touchUpdatedAt with explicit date sets updatedAt', () => {
+      const c = makeChange()
+      const explicit = new Date('2024-06-01T12:00:00Z')
+      c.touchUpdatedAt(explicit)
+      expect(c.updatedAt).toEqual(explicit)
+    })
+
+    it('touchUpdatedAt throws when explicit date is before createdAt', () => {
+      const c = makeChange()
+      expect(() => c.touchUpdatedAt(new Date('2023-12-31T00:00:00Z'))).toThrow(InvalidChangeError)
+    })
+  })
 })

@@ -18,6 +18,14 @@ Identities in specd are represented by the `ActorIdentity` interface:
 - **`providerId`** — optional unique ID within that provider (e.g. LDAP DN)
 - **`metadata`** — optional bag of arbitrary string-valued metadata (`Record<string, string>`)
 
+### Requirement: Revision timestamp
+
+The `Change` entity SHALL maintain a `updatedAt` property representing its last modification timestamp.
+
+- `updatedAt` MUST NOT be prior to `createdAt`.
+- If `updatedAt` is omitted at construction, it SHALL default to `createdAt`.
+- `Change` SHALL provide a `touchUpdatedAt(at: Date = new Date())` method to set or advance `updatedAt` (defaulting to current date/time when omitted).
+
 ### Requirement: Workspaces and specs
 
 A Change declares:

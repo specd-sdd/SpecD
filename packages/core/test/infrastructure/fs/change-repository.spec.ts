@@ -15,6 +15,7 @@ import { DraftedChangeReadOnlyError } from '../../../src/domain/errors/drafted-c
 import { SchemaMismatchError } from '../../../src/application/errors/schema-mismatch-error.js'
 import { Logger } from '../../../src/application/logger.js'
 import { FsChangeRepository } from '../../../src/infrastructure/fs/change-repository.js'
+import { changeManifestSchema } from '../../../src/infrastructure/fs/manifest.js'
 import { vi } from 'vitest'
 import { sha256 } from '../../../src/infrastructure/fs/hash.js'
 import { artifactDagFromChangeArtifacts } from '../../../src/domain/value-objects/artifact-dag.js'
@@ -1110,6 +1111,82 @@ describe('FsChangeRepository', () => {
       expect(fromGet).not.toBeNull()
       expect(fromGet?.isDrafted).toBe(false)
       expect(fromGet?.state).toBe(restored.state)
+    })
+  })
+
+  describe('updatedAt persistence', () => {
+    it('given a valid change, when save is called, then manifest.json includes updatedAt', async () => {
+      const change = makeChange('add-auth')
+      await persistChange(ctx.repo, change)
+
+      const dir = path.join(ctx.changesPath, '20240115-100000-add-auth')
+      const raw = await fs.readFile(path.join(dir, 'manifest.json'), 'utf8')
+      const parsed = JSON.parse(raw) as Record<string, unknown>
+      expect(parsed['updatedAt']).toBeTypeOf('string')
+      expect(parsed['updatedAt']).toBe(change.updatedAt.toISOString())
+    })
+
+    it('given a saved change, when save is called again, then updatedAt advances', async () => {
+      const change = makeChange('add-auth')
+      await persistChange(ctx.repo, change)
+      const firstUpdatedAt = change.updatedAt.toISOString()
+
+      await new Promise((resolve) => setTimeout(resolve, 5))
+      change.transition('designing', actor)
+      await persistChange(ctx.repo, change)
+
+      const dir = path.join(ctx.changesPath, '20240115-100000-add-auth')
+      const raw = await fs.readFile(path.join(dir, 'manifest.json'), 'utf8')
+      const parsed = JSON.parse(raw) as Record<string, unknown>
+      expect(parsed['updatedAt']).toBeTypeOf('string')
+      expect(parsed['updatedAt']).not.toBe(firstUpdatedAt)
+      expect(new Date(parsed['updatedAt'] as string).getTime()).toBeGreaterThanOrEqual(
+        new Date(firstUpdatedAt).getTime(),
+      )
+    })
+
+    it('given a legacy manifest without updatedAt, when loaded, then updatedAt derives from history', async () => {
+      const change = makeChange('legacy-auth')
+      change.transition('designing', actor)
+      await persistChange(ctx.repo, change)
+
+      const dir = path.join(ctx.changesPath, '20240115-100000-legacy-auth')
+      const raw = await fs.readFile(path.join(dir, 'manifest.json'), 'utf8')
+      const parsed = JSON.parse(raw) as Record<string, unknown>
+      delete parsed['updatedAt']
+      await fs.writeFile(path.join(dir, 'manifest.json'), JSON.stringify(parsed, null, 2), 'utf8')
+
+      const loaded = await ctx.repo.get('legacy-auth')
+      expect(loaded).not.toBeNull()
+      const expected = Math.max(
+        new Date(parsed['createdAt'] as string).getTime(),
+        ...((parsed['history'] as Array<{ at: string }>) ?? []).map((event) =>
+          new Date(event.at).getTime(),
+        ),
+      )
+      expect(loaded?.updatedAt.getTime()).toBe(expected)
+    })
+
+    it('given a valid manifest containing updatedAt, when validated against schema, then validation succeeds', () => {
+      const result = changeManifestSchema.safeParse({
+        name: 'add-auth',
+        createdAt: '2024-01-01T00:00:00.000Z',
+        updatedAt: '2024-06-01T12:00:00.000Z',
+        schema: { name: 'schema-std', version: 1 },
+        specIds: ['default:auth/login'],
+        artifacts: [],
+        history: [
+          {
+            type: 'created',
+            at: '2024-01-01T00:00:00.000Z',
+            by: { name: 'Alice', email: 'alice@example.com' },
+            schemaName: 'schema-std',
+            schemaVersion: 1,
+          },
+        ],
+      })
+
+      expect(result.success).toBe(true)
     })
   })
 

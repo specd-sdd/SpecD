@@ -12,6 +12,7 @@ Users and tooling need a quick way to see where a change stands — both its lif
 
 - `name` (string, required) — the change name to look up
 - `refreshImplementationTracking` (boolean, optional) — when omitted or `true`, refresh tracked implementation files before loading status for **active** changes only; when `false`, skip refresh
+- `ifModifiedSince` (string, optional) — client revision timestamp (ISO 8601 or any value accepted by `Date.parse`). Used for conditional status short-circuit against `change.updatedAt`
 
 ### Requirement: Returns the change and its artifact statuses
 
@@ -19,11 +20,12 @@ On success, `execute()` MUST return a `GetStatusResult` containing:
 
 - `change` — the loaded active `Change` when the name resolves under `changes/`; MUST be absent when only a draft exists
 - `draftView` — a `DraftedChangeView` when the name resolves only under `drafts/`; MUST be absent for active changes
-- `artifactStatuses` — an array of `ArtifactStatusEntry` objects, one per artifact attached to the change
+- `unchanged` (boolean, optional) — when `true`, the client revision matched or exceeded `change.updatedAt` and full status evaluation was skipped (HTTP-304-style short-circuit)
+- `artifactStatuses` — an array of `ArtifactStatusEntry` objects, one per artifact attached to the change; **except** when `unchanged` is `true`, in which case `artifactStatuses` MUST be an empty array (full projection intentionally omitted)
 - `specDependsOn` — the map of declared spec dependencies from the change manifest
-- `review` — a derived review summary for agents and CLI serializers
-- `blockers` — an array of active blockers preventing progress
-- `nextAction` — a recommended next action to guide the actor
+- `review` — a derived review summary for agents and CLI serializers; when `unchanged` is `true`, review MAY be a minimal stub (`required: false`)
+- `blockers` — an array of active blockers preventing progress; when `unchanged` is `true`, blockers MUST be an empty array
+- `nextAction` — a recommended next action to guide the actor; when `unchanged` is `true`, nextAction MAY indicate the client revision is current
 
 Resolution order:
 
@@ -36,7 +38,19 @@ If both are null, the use case MUST throw `ChangeNotFoundError`.
 
 When `draftView` is present, the use case MUST compute artifact and lifecycle projections for inspection only. It MUST NOT expose a mutable `Change` to callers and MUST NOT surface transitions that would mutate the drafted change (`availableTransitions` MUST be empty; `nextAction.command` MUST NOT recommend transition or validate commands).
 
-(rest of requirement content remains unchanged...)
+### Requirement: Revision evaluation for conditional status queries
+
+`GetStatus` SHALL support optional client revision comparison via `ifModifiedSince`.
+
+When `ifModifiedSince` is provided, `GetStatus` MUST parse it with `Date.parse`. If parsing yields a valid timestamp greater than or equal to `change.updatedAt.getTime()`, `GetStatus` SHALL short-circuit like HTTP 304:
+
+- bypass full status re-evaluation (no full artifact effective-status projection, no full review/blocker recomputation)
+- MUST NOT invoke `RefreshImplementationTracking`
+- return `unchanged: true`
+- return `artifactStatuses` as an empty array
+- still return the loaded `change` and `specDependsOn`
+
+When `ifModifiedSince` is omitted, unparseable (`NaN`), or strictly older than `change.updatedAt`, `GetStatus` MUST perform the normal full status evaluation path.
 
 ### Requirement: Drafted change read-only status
 
@@ -57,7 +71,7 @@ That projection MUST include:
 
 ### Requirement: Optional pre-read implementation tracking refresh
 
-When `refreshImplementationTracking` is not `false` (default `true`) and `ChangeRepository.get(name)` returns a non-null active change, `GetStatus` MUST invoke `RefreshImplementationTracking.execute({ name })` before loading status.
+When `refreshImplementationTracking` is not `false` (default `true`) and `ChangeRepository.get(name)` returns a non-null active change, `GetStatus` MUST invoke `RefreshImplementationTracking.execute({ name })` before loading status — **except** when the `ifModifiedSince` short-circuit applies (client revision current), in which case `GetStatus` MUST NOT invoke `RefreshImplementationTracking`.
 
 When the change resolves only via `ChangeRepository.getDraft(name)`, or when `refreshImplementationTracking` is `false`, `GetStatus` MUST NOT invoke `RefreshImplementationTracking`.
 
@@ -125,9 +139,11 @@ The config-based factory MUST NOT assemble a weaker repository variant that can 
 
 ### Requirement: Reports effective status for every artifact
 
-The `artifactStatuses` array MUST contain exactly one entry per artifact in the change's artifact map. It MUST NOT omit artifacts and MUST NOT include entries for artifacts that do not exist on the change.
+When `unchanged` is not `true`, the `artifactStatuses` array MUST contain exactly one entry per artifact in the change's artifact map. It MUST NOT omit artifacts and MUST NOT include entries for artifacts that do not exist on the change.
 
-`GetStatus` MUST derive each entry's `effectiveStatus` through `LifecycleEngine` so the reported value reflects recursive dependency blocking, workflow requirements, and approval-gate semantics from the active schema rather than only persisted aggregate artifact state.
+When `unchanged` is `true`, `artifactStatuses` MUST be empty (full projection omitted by the revision short-circuit).
+
+On the full evaluation path, `GetStatus` MUST derive each entry's `effectiveStatus` through `LifecycleEngine` so the reported value reflects recursive dependency blocking, workflow requirements, and approval-gate semantics from the active schema rather than only persisted aggregate artifact state.
 
 ### Requirement: Returns lifecycle context
 

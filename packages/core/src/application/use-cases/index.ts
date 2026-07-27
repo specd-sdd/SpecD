@@ -6,6 +6,11 @@ export { type GetArchivedChange, type GetArchivedChangeInput } from './get-archi
 export { type EditChange, type EditChangeInput, type EditChangeResult } from './edit-change.js'
 export { type SkipArtifact, type SkipArtifactInput } from './skip-artifact.js'
 export {
+  type SaveChangeArtifact,
+  type SaveChangeArtifactInput,
+  type SaveChangeArtifactResult,
+} from './save-change-artifact.js'
+export {
   type UpdateSpecDeps,
   type UpdateSpecDepsInput,
   type UpdateSpecDepsResult,

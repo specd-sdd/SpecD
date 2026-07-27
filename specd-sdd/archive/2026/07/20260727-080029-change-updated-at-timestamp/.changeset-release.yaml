@@ -1,0 +1,5 @@
+releases:
+  core:change: minor
+  core:change-manifest: patch
+  core:fs-change-repository: patch
+  core:get-status: minor

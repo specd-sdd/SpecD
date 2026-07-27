@@ -1,0 +1,14 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Manifest structure'
+    after:
+      type: section
+      matches: 'Scenario: Manifest stores confirmed links with fileLinkExplicit semantics'
+  content: |
+    #### Scenario: Valid manifest containing updatedAt
+
+    - **GIVEN** a `manifest.json` file containing a valid `updatedAt` ISO string
+    - **WHEN** the manifest is validated against the schema
+    - **THEN** validation succeeds

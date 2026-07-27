@@ -41,6 +41,12 @@ Canonical sort order per bucket:
 | Drafts    | `draftedAt`   | newest → oldest |
 | Discarded | `discardedAt` | newest → oldest |
 
+### Requirement: Revision timestamp serialization and backward compatibility
+
+`FsChangeRepository` SHALL serialize `change.updatedAt` to `manifest.json`.
+
+For legacy manifests where `updatedAt` is missing, `FsChangeRepository` SHALL derive `updatedAt` as the maximum timestamp among `createdAt` and all event timestamps in `history`.
+
 ### Requirement: Index helper mutate and lock
 
 Each `FsChangeIndexCache` MUST expose a `mutate(fn)`-style API as the **only** allowed write path for its bucket index files. It MUST acquire a per-bucket file lock, run `fn`, and release the lock — including on failure. Concurrent mutators MUST wait (they MUST NOT fail with lock contention).

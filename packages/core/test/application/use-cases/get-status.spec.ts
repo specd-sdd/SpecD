@@ -473,4 +473,84 @@ describe('GetStatus', () => {
       expect(result.lifecycle.nextArtifact).toBeNull()
     })
   })
+
+  describe('ifModifiedSince revision checks', () => {
+    it('returns unchanged early when client revision matches updatedAt', async () => {
+      const createdAt = new Date('2024-01-01T00:00:00Z')
+      const updatedAt = new Date('2024-06-01T12:00:00Z')
+      const change = makeChange('my-change', { createdAt, updatedAt })
+      change.transition('designing', testActor)
+      const refreshExecute = vi.fn()
+      const uc = makeGetStatus(makeChangeRepository([change]), { refreshExecute })
+
+      const result = await uc.execute({
+        name: 'my-change',
+        ifModifiedSince: updatedAt.toISOString(),
+      })
+
+      expect(result.unchanged).toBe(true)
+      expect(result.artifactStatuses).toEqual([])
+      expect(refreshExecute).not.toHaveBeenCalled()
+      expect(result.change).toBe(change)
+      expect(result.specDependsOn).toEqual({})
+      expect(result.blockers).toEqual([])
+      expect(result.review.required).toBe(false)
+    })
+
+    it('returns unchanged early when client revision exceeds updatedAt', async () => {
+      const createdAt = new Date('2024-01-01T00:00:00Z')
+      const updatedAt = new Date('2024-06-01T12:00:00Z')
+      const change = makeChange('my-change', { createdAt, updatedAt })
+      change.transition('designing', testActor)
+      const refreshExecute = vi.fn()
+      const uc = makeGetStatus(makeChangeRepository([change]), { refreshExecute })
+
+      const result = await uc.execute({
+        name: 'my-change',
+        ifModifiedSince: new Date('2024-06-01T13:00:00Z').toISOString(),
+      })
+
+      expect(result.unchanged).toBe(true)
+      expect(result.artifactStatuses).toEqual([])
+      expect(refreshExecute).not.toHaveBeenCalled()
+      expect(result.change).toBe(change)
+      expect(result.specDependsOn).toEqual({})
+      expect(result.blockers).toEqual([])
+      expect(result.review.required).toBe(false)
+    })
+
+    it('re-evaluates full status when client revision is older than updatedAt', async () => {
+      const createdAt = new Date('2024-01-01T00:00:00Z')
+      const updatedAt = new Date('2024-06-01T12:00:00Z')
+      const change = makeChange('my-change', { createdAt, updatedAt })
+      change.transition('designing', testActor)
+      const uc = makeGetStatus(makeChangeRepository([change]))
+
+      const result = await uc.execute({
+        name: 'my-change',
+        ifModifiedSince: new Date('2024-01-01T00:00:00Z').toISOString(),
+      })
+
+      expect(result.unchanged).toBeUndefined()
+      expect(result.artifactStatuses.length).toBeGreaterThan(0)
+    })
+
+    it('re-evaluates full status when ifModifiedSince is unparseable', async () => {
+      const createdAt = new Date('2024-01-01T00:00:00Z')
+      const updatedAt = new Date('2024-06-01T12:00:00Z')
+      const change = makeChange('my-change', { createdAt, updatedAt })
+      change.transition('designing', testActor)
+      const refreshExecute = vi.fn()
+      const uc = makeGetStatus(makeChangeRepository([change]), { refreshExecute })
+
+      const result = await uc.execute({
+        name: 'my-change',
+        ifModifiedSince: 'not-a-date',
+      })
+
+      expect(result.unchanged).toBeUndefined()
+      expect(result.artifactStatuses.length).toBeGreaterThan(0)
+      expect(refreshExecute).toHaveBeenCalled()
+    })
+  })
 })

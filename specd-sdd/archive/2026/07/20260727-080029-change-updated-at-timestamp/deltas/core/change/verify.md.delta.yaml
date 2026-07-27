@@ -1,0 +1,33 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Identity'
+  content: |
+    ### Requirement: Revision timestamp
+
+    #### Scenario: Initialized with createdAt default
+
+    - **GIVEN** a new `Change` entity created without explicit `updatedAt`
+    - **WHEN** `change.updatedAt` is accessed
+    - **THEN** it returns a `Date` equal to `change.createdAt`
+
+    #### Scenario: Rejects updatedAt before createdAt
+
+    - **WHEN** constructing a `Change` with `updatedAt` earlier than `createdAt`
+    - **THEN** it throws `InvalidChangeError`
+
+    #### Scenario: Touch advances updatedAt to default current time
+
+    - **GIVEN** an existing `Change` entity
+    - **WHEN** `change.touchUpdatedAt()` is called without arguments
+    - **THEN** `change.updatedAt` is updated to the current date/time
+
+    #### Scenario: Touch advances updatedAt to explicit timestamp
+
+    - **GIVEN** an existing `Change` entity
+    - **WHEN** `change.touchUpdatedAt(newDate)` is called with an explicit timestamp later than current `updatedAt`
+    - **THEN** `change.updatedAt` is updated to `newDate`

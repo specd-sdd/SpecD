@@ -1,0 +1,59 @@
+- op: modified
+  description: Include optional updatedAt in the illustrative manifest.json example
+  selector:
+    type: code-block
+    matches: 'jsonc'
+    parent:
+      type: section
+      matches: 'Requirement: Manifest structure'
+  value: |
+    {
+      "name": "add-oauth-login",
+      "createdAt": "2026-05-15T10:00:00.000Z",
+      "updatedAt": "2026-05-15T12:30:00.000Z",
+      "schema": { "name": "schema-std", "version": 1 },
+      "specIds": ["core:change"],
+      "invalidationPolicy": "downstream",
+      "trackedImplementationFiles": [
+        { "file": "packages/core/src/domain/entities/change.ts", "state": "open" },
+        { "file": "packages/core/src/domain/entities/removed-file.ts", "state": "removed" },
+      ],
+      "implementationLinks": [
+        {
+          "specId": "core:change",
+          "file": "packages/core/src/domain/entities/change.ts",
+          "fileLinkExplicit": true,
+          "symbols": ["Change.transition"],
+        },
+      ],
+      "artifacts": [
+        {
+          "type": "proposal",
+          "optional": false,
+          "requires": [],
+          "state": "complete",
+          "files": [
+            {
+              "key": "proposal",
+              "filename": "proposal.md",
+              "state": "complete",
+              "validatedHash": "sha256:...",
+              "hasDrift": false,
+            },
+          ],
+        },
+      ],
+      "history": [],
+    }
+
+- op: added
+  description: Document optional updatedAt field on change manifests
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Manifest structure'
+    after:
+      type: paragraph
+      contains: 'Field definitions:'
+  content: |
+    - `updatedAt` — optional ISO 8601 timestamp string representing the timestamp when the change was last updated.

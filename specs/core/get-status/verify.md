@@ -49,6 +49,44 @@
 - **WHEN** `execute()` is called for that change
 - **THEN** `result.specDependsOn` matches the change's `specDependsOn` map
 
+### Requirement: Revision evaluation for conditional status queries
+
+#### Scenario: Revision matches updatedAt
+
+- **GIVEN** a change with `updatedAt`
+- **WHEN** `GetStatus` is called with `ifModifiedSince` equal to `updatedAt.toISOString()`
+- **THEN** the result has `unchanged: true`
+- **AND** `artifactStatuses` is an empty array
+- **AND** `RefreshImplementationTracking` is not invoked
+- **AND** the result still includes the loaded `change` and `specDependsOn`
+- **AND** `blockers` is an empty array
+- **AND** `review.required` is `false`
+
+#### Scenario: Revision exceeds updatedAt
+
+- **GIVEN** a change with `updatedAt`
+- **WHEN** `GetStatus` is called with `ifModifiedSince` strictly later than `updatedAt`
+- **THEN** the result has `unchanged: true`
+- **AND** `artifactStatuses` is an empty array
+- **AND** `RefreshImplementationTracking` is not invoked
+- **AND** the result still includes the loaded `change` and `specDependsOn`
+- **AND** `blockers` is an empty array
+- **AND** `review.required` is `false`
+
+#### Scenario: Revision older than updatedAt evaluates full status
+
+- **GIVEN** a change with `updatedAt`
+- **WHEN** `GetStatus` is called with `ifModifiedSince` strictly earlier than `updatedAt`
+- **THEN** `unchanged` is absent or not `true`
+- **AND** full status evaluation runs (non-empty `artifactStatuses` for a change that has artifacts)
+
+#### Scenario: Unparseable ifModifiedSince evaluates full status
+
+- **GIVEN** a change with `updatedAt`
+- **WHEN** `GetStatus` is called with `ifModifiedSince` that `Date.parse` cannot parse
+- **THEN** `unchanged` is absent or not `true`
+- **AND** full status evaluation runs
+
 ### Requirement: Drafted change read-only status
 
 #### Scenario: Draft-only name returns draftView

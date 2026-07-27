@@ -29,6 +29,12 @@ export interface GetStatusInput {
    * status for active changes only. When `false`, skip refresh.
    */
   readonly refreshImplementationTracking?: boolean
+  /**
+   * Optional client revision timestamp (ISO 8601 or any value accepted by
+   * `Date.parse`). When greater than or equal to `change.updatedAt`, the use
+   * case returns early without re-evaluating full status.
+   */
+  readonly ifModifiedSince?: string
 }
 
 /** Per-file status detail within an artifact. */
@@ -188,6 +194,11 @@ export interface GetStatusResult {
   readonly change?: Change
   /** The drafted read model; absent for active changes. */
   readonly draftView?: DraftedChangeView
+  /**
+   * When `true`, the client revision matched or exceeded `change.updatedAt`
+   * and full status evaluation was skipped.
+   */
+  readonly unchanged?: boolean
   /** Effective status for each artifact attached to the change. */
   readonly artifactStatuses: ArtifactStatusEntry[]
   /** Per-spec declared dependencies from the change manifest. */
@@ -257,13 +268,6 @@ export class GetStatus {
    * @throws {ChangeNotFoundError} If no change with the given name exists
    */
   async execute(input: GetStatusInput): Promise<GetStatusResult> {
-    if (input.refreshImplementationTracking !== false) {
-      const active = await this._changes.get(input.name)
-      if (active !== null) {
-        await this._refresh.execute({ name: input.name })
-      }
-    }
-
     const change = await this._changes.get(input.name)
     if (change === null) {
       const draftView = await this._changes.getDraft(input.name)
@@ -273,6 +277,32 @@ export class GetStatus {
       return this._buildDraftedResult(draftView)
     }
 
+    if (input.ifModifiedSince !== undefined) {
+      const clientRevision = Date.parse(input.ifModifiedSince)
+      if (!Number.isNaN(clientRevision) && clientRevision >= change.updatedAt.getTime()) {
+        return this._buildUnchangedResult(change)
+      }
+    }
+
+    if (input.refreshImplementationTracking !== false) {
+      await this._refresh.execute({ name: input.name })
+    }
+
+    const refreshedChange = await this._changes.get(input.name)
+    if (refreshedChange === null) {
+      throw new ChangeNotFoundError(input.name)
+    }
+
+    return this._buildActiveResult(refreshedChange)
+  }
+
+  /**
+   * Builds the full status projection for an active change.
+   *
+   * @param change - Active change loaded from the repository
+   * @returns Full status result
+   */
+  private async _buildActiveResult(change: Change): Promise<GetStatusResult> {
     const changePath = this._changes.changePath(change)
     const artifactStatuses: ArtifactStatusEntry[] = []
     let schemaInfo: LifecycleContext['schemaInfo'] = null
@@ -405,6 +435,51 @@ export class GetStatus {
       review,
       blockers,
       nextAction,
+    }
+  }
+
+  /**
+   * Builds a short-circuited status result when the client revision is current.
+   *
+   * @param change - Active change loaded from the repository
+   * @returns Minimal unchanged status result
+   */
+  private _buildUnchangedResult(change: Change): GetStatusResult {
+    const changePath = this._changes.changePath(change)
+    const specDependsOn: Record<string, string[]> = {}
+    for (const [specId, deps] of change.specDependsOn) {
+      specDependsOn[specId] = [...deps]
+    }
+
+    return {
+      change,
+      unchanged: true,
+      artifactStatuses: [],
+      specDependsOn,
+      lifecycle: {
+        validTransitions: VALID_TRANSITIONS[change.state],
+        availableTransitions: [],
+        blockers: [],
+        approvals: this._approvals,
+        nextArtifact: null,
+        changePath,
+        schemaInfo: null,
+      },
+      implementationTracking: projectImplementationTracking(change),
+      review: {
+        required: false,
+        route: null,
+        reason: null,
+        affectedArtifacts: [],
+        overlapDetail: [],
+      },
+      blockers: [],
+      nextAction: {
+        targetStep: change.state,
+        actionType: 'cognitive',
+        reason: 'Client revision is current',
+        command: null,
+      },
     }
   }
 

@@ -1,0 +1,1022 @@
+{
+  "name": "change-updated-at-timestamp",
+  "createdAt": "2026-07-27T08:00:29.629Z",
+  "updatedAt": "2026-07-27T11:09:07.492Z",
+  "description": "Add updatedAt timestamp tracking, backward compatibility derivation, and status caching support for changes",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "core:change",
+    "core:change-manifest",
+    "core:fs-change-repository",
+    "core:get-status"
+  ],
+  "specDependsOn": {
+    "core:change": [
+      "core:change-manifest",
+      "core:workflow-model",
+      "core:spec-metadata",
+      "core:spec-id-format",
+      "default:_global/architecture",
+      "core:lifecycle-engine",
+      "default:_global/logging",
+      "core:implementation-detector-port"
+    ],
+    "core:change-manifest": [
+      "core:change",
+      "core:change-layout",
+      "core:storage",
+      "core:spec-metadata",
+      "core:spec-id-format",
+      "core:workspace"
+    ],
+    "core:fs-change-repository": [
+      "default:_global/architecture",
+      "core:composition",
+      "core:storage",
+      "core:change-list-entry",
+      "core:change-repository-port"
+    ],
+    "core:get-status": [
+      "core:change",
+      "core:kernel",
+      "core:transition-change",
+      "core:schema-format",
+      "core:config",
+      "core:lifecycle-engine",
+      "core:refresh-implementation-tracking",
+      "core:composition-resolver",
+      "core:count-tasks"
+    ]
+  },
+  "invalidationPolicy": "downstream",
+  "trackedImplementationFiles": [
+    {
+      "file": ".specd/metadata/core/archive-repository-port/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/archived-change-index-entry/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/entities/change.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/infrastructure/fs/manifest.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/infrastructure/fs/change-repository.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/get-status.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/save-change-artifact.ts",
+      "state": "resolved"
+    },
+    {
+      "file": ".specd/metadata/cli/change-context/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/cli/entrypoint/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/cli/project-context/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/code-graph/composition/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/code-graph/get-graph-health/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/code-graph/staleness-detection/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/change-list-entry/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/change-manifest/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/change-repository-port/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/compile-context/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/composition-resolver/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/config-writer-port/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/config/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/count-tasks/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/discarded-change-view/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/drafted-change-read-only-error/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/drafted-change-view/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/get-project-context/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/get-spec-metadata/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/get-specs-health/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/implementation-detector-port/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/lifecycle-engine/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/project-metadata/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/read-only-change-view/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/repository-port/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/schema-format/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/spec-metadata/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/spec-optimization/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/spec-overlap/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/storage/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/validate-specs/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/workspace/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/sdk/composition/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/sdk/context-markdown/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/sdk/host-context/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/skills/agent-instruction-template/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/skills/agents/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/skills/skill-templates-source/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/get-status.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/helpers.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/domain/entities/change.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/infrastructure/fs/change-repository.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/save-change-artifact.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/change-layout/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/get-status/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/refresh-implementation-tracking/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/change-layout/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/get-status/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/refresh-implementation-tracking/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/transition-change/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": ".specd/metadata/core/transition-change/metadata.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/skills/agent-instruction-template/spec.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/skills/agent-instruction-template/verify.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/plugin-agent-claude/native-hook/spec.md",
+      "state": "removed"
+    },
+    {
+      "file": "specs/plugin-agent-claude/native-hook/verify.md",
+      "state": "removed"
+    },
+    {
+      "file": "specs/plugin-agent-opencode/native-hook/spec.md",
+      "state": "removed"
+    },
+    {
+      "file": "specs/plugin-agent-opencode/native-hook/verify.md",
+      "state": "removed"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "core:change",
+      "file": "packages/core/src/domain/entities/change.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["Change", "touchUpdatedAt"]
+    },
+    {
+      "specId": "core:change-manifest",
+      "file": "packages/core/src/infrastructure/fs/manifest.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["changeManifestSchema", "ChangeManifest"]
+    },
+    {
+      "specId": "core:fs-change-repository",
+      "file": "packages/core/src/infrastructure/fs/change-repository.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["FsChangeRepository", "deriveManifestUpdatedAt", "changeToManifest"]
+    },
+    {
+      "specId": "core:get-status",
+      "file": "packages/core/src/application/use-cases/get-status.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["GetStatus", "GetStatusInput", "GetStatusResult"]
+    },
+    {
+      "specId": "core:change",
+      "file": "packages/core/src/application/use-cases/save-change-artifact.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["SaveChangeArtifact", "SaveChangeArtifactResult"]
+    },
+    {
+      "specId": "core:change-manifest",
+      "file": "packages/core/test/infrastructure/fs/change-repository.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:get-status",
+      "file": "packages/core/test/application/use-cases/get-status.spec.ts",
+      "fileLinkExplicit": true
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:ed225f64f647c5612ec11b0b401a32dae4e99c51df28c5eb1f639d9b70bed7c0"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:change",
+          "filename": "deltas/core/change/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:f70021b250a264aa3ce7817494645fbe5e7e0c7afb3bb80d6e721b896f9f7a9e"
+        },
+        {
+          "key": "core:change-manifest",
+          "filename": "deltas/core/change-manifest/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:8c7bfb0c33d7323570519b25dedd0106d80e4f4e9acc8b7248a0900e3ec72a79"
+        },
+        {
+          "key": "core:fs-change-repository",
+          "filename": "deltas/core/fs-change-repository/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:448b11eaf55cd7a7e41abe4c9bea096c5b581601fcc2a3c6543d52afcf7c3a40"
+        },
+        {
+          "key": "core:get-status",
+          "filename": "deltas/core/get-status/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:2e8c57ec210f08ab64147157f36889ad5e097ff9eb1713fd245c3aecc78015ac"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:change",
+          "filename": "deltas/core/change/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:c7666fa6730165136ac1bbb2232f1daaa4989c87b57015f8aaccf719834fb4e2"
+        },
+        {
+          "key": "core:change-manifest",
+          "filename": "deltas/core/change-manifest/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:3b0e62a40ca9f3920c5f91a9af132099e83c599cd0049e38498e27cf80d37d8c"
+        },
+        {
+          "key": "core:fs-change-repository",
+          "filename": "deltas/core/fs-change-repository/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:4c166e8e06f0300d25cb966a6ddfb2c33718c708b85b5742202a655e5ba6939c"
+        },
+        {
+          "key": "core:get-status",
+          "filename": "deltas/core/get-status/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:1e773a390b9ad3ceffe86286cee06f1175475d27583753d0df112f4b59cf30d0"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:647508c01db5a1493b6c165a6ba8ff3a4ff2456ee0c75f74623011c6d75ca5b6"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:88d2a8ced2d36403d80694dac1a3095f5d275b748ae2c20f6729f6561e0ffc5e"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-07-27T08:00:29.629Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": [
+        "core:change",
+        "core:change-manifest",
+        "core:fs-change-repository",
+        "core:get-status"
+      ],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-27T08:00:29.645Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "core:change"
+        },
+        {
+          "type": "specs",
+          "key": "core:change-manifest"
+        },
+        {
+          "type": "specs",
+          "key": "core:fs-change-repository"
+        },
+        {
+          "type": "specs",
+          "key": "core:get-status"
+        },
+        {
+          "type": "verify",
+          "key": "core:change"
+        },
+        {
+          "type": "verify",
+          "key": "core:change-manifest"
+        },
+        {
+          "type": "verify",
+          "key": "core:fs-change-repository"
+        },
+        {
+          "type": "verify",
+          "key": "core:get-status"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-27T08:06:41.796Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-27T09:07:25.253Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:change",
+            "core:change-manifest",
+            "core:fs-change-repository",
+            "core:get-status"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:change",
+            "core:change-manifest",
+            "core:fs-change-repository",
+            "core:get-status"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-27T09:08:12.294Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:change",
+            "core:change-manifest",
+            "core:fs-change-repository",
+            "core:get-status"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:change",
+            "core:change-manifest",
+            "core:fs-change-repository",
+            "core:get-status"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-27T09:20:39.413Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [core:change-manifest]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:change-manifest"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:change",
+            "core:change-manifest",
+            "core:fs-change-repository",
+            "core:get-status"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-27T09:21:52.941Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-27T09:22:53.017Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [core:change]; verify [core:change]; design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:change"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:change"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-27T09:22:53.017Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-27T09:24:04.696Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-27T09:26:27.699Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [core:change]; verify [core:change]; design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:change"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:change"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-27T09:31:30.977Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-27T09:42:00.813Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-27T09:50:05.115Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-27T10:02:28.415Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:change",
+            "core:change-manifest",
+            "core:fs-change-repository",
+            "core:get-status"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:change",
+            "core:change-manifest",
+            "core:fs-change-repository",
+            "core:get-status"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-27T10:02:28.415Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-27T10:07:33.498Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-27T10:09:16.583Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-27T10:16:57.834Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-27T10:34:09.106Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:change",
+            "core:change-manifest",
+            "core:fs-change-repository",
+            "core:get-status"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:change",
+            "core:change-manifest",
+            "core:fs-change-repository",
+            "core:get-status"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-27T10:34:09.106Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-27T10:37:20.617Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-27T10:43:04.915Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-27T10:54:26.972Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-27T11:03:42.316Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-27T11:03:50.651Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-27T11:09:07.491Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-07-27T11:09:07.610Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

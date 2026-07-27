@@ -17,14 +17,46 @@
   "implementation": [
     {
       "file": "core:src/application/use-cases/get-status.ts",
-      "symbols": ["GetStatus"]
-    },
-    {
-      "file": "core:src/composition/use-cases/get-status.ts",
-      "symbols": ["GetStatusDeps", "resolveGetStatusDeps"]
+      "symbols": ["GetStatus", "GetStatusInput", "GetStatusResult"]
     },
     {
       "file": "core:test/application/use-cases/get-status.spec.ts"
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Read-only query: load change/draft by name; return lifecycle, cascading artifact statuses, review, blockers, nextAction.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:cf1c8042f72fda3dc1b227ef6b987ab72fb92f4e66d7ec93ea9187be75ab5d05",
+          "lastModified": "2026-07-23T17:26:17.338Z"
+        },
+        "verify.md": {
+          "hash": "sha256:c4992085605027e0a03f0ae130f86297db8443543a8026afcb6cb44c13d7344e",
+          "lastModified": "2026-07-23T17:26:17.338Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# GetStatus\n\n## Rules\n\n### Input\n- `GetStatus.execute(GetStatusInput)`: `name` (required); `refreshImplementationTracking` (optional, default `true` — refresh only for **active** changes; `false` skips)\n\n### Result shape\n- Success → `GetStatusResult`:\n  - `change` — active `Change` from `changes/`; absent if draft-only\n  - `draftView` — `DraftedChangeView` from `drafts/`; absent if active\n  - `artifactStatuses` — one `ArtifactStatusEntry` per attached artifact\n  - `specDependsOn`, `review`, `blockers`, `nextAction`\n- Resolve: `ChangeRepository.get(name)` → else `getDraft(name)` → else throw `ChangeNotFoundError`\n- MUST NOT call `getDiscarded` / load `discarded/`; use `GetDiscarded` for discarded\n- Draft path: inspection-only; no mutable `Change` on result; `availableTransitions` empty; `nextAction.command` MUST NOT recommend transition/validate\n\n### Drafted read-only\n- Draft-only load MUST satisfy `core:drafted-change-view`\n- Internal `Change` from draft OK for status math; MUST NOT appear on `GetStatusResult`\n- Suitable for `drafts show` / read-only CLI; no lifecycle mutation\n\n### Implementation projection\n- `GetStatusResult` MUST include tracked impl files (review state) + confirmed links (file + symbol)\n\n### Pre-read refresh\n- Default/`true` + active change → MUST call `RefreshImplementationTracking.execute({ name })` before status\n- Draft-only or `refreshImplementationTracking: false` → MUST NOT refresh\n- MUST NOT call `ImplementationDetector` or duplicate merge logic\n- After refresh, project from persisted state via `ChangeRepository`\n\n### Drift-aware display\n- Keep canonical `state` / `effectiveStatus`; add display projections\n- `ArtifactFileStatus`: `hasDrift`, `displayStatus` (from state + `hasDrift`)\n- `ArtifactStatusEntry.displayStatus` — aggregated\n- File `displayStatus` = `complete-with-drift` only when state=`complete` AND `hasDrift=true`\n- Aggregated `displayStatus` from file displays; real workflow states beat drift-only projections\n\n### Task completion\n- Artifact type `hasTasks: true` + `taskCompletionCheck` → counts from `CountTasks`\n- Optional `taskCompletion` on `ArtifactStatusEntry` from `CountTasksResult.byArtifact` by type ID\n- Fields: `complete` (`completePattern`), `incomplete` (`incompletePattern`), `total` (sum; omitted patterns → schema defaults)\n- Omit `taskCompletion` if file missing/empty\n\n### Errors\n- Unknown name → throw `ChangeNotFoundError` code `CHANGE_NOT_FOUND`; MUST NOT return `null`\n\n### Constructor deps\n- `changes: ChangeRepository`\n- `schemaProvider: SchemaProvider` (replaces `SchemaRegistry`+`schemaRef`+`workspaceSchemasPaths`)\n- `lifecycle: LifecycleEngine`\n- `approvals: { readonly spec: boolean; readonly signoff: boolean }`\n- `refreshImplementationTracking: RefreshImplementationTracking`\n- `countTasks: CountTasks`\n- Load via `get` then `getDraft`; MUST NOT `getDiscarded`\n- MUST NOT accept/invoke `ImplementationDetector`\n\n### Factory bootstrap\n- `createGetStatus(config)` MUST preserve full change-repository bootstrap + schema-driven artifact-type behavior\n- MUST NOT weaker repo path that diverges artifact states vs canonical read path\n- Config form MUST derive `GetStatusDeps` via `resolveGetStatusDeps(resolver)` then canonical `createGetStatus(deps)`\n- `resolveGetStatusDeps` resolves: `changes`, `schemaProvider`, `approvals`, `refreshImplementationTracking`, `lifecycle`, `countTasks`\n- Only use-case-specific composition entry; MUST NOT inline fs wiring\n\n### Effective status\n- Exactly one `artifactStatuses` entry per change artifact map entry\n- Derive `effectiveStatus` via `LifecycleEngine` (recursive deps, workflow requires, approval gates) — not raw persisted aggregate alone\n\n### Lifecycle / review\n- Compute `ReviewSummary` priority:\n  1. any file `drifted-pending-review` → `required=true`, `reason='artifact-drift'`, `route='designing'`\n  2. else any `pending-review` + unhandled `spec-overlap-conflict` → `reason='spec-overlap-conflict'`, `route='designing'`\n  3. else any `pending-review` → `reason='artifact-review-required'`, `route='designing'`\n  4. else `required=false`, `reason=null`, `route=null`\n- Same authoritative interpretation as transition/validation\n- Unhandled overlaps: reverse-scan `change.history` for `invalidated` with `cause:'spec-overlap-conflict'`; stop at first `transitioned` where `to !== 'designing'`\n- `ReviewSummary.reason`: `'artifact-drift' | 'artifact-review-required' | 'spec-overlap-conflict' | null`\n- `reason='spec-overlap-conflict'` → `overlapDetail: OverlapEntry[]` (newest-first): `archivedChangeName`, `overlappingSpecIds` from `invalidated.message`\n- Else `overlapDetail` empty array\n\n### Blockers\n- From same lifecycle interpretation:\n  - `ARTIFACT_DRIFT` if `review.reason='artifact-drift'`\n  - `REVIEW_REQUIRED` if `'artifact-review-required'`\n  - `OVERLAP_CONFLICT` if `'spec-overlap-conflict'`\n  - `MISSING_ARTIFACT` per current-state `requires` artifact in `missing`/`in-progress`\n\n### Schema failure degrade\n- `SchemaProvider.get()` throws → MUST NOT throw; try/catch; `lifecycle` present degraded:\n  - `validTransitions` normal (static)\n  - `availableTransitions`=[]\n  - `blockers`=[]\n  - `approvals` normal (injected)\n  - `nextArtifact=null`\n  - `changePath` normal\n  - `schemaInfo=null`\n\n## Constraints\n\n- Read-only — MUST NOT modify change\n- No artifact content load for lifecycle/status metadata; task counts via `CountTasks` when applicable\n- Effective status may delegate to `LifecycleEngine` (not `Change` entity concern)\n- Lifecycle adds zero I/O beyond schema resolve — `VALID_TRANSITIONS` static; rest in-memory from change+schema+approvals\n- `changePath` from `ChangeRepository.changePath(change)`",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:cf1c8042f72fda3dc1b227ef6b987ab72fb92f4e66d7ec93ea9187be75ab5d05",
+          "lastModified": "2026-07-23T17:26:17.338Z"
+        },
+        "verify.md": {
+          "hash": "sha256:c4992085605027e0a03f0ae130f86297db8443543a8026afcb6cb44c13d7344e",
+          "lastModified": "2026-07-23T17:26:17.338Z"
+        }
+      }
+    }
+  }
 }

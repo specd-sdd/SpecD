@@ -176,6 +176,7 @@ export class StubChangeRepository extends ChangeRepository {
   }
 
   private async _persist(change: Change): Promise<void> {
+    change.touchUpdatedAt()
     this.store.set(change.name, change)
   }
 

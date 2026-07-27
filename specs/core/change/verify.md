@@ -9,6 +9,31 @@
 - **WHEN** a Change is created with name `add-auth-flow`
 - **THEN** the name cannot be changed by any subsequent operation
 
+### Requirement: Revision timestamp
+
+#### Scenario: Initialized with createdAt default
+
+- **GIVEN** a new `Change` entity created without explicit `updatedAt`
+- **WHEN** `change.updatedAt` is accessed
+- **THEN** it returns a `Date` equal to `change.createdAt`
+
+#### Scenario: Rejects updatedAt before createdAt
+
+- **WHEN** constructing a `Change` with `updatedAt` earlier than `createdAt`
+- **THEN** it throws `InvalidChangeError`
+
+#### Scenario: Touch advances updatedAt to default current time
+
+- **GIVEN** an existing `Change` entity
+- **WHEN** `change.touchUpdatedAt()` is called without arguments
+- **THEN** `change.updatedAt` is updated to the current date/time
+
+#### Scenario: Touch advances updatedAt to explicit timestamp
+
+- **GIVEN** an existing `Change` entity
+- **WHEN** `change.touchUpdatedAt(newDate)` is called with an explicit timestamp later than current `updatedAt`
+- **THEN** `change.updatedAt` is updated to `newDate`
+
 ### Requirement: Workspaces and specs
 
 #### Scenario: Workspaces derived from specIds
