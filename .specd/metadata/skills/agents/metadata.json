@@ -9,7 +9,7 @@
     {
       "requirement": "Optimizer agents",
       "rules": [
-        "The system SHALL provide two specialized optimizer agents:\n\n1. `specd-project-context-optimizer` — specializes in project-level context (instructions and global constraints).\n2. `specd-spec-context-optimizer` — specializes in spec-level metadata (rules, constraints, and scenarios)."
+        "The system SHALL provide two specialized optimizer agents:\n\n1. `specd-project-context-optimizer` — specializes in project-level context (instructions and global constraints).\n2. `specd-spec-context-optimizer` — specializes in spec-level metadata (rules, constraints, and scenarios).\n\nThe skills bundle SHALL NOT publish a standard `specd-metadata` skill. Metadata optimization SHALL be performed through these specialized agents."
       ]
     },
     {
@@ -56,7 +56,8 @@
       "when": ["the skills repository is scanned"],
       "then": [
         "it finds specd-project-context-optimizer and specd-spec-context-optimizer",
-        "AND their kind is agent"
+        "AND their kind is agent",
+        "AND it does not find a standard specd-metadata skill"
       ]
     },
     {
@@ -129,22 +130,24 @@
       ]
     }
   ],
+  "optimizedDescription": "Defines specd-project-context-optimizer and specd-spec-context-optimizer agents to compress spec context using smart caveman style.",
+  "optimizedContext": "# skills:agents\n\n## Rules\n- Provide specialized optimizer agents: `specd-project-context-optimizer` (project context) and `specd-spec-context-optimizer` (spec metadata).\n- Skills bundle MUST NOT publish standard `specd-metadata` skill. Metadata optimization via specialized agents only.\n- Prompts MUST use smart caveman style: drop articles/filler, use fragments, preserve technical exactness (symbols, APIs, values, constants), maintain Markdown headings (`## Rules`, `## Constraints`).\n- Target 50-70% token reduction vs full spec/metadata without normative loss.\n- Agent templates (e.g. `SPECD-AGENT.md.tpl`) MUST contain ONLY raw prompt/instructions — NO YAML frontmatter/metadata. Place metadata in `specd-agent.meta.json`.\n- Missing `agents` capability fallback: copy template file to directory of `shared.md` for orchestrator inspection/execution.\n- `llmOptimizedContext` gate: inspect effective project config. If not `true`, MUST exit without generating/persisting data. Proceed ONLY if `llmOptimizedContext: true`.\n- Persist via `specd spec optimizations set` (lock-owned state). MUST NOT use metadata editors (`update-metadata`/`write-metadata`). MUST NOT run `specd spec generate-metadata` after persisting.",
   "contentHashes": {
-    "spec.md": "sha256:c7e00fb51108418855ad294ab276d7814623a7b1190bceb407800fc546755143",
-    "verify.md": "sha256:1ea369f7400583b98accfbc34b552f15a9dd881c541be4f14f99c028ee5180b3"
+    "spec.md": "sha256:79cd593754e667f5cf8015f5db1cc64cc030db8d32d574d85aca316bfd859188",
+    "verify.md": "sha256:87eac33c3da1f2e6314d63da7a136ef059d90131024139e0561aa543cf6cf9c2"
   },
   "provenance": {
     "artifacts": {
       "spec.md": {
-        "hash": "sha256:c7e00fb51108418855ad294ab276d7814623a7b1190bceb407800fc546755143",
-        "lastModified": "2026-07-25T11:53:31.643Z"
+        "hash": "sha256:79cd593754e667f5cf8015f5db1cc64cc030db8d32d574d85aca316bfd859188",
+        "lastModified": "2026-07-27T07:22:53.667Z"
       },
       "verify.md": {
-        "hash": "sha256:1ea369f7400583b98accfbc34b552f15a9dd881c541be4f14f99c028ee5180b3",
-        "lastModified": "2026-07-25T11:53:31.643Z"
+        "hash": "sha256:87eac33c3da1f2e6314d63da7a136ef059d90131024139e0561aa543cf6cf9c2",
+        "lastModified": "2026-07-27T07:22:53.669Z"
       }
     },
-    "persistedStateHash": "sha256:fc4c1f07108f08c3515056a87cedb7737166961e4e43ac5279cab0ef2d844c30",
+    "persistedStateHash": "sha256:445a4e7aaff799cdc84e10e2a969a8a13cc7e2ef2eb803373d0a4c895c34f4b9",
     "schema": {
       "name": "schema-std",
       "version": 1

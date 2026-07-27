@@ -13,6 +13,8 @@ The system SHALL provide two specialized optimizer agents:
 1. `specd-project-context-optimizer` — specializes in project-level context (instructions and global constraints).
 2. `specd-spec-context-optimizer` — specializes in spec-level metadata (rules, constraints, and scenarios).
 
+The skills bundle SHALL NOT publish a standard `specd-metadata` skill. Metadata optimization SHALL be performed through these specialized agents.
+
 ### Requirement: Agent prompt policy
 
 Optimizer agents SHALL use a "smart caveman" style for their generated content:

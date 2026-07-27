@@ -28,9 +28,11 @@ Installed files rendered from those templates MUST be emitted as `.md` files aft
 
 The template directory structure SHALL be:
 
-- `templates/skills/` — contains `specd/`, `specd-archive/`, `specd-design/`, `specd-implement/`, `specd-new/`, `specd-metadata/`, `specd-compliance/`, and `specd-verify/`.
+- `templates/skills/` — contains `specd/`, `specd-archive/`, `specd-design/`, `specd-implement/`, `specd-new/`, `specd-compliance/`, and `specd-verify/`.
 - `templates/agents/` — contains specialized agents such as `specd-project-context-optimizer` and `specd-spec-context-optimizer`.
 - `templates/shared/` — contains shared template source files like `shared.md.tpl`.
+
+The `templates/skills/` directory SHALL NOT contain a `specd-metadata/` template. Metadata optimization SHALL be exposed through the specialized agent templates.
 
 Each skill or agent directory contains its respective template file (`SKILL.md.tpl` or `SPECD-AGENT.md.tpl`) plus its metadata contract file.
 

@@ -9,6 +9,7 @@
 - **WHEN** the skills repository is scanned
 - **THEN** it finds `specd-project-context-optimizer` and `specd-spec-context-optimizer`
 - **AND** their `kind` is `agent`
+- **AND** it does not find a standard `specd-metadata` skill
 
 ### Requirement: Agent prompt policy
 

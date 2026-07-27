@@ -7,7 +7,7 @@ const templatesRoot = join(dirname(fileURLToPath(import.meta.url)), '..', 'templ
 
 describe('workflow skill templates', () => {
   it('does not instruct removed metadata-status scans or write-metadata flows', () => {
-    for (const name of ['specd-metadata', 'specd-archive']) {
+    for (const name of ['specd-archive']) {
       const content = readFileSync(join(templatesRoot, 'skills', name, 'SKILL.md.tpl'), 'utf8')
       expect(content).not.toMatch(/specd specs list --metadata-status/)
       expect(content).not.toMatch(/generate-metadata --all --write/)

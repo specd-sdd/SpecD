@@ -30,6 +30,12 @@
 - **AND** it contains `agents/` (using `SPECD-AGENT.md.tpl` and `specd-agent.meta.json`)
 - **AND** it contains `shared/` for shared template source files
 
+#### Scenario: Obsolete metadata skill is absent
+
+- **WHEN** standard skill templates are discovered
+- **THEN** no `specd-metadata` skill template is returned
+- **AND** metadata optimization remains available through specialized agent templates
+
 #### Scenario: Shared consumer index is no longer authoritative
 
 - **WHEN** shared template ownership is reviewed

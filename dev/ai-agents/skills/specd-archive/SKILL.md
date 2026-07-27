@@ -118,7 +118,7 @@ specd spec generate-metadata --all --write --status stale,missing
 specd config show --format json
 ```
 
-If `llmOptimizedContext` is `true`, suggest running `/specd-spec-metadata` for each
+If `llmOptimizedContext` is `true`, suggest invoking the specialized `specd-spec-context-optimizer` agent for each
 spec in the change.
 
 ### 9. Done
