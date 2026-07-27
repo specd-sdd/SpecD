@@ -1,0 +1,58 @@
+- op: modified
+  description: 'Fix return type from string to Promise<string> (async file I/O)'
+  selector:
+    type: section
+    matches: 'Requirement: Base Prompt Rendering Interface'
+  content: |
+    `@specd/skills` MUST export a function `renderBaseAgentInstruction(options?: RenderBaseAgentInstructionOptions): Promise<string>`.
+
+    - `RenderBaseAgentInstructionOptions` MAY accept `extraInstructions?: string`.
+    - When `extraInstructions` is provided and non-empty, the rendered prompt MUST include `extraInstructions` inside the `<!-- <specd> -->` block.
+    - When `extraInstructions` is omitted or empty, the rendered prompt MUST render only the clean base prompt without trailing empty headers or sections.
+
+- op: added
+  description: 'Add Shared File Plugin Registration requirement for reference-counted cleanup'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Idempotent Markdown Block Management'
+  content: |
+    ### Requirement: Shared File Plugin Registration
+
+    When multiple agent plugins target the same instruction file (e.g. `AGENTS.md`), each plugin MUST inject a plugin-specific registration marker block using `injectSpecdBlock(filePath, registrationContent, pluginName)` alongside the shared base `<!-- <specd> -->` block.
+
+    - The registration content MUST be a non-empty string identifying the plugin (e.g. `"Registered by @specd/plugin-agent-<name>"`).
+    - This marker block enables reference-counted cleanup: `removeSpecdBlock(filePath, pluginName)` will remove the plugin's marker, and if no other plugin markers remain, the shared base block is also removed.
+    - Plugins targeting exclusive instruction files (e.g. `CLAUDE.md`, `.github/copilot-instructions.md`) do NOT inject plugin-specific marker blocks; they use only the base `<!-- <specd> -->` block.
+
+- op: added
+  description: 'Add Safe JSON Config Merge Utilities requirement'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Shared File Plugin Registration'
+  content: |
+    ### Requirement: Safe JSON Config Merge Utilities
+
+    `@specd/skills` MUST export safe JSON configuration helpers `mergeJsonConfig<T>(filePath: string, updater: (existing: T) => T): Promise<void>` and `unmergeJsonConfig<T>(filePath: string, updater: (existing: T) => T): Promise<void>`.
+
+    - `mergeJsonConfig` MUST read the existing JSON file, parse it, pass the parsed object to the `updater` function, and write the result back as formatted JSON with a trailing newline.
+    - If the target file does not exist or contains invalid JSON, `mergeJsonConfig` MUST pass an empty object `{} as T` to the `updater` and create the file (including parent directories).
+    - `mergeJsonConfig` MUST NOT overwrite existing top-level properties not touched by the `updater`.
+    - `unmergeJsonConfig` MUST read the existing JSON file, parse it, pass the parsed object to the `updater` function, and write the result back.
+    - If the target file does not exist or contains invalid JSON, `unmergeJsonConfig` MUST be a graceful no-op.
+    - Both utilities MUST write formatted JSON with 2-space indentation and a trailing newline.
+
+- op: modified
+  description: 'Fix spec dependencies — this spec has no specd workspace dependencies'
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    *None — this spec defines standalone utility functions with no specd workspace dependencies.*

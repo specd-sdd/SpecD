@@ -161,3 +161,12 @@ The SDK root exports explicit symbols from the curated `@specd/core` and `@specd
 - `SDK_VERSION`, `CORE_VERSION`, `CODE_GRAPH_VERSION`
 
 For package-level semantics (domain model, graph indexing, plugin ports), see the **Core** and **Code graph** package reference sections.
+
+## Agent Plugin Prompt Injection & Native Hooks
+
+Agent plugins (`@specd/plugin-agent-*`) initialize project runtimes during `install()` and clean them up during `uninstall()` using `@specd/skills` helpers:
+
+- **Prompt Rendering**: `renderBaseAgentInstruction({ extraInstructions? })` compiles the canonical specd instruction prompt with entry points, graph-first rules, and user escape hatch.
+- **Markdown Block Management**: `injectSpecdBlock(file, content, blockId?)` and `removeSpecdBlock(file, blockId?)` manage `<!-- <specd> -->` and `<!-- <specd-plugin:id> -->` comment blocks.
+- **Shared File Reference Counting**: Multiple plugins targeting `AGENTS.md` register plugin markers (`blockId`). `removeSpecdBlock` removes base blocks only when all plugin markers are uninstalled.
+- **Safe JSON Config Modification**: `mergeJsonConfig` and `unmergeJsonConfig` preserve user properties in `.claude/settings.json` and `opencode.json` while performing namespace-filtered hook registration (`specd-*`).

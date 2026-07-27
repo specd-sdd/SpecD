@@ -9,7 +9,8 @@
     "skills:skill-bundle",
     "skills:skill-repository",
     "skills:resolve-bundle",
-    "skills:agents"
+    "skills:agents",
+    "skills:agent-instruction-template"
   ],
   "implementation": [
     {
@@ -17,11 +18,8 @@
       "symbols": ["InstallSkills"]
     },
     {
-      "file": "plugin-agent-claude:test/install-skills.spec.ts"
-    },
-    {
-      "file": "plugin-agent-claude:src/domain/frontmatter/index.ts",
-      "symbols": ["agentFrontmatter"]
+      "file": "plugin-agent-claude:src/application/use-cases/uninstall-skills.ts",
+      "symbols": ["UninstallSkills"]
     }
   ]
 }

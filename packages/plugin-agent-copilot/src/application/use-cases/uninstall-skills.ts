@@ -1,5 +1,5 @@
 import { rm } from 'node:fs/promises'
-import { createSkillRepository } from '@specd/skills'
+import { createSkillRepository, removeSpecdBlock } from '@specd/skills'
 import path from 'node:path'
 import type { SpecdConfig } from '@specd/core'
 import type { AgentInstallOptions } from '@specd/plugin-manager'
@@ -54,5 +54,9 @@ export class UninstallSkills {
       await rm(path.join(agentsTargetDir, `${agent}.agent.md`), { force: true })
     }
     await rm(sharedDir, { recursive: true, force: true })
+
+    // Remove plugin registration from .github/copilot-instructions.md
+    const copilotMdPath = path.join(config.projectRoot, '.github', 'copilot-instructions.md')
+    await removeSpecdBlock(copilotMdPath, 'copilot')
   }
 }

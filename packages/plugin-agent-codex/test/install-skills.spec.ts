@@ -227,4 +227,30 @@ describe('plugin-agent-codex create()', () => {
       await rm(projectRoot, { recursive: true, force: true })
     }
   })
+
+  it('given project root, when install runs, then injects AGENTS.md prompt block and codex marker and uninstalls cleanly', async () => {
+    const projectRoot = await createTempProjectRoot()
+    const config = makeMockConfig(projectRoot)
+
+    try {
+      const { create } = await import('../src/index.js')
+      const plugin = await create({ config })
+
+      await plugin.install(config, { skills: [] })
+
+      const agentsMdPath = path.join(projectRoot, 'AGENTS.md')
+      const agentsContent = await readFile(agentsMdPath, 'utf8')
+      expect(agentsContent).toContain('<!-- <specd agents="codex"> -->')
+      expect(agentsContent).not.toContain('<!-- <specd-plugin:codex> -->')
+
+      await plugin.uninstall(config)
+
+      const exists = await readFile(agentsMdPath, 'utf8')
+        .then(() => true)
+        .catch(() => false)
+      expect(exists).toBe(false)
+    } finally {
+      await rm(projectRoot, { recursive: true, force: true })
+    }
+  })
 })

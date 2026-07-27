@@ -25,6 +25,7 @@ export interface UninstallPluginInput {
 
 /**
  * Uninstalls one plugin via the runtime loader.
+ * Delegates reference-counted prompt block removal and native asset teardown to `plugin.uninstall()`.
  */
 export class UninstallPlugin {
   /**

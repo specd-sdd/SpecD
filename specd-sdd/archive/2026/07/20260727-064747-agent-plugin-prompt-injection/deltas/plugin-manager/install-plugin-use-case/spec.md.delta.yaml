@@ -1,0 +1,17 @@
+- op: added
+  description: 'Add Agent Initialization Phase delegation constraint to InstallPlugin'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Install location'
+  content: |
+    ### Requirement: Agent Initialization Phase
+
+    `InstallPlugin` MUST delegate agent prompt initialization, block injection, and native asset deployment to the target `AgentPlugin.install()` implementation.
+
+    - `InstallPlugin.execute()` MUST call `plugin.install(input.config, input.options)`.
+    - Each `AgentPlugin` implementation MUST utilize `@specd/skills` prompt rendering (`renderBaseAgentInstruction`) and block management (`injectSpecdBlock`, `removeSpecdBlock`) during its `install()` / `uninstall()` lifecycle.
+    - Reference-counted cleanup on shared instruction files (`AGENTS.md`) MUST be maintained so that the base `<!-- <specd> -->` block persists until all agent plugins targeting that file are uninstalled.

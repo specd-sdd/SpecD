@@ -1,7 +1,12 @@
 import { mkdir, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import type { SpecdConfig } from '@specd/core'
-import { createSkillRepository, ResolveBundle } from '@specd/skills'
+import {
+  createSkillRepository,
+  injectSpecdBlock,
+  renderBaseAgentInstruction,
+  ResolveBundle,
+} from '@specd/skills'
 import type {
   AgentInstallOptions,
   AgentInstallResult,
@@ -144,6 +149,11 @@ export class InstallSkills {
             : path.join(sharedDir, `${name}.agent.md`),
       })
     }
+
+    // Inject prompt block into AGENTS.md with registered plugin tag
+    const agentsMdPath = path.join(config.projectRoot, 'AGENTS.md')
+    const prompt = await renderBaseAgentInstruction()
+    await injectSpecdBlock(agentsMdPath, prompt, 'standard')
 
     return { installed, skipped }
   }

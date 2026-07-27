@@ -73,6 +73,15 @@ Files marked as shared MUST be installed under the rendered `sharedFolder` locat
 
 The resolved shared location MUST NOT contain a `SKILL.md` file.
 
+### Requirement: Prompt Injection
+
+`OpenCodeAgentPlugin.install()` MUST perform agent prompt initialization on the shared `AGENTS.md` file.
+
+- `install()` MUST inject the base agent instruction prompt into `AGENTS.md` under the project root using `injectSpecdBlock(agentsMdPath, prompt)`.
+- `install()` MUST call `removeSpecdBlock(agentsMdPath, "opencode")` to purge any legacy plugin marker blocks left by previous versions.
+- `uninstall()` MUST call `removeSpecdBlock(agentsMdPath, "opencode")` (no-op if not present), then `removeSpecdBlock(agentsMdPath)` to remove the base block.
+- No plugin marker block (`<!-- <specd-plugin:opencode> -->`) is injected during install.
+
 ### Requirement: Project init wizard integration
 
 The interactive `specd project init` plugin selection MUST include `@specd/plugin-agent-opencode` in the known agent plugin options.
@@ -107,5 +116,6 @@ Uninstall MUST NOT remove unrelated directories or files under `.opencode/skills
 - [`plugin-manager:agent-plugin-type`](../plugin-manager/agent-plugin-type/spec.md) — plugin interface
 - [`skills:skill-bundle`](../skills/skill-bundle/spec.md) — shared bundle file routing contract
 - [`skills:skill-repository`](../skills/skill-repository/spec.md) — skill access
-- [`skills:resolve-bundle`](../skills/resolve-bundle/spec.md) — canonical install-time bundle resolution with built-in render defaults
-- [`skills:agents`](../skills/agents/spec.md) — defines specialized optimizer agents and their prompts.
+- [`skills:resolve-bundle`](../skills/resolve-bundle/spec.md) — canonical install-time bundle resolution
+- [`skills:agents`](../skills/agents/spec.md) — defines specialized optimizer agents
+- [`skills:agent-instruction-template`](../skills/agent-instruction-template/spec.md) — shared base prompt rendering and block management

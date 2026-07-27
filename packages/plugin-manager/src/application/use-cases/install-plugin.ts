@@ -45,6 +45,7 @@ export interface InstallPluginOutput {
 
 /**
  * Installs one plugin using the runtime loader.
+ * Delegates agent prompt initialization, block injection, and native asset deployment to `plugin.install()`.
  */
 export class InstallPlugin {
   /**

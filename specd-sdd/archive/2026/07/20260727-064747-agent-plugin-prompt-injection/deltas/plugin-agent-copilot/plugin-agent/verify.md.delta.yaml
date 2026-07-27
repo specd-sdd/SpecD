@@ -1,0 +1,19 @@
+- op: added
+  description: 'Add Prompt Injection scenario'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Install location'
+  content: |
+    ### Requirement: Prompt Injection
+
+    #### Scenario: Install writes copilot-instructions.md prompt block
+    - **WHEN** `CopilotAgentPlugin.install()` runs
+    - **THEN** `.github/copilot-instructions.md` contains the `<!-- <specd> -->` block
+
+    #### Scenario: Uninstall cleans up copilot prompt block
+    - **WHEN** `CopilotAgentPlugin.uninstall()` runs
+    - **THEN** `.github/copilot-instructions.md` `<!-- <specd> -->` block is removed

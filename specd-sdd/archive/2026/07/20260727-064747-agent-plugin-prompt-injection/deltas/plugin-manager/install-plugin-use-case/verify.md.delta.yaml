@@ -1,0 +1,33 @@
+- op: added
+  description: 'Add Agent Initialization Phase verification scenarios to InstallPlugin (split nested WHEN into separate scenarios)'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Install location'
+  content: |
+    ### Requirement: Agent Initialization Phase
+
+    #### Scenario: Install delegates to AgentPlugin.install() which injects base prompt and deploys native assets
+
+    - **GIVEN** an `AgentPlugin` with target file `CLAUDE.md` and hook asset `specd-agent-init.sh`
+    - **WHEN** `InstallPlugin.execute()` runs
+    - **THEN** `plugin.install()` is executed
+    - **AND** `CLAUDE.md` contains the `<!-- <specd> -->` base prompt block
+    - **AND** `.claude/hooks/specd-agent-init.sh` is written to the project root
+
+    #### Scenario: Uninstall removes plugin-specific block from shared file while other plugins remain
+
+    - **GIVEN** `AGENTS.md` containing `<!-- <specd> -->` shared by two agent plugins with markers `<!-- <specd-plugin:opencode> -->` and `<!-- <specd-plugin:codex> -->`
+    - **WHEN** `UninstallPlugin.execute()` runs for the opencode plugin
+    - **THEN** `<!-- <specd-plugin:opencode> -->` is removed from `AGENTS.md`
+    - **AND** `AGENTS.md` retains the `<!-- <specd> -->` base block (codex still registered)
+
+    #### Scenario: Uninstall removes base block when last plugin is removed from shared file
+
+    - **GIVEN** `AGENTS.md` containing `<!-- <specd> -->` with only one remaining plugin marker `<!-- <specd-plugin:codex> -->`
+    - **WHEN** `UninstallPlugin.execute()` runs for the codex plugin
+    - **THEN** `<!-- <specd-plugin:codex> -->` is removed
+    - **AND** `<!-- <specd> -->` base block is also removed from `AGENTS.md`

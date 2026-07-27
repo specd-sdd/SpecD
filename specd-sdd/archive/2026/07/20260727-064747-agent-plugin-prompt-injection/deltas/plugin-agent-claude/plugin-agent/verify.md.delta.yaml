@@ -1,0 +1,21 @@
+- op: added
+  description: 'Add Prompt Injection scenarios'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Install location'
+  content: |
+    ### Requirement: Prompt Injection
+
+    #### Scenario: Install writes CLAUDE.md prompt block
+
+    - **WHEN** `ClaudeAgentPlugin.install()` runs
+    - **THEN** `CLAUDE.md` contains the `<!-- <specd> -->` block with standard specd agent instructions
+
+    #### Scenario: Uninstall removes CLAUDE.md prompt block
+
+    - **WHEN** `ClaudeAgentPlugin.uninstall()` runs
+    - **THEN** `CLAUDE.md` `<!-- <specd> -->` block is removed

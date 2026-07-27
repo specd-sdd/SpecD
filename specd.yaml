@@ -362,5 +362,5 @@ plugins:
     - name: '@specd/plugin-agent-codex'
     - name: '@specd/plugin-agent-claude'
     - name: '@specd/plugin-agent-copilot'
-    - name: '@specd/plugin-agent-opencode'
     - name: '@specd/plugin-agent-standard'
+    - name: '@specd/plugin-agent-opencode'

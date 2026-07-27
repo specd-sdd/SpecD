@@ -84,6 +84,14 @@ Files marked as shared MUST be installed under the rendered `sharedFolder` locat
 
 The resolved shared location MUST NOT contain a `SKILL.md` file.
 
+### Requirement: Prompt Injection
+
+`ClaudeAgentPlugin.install()` MUST inject the base agent instruction prompt into `CLAUDE.md` under the project root using `injectSpecdBlock`.
+
+- `CLAUDE.md` is an exclusive file (not shared with other agent plugins), so only the base `<!-- <specd> -->` block is injected (no plugin-specific marker block).
+- `install()` MAY pass `extraInstructions` to `renderBaseAgentInstruction` for Claude-specific guidance.
+- `uninstall()` MUST remove the `<!-- <specd> -->` block from `CLAUDE.md`.
+
 ### Requirement: Uninstall behavior
 
 `uninstall(config: SpecdConfig, options?: AgentInstallOptions)` MUST remove installed skill directories from `.claude/skills/` and agent files from `.claude/agents/` relative to `config.projectRoot`.
@@ -108,5 +116,6 @@ Uninstall MUST NOT remove unrelated directories or files under `.claude/skills/`
 - [`plugin-manager:agent-plugin-type`](../plugin-manager/agent-plugin-type/spec.md) — plugin interface
 - [`skills:skill-bundle`](../skills/skill-bundle/spec.md) — shared bundle file routing contract
 - [`skills:skill-repository`](../skills/skill-repository/spec.md) — skill access
-- [`skills:resolve-bundle`](../skills/resolve-bundle/spec.md) — canonical install-time bundle resolution with built-in render defaults
-- [`skills:agents`](../skills/agents/spec.md) — defines specialized optimizer agents and their prompts.
+- [`skills:resolve-bundle`](../skills/resolve-bundle/spec.md) — canonical install-time bundle resolution
+- [`skills:agents`](../skills/agents/spec.md) — defines specialized optimizer agents
+- [`skills:agent-instruction-template`](../skills/agent-instruction-template/spec.md) — shared base prompt rendering and block management

@@ -61,6 +61,18 @@
 - **WHEN** an agent is installed
 - **THEN** it is copied to the same directory as `shared.md`
 
+### Requirement: Prompt Injection
+
+#### Scenario: Install writes CLAUDE.md prompt block
+
+- **WHEN** `ClaudeAgentPlugin.install()` runs
+- **THEN** `CLAUDE.md` contains the `<!-- <specd> -->` block with standard specd agent instructions
+
+#### Scenario: Uninstall removes CLAUDE.md prompt block
+
+- **WHEN** `ClaudeAgentPlugin.uninstall()` runs
+- **THEN** `CLAUDE.md` `<!-- <specd> -->` block is removed
+
 ### Requirement: Uninstall behavior
 
 #### Scenario: Uninstall removes selected skill directories and keeps shared resources

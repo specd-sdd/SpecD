@@ -233,4 +233,72 @@ describe('plugin-agent-claude create()', () => {
       await rm(projectRoot, { recursive: true, force: true })
     }
   })
+
+  it('given non-specd user files in sharedFolder, when uninstall runs, then preserves non-specd user files and sharedFolder', async () => {
+    const projectRoot = await createTempProjectRoot()
+    const config = makeMockConfig(projectRoot)
+
+    try {
+      const { create } = await import('../src/index.js')
+      const plugin = await create({ config })
+
+      await plugin.install(config, { skills: [] })
+
+      // Pre-seed a custom non-specd user file in sharedFolder
+      const customUserFilePath = path.join(
+        projectRoot,
+        '.specd',
+        'config',
+        'skills',
+        'shared',
+        'custom-user-instruction.md',
+      )
+      await mkdir(path.dirname(customUserFilePath), { recursive: true })
+      await writeFile(customUserFilePath, '# Custom User Instruction\n', 'utf8')
+
+      await plugin.uninstall(config)
+
+      const userFileExists = await readFile(customUserFilePath, 'utf8')
+        .then(() => true)
+        .catch(() => false)
+      expect(userFileExists).toBe(true)
+    } finally {
+      await rm(projectRoot, { recursive: true, force: true })
+    }
+  })
+
+  it('given project root, when install runs, then injects CLAUDE.md prompt block and uninstalls cleanly', async () => {
+    const projectRoot = await createTempProjectRoot()
+    const config = makeMockConfig(projectRoot)
+
+    try {
+      const { create } = await import('../src/index.js')
+      const plugin = await create({ config })
+
+      await plugin.install(config, { skills: [] })
+
+      // Verify CLAUDE.md prompt block
+      const claudeMdPath = path.join(projectRoot, 'CLAUDE.md')
+      const claudeMdContent = await readFile(claudeMdPath, 'utf8')
+      expect(claudeMdContent).toContain('<!-- <specd agents="claude"> -->')
+      expect(claudeMdContent).toContain('<!-- </specd> -->')
+
+      // Verify no native hook script is deployed
+      const hookPath = path.join(projectRoot, '.claude', 'hooks', 'specd-agent-init.sh')
+      const hookExists = await readFile(hookPath, 'utf8')
+        .then(() => true)
+        .catch(() => false)
+      expect(hookExists).toBe(false)
+
+      // Uninstall and verify CLAUDE.md cleanup
+      await plugin.uninstall(config)
+
+      const claudeMdExists = await readFile(claudeMdPath, 'utf8')
+        .then(() => true)
+        .catch(() => false)
+      expect(claudeMdExists).toBe(false)
+    } finally {
+      await rm(projectRoot, { recursive: true, force: true })
+    }
+  })
 })

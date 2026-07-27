@@ -98,6 +98,27 @@
 - **WHEN** an agent is installed
 - **THEN** it is copied to the same directory as `shared.md`
 
+### Requirement: Prompt Injection
+
+#### Scenario: Install writes AGENTS.md prompt block
+
+- **WHEN** `CodexAgentPlugin.install()` runs
+- **THEN** `AGENTS.md` contains the `<!-- <specd> -->` base block with standard specd agent instructions
+- **AND** `AGENTS.md` does NOT contain any `<!-- <specd-plugin:codex> -->` marker block
+
+#### Scenario: Uninstall removes AGENTS.md base block
+
+- **GIVEN** `AGENTS.md` contains `<!-- <specd> -->` and no other plugin markers
+- **WHEN** `CodexAgentPlugin.uninstall()` runs
+- **THEN** `<!-- <specd> -->` base block is removed from `AGENTS.md`
+
+#### Scenario: Legacy plugin marker removed on install
+
+- **GIVEN** `AGENTS.md` contains a legacy `<!-- <specd-plugin:codex> -->` block from a previous install
+- **WHEN** `CodexAgentPlugin.install()` runs
+- **THEN** the `<!-- <specd-plugin:codex> -->` block is removed
+- **AND** the `<!-- <specd> -->` base block is present
+
 ### Requirement: Uninstall behavior
 
 #### Scenario: Uninstall removes selected skill directories and keeps shared resources

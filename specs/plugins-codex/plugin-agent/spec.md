@@ -69,6 +69,15 @@ Files marked as shared MUST be installed under the rendered `sharedFolder` locat
 
 The resolved shared location MUST NOT contain a `SKILL.md` file.
 
+### Requirement: Prompt Injection
+
+`CodexAgentPlugin.install()` MUST inject the base agent instruction prompt into the shared `AGENTS.md` file under the project root.
+
+- `install()` MUST inject the base prompt using `injectSpecdBlock(agentsMdPath, prompt)`.
+- `install()` MUST call `removeSpecdBlock(agentsMdPath, "codex")` to purge any legacy plugin marker blocks left by previous versions.
+- `uninstall()` MUST call `removeSpecdBlock(agentsMdPath, "codex")` (no-op if not present), then `removeSpecdBlock(agentsMdPath)` to remove the base block.
+- No plugin marker block (`<!-- <specd-plugin:codex> -->`) is injected during install.
+
 ### Requirement: Uninstall behavior
 
 `uninstall(config: SpecdConfig, options?: AgentInstallOptions)` MUST remove installed skill directories from `.codex/skills/` and agent files from `.codex/agents/` relative to `config.projectRoot`.
@@ -93,6 +102,7 @@ Uninstall MUST NOT remove unrelated directories or files under `.codex/skills/` 
 - [`core:config`](../../core/core/config/spec.md) — defines SpecdConfig type
 - [`plugin-manager:agent-plugin-type`](../plugin-manager/agent-plugin-type/spec.md) — plugin interface
 - [`skills:skill-bundle`](../skills/skill-bundle/spec.md) — shared bundle file routing contract
-- [`skills:skill-templates-source`](../skills/skill-templates-source/spec.md) — frontmatter injection responsibility and template source contract
-- [`skills:resolve-bundle`](../skills/resolve-bundle/spec.md) — canonical install-time bundle resolution with built-in render defaults
-- [`skills:agents`](../skills/agents/spec.md) — defines specialized optimizer agents and their prompts.
+- [`skills:skill-templates-source`](../skills/skill-templates-source/spec.md) — skill source
+- [`skills:resolve-bundle`](../skills/resolve-bundle/spec.md) — canonical install-time bundle resolution
+- [`skills:agents`](../skills/agents/spec.md) — defines specialized optimizer agents
+- [`skills:agent-instruction-template`](../skills/agent-instruction-template/spec.md) — shared base prompt rendering and block management

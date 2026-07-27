@@ -13,6 +13,13 @@ export {
 } from './application/use-cases/index.js'
 export { createSkillRepository, type SkillRepositoryOptions } from './infrastructure/index.js'
 
+export {
+  renderBaseAgentInstruction,
+  type RenderBaseAgentInstructionOptions,
+} from './application/render-base-agent-instruction.js'
+export { injectSpecdBlock, removeSpecdBlock } from './application/specd-block-manager.js'
+export { mergeJsonConfig, unmergeJsonConfig } from './application/json-config-manager.js'
+
 /**
  * Legacy flat skill shape kept temporarily for the old CLI `skills *` commands
  * during migration.

@@ -86,6 +86,27 @@
 - **WHEN** an agent is installed
 - **THEN** it is copied to the same directory as `shared.md`
 
+### Requirement: Prompt Injection
+
+#### Scenario: Install writes AGENTS.md prompt block
+
+- **WHEN** `OpenCodeAgentPlugin.install()` runs
+- **THEN** `AGENTS.md` contains the `<!-- <specd> -->` base block with standard specd agent instructions
+- **AND** `AGENTS.md` does NOT contain any `<!-- <specd-plugin:opencode> -->` marker block
+
+#### Scenario: Uninstall removes AGENTS.md base block
+
+- **GIVEN** `AGENTS.md` contains `<!-- <specd> -->` and no other plugin markers
+- **WHEN** `OpenCodeAgentPlugin.uninstall()` runs
+- **THEN** `<!-- <specd> -->` base block is removed from `AGENTS.md`
+
+#### Scenario: Legacy plugin marker removed on install
+
+- **GIVEN** `AGENTS.md` contains a legacy `<!-- <specd-plugin:opencode> -->` block from a previous install
+- **WHEN** `OpenCodeAgentPlugin.install()` runs
+- **THEN** the `<!-- <specd-plugin:opencode> -->` block is removed
+- **AND** the `<!-- <specd> -->` base block is present
+
 ### Requirement: Project init wizard integration
 
 #### Scenario: Wizard exposes Open Code plugin option

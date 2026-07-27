@@ -1,7 +1,12 @@
 import { mkdir, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import type { SpecdConfig } from '@specd/core'
-import { createSkillRepository, ResolveBundle } from '@specd/skills'
+import {
+  createSkillRepository,
+  injectSpecdBlock,
+  renderBaseAgentInstruction,
+  ResolveBundle,
+} from '@specd/skills'
 import type {
   AgentInstallOptions,
   AgentInstallResult,
@@ -150,6 +155,11 @@ export class InstallSkills {
             : path.join(agentsTargetDir, `${name}.agent.md`),
       })
     }
+
+    // Inject prompt block into .github/copilot-instructions.md with registered plugin tag
+    const copilotMdPath = path.join(config.projectRoot, '.github', 'copilot-instructions.md')
+    const prompt = await renderBaseAgentInstruction()
+    await injectSpecdBlock(copilotMdPath, prompt, 'copilot')
 
     return { installed, skipped }
   }

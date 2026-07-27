@@ -79,6 +79,27 @@
 - **WHEN** `install(config, options)` runs
 - **THEN** it copies the agent to the same directory as `shared.md` (since `agents` capability is not supported)
 
+### Requirement: Prompt Injection
+
+#### Scenario: Install writes AGENTS.md prompt block
+
+- **WHEN** `StandardAgentPlugin.install()` runs
+- **THEN** `AGENTS.md` contains the `<!-- <specd> -->` base block with standard specd agent instructions
+- **AND** `AGENTS.md` does NOT contain any `<!-- <specd-plugin:standard> -->` marker block
+
+#### Scenario: Uninstall removes AGENTS.md base block
+
+- **GIVEN** `AGENTS.md` contains `<!-- <specd> -->` and no other plugin markers
+- **WHEN** `StandardAgentPlugin.uninstall()` runs
+- **THEN** `<!-- <specd> -->` base block is removed from `AGENTS.md`
+
+#### Scenario: Legacy plugin marker removed on install
+
+- **GIVEN** `AGENTS.md` contains a legacy `<!-- <specd-plugin:standard> -->` block from a previous install
+- **WHEN** `StandardAgentPlugin.install()` runs
+- **THEN** the `<!-- <specd-plugin:standard> -->` block is removed
+- **AND** the `<!-- <specd> -->` base block is present
+
 ### Requirement: allowed-tools configuration
 
 #### Scenario: Each skill has appropriate tool declarations

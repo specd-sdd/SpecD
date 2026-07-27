@@ -68,6 +68,12 @@ Files marked as shared MUST be installed under the rendered `sharedFolder` locat
 
 The resolved shared location MUST NOT contain a `SKILL.md` file.
 
+### Requirement: Prompt Injection
+
+`CopilotAgentPlugin.install()` MUST inject the base agent instruction prompt into `.github/copilot-instructions.md` under the project root using `injectSpecdBlock`.
+
+- `uninstall()` MUST remove the `<!-- <specd> -->` block from `.github/copilot-instructions.md`.
+
 ### Requirement: Uninstall behavior
 
 `uninstall(config: SpecdConfig, options?: AgentInstallOptions)` MUST remove installed skill directories from `.github/skills/` and agent profiles from `.github/agents/` relative to `config.projectRoot`.
@@ -92,6 +98,7 @@ Uninstall MUST NOT remove unrelated directories or files under `.github/skills/`
 - [`core:config`](../../core/core/config/spec.md) — defines SpecdConfig type
 - [`plugin-manager:agent-plugin-type`](../plugin-manager/agent-plugin-type/spec.md) — plugin interface
 - [`skills:skill-bundle`](../skills/skill-bundle/spec.md) — shared bundle file routing contract
-- [`skills:skill-templates-source`](../skills/skill-templates-source/spec.md) — frontmatter injection responsibility and template source contract
-- [`skills:resolve-bundle`](../skills/resolve-bundle/spec.md) — canonical install-time bundle resolution with built-in render defaults
-- [`skills:agents`](../skills/agents/spec.md) — defines specialized optimizer agents and their prompts.
+- [`skills:skill-templates-source`](../skills/skill-templates-source/spec.md) — skill source
+- [`skills:resolve-bundle`](../skills/resolve-bundle/spec.md) — canonical install-time bundle resolution
+- [`skills:agents`](../skills/agents/spec.md) — defines specialized optimizer agents
+- [`skills:agent-instruction-template`](../skills/agent-instruction-template/spec.md) — shared base prompt rendering and block management

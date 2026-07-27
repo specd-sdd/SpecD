@@ -19,7 +19,7 @@ Define the shared agent instruction prompt template (`agent-instruction.md.tpl`)
 
 ### Requirement: Base Prompt Rendering Interface
 
-`@specd/skills` MUST export a function `renderBaseAgentInstruction(options?: RenderBaseAgentInstructionOptions): string`.
+`@specd/skills` MUST export a function `renderBaseAgentInstruction(options?: RenderBaseAgentInstructionOptions): Promise<string>`.
 
 - `RenderBaseAgentInstructionOptions` MAY accept `extraInstructions?: string`.
 - When `extraInstructions` is provided and non-empty, the rendered prompt MUST include `extraInstructions` inside the `<!-- <specd> -->` block.
@@ -38,7 +38,25 @@ Define the shared agent instruction prompt template (`agent-instruction.md.tpl`)
 - `removeSpecdBlock` MUST remove the target block matching `blockId` (or default base block) without leaving orphaned comment tags.
 - `removeSpecdBlock` MUST perform reference-counted cleanup on shared files: if all plugin-specific blocks (`<!-- <specd-plugin:* -->`) have been removed, it MUST also remove the shared `<!-- <specd> -->` base block.
 
+### Requirement: Shared File Plugin Registration
+
+When multiple agent plugins target the same instruction file (e.g. `AGENTS.md`), each plugin MUST inject a plugin-specific registration marker block using `injectSpecdBlock(filePath, registrationContent, pluginName)` alongside the shared base `<!-- <specd> -->` block.
+
+- The registration content MUST be a non-empty string identifying the plugin (e.g. `"Registered by @specd/plugin-agent-<name>"`).
+- This marker block enables reference-counted cleanup: `removeSpecdBlock(filePath, pluginName)` will remove the plugin's marker, and if no other plugin markers remain, the shared base block is also removed.
+- Plugins targeting exclusive instruction files (e.g. `CLAUDE.md`, `.github/copilot-instructions.md`) do NOT inject plugin-specific marker blocks; they use only the base `<!-- <specd> -->` block.
+
+### Requirement: Safe JSON Config Merge Utilities
+
+`@specd/skills` MUST export safe JSON configuration helpers `mergeJsonConfig<T>(filePath: string, updater: (existing: T) => T): Promise<void>` and `unmergeJsonConfig<T>(filePath: string, updater: (existing: T) => T): Promise<void>`.
+
+- `mergeJsonConfig` MUST read the existing JSON file, parse it, pass the parsed object to the `updater` function, and write the result back as formatted JSON with a trailing newline.
+- If the target file does not exist or contains invalid JSON, `mergeJsonConfig` MUST pass an empty object `{} as T` to the `updater` and create the file (including parent directories).
+- `mergeJsonConfig` MUST NOT overwrite existing top-level properties not touched by the `updater`.
+- `unmergeJsonConfig` MUST read the existing JSON file, parse it, pass the parsed object to the `updater` function, and write the result back.
+- If the target file does not exist or contains invalid JSON, `unmergeJsonConfig` MUST be a graceful no-op.
+- Both utilities MUST write formatted JSON with 2-space indentation and a trailing newline.
+
 ## Spec Dependencies
 
-- [`skills:skill-bundle`](../skills/skill-bundle/spec.md) — bundle representation
-- [`skills:skill-repository-port`](../skills/skill-repository-port/spec.md) — skill repository abstraction
+_None — this spec defines standalone utility functions with no specd workspace dependencies._

@@ -241,4 +241,76 @@ describe('plugin-agent-opencode create()', () => {
       await rm(projectRoot, { recursive: true, force: true })
     }
   })
+
+  it('given project root, when install runs, then injects AGENTS.md prompt block and opencode marker, deploys plugin script, merges opencode.json, and uninstalls cleanly', async () => {
+    const projectRoot = await createTempProjectRoot()
+    const config = makeMockConfig(projectRoot)
+
+    try {
+      repositoryMock.list.mockImplementation(async () => [
+        {
+          name: 'specd',
+          description: 'specd',
+          templates: [],
+          kind: 'skill',
+          metadata: {
+            kind: 'skill',
+            supportedCapabilities: [],
+            requiredCapabilities: [],
+            requiredSharedTemplates: [],
+          },
+        },
+      ])
+
+      repositoryMock.getBundle.mockImplementation(async (name: string) => ({
+        name,
+        description: name,
+        files: [
+          { filename: 'SKILL.md', content: '---\nname: "specd"\n---\n\n# ' + name },
+          { filename: 'shared.md', content: 'shared-content', shared: true },
+        ],
+        install: async () => {},
+        uninstall: async () => {},
+      }))
+
+      const { create } = await import('../src/index.js')
+      const plugin = await create({ config })
+
+      // Pre-seed AGENTS.md with existing content and legacy plugin marker
+      const agentsMdPath = path.join(projectRoot, 'AGENTS.md')
+      await writeFile(
+        agentsMdPath,
+        '# Existing Project Instructions\n\n<!-- <specd-plugin:opencode> -->\nRegistered by @specd/plugin-agent-opencode\n<!-- </specd-plugin:opencode> -->\n',
+        'utf8',
+      )
+
+      await plugin.install(config, { skills: ['specd'] })
+
+      // Verify AGENTS.md base block is present and legacy marker block is removed
+      const agentsContent = await readFile(agentsMdPath, 'utf8')
+      expect(agentsContent).toContain('<!-- <specd agents="opencode"> -->')
+      expect(agentsContent).not.toContain('<!-- <specd-plugin:opencode> -->')
+
+      // Verify no native plugin script is deployed
+      const pluginScriptPath = path.join(projectRoot, '.opencode', 'plugins', 'specd-agent-init.ts')
+      const scriptExistsBefore = await readFile(pluginScriptPath, 'utf8')
+        .then(() => true)
+        .catch(() => false)
+      expect(scriptExistsBefore).toBe(false)
+
+      // Uninstall and verify reference-counted cleanup
+      await plugin.uninstall(config)
+
+      const remainingAgentsContent = await readFile(agentsMdPath, 'utf8')
+      expect(remainingAgentsContent).not.toContain('<!-- <specd')
+      expect(remainingAgentsContent).toContain('# Existing Project Instructions')
+
+      const scriptExistsAfter = await readFile(pluginScriptPath, 'utf8')
+        .then(() => true)
+        .catch(() => false)
+      expect(scriptExistsAfter).toBe(false)
+    } finally {
+      await rm(projectRoot, { recursive: true, force: true })
+    }
+  })
 })

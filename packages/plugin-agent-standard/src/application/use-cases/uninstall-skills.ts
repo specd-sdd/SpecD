@@ -1,5 +1,5 @@
 import { rm } from 'node:fs/promises'
-import { createSkillRepository } from '@specd/skills'
+import { createSkillRepository, removeSpecdBlock } from '@specd/skills'
 import path from 'node:path'
 import type { SpecdConfig } from '@specd/core'
 import type { AgentInstallOptions } from '@specd/plugin-manager'
@@ -47,6 +47,15 @@ export class UninstallSkills {
       await rm(path.join(targetDir, skill), { recursive: true, force: true })
       await rm(path.join(targetDir, `${skill}.md`), { force: true })
     }
-    await rm(sharedDir, { recursive: true, force: true })
+    await rm(path.join(sharedDir, 'shared.md'), { force: true })
+    try {
+      await rm(sharedDir)
+    } catch {
+      // Ignore if sharedDir contains other non-specd user files
+    }
+
+    // Remove plugin registration from AGENTS.md (reference-counted block manager removes block when 0 agents remain)
+    const agentsMdPath = path.join(config.projectRoot, 'AGENTS.md')
+    await removeSpecdBlock(agentsMdPath, 'standard')
   }
 }

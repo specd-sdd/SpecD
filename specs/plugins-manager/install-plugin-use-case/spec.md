@@ -44,6 +44,14 @@ On failure, the use case MUST throw an appropriate error:
 - `PluginValidationError` — when the plugin fails type guard validation (not an `AgentPlugin`)
 - `PluginValidationError` — when `install()` throws
 
+### Requirement: Agent Initialization Phase
+
+`InstallPlugin` MUST delegate agent prompt initialization, block injection, and native asset deployment to the target `AgentPlugin.install()` implementation.
+
+- `InstallPlugin.execute()` MUST call `plugin.install(input.config, input.options)`.
+- Each `AgentPlugin` implementation MUST utilize `@specd/skills` prompt rendering (`renderBaseAgentInstruction`) and block management (`injectSpecdBlock`, `removeSpecdBlock`) during its `install()` / `uninstall()` lifecycle.
+- Reference-counted cleanup on shared instruction files (`AGENTS.md`) MUST be maintained so that the base `<!-- <specd> -->` block persists until all agent plugins targeting that file are uninstalled.
+
 ## Constraints
 
 - This use case does NOT modify config — it only calls the plugin's install.

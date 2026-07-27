@@ -241,4 +241,30 @@ describe('plugin-agent-copilot create()', () => {
       await rm(projectRoot, { recursive: true, force: true })
     }
   })
+
+  it('given project root, when install runs, then injects copilot-instructions.md prompt block and uninstalls cleanly', async () => {
+    const projectRoot = await createTempProjectRoot()
+    const config = makeMockConfig(projectRoot)
+
+    try {
+      const { create } = await import('../src/index.js')
+      const plugin = await create({ config })
+
+      await plugin.install(config, { skills: [] })
+
+      const copilotMdPath = path.join(projectRoot, '.github', 'copilot-instructions.md')
+      const copilotContent = await readFile(copilotMdPath, 'utf8')
+      expect(copilotContent).toContain('<!-- <specd agents="copilot"> -->')
+      expect(copilotContent).toContain('<!-- </specd> -->')
+
+      await plugin.uninstall(config)
+
+      const exists = await readFile(copilotMdPath, 'utf8')
+        .then(() => true)
+        .catch(() => false)
+      expect(exists).toBe(false)
+    } finally {
+      await rm(projectRoot, { recursive: true, force: true })
+    }
+  })
 })

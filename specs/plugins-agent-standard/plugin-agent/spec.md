@@ -69,6 +69,15 @@ Files marked as shared MUST be installed under the rendered `sharedFolder` locat
 
 The resolved shared location MUST NOT contain a `SKILL.md` file.
 
+### Requirement: Prompt Injection
+
+`StandardAgentPlugin.install()` MUST inject the base agent instruction prompt into the shared `AGENTS.md` file under the project root.
+
+- `install()` MUST inject the base prompt using `injectSpecdBlock(agentsMdPath, prompt)`.
+- `install()` MUST call `removeSpecdBlock(agentsMdPath, "standard")` to purge any legacy plugin marker blocks left by previous versions.
+- `uninstall()` MUST call `removeSpecdBlock(agentsMdPath, "standard")` (no-op if not present), then `removeSpecdBlock(agentsMdPath)` to remove the base block.
+- No plugin marker block (`<!-- <specd-plugin:standard> -->`) is injected during install.
+
 ### Requirement: allowed-tools configuration
 
 The per-skill frontmatter map MUST declare `allowed-tools` for each skill with appropriate tool strings matching the agentskills.io format (space-separated). Tool strings MUST include the tools needed by each specd skill:
@@ -110,5 +119,6 @@ Uninstall MUST NOT remove unrelated directories or files under `.agents/skills/`
 - [`plugin-manager:agent-plugin-type`](../plugin-manager/agent-plugin-type/spec.md) — plugin interface
 - [`skills:skill-bundle`](../skills/skill-bundle/spec.md) — shared bundle file routing contract
 - [`skills:skill-repository`](../skills/skill-repository/spec.md) — skill access
-- [`skills:resolve-bundle`](../skills/resolve-bundle/spec.md) — canonical install-time bundle resolution with built-in render defaults
-- [`skills:agents`](../skills/agents/spec.md) — defines specialized optimizer agents and their prompts.
+- [`skills:resolve-bundle`](../skills/resolve-bundle/spec.md) — canonical install-time bundle resolution
+- [`skills:agents`](../skills/agents/spec.md) — defines specialized optimizer agents
+- [`skills:agent-instruction-template`](../skills/agent-instruction-template/spec.md) — shared base prompt rendering and block management

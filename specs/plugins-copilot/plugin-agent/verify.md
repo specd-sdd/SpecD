@@ -92,6 +92,18 @@
 - **AND** the file uses the `.agent.md` extension
 - **AND** the YAML frontmatter contains `tools` as a list
 
+### Requirement: Prompt Injection
+
+#### Scenario: Install writes copilot-instructions.md prompt block
+
+- **WHEN** `CopilotAgentPlugin.install()` runs
+- **THEN** `.github/copilot-instructions.md` contains the `<!-- <specd> -->` block
+
+#### Scenario: Uninstall cleans up copilot prompt block
+
+- **WHEN** `CopilotAgentPlugin.uninstall()` runs
+- **THEN** `.github/copilot-instructions.md` `<!-- <specd> -->` block is removed
+
 ### Requirement: Uninstall behavior
 
 #### Scenario: Uninstall removes selected skill directories and keeps shared resources

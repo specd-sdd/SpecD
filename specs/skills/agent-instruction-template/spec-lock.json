@@ -1,0 +1,40 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [],
+  "implementation": [
+    {
+      "file": "skills:templates/prompt/agent-instruction.md.tpl"
+    },
+    {
+      "file": "skills:src/domain/templates/index.ts",
+      "symbols": ["getAgentInstructionTemplatePath"]
+    },
+    {
+      "file": "skills:src/application/render-base-agent-instruction.ts",
+      "symbols": ["renderBaseAgentInstruction", "RenderBaseAgentInstructionOptions"]
+    },
+    {
+      "file": "skills:src/application/specd-block-manager.ts",
+      "symbols": ["injectSpecdBlock", "removeSpecdBlock"]
+    },
+    {
+      "file": "skills:src/application/json-config-manager.ts",
+      "symbols": ["mergeJsonConfig", "unmergeJsonConfig"]
+    },
+    {
+      "file": "skills:test/application/render-base-agent-instruction.spec.ts"
+    },
+    {
+      "file": "skills:test/application/specd-block-manager.spec.ts"
+    },
+    {
+      "file": "skills:test/application/json-config-manager.spec.ts"
+    },
+    {
+      "file": "skills:src/index.ts"
+    }
+  ]
+}

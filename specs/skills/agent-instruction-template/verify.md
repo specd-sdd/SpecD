@@ -39,9 +39,68 @@
 - **WHEN** `injectSpecdBlock(filePath, "   ", "opencode")` is executed
 - **THEN** no `<!-- <specd-plugin:opencode> -->` tag is written to `filePath`
 
+#### Scenario: Updates existing base block content idempotently
+
+- **GIVEN** a file already containing a `<!-- <specd> -->` block
+- **WHEN** `injectSpecdBlock(filePath, updatedPrompt)` is executed
+- **THEN** the block content is replaced with `updatedPrompt`
+- **AND** surrounding user content is preserved
+
+#### Scenario: Reference-counted cleanup preserves base block when other plugins remain
+
+- **GIVEN** a file with base `<!-- <specd> -->` and two plugin blocks `<!-- <specd-plugin:opencode> -->` and `<!-- <specd-plugin:codex> -->`
+- **WHEN** `removeSpecdBlock(filePath, "opencode")` is executed
+- **THEN** `<!-- <specd-plugin:opencode> -->` is removed
+- **AND** the shared `<!-- <specd> -->` base block is preserved
+- **AND** `<!-- <specd-plugin:codex> -->` is preserved
+
 #### Scenario: Reference-counted cleanup removes base block when last plugin is uninstalled
 
 - **GIVEN** a file with base `<!-- <specd> -->` and single plugin block `<!-- <specd-plugin:opencode> -->`
 - **WHEN** `removeSpecdBlock(filePath, "opencode")` is executed
 - **THEN** `<!-- <specd-plugin:opencode> -->` is removed
 - **AND** the shared `<!-- <specd> -->` base block is also removed
+
+### Requirement: Shared File Plugin Registration
+
+#### Scenario: Shared-file plugin injects both base block and plugin marker
+
+- **GIVEN** plugin-agent-codex targeting `AGENTS.md`
+- **WHEN** install injects base prompt via `injectSpecdBlock(agentsMdPath, prompt)` and plugin marker via `injectSpecdBlock(agentsMdPath, "Registered by @specd/plugin-agent-codex", "codex")`
+- **THEN** `AGENTS.md` contains both `<!-- <specd> -->` base block and `<!-- <specd-plugin:codex> -->` marker block
+
+#### Scenario: Exclusive-file plugin injects only base block
+
+- **GIVEN** plugin-agent-claude targeting `CLAUDE.md`
+- **WHEN** install injects base prompt via `injectSpecdBlock(claudeMdPath, prompt)`
+- **THEN** `CLAUDE.md` contains only `<!-- <specd> -->` base block
+- **AND** no `<!-- <specd-plugin:*> -->` blocks are present
+
+### Requirement: Safe JSON Config Merge Utilities
+
+#### Scenario: mergeJsonConfig preserves existing keys when adding new entries
+
+- **GIVEN** a JSON file `settings.json` containing `{ "permissions": { "allow": ["read"] } }`
+- **WHEN** `mergeJsonConfig(settingsPath, (cfg) => ({ ...cfg, hooks: { SessionStart: [...] } }))` is called
+- **THEN** `settings.json` contains both `permissions` and `hooks` keys
+- **AND** `permissions.allow` is unchanged
+
+#### Scenario: mergeJsonConfig creates file and parent directories when missing
+
+- **GIVEN** a non-existent file path `.claude/settings.json`
+- **WHEN** `mergeJsonConfig(settingsPath, (cfg) => ({ ...cfg, hooks: {...} }))` is called
+- **THEN** `.claude/settings.json` is created with the updater result
+- **AND** parent directory `.claude/` is created
+
+#### Scenario: unmergeJsonConfig is no-op when file does not exist
+
+- **GIVEN** a non-existent file path
+- **WHEN** `unmergeJsonConfig(path, updater)` is called
+- **THEN** no file is created
+- **AND** no error is thrown
+
+#### Scenario: unmergeJsonConfig removes entries from existing JSON
+
+- **GIVEN** a JSON file containing `{ "plugins": ["./.opencode/plugins/specd-agent-init.ts", "other-plugin.ts"] }`
+- **WHEN** `unmergeJsonConfig(path, (cfg) => ({ ...cfg, plugins: cfg.plugins.filter(p => !p.includes('specd-')) }))` is called
+- **THEN** the file contains `{ "plugins": ["other-plugin.ts"] }`
