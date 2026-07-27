@@ -26,11 +26,7 @@ export const skillFrontmatter: Readonly<Record<string, Frontmatter>> = {
     description: 'Create a new specd change from intent discovery.',
     'allowed-tools': 'Bash(node:*) Bash(specd:*) Read Grep Glob Agent',
   },
-  'specd-metadata': {
-    name: 'specd-metadata',
-    description: 'Generate and maintain spec metadata artifacts.',
-    'allowed-tools': 'Bash(node:*) Bash(specd:*) Bash(cat:*) Bash(rm:*) Bash(shasum:*) Read Agent',
-  },
+
   'specd-compliance': {
     name: 'specd-compliance',
     description: 'Run specs-compliance review between implementation and specs.',

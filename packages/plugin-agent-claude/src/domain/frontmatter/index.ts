@@ -36,13 +36,7 @@ export const skillFrontmatter: Readonly<Record<string, Frontmatter>> = {
     allowed_tools: 'Bash(node *), Bash(specd *), Read, Grep, Glob, Agent, TaskCreate, TaskUpdate',
     argument_hint: '<change-name>',
   },
-  'specd-metadata': {
-    name: 'specd-metadata',
-    description: 'Generate and maintain spec metadata artifacts.',
-    allowed_tools:
-      'Bash(node *), Bash(specd *), Bash(cat *), Bash(rm *), Bash(shasum *), Read, Agent',
-    argument_hint: '<change-name>',
-  },
+
   'specd-compliance': {
     name: 'specd-compliance',
     description: 'Run specs-compliance review between implementation and specs.',

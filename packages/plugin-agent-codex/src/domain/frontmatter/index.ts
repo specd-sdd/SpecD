@@ -24,10 +24,7 @@ export const skillFrontmatter: Readonly<Record<string, Frontmatter>> = {
     name: 'specd-new',
     description: 'Create a new specd change from intent discovery.',
   },
-  'specd-metadata': {
-    name: 'specd-metadata',
-    description: 'Generate and maintain spec metadata artifacts.',
-  },
+
   'specd-compliance': {
     name: 'specd-compliance',
     description: 'Run specs-compliance review between implementation and specs.',
