@@ -11,5 +11,41 @@
     "core:archive-change",
     "core:workspace"
   ],
-  "implementation": []
+  "implementation": [],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Change-dir layout: flat root artifacts; new specs under specs/<ws>/<path>/; existing delta-capable under deltas/<ws>/<path>/<file>.delta.yaml.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:8a55aaa7d8e314dfdc6d6bb1d139bae5324f99589e83aa72a2c775cb62b82f24",
+          "lastModified": "2026-07-24T09:03:05.061Z"
+        },
+        "verify.md": {
+          "hash": "sha256:566ee083774943c626402c9062c9dab45d73b021851056669b418fa05af5e15e",
+          "lastModified": "2026-05-25T06:02:58.413Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Change Directory Layout\n\n## Rules\n\n### Root files\n- Root holds `manifest.json` + schema-declared change-scoped artifacts — flat, no workspace/capability prefix (e.g. `proposal.md`, `tasks.md`, `design.md` in `schema-std`).\n- `manifest.json` = change entity source of truth. No other root file types.\n\n```\n<changes>/<timestamp>-<name>/\n├── manifest.json\n└── <change-artifact>…   ← schema-declared; optional only if produced\n```\n\n### New spec-scoped artifacts\n- New capability artifacts → `specs/<workspace>/<capability-path>/<artifact-filename>` inside change dir.\n- `<workspace>` = workspace ID from `specd.yaml`; `<capability-path>` = spec path in that workspace.\n- Mirrors permanent layout → `ArchiveChange` syncs without path transform: change `specs/<ws>/<path>/<file>` → `<workspace.specs.path>/<path>/<file>`.\n\n### Delta files\n- Existing spec-scoped artifact with schema `delta: true` → delta, not full rewrite.\n- Path: `deltas/<workspace>/<capability-path>/<artifact-filename>.delta.yaml`\n- Deltas never sync to permanent specs. `deltas/` ≠ `specs/` substitute.\n- For existing delta-capable specs, delta path is expected; same-named `specs/...` file invalid substitute.\n\n### Expected spec-scoped artifact path\n- Exactly one expected path before manifest/status/validation/artifact instructions.\n- Exists + `delta: true` → `deltas/<ws>/<path>/<file>.delta.yaml`\n- Spec missing → `specs/<ws>/<path>/<file>`\n- No `delta: true` → always `specs/<ws>/<path>/…` whether exists or not\n- Tools MUST NOT treat `specs/...` and `deltas/...` as interchangeable for same artifact\n\n### Tracked artifact filename is authoritative\n- Once resolved + persisted as tracked filename → authoritative representation\n- Consumers MUST NOT probe alternate `specs/...` or `deltas/...` just because syntactically valid for other repo state\n- Repo path normalization MUST preserve tracked-intent unless proven same representation for same file\n\n### Workspace segment is always present\n- `specs/<workspace>/` and `deltas/<workspace>/` always include workspace segment — even single-workspace. Omit invalid.\n- Enables unambiguous multi-ws + resolve `SpecRepository` without reading `specd.yaml` at read time\n\n### Full change directory structure\n```\n<changes>/<timestamp>-<name>/\n├── manifest.json\n├── <change-artifact>…          ← flat schema change-scoped\n├── specs/<ws>/<capability-path>/<artifact-filename>\n└── deltas/<ws>/<capability-path>/<artifact-filename>.delta.yaml\n```\n- New-only → no `deltas/`. Modify-only → no `specs/`. Mixed → both.\n\n## Constraints\n- Change-scoped artifacts flat at root — no workspace/capability prefix\n- New capability files under `specs/<workspace>/<capability-path>/`\n- Deltas under `deltas/<workspace>/<capability-path>/` named `<artifact-filename>.delta.yaml`\n- Per artifact: exactly one of `specs/...` or `deltas/...` expected; never both\n- Workspace segment always present in `specs/` and `deltas/` — never omit\n- Change-dir `specs/` + `deltas/` never sync to permanent specs; only `ArchiveChange` moves contents\n- Root allows only `manifest.json`, schema artifacts, `specs/`, `deltas/`\n",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:8a55aaa7d8e314dfdc6d6bb1d139bae5324f99589e83aa72a2c775cb62b82f24",
+          "lastModified": "2026-07-24T09:03:05.061Z"
+        },
+        "verify.md": {
+          "hash": "sha256:566ee083774943c626402c9062c9dab45d73b021851056669b418fa05af5e15e",
+          "lastModified": "2026-05-25T06:02:58.413Z"
+        }
+      }
+    }
+  }
 }

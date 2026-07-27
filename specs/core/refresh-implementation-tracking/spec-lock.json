@@ -14,5 +14,41 @@
     {
       "file": "core:src/composition/use-cases/refresh-implementation-tracking.ts"
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "App-layer VCS refresh of trackedImplementationFiles via ImplementationDetector; GetStatus/TransitionChange default; skip if never implementing.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:686b760faca66b59a7fa0023327d975f519cc0b26c7b7cb3dac39594257a042c",
+          "lastModified": "2026-07-06T14:22:55.383Z"
+        },
+        "verify.md": {
+          "hash": "sha256:e5c2ad4cc7f38b82abe8b3ca46ac4e709522f847f5563496a787e400d9264f6d",
+          "lastModified": "2026-07-06T14:22:55.384Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# RefreshImplementationTracking\n\n## Rules\n\n### Input contract\n- `RefreshImplementationTracking.execute` MUST accept `name` (change to refresh)\n\n### Default orchestration by host use cases\n- `GetStatus` and `TransitionChange` MUST delegate pre-read / pre-transition refresh to `RefreshImplementationTracking` (not `ImplementationDetector` directly)\n- `RefreshImplementationTracking` remains standalone primitive for explicit refresh (e.g. `specd change implementation refresh`)\n\n### Historical implementing guard\n- When `Change.getHistoricalImplementationAt()` is `null`: MUST NOT invoke `ImplementationDetector`; MUST NOT mutate tracked implementation files\n- When guard satisfied: MUST run targeted detection; MAY persist tracking updates\n\n### Detection merge semantics\nWhen detection runs, MUST:\n1. Call `ImplementationDetector.detectModifiedFiles(change, options)` with loaded change + internal paths as exclusions\n2. For each returned project-relative path not in `trackedImplementationFiles`: `Change.trackImplementationFile(file, 'open')`\n3. For each already-tracked path: preserve review state (unless `removed` — see resurrections)\n- MUST NOT mark files `resolved` or `ignored` during merge of newly detected files\n\n### Deletion and removal semantics\nWhen detection runs, MUST identify tracked files physically removed from project.\n- For every file in `trackedImplementationFiles` not `ignored`: verify disk existence\n- If missing: (1) `Change.trackImplementationFile(file, 'removed')`; (2) remove all `implementationLinks` (file-level + symbol-level) referencing missing file\n\n### Resurrections and re-appearances\nWhen detection runs, MUST handle files previously `removed` that exist again on disk.\n- SHALL transition `removed` → `open` when: returned by `ImplementationDetector` as modified, OR found on disk during existence check for tracked files\n- Return to `open` forces re-review (content/purpose may have changed)\n\n### Internal directory filtering\nBefore detection, MUST collect internal dirs so specd metadata / archived changes not discovered as implementation:\n1. Query `ChangeRepository.internalPaths()` and `ArchiveRepository.internalPaths()`\n2. Normalize absolute → project-relative portable paths\n3. Pass as `excludePaths` to `ImplementationDetector.detectModifiedFiles`\n\n### Persistence\n- MUST persist tracking updates via `ChangeRepository.mutate`\n- When historical implementing guard not satisfied: `mutate` MUST still load change but MUST NOT alter tracked implementation state\n\n### Result projection\n- MUST return `ImplementationTrackingProjection`: `trackedFiles` (post-refresh review state), `links` (confirmed implementation links post-refresh)\n- Projection MUST use shared `projectImplementationTracking` helper from implementation-tracking module\n\n### Change must exist\n- Missing change → throw `ChangeNotFoundError` with code `CHANGE_NOT_FOUND`\n\n### Constructor dependencies\n`RefreshImplementationTracking` MUST accept:\n- `changes: ChangeRepository` — load, persist, internal path discovery\n- `archives: ArchiveRepository` — internal path discovery\n- `implementationDetector: ImplementationDetector` — targeted candidate discovery\n\n### Delivery-agnostic boundary\n- MUST NOT reference CLI commands, MCP servers, filesystem watchers, or other delivery mechanisms\n- Exposes only VCS-backed refresh contract; other adapters MAY update tracked files via different strategies without this use case\n\n### Config-based factory delegates through resolveRefreshImplementationTrackingDeps\n- Config-based `createRefreshImplementationTracking(config, options?)` MUST derive `RefreshImplementationTrackingDeps` via `resolveRefreshImplementationTrackingDeps(resolver)`, then delegate to canonical `createRefreshImplementationTracking(deps)`\n- `resolveRefreshImplementationTrackingDeps(resolver)` MUST resolve: `changes: ChangeRepository`, `archives: ArchiveRepository`, `implementationDetector: ImplementationDetector`, `files: FileReader`, `projectRoot: string`\n- Helper is only use-case-specific composition entry for config-based bootstrap; factory MUST NOT reconstruct fs-shaped wiring inline\n\n## Constraints\n- Detection demand-driven per invocation, not background polling\n- Returned detector paths MUST stay project-relative and forward-slash-normalized per core:implementation-detector-port\n- No manual add / remove / resolve / ignore mutations — those remain UpdateImplementationTracking\n",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:686b760faca66b59a7fa0023327d975f519cc0b26c7b7cb3dac39594257a042c",
+          "lastModified": "2026-07-06T14:22:55.383Z"
+        },
+        "verify.md": {
+          "hash": "sha256:e5c2ad4cc7f38b82abe8b3ca46ac4e709522f847f5563496a787e400d9264f6d",
+          "lastModified": "2026-07-06T14:22:55.384Z"
+        }
+      }
+    }
+  }
 }
