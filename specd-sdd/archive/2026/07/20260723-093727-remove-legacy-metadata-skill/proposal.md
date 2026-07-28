@@ -2,15 +2,17 @@
 
 ## Motivation
 
-`specd-metadata` duplicates metadata-optimization work that is now owned by specialized agents. Removing the obsolete skill makes the agent-based interface unambiguous before any external users depend on it.
+`specd-metadata` / `specd-spec-metadata` duplicated metadata-optimization work now owned by specialized agents. Completing the removal closes the last active invocation paths before external users depend on the obsolete skill.
 
 ## Current behaviour
 
-The skills package publishes a `specd-metadata` template, all agent plugins register it as a standard skill, and installed copies remain invocable. Archive guidance also points to the legacy workflow even though `specd-spec-context-optimizer` already performs the per-spec optimized-context update.
+Canonical removal has largely already landed in the tree: the `specd-metadata` template directory is gone, plugin `skillFrontmatter` maps no longer register it, archive guidance already points to `specd-spec-context-optimizer`, and the live `skills:skill-templates-source` / `skills:agents` requirements already forbid publishing the standard skill.
+
+What remains broken is project-local commit guidance (`.claude` / `.agents` / `.codex` `commit` skills): it still tells agents to invoke `specd-spec-metadata` and to stage obsolete `.specd-metadata.yaml` sidecars. That keeps an active obsolete interface and conflicts with lock-owned optimizations persisted through `specs optimizations set`.
 
 ## Proposed solution
 
-Remove the legacy skill template, plugin registrations, legacy development copy, and rendered installations. Update active workflow guidance and the template-source contract to use the specialized optimizer agents. Preserve deterministic metadata generation and all metadata CLI/core capabilities.
+Treat the template-source and agents contracts as already correct (`no-op` deltas). Finish the removal by rewriting commit-skill guidance so it no longer invokes the legacy skill, aligns metadata refresh with the current self-healing / `generate-metadata` and `specs optimizations` model, and verify that no active source or rendered skill still names `specd-metadata` or `specd-spec-metadata`.
 
 ## Specs affected
 
@@ -20,22 +22,24 @@ None.
 
 ### Modified specs
 
-- `skills:skill-templates-source`: remove `specd-metadata` from the required standard-template inventory and require rendered bundles to omit removed skill templates.
+- `skills:skill-templates-source`: requirements already exclude `specd-metadata` from the standard-template inventory; this change records a `no-op` delta and implements remaining cleanup against that contract.
   - Depends on (added): none
   - Depends on (removed): none
-- `skills:agents`: establish specialized optimizer agents as the supported metadata-optimization interface in place of the legacy standard skill.
+- `skills:agents`: requirements already establish specialized optimizer agents as the exclusive metadata-optimization interface; this change records a `no-op` delta and removes leftover invocation paths.
   - Depends on (added): none
   - Depends on (removed): none
 
 ## Impact
 
-Affected areas include `@specd/skills` template discovery and rendering, the frontmatter maps in the Claude, Codex, Copilot, OpenCode, and Standard plugins, the archive workflow template, the legacy development skill, and generated local skill copies. No core metadata data model, API, or persistence behavior changes.
+Primary remaining impact is project-local commit skills under `.claude/skills/commit`, `.agents/skills/commit`, and `.codex/skills/commit`. Canonical template discovery, plugin frontmatter maps, archive templates, and core/CLI metadata infrastructure stay as they are. No public API or persistence model changes in this change.
 
 ## Technical context
 
-The old skill orchestrates deterministic metadata generation and subagent optimization. The existing `specd-spec-context-optimizer` agent instead updates only `optimizedDescription` and `optimizedContext` through the safe metadata-update path, which preserves fresh deterministic extraction. The template system distinguishes standard skills from specialized agents through separate directories and metadata files. Agent-capability fallback remains supported by rendering agent prompts for manual or inline execution.
-
-The user approved direct removal: there are no users, so no alias, deprecation period, migration documentation, or compatibility fallback is needed. Historical archives and references to the metadata persistence mechanism are out of scope.
+- Direct removal remains approved: no alias, deprecation window, or migration docs.
+- Persist path for optimized fields is `specs optimizations set` / `clear` (lock-owned), not the removed `update-metadata` / `UpdateSpecMetadata` surface.
+- Optimizer agents already use that path; archive templates already recommend `specd-spec-context-optimizer`.
+- Historical archives and incidental `.specd-metadata.yaml` wording in unrelated specs stay out of scope unless they form an active skill invocation path.
+- Spec deltas previously written for this change now merge as empty diffs against base; converting them to `no-op` avoids pretending the contracts still need editing.
 
 ## Open questions
 

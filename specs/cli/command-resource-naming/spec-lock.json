@@ -4,5 +4,41 @@
     "version": 1
   },
   "dependsOn": ["cli:entrypoint"],
-  "implementation": []
+  "implementation": [],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Canonical CLI groups are plural (`changes`,`specs`,`archives`,`drafts`); singulars are aliases only.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:b159acf1428275aff42bb08cb60f33d4aedf3c3936dbf571abfa1f684b3d013c",
+          "lastModified": "2026-05-25T06:02:58.362Z"
+        },
+        "verify.md": {
+          "hash": "sha256:5467d54c7ce56fac9155ad7d223ba5351700e642096099ae28487a963d3854df",
+          "lastModified": "2026-05-25T06:02:58.362Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Command Resource Naming\n\n## Rules\n\n### Canonical plural groups\n- Countable CLI resources: canonical command-group name SHALL be plural.\n- In scope: `changes`, `specs`, `archives`, `drafts`.\n\n### Singular aliases\n- Each plural group SHALL accept singular alias for backward compat:\n  - `change` → `changes`\n  - `spec` → `specs`\n  - `archive` → `archives`\n  - `draft` → `drafts`\n\n### Help and docs canonical display\n- CLI help, project docs, agent workflow artifacts SHALL present plural groups as primary. Singular MAY appear as aliases only.\n\n### Behavioral equivalence\n- Canonical group and singular alias: behavior, outputs, exit codes MUST be equivalent for same subcommand/args.\n\n### Workflow equivalence mapping\n- Skip-command guidance MUST use explicit, deterministic field mapping (which output fields satisfy each decision check).\n- If equivalence not deterministic → MUST run explicit canonical command.\n\n## Constraints\n\n- Policy covers command-group naming only — NOT domain entities or internal use-case ids.\n- Plural canonicals MUST NOT break existing singular invocations.\n",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:b159acf1428275aff42bb08cb60f33d4aedf3c3936dbf571abfa1f684b3d013c",
+          "lastModified": "2026-05-25T06:02:58.362Z"
+        },
+        "verify.md": {
+          "hash": "sha256:5467d54c7ce56fac9155ad7d223ba5351700e642096099ae28487a963d3854df",
+          "lastModified": "2026-05-25T06:02:58.362Z"
+        }
+      }
+    }
+  }
 }

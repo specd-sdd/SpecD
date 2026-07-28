@@ -13,5 +13,41 @@
       "file": "skills:src/domain/skill-template-metadata.ts",
       "symbols": ["SkillTemplateMetadata"]
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Pure domain models `Skill` and `SkillTemplate` — lazy content, no I/O.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:0f582de9b928912a78aa2e5e5ea4048dab178ef40e051e95ee087c8f2dee5611",
+          "lastModified": "2026-06-16T14:28:14.913Z"
+        },
+        "verify.md": {
+          "hash": "sha256:ada1cbca83da5c249addd9b5d75b856bcf3412c064c41e7787a7006c08fd6388",
+          "lastModified": "2026-06-16T14:28:14.914Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# skills:skill\n\n## Rules\n\n### Skill interface\n- `Skill` MUST be interface:\n  - `name: string` — unique id\n  - `description: string` — human-readable purpose\n  - `kind: 'skill' | 'agent'`\n  - `templates: SkillTemplate[]`\n\n### SkillTemplate interface\n- `SkillTemplate` MUST be interface:\n  - `filename: string`\n  - `getContent(): Promise<string>` — lazy load\n\n### No I/O in domain\n- Domain layer MUST NOT contain I/O (fs, network, etc.). I/O only in infrastructure.\n\n### Lazy content loading\n- Content MUST load lazily via `getContent()`. `Skill` MUST NOT hold loaded content in memory.\n\n### Typed errors for skill operations\n- Skill domain errors MUST use typed classes extending package-level base (e.g. `SpecdSkillsError`). Base MUST follow Specd Error Contract and extend `SpecdError` from `@specd/core`.\n\n## Constraints\n\n- Domain types MUST be pure TypeScript interfaces.\n- No deps on `node:fs` or any I/O library.\n",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:0f582de9b928912a78aa2e5e5ea4048dab178ef40e051e95ee087c8f2dee5611",
+          "lastModified": "2026-06-16T14:28:14.913Z"
+        },
+        "verify.md": {
+          "hash": "sha256:ada1cbca83da5c249addd9b5d75b856bcf3412c064c41e7787a7006c08fd6388",
+          "lastModified": "2026-06-16T14:28:14.914Z"
+        }
+      }
+    }
+  }
 }

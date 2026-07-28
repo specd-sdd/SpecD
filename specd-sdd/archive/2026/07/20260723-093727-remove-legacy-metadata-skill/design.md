@@ -2,142 +2,231 @@
 
 ## Objectives
 
-Remove every active invocation path for the obsolete standard `specd-metadata` skill. The resulting bundle exposes metadata optimization only through `specd-project-context-optimizer` and `specd-spec-context-optimizer`, while deterministic metadata generation, persistence, CLI commands, and metadata sidecars remain unchanged.
+Close every remaining active invocation path for the obsolete standard skill
+`specd-metadata` / `specd-spec-metadata`. After this change, metadata optimization
+is reachable only through `specd-project-context-optimizer` and
+`specd-spec-context-optimizer`. Canonical template discovery, plugin registrations,
+archive guidance, and the live skill-template / agents contracts already satisfy that
+end state; this change finishes the leftover project-local commit guidance and
+re-validates absence across active sources.
 
 ## Non-goals
 
-- Do not alter `metadata.json`, metadata extraction, `GenerateSpecMetadata`, `UpdateSpecMetadata`, `SaveSpecMetadata`, or any metadata CLI command.
-- Do not modify historical archives or historical change artifacts.
-- Do not provide an alias, deprecation warning, migration guide, compatibility shim, or feature flag. There are no users to preserve.
-- Do not change agent prompt semantics, capability negotiation, or frontmatter field schemas.
+- Do not alter Core metadata materialization, `GenerateSpecMetadata`,
+  `RegenerateSpecMetadata`, `PersistSpecMetadata`, `MaterializeSpecMetadata`, or
+  lock-owned optimization use cases.
+- Do not resurrect or call removed surfaces (`UpdateSpecMetadata`, `SaveSpecMetadata`,
+  `specs update-metadata`, `specs write-metadata`, `specs invalidate-metadata`).
+- Do not change `specs optimizations set` / `get` / `clear` semantics.
+- Do not modify historical archives under `specd-sdd/changes/` or `.specd/changes/`.
+- Do not add an alias, deprecation warning, migration guide, compatibility shim, or
+  feature flag.
+- Do not rewrite unrelated specs that still mention the historical sidecar filename
+  `.specd-metadata.yaml` as documentation of the metadata mechanism (out of scope
+  unless they form an active skill invocation path).
+- Do not re-delete canonical templates, plugin frontmatter entries, or installed
+  `specd-metadata` directories that are already absent.
 
 ## Affected areas
 
-- `packages/skills/templates/skills/specd-metadata/SKILL.md.tpl` and `skill.meta.json`
-  - Remove both files by deleting the complete obsolete standard-skill template directory.
-  - Graph impact: LOW for the template files themselves; template discovery determines the actual bundle membership.
-- `packages/skills/templates/skills/specd-archive/SKILL.md.tpl`
-  - Replace the post-archive recommendation for `/specd-spec-metadata` with `specd-spec-context-optimizer` for each affected spec. The wording must preserve the existing condition that optimization is enabled.
+### Already landed (verify only; do not re-implement)
+
+- `packages/skills/templates/skills/specd-metadata/` — directory already removed.
 - `packages/plugin-agent-{claude,codex,copilot,opencode,standard}/src/domain/frontmatter/index.ts`
-  - Remove the `specd-metadata` entry from each `skillFrontmatter` map. Do not alter `agentFrontmatter` entries.
-  - Each `skillFrontmatter` symbol has one direct dependent and MEDIUM risk. Its installation flow reaches the package `InstallSkills` use case, package entry point, and `install-skills.spec.ts`.
-- `packages/plugin-agent-{claude,codex,copilot,opencode,standard}/test/install-skills.spec.ts`
-  - Update expected installed skill inventories so no plugin emits `specd-metadata`; retain assertions for the specialized agents according to each plugin capability.
-- `dev/ai-agents/skills/specd-spec-metadata/SKILL.md` and `dev/ai-agents/skills/specd-archive/SKILL.md`
-  - Delete the legacy metadata skill and replace its archive reference with the specialized spec-context optimizer.
-- `.codex/skills/specd-metadata/SKILL.md`, `.agents/skills/specd-archive/SKILL.md`, `.codex/skills/specd-archive/SKILL.md`, `.agents/skills/commit/SKILL.md`, and `.codex/skills/commit/SKILL.md`
-  - Regenerate or update these installed/project skill copies through the repository skills synchronization workflow. They must contain no invocation of `specd-metadata` or `specd-spec-metadata`; references to the metadata persistence sidecar itself remain valid.
-  - Note: `.agents/skills/specd-metadata/` is already absent (cleaned by a previous sync). Only `.codex/skills/specd-metadata/` still exists and requires directory removal.
-- `specs/skills/skill-templates-source/{spec.md,verify.md}`
-  - Remove `specd-metadata` from the canonical standard-template inventory and add verification that discovery omits it while specialized optimizer agents remain available.
-- `specs/skills/agents/{spec.md,verify.md}`
-  - Define specialized optimizer agents as the exclusive metadata-optimization interface and verify that no standard `specd-metadata` skill is discovered.
+  — `skillFrontmatter` maps already omit `specd-metadata`.
+- `packages/plugin-agent-*/test/install-skills.spec.ts` — inventories already omit it.
+- `packages/skills/templates/skills/specd-archive/SKILL.md.tpl` — already recommends
+  `specd-spec-context-optimizer` when optimization is enabled (LOW graph impact; no
+  code dependents).
+- `dev/ai-agents/skills/specd-spec-metadata/` — already absent.
+- `.agents/skills/specd-metadata/` and `.codex/skills/specd-metadata/` — already absent.
+- Live specs `skills:skill-templates-source` and `skills:agents` (and their verify
+  scenarios) already encode the removal contract. Change deltas are `no-op`.
+
+### Remaining edits
+
+- `.claude/skills/commit/SKILL.md`
+- `.agents/skills/commit/SKILL.md`
+- `.codex/skills/commit/SKILL.md`
+
+  These three project-local copies are identical today and are **not** produced from
+  `packages/skills/templates/`. Update all three in lockstep.
+
+  Required content changes:
+  1. Remove every instruction that names `specd-spec-metadata` or `specd-metadata` as
+     a skill to invoke.
+  2. For LLM-optimized context work, instruct agents to launch
+     `specd-spec-context-optimizer` (and project-level work via
+     `specd-project-context-optimizer`) only when effective `llmOptimizedContext` is
+     `true`, matching `skills:agents`.
+  3. Stop telling agents to regenerate and `git add specs/**/.specd-metadata.yaml`.
+     Deterministic metadata is a self-healing cache under `.specd/metadata/` (gitignored).
+     Commit flow MUST NOT stage gitignored metadata cache files as part of the commit.
+  4. Keep Conventional Commits workflow (read `_global/commits`, inspect diff, craft
+     message, stage confirmed scope, commit with `SPECD_COMMIT=1`) intact.
+  5. Optional forced rebuild remains `specd specs generate-metadata` when the user
+     explicitly wants cache warming; it is not a commit prerequisite and its outputs
+     are not commit payloads.
+  6. Update the skill description / "What this agent does" blurb so it no longer claims
+     the commit skill regenerates `.specd-metadata.yaml` sidecars.
+
+- `dev/ai-agents/skills/specd-archive/SKILL.md` — already names the optimizer agent;
+  confirm no residual `specd-spec-metadata` string remains (verify-only).
 
 ## New constructs
 
-None. This change removes registrations and content; it introduces no new runtime symbols, APIs, data types, files, or configuration.
+None. No new runtime symbols, APIs, data types, templates, or configuration keys.
 
 ## Approach
 
-1. Delete the canonical `specd-metadata` skill template directory so `@specd/skills` discovery can no longer resolve it.
-2. Remove the matching standard-skill frontmatter record from each plugin. Leave each optimizer-agent record intact so capability-aware agent rendering continues to work.
-3. Replace every active workflow instruction that names the legacy skill with the specialized optimizer appropriate to per-spec metadata (`specd-spec-context-optimizer`). Remove the separate legacy development skill rather than renaming it.
-4. Run the project skills synchronization path to refresh `.agents` and `.codex` generated copies, then verify that the old skill directories and invocations are absent. Note: `.agents/skills/specd-metadata/` is already absent; only `.codex/skills/specd-metadata/` requires directory removal.
-5. Update plugin installation tests and run the package tests so installed bundles prove the removal across all supported plugin runtimes.
+1. **Treat specs as settled.** Keep `no-op` deltas for `skills:skill-templates-source`
+   and `skills:agents`. Implementation proves the existing requirements, including:
+   - no `specd-metadata` standard skill template is discovered
+   - optimizer agents remain discoverable with `kind: agent`
+2. **Rewrite project-local commit skills** (three files) so the only metadata-optimization
+   interface they name is the specialized agents, and so metadata filesystem guidance
+   matches the self-healing / lock-owned model.
+3. **Absence sweep.** Search active source and rendered skill directories for
+   `specd-metadata` and `specd-spec-metadata`. Allowed hits: this change's own artifacts,
+   historical archives, and incidental documentation of the metadata mechanism that does
+   not instruct invoking the removed skill. Fail the change if any active skill still
+   recommends the removed skill.
+4. **Regression confirmation.** Run plugin install-skills tests and skills package tests
+   as a smoke check that the already-landed removals remain green; do not invent new
+   plugin inventory expectations unless a test still fails.
 
-The implementation satisfies both modified requirements: the template inventory explicitly excludes the standard skill, and only the two specialized agents remain discoverable for metadata optimization. The new verification scenarios map to bundle discovery and agent discovery assertions in the skills/package and plugin installation tests.
+This satisfies Template migration and Optimizer agents: the published inventory stays
+free of the obsolete skill, and active workflow text no longer routes through it.
 
 ## Functional and operational contract
 
-- Standard-skill discovery and rendered plugin bundles MUST NOT include an item whose identifier is `specd-metadata`.
-- Agent discovery MUST continue to include `specd-project-context-optimizer` and `specd-spec-context-optimizer` with `kind: agent`.
-- When archive guidance is rendered and optimized context is enabled, it MUST direct the orchestrator to `specd-spec-context-optimizer` for each relevant spec.
-- Agent-capability fallback remains unchanged: runtimes without `agents` receive agent prompts for manual or inline execution through the existing rendering behavior.
-- Any active textual instruction naming `/specd-metadata` or `/specd-spec-metadata` MUST be removed or replaced. References to metadata files, deterministic extraction, or safe metadata-update commands are explicitly retained.
-- No persistence, state transition, network operation, authentication, authorization, retry, concurrency, migration, rollback data, or feature-flag behavior is added or changed.
+- Standard-skill discovery MUST NOT return an item whose identifier is `specd-metadata`.
+- Agent discovery MUST continue to include `specd-project-context-optimizer` and
+  `specd-spec-context-optimizer` with `kind: agent`.
+- Project-local commit skills MUST NOT instruct invocation of `/specd-metadata`,
+  `/specd-spec-metadata`, or a skill named `specd-spec-metadata`.
+- When commit guidance mentions LLM optimization, it MUST name
+  `specd-spec-context-optimizer` (per-spec) and MUST gate that suggestion on effective
+  `llmOptimizedContext === true`.
+- Commit guidance MUST NOT stage `.specd-metadata.yaml` or `.specd/metadata/**` as part
+  of the normal commit payload.
+- Optimized-field persistence remains `specd specs optimizations set` (agents already
+  use this); commit skills do not perform that write themselves.
+- No persistence, auth, network, retry, concurrency, migration, or feature-flag behavior
+  is added.
 
 ## Key decisions
 
-- **Direct removal** → The user confirmed there are no users, so retaining an alias or migration path adds a second unsupported interface without benefit. **Alternatives rejected:** deprecation period, redirect, and compatibility shim.
-- **Retain specialized agents, not a renamed skill** → Existing agent templates already perform focused optimized-context updates through the safe update path. **Alternative rejected:** keeping the orchestration skill, because it duplicates agent responsibilities.
-- **Preserve metadata infrastructure** → The removed item is an interaction workflow, not the metadata domain. **Alternative rejected:** deleting core/CLI metadata commands or sidecar support, which would break deterministic generation and context consumers.
-- **Regenerate installed copies** → `.agents` and `.codex` are delivery artifacts and must reflect canonical sources. **Alternative rejected:** deleting only canonical templates and leaving stale invocable local copies.
+- **Complete leftover commit paths rather than reopen canonical removal** → Canonical
+  template/plugin work already merged. Re-doing it wastes effort and risks churn.
+  **Alternatives rejected:** rewriting already-correct plugin frontmatter; re-adding
+  then re-deleting the template for ceremony.
+- **`no-op` deltas** → Live specs already contain the desired requirements and scenarios.
+  **Alternatives rejected:** identity `modified` deltas that produce empty merges;
+  removing the specs from the change (would lose explicit contract linkage for verify).
+- **Commit skills are hand-maintained triples** → They are not under
+  `packages/skills/templates/`, so skills sync cannot refresh them. Edit all three
+  copies explicitly.
+  **Alternatives rejected:** editing only `.claude` and hoping sync propagates.
+- **Align commit metadata wording with current model while removing the skill** → Leaving
+  `.specd-metadata.yaml` staging instructions would keep a broken path next to the
+  removed skill name.
+  **Alternatives rejected:** only deleting the skill name while leaving obsolete staging
+  commands; expanding into a full unrelated rewrite of Conventional Commits policy.
 
 ## Trade-offs
 
-- [Bundle and plugin fan-out] → The aggregate file impact is MEDIUM and reaches five plugin installation flows. Mitigate with focused installation tests for every plugin and a post-sync inventory check.
-- [Spec ripple] → `skills:agents` has HIGH dependent impact: five agent-plugin specs and `skills:workflow-automation` depend on it. No dependent requirements require a delta because the two agent names, fallback behavior, and agent contract are unchanged; only the obsolete parallel standard-skill path is removed. Confirm this with the affected plugin tests.
-- [Generated artifacts] → A manual source edit can leave stale installed skills. Mitigate by running the repository synchronization command and searching the active source and rendered directories afterward.
+- [Narrow remaining surface] → Most removal is already done; residual risk is stale
+  project-local text. Mitigate with an explicit string sweep after edits.
+- [Triple copy drift] → Three commit files can diverge later. Mitigate by editing them
+  identically in one task and diffing the three afterward.
+- [Commit metadata step simplification] → Removing forced sidecar staging changes
+  operator habit. Mitigate by documenting self-heal + optional `generate-metadata` and
+  pointing LLM work at optimizer agents.
 
 ## Spec impact
 
 ### `skills:skill-templates-source`
 
-- Direct dependent specs: the five `plugin-agent-*:plugin-agent` specs and `skills:skill-repository` through template discovery and rendering.
-- Transitive impact: plugin `InstallSkills` flows install the discovered templates into their runtime-specific locations.
-- Assessment: no dependent specification requires changed behavior; all continue to require deterministic rendering. Their test inventories must change because the discovered standard-skill set becomes smaller.
+- Direct dependents: five `plugin-agent-*:plugin-agent` specs and template discovery
+  consumers.
+- Assessment: `no-op`. Dependent specs remain satisfied; inventories already exclude
+  the skill. No additional spec deltas required.
 
 ### `skills:agents`
 
-- Direct dependent specs: `plugin-agent-claude:plugin-agent`, `plugin-agent-codex:plugin-agent`, `plugin-agent-copilot:plugin-agent`, `plugin-agent-opencode:plugin-agent`, `plugin-agent-standard:plugin-agent`, and `skills:workflow-automation`.
-- Assessment: the named optimizer agents and capability fallback remain unchanged, so dependent requirements stay satisfied. The removal strengthens the existing agent-first contract; no additional spec delta is required.
+- Direct dependents: five `plugin-agent-*:plugin-agent` specs and
+  `skills:workflow-automation`.
+- Assessment: `no-op`. Agent names, fallback, `llmOptimizedContext` gate, and
+  `specs optimizations set` write path already specified. No additional spec deltas
+  required.
 
 ## Dependency map
 
 ```mermaid
 graph LR
-  Legacy[specd-metadata template] --> Discovery[Skill template discovery]
-  Discovery --> Claude[Claude bundle]
-  Discovery --> Codex[Codex bundle]
-  Discovery --> Copilot[Copilot bundle]
-  Discovery --> OpenCode[OpenCode bundle]
-  Discovery --> Standard[Standard bundle]
-  Agents[Optimizer agents] --> Discovery
-  SourceSpec[skills:skill-templates-source] --> Discovery
-  AgentSpec[skills:agents] --> Agents
+  CommitSkills[project-local commit skills] -->|remove invoke| Legacy[specd-spec-metadata]
+  CommitSkills -->|recommend| SpecOpt[specd-spec-context-optimizer]
+  SpecOpt -->|persist via| OptCmd[specs optimizations set]
+  TemplateSpec[skills:skill-templates-source] -->|already forbids| LegacyTpl[specd-metadata template]
+  AgentSpec[skills:agents] -->|already requires| SpecOpt
+  AgentSpec -->|already requires| ProjOpt[specd-project-context-optimizer]
 ```
 
 ```
-┌────────────────────────────┐        ┌─────────────────────────┐
-│ legacy specd-metadata      │ ─────▶ │ template discovery      │
-│ template + registrations   │ remove │ and bundle rendering    │
-└────────────────────────────┘        └──────────┬──────────────┘
-                                                  │
-             ┌────────────────────────────────────┼───────────────────────────────────┐
-             ▼                                    ▼                                   ▼
-      ┌────────────┐                       ┌────────────┐                      ┌────────────┐
-      │ Claude     │                       │ Codex      │                      │ Copilot    │
-      │ install    │                       │ install    │                      │ install    │
-      └────────────┘                       └────────────┘                      └────────────┘
-             ▲                                    ▲                                   ▲
-             └───────────────────┬────────────────┴───────────────────┬───────────────┘
-                                 │                                    │
-                    ┌────────────┴────────────┐          ┌────────────┴────────────┐
-                    │ specialized optimizer   │          │ skills specs: template  │
-                    │ agents remain published │          │ source + agents          │
-                    └─────────────────────────┘          └─────────────────────────┘
+┌──────────────────────────────┐
+│ project-local commit skills  │
+│ .claude / .agents / .codex   │
+└──────────────┬───────────────┘
+               │ rewrite
+               ▼
+┌──────────────────────────────┐     ┌─────────────────────────────┐
+│ stop invoking                │     │ recommend when              │
+│ specd-spec-metadata          │     │ llmOptimizedContext=true    │
+└──────────────────────────────┘     │ specd-spec-context-optimizer│
+                                     └──────────────┬──────────────┘
+                                                    │
+                                                    ▼
+                                     ┌─────────────────────────────┐
+                                     │ specs optimizations set     │
+                                     │ (lock-owned fields)         │
+                                     └─────────────────────────────┘
+
+┌──────────────────────────────┐
+│ live specs (no-op deltas)    │──── already forbid legacy skill
+│ skill-templates-source       │
+│ agents                       │
+└──────────────────────────────┘
 ```
 
 ## Documentation and generated artifacts
 
-No public `docs/` page currently names the legacy skill. Do not add migration documentation. Update active skill instructions and regenerate their installed copies; do not edit historical archive documents.
+No public `docs/` page currently instructs agents to invoke `specd-metadata`. Do not
+add migration documentation. Do not invent a published template for the project-local
+commit skill in this change. Update the three commit skill files only.
 
 ## Testing
 
 ### Automated tests
 
-- Update each `packages/plugin-agent-*/test/install-skills.spec.ts` inventory expectation to assert that the standard skill list excludes `specd-metadata` and that applicable specialized agents remain present.
-- Run the affected plugin test suites for Claude, Codex, Copilot, OpenCode, and Standard.
-- Run the skills package test suite to verify discovery and bundle resolution after the template directory is removed.
-- Run the repository synchronization check and search active source/rendered skill directories for `specd-metadata` and `specd-spec-metadata`; only metadata file-name references are allowed.
+- Run `packages/skills` tests as a smoke check that template discovery still omits
+  `specd-metadata` and still finds both optimizer agents.
+- Run each `packages/plugin-agent-*/test/install-skills.spec.ts` suite as a smoke check
+  that installed inventories stay free of `specd-metadata`.
+- Diff the three commit skill files after editing; they MUST be identical.
 
 ### Manual verification
 
-1. Run the skills synchronization command used by this repository.
-2. Inspect the rendered `.agents` and `.codex` skill inventories: neither contains a `specd-metadata` directory.
-3. Inspect rendered archive and commit guidance: neither instructs users to invoke the removed skill; archive guidance names `specd-spec-context-optimizer` when optimization is enabled.
-4. Execute each plugin's installation test suite and confirm it exits successfully.
-5. Confirm `specd-project-context-optimizer` and `specd-spec-context-optimizer` remain discoverable as agents.
+1. Search active skill trees (`.claude/skills`, `.agents/skills`, `.codex/skills`,
+   `packages/skills/templates`, `dev/ai-agents/skills`) for `specd-metadata` and
+   `specd-spec-metadata`. Expect zero skill-invocation hits.
+2. Confirm commit skill text no longer stages `.specd-metadata.yaml` and names
+   `specd-spec-context-optimizer` for LLM optimization when enabled.
+3. Confirm `packages/skills/templates/skills/` still lists only:
+   `specd`, `specd-archive`, `specd-compliance`, `specd-design`, `specd-implement`,
+   `specd-new`, `specd-verify`.
+4. Confirm `packages/skills/templates/agents/` still lists
+   `specd-project-context-optimizer` and `specd-spec-context-optimizer`.
 
 ## Open questions
 

@@ -4,11 +4,7 @@
     "version": 1
   },
   "dependsOn": ["skills:skill", "cli:spec-optimizations"],
-  "implementation": [
-    {
-      "file": "skills:templates/skills/specd-archive/SKILL.md.tpl"
-    }
-  ],
+  "implementation": [],
   "optimizations": {
     "optimizedDescription": {
       "value": "Defines sourcing, metadata contracts, and capability-aware rendering for skill templates without static frontmatter across agent runtimes.",

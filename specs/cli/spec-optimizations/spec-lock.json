@@ -13,5 +13,41 @@
       "file": "cli:src/commands/spec/optimizations.ts",
       "symbols": ["registerSpecOptimizations"]
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "CLI group `specd specs optimizations` get/set/clear lock-owned optimizedDescription/optimizedContext via Kernel; no local freshness/hash logic.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:1c277f96f47e922f58d86a8d004a04d3ada543659ae05d00540cce9846b0175d",
+          "lastModified": "2026-07-25T11:53:31.277Z"
+        },
+        "verify.md": {
+          "hash": "sha256:07da71eb3a20896011a077653f1306ca6ecce75e8e6566c6a1738b62b969e08a",
+          "lastModified": "2026-07-25T11:53:31.278Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# cli:spec-optimizations\n\n## Rules\n\n### Command signature\n- Persisted opts under `specd specs optimizations`:\n  - `specs optimizations get <spec-id> [--field optimizedDescription|optimizedContext]`\n  - `specs optimizations set <spec-id> --input <json-file|->`\n  - `specs optimizations clear <spec-id> --field optimizedDescription|optimizedContext...`\n- Every subcommand: `--format text|json|toon` (default `text`) per `cli:entrypoint`\n\n### Get subcommand\n- MUST call `Kernel.specs.getPersistedOptimizations` w/ optional `field`; print value + freshness + staleness reasons\n- Text: mark stale as `STALE` + reasons (`artifact-added`, `artifact-removed`, `artifact-changed`, `schema-changed`)\n- JSON/TOON: full per-field freshness + aggregate `fresh` from use case unchanged\n- No persisted state → report not yet initialized\n- Absent requested field → report missing, not error\n\n### Set subcommand\n- MUST read JSON from file path, or stdin when `--input -`\n- Parse as object; keys ⊂ `{optimizedDescription, optimizedContext}` w/ string values; reject other shapes at CLI w/ `error:` before Core\n- On success: `Kernel.specs.updatePersistedOptimizations` w/ `set` = parsed object; print resulting values\n\n### Clear subcommand\n- MUST call `Kernel.specs.updatePersistedOptimizations` w/ `clear` = supplied field names; print result (may be empty)\n\n### No repeated CLI-owned mutation or freshness logic\n- Handlers MUST NOT compute artifact hashes, staleness reasons, or baseline capture; MUST NOT write persisted state directly\n- Every read/mutation = one call to `Kernel.specs.getPersistedOptimizations` or `Kernel.specs.updatePersistedOptimizations`; flags map onto typed input\n\n### Error mapping\n- `SpecNotFoundError` → exit 1, `error:` naming unresolved spec\n- Invalid `--input` JSON → exit 1, `error: invalid JSON: <message>` before Core\n- `ArtifactConflictError` → exit 1, concurrent modification + retry\n- `ReadOnlyWorkspaceError` → exit 1, no configuration workaround suggestion\n\n## Constraints\n- Never read/write spec-lock.json directly — only via `Kernel.specs.getPersistedOptimizations` / `Kernel.specs.updatePersistedOptimizations`\n- Never invoke LLM; never decide if optimization should run; `llmOptimizedContext` gate is caller-owned (skill/agent)\n- `specs optimizations set` = sole persist entry; no write-metadata equivalent for optimizations\n- Every leaf subcommand: `.allowExcessArguments(false)`\n",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:1c277f96f47e922f58d86a8d004a04d3ada543659ae05d00540cce9846b0175d",
+          "lastModified": "2026-07-25T11:53:31.277Z"
+        },
+        "verify.md": {
+          "hash": "sha256:07da71eb3a20896011a077653f1306ca6ecce75e8e6566c6a1738b62b969e08a",
+          "lastModified": "2026-07-25T11:53:31.278Z"
+        }
+      }
+    }
+  }
 }
