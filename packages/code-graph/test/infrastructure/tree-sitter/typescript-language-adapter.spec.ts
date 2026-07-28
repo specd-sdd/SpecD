@@ -2,6 +2,7 @@ import { describe, it, expect, afterEach } from 'vitest'
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
+import { parse, Lang } from '@ast-grep/napi'
 import { TypeScriptLanguageAdapter } from '../../../src/infrastructure/tree-sitter/typescript-language-adapter.js'
 import { SymbolKind } from '../../../src/domain/value-objects/symbol-kind.js'
 import { RelationType } from '../../../src/domain/value-objects/relation-type.js'
@@ -263,6 +264,79 @@ describe('TypeScriptLanguageAdapter', () => {
       const s2 = adapter.extractSymbols('main.ts', code)
       expect(s1[0]!.id).toBe(s2[0]!.id)
     })
+
+    it('extracts member assignment namespace symbol as variable', () => {
+      const code = `App.Article = (function(){ return {}; })();`
+      const symbols = adapter.extractSymbols('main.ts', code)
+      const namespaceSym = symbols.find((s: SymbolNode) => s.name === 'App.Article')
+      expect(namespaceSym).toBeDefined()
+      expect(namespaceSym!.kind).toBe(SymbolKind.Variable)
+    })
+
+    it('extracts member assignment prototype/static method', () => {
+      const code = `Article.prototype.generateAltHeadlines = function(config, data) { };
+Article.formatTitle = (title) => { };`
+      const symbols = adapter.extractSymbols('main.ts', code)
+      const methodSym1 = symbols.find(
+        (s: SymbolNode) => s.name === 'Article.prototype.generateAltHeadlines',
+      )
+      const methodSym2 = symbols.find((s: SymbolNode) => s.name === 'Article.formatTitle')
+      expect(methodSym1).toBeDefined()
+      expect(methodSym1!.kind).toBe(SymbolKind.Method)
+      expect(methodSym2).toBeDefined()
+      expect(methodSym2!.kind).toBe(SymbolKind.Method)
+    })
+
+    it('extracts object literal methods and properties', () => {
+      const code = `const Article = {
+        generateAltHeadlines: function(config, data) { },
+        calculateScore: (data) => { },
+        version: '1.0.0'
+      };`
+      const symbols = adapter.extractSymbols('main.ts', code)
+      const methodSym1 = symbols.find((s: SymbolNode) => s.name === 'generateAltHeadlines')
+      const methodSym2 = symbols.find((s: SymbolNode) => s.name === 'calculateScore')
+      const varSym = symbols.find((s: SymbolNode) => s.name === 'version')
+      expect(methodSym1).toBeDefined()
+      expect(methodSym1!.kind).toBe(SymbolKind.Method)
+      expect(methodSym2).toBeDefined()
+      expect(methodSym2!.kind).toBe(SymbolKind.Method)
+      expect(varSym).toBeDefined()
+      expect(varSym!.kind).toBe(SymbolKind.Variable)
+    })
+
+    it('extracts class arrow fields', () => {
+      const code = `class ArticleHandler {
+        generateAltHeadlines = (config, data) => { };
+        count = 10;
+      }`
+      const symbols = adapter.extractSymbols('main.ts', code)
+      const methodSym = symbols.find((s: SymbolNode) => s.name === 'generateAltHeadlines')
+      const varSym = symbols.find((s: SymbolNode) => s.name === 'count')
+      expect(methodSym).toBeDefined()
+      expect(methodSym!.kind).toBe(SymbolKind.Method)
+      expect(varSym).toBeDefined()
+      expect(varSym!.kind).toBe(SymbolKind.Variable)
+    })
+
+    it('extracts HOF initializers as functions', () => {
+      const code = `const generateAltHeadlines = memoize(withAuth(function(config) { }));`
+      const symbols = adapter.extractSymbols('main.ts', code)
+      const funcSym = symbols.find((s: SymbolNode) => s.name === 'generateAltHeadlines')
+      expect(funcSym).toBeDefined()
+      expect(funcSym!.kind).toBe(SymbolKind.Function)
+    })
+
+    it('extracts destructuring patterns', () => {
+      const code = `const { generateAltHeadlines, parseArticle } = articleUtils;`
+      const symbols = adapter.extractSymbols('main.ts', code)
+      const sym1 = symbols.find((s: SymbolNode) => s.name === 'generateAltHeadlines')
+      const sym2 = symbols.find((s: SymbolNode) => s.name === 'parseArticle')
+      expect(sym1).toBeDefined()
+      expect(sym1!.kind).toBe(SymbolKind.Variable)
+      expect(sym2).toBeDefined()
+      expect(sym2!.kind).toBe(SymbolKind.Variable)
+    })
   })
 
   describe('extractRelations', () => {
@@ -276,6 +350,14 @@ describe('TypeScriptLanguageAdapter', () => {
 
     it('creates EXPORTS relations for exported symbols', () => {
       const code = `export function foo() { }\nfunction bar() { }`
+      const symbols = adapter.extractSymbols('main.ts', code)
+      const relations = adapter.extractRelations('main.ts', code, symbols, new Map())
+      const exports = relations.filter((r: Relation) => r.type === RelationType.Exports)
+      expect(exports).toHaveLength(1)
+    })
+
+    it('creates EXPORTS relations for CommonJS export assignments', () => {
+      const code = `exports.generateAltHeadlines = function(config, data) { };`
       const symbols = adapter.extractSymbols('main.ts', code)
       const relations = adapter.extractRelations('main.ts', code, symbols, new Map())
       const exports = relations.filter((r: Relation) => r.type === RelationType.Exports)

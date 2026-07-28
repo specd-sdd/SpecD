@@ -1,0 +1,41 @@
+- op: modified
+  description: 'Extend TypeScript/JavaScript adapter requirement to specify extraction and mapping for member assignments, object literal methods, class fields, HOF initializers, destructuring, and CommonJS exports.'
+  selector:
+    type: section
+    matches: 'Requirement: TypeScript adapter'
+  content: |
+    A built-in `TypeScriptLanguageAdapter` SHALL handle `typescript`, `tsx`, `javascript`, and `jsx` files using `@ast-grep/napi` for Tree-sitter parsing. Through the unified `analyzeFile` / `resolveImports` / `buildRelations` contract it MUST support:
+
+    - **Symbols**: functions (named, arrow assigned to `const`/`let`/`var`, and HOF-wrapped initializers), classes, methods (class methods, class arrow fields, prototype methods, static methods, and object literal function properties), exported variables, member/namespace assignments, destructured bindings, type aliases, interfaces, enums
+    - **Comments**: For each extracted symbol, the adapter extracts the raw text of the immediately preceding comment block (JSDoc `/** ... */`, block `/* ... */`, or contiguous line comments `// ...`). The comment is stored verbatim in `SymbolNode.comment`. If no comment precedes the declaration, `comment` is `undefined`.
+    - **Relations**: `DEFINES` (file → symbol), `EXPORTS` (file → exported symbol, including CommonJS `module.exports`/`exports`), `IMPORTS` (file → file via import specifier resolution), `CALLS` (symbol → symbol via call expressions)
+
+    The adapter maps TypeScript/JavaScript constructs to `SymbolKind` values:
+
+    | Construct | Syntax Pattern | SymbolKind |
+    | :--- | :--- | :--- |
+    | Function declaration | `function foo() {}` | `function` |
+    | Arrow function assigned to variable | `const foo = () => {}` | `function` |
+    | HOF wrapper initializer | `const foo = memoize(...)` | `function` |
+    | Class declaration | `class Foo {}` | `class` |
+    | Method definition | `class Foo { bar() {} }` | `method` |
+    | Class arrow field | `class Foo { bar = () => {} }` | `method` |
+    | Prototype method assignment | `Foo.prototype.bar = function() {}` | `method` |
+    | Static method assignment | `Foo.bar = function() {}` | `method` |
+    | Object literal function property | `{ bar: function() {} }` or `{ bar() {} }` | `method` |
+    | Member namespace assignment | `App.Article = (function(){ ... })()` | `variable` |
+    | Object literal scalar data property | `{ version: "1.0.0" }` | `variable` |
+    | Destructured variable binding | `const { foo, bar } = utils` | `variable` / `function` |
+    | CommonJS export declaration | `module.exports.foo = function() {}` | `function` / `variable` |
+    | Exported `const`/`let`/`var` | `export const foo = 123` | `variable` |
+    | Type alias | `type Foo = string` | `type` |
+    | Interface declaration | `interface Foo {}` | `interface` |
+    | Enum declaration | `enum Foo {}` | `enum` |
+
+    Extraction Rules for Extended JavaScript Syntaxes:
+    - **Member & Namespace Assignments**: `assignment_expression` targetting a `member_expression` (e.g., `App.Article`) SHALL be extracted. If the value is callable (function, arrow function, or IIFE returning methods), assign `SymbolKind.Method` with qualified name `App.Article.methodName`. If the value is an IIFE or object literal namespace target, assign `SymbolKind.Variable`.
+    - **Object Literal Methods**: `pair` and `property_definition` AST nodes in `object` literals where the value is callable SHALL be extracted as `SymbolKind.Method`.
+    - **Class Arrow Fields**: `field_definition` and `public_field_definition` AST nodes in class bodies initialized with callable expressions SHALL be extracted as `SymbolKind.Method`.
+    - **HOF Initializers**: `variable_declarator` AST nodes whose initializer value is a `call_expression` SHALL be extracted as `SymbolKind.Function`.
+    - **Unrolled Destructuring**: `object_pattern` and `array_pattern` AST nodes SHALL be unrolled recursively to register each declared identifier as an individual symbol.
+    - **CommonJS / UMD Exports**: `module.exports` and `exports.*` assignments SHALL be extracted as symbols and registered in the file's exported names set to generate `EXPORTS` relations.

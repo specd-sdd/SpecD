@@ -6,32 +6,47 @@
   "dependsOn": ["code-graph:symbol-model"],
   "implementation": [
     {
-      "file": "code-graph:src/infrastructure/tree-sitter/php-language-adapter.ts",
-      "symbols": [
-        "PhpLanguageAdapter",
-        "selectCandidatePath",
-        "resolveCakeTarget",
-        "resolveCodeIgniterTarget",
-        "resolveYiiImportTarget",
-        "resolveGenericPhpTarget",
-        "resolveFrameworkClassLiteralTarget"
-      ]
-    },
-    {
-      "file": "code-graph:src/domain/value-objects/language-adapter.ts",
-      "symbols": ["LanguageAdapter"]
-    },
-    {
       "file": "code-graph:src/infrastructure/tree-sitter/typescript-language-adapter.ts",
       "symbols": ["TypeScriptLanguageAdapter"]
     },
     {
-      "file": "code-graph:src/infrastructure/tree-sitter/python-language-adapter.ts",
-      "symbols": ["PythonLanguageAdapter"]
-    },
-    {
-      "file": "code-graph:src/infrastructure/tree-sitter/go-language-adapter.ts",
-      "symbols": ["GoLanguageAdapter"]
+      "file": "code-graph:test/infrastructure/tree-sitter/typescript-language-adapter.spec.ts"
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Pluggable Tree-sitter language adapters extract symbols and relations for code graph indexing without compiler coupling.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:2a98265444770c3e30489264b4a443cc08fb5b9d98d08a396fe3b703b2326b90",
+          "lastModified": "2026-07-28T07:32:15.673Z"
+        },
+        "verify.md": {
+          "hash": "sha256:aea10e06f3b9758d2bda46728402fe3b4c9c0979104eb073f03e99dd84587bbc",
+          "lastModified": "2026-07-28T07:32:15.675Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Language Adapter\n\n## Rules\n\n### LanguageAdapter interface\n- `LanguageAdapter` MUST be interface, not abstract class. Stateless.\n- Methods:\n  - `languages(): string[]` — language IDs handled.\n  - `extensions(): Record<string, string>` — extension to language ID map. Used by registry.\n  - `analyzeFile(filePath: string, content: string, context: AdapterAnalyzeContext): FileAnalysisDraft` — single-pass parser. Returns symbols, imports, binding facts, call facts, namespace data, optional parser state.\n  - `resolveImports(analysis: FileAnalysis, context: ImportResolutionContext): ResolvedImports` — resolves imports, qualified names, aliases, file targets via session lookups. No filesystem re-reads.\n  - `buildRelations(analysis: FileAnalysis, context: RelationBuildContext): readonly Relation[]` — builds graph relations (`IMPORTS`, `CALLS`, `CONSTRUCTS`, `USES_TYPE`, hierarchy relations). `DEPENDS_ON` reserved for specs.\n  - `getPackageIdentity?(codeRoot: string, repoRoot?: string): string | undefined` — optional. Derives package name from manifest.\n  - `resolvePackageFromSpecifier?(specifier: string, knownPackages: string[]): string | undefined` — maps specifier to package.\n  - `resolveQualifiedNameToPath?(qualifiedName: string, codeRoot: string, repoRoot?: string): string | undefined` — maps qualified name to source file.\n- All methods synchronous, deterministic. No side effects outside indexing session. Cache access via `IndexSession` API.\n\n### Full-file analysis contract\n- Single `analyzeFile` call returns entire `FileAnalysisDraft`.\n- No separate extraction calls allowed.\n- Parser state in `FileAnalysisDraft` must be plain serializable data. No AST/parser trees retained.\n\n### Unified built-in adapter migration\n- TypeScript/JavaScript, PHP, Python, Go adapters implement unified contract.\n- No legacy extraction path. Registry, indexer, tests use unified contract.\n\n### Language detection\n- File-to-language mapped by extension from `extensions()`.\n- Unrecognized extensions skipped. No error, no `FileNode`.\n- TypeScript adapter supports: `.ts`, `.tsx`, `.js`, `.jsx`.\n\n### TypeScript adapter\n- Uses `@ast-grep/napi`.\n- Supports:\n  - Symbols: functions (named, arrow in variable, HOF-wrapped), classes, methods (class, arrow field, prototype, static, object literal property), exported variables, namespace assignments, destructured bindings, types, interfaces, enums.\n  - Comments: preceding comment block text in `SymbolNode.comment`, otherwise `undefined`.\n  - Relations: `DEFINES`, `EXPORTS`, `IMPORTS`, `CALLS`.\n- AST parsing details:\n  - Member/Namespace: `assignment_expression` to `member_expression` (e.g. `App.Article`). If callable value, kind `method` (name `App.Article.methodName`). If IIFE/literal namespace, kind `variable`.\n  - Object methods: `pair` and `property_definition` with callable values are `method`.\n  - Class arrow fields: class body `field_definition`/`public_field_definition` with callable init are `method`.\n  - HOF: `variable_declarator` with `call_expression` init is `function`.\n  - Destructuring: recursively unroll object/array patterns.\n  - CommonJS: `module.exports` and `exports.*` assignments registered as symbols and file exports.\n\n### Import declaration extraction\n- `analyzeFile` returns structured `ImportDeclaration` array.\n- Fields: `localName`, `originalName`, `specifier`, `isRelative` (starts with `.`).\n- Syntax mapping:\n  - TypeScript: `import { X } from 'specifier'` (relative if starts with `.`)\n  - Python: `from module import X`, `import module` (relative if starts with `.`)\n  - Go: `import \"pkg\"` (always `isRelative: false`)\n  - PHP: `use Namespace\\Class` (always `isRelative: false`)\n- Resolve imports later via `resolveImports` in Pass 2.\n\n### Call resolution\n- Extract call facts in `analyzeFile`, convert to `CALLS` in `buildRelations` using resolved imports.\n- Caller: innermost function/method/arrow. Top-level calls dropped.\n- Callee: resolved via local symbols, imports, receivers, session lookup.\n- Unresolvable calls dropped.\n\n### Scoped binding fact extraction\n- `analyzeFile` exposes scoped binding/call facts in draft (TS/JS, Python, Go, PHP).\n- Fact extraction limited to syntax/semantics. Pipeline handles resolution/shadowing.\n- Extract facts for: lexical scopes, typed parameters/properties/fields, construction (`new X()`), receiver (`this`/`self`/etc), local aliases, referenced types, framework-managed bindings.\n- Drop facts depending on runtime, reflection, dynamic expressions, whole-program flow.\n\n### Built-in multi-language dependency coverage\n- TypeScript: static/side-effect/dynamic imports, CommonJS `require`, `new ClassName()` (`CONSTRUCTS`), annotations (`USES_TYPE`), fields, properties, `this` receiver, member/namespace calls, `extends`/`implements`.\n- Python: `import`/`from`, `importlib.import_module()`, `__import__()`, package layout (`__init__.py`), constructors, typed parameters/attributes, `self`/`cls`, inheritance.\n- Go: imports (standard, grouped, aliased, dot, blank), file `IMPORTS`, selector calls (`pkg.Func`), constructors, composite literals.\n- PHP: require/include, dynamic loader, loaded-instance calls, framework bindings. Feeds shared scoped model.\n\n### Detectable dependency boundary\n- Dependency detectable only via static source, imports, manifests, namespaces, framework rules.\n- Static/deterministic dynamic cases emit relations. Heuristics/dynamic without evidence dropped.\n- Drop unresolved facts, ambiguous receivers, reflection, monkey patching, alias flow.\n\n### Hierarchy extraction\n- Emit `EXTENDS` (inheritance), `IMPLEMENTS` (interfaces/contracts), `OVERRIDES` (method override).\n- Normalize inheritance-adjacent syntax if semantic meaning matches. Unresolvable targets dropped.\n\n### Package identity extraction\n- Optional `getPackageIdentity(codeRoot, repoRoot)`.\n- Scans `package.json` (TypeScript, key `name`), `pyproject.toml` (Python, key `[project].name`), `go.mod` (Go, key `module`), `composer.json` (PHP, key `name`).\n- Walks up filesystem bounded by VCS root `repoRoot`.\n- Builds package-to-workspace mapping.\n\n### Import specifier resolution\n- Resolve imports via `IndexSession` indexes in `ImportResolutionContext` (no Pass 2 filesystem scan/symbol search).\n- `resolveQualifiedNameToPath` uses cached/compact state from Pass 1. No disk probes.\n- PHP uses session lookups to avoid O(N) symbol scans.\n\n### PHP require/include dependencies\n- Emit `IMPORTS` for literal string arguments. Path resolved relative to file directory.\n- Dynamic paths (APPPATH, variables, concatenation) silently dropped. No filesystem checks at extraction.\n\n### PHP dynamic loader dependencies\n- Emit `IMPORTS` for literal/class arguments mapping to files.\n- Supports CakePHP (loadModel, App::uses, uses property), CodeIgniter (load->model), Yii (Yii::import), Zend (loadClass), container class name naming rules.\n- Non-literal arguments, generic getters (`->get('x')`), unresolved targets dropped.\n\n### PHP loaded-instance call extraction\n- Extract `CALLS` from tracked aliases, properties, and assignments inside method.\n- Framework-managed aliases (e.g. CakePHP `uses`) available in methods.\n- Bare/receiver loader forms feed same alias flow.\n- Emit `CALLS` only if caller and callee resolved. No interprocedural propagation.\n\n### PHP loader resolver extensibility\n- Loader detection registry-based. Add resolvers without changing core extractor. Tested per pattern.\n\n### Tree-sitter query patterns\n- Internal implementation detail. Excluded from `LanguageAdapter` interface.\n\n### Adapter registry\n- `AdapterRegistry` maps language ID to `LanguageAdapter`.\n- Methods: `register`, `getAdapter`, `getAdapterForFile`, `getLanguageForFile`, `getAdapters`.\n- Dynamic extension mapping. TS adapter registered by default.\n\n## Constraints\n- `LanguageAdapter` interface, stateless.\n- `analyzeFile`, `resolveImports`, `buildRelations` synchronous, deterministic.\n- `analyzeFile` receives string content, emits `FileAnalysisDraft`.\n- Parser state and cache state must be compact plain data.\n- Only `getPackageIdentity` and `resolveQualifiedNameToPath` may perform I/O.\n- Resolution methods synchronous, deterministic. No filesystem probe per candidate in Pass 2.\n- `resolveQualifiedNameToPath` caches metadata per codeRoot/session.\n- Indexer has no language-specific logic.\n- Unrecognized extensions, unresolvable call/loader targets, dynamic paths silently dropped.\n- Tree-sitter patterns internal.\n- TypeScript adapter default.\n- Hierarchy relations emitted only when targets resolved.\n- Scoped binding facts: no fuzzy/runtime inference.\n- No dependency on `@specd/core`.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:2a98265444770c3e30489264b4a443cc08fb5b9d98d08a396fe3b703b2326b90",
+          "lastModified": "2026-07-28T07:32:15.673Z"
+        },
+        "verify.md": {
+          "hash": "sha256:aea10e06f3b9758d2bda46728402fe3b4c9c0979104eb073f03e99dd84587bbc",
+          "lastModified": "2026-07-28T07:32:15.675Z"
+        }
+      }
+    }
+  }
 }

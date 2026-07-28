@@ -1,0 +1,405 @@
+{
+  "name": "code-graph-js-extended-symbols",
+  "createdAt": "2026-07-27T18:11:44.893Z",
+  "updatedAt": "2026-07-28T07:32:15.653Z",
+  "description": "This change extends the TypeScript adapter (TypeScriptLanguageAdapter) in @specd/code-graph to extract symbols and relations from structural patterns in JavaScript/TypeScript (such as member assignments, object literal methods, CommonJS exports, class arrow fields, destructuring, and HOF initializers). By translating these dynamic, expression-based AST forms into standard SymbolKind kinds and RelationType relations, it ensures accurate code graph construction and blast-radius analyses for mixed/legacy projects without model schema changes or native memory regressions.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": ["code-graph:language-adapter"],
+  "specDependsOn": {
+    "code-graph:language-adapter": ["code-graph:symbol-model"]
+  },
+  "invalidationPolicy": "downstream",
+  "trackedImplementationFiles": [
+    {
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/typescript-language-adapter.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/tree-sitter/typescript-language-adapter.spec.ts",
+      "state": "resolved"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "code-graph:language-adapter",
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/typescript-language-adapter.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["TypeScriptLanguageAdapter"]
+    },
+    {
+      "specId": "code-graph:language-adapter",
+      "file": "packages/code-graph/test/infrastructure/tree-sitter/typescript-language-adapter.spec.ts",
+      "fileLinkExplicit": true
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:fc07a3cdb9a46c28aed26a10f4bf495c1e314abebdfba33627250c73a95c067b"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "code-graph:language-adapter",
+          "filename": "deltas/code-graph/language-adapter/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:dc6f50197d8d747fe818910879bf6e7be0017b084866d900ac3ce0e051e2954a"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "code-graph:language-adapter",
+          "filename": "deltas/code-graph/language-adapter/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:9ecc627b1d01f0f69cc292bcce5a2723892523d0399e7cf4f707a4c76507f5c8"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:28617ab001d5206ee40b3f8a0a33b892f1de287b0edf65c41e896c76c61d8d1e"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:3760475e1ae2dc854988d26fac7b45980569e934a1bf62851c8ffb1b561b36d2"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-07-27T18:11:44.893Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": ["code-graph:language-adapter"],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-27T18:11:44.906Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:language-adapter"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:language-adapter"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-27T18:15:00.883Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-27T18:15:41.536Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["code-graph:language-adapter"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:language-adapter"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-27T18:16:10.678Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["code-graph:language-adapter"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:language-adapter"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-27T18:17:09.159Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["code-graph:language-adapter"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:language-adapter"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-27T21:47:39.250Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-27T21:59:03.701Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["code-graph:language-adapter"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:language-adapter"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-27T21:59:03.701Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-27T21:59:29.414Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-27T22:05:26.534Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-28T06:44:41.100Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-28T06:45:19.523Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-28T06:45:31.052Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "description-updated",
+      "at": "2026-07-28T06:47:36.431Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "description": "This change extends the TypeScript adapter (TypeScriptLanguageAdapter) in @specd/code-graph to extract symbols and relations from structural patterns in JavaScript/TypeScript (such as member assignments, object literal methods, CommonJS exports, class arrow fields, destructuring, and HOF initializers). By translating these dynamic, expression-based AST forms into standard SymbolKind kinds and RelationType relations, it ensures accurate code graph construction and blast-radius analyses for mixed/legacy projects without model schema changes or native memory regressions."
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-28T07:32:15.653Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-07-28T07:32:15.706Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

@@ -305,6 +305,7 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
     const root = sgRoot.root()
     const symbols: SymbolNode[] = []
     const seenSymbol = new Set<string>()
+    const exportedNames = new Set<string>()
 
     const addSymbol = (
       name: string,
@@ -341,6 +342,11 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
       'lexical_declaration',
       'variable_declaration',
       'export_statement',
+      'assignment_expression',
+      'field_definition',
+      'public_field_definition',
+      'pair',
+      'property_definition',
     ])
     collectByKind(root, targetKinds, allNodes)
 
@@ -392,6 +398,20 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
           }
           break
         }
+        case 'assignment_expression': {
+          this.processAssignmentExpression(node, filePath, addSymbol, exportedNames)
+          break
+        }
+        case 'field_definition':
+        case 'public_field_definition': {
+          this.processFieldDefinition(node, filePath, addSymbol)
+          break
+        }
+        case 'pair':
+        case 'property_definition': {
+          this.processPairNode(node, filePath, addSymbol)
+          break
+        }
       }
     }
 
@@ -400,7 +420,6 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
     const callFacts = this.extractCallFactsFromData(filePath, content, symbols)
 
     const declarations = this.collectTypeDeclarations(root, symbols)
-    const exportedNames = new Set<string>()
 
     for (const child of root.children()) {
       if (nodeKind(child) !== 'export_statement') continue
@@ -699,6 +718,77 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
    * @param filePath - Path to the source file.
    * @param addSymbol - Callback to register a discovered symbol.
    */
+  /**
+   * Processes a variable declarator, extracting plain identifiers, destructuring patterns, or HOFs.
+   * @param child - The variable declarator AST node.
+   * @param filePath - The path to the source file.
+   * @param addSymbol - Callback to register a discovered symbol.
+   * @param isExported - Whether the parent declaration is exported.
+   */
+  private processVariableDeclarator(
+    child: SgNode,
+    filePath: string,
+    addSymbol: (name: string, kind: SymbolKind, node: SgNode, comment: string | undefined) => void,
+    isExported: boolean,
+  ): void {
+    const nameNode = child.field('name')
+    if (!nameNode) return
+    const kind = nodeKind(nameNode)
+
+    if (kind === 'object_pattern' || kind === 'array_pattern') {
+      const collectIdentifiers = (n: SgNode): void => {
+        const nKind = nodeKind(n)
+        if (
+          nKind === 'shorthand_property_identifier_pattern' ||
+          nKind === 'shorthand_property_identifier' ||
+          nKind === 'identifier'
+        ) {
+          const idName = n.text().trim()
+          if (idName) {
+            addSymbol(idName, SymbolKind.Variable, child, extractComment(child))
+          }
+        }
+        for (const c of n.children()) {
+          collectIdentifiers(c)
+        }
+      }
+      collectIdentifiers(nameNode)
+      return
+    }
+
+    if (kind === 'identifier') {
+      const name = nameNode.text().trim()
+      const valueNode = child.field('value')
+      if (valueNode) {
+        const valKind = nodeKind(valueNode)
+        if (
+          valKind === 'arrow_function' ||
+          valKind === 'function' ||
+          valKind === 'function_expression' ||
+          valKind === 'generator_function'
+        ) {
+          addSymbol(name, SymbolKind.Function, child, extractComment(child))
+        } else if (valKind === 'call_expression') {
+          addSymbol(name, SymbolKind.Function, child, extractComment(child))
+        } else {
+          if (isExported) {
+            addSymbol(name, SymbolKind.Variable, child, extractComment(child))
+          }
+        }
+      } else {
+        if (isExported) {
+          addSymbol(name, SymbolKind.Variable, child, extractComment(child))
+        }
+      }
+    }
+  }
+
+  /**
+   * Processes a variable declaration to extract function-assigned or plain variables.
+   * @param node - The variable declaration AST node.
+   * @param filePath - The path to the source file.
+   * @param addSymbol - Callback to register a discovered symbol.
+   */
   private processVariableDeclaration(
     node: SgNode,
     filePath: string,
@@ -706,24 +796,14 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
   ): void {
     for (const child of node.children()) {
       if (nodeKind(child) !== 'variable_declarator') continue
-      const nameNode = child.field('name')
-      if (!nameNode) continue
-      const name = nameNode.text()
-
-      const valueNode = child.field('value')
-      if (
-        valueNode &&
-        (nodeKind(valueNode) === 'arrow_function' || nodeKind(valueNode) === 'function')
-      ) {
-        addSymbol(name, SymbolKind.Function, child, extractComment(child))
-      }
+      this.processVariableDeclarator(child, filePath, addSymbol, false)
     }
   }
 
   /**
-   * Processes an exported variable declaration, extracting both function-assigned and plain variable symbols.
-   * @param node - The variable declaration AST node inside an export statement.
-   * @param filePath - Path to the source file.
+   * Processes an exported variable declaration to extract function-assigned or plain variables.
+   * @param node - The variable declaration AST node.
+   * @param filePath - The path to the source file.
    * @param addSymbol - Callback to register a discovered symbol.
    */
   private processExportedVariableDeclaration(
@@ -733,19 +813,133 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
   ): void {
     for (const child of node.children()) {
       if (nodeKind(child) !== 'variable_declarator') continue
-      const nameNode = child.field('name')
-      if (!nameNode) continue
-      const name = nameNode.text()
+      this.processVariableDeclarator(child, filePath, addSymbol, true)
+    }
+  }
 
-      const valueNode = child.field('value')
-      if (
-        valueNode &&
-        (nodeKind(valueNode) === 'arrow_function' || nodeKind(valueNode) === 'function')
-      ) {
-        addSymbol(name, SymbolKind.Function, child, extractComment(child))
-      } else {
-        addSymbol(name, SymbolKind.Variable, child, extractComment(child))
+  /**
+   * Processes assignment expressions (e.g. member assignments, prototype methods, CommonJS exports).
+   * @param node - The assignment expression AST node.
+   * @param filePath - The path to the source file.
+   * @param addSymbol - Callback to register a discovered symbol.
+   * @param exportedNames - Set of exported symbol names for the file.
+   */
+  private processAssignmentExpression(
+    node: SgNode,
+    filePath: string,
+    addSymbol: (name: string, kind: SymbolKind, node: SgNode, comment: string | undefined) => void,
+    exportedNames: Set<string>,
+  ): void {
+    const left = node.field('left')
+    const right = node.field('right')
+    if (!left || !right) return
+
+    const rawLeftText = left.text().trim()
+    if (!rawLeftText) return
+
+    if (
+      rawLeftText === 'module.exports' ||
+      rawLeftText.startsWith('module.exports.') ||
+      rawLeftText.startsWith('exports.')
+    ) {
+      const parts = rawLeftText.split('.')
+      const exportName = parts.pop()!
+      if (exportName && exportName !== 'exports' && exportName !== 'module') {
+        exportedNames.add(exportName)
+        const rightKind = nodeKind(right)
+        if (
+          rightKind === 'function' ||
+          rightKind === 'arrow_function' ||
+          rightKind === 'function_expression' ||
+          rightKind === 'generator_function'
+        ) {
+          addSymbol(exportName, SymbolKind.Function, node, extractComment(node))
+        } else {
+          addSymbol(exportName, SymbolKind.Variable, node, extractComment(node))
+        }
       }
+      return
+    }
+
+    if (nodeKind(left) === 'member_expression') {
+      const rightKind = nodeKind(right)
+      if (
+        rightKind === 'function' ||
+        rightKind === 'arrow_function' ||
+        rightKind === 'function_expression' ||
+        rightKind === 'generator_function'
+      ) {
+        addSymbol(rawLeftText, SymbolKind.Method, node, extractComment(node))
+      } else if (rightKind === 'call_expression' || rightKind === 'object') {
+        addSymbol(rawLeftText, SymbolKind.Variable, node, extractComment(node))
+      }
+    }
+  }
+
+  /**
+   * Processes key-value pair nodes inside object literals.
+   * @param node - The pair or property definition AST node.
+   * @param filePath - The path to the source file.
+   * @param addSymbol - Callback to register a discovered symbol.
+   */
+  private processPairNode(
+    node: SgNode,
+    filePath: string,
+    addSymbol: (name: string, kind: SymbolKind, node: SgNode, comment: string | undefined) => void,
+  ): void {
+    const keyNode = node.field('key')
+    const valueNode = node.field('value')
+    if (!keyNode || !valueNode) return
+
+    const keyName = keyNode.text().trim()
+    if (!keyName) return
+
+    const valKind = nodeKind(valueNode)
+    if (
+      valKind === 'function' ||
+      valKind === 'arrow_function' ||
+      valKind === 'function_expression' ||
+      valKind === 'generator_function'
+    ) {
+      addSymbol(keyName, SymbolKind.Method, keyNode, extractComment(node))
+    } else if (
+      valKind === 'object' ||
+      valKind === 'string' ||
+      valKind === 'number' ||
+      valKind === 'boolean_literal'
+    ) {
+      addSymbol(keyName, SymbolKind.Variable, keyNode, extractComment(node))
+    }
+  }
+
+  /**
+   * Processes class field definitions (e.g. class properties assigned to arrow functions).
+   * @param node - The field definition AST node.
+   * @param filePath - The path to the source file.
+   * @param addSymbol - Callback to register a discovered symbol.
+   */
+  private processFieldDefinition(
+    node: SgNode,
+    filePath: string,
+    addSymbol: (name: string, kind: SymbolKind, node: SgNode, comment: string | undefined) => void,
+  ): void {
+    const nameNode = node.field('name')
+    const valueNode = node.field('value')
+    if (!nameNode) return
+
+    const fieldName = nameNode.text().trim()
+    if (!fieldName) return
+
+    if (
+      valueNode &&
+      (nodeKind(valueNode) === 'arrow_function' ||
+        nodeKind(valueNode) === 'function' ||
+        nodeKind(valueNode) === 'function_expression' ||
+        nodeKind(valueNode) === 'generator_function')
+    ) {
+      addSymbol(fieldName, SymbolKind.Method, node, extractComment(node))
+    } else {
+      addSymbol(fieldName, SymbolKind.Variable, node, extractComment(node))
     }
   }
 

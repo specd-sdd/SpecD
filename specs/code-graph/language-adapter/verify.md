@@ -117,6 +117,49 @@
 - **WHEN** `buildRelations()` is called for that analysis
 - **THEN** an `EXPORTS` relation from the file to the `createUser` symbol is returned
 
+#### Scenario: Member assignment to IIFE extracts namespace symbol as variable
+
+- **GIVEN** content containing `App.Article = (function(){ ... })();`
+- **WHEN** `analyzeFile()` is called
+- **THEN** a `SymbolNode` with `name: 'App.Article'` and `kind: 'variable'` is extracted
+
+#### Scenario: Member assignment to function extracts method symbol with qualified name
+
+- **GIVEN** content containing `Article.prototype.generateAltHeadlines = function(config, data) { ... }`
+- **WHEN** `analyzeFile()` is called
+- **THEN** a `SymbolNode` with `name: 'Article.prototype.generateAltHeadlines'` and `kind: 'method'` is extracted
+
+#### Scenario: Object literal method is extracted as method symbol
+
+- **GIVEN** content containing `const Article = { generateAltHeadlines: function(config, data) { ... } };`
+- **WHEN** `analyzeFile()` is called
+- **THEN** a `SymbolNode` with `name: 'generateAltHeadlines'` and `kind: 'method'` is extracted
+
+#### Scenario: Class arrow field property is extracted as method symbol
+
+- **GIVEN** content containing `class ArticleHandler { generateAltHeadlines = (config, data) => { ... }; }`
+- **WHEN** `analyzeFile()` is called
+- **THEN** a `SymbolNode` with `name: 'generateAltHeadlines'` and `kind: 'method'` is extracted
+
+#### Scenario: HOF wrapper initializer extracts function symbol
+
+- **GIVEN** content containing `const generateAltHeadlines = memoize(withAuth(function(config, data) { ... }));`
+- **WHEN** `analyzeFile()` is called
+- **THEN** a `SymbolNode` with `name: 'generateAltHeadlines'` and `kind: 'function'` is extracted
+
+#### Scenario: Destructuring pattern extracts individual variable symbols
+
+- **GIVEN** content containing `const { generateAltHeadlines, parseArticle } = articleUtils;`
+- **WHEN** `analyzeFile()` is called
+- **THEN** individual `SymbolNode` entries for `generateAltHeadlines` and `parseArticle` are extracted
+
+#### Scenario: CommonJS export assignment yields symbol and EXPORTS relation
+
+- **GIVEN** content containing `exports.generateAltHeadlines = function(config, data) { ... };`
+- **WHEN** `analyzeFile()` and `buildRelations()` are called
+- **THEN** a symbol with `name: 'generateAltHeadlines'` and `kind: 'function'` is extracted
+- **AND** an `EXPORTS` relation is emitted for that symbol
+
 ### Requirement: Import declaration extraction
 
 #### Scenario: TypeScript named imports appear in file analysis
