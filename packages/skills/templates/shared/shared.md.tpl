@@ -256,6 +256,16 @@ Important scope rule:
 - `scope: change` artifacts do not require a spec ID:
   `specd changes validate <name> --artifact <artifactId> --format text`
 
+## Spec read surfaces
+
+Choose the command that matches the information you need:
+
+- `specd specs show <spec-id>` for exact raw artifact content during authoring, delta composition, or content review.
+- `specd specs context <spec-id>` for semantic working context, including section filtering, dependency traversal, and optimized-content preference.
+- `specd specs metadata <spec-id>` only for the normalized metadata projection and materialization diagnostics such as `source`, `regenerated`, and warnings.
+
+Do not treat `specd specs metadata` as the default context-loading command or as a source of effective project configuration. Effective project configuration must come from a project configuration or project status command whose contract exposes the field you need.
+
 ## Spec scope vs spec dependencies
 
 These are two distinct operations — do not confuse them:

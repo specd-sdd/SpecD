@@ -1,0 +1,1312 @@
+{
+  "name": "align-spec-optimization-cli-and-agents",
+  "createdAt": "2026-07-28T10:08:06.501Z",
+  "updatedAt": "2026-07-29T07:57:13.897Z",
+  "description": "Aligns the persisted spec-optimization CLI, Core mutation semantics, and optimizer workflow templates around one executable contract. Adds direct and compatibility set/clear forms, strict runtime validation, durable field deletion, authoritative llmOptimizedContext gating, and clarified spec-reading guidance, with regression tests and documentation updates.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "cli:spec-optimizations",
+    "skills:agents",
+    "skills:skill-templates-source",
+    "skills:workflow-automation",
+    "core:update-persisted-spec-optimizations"
+  ],
+  "specDependsOn": {
+    "cli:spec-optimizations": [
+      "cli:entrypoint",
+      "core:get-persisted-spec-optimizations",
+      "core:update-persisted-spec-optimizations"
+    ],
+    "skills:agents": ["skills:skill", "skills:workflow-automation", "cli:spec-optimizations"],
+    "skills:skill-templates-source": [
+      "skills:skill",
+      "cli:spec-optimizations",
+      "skills:workflow-automation"
+    ],
+    "skills:workflow-automation": [
+      "cli:command-resource-naming",
+      "skills:agents",
+      "cli:spec-context",
+      "cli:spec-metadata"
+    ],
+    "core:update-persisted-spec-optimizations": [
+      "core:spec-optimization",
+      "core:spec-repository-port",
+      "core:spec-id-format",
+      "core:initialize-persisted-spec-state"
+    ]
+  },
+  "invalidationPolicy": "downstream",
+  "trackedImplementationFiles": [
+    {
+      "file": "specs/cli/spec-context/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/spec-metadata/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/document-model/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/symbol-model/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/change-manifest/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/change/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/get-persisted-spec-optimizations/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/get-spec-context/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/initialize-persisted-spec-state/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/update-persisted-spec-optimizations/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/commands/spec/optimizations.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/skills/templates/skills/specd-archive/SKILL.md.tpl",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/skills/templates/agents/specd-project-context-optimizer/SPECD-AGENT.md.tpl",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/skills/templates/shared/shared.md.tpl",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/skills/templates/agents/specd-spec-context-optimizer/SPECD-AGENT.md.tpl",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/cli/spec-optimizations.md",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/spec-optimizations.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/skills/test/template-workflow.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/cli/graph-cli-context/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/host-context/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/spec-optimizations/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/code-graph/get-change-spec-coverage/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/get-spec-coverage/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/graph-store/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/index-project-graph/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/indexer/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/language-adapter/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/traversal/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/workspace-integration/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/sdk/composition/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/sdk/with-open-graph-provider/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/services/apply-persisted-spec-state-patch.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/update-persisted-spec-optimizations.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/update-persisted-spec-optimizations.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/domain/services/apply-persisted-spec-state-patch.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "AGENTS.md",
+      "state": "ignored"
+    },
+    {
+      "file": "CLAUDE.md",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/plugin-agent-opencode/src/application/use-cases/install-skills.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/src/application/specd-block-manager.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "specd.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/get-implementation-review/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/get-status/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/update-implementation-tracking/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/sdk/context-markdown/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/sdk/run-index-project-graph/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/composition/use-cases/update-persisted-spec-optimizations.spec.ts",
+      "state": "resolved"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "cli:spec-optimizations",
+      "file": "packages/cli/src/commands/spec/optimizations.ts",
+      "fileLinkExplicit": false,
+      "symbols": [
+        "OptimizationField",
+        "SetOptimizationOptions",
+        "ClearOptimizationOptions",
+        "resolveOptimizationSet",
+        "resolveOptimizationClear",
+        "registerSpecOptimizations"
+      ]
+    },
+    {
+      "specId": "skills:skill-templates-source",
+      "file": "packages/skills/templates/skills/specd-archive/SKILL.md.tpl",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "skills:agents",
+      "file": "packages/skills/templates/agents/specd-project-context-optimizer/SPECD-AGENT.md.tpl",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "skills:workflow-automation",
+      "file": "packages/skills/templates/shared/shared.md.tpl",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "skills:skill-templates-source",
+      "file": "packages/skills/templates/shared/shared.md.tpl",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "skills:skill-templates-source",
+      "file": "packages/skills/templates/agents/specd-spec-context-optimizer/SPECD-AGENT.md.tpl",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "skills:agents",
+      "file": "packages/skills/templates/agents/specd-spec-context-optimizer/SPECD-AGENT.md.tpl",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "skills:skill-templates-source",
+      "file": "packages/skills/templates/agents/specd-project-context-optimizer/SPECD-AGENT.md.tpl",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:update-persisted-spec-optimizations",
+      "file": "packages/core/src/domain/services/apply-persisted-spec-state-patch.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["PersistedSpecStatePatch", "applyPersistedSpecStatePatch"]
+    },
+    {
+      "specId": "core:update-persisted-spec-optimizations",
+      "file": "packages/core/src/application/use-cases/update-persisted-spec-optimizations.ts",
+      "fileLinkExplicit": false,
+      "symbols": [
+        "optimizationFieldNameSchema",
+        "optimizationSetSchema",
+        "updatePersistedSpecOptimizationsInputSchema",
+        "parseUpdatePersistedSpecOptimizationsInput",
+        "UpdatePersistedSpecOptimizations"
+      ]
+    },
+    {
+      "specId": "core:update-persisted-spec-optimizations",
+      "file": "packages/core/test/application/use-cases/update-persisted-spec-optimizations.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:update-persisted-spec-optimizations",
+      "file": "packages/core/test/domain/services/apply-persisted-spec-state-patch.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "skills:workflow-automation",
+      "file": "packages/skills/test/template-workflow.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "skills:agents",
+      "file": "packages/skills/test/template-workflow.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:spec-optimizations",
+      "file": "packages/cli/test/commands/spec-optimizations.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "skills:skill-templates-source",
+      "file": "packages/skills/test/template-workflow.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:update-persisted-spec-optimizations",
+      "file": "packages/core/test/composition/use-cases/update-persisted-spec-optimizations.spec.ts",
+      "fileLinkExplicit": true
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:9905b7c89e2c83d2b6ab1dcf64a5f8acd5d256b6326a0c713aa9fc88c133ab1d"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "cli:spec-optimizations",
+          "filename": "deltas/cli/spec-optimizations/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b96bc8417eb930f2d2d6f17891a6390e82a4cd664b9b8bc7ea5c3259ba14651d"
+        },
+        {
+          "key": "skills:agents",
+          "filename": "deltas/skills/agents/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:55144f621d77ba464aaef2adbaffae8f392afdb52f9f3baaf3c2783175c4e869"
+        },
+        {
+          "key": "skills:skill-templates-source",
+          "filename": "deltas/skills/skill-templates-source/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:93528a50517f533f96a71a7b4b3f75517860bf3328392d27042eea63516798c6"
+        },
+        {
+          "key": "skills:workflow-automation",
+          "filename": "deltas/skills/workflow-automation/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:02f215f04c83f13b9f09c4a929f59bd29c98dca729215664dc0c6f7945f83f2a"
+        },
+        {
+          "key": "core:update-persisted-spec-optimizations",
+          "filename": "deltas/core/update-persisted-spec-optimizations/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:fe3876d36b601b91f079c913472d35a8948d78e14cb24a5f66f57e704b539912"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "cli:spec-optimizations",
+          "filename": "deltas/cli/spec-optimizations/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:857a0f01b23c43327d78496324ab6c0f87805746735f1506de75aa0a45c21a52"
+        },
+        {
+          "key": "skills:agents",
+          "filename": "deltas/skills/agents/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:10fed09aa97e8eebf42983c3bf24a8cd9b2fbc4877ca5418b82ad1077af999c5"
+        },
+        {
+          "key": "skills:skill-templates-source",
+          "filename": "deltas/skills/skill-templates-source/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:9d73e06fd4a8d8a6fd6619bcb0afa6965e88b1baa53e5829df2d0530ae40ee10"
+        },
+        {
+          "key": "skills:workflow-automation",
+          "filename": "deltas/skills/workflow-automation/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:872159dd383e4ed905210a8d8f4673d2800eca549c10222edbc303cf9b944503"
+        },
+        {
+          "key": "core:update-persisted-spec-optimizations",
+          "filename": "deltas/core/update-persisted-spec-optimizations/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:2ba028f5e65bd468841fa744a4bec1f8c5dfe30f32fc4a3141559b68b1446344"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:b0fafe967f4fd11f2cfa24d4aed32e2744e363dcefee92174c9aa42e63b93979"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:8e13abb946ac5d97509a0e9420a1bcd0fa92819a130a4dba6a85b2a39ccb723c"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-07-28T10:08:06.501Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": ["cli:spec-optimizations", "skills:agents", "skills:skill-templates-source"],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-28T10:08:06.519Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "cli:spec-optimizations"
+        },
+        {
+          "type": "specs",
+          "key": "skills:agents"
+        },
+        {
+          "type": "specs",
+          "key": "skills:skill-templates-source"
+        },
+        {
+          "type": "verify",
+          "key": "cli:spec-optimizations"
+        },
+        {
+          "type": "verify",
+          "key": "skills:agents"
+        },
+        {
+          "type": "verify",
+          "key": "skills:skill-templates-source"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-28T10:26:25.768Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-28T10:38:18.863Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["cli:spec-optimizations", "skills:agents", "skills:skill-templates-source"]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:spec-optimizations", "skills:agents", "skills:skill-templates-source"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-28T10:38:18.866Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "skills:workflow-automation"
+        },
+        {
+          "type": "verify",
+          "key": "skills:workflow-automation"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-28T10:42:59.694Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:spec-optimizations",
+            "skills:agents",
+            "skills:skill-templates-source",
+            "skills:workflow-automation"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:spec-optimizations",
+            "skills:agents",
+            "skills:skill-templates-source",
+            "skills:workflow-automation"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-28T10:43:50.847Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:spec-optimizations",
+            "skills:agents",
+            "skills:skill-templates-source",
+            "skills:workflow-automation"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:spec-optimizations",
+            "skills:agents",
+            "skills:skill-templates-source",
+            "skills:workflow-automation"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-28T11:04:43.921Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-28T11:06:14.597Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-28T11:20:05.582Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:spec-optimizations",
+            "skills:agents",
+            "skills:skill-templates-source",
+            "skills:workflow-automation"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:spec-optimizations",
+            "skills:agents",
+            "skills:skill-templates-source",
+            "skills:workflow-automation"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-28T11:20:05.582Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-28T11:22:15.339Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-28T11:25:39.029Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:spec-optimizations",
+            "skills:agents",
+            "skills:skill-templates-source",
+            "skills:workflow-automation"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:spec-optimizations",
+            "skills:agents",
+            "skills:skill-templates-source",
+            "skills:workflow-automation"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-28T11:25:39.035Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:update-persisted-spec-optimizations"
+        },
+        {
+          "type": "verify",
+          "key": "core:update-persisted-spec-optimizations"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-28T11:40:28.726Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:spec-optimizations",
+            "skills:agents",
+            "skills:skill-templates-source",
+            "skills:workflow-automation",
+            "core:update-persisted-spec-optimizations"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:spec-optimizations",
+            "skills:agents",
+            "skills:skill-templates-source",
+            "skills:workflow-automation",
+            "core:update-persisted-spec-optimizations"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-28T11:49:49.047Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-28T11:50:35.819Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-28T14:28:57.547Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-28T14:47:04.270Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:spec-optimizations",
+            "skills:agents",
+            "skills:skill-templates-source",
+            "skills:workflow-automation",
+            "core:update-persisted-spec-optimizations"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:spec-optimizations",
+            "skills:agents",
+            "skills:skill-templates-source",
+            "skills:workflow-automation",
+            "core:update-persisted-spec-optimizations"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-28T14:47:04.270Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-28T14:48:29.968Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-28T14:52:49.278Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [core:update-persisted-spec-optimizations]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:update-persisted-spec-optimizations"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:spec-optimizations",
+            "skills:agents",
+            "skills:skill-templates-source",
+            "skills:workflow-automation",
+            "core:update-persisted-spec-optimizations"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-28T15:24:17.359Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-28T15:28:33.807Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-28T15:35:32.761Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-28T20:14:35.850Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:spec-optimizations",
+            "skills:agents",
+            "skills:skill-templates-source",
+            "skills:workflow-automation",
+            "core:update-persisted-spec-optimizations"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:spec-optimizations",
+            "skills:agents",
+            "skills:skill-templates-source",
+            "skills:workflow-automation",
+            "core:update-persisted-spec-optimizations"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-28T20:14:35.850Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-28T20:17:43.133Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-28T22:19:37.342Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [skills:skill-templates-source]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["skills:skill-templates-source"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-28T22:21:20.620Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-29T06:31:28.481Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-29T06:36:15.935Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-29T06:54:33.716Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-29T06:56:16.480Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-29T06:56:16.480Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-29T07:10:26.601Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-29T07:14:41.367Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-29T07:16:52.479Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-29T07:20:55.119Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-29T07:27:58.833Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-29T07:28:34.173Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "description-updated",
+      "at": "2026-07-29T07:55:16.220Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "description": "Aligns the persisted spec-optimization CLI, Core mutation semantics, and optimizer workflow templates around one executable contract. Adds direct and compatibility set/clear forms, strict runtime validation, durable field deletion, authoritative llmOptimizedContext gating, and clarified spec-reading guidance, with regression tests and documentation updates."
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-07-29T07:56:07.691Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Implementation link \"cli:spec-optimizations\" points outside workspace \"cli\" codeRoot.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-07-29T07:56:39.789Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Implementation link \"cli:spec-optimizations\" points outside workspace \"cli\" codeRoot.",
+      "commitStarted": false
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-29T07:57:13.894Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-07-29T07:57:14.056Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

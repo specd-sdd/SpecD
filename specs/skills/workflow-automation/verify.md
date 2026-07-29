@@ -4,19 +4,50 @@
 
 ### Requirement: Diagnostic Priority
 
-#### Scenario: Agent chooses text format for status checks
+#### Scenario: Agent uses canonical plural status diagnostics
 
 - **WHEN** an AI agent needs to check the current status of a change
-- **THEN** it SHALL use `specd change status <name> --format text`
+- **THEN** it SHALL use `specd changes status <name> --format text`
+- **AND** it MUST NOT use a singular resource group
 - **AND** it MUST NOT use `--format json` as the primary diagnostic tool
 
 ### Requirement: Data Extraction
 
-#### Scenario: Agent chooses JSON for tool-call preparation
+#### Scenario: Agent chooses TOON for tool-call preparation
 
 - **GIVEN** an agent needs to retrieve a list of spec IDs to pass to another tool
 - **WHEN** it executes the status check
-- **THEN** it SHALL use `--format json` or `--format toon` to ensure robust parsing of the spec ID array
+- **THEN** it SHALL use `--format toon` to ensure robust parsing of the spec ID array
+
+#### Scenario: Agent uses JSON only for an explicit exception
+
+- **GIVEN** TOON is unavailable or JSON was explicitly requested
+- **WHEN** an agent needs structured extraction
+- **THEN** it MAY use `--format json`
+- **AND** it MUST NOT present JSON as co-equal with TOON in the default guidance
+
+### Requirement: Spec read surface selection
+
+#### Scenario: Exact artifact authoring uses specs show
+
+- **WHEN** an agent needs exact raw spec or verification content for authoring or review
+- **THEN** it uses `specd specs show <spec-id>`
+
+#### Scenario: Semantic working context uses specs context
+
+- **WHEN** an agent needs section filtering, dependency traversal, or optimized-content preference
+- **THEN** it uses `specd specs context <spec-id>`
+
+#### Scenario: Materialization diagnostics use specs metadata
+
+- **WHEN** an agent needs the normalized projection, `source`, `regenerated`, or materialization warnings
+- **THEN** it uses `specd specs metadata <spec-id>`
+
+#### Scenario: Metadata is not a configuration or default context source
+
+- **WHEN** an agent needs effective project configuration or ordinary semantic working context
+- **THEN** it does not use `specd specs metadata`
+- **AND** it selects the project status or spec context command whose contract exposes the required data
 
 ### Requirement: On-demand outline retrieval
 

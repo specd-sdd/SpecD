@@ -192,13 +192,50 @@
 
 ### Requirement: Optimizer agent gating declared in templates
 
-#### Scenario: Optimizer agent templates declare the llmOptimizedContext gate
+#### Scenario: Optimizer templates use the top-level project status gate
 
-- **WHEN** the `specd-project-context-optimizer` and `specd-spec-context-optimizer` agent templates are inspected
-- **THEN** each declares that it performs no generation or persistence unless the effective `llmOptimizedContext` project setting is `true`
+- **WHEN** the `specd-project-context-optimizer` and `specd-spec-context-optimizer` templates are inspected
+- **THEN** each runs `specd project status --format toon`
+- **AND** each reads the top-level `llmOptimizedContext` field
+- **AND** neither uses `specd specs metadata` as a project-configuration gate
 
-#### Scenario: Optimizer agent templates direct persistence through lock-owned commands
+#### Scenario: Spec optimizer template uses direct lock-owned options
 
-- **WHEN** the optimizer agent templates describe how to persist generated content
-- **THEN** they direct persistence through the lock-owned persisted-optimization commands (`cli:spec-optimizations`)
-- **AND** neither template instructs invoking spec metadata generation after persisting an optimization
+- **WHEN** the `specd-spec-context-optimizer` template describes how to persist generated spec content
+- **THEN** it uses `specd specs optimizations set` with `--optimized-description` or `--optimized-context`
+- **AND** it does not combine `--input` with either direct option
+- **AND** it does not instruct invoking spec metadata generation after persisting an optimization
+
+#### Scenario: Project optimizer template retains project-scoped persistence
+
+- **WHEN** the `specd-project-context-optimizer` template describes how to persist generated project context
+- **THEN** it uses `specd project update-metadata --optimized-context`
+- **AND** it does not use `specd specs optimizations set`
+- **AND** it does not instruct invoking spec metadata generation
+
+### Requirement: Agent-facing command roles in templates
+
+#### Scenario: Shared guidance selects the read surface by intent
+
+- **WHEN** shared workflow guidance is inspected
+- **THEN** it assigns `specd specs show <spec-id>` to exact raw artifact reads
+- **AND** it assigns `specd specs context <spec-id>` to semantic agent-ready context
+- **AND** it assigns `specd specs metadata <spec-id>` only to normalized projection and materialization diagnostics
+
+#### Scenario: Archive template uses metadata only for diagnostics
+
+- **WHEN** the archive template inspects metadata materialization
+- **THEN** it may read `source`, `regenerated`, and warnings from `specd specs metadata`
+- **AND** it does not use that command as general working context
+
+#### Scenario: Archive optimizer decision uses the top-level status field
+
+- **WHEN** the archive template decides whether to suggest an optimizer agent
+- **THEN** it reads top-level `llmOptimizedContext` from `specd project status --format toon`
+- **AND** it does not reference `approvals.llmOptimized`
+
+#### Scenario: Template tests assert exact contracts
+
+- **WHEN** template contract tests verify command roles and optimization gating
+- **THEN** they assert the exact commands and output fields
+- **AND** keyword-only assertions are insufficient

@@ -1,4 +1,5 @@
 import path from 'node:path'
+import { z } from 'zod'
 import { applyPersistedSpecStatePatch } from '../../domain/services/apply-persisted-spec-state-patch.js'
 import { parseSpecId } from '../../domain/services/parse-spec-id.js'
 import { SpecPath } from '../../domain/value-objects/spec-path.js'
@@ -20,6 +21,49 @@ import { type GetActiveSchema } from './get-active-schema.js'
 /** Persisted optimization field names supported by {@link UpdatePersistedSpecOptimizations}. */
 export type PersistedOptimizationFieldName = 'optimizedDescription' | 'optimizedContext'
 
+const optimizationFieldNameSchema = z.enum(['optimizedDescription', 'optimizedContext'])
+
+const optimizationSetSchema = z
+  .object({
+    optimizedDescription: z.string().optional(),
+    optimizedContext: z.string().optional(),
+  })
+  .strict()
+  .refine(
+    (value) => value.optimizedDescription !== undefined || value.optimizedContext !== undefined,
+    {
+      message: 'must include at least one field',
+    },
+  )
+
+const updatePersistedSpecOptimizationsInputSchema = z
+  .object({
+    specId: z.string().min(1),
+    set: optimizationSetSchema.optional(),
+    clear: z.array(optimizationFieldNameSchema).nonempty().optional(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.set !== undefined && value.clear !== undefined) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['set'],
+        message: 'must not be provided when clear is present',
+      })
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['clear'],
+        message: 'must not be provided when set is present',
+      })
+    }
+    if (value.set === undefined && value.clear === undefined) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'must include exactly one of set or clear',
+      })
+    }
+  })
+
 /** Input for the {@link UpdatePersistedSpecOptimizations} use case. */
 export interface UpdatePersistedSpecOptimizationsInput {
   /** Target spec identifier. */
@@ -38,6 +82,46 @@ export interface UpdatePersistedSpecOptimizationsResult {
   readonly optimizations?: Readonly<Record<PersistedOptimizationFieldName, string>>
   /** Whether persisted state was created during the update. */
   readonly created: boolean
+}
+
+/** Strictly validated runtime input used after Zod parsing succeeds. */
+type ParsedUpdatePersistedSpecOptimizationsInput = {
+  readonly specId: string
+  readonly set?:
+    | {
+        readonly optimizedDescription?: string | undefined
+        readonly optimizedContext?: string | undefined
+      }
+    | undefined
+  readonly clear?: readonly PersistedOptimizationFieldName[] | undefined
+}
+
+/**
+ * Validates untrusted runtime input for persisted optimization mutations.
+ *
+ * @param input - Raw caller input
+ * @returns Strictly validated mutation input
+ * @throws {InvalidInputError} When the payload shape is invalid
+ */
+function parseUpdatePersistedSpecOptimizationsInput(
+  input: UpdatePersistedSpecOptimizationsInput,
+): ParsedUpdatePersistedSpecOptimizationsInput {
+  const result = updatePersistedSpecOptimizationsInputSchema.safeParse(input)
+  if (result.success) {
+    return {
+      specId: result.data.specId,
+      ...(result.data.set !== undefined ? { set: result.data.set } : {}),
+      ...(result.data.clear !== undefined ? { clear: result.data.clear } : {}),
+    }
+  }
+
+  const issues = result.error.issues
+    .map((issue) => {
+      const path = issue.path.length > 0 ? issue.path.join('.') : 'input'
+      return `${path}: ${issue.message}`
+    })
+    .join('; ')
+  throw new InvalidInputError(`Invalid persisted optimization update: ${issues}`)
 }
 
 /**
@@ -77,17 +161,9 @@ export class UpdatePersistedSpecOptimizations {
   async execute(
     input: UpdatePersistedSpecOptimizationsInput,
   ): Promise<UpdatePersistedSpecOptimizationsResult> {
-    if (input.set !== undefined && input.clear !== undefined) {
-      throw new InvalidInputError('set and clear are mutually exclusive')
-    }
-    if (
-      (input.set === undefined || Object.keys(input.set).length === 0) &&
-      (input.clear === undefined || input.clear.length === 0)
-    ) {
-      throw new InvalidInputError('at least one of set or clear must be provided')
-    }
+    const validatedInput = parseUpdatePersistedSpecOptimizationsInput(input)
 
-    const { workspace, capPath } = parseSpecId(input.specId)
+    const { workspace, capPath } = parseSpecId(validatedInput.specId)
     const repo = this.specRepositories.get(workspace)
     if (repo === undefined) {
       throw new WorkspaceNotFoundError(workspace)
@@ -98,12 +174,12 @@ export class UpdatePersistedSpecOptimizations {
 
     const spec = await repo.get(SpecPath.parse(capPath))
     if (spec === null) {
-      throw new SpecNotFoundError(input.specId)
+      throw new SpecNotFoundError(validatedInput.specId)
     }
 
     let current = await repo.readPersistedState(spec)
-    if (current === null && (input.set === undefined || Object.keys(input.set).length === 0)) {
-      return { specId: input.specId, created: false }
+    if (current === null && validatedInput.set === undefined) {
+      return { specId: validatedInput.specId, created: false }
     }
 
     const schemaResult = await this.getActiveSchema.execute()
@@ -117,7 +193,7 @@ export class UpdatePersistedSpecOptimizations {
     let created = false
     if (current === null) {
       const dependsOn = await resolveInitialPersistedDependsOn(
-        { specId: input.specId, schema: schemaIdentity },
+        { specId: validatedInput.specId, schema: schemaIdentity },
         {
           specRepo: repo,
           schemaProvider: { get: () => Promise.resolve(schemaResult.schema) },
@@ -143,9 +219,9 @@ export class UpdatePersistedSpecOptimizations {
       ...(current.optimizations ?? {}),
     }
 
-    if (input.set !== undefined) {
+    if (validatedInput.set !== undefined) {
       const schemaForField = created ? schemaIdentity : current.schema
-      for (const [field, value] of Object.entries(input.set) as Array<
+      for (const [field, value] of Object.entries(validatedInput.set) as Array<
         [PersistedOptimizationFieldName, string]
       >) {
         nextOptimizations[field] = {
@@ -156,8 +232,8 @@ export class UpdatePersistedSpecOptimizations {
       }
     }
 
-    if (input.clear !== undefined) {
-      for (const field of input.clear) {
+    if (validatedInput.clear !== undefined) {
+      for (const field of validatedInput.clear) {
         delete nextOptimizations[field]
       }
     }
@@ -165,7 +241,7 @@ export class UpdatePersistedSpecOptimizations {
     const patchOptimizations =
       nextOptimizations.optimizedDescription === undefined &&
       nextOptimizations.optimizedContext === undefined
-        ? undefined
+        ? null
         : (nextOptimizations as PersistedSpecOptimizations)
 
     const state = applyPersistedSpecStatePatch(
@@ -176,28 +252,28 @@ export class UpdatePersistedSpecOptimizations {
             dependsOn: current.dependsOn,
           }
         : { kind: 'existing', state: current },
-      patchOptimizations !== undefined ? { optimizations: patchOptimizations } : {},
-      { specId: input.specId },
+      { optimizations: patchOptimizations },
+      { specId: validatedInput.specId },
     )
 
     await repo.writePersistedState(spec, state, {
       expectedRevision: created ? null : current.originalHash,
     })
 
-    const projection =
-      patchOptimizations === undefined
-        ? undefined
-        : ({
-            ...(patchOptimizations.optimizedDescription !== undefined
-              ? { optimizedDescription: patchOptimizations.optimizedDescription.value }
-              : {}),
-            ...(patchOptimizations.optimizedContext !== undefined
-              ? { optimizedContext: patchOptimizations.optimizedContext.value }
-              : {}),
-          } as Readonly<Record<PersistedOptimizationFieldName, string>>)
+    let projection: Readonly<Record<PersistedOptimizationFieldName, string>> | undefined
+    if (patchOptimizations !== null) {
+      projection = {
+        ...(patchOptimizations.optimizedDescription !== undefined
+          ? { optimizedDescription: patchOptimizations.optimizedDescription.value }
+          : {}),
+        ...(patchOptimizations.optimizedContext !== undefined
+          ? { optimizedContext: patchOptimizations.optimizedContext.value }
+          : {}),
+      } as Readonly<Record<PersistedOptimizationFieldName, string>>
+    }
 
     return {
-      specId: input.specId,
+      specId: validatedInput.specId,
       created,
       ...(projection !== undefined ? { optimizations: projection } : {}),
     }

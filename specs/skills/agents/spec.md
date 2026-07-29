@@ -38,11 +38,21 @@ When the target coding agent or plugin does not support specialized subagents (i
 
 ### Requirement: Effective llmOptimizedContext gate
 
-Optimizer agents MUST inspect the effective project configuration before doing any optimization work. When the effective `llmOptimizedContext` is not `true`, missing or stale optimization data is not a request to optimize: the agent MUST NOT generate, persist, or otherwise write any optimized field, metadata document, or lock state, and MUST exit without performing optimization. Optimization work MUST proceed only when the effective `llmOptimizedContext` is `true`.
+Optimizer agents MUST inspect the effective project configuration before doing any optimization work by running `specd project status --format toon` and reading its top-level `llmOptimizedContext` field.
+
+Optimizer agents MUST NOT use `specd specs metadata` to determine whether optimization is enabled because that command exposes a spec's materialized metadata projection, not effective project configuration.
+
+When top-level `llmOptimizedContext` is not exactly `true`, missing or stale optimization data is not a request to optimize: the agent MUST NOT generate, persist, or otherwise write any optimized field, metadata document, or lock state, and MUST exit without performing optimization. Optimization work MUST proceed only when that field is `true`.
 
 ### Requirement: Persisted optimization writes replace metadata editors
 
-Optimizer agents MUST persist generated optimized content through `specd spec optimizations set` (see `cli:spec-optimizations`), which writes directly to lock-owned per-field optimization state. Optimizer agents MUST NOT use a metadata-editing command (`update-metadata`, `write-metadata`, or any equivalent) to store optimized content, since none is exposed by the CLI. After persisting an optimization, an optimizer agent MUST NOT invoke spec metadata generation (`specd spec generate-metadata`) — normal consumers self-heal their own metadata projection on the next read and do not depend on a manual regeneration step.
+The `specd-spec-context-optimizer` MUST persist generated spec-level content through `specd specs optimizations set <spec-id> --optimized-description <text> --optimized-context <text>` (see `cli:spec-optimizations`), which writes directly to lock-owned per-field optimization state.
+
+The spec optimizer MAY set only one field by omitting the other direct option. The direct options MAY be combined, but its instructions MUST NOT combine either direct option with `--input`.
+
+The `specd-project-context-optimizer` MUST persist generated project-level context through `specd project update-metadata --optimized-context <text>`. It MUST NOT route project-level context through the spec-scoped optimizations command because project context has no target spec identity.
+
+The spec optimizer MUST NOT use a metadata-editing command (`update-metadata`, `write-metadata`, or any equivalent) to store spec-level optimized content. After persisting a spec optimization, it MUST NOT invoke spec metadata generation (`specd specs generate-metadata`) — normal consumers self-heal their own metadata projection on the next read and do not depend on a manual regeneration step.
 
 ## Spec Dependencies
 

@@ -8,15 +8,19 @@ Optimized fields are durable authoring decisions, so setting or clearing them mu
 
 ### Requirement: Input contract
 
-`UpdatePersistedSpecOptimizations.execute` SHALL accept an `UpdatePersistedSpecOptimizationsInput` with:
+`UpdatePersistedSpecOptimizations.execute` SHALL accept an `UpdatePersistedSpecOptimizationsInput` containing:
 
-- `specId` (required, string) — the spec whose persisted optimizations are being mutated
-- `set` (optional, object) — a partial map of `optimizedDescription` and/or `optimizedContext` string values to persist
-- `clear` (optional, readonly array of `'optimizedDescription' | 'optimizedContext'`) — field names to remove
+- `specId` (required, non-empty string) — the spec whose persisted optimizations are being mutated;
+- `set` (optional, strict object) — a non-empty partial map of `optimizedDescription` and/or `optimizedContext` string values to persist;
+- `clear` (optional, non-empty readonly array) — field names limited to `optimizedDescription` and `optimizedContext`.
+
+Before workspace resolution, schema resolution, artifact reads, or persisted-state I/O, the use case MUST validate the complete runtime input with a strict Zod schema. The schema MUST reject unknown root keys, unknown `set` keys, non-string set values, invalid clear field names, empty `set`, empty `clear`, missing operations, and simultaneous `set` and `clear`.
+
+Runtime validation failures MUST throw `InvalidInputError` with actionable issue text. This Core validation is authoritative for every caller, including JavaScript or otherwise untyped SDK consumers; adapter-level validation MAY fail earlier but MUST NOT be the only enforcement.
 
 ### Requirement: Mutual exclusivity and minimum operation
 
-`set` and `clear` MUST NOT be provided together. If neither is provided, or `set` is an empty object, or `clear` is an empty array, the use case MUST throw a typed validation error.
+`set` and `clear` MUST NOT be provided together. Exactly one non-empty operation MUST be present. The strict Core input schema MUST enforce this invariant before mutation and map every violation to `InvalidInputError`.
 
 ### Requirement: Set captures a fresh baseline per changed field
 
@@ -64,14 +68,19 @@ On success, `execute` SHALL return an `UpdatePersistedSpecOptimizationsResult` c
 
 ### Requirement: Config-based factory delegates through resolveUpdatePersistedSpecOptimizationsDeps
 
-The config-based `createUpdatePersistedSpecOptimizations(config, options?)` form MUST derive `UpdatePersistedSpecOptimizationsDeps` through `resolveUpdatePersistedSpecOptimizationsDeps(resolver)` and then delegate to canonical `createUpdatePersistedSpecOptimizations(deps)`.
+The config-based `createUpdatePersistedSpecOptimizations(config, options?)` factory MUST create a shared composition resolver, derive `UpdatePersistedSpecOptimizationsDeps` through `resolveUpdatePersistedSpecOptimizationsDeps(resolver)`, and delegate construction to the canonical dependency-based factory.
 
-`resolveUpdatePersistedSpecOptimizationsDeps(resolver)` MUST resolve:
+The resolver MUST provide the established persisted-spec composition dependencies:
 
-- `specs: ReadonlyMap<string, SpecRepository>` — one repository instance per workspace
-- `initializePersistedSpecState` collaborator sufficient to invoke `resolveInitialPersistedDependsOn()` for the set creation path
+- `specRepositories`;
+- `getActiveSchema`;
+- `parsers`;
+- `extractorTransforms`;
+- `contentHasher`.
 
-The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
+Initial persisted-state creation MUST continue through the shared `resolveInitialPersistedDependsOn()` service using those dependencies. A separate `initializePersistedSpecState` collaborator is not required in `UpdatePersistedSpecOptimizationsDeps`.
+
+`resolveUpdatePersistedSpecOptimizationsDeps(resolver)` MUST remain the only use-case-specific composition entry point for the config-based factory. The factory MUST NOT duplicate filesystem-shaped wiring inline.
 
 ## Constraints
 

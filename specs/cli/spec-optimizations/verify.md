@@ -9,6 +9,13 @@
 - **WHEN** `specd specs optimizations get core:auth/login --format json` is run
 - **THEN** the output is valid JSON
 
+#### Scenario: Set and clear require an input or selection form
+
+- **WHEN** `set` is invoked without `--input` or a direct value option
+- **OR** `clear` is invoked without `--field` or a direct clear flag
+- **THEN** the command fails at the CLI boundary
+- **AND** no Kernel method is called
+
 ### Requirement: Get subcommand
 
 #### Scenario: Text output marks a stale field with its staleness reasons
@@ -43,7 +50,26 @@
 
 - **GIVEN** `{"optimizedDescription": "text"}` is piped to stdin
 - **WHEN** `specd specs optimizations set core:auth/login --input -` is run
-- **THEN** the command calls `Kernel.specs.updatePersistedOptimizations` with `set` equal to the parsed object
+- **THEN** the command calls `Kernel.specs.updatePersistedOptimizations` exactly once with `set` equal to the parsed object
+
+#### Scenario: Direct set options update both fields atomically
+
+- **WHEN** `specd specs optimizations set core:auth/login --optimized-description "summary" --optimized-context "context"` is run
+- **THEN** the command calls `Kernel.specs.updatePersistedOptimizations` exactly once
+- **AND** `set` contains `optimizedDescription: "summary"` and `optimizedContext: "context"`
+
+#### Scenario: Set rejects mixed input forms
+
+- **WHEN** `--input file.json` is combined with `--optimized-description` or `--optimized-context`
+- **THEN** the command exits with code 1 with an `error:` message
+- **AND** `Kernel.specs.updatePersistedOptimizations` is never called
+
+#### Scenario: Set rejects an empty input object
+
+- **GIVEN** an `--input` file containing `{}`
+- **WHEN** `specd specs optimizations set core:auth/login --input file.json` is run
+- **THEN** the command exits with code 1 with an `error:` message
+- **AND** `Kernel.specs.updatePersistedOptimizations` is never called
 
 #### Scenario: Set rejects an unknown-key JSON shape at the CLI boundary
 
@@ -64,13 +90,35 @@
 #### Scenario: Clear accepts multiple --field flags
 
 - **WHEN** `specd specs optimizations clear core:auth/login --field optimizedDescription --field optimizedContext` is run
-- **THEN** the command calls `Kernel.specs.updatePersistedOptimizations` with `clear` equal to both field names
+- **THEN** the command calls `Kernel.specs.updatePersistedOptimizations` exactly once with `clear` equal to both field names
+
+#### Scenario: Direct clear flags remove both fields atomically
+
+- **GIVEN** both optimization fields are persisted for `core:auth/login`
+- **WHEN** `specd specs optimizations clear core:auth/login --optimized-description --optimized-context` is run
+- **THEN** the command calls `Kernel.specs.updatePersistedOptimizations` exactly once
+- **AND** `clear` contains `optimizedDescription` and `optimizedContext`
+- **AND** a subsequent `specd specs optimizations get core:auth/login` reports that neither field is persisted
+
+#### Scenario: Compatibility clear persists a partial removal
+
+- **GIVEN** both optimization fields are persisted for `core:auth/login`
+- **WHEN** `specd specs optimizations clear core:auth/login --field optimizedContext` is run
+- **THEN** a subsequent `specd specs optimizations get core:auth/login` reports `optimizedContext` missing
+- **AND** the same read returns the unchanged `optimizedDescription`
+
+#### Scenario: Clear rejects mixed selection forms
+
+- **WHEN** `--field optimizedDescription` is combined with `--optimized-context`
+- **THEN** the command exits with code 1 with an `error:` message
+- **AND** `Kernel.specs.updatePersistedOptimizations` is never called
 
 #### Scenario: Clear result may be empty when the last field is removed
 
 - **GIVEN** clearing removes the last remaining optimization field
 - **WHEN** `specd specs optimizations clear core:auth/login --field optimizedDescription` is run
 - **THEN** the printed result shows no remaining optimization values
+- **AND** a subsequent `specd specs optimizations get core:auth/login` also reports no persisted optimization values
 
 ### Requirement: No repeated CLI-owned mutation or freshness logic
 

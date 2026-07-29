@@ -17,28 +17,45 @@
 - **WHEN** `execute({ specId, clear: ['optimizedDescription', 'optimizedContext'] })` is called
 - **THEN** the persisted state has no `optimizations` block afterward
 
+#### Scenario: Strict input validation rejects malformed untyped set payloads before I/O
+
+- **GIVEN** an untyped caller supplies an unknown root key, unknown set key, non-string set value, missing or empty `specId`, or a non-object input
+- **WHEN** the payload is passed to `execute`
+- **THEN** `InvalidInputError` is thrown with actionable issue text
+- **AND** workspace lookup, schema resolution, artifact reads, and persisted-state I/O are not performed
+
+#### Scenario: Strict input validation rejects malformed untyped clear payloads before I/O
+
+- **GIVEN** an untyped caller supplies an invalid clear field name, non-array clear value, or non-string clear entry
+- **WHEN** the payload is passed to `execute`
+- **THEN** `InvalidInputError` is thrown with actionable issue text
+- **AND** workspace lookup, schema resolution, artifact reads, and persisted-state I/O are not performed
+
 ### Requirement: Mutual exclusivity and minimum operation
 
-#### Scenario: Providing both set and clear throws a validation error
+#### Scenario: Providing both set and clear throws InvalidInputError
 
 - **WHEN** `execute({ specId, set: { optimizedDescription: 'x' }, clear: ['optimizedContext'] })` is called
-- **THEN** a typed validation error is thrown
-- **AND** persisted state is not mutated
+- **THEN** `InvalidInputError` is thrown
+- **AND** no workspace, schema, artifact, or persisted-state port is called
 
-#### Scenario: Neither set nor clear throws a validation error
+#### Scenario: Neither set nor clear throws InvalidInputError
 
 - **WHEN** `execute({ specId })` is called with neither `set` nor `clear`
-- **THEN** a typed validation error is thrown
+- **THEN** `InvalidInputError` is thrown
+- **AND** no workspace, schema, artifact, or persisted-state port is called
 
-#### Scenario: Empty set object throws a validation error
+#### Scenario: Empty set object throws InvalidInputError
 
 - **WHEN** `execute({ specId, set: {} })` is called
-- **THEN** a typed validation error is thrown
+- **THEN** `InvalidInputError` is thrown
+- **AND** no workspace, schema, artifact, or persisted-state port is called
 
-#### Scenario: Empty clear array throws a validation error
+#### Scenario: Empty clear array throws InvalidInputError
 
 - **WHEN** `execute({ specId, clear: [] })` is called
-- **THEN** a typed validation error is thrown
+- **THEN** `InvalidInputError` is thrown
+- **AND** no workspace, schema, artifact, or persisted-state port is called
 
 ### Requirement: Set captures a fresh baseline per changed field
 
@@ -78,25 +95,38 @@
 
 ### Requirement: Clear removes selected fields
 
-#### Scenario: Clearing an existing field removes only that field
+#### Scenario: Clearing an existing field removes only that field from the written state
 
 - **GIVEN** persisted optimizations has both `optimizedDescription` and `optimizedContext`
 - **WHEN** `execute({ specId, clear: ['optimizedContext'] })` is called
-- **THEN** only `optimizedDescription` remains in persisted state
+- **THEN** the state passed to `writePersistedState` has no `optimizedContext`
+- **AND** its `optimizedDescription` value and baseline remain exactly unchanged
+- **AND** the result reports only `optimizedDescription`
 
-#### Scenario: Clearing an already-absent field is a silent no-op for that field
+#### Scenario: Clearing an already-absent field preserves the written state
 
 - **GIVEN** persisted optimizations has only `optimizedDescription`
 - **WHEN** `execute({ specId, clear: ['optimizedContext'] })` is called
 - **THEN** no error is thrown
-- **AND** `optimizedDescription` remains unchanged
+- **AND** any state passed to `writePersistedState` contains the exact original `optimizedDescription`
+- **AND** no `optimizedContext` is introduced
 
-#### Scenario: Clearing the last remaining field omits the optimizations block entirely
+#### Scenario: Clearing the last remaining field omits the optimization block from the written state
 
 - **GIVEN** persisted optimizations has only `optimizedDescription`
 - **WHEN** `execute({ specId, clear: ['optimizedDescription'] })` is called
-- **THEN** the resulting persisted state has no `optimizations` key at all
-- **AND** it is not left as an empty object
+- **THEN** the state passed to `writePersistedState` has no `optimizations` key
+- **AND** it is not written as an empty object
+- **AND** the result has no `optimizations`
+
+#### Scenario: Repository round trip preserves partial and final clear removals
+
+- **GIVEN** a real writable `SpecRepository` contains persisted `optimizedDescription` and `optimizedContext`
+- **WHEN** the use case clears `optimizedContext` and the repository state is read again
+- **THEN** the reloaded state contains only the unchanged `optimizedDescription`
+- **WHEN** the use case then clears `optimizedDescription` and the repository state is read again
+- **THEN** the reloaded state has no `optimizations` key
+- **AND** the assertions inspect reloaded persisted state rather than relying only on the use-case return value
 
 ### Requirement: Clear against missing persisted state is a no-op
 
@@ -159,10 +189,18 @@
 
 ### Requirement: Config-based factory delegates through resolveUpdatePersistedSpecOptimizationsDeps
 
-#### Scenario: createUpdatePersistedSpecOptimizations config form derives deps through the resolver
+#### Scenario: Config factory derives exact dependencies through the resolver
 
 - **WHEN** `createUpdatePersistedSpecOptimizations(config, options?)` is invoked
-- **THEN** it creates a composition resolver for that composition session
+- **THEN** it creates one composition resolver for that composition session
 - **AND** it derives `UpdatePersistedSpecOptimizationsDeps` through `resolveUpdatePersistedSpecOptimizationsDeps(resolver)`
-- **AND** `resolveUpdatePersistedSpecOptimizationsDeps(resolver)` resolves `specs: ReadonlyMap<string, SpecRepository>` and an `initializePersistedSpecState` collaborator sufficient to invoke `resolveInitialPersistedDependsOn()`
+- **AND** the resolved dependencies are `specRepositories`, `getActiveSchema`, `parsers`, `extractorTransforms`, and `contentHasher`
 - **AND** the factory delegates to canonical `createUpdatePersistedSpecOptimizations(deps)`
+- **AND** it does not reconstruct filesystem-shaped dependencies inline
+
+#### Scenario: Initial state creation remains behind the shared service
+
+- **GIVEN** the config factory has resolved the established persisted-spec dependencies
+- **WHEN** a set operation must create missing persisted state
+- **THEN** initial dependencies are derived through `resolveInitialPersistedDependsOn()`
+- **AND** `UpdatePersistedSpecOptimizationsDeps` does not require a separate `initializePersistedSpecState` collaborator

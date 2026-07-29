@@ -44,29 +44,48 @@
 
 ### Requirement: Effective llmOptimizedContext gate
 
-#### Scenario: Optimization skipped when llmOptimizedContext is not true
+#### Scenario: Optimization skipped when the top-level status field is not true
 
-- **GIVEN** the effective project configuration has `llmOptimizedContext` set to `false` (or unset)
+- **GIVEN** `specd project status --format toon` returns top-level `llmOptimizedContext: false` or omits the field
 - **WHEN** an optimizer agent runs against a spec with missing or stale optimization data
 - **THEN** the agent does not generate, persist, or write any optimized field, metadata document, or lock state
 - **AND** it exits without performing optimization
 
-#### Scenario: Optimization proceeds when llmOptimizedContext is true
+#### Scenario: Optimization proceeds when the top-level status field is true
 
-- **GIVEN** the effective project configuration has `llmOptimizedContext: true`
+- **GIVEN** `specd project status --format toon` returns top-level `llmOptimizedContext: true`
 - **WHEN** an optimizer agent runs against a spec with missing or stale optimization data
 - **THEN** the agent proceeds with generating and persisting the optimized content
 
+#### Scenario: Spec metadata is not used as the optimization gate
+
+- **WHEN** an optimizer agent determines whether optimization is enabled
+- **THEN** it does not read `specd specs metadata` for effective project configuration
+- **AND** it reads the top-level status field instead
+
 ### Requirement: Persisted optimization writes replace metadata editors
 
-#### Scenario: Optimizer agent persists through specd spec optimizations set
+#### Scenario: Spec optimizer persists both fields through direct options
 
-- **WHEN** an optimizer agent finishes generating optimized content for a spec
-- **THEN** it persists that content via `specd spec optimizations set`
+- **WHEN** the spec optimizer finishes generating optimized description and context for a spec
+- **THEN** it invokes `specd specs optimizations set <spec-id> --optimized-description <text> --optimized-context <text>`
+- **AND** it does not combine those options with `--input`
 - **AND** it does not invoke a metadata-editing command such as `update-metadata` or `write-metadata`
 
-#### Scenario: Optimizer agent does not trigger metadata regeneration after persisting
+#### Scenario: Spec optimizer may persist one field
 
-- **WHEN** an optimizer agent has persisted an optimization via `specd spec optimizations set`
-- **THEN** it does not invoke `specd spec generate-metadata`
+- **GIVEN** only one optimized field needs to be refreshed
+- **WHEN** the spec optimizer persists the result
+- **THEN** it supplies only the corresponding direct option
+
+#### Scenario: Project optimizer retains project-scoped persistence
+
+- **WHEN** the project optimizer finishes generating project-level optimized context
+- **THEN** it invokes `specd project update-metadata --optimized-context <text>`
+- **AND** it does not invoke `specd specs optimizations set`
+
+#### Scenario: Spec optimizer does not trigger metadata regeneration after persisting
+
+- **WHEN** the spec optimizer has persisted an optimization via `specd specs optimizations set`
+- **THEN** it does not invoke `specd specs generate-metadata`
 - **AND** normal consumers self-heal their own metadata projection on the next read

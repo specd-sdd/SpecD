@@ -12,11 +12,14 @@ Persisted optimization features SHALL be exposed under the `specd specs optimiza
 
 ```
 specs optimizations get <spec-id> [--field optimizedDescription|optimizedContext]
-specs optimizations set <spec-id> --input <json-file|->
-specs optimizations clear <spec-id> --field optimizedDescription|optimizedContext...
+specs optimizations set <spec-id> [--input <json-file|->] [--optimized-description <text>] [--optimized-context <text>]
+specs optimizations clear <spec-id> [--field optimizedDescription|optimizedContext...] [--optimized-description] [--optimized-context]
 ```
 
 Every subcommand accepts `--format text|json|toon` (default `text`) per [`cli:entrypoint`](../entrypoint/spec.md).
+
+`set` MUST receive either `--input` or at least one direct value option.
+`clear` MUST receive either one or more `--field` options or at least one direct clear option.
 
 ### Requirement: Get subcommand
 
@@ -28,13 +31,27 @@ When the spec has no persisted state, the command MUST report that the spec is n
 
 ### Requirement: Set subcommand
 
-`specs optimizations set <spec-id> --input <json-file|->` MUST read JSON content from the given file path, or from stdin when `--input -` is given. The command MUST parse the content as a JSON object whose keys are a subset of `optimizedDescription` and `optimizedContext` with string values, and MUST reject any other shape at the CLI boundary with an `error:` message before calling Core.
+`specs optimizations set <spec-id>` MUST accept exactly one input form:
 
-On success, the command MUST call `Kernel.specs.updatePersistedOptimizations` with `set` equal to the parsed object, and print the resulting persisted optimization values.
+- `--input <json-file|->` reads JSON from the given file path, or from stdin when `--input -` is used. The JSON MUST be an object whose keys are a subset of `optimizedDescription` and `optimizedContext` with string values.
+- `--optimized-description <text>` and `--optimized-context <text>` map their values directly to the corresponding keys in the Core `set` input. Both direct options MAY be provided together to update both fields atomically.
+
+`--input` MUST NOT be combined with either direct value option. Supplying both input forms, or supplying neither form, MUST fail at the CLI boundary before any Kernel call. Unknown JSON keys, non-string values, malformed JSON, and an empty JSON object MUST also fail before any Kernel call.
+
+On success, the command MUST call `Kernel.specs.updatePersistedOptimizations` exactly once with `set` equal to the normalized values and print the resulting persisted optimization values.
 
 ### Requirement: Clear subcommand
 
-`specs optimizations clear <spec-id> --field <name>...` MUST call `Kernel.specs.updatePersistedOptimizations` with `clear` equal to the supplied field names, and print the resulting persisted optimization values (which may be empty).
+`specs optimizations clear <spec-id>` MUST accept exactly one selection form:
+
+- repeated `--field optimizedDescription|optimizedContext` options;
+- direct `--optimized-description` and `--optimized-context` flags.
+
+Both direct flags MAY be provided together to clear both fields atomically. The repeated `--field` form MAY select both fields.
+
+`--field` MUST NOT be combined with either direct clear flag. Supplying both selection forms, or supplying neither form, MUST fail at the CLI boundary before any Kernel call.
+
+On success, the command MUST call `Kernel.specs.updatePersistedOptimizations` exactly once with `clear` equal to the normalized field names and print the resulting persisted optimization values, which may be empty.
 
 ### Requirement: No repeated CLI-owned mutation or freshness logic
 

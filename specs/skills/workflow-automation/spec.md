@@ -16,6 +16,16 @@ AI agents SHALL use machine-optimized formats strictly when structured data extr
 
 Agents MUST prefer `--format toon` for structured extraction. Agents MAY use `--format json` only when `toon` is unavailable or explicitly requested.
 
+### Requirement: Spec read surface selection
+
+AI agents MUST select a spec read command according to the information required:
+
+- `specd specs show <spec-id>` MUST be used when exact raw artifact content is required for authoring, delta composition, or content review.
+- `specd specs context <spec-id>` MUST be used when the agent needs semantic working context, including section filtering, dependency traversal, or configured optimized-content preference.
+- `specd specs metadata <spec-id>` MUST be used only when the caller needs the normalized metadata projection or materialization diagnostics such as `source`, `regenerated`, and warnings.
+
+Agents MUST NOT treat `specs metadata` as a source of effective project configuration or as the default way to load working context. Effective project configuration MUST come from a project configuration or project status command whose contract exposes the required field.
+
 ### Requirement: On-demand outline retrieval
 
 When artifact-instruction responses provide only outline availability references (for example `availableOutlines`), AI agents MUST retrieve full outline content on demand using the canonical command:
@@ -88,4 +98,6 @@ If subagent flows are not supported, the orchestrator agent SHALL perform optimi
 ## Spec Dependencies
 
 - [`cli:command-resource-naming`](../cli/command-resource-naming/spec.md) — canonical plural naming policy used by agent-facing command examples
-- [`skills:agents`](../agents/spec.md) — defines specialized optimizer agents and their prompts.
+- [`skills:agents`](../agents/spec.md) — defines specialized optimizer agents and their prompts
+- [`cli:spec-context`](../../cli/spec-context/spec.md) — agent-ready semantic spec context, filtering, and dependency traversal
+- [`cli:spec-metadata`](../../cli/spec-metadata/spec.md) — normalized metadata projection and materialization diagnostics

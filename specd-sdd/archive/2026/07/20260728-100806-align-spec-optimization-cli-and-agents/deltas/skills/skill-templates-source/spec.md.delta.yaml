@@ -1,0 +1,41 @@
+- op: modified
+  description: 'Bind optimizer templates to authoritative project status and supported set syntax'
+  selector:
+    type: section
+    matches: 'Requirement: Optimizer agent gating declared in templates'
+  content: |
+    The `specd-project-context-optimizer` and `specd-spec-context-optimizer` agent templates MUST gate optimization by running `specd project status --format toon` and reading the top-level `llmOptimizedContext` field. They MUST NOT use `specd specs metadata` as a project-configuration gate.
+
+    Both templates MUST declare that they perform no optimization work — no generation, no persistence — unless top-level `llmOptimizedContext` is exactly `true`.
+
+    Spec optimizer templates MUST direct persistence through the direct lock-owned options defined by `cli:spec-optimizations`. They MUST NOT combine `--input` with either direct set option, and neither optimizer template may instruct invoking spec metadata generation after persisting an optimization.
+- op: added
+  description: 'Require exact spec read roles and archive configuration fields in workflow templates'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Optimizer agent gating declared in templates'
+  content: |
+    ### Requirement: Agent-facing command roles in templates
+
+    Shared workflow guidance MUST distinguish the three spec read surfaces:
+
+    - `specd specs show <spec-id>` reads exact raw artifacts for authoring and content review.
+    - `specd specs context <spec-id>` provides agent-ready semantic context, including filtering, dependency traversal, and optimized-content preference.
+    - `specd specs metadata <spec-id>` inspects the self-healed normalized projection and materialization diagnostics; it MUST NOT be presented as the general context-loading command or as a source of effective project configuration.
+
+    Archive-oriented templates MAY use `specs metadata` to inspect `source`, `regenerated`, and materialization warnings. When they decide whether to suggest an optimizer agent, they MUST read top-level `llmOptimizedContext` from `specd project status --format toon` and MUST NOT reference a nested `approvals.llmOptimized` field.
+
+    Template contract tests MUST assert the exact commands and output fields required by these roles, not only the presence of command-group or configuration keywords.
+- op: modified
+  description: 'Declare workflow automation as the source of shared command-role policy'
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`skills:skill`](../skill/spec.md) — base skill type
+    - [`cli:spec-optimizations`](../../cli/spec-optimizations/spec.md) — the command optimizer-agent templates must direct persistence through
+    - [`skills:workflow-automation`](../workflow-automation/spec.md) — agent-facing command selection and context-loading policy rendered into shared workflow guidance

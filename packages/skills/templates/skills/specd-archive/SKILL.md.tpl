@@ -184,10 +184,10 @@ specd project status --format toon
 ```
 
 Reuse a fresh `project status` result from this archive execution if it already
-contains `approvals.llmOptimized`; otherwise run the command.
+contains top-level `llmOptimizedContext`; otherwise run the command.
 
-If `approvals.llmOptimized` is `true`, suggest invoking the specialized `specd-spec-context-optimizer` agent for each
-spec in the change.
+If top-level `llmOptimizedContext` is `true`, suggest invoking the specialized
+`specd-spec-context-optimizer` agent for each spec in the change.
 
 ### 9. Done
 

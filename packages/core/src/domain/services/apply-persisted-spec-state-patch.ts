@@ -36,7 +36,7 @@ export type PersistedSpecStateBase =
 export interface PersistedSpecStatePatch {
   readonly dependsOn?: readonly string[]
   readonly implementation?: readonly PersistedImplementationLink[]
-  readonly optimizations?: PersistedSpecOptimizations
+  readonly optimizations?: PersistedSpecOptimizations | null
   /** @internal Guard — schema replacement is rejected on existing bases. */
   readonly schema?: PersistedSchemaIdentity
 }
@@ -68,9 +68,11 @@ export function applyPersistedSpecStatePatch(
 
   if (base.kind === 'initial') {
     const optimizations =
-      patch.optimizations !== undefined
-        ? normalizePersistedSpecOptimizations(patch.optimizations)
-        : undefined
+      patch.optimizations === null
+        ? undefined
+        : patch.optimizations !== undefined
+          ? normalizePersistedSpecOptimizations(patch.optimizations)
+          : undefined
 
     const state: PersistedSpecState = {
       schema: base.schema,
@@ -85,18 +87,19 @@ export function applyPersistedSpecStatePatch(
 
   const { state } = base
   const optimizations =
-    patch.optimizations !== undefined
-      ? normalizePersistedSpecOptimizations(patch.optimizations)
-      : state.optimizations
+    patch.optimizations === null
+      ? undefined
+      : patch.optimizations !== undefined
+        ? normalizePersistedSpecOptimizations(patch.optimizations)
+        : state.optimizations
 
   const next: PersistedSpecState = {
     schema: state.schema,
     dependsOn: patch.dependsOn ?? state.dependsOn,
     implementation: patch.implementation ?? state.implementation,
   }
-  const resolvedOptimizations = optimizations ?? state.optimizations
-  if (resolvedOptimizations !== undefined) {
-    return { ...next, optimizations: resolvedOptimizations }
+  if (optimizations !== undefined) {
+    return { ...next, optimizations }
   }
   return next
 }

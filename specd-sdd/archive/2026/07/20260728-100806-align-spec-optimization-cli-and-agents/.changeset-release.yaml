@@ -1,0 +1,6 @@
+releases:
+  cli:spec-optimizations: minor
+  skills:agents: minor
+  skills:skill-templates-source: minor
+  skills:workflow-automation: patch
+  core:update-persisted-spec-optimizations: minor

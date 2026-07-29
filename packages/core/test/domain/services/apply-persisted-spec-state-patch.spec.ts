@@ -37,6 +37,30 @@ describe('applyPersistedSpecStatePatch', () => {
     expect(result.schema).toEqual(SCHEMA)
   })
 
+  it('preserves existing optimizations when the patch omits them', () => {
+    const result = applyPersistedSpecStatePatch(
+      {
+        kind: 'existing',
+        state: {
+          schema: SCHEMA,
+          dependsOn: [],
+          implementation: [],
+          optimizations: {
+            optimizedDescription: {
+              value: 'desc',
+              schema: SCHEMA,
+              artifactState: { 'spec.md': { hash: HASH, lastModified: 't1' } },
+            },
+          },
+          originalHash: HASH,
+        },
+      },
+      { implementation: [] },
+    )
+
+    expect(result.optimizations?.optimizedDescription?.value).toBe('desc')
+  })
+
   it('strips empty optimizations from patch', () => {
     const result = applyPersistedSpecStatePatch(
       { kind: 'initial', schema: SCHEMA, dependsOn: [] },
@@ -52,6 +76,30 @@ describe('applyPersistedSpecStatePatch', () => {
     )
 
     expect(result.optimizations?.optimizedDescription?.value).toBe('desc')
+  })
+
+  it('removes existing optimizations when the patch sets null', () => {
+    const result = applyPersistedSpecStatePatch(
+      {
+        kind: 'existing',
+        state: {
+          schema: SCHEMA,
+          dependsOn: [],
+          implementation: [],
+          optimizations: {
+            optimizedDescription: {
+              value: 'desc',
+              schema: SCHEMA,
+              artifactState: { 'spec.md': { hash: HASH, lastModified: 't1' } },
+            },
+          },
+          originalHash: HASH,
+        },
+      },
+      { optimizations: null },
+    )
+
+    expect(result).not.toHaveProperty('optimizations')
   })
 
   it('rejects schema replacement on existing base', () => {

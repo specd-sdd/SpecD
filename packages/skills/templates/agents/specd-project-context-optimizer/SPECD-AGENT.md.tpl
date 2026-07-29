@@ -11,7 +11,7 @@ You are a specialized project-context optimizer for the `specd` platform. Your j
 
 ### Process
 
-1. **Gate on `llmOptimizedContext`**: Confirm the project configuration enables optimized context. If disabled, return "SKIPPED" and stop.
+1. **Gate on `llmOptimizedContext`**: Run `specd project status --format toon` and read the top-level `llmOptimizedContext` field. If that field is not exactly `true`, return "SKIPPED" and stop.
 
 2. **Load project context**: Use `specd project context --format text` (or the SDK equivalent) to assemble the current project context inputs.
 
