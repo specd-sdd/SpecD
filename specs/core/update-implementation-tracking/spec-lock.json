@@ -8,5 +8,41 @@
     {
       "file": "core:src/composition/use-cases/update-implementation-tracking.ts"
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Mutates persisted implementation review state and confirmed spec-file-symbol links with core path and transition validation.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:6610dbd3f529ef58089a9d273c887068ae90b070b91a22a930604ec20c8b5d64",
+          "lastModified": "2026-07-06T14:22:55.373Z"
+        },
+        "verify.md": {
+          "hash": "sha256:d27d68dfe11f77cf0e5ea0b80f14632f9921e1feb98d9b1dba4bff1c097e5964",
+          "lastModified": "2026-07-06T14:22:55.373Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# UpdateImplementationTracking\n\n## Rules\n\n- `execute` input: `name`; `action: 'add' | 'remove' | 'ignore' | 'resolve' | 'unresolve'`; raw project-relative `file`; optional canonical `specId`; optional `symbols`.\n- `add`: file MUST exist; create/enrich confirmed `specId + file` link with optional symbols; if untracked, add tracked entry state `open`.\n- `remove`: remove confirmed links; with `symbols`, remove only refinements; without, remove entire `specId + file` link set.\n- `resolve`: file MUST exist and be tracked; set review state `resolved`.\n- `unresolve`: file MUST exist and be tracked; reopen `resolved`/`ignored` to `open`; MUST NOT reopen `removed` (only refresh resurrection may).\n- `ignore`: set tracked file `ignored`; missing file allowed only when already tracked; untracked file MUST exist before addition. Preserve confirmed links.\n- Missing change MUST throw `ChangeNotFoundError`.\n- Required missing file or invalid requested transition MUST throw `ImplementationFileNotFoundError`.\n- Persist through `ChangeRepository.mutate`; return resulting `ImplementationTrackingProjection`.\n- `createUpdateImplementationTracking(config, options?)` MUST call `resolveUpdateImplementationTrackingDeps(resolver)`, then canonical `createUpdateImplementationTracking(deps)`.\n- Resolver MUST provide `changes: ChangeRepository`, `files: FileReader`, `projectRoot: string`; only use-case-specific config bootstrap, no inline fs wiring.\n\n## Constraints\n\n- Mutates implementation-tracking only; no lifecycle validation/transition.\n- Uses raw project-relative paths during active-change authoring.\n- No candidate autodetection; `RefreshImplementationTracking` owns detection.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:6610dbd3f529ef58089a9d273c887068ae90b070b91a22a930604ec20c8b5d64",
+          "lastModified": "2026-07-06T14:22:55.373Z"
+        },
+        "verify.md": {
+          "hash": "sha256:d27d68dfe11f77cf0e5ea0b80f14632f9921e1feb98d9b1dba4bff1c097e5964",
+          "lastModified": "2026-07-06T14:22:55.373Z"
+        }
+      }
+    }
+  }
 }

@@ -21,5 +21,41 @@
       "file": "code-graph:src/composition/use-cases/get-change-spec-coverage.ts",
       "symbols": ["createGetChangeSpecCoverage"]
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Aggregates ordered per-spec graph coverage for a named change through ChangeRepository and GetSpecCoverage.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:cdb7ff3afb185e8c744a8a3187272525c443783ffcc10d89675a3d308bafd717",
+          "lastModified": "2026-06-27T21:29:45.692Z"
+        },
+        "verify.md": {
+          "hash": "sha256:946ed8fda6df02bae52e02a0245ddd7fcabd63b9c2313decac5bbe99cef84484",
+          "lastModified": "2026-06-27T21:29:45.692Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# GetChangeSpecCoverage\n\n## Rules\n\n- `GetChangeSpecCoverage.execute(input)` MUST return `{ changeName: string, specs: GetSpecCoverageResult[] }`; one result per change `specId`, manifest declaration order.\n- Load via `input.changes.get(input.changeName)`; missing change MUST throw `ChangeNotFoundError` from `@specd/core`.\n- For each `specId`, delegate to `GetSpecCoverage.execute({ provider, specId })`.\n- `GetChangeSpecCoverageInput` MUST contain already-open `provider: CodeGraphProvider`, `changes: ChangeRepository`, `changeName: string`.\n- MUST NOT open/close provider or mutate change.\n- `createGetChangeSpecCoverage(getSpecCoverage: GetSpecCoverage)` MUST constructor-inject `GetSpecCoverage`.\n\n## Constraints\n\n- MUST NOT load change artifact content beyond `ChangeRepository.get` result needed for `specIds`.\n- MUST NOT modify graph data.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:cdb7ff3afb185e8c744a8a3187272525c443783ffcc10d89675a3d308bafd717",
+          "lastModified": "2026-06-27T21:29:45.692Z"
+        },
+        "verify.md": {
+          "hash": "sha256:946ed8fda6df02bae52e02a0245ddd7fcabd63b9c2313decac5bbe99cef84484",
+          "lastModified": "2026-06-27T21:29:45.692Z"
+        }
+      }
+    }
+  }
 }

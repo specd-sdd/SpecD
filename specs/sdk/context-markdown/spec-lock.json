@@ -26,5 +26,41 @@
     {
       "file": "sdk:test/presentation/project-context-to-markdown.spec.ts"
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "SDK presentation helpers render compiled change and project context as canonical agent-facing markdown with correct spec load hints.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:0adecef814c8ac6948400a119636f159a7ed754fec5997083601bb280978bdd8",
+          "lastModified": "2026-07-26T18:50:55.602Z"
+        },
+        "verify.md": {
+          "hash": "sha256:80c9820e28b523a8d04830e53f00e4173bb968336a36c360075cb2b17df6155d",
+          "lastModified": "2026-07-26T18:50:55.603Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Context Markdown\n\n## Rules\n\n- Export pure synchronous `changeContextToMarkdown(context: CompileContextResult, options: ChangeContextToMarkdownOptions): string`. Options: required `changeName: string`; optional `includeFingerprint: boolean`, default `true`.\n- `context.status === 'unchanged'`: include fingerprint line when enabled; include exactly `Context unchanged since last call.`; render no project context/spec catalogues.\n- `context.status === 'changed'`: when enabled, first line `Context Fingerprint: <context.contextFingerprint>`. Then project entries separated by `---`: files as `**Source: <path>**` + content; instructions as `**Source: instruction**` + content.\n- Full specs: `## Spec content`; each `### Spec: <specId>`, explicit `Mode: full`, then content.\n- Non-full (`summary`/`list`) change catalogue: `## Available context specs`; partition/order:\n  1. Change specs, `source: 'specIds'`: when non-empty, emit once Use `specd changes spec-preview <changeName> <specId>` to load the merged full content of any change spec you need. then table. These may contain deltas/new specs; canonical context is incorrect.\n  2. Other context specs, `source: 'specDependsOn'` or `'includePattern'`: if this or dependency group exists, emit once before first applicable table Use `specd specs context <specId>` to load the full optimized context of any listed spec.; render table when non-empty.\n  3. Via dependencies, `source: 'dependsOnTraversal'`: when non-empty, `### Via dependencies` then table; never duplicate specs-context hint.\n- Omit empty groups and their hints. Never suggest `spec-preview` outside `source: 'specIds'`. Grouping/hints apply equally to `summary` and `list`.\n- Change tables: `summary` columns `| Spec ID | Mode | Source | Title | Description |`; `list` columns `| Spec ID | Mode | Source |`.\n- Export pure synchronous `projectContextToMarkdown(context: GetProjectContextResult): string`.\n- Project rendering: pre-rendered `context.contextEntries` first, separated by `---`; full specs under `## Spec content` with spec heading, `Mode: full`, content; non-full specs under `## Available context specs` and, when non-empty, exactly Use `specd specs context <specId>` to load the full optimized context of any listed spec.. Never mention `changes spec-preview` or change preview commands. Empty entries and specs returns exactly `no project context configured`.\n- Project tables: `summary` columns `| Spec ID | Mode | Title | Description |`; `list` columns `| Spec ID | Mode |`.\n- Helpers perform no I/O, kernel access, process effects. Hosts MAY use them for text; hosts emit JSON/TOON from raw results. `CompileContext` owns fingerprint short-circuit; helper only formats received result.\n- Place under `packages/sdk/src/presentation/`; re-export through `src/index.ts`. Shared table internals MAY remain non-exported.\n\n## Constraints\n\n- Accept core `CompileContextResult` and `GetProjectContextResult` types already re-exported by `@specd/sdk`.\n- Never invent optimized content; format only argument fields.\n- Agent hints use plural CLI groups `changes`, `specs`.\n- MUST NOT depend on `sdk:composition`; composition exports helpers, presentation does not depend on barrel contract.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:0adecef814c8ac6948400a119636f159a7ed754fec5997083601bb280978bdd8",
+          "lastModified": "2026-07-26T18:50:55.602Z"
+        },
+        "verify.md": {
+          "hash": "sha256:80c9820e28b523a8d04830e53f00e4173bb968336a36c360075cb2b17df6155d",
+          "lastModified": "2026-07-26T18:50:55.603Z"
+        }
+      }
+    }
+  }
 }

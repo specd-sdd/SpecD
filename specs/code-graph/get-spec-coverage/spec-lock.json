@@ -13,5 +13,41 @@
       "file": "code-graph:src/composition/use-cases/get-spec-coverage.ts",
       "symbols": ["createGetSpecCoverage"]
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Returns one spec's indexed file and symbol coverage, unique counts, and absence state through an open graph provider.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:d55baba031c472eae25d95d7d68edd82c7a89fe42ef66780f63ae388a4921fdb",
+          "lastModified": "2026-06-27T21:29:45.695Z"
+        },
+        "verify.md": {
+          "hash": "sha256:ee98f7d08e172a39fc39208b1230f9bf56ee2e84bbf5255d39f69ba01f167267",
+          "lastModified": "2026-06-27T21:29:45.696Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# GetSpecCoverage\n\n## Rules\n\n- `GetSpecCoverage.execute(input)` MUST return `GetSpecCoverageResult`:\n  - `specId: string`: input value.\n  - `found: boolean`: whether `provider.getSpec(specId)` returns node.\n  - `coveredFiles: Relation[]`: `provider.getCoveredFiles(specId)`.\n  - `coveredSymbols: Relation[]`: `provider.getCoveredSymbols(specId)`.\n  - `fileCount: number`, `symbolCount: number`: unique target counts in respective relations.\n- Missing spec: `found: false`, empty coverage arrays, zero counts.\n- `GetSpecCoverageInput` MUST contain already-open `provider: CodeGraphProvider` and `specId: string`.\n- Use case MUST NOT open/close provider.\n- `createGetSpecCoverage()` MUST return stateless `GetSpecCoverage`.\n\n## Constraints\n\n- Missing spec MUST return `found: false`; MUST NOT throw.\n- MUST NOT load spec artifacts from `SpecRepository`.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:d55baba031c472eae25d95d7d68edd82c7a89fe42ef66780f63ae388a4921fdb",
+          "lastModified": "2026-06-27T21:29:45.695Z"
+        },
+        "verify.md": {
+          "hash": "sha256:ee98f7d08e172a39fc39208b1230f9bf56ee2e84bbf5255d39f69ba01f167267",
+          "lastModified": "2026-06-27T21:29:45.696Z"
+        }
+      }
+    }
+  }
 }

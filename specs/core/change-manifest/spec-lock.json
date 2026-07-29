@@ -22,36 +22,36 @@
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "manifest.json: Change identity, specs, artifacts, history; atomic write by FsChangeRepository only.",
+      "value": "Atomic manifest.json persists Change identity, scope, artifacts, links, drift, and append-only lifecycle history.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:789f698f76b842553aaf0e1269b5b4bd72b278e236a82a69edf2ee16f4df5324",
-          "lastModified": "2026-07-01T16:02:44.617Z"
+          "hash": "sha256:c6a49a62e41d3a1d6a28c5defbb1441d82a6f22a17ccf07721f873cd9823d14d",
+          "lastModified": "2026-07-27T11:13:40.133Z"
         },
         "verify.md": {
-          "hash": "sha256:704a7cde1d6b5977a09370bca14a8a7c46158522f975ea1ba54f25b3e4a074ea",
-          "lastModified": "2026-07-01T16:02:44.617Z"
+          "hash": "sha256:a20f49b4998261c705b85f9c3df191002f67f5a2f012a52885f82d77a2c192fc",
+          "lastModified": "2026-07-27T11:09:07.540Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# Change Manifest\n\n## Rules\n- `manifest.json` in change dir: `name`, `createdAt`, `schema{name,version}`, `specIds`, `invalidationPolicy`, optional `trackedImplementationFiles`, `implementationLinks`, `specDependsOn`, `artifacts`, `history`.\n- `workspaces` load-only (compat); runtime from `parseSpecId(specIds)`. `schema` write-once.\n- `trackedImplementationFiles`: `file` + `state` (`open|resolved|ignored|removed`). Links: `specId`, `file`, `fileLinkExplicit`; `fileLinkExplicit:false` only with non-empty `symbols`.\n- `specDependsOn`: seed lock → legacy metadata.dependsOn → []. Archive-time input.\n- Artifact/file `state` = ArtifactStatus; file state SoT. `validatedHash`: null | sha256 | `\"skipped\"` — not presence proof. `hasDrift` per file.\n- History append-only; lifecycle from latest `transitioned`. `archive-failed`: `step`, `message`, `commitStarted`. Success via archive meta, not active history event.\n- Filenames = expected paths (`core:change-layout`). Existing delta-capable → `deltas/...`; new → `specs/...` at write time. Load MAY normalize stale `specs/`→`deltas/` preserving state/hash; reject representation-class change unless semantics proven.\n- Schema version mismatch → advisory warn; name mismatch → `SchemaMismatchError`. Atomic write: temp+rename.\n\n## Constraints\n- No top-level state field. Do not derive status from validatedHash alone. Missing state → `missing`. History immutable. Schema never updated post-create.",
+      "value": "# Change Manifest\n\n## Rules\n- Persist each Change as change-directory `manifest.json`, exclusively read/written by `FsChangeRepository`.\n- Fields: immutable `name`, `createdAt`; optional ISO 8601 `updatedAt`; write-once `schema{name,version}`; mutable `specIds`; `invalidationPolicy` (`none`, `surgical`, `downstream`, `global`); optional `trackedImplementationFiles`, `implementationLinks`, `specDependsOn`; `artifacts`; append-only `history`.\n- Accept legacy `workspaces` on load; never save it. Derive active workspaces from `parseSpecId(specIds)`.\n- `trackedImplementationFiles`: raw project-relative `file` + `state` (`open`, `resolved`, `ignored`, `removed`). `implementationLinks`: `specId`, raw project-relative `file`, `fileLinkExplicit`, optional `symbols`; `fileLinkExplicit: false` requires non-empty `symbols`.\n- When existing spec first enters scope, seed `specDependsOn` from `spec-lock.json`, else legacy `metadata.json.dependsOn`, else empty set. Use only for archive-time sidecar/metadata generation.\n- Artifacts contain `type`, `optional`, `requires`, aggregate `state`, files. Files contain `key`, `filename`, canonical `state`, `validatedHash`, `hasDrift`. Artifact/file states use `ArtifactStatus`; file state is source of truth.\n- `validatedHash` records last validated baseline only: `null`, SHA-256 string, or `\"**skipped**\"` for explicitly skipped optional artifact. Never proves current presence/completeness. `hasDrift` records baseline difference.\n- Derive lifecycle state from latest `transitioned` event. Events retain common `type`, `at`, `by`; `by` is `ActorIdentity`.\n- Append `archive-failed` after archive execution begins but before successful commit; include `step`, `message`, `commitStarted`. Failed pre-commit attempt implies neither completion nor partial permanent-spec acceptance. Successful archive trace lives in archived metadata (`archivedAt`, `archivedBy`, location), never new active-history success event.\n- Every `ManifestArtifactFile.filename` MUST match `core:change-layout`. Resolve before write: existing delta-capable spec → `deltas/<workspace>/<capability-path>/<artifact-filename>.delta.yaml`; new spec → `specs/<workspace>/<capability-path>/<artifact-filename>`.\n- Older stale direct path MAY normalize to expected delta path only while preserving file state, validation baseline, tracked representation, and exact artifact semantics. Partial materialization or `validatedHash: null` MUST NOT flip direct/delta class. Reject unproven representation-class changes.\n- Schema version mismatch: warn, remain usable/archiveable. Schema name mismatch: reject load with `SchemaMismatchError`.\n- Write atomically: temporary file then rename.\n\n## Constraints\n- Persist artifact/file state explicitly; never reconstruct steady state from `validatedHash` alone. Check file presence and canonical state first.\n- Legacy missing artifact/file `state` defaults to `missing`.\n- Accept legacy `invalidated` cause `\"artifact-change\"`; normalize to current artifact-drift semantics.\n- No top-level lifecycle state. Never modify/remove existing history events.\n- Never update persisted `schema` after creation.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:789f698f76b842553aaf0e1269b5b4bd72b278e236a82a69edf2ee16f4df5324",
-          "lastModified": "2026-07-01T16:02:44.617Z"
+          "hash": "sha256:c6a49a62e41d3a1d6a28c5defbb1441d82a6f22a17ccf07721f873cd9823d14d",
+          "lastModified": "2026-07-27T11:13:40.133Z"
         },
         "verify.md": {
-          "hash": "sha256:704a7cde1d6b5977a09370bca14a8a7c46158522f975ea1ba54f25b3e4a074ea",
-          "lastModified": "2026-07-01T16:02:44.617Z"
+          "hash": "sha256:a20f49b4998261c705b85f9c3df191002f67f5a2f012a52885f82d77a2c192fc",
+          "lastModified": "2026-07-27T11:09:07.540Z"
         }
       }
     }

@@ -17,5 +17,41 @@
     {
       "file": "cli:test/commands/spec-metadata.spec.ts"
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Inspect self-healed spec metadata plus materialization diagnostics and fresh lock-owned optimizations.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:4cfc9c3fc27e221d7d4ab3b32288db97eb38814565a4dbfd10cde550cc764395",
+          "lastModified": "2026-07-25T11:53:31.254Z"
+        },
+        "verify.md": {
+          "hash": "sha256:844e0a5b1488d214a4e161a235fc35e3a9b96ae957dcd8b0de0a0c439c5904e6",
+          "lastModified": "2026-07-25T11:53:31.254Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Spec Metadata\n\n## Rules\n\n- Signature: `specd spec metadata <workspace:capability-path> [--format text|json|toon]`; fully-qualified spec ID required (for example, `default:auth/login`); format defaults `text`. Missing ID: exit 1, usage error on stderr.\n- Call `GetSpecMetadata` only; never call `SpecRepository.metadata()` or compute/compare per-file hashes. Use case materializes `if-needed`: reuse fresh persisted projection; regenerate missing, invalid, or stale projection from current artifacts.\n- Render returned `metadata`, `source` (`persisted`|`generated`), `regenerated`, and `warnings`. Absent/stale metadata self-heals; not \"no metadata exists\" error.\n- `text`: print spec, title, description, `generatedBy`, source, regenerated; optional non-empty `dependsOn`; counts for rules/constraints/scenarios; `warnings:` only when non-empty, one warning per line; omit other empty sections. `generatedBy`: `core` for deterministic extraction, `agent` for fresh lock-owned optimized field.\n- `json`/`toon`: encode full metadata plus diagnostics; rules/constraints/scenarios remain full arrays, not counts. No top-level `fresh` or per-file `contentHashes` array.\n- Unconfigured workspace or failure to produce valid metadata (missing spec, schema lacking extraction rules): propagate through `handleError`, print `error:` to stderr, exit 1.\n\n## Constraints\n\n- Caller-facing read-only: accepts no metadata content; exposes no editing.\n- `GetSpecMetadata` may cache freshly generated projection. Command never forces rebuild; forced rebuild is `specd spec generate-metadata`.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:4cfc9c3fc27e221d7d4ab3b32288db97eb38814565a4dbfd10cde550cc764395",
+          "lastModified": "2026-07-25T11:53:31.254Z"
+        },
+        "verify.md": {
+          "hash": "sha256:844e0a5b1488d214a4e161a235fc35e3a9b96ae957dcd8b0de0a0c439c5904e6",
+          "lastModified": "2026-07-25T11:53:31.254Z"
+        }
+      }
+    }
+  }
 }

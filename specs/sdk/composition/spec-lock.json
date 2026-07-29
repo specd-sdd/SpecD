@@ -17,36 +17,36 @@
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "Thin `@specd/sdk` composition: wire core+code-graph, curated barrels, host orchestration; delivery hosts depend on SDK only.",
+      "value": "Thin `@specd/sdk` composes core and code-graph, exposes curated host APIs, and centralizes cross-package orchestration.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:fc065b78b23d9a9fbc402684d19fb63afea8bc387989ac727965533888b23537",
-          "lastModified": "2026-07-25T11:53:31.594Z"
+          "hash": "sha256:5e6a6b3b9a31b9379cd36d3c657a68c2dc1984363f0122191e9e83eccfe3ecd4",
+          "lastModified": "2026-07-26T18:50:55.625Z"
         },
         "verify.md": {
-          "hash": "sha256:d42351b2206851c0c499ecd183887a3b75f9f8cb3c71e848e084ae4b43a94277",
-          "lastModified": "2026-07-25T13:14:45.443Z"
+          "hash": "sha256:72ce73629e0759985712321f05fbfb58682b2dae4ee5e30e01804991865f39ee",
+          "lastModified": "2026-07-26T18:54:23.329Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# SDK Composition\n## Rules\n### Package identity and dependencies\n- Path `packages/sdk/`, workspace name `sdk`\n- Runtime deps ONLY `@specd/core` + `@specd/code-graph`\n- MUST NOT depend on `@specd/cli`, `@specd/mcp`, plugins\n\n### Layer structure\n- Hexagonal per `default:_global/architecture`:\n  - `src/composition/` — `openSpecdHost`, `createSdkContext`, `withOpenGraphProvider`\n  - `src/orchestration/` — `buildProjectStatusSnapshot`, `runIndexProjectGraph`\n  - `src/shared/` — internal helpers; NOT re-exported\n  - `src/index.ts` — public barrel only\n- No domain entities, application ports, or infrastructure adapters\n\n### Public barrel exports\n- `exports`: `\".\"`→`src/index.ts`; `\"./ports\"`→`@specd/core/ports`; `\"./extensions\"`→`@specd/core/extensions`\n- Explicit exports (no `export * from '@specd/core'`):\n  - Composition: `openSpecdHost`, `createSdkContext`, `withOpenGraphProvider`, `SdkHostContext`, `OpenSpecdHostInput`, `OpenSpecdHostResult`, `WithOpenGraphProviderOptions`\n  - Orchestration: `buildProjectStatusSnapshot`, `runIndexProjectGraph` + I/O types\n  - Core re-exports: bootstrap, `Kernel`, `createX` factories, repos, use-case I/O, entities, errors — track `kernel.specs` incl. `MaterializeSpecMetadata`, `GetSpecMetadata`, `RegenerateSpecMetadata`, `InitializePersistedSpecState`, schema inspect/reassign, dep/impl/opt use cases + `create*`\n  - Code-graph `\".\"` re-exports (provider, host use cases, host-adapter symbols)\n  - `SDK_VERSION`, `codeGraphVersion`, `getCodeGraphVersion`\n- MUST NOT export infra/`./internal` symbols\n- MUST NOT export `SaveSpecMetadata`, `UpdateSpecMetadata`, `InvalidateSpecMetadata` or their `create*` factories; MUST NOT export `PersistSpecMetadata`\n\n### Public barrel exports for host adapters\n- Re-export from `@specd/code-graph`: `acquireGraphIndexLock`, `assertGraphIndexUnlocked`, `createGetGraphHealth`, `GetGraphHealthInput`, `GetGraphHealthResult`, `IndexResult`, `HotspotResult`, `ImpactResult`, `FileImpactResult`, `codeGraphVersion`, `getCodeGraphVersion`, `GraphSpecNotFoundError`, `SymbolKind`, `SearchOptions`, `HotspotOptions`, `RiskLevel`, `normalizeFileSelectorPath`, `createBootstrapGraphConfig`, `isGraphStale`, `detectFingerprintMismatch`, `parseFingerprintMap`, `buildProjectGraphConfig`\n- Delivery hosts MUST import these from `@specd/sdk`, not `@specd/code-graph`\n\n### Import policy for integrators\n- CLI/MCP/API/IPC using core+code-graph → depend `@specd/sdk` only\n- Core-only packages (`plugin-*`, `skills`) MAY import `@specd/core`\n- Storage implementers MAY use `@specd/core/ports` or `@specd/sdk/ports`; extensions similarly\n\n### Version constant\n- Export `SDK_VERSION` matching `package.json` version\n\n## Constraints\n- Thin composition + orchestration only; no infra duplication in hosts",
+      "value": "# SDK Composition\n## Rules\n- Package: `packages/sdk/`; workspace `sdk`; runtime deps only `@specd/core`, `@specd/code-graph`; MUST NOT depend on `@specd/cli`, `@specd/mcp`, plugins.\n- Hexagonal layout: `src/composition/` (`openSpecdHost`, `createSdkContext`, `withOpenGraphProvider`); `src/orchestration/` (`buildProjectStatusSnapshot`, `runIndexProjectGraph`); `src/presentation/` pure `changeContextToMarkdown` / `projectContextToMarkdown`; `src/shared/` unexported internal helpers; `src/index.ts` public barrel only.\n- No domain entities, application ports, infrastructure adapters. Presentation helpers: no I/O, MAY export.\n- `package.json` exports: `\".\"` -> `src/index.ts`; `\"./ports\"` -> `@specd/core/ports`; `\"./extensions\"` -> `@specd/core/extensions`.\n- `src/index.ts` explicit exports only: composition APIs/types; orchestration APIs/I/O types; `changeContextToMarkdown`, `projectContextToMarkdown`, `ChangeContextToMarkdownOptions`; curated `@specd/core` public APIs; curated `@specd/code-graph` public APIs; `SDK_VERSION`, `codeGraphVersion`, `getCodeGraphVersion`.\n- Core surface MUST track revised `kernel.specs`: bootstrap, `Kernel`, kernel-equivalent `createX` factories, repository factories, kernel use-case I/O, entities, errors, `MaterializeSpecMetadata`, `GetSpecMetadata`, `RegenerateSpecMetadata`, `InitializePersistedSpecState`, persisted schema inspect/reassign, persisted dependency/implementation/optimization use cases, corresponding `create*` factories.\n- MUST NOT wildcard-export `@specd/core`; export infrastructure, internal composition, or dependency `\"./internal\"` symbols; export `SaveSpecMetadata`, `UpdateSpecMetadata`, `InvalidateSpecMetadata`, their `createSaveSpecMetadata` / `createUpdateSpecMetadata` / `createInvalidateSpecMetadata`, or `PersistSpecMetadata`.\n- Host-adapter re-exports from `@specd/code-graph` `\".\"`: `acquireGraphIndexLock`, `assertGraphIndexUnlocked`, `createGetGraphHealth`, `GetGraphHealthInput`, `GetGraphHealthResult`, `IndexResult`, `HotspotResult`, `ImpactResult`, `FileImpactResult`, `codeGraphVersion`, `getCodeGraphVersion`, `GraphSpecNotFoundError`, `SymbolKind`, `SearchOptions`, `HotspotOptions`, `RiskLevel`, `normalizeFileSelectorPath`, `createBootstrapGraphConfig`, `isGraphStale`, `detectFingerprintMismatch`, `parseFingerprintMap`, `buildProjectGraphConfig`.\n- Delivery hosts using core+code-graph MUST depend only on `@specd/sdk` and import host symbols there. Core-only `plugin-*` / `skills` MAY depend directly on `@specd/core`.\n- Storage implementers MAY use `@specd/core/ports` or `@specd/sdk/ports`; registration types via `@specd/core/extensions` or `@specd/sdk/extensions`.\n- Export `SDK_VERSION` string matching `package.json` version.\n## Constraints\n- Thin composition/orchestration package; no infrastructure or host bootstrap duplication.\n- `src/shared/` never re-exported.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:fc065b78b23d9a9fbc402684d19fb63afea8bc387989ac727965533888b23537",
-          "lastModified": "2026-07-25T11:53:31.594Z"
+          "hash": "sha256:5e6a6b3b9a31b9379cd36d3c657a68c2dc1984363f0122191e9e83eccfe3ecd4",
+          "lastModified": "2026-07-26T18:50:55.625Z"
         },
         "verify.md": {
-          "hash": "sha256:d42351b2206851c0c499ecd183887a3b75f9f8cb3c71e848e084ae4b43a94277",
-          "lastModified": "2026-07-25T13:14:45.443Z"
+          "hash": "sha256:72ce73629e0759985712321f05fbfb58682b2dae4ee5e30e01804991865f39ee",
+          "lastModified": "2026-07-26T18:54:23.329Z"
         }
       }
     }

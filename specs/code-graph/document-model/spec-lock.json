@@ -12,5 +12,41 @@
     {
       "file": "code-graph:test/domain/value-objects/document-node.spec.ts"
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "DocumentNode indexes searchable non-code text with stable workspace or reserved root: graph identity.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:cb309381cecabf114094161697570e9bb4d25144bee9aaf77487935c79f5f27a",
+          "lastModified": "2026-06-02T14:44:12.649Z"
+        },
+        "verify.md": {
+          "hash": "sha256:d6d3bb4716e06362946f9846cf3af24ea4aabb599143f4e17788fcb2c1ceb67e",
+          "lastModified": "2026-06-02T14:44:12.650Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Document Model\n\n## Rules\n- `DocumentNode` represents textual non-code project resource; MUST include unique `path`, project-root-relative `configRelativePath`, SHA-256 `contentHash`, raw searchable `content`, owning `workspace`.\n- Reserve `root:` node prefix and `root` workspace for project-global files found through `graph.includePaths` but owned by no workspace. Identity: `root:<project-relative-path>`.\n- During indexing, file matching no registered language adapter becomes `DocumentNode` only when textual. Binary file produces no graph node.\n- Exclude filesystem-backed repository directories exposed by `specsPath` from file/document discovery. Index spec artifacts only through spec indexing; never also as `DocumentNode`.\n- Graph search API MUST treat documents as first-class category and support including or excluding `DocumentNode` results.\n\n## Constraints\n- By default, `DocumentNode` produces no symbol nodes or structural relations such as `CALLS` or `DEPENDS_ON` code.\n- `DocumentNode.path` MUST NOT collide with `FileNode.path` in same workspace.\n- Normal spec workspaces cannot use reserved workspace name `root`.\n- File owned by workspace `codeRoot` MUST NOT also be indexed as `root:` document.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:cb309381cecabf114094161697570e9bb4d25144bee9aaf77487935c79f5f27a",
+          "lastModified": "2026-06-02T14:44:12.649Z"
+        },
+        "verify.md": {
+          "hash": "sha256:d6d3bb4716e06362946f9846cf3af24ea4aabb599143f4e17788fcb2c1ceb67e",
+          "lastModified": "2026-06-02T14:44:12.650Z"
+        }
+      }
+    }
+  }
 }

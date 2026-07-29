@@ -13,5 +13,41 @@
     {
       "file": "core:src/composition/use-cases/get-implementation-review.ts"
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Reads persisted tracked files, confirmed implementation links, and in-scope spec IDs for one active change.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:1e9cdf9590b7c90c679cf074e743e9e403289dd5c75264b0084e414d2731eb21",
+          "lastModified": "2026-07-06T14:22:55.404Z"
+        },
+        "verify.md": {
+          "hash": "sha256:3c7c4ba9af91a53ab7f1d2a772c5879e53092f3bdff867f0da55fd1b010ca6bf",
+          "lastModified": "2026-07-06T14:22:55.405Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# GetImplementationReview\n\n## Rules\n\n- `GetImplementationReview.execute` SHALL accept change name.\n- Missing active change MUST throw `ChangeNotFoundError`.\n- Return:\n  - `implementationTracking`: raw persisted `ImplementationTrackingProjection`.\n  - `specIds`: change's current in-scope spec IDs.\n- Projection MUST derive from persisted change state without mutation.\n- Delivery-agnostic model only; MUST NOT include CLI formatting, symbol-graph rendering, archive materialization.\n- `createGetImplementationReview(config, options?)` MUST call `resolveGetImplementationReviewDeps(resolver)`, then canonical `createGetImplementationReview(deps)`.\n- Resolver MUST provide `changes: ChangeRepository`; only use-case-specific config bootstrap, no inline fs wiring.\n\n## Constraints\n\n- Read-only; active changes through persisted state.\n- No autodetection or mutation; `RefreshImplementationTracking` and `UpdateImplementationTracking` own them.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:1e9cdf9590b7c90c679cf074e743e9e403289dd5c75264b0084e414d2731eb21",
+          "lastModified": "2026-07-06T14:22:55.404Z"
+        },
+        "verify.md": {
+          "hash": "sha256:3c7c4ba9af91a53ab7f1d2a772c5879e53092f3bdff867f0da55fd1b010ca6bf",
+          "lastModified": "2026-07-06T14:22:55.405Z"
+        }
+      }
+    }
+  }
 }

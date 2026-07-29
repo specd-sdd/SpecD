@@ -9,5 +9,41 @@
       "file": "sdk:src/composition/with-open-graph-provider.ts",
       "symbols": ["WithOpenGraphProviderOptions", "withOpenGraphProvider"]
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "`withOpenGraphProvider` safely wraps provider creation, hooks, open, callback, close, cleanup, and error propagation.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:c96df715aec44c340d432ef80975cef0aceed18bcac9dfcf7c88d856d404cc20",
+          "lastModified": "2026-07-20T16:47:44.296Z"
+        },
+        "verify.md": {
+          "hash": "sha256:45d9709c63dbaa3b423d0dce874ff77155ba0b0c5bafc6f0ad2eff88712c4637",
+          "lastModified": "2026-07-20T16:47:44.296Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# SDK With Open Graph Provider\n## Rules\n- `withOpenGraphProvider<T>(ctx: SdkHostContext, fn: (provider: CodeGraphProvider) => Promise<T>, options?: WithOpenGraphProviderOptions): Promise<T>`:\n  1. `ctx.createGraphProvider()`\n  2. await optional `beforeOpen(provider)`\n  3. `provider.open()`\n  4. await `fn(provider)`; return result\n  5. attempt `provider.close()` after success, callback failure, or `open()` failure\n  6. await optional `afterClose(provider)` after close attempt on every completion/error path\n- `WithOpenGraphProviderOptions`: `readonly beforeOpen?: (provider: CodeGraphProvider) => Promise<void>`; `readonly afterClose?: (provider: CodeGraphProvider) => Promise<void>`.\n- If `fn` throws, preserve original error even if `close()` fails.\n- If `open()` fails, attempt close and run `afterClose`, whether or not `beforeOpen` exists; propagate open error.\n- After successful operation, primary `close()` failure MAY propagate; subsequent `afterClose` failure MAY be terminal.\n- Hooks MAY provide host setup/teardown but MUST NOT alter `CodeGraphProvider` contract.\n## Constraints\n- MUST NOT call `process.exit()`.\n- Signal handling/forced exit remain host-adapter responsibilities.\n- Long-lived hosts may use `CodeGraphProvider` directly.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:c96df715aec44c340d432ef80975cef0aceed18bcac9dfcf7c88d856d404cc20",
+          "lastModified": "2026-07-20T16:47:44.296Z"
+        },
+        "verify.md": {
+          "hash": "sha256:45d9709c63dbaa3b423d0dce874ff77155ba0b0c5bafc6f0ad2eff88712c4637",
+          "lastModified": "2026-07-20T16:47:44.296Z"
+        }
+      }
+    }
+  }
 }

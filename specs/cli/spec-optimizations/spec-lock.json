@@ -11,7 +11,17 @@
   "implementation": [
     {
       "file": "cli:src/commands/spec/optimizations.ts",
-      "symbols": ["registerSpecOptimizations"]
+      "symbols": [
+        "OptimizationField",
+        "SetOptimizationOptions",
+        "ClearOptimizationOptions",
+        "resolveOptimizationSet",
+        "resolveOptimizationClear",
+        "registerSpecOptimizations"
+      ]
+    },
+    {
+      "file": "cli:test/commands/spec-optimizations.spec.ts"
     }
   ],
   "optimizations": {

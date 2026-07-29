@@ -14,5 +14,41 @@
     "core:composition-resolver",
     "core:generate-metadata"
   ],
-  "implementation": []
+  "implementation": [],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Explicitly adopts existing lock-less specs into one schema, deriving dependencies from canonical artifacts.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:e3f4e29d1fb32f3eb4c4a141e35787903df31d019fd6e9b830e611998d2c3b9d",
+          "lastModified": "2026-07-25T11:53:31.694Z"
+        },
+        "verify.md": {
+          "hash": "sha256:7a3d7325449805dcf8cfbb76d4fd5403b18a23ffcecbabc148f6ed93440c1a4a",
+          "lastModified": "2026-07-25T11:53:31.695Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Initialize Persisted Spec State\n\n## Rules\n\n- `InitializePersistedSpecState.execute(input)`: async; input `InitializePersistedSpecStateInput` with `target: { kind: 'spec', specId } | { kind: 'all', workspaces? }` and optional `schemaRef`.\n- Schema: resolve provided `schemaRef` explicitly; otherwise effective project schema. Resolve/apply exactly one schema per invocation; differing subsets require separate targeted calls.\n- Per target: resolve schema once through Core composition for whole invocation; discover raw identity without metadata materialization; read aggregate persisted-state snapshot; reject any existing state with `SpecAlreadyInitializedError` regardless of schema identity; load/parse schema-declared canonical `scope: spec` artifacts; resolve dependencies via shared `resolveInitialPersistedDependsOn()`; call `applyPersistedSpecStatePatch()` with `{ kind: 'initial', schema, dependsOn }` base plus empty patch; conditionally write complete state using `expectedRevision: null`.\n- Initial `dependsOn` precedence: caller-supplied complete value (for example accompanying `deps set`/`deps clear` intent or archive publication plan); else fresh deterministic projection of current canonical artifacts under selected schema; else `[]` when extraction yields no value. Reuse `GenerateSpecMetadata` deterministic projection directly; never persist intermediate cache or read persisted metadata snapshot.\n- Never import dependency, optimization, or implementation values from metadata cache. Initialize `implementation: []`; omit `optimizations`; derive `dependsOn` only from current artifact projection.\n- Write lock only; never eagerly materialize/persist metadata. Next normal metadata consumer self-heals stale cache.\n- One-time only: no `--force`, schema reassignment, or reinitialization. Single-spec existing state always throws `SpecAlreadyInitializedError`.\n- Batch `target.kind: 'all'`: preselect lock-less specs, optionally by `workspaces`; exclude initialized specs. Continue all eligible targets despite failures. Return `initialized`, `failed` with per-spec detail, and `existingSkipped` count. Any eligible failure makes overall outcome failure despite partial success. Read-only workspace targets are failures, never skipped/existing.\n- Concurrency: `expectedRevision: null` must reject state created after selection.\n- Standard Core composition: class with async `execute(input)`, explicit constructor dependencies; expose `InitializePersistedSpecStateDeps`, `resolveInitializePersistedSpecStateDeps(resolver: CompositionResolver): InitializePersistedSpecStateDeps`, `createInitializePersistedSpecState(deps): InitializePersistedSpecState`, and `createInitializePersistedSpecState(config: SpecdConfig, options?: CompositionResolutionOptions): InitializePersistedSpecState`.\n- Resolver dependencies include workspace `SpecRepository` instances, `ListWorkspaces`, schema resolution via `GetActiveSchema`, shared `resolveInitialPersistedDependsOn()` built on `GenerateSpecMetadata` deterministic projection/content extraction. Config factory creates one `CompositionResolver`, resolves deps, delegates to canonical deps factory.\n- Export `InitializePersistedSpecState`, Input/Result types, Deps, and `create*` factory through Core public surface; SDK re-export; expose `Kernel.specs.initializePersistedState`.\n\n## Constraints\n\n- Initialize persisted state only for existing artifacts; never create spec artifacts.\n- Same shared `resolveInitialPersistedDependsOn()` must serve this use case, incidental first-lock creation in mutation use cases, and `ArchiveChange`; no local reimplementation.\n- Never construct legacy fallback `{ schema: { name: 'unknown', version: 0 } }`.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:e3f4e29d1fb32f3eb4c4a141e35787903df31d019fd6e9b830e611998d2c3b9d",
+          "lastModified": "2026-07-25T11:53:31.694Z"
+        },
+        "verify.md": {
+          "hash": "sha256:7a3d7325449805dcf8cfbb76d4fd5403b18a23ffcecbabc148f6ed93440c1a4a",
+          "lastModified": "2026-07-25T11:53:31.695Z"
+        }
+      }
+    }
+  }
 }

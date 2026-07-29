@@ -9,5 +9,41 @@
       "file": "code-graph:src/application/use-cases/index-code-graph.ts",
       "symbols": ["IndexCodeGraph"]
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Indexes workspace code and specs into one graph with collision-free identities, config-relative lookup, and cross-workspace resolution.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:136d5c15c32a721fca02733c38bdf3d397d05bde8171412efdac7b02d69ef384",
+          "lastModified": "2026-07-23T00:34:57.232Z"
+        },
+        "verify.md": {
+          "hash": "sha256:f637ae8331d07a7bbd073990099a9515844adfc710cf386dad66f7740c15b0e9",
+          "lastModified": "2026-07-23T00:34:57.232Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Workspace Integration\n\n## Rules\n\n### Identity and lookup\n- Files/documents MUST use globally unique identity:\n  - Workspace: `{workspaceName}:{relativeToCodeRoot}` (example `core:src/index.ts`).\n  - Project-global `graph.includePaths` outside workspaces: reserved `root:{projectRelativePath}`.\n- Workspace `codeRoot` ownership wins over `root:`; physical file MUST NOT have both identities.\n- `path` remains canonical identity for `SymbolNode.filePath`, symbol IDs, relations.\n- Every node MUST store `configRelativePath`, relative to active `specd.yaml` directory; forward slashes, no leading `./`; outside files may contain `..`.\n- CLI file selectors MAY resolve unprefixed config-relative paths; canonical identity unchanged.\n- `SymbolNode.id = {filePath}:{kind}:{name}:{line}:{column}`.\n- `SpecNode.workspace: string` MUST identify owning workspace. Spec IDs follow `{workspace}:{specPath}`; prefix comes from workspace `specd.yaml` configuration.\n\n### Discovery and specs\n- For each workspace `codeRoot`, discover from absolute `SpecdWorkspaceConfig.codeRoot`; prefix stored paths with workspace name.\n- `discoverFiles` accepts root and emits root-relative paths; remains workspace-unaware.\n- Index specs directly from each orchestrated workspace `SpecRepository`:\n  1. identities: `repo.list()`;\n  2. freshness: `repo.persistedStateHash()` (formerly `specHash`);\n  3. content: `repo.artifact()` for `spec.artifacts[].filename` only; exclude metadata/lock sidecars; concatenate `spec.md` first when present, then remaining filenames alphabetically;\n  4. metadata: `repo.metadata()`; when `null`, default title=`specId`, description=`''`, `dependsOn=[]`; never parse `spec.md` fallback;\n  5. dependencies: `repo.readPersistedDependsOn()`;\n  6. coverage: `repo.readPersistedImplementation()`.\n- Indexer MUST NOT rely on CLI-precomputed semantics/callbacks.\n\n### Cross-workspace resolution\n- Pass 2 resolves relative imports within workspace; package imports via `packageName → workspaceName` from `LanguageAdapter.getPackageIdentity`; PHP qualified names globally.\n- `SymbolIndex` MUST contain all workspace symbols before Pass 2.\n\n### Index contract\n- `IndexOptions` SHALL contain `projectRoot: string`, `workspaces: readonly ProjectWorkspace[]`, `graphConfig: ProjectGraphConfig`, optional `onProgress: IndexProgressCallback`, `chunkBytes: number`, `vcsRef: string`, and `vcsRoot: string | null`.\n- `ProjectGraphConfig`: optional `includePaths`, `excludePaths`; optional workspace map with `allowedPaths`, `excludePaths`, `respectGitignore`.\n- Remove `WorkspaceIndexTarget.specs` callback; pull from each `ProjectWorkspace` repository.\n- CLI/MCP maps `SpecdConfig.graph` into `ProjectGraphConfig`.\n- `IndexResult.workspaces` SHALL contain `WorkspaceIndexBreakdown[]`; each: `name`, `filesDiscovered`, `filesIndexed`, `filesSkipped`, `filesRemoved`, `specsDiscovered`, `specsIndexed`.\n\n### `.gitignore`\n- Per-workspace `respectGitignore` defaults `true`.\n- True + non-null `vcsRoot`: load root and nested `.gitignore`; apply relative to containing directory; gitignore exclusion overrides `excludePaths` re-inclusion.\n- Null `vcsRoot`: do not load repository-root `.gitignore`; MUST NOT probe `.git/`, `.hg/`, `.svn/`.\n- False: ignore all `.gitignore`; only `excludePaths` controls exclusion.\n\n## Constraints\n\n- `@specd/code-graph` runtime-depends on `@specd/core`.\n- One `.specd/code-graph.lbug` per project.\n- `discoverFiles` workspace-agnostic; indexer owns prefix and `configRelativePath`.\n- Spec resolution exclusively via `SpecRepository`; no filesystem fallback.\n- File identity metadata changes, including `configRelativePath`, require full rebuild; existing stores incompatible.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:136d5c15c32a721fca02733c38bdf3d397d05bde8171412efdac7b02d69ef384",
+          "lastModified": "2026-07-23T00:34:57.232Z"
+        },
+        "verify.md": {
+          "hash": "sha256:f637ae8331d07a7bbd073990099a9515844adfc710cf386dad66f7740c15b0e9",
+          "lastModified": "2026-07-23T00:34:57.232Z"
+        }
+      }
+    }
+  }
 }

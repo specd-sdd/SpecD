@@ -12,5 +12,41 @@
     {
       "file": "cli:test/helpers/cli-context.spec.ts"
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "`resolveCliContext` centralizes SDK host bootstrap while preserving CLI logging, warnings, and stable context output.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:37fb69fa0728c8e19b85a4761093288575620cbc8e7d98522caaf10918d36e96",
+          "lastModified": "2026-07-17T08:08:32.961Z"
+        },
+        "verify.md": {
+          "hash": "sha256:d20c328ff47aed80f173f7b279cee4722f8a1b9e04636eb8a9e163b66bd4baf4",
+          "lastModified": "2026-07-17T08:08:32.962Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# CLI Host Context\n## Rules\n- `resolveCliContext` in `packages/cli/src/helpers/cli-context.ts` MUST call `openSpecdHost` from `@specd/sdk` with caller `configPath` when provided and CLI-derived `kernelOptions`.\n- `kernelOptions`: argv verbosity, TTY-aware console format/destination, optional `onLog` callback destination; wiring remains CLI-owned.\n- Return `{ config, configFilePath, kernel }` as `CliContext`.\n- `config.warnings` is canonical bootstrap warning source; emit each warning at most once per `resolveCliContext` call; never require duplicate top-level `warnings` on `OpenSpecdHostResult`.\n- Non-test CLI handlers/helpers needing steady-state host context MUST use `resolveCliContext` or `openSpecdHost`.\n- `@specd/cli` runtime dependencies: `@specd/sdk` is sole direct workspace dependency among `@specd/core`, `@specd/code-graph`, `@specd/sdk`; plugin/schema dependencies unaffected.\n## Constraints\n- Core/code-graph symbols in CLI MUST use `@specd/sdk` re-exports.\n- Commands MUST NOT duplicate config loading or kernel construction.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:37fb69fa0728c8e19b85a4761093288575620cbc8e7d98522caaf10918d36e96",
+          "lastModified": "2026-07-17T08:08:32.961Z"
+        },
+        "verify.md": {
+          "hash": "sha256:d20c328ff47aed80f173f7b279cee4722f8a1b9e04636eb8a9e163b66bd4baf4",
+          "lastModified": "2026-07-17T08:08:32.962Z"
+        }
+      }
+    }
+  }
 }

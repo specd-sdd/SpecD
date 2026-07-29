@@ -11,8 +11,63 @@
   ],
   "implementation": [
     {
+      "file": "core:src/domain/services/apply-persisted-spec-state-patch.ts",
+      "symbols": ["PersistedSpecStatePatch", "applyPersistedSpecStatePatch"]
+    },
+    {
       "file": "core:src/application/use-cases/update-persisted-spec-optimizations.ts",
-      "symbols": ["UpdatePersistedSpecOptimizations"]
+      "symbols": [
+        "optimizationFieldNameSchema",
+        "optimizationSetSchema",
+        "updatePersistedSpecOptimizationsInputSchema",
+        "parseUpdatePersistedSpecOptimizationsInput",
+        "UpdatePersistedSpecOptimizations"
+      ]
+    },
+    {
+      "file": "core:test/application/use-cases/update-persisted-spec-optimizations.spec.ts"
+    },
+    {
+      "file": "core:test/domain/services/apply-persisted-spec-state-patch.spec.ts"
+    },
+    {
+      "file": "core:test/composition/use-cases/update-persisted-spec-optimizations.spec.ts"
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Sets or clears persisted spec optimizations, refreshing exact schema and artifact baselines only for changed fields.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:b806e77612b3157970c4bd1827c3033ce63287f21f1ce627f0c9a07d7d5b6371",
+          "lastModified": "2026-07-25T11:53:31.390Z"
+        },
+        "verify.md": {
+          "hash": "sha256:761c7c43c78c13348b8608d879bc7d6e0f74f91dab91800a25ec2019e3efa6ce",
+          "lastModified": "2026-07-25T11:53:31.390Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# UpdatePersistedSpecOptimizations\n\n## Rules\n\n- `UpdatePersistedSpecOptimizations.execute(input)` accepts `UpdatePersistedSpecOptimizationsInput`: required string `specId`; optional partial `set` containing `optimizedDescription` and/or `optimizedContext` strings; optional readonly `clear` containing those field names.\n- Exactly one non-empty operation required. Providing both `set` and `clear`, neither, `set: {}`, or `clear: []` MUST throw typed validation error without mutation.\n- Each key present in `set` MUST persist exact provided `value` plus fresh baseline: `schema` equals current persisted schema identity, or effective project schema when creating state; `artifactState` contains every present schema-declared `scope: spec` artifact for `specId`, sorted by filename, with raw UTF-8 SHA-256 content hash and `lastModified` from `SpecRepository.artifactMeta()`.\n- `set` refreshes baseline only for keys present. Unset optimization fields retain exact persisted value and baseline.\n- When state is missing, `set` MUST obtain initial base through same `resolveInitialPersistedDependsOn()` service used by `core:initialize-persisted-spec-state`, then patch requested fields onto base.\n- `clear` removes each selected present field; absent selected fields are no-ops. If last field is removed, omit `optimizations` entirely, never persist empty object.\n- When state is missing, `clear` MUST return no `optimizations`, `created: false`, create no state, and never call `writePersistedState`.\n- Apply resulting `optimizations` via shared pure `applyPersistedSpecStatePatch()`. Pass complete `PersistedSpecState` to `SpecRepository.writePersistedState()` with `expectedRevision` equal observed `originalHash`, or `null` when state was absent.\n- Revision mismatch MUST propagate `ArtifactConflictError`; no retry or silent rebase.\n- Unresolvable spec artifact identity MUST throw `SpecNotFoundError`.\n- Success returns `UpdatePersistedSpecOptimizationsResult`: fully-qualified `specId`; resulting optimization values without baseline detail, absent when none remain; `created` true only when this call created state.\n- Config form `createUpdatePersistedSpecOptimizations(config, options?)` MUST create composition resolver, derive `UpdatePersistedSpecOptimizationsDeps` exclusively through `resolveUpdatePersistedSpecOptimizationsDeps(resolver)`, then delegate to canonical `createUpdatePersistedSpecOptimizations(deps)`. Resolver supplies `specs: ReadonlyMap<string, SpecRepository>` and `initializePersistedSpecState` collaborator sufficient for `resolveInitialPersistedDependsOn()`. Factory MUST NOT reconstruct fs-shaped wiring inline.\n\n## Constraints\n\n- Use case never validates or interprets effective `llmOptimizedContext`; caller skill or agent template gates optimizer writes.\n- Use case never regenerates, reads, or invalidates generated metadata; fresh baseline determines write freshness.\n- `readOnly` workspace ownership MUST throw `ReadOnlyWorkspaceError` before persisted-state I/O.\n- `set` accepts arbitrary caller strings; no LLM invocation or production-method policy.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:b806e77612b3157970c4bd1827c3033ce63287f21f1ce627f0c9a07d7d5b6371",
+          "lastModified": "2026-07-25T11:53:31.390Z"
+        },
+        "verify.md": {
+          "hash": "sha256:761c7c43c78c13348b8608d879bc7d6e0f74f91dab91800a25ec2019e3efa6ce",
+          "lastModified": "2026-07-25T11:53:31.390Z"
+        }
+      }
+    }
+  }
 }

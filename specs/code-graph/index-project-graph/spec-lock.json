@@ -17,5 +17,41 @@
     {
       "file": "code-graph:test/application/use-cases/index-project-graph.spec.ts"
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "IndexProjectGraph forwards prepared project indexing inputs to an open provider while hosts retain I/O, locking, and process concerns.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:eae0aaa60890c772fa2726aba22d015d5d73709c7ed67c76ed0b5f95d2739c18",
+          "lastModified": "2026-07-20T16:47:44.349Z"
+        },
+        "verify.md": {
+          "hash": "sha256:837011840b49247e061ac806d45691266056cd45313ac5a48762e0840db8db9c",
+          "lastModified": "2026-07-20T16:47:44.349Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# IndexProjectGraph\n\n## Rules\n\n- `IndexProjectGraph.execute(input)` MUST call `provider.index()` once with `IndexOptions` built from `projectRoot`, `workspaces`, `graphConfig`, `codeGraphVersion`, `vcsRoot`, optional `vcsRef`, optional `onProgress`, and force intent; return `IndexResult` unchanged.\n- When `input.force === true`, forward `force: true` to `provider.index(...)`. Never call `provider.recreate()` directly; provider owns destructive reset, generation rotation, lock policy. Omitted/false force requests no recreation.\n- `IndexProjectGraphInput` MUST contain opened `provider: CodeGraphProvider`, `projectRoot: string`, `workspaces: WorkspaceIndexTarget[]`, `graphConfig: ProjectGraphConfig`, `codeGraphVersion: string`, `vcsRoot: string | null`; MAY contain `vcsRef: string`, `force: boolean`, `onProgress: IndexProgressCallback`. Forward `vcsRoot` unchanged.\n- Use case MUST NOT resolve workspaces from `specd.yaml`, acquire locks, spawn subprocesses, or directly reset provider/store.\n- `createIndexProjectGraph()` in composition returns stateless `IndexProjectGraph`.\n\n## Constraints\n\n- MUST NOT open/close provider.\n- MUST NOT acquire/release graph indexing lock.\n- Parse failures remain `IndexResult.errors`; use case MUST NOT throw for per-file errors.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:eae0aaa60890c772fa2726aba22d015d5d73709c7ed67c76ed0b5f95d2739c18",
+          "lastModified": "2026-07-20T16:47:44.349Z"
+        },
+        "verify.md": {
+          "hash": "sha256:837011840b49247e061ac806d45691266056cd45313ac5a48762e0840db8db9c",
+          "lastModified": "2026-07-20T16:47:44.349Z"
+        }
+      }
+    }
+  }
 }

@@ -9,5 +9,41 @@
       "file": "cli:src/commands/spec/context.ts",
       "symbols": ["registerSpecContext"]
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Renders one spec’s metadata context with modes, section filters, dependency traversal, stale fallback, and optimized-content preference.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:96d776d3aa01bcfaa0f5011853f7478f95e71507b5ec2d3ce5f2b2b289e828d0",
+          "lastModified": "2026-06-16T14:28:15.011Z"
+        },
+        "verify.md": {
+          "hash": "sha256:ef0329da25ec6627bcdbc3a9460bf711905a77f4ddc5c022c62e6c971e4b9e73",
+          "lastModified": "2026-06-16T14:28:15.011Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Spec Context\n\n## Rules\n\n- Command: `specd specs context <specPath> [options]`; `<specPath>` required fully-qualified ID (for example, `default:auth/login`).\n- Options: `--mode <mode>` = `list|summary|full|hybrid` (default `full`); `--rules`, `--constraints`, `--scenarios` select sections; `--follow-deps` traverses `dependsOn` transitively; `--depth <n>` limits traversal (1 = direct only, otherwise unlimited); `--optimized` forces optimized preference; `--no-optimized` suppresses it; `--format text|json|toon` defaults `text`.\n- No section flags: rule declares description + rules + constraints + scenarios; verification expects Scenarios omitted unless explicitly requested. With flags, include selected sections; flags additive and affect full-shaped modes only. Title/Description remain in verified filtered full output.\n- Selected mode governs rendering; verified no-`--mode` behavior is absolute `full`, ignoring configured `contextMode`. Read `.specd-metadata.yaml`; render sections only for full-shaped mode.\n- Missing/stale metadata (artifact hashes differ) triggers schema `metadataExtraction` fallback when available plus stderr `warning:`; never hard-fails solely for metadata staleness/absence.\n- `--follow-deps`: recursively apply same mode and fallback; root first, dependencies traversal order; silently break cycles using `CompileContext` cycle detection.\n- Config-enabled `llmOptimizedContext` prefers fresh `optimizedDescription` and `optimizedContext`. Effective value becomes `false` with `--no-optimized` or section flags excluding rules or constraints. Both `--rules --constraints` retain optimization; rules-only/constraints-only disable it and emit no optimization warning.\n- Effective optimization + missing/stale optimized fields: stderr `stale-optimization` warning containing exact remediation `Launch specd-spec-context-optimizer agent to refresh`.\n- Text entry header: `### Spec: <workspace>:<capability-path>` then `Mode: <list|summary|full>`. List: ID + mode/source only. Summary: title/description when available. Full: filtered metadata. Followed dependencies use subsequent same-mode blocks.\n- JSON/toon: object contains `specs`, `warnings`; entries expose only selected-mode fields; root always `specs[0]`, then dependencies.\n- Exit 1: unconfigured/unknown workspace, absent artifact files, missing path, or `--depth` without `--follow-deps`; usage errors go stderr, unknown/no-artifact errors include `error:`.\n\n## Constraints\n\n- Read-only; never updates metadata.\n- Workspace always explicit in path.\n- Section flags additive; ineffective in list/summary.\n- Stale/absent metadata fallback always attempted.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:96d776d3aa01bcfaa0f5011853f7478f95e71507b5ec2d3ce5f2b2b289e828d0",
+          "lastModified": "2026-06-16T14:28:15.011Z"
+        },
+        "verify.md": {
+          "hash": "sha256:ef0329da25ec6627bcdbc3a9460bf711905a77f4ddc5c022c62e6c971e4b9e73",
+          "lastModified": "2026-06-16T14:28:15.011Z"
+        }
+      }
+    }
+  }
 }

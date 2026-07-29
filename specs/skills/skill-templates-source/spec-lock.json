@@ -3,8 +3,24 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": ["skills:skill", "cli:spec-optimizations"],
-  "implementation": [],
+  "dependsOn": ["skills:skill", "cli:spec-optimizations", "skills:workflow-automation"],
+  "implementation": [
+    {
+      "file": "skills:templates/skills/specd-archive/SKILL.md.tpl"
+    },
+    {
+      "file": "skills:templates/shared/shared.md.tpl"
+    },
+    {
+      "file": "skills:templates/agents/specd-spec-context-optimizer/SPECD-AGENT.md.tpl"
+    },
+    {
+      "file": "skills:templates/agents/specd-project-context-optimizer/SPECD-AGENT.md.tpl"
+    },
+    {
+      "file": "skills:test/template-workflow.spec.ts"
+    }
+  ],
   "optimizations": {
     "optimizedDescription": {
       "value": "Defines sourcing, metadata contracts, and capability-aware rendering for skill templates without static frontmatter across agent runtimes.",

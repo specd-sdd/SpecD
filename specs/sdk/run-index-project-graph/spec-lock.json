@@ -20,5 +20,41 @@
     {
       "file": "sdk:test/orchestration/run-index-project-graph.spec.ts"
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "runIndexProjectGraph resolves project indexing inputs and provider lifecycle, then forwards execution and results without host duplication.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:338ad2cf3a2924d56a76c4929f5189f2f19a73dd42f59a2c5bf73220d09f4ea0",
+          "lastModified": "2026-07-21T15:29:50.836Z"
+        },
+        "verify.md": {
+          "hash": "sha256:845eb475dc5685ebc59c98732137f54826036a6a64ef8546dc3272a1eaaa6cfe",
+          "lastModified": "2026-07-21T15:29:50.838Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# runIndexProjectGraph\n\n## Rules\n\n- `runIndexProjectGraph(ctx: SdkHostContext, input: RunIndexProjectGraphInput): Promise<RunIndexProjectGraphResult>` orchestrates SDK graph indexing.\n- Validate lifecycle first: if `input.provider` and either `input.beforeOpen` or `input.afterClose` exist, throw `InvalidProviderLifecycleError`, a `SpecdError` with `code: 'INVALID_PROVIDER_LIFECYCLE'`.\n- Resolve `SpecdConfig` through `ctx.kernel.project.getConfig.execute()`; call `ctx.kernel.project.listWorkspaces.execute()`; prepare `projectRoot`, `workspaces`, `graphConfig`, `codeGraphVersion`, `vcsRoot`, `vcsRef`, `force`, `onProgress`.\n- `input.workspaces` MAY restrict targets; omission indexes all configured workspaces.\n- Provided `input.provider`: require already-open `CodeGraphProvider`; invoke `createIndexProjectGraph()` directly with provider; MUST NOT close provider after success/failure.\n- Omitted provider: execute inside `withOpenGraphProvider(ctx, async (provider) => { ... }, { beforeOpen: input.beforeOpen, afterClose: input.afterClose })`; invoke `createIndexProjectGraph()` on transient opened provider; close transient provider on completion.\n- `acquireGraphIndexLock` MUST NOT run inside orchestration. CLI adapters MAY acquire subprocess lock through `beforeOpen` passed to `withOpenGraphProvider`.\n- Forward `input.onProgress` events from `IndexProjectGraph` unchanged.\n- `RunIndexProjectGraphResult` MUST preserve all `IndexProjectGraph` result fields, including indexed file/symbol counts, per-workspace breakdown, errors; no lossy mapping.\n\n## Constraints\n\n- External provider lifecycle belongs to caller; transient provider lifecycle belongs to `withOpenGraphProvider`.\n- Concurrent-index lock acquisition remains host/CLI concern.\n- Progress and result data pass through without transformation.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:338ad2cf3a2924d56a76c4929f5189f2f19a73dd42f59a2c5bf73220d09f4ea0",
+          "lastModified": "2026-07-21T15:29:50.836Z"
+        },
+        "verify.md": {
+          "hash": "sha256:845eb475dc5685ebc59c98732137f54826036a6a64ef8546dc3272a1eaaa6cfe",
+          "lastModified": "2026-07-21T15:29:50.838Z"
+        }
+      }
+    }
+  }
 }

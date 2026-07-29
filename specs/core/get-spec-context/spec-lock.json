@@ -15,5 +15,41 @@
     "core:spec-optimization",
     "core:get-spec-metadata"
   ],
-  "implementation": []
+  "implementation": [],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Builds mode-aware spec context, optionally traversing dependencies via self-healing metadata with stale optimization warnings.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:a853877a08f394bbd87a585ac933fe108f51fcd355ac7fd7908430bd099e44a1",
+          "lastModified": "2026-07-25T11:53:31.198Z"
+        },
+        "verify.md": {
+          "hash": "sha256:5c262522a03378c0f1469b5766fb0505f25912457175c30847a9320a875691f0",
+          "lastModified": "2026-07-25T11:53:31.199Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Get Spec Context\n\n## Rules\n\n- Resolve requested spec through repository from `ListWorkspaces.execute()`: find input `workspace` or throw `WorkspaceNotFoundError`; call `repo.get(specPath)` or throw `SpecNotFoundError`.\n- Per resolved spec: load all artifacts; obtain usable metadata via `GetSpecMetadata.execute({ specId })` with default `if-needed`; never read `SpecRepository.metadata()` directly.\n- Render by resolved `contextMode`: `list` = `spec`, `stale`, mode/source metadata only; `summary` = identity plus available title/description; `full` = identity plus available title, description, rules, constraints, scenarios; `hybrid` = `full` for single-spec context.\n- Successful materialization: render returned metadata; set `stale: false`. Full output includes rules/constraints/scenarios when no section filter, or only requested sections when filtered. Forward `metadata-cache-write-failed` and generation warnings into result `warnings`; do not log again.\n- With `llmOptimizedContext: true`, prefer non-empty, fresh `optimizedContext`. Freshness comes from per-field artifact/schema baselines in lock-owned optimization state, not metadata-document freshness. Missing/stale/empty optimization: use standard `context`; emit `stale-optimization` identifying spec with remediation `Launch specd-spec-context-optimizer agent to refresh`.\n- If `GetSpecMetadata.execute({ specId })` cannot produce valid in-memory projection: emit stale minimal entry. `list`: identity/mode/source plus `stale: true`; `summary`/`full`/`hybrid`: `spec`, `stale: true`, safely extractable title/description only. Never include rules/constraints/scenarios. Treat as materialization failure; content-hash drift self-healed by `GetSpecMetadata` is not staleness.\n- Non-empty `input.sections` affects full mode only: include listed `rules`, `constraints`, `scenarios`; omit title/description. Empty/absent filter shows all. Filters never affect `list` or `summary`.\n- With `input.followDeps: true`, traverse canonical `dependsOn` transitively using DFS and cycle detection. For each unvisited identity: use self-healing metadata from `GetSpecMetadata.execute({ specId })`; only if no projection exists, MAY use schema `metadataExtraction.dependsOn`; absent both means no outgoing dependencies.\n- With `followDeps: true`, `input.depth` caps traversal: `0` = root only; omitted = unlimited.\n- Traversal failures warn and continue: unusable current-spec projection = `missing-metadata`; unknown dependency workspace = `unknown-workspace`; absent dependency spec = `missing-spec`; stale/missing lock-owned optimization under enabled optimization = `stale-optimization`. Never access `spec-lock.json` generically; sidecars affect traversal only via normalized `GetSpecMetadata` projection.\n- `GetSpecContextResult`: `entries` ordered root first then DFS dependencies; `warnings` accumulated. Every entry includes canonical spec label and resolved display mode; content fields follow mode and section filter.\n- `createGetSpecContext(config, options?)` MUST create composition session resolver, derive dependencies only through `resolveGetSpecContextDeps(resolver)`, then delegate to canonical `createGetSpecContext(deps)`; MUST NOT rebuild fs-shaped wiring inline.\n- `resolveGetSpecContextDeps(resolver)` resolves `listWorkspaces: ListWorkspaces`, `hasher: ContentHasher`, `getMetadata: GetSpecMetadata`, `schemaProvider?: SchemaProvider`, `parsers?: ArtifactParserRegistry`, `extractorTransforms: ExtractorTransformRegistry`, `workspaceRoutes: readonly SpecWorkspaceRoute[]`.\n\n## Constraints\n\n- Repository access only through orchestrated `ListWorkspaces`; never mutate returned workspaces or repositories.\n- Cycle identity: `workspace:capabilityPath` label.\n- Root always first/included, even stale.\n- Empty `sections` equals undefined: show all.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:a853877a08f394bbd87a585ac933fe108f51fcd355ac7fd7908430bd099e44a1",
+          "lastModified": "2026-07-25T11:53:31.198Z"
+        },
+        "verify.md": {
+          "hash": "sha256:5c262522a03378c0f1469b5766fb0505f25912457175c30847a9320a875691f0",
+          "lastModified": "2026-07-25T11:53:31.199Z"
+        }
+      }
+    }
+  }
 }

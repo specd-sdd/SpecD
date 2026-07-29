@@ -9,5 +9,41 @@
       "file": "core:src/application/use-cases/get-persisted-spec-optimizations.ts",
       "symbols": ["GetPersistedSpecOptimizations"]
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Reads lock-owned spec optimizations with field-level and aggregate freshness from current artifacts and persisted schema.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:3119968410fd128b421ace8c2f1223eb2594822fa0392db13ea8457c50db9952",
+          "lastModified": "2026-07-25T11:53:31.357Z"
+        },
+        "verify.md": {
+          "hash": "sha256:31a25ae1ab56244ac4f66e5def24d31dc84b405f1978bef6b9aa1cd5fda94ae3",
+          "lastModified": "2026-07-25T11:53:31.358Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# GetPersistedSpecOptimizations\n\n## Rules\n\n- GetPersistedSpecOptimizations.execute input: specId required string, fully-qualified identity; field optional 'optimizedDescription' | 'optimizedContext', restricting output to selected field.\n- Resolve spec workspace repository; call SpecRepository.readPersistedState(spec) for optimizations. Never read spec-lock.json directly; never materialize/read generated metadata.\n- readPersistedState null: initialized: false; no fields; fresh: false.\n- Persisted state without optimizations, or requested field absent: initialized: true; omit field; annotate reason missing; no validation error.\n- Each present field: compare recorded artifactState against current schema-declared scope: spec canonical artifact set using SpecRepository.artifactMeta():\n  - current-only artifact: artifact-added\n  - baseline-only artifact: artifact-removed\n  - same artifact, unequal content hash: artifact-changed\n  - equal hash, unequal lastModified: diagnostic only; freshness unaffected\n  - all hashes equal plus recorded schema equals current persisted schema identity: fresh\n  - schema mismatch: stale with schema-changed, even when hashes equal\n- Any artifact-added, artifact-removed, artifact-changed, or schema-changed makes field stale.\n- Present field result: value; freshness 'fresh' | 'stale'; ordered reasons producing staleness, empty when fresh.\n- Top-level fresh true only when persisted state exists, at least one optimization field exists, and every present field—or requested field—is fresh.\n- Unresolvable spec artifact set: throw SpecNotFoundError.\n- createGetPersistedSpecOptimizations(config, options?) MUST derive GetPersistedSpecOptimizationsDeps through resolveGetPersistedSpecOptimizationsDeps(resolver), then delegate to canonical createGetPersistedSpecOptimizations(deps).\n- resolveGetPersistedSpecOptimizationsDeps(resolver) MUST resolve specs: ReadonlyMap<string, SpecRepository>, one repository per workspace. Sole use-case-specific config bootstrap composition entry; factory MUST NOT reconstruct fs-shaped wiring inline.\n\n## Constraints\n\n- Read-only: never create, mutate, regenerate, or write persisted state, metadata, or optimization values.\n- Compute freshness only from persisted state plus current artifact/schema observations; never generated metadata.\n- readOnly workspace ownership never blocks reads.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:3119968410fd128b421ace8c2f1223eb2594822fa0392db13ea8457c50db9952",
+          "lastModified": "2026-07-25T11:53:31.357Z"
+        },
+        "verify.md": {
+          "hash": "sha256:31a25ae1ab56244ac4f66e5def24d31dc84b405f1978bef6b9aa1cd5fda94ae3",
+          "lastModified": "2026-07-25T11:53:31.358Z"
+        }
+      }
+    }
+  }
 }

@@ -22,5 +22,41 @@
       "file": "code-graph:test/helpers/in-memory-graph-store.ts",
       "symbols": ["InMemoryGraphStore"]
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "GraphStore defines durable, atomic, backend-neutral graph persistence, querying, search, lifecycle, and generation semantics.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:aae3f43e9847d831e10e9de18f977620285bd339dc2fd88544e72f4cae2b1e55",
+          "lastModified": "2026-07-20T16:47:44.500Z"
+        },
+        "verify.md": {
+          "hash": "sha256:76c4972e607632308c17d207215e5fd2d3d9cf338754c963de683494c7cfc02b",
+          "lastModified": "2026-07-20T16:51:09.232Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Graph Store\n\n## Rules\n\n- `GraphStore`: abstract class in `domain/ports/`; constructor `storagePath`; adapters in `infrastructure/`; implementations own backend schema/layout.\n- Persist minimum semantics: `FileNode` with canonical workspace path, normalized `configRelativePath`, full textual content, `contentHash`; `SymbolNode`; `SpecNode`; `DocumentNode`; relations `IMPORTS`, `DEFINES`, `CALLS`, `CONSTRUCTS`, `USES_TYPE`, `EXPORTS`, `DEPENDS_ON`, `COVERS_FILE`, `COVERS_SYMBOL`, `EXTENDS`, `IMPLEMENTS`, `OVERRIDES`; metadata `lastIndexedAt`, `lastIndexedRef`, graph fingerprint. `COVERS_FILE`: spec→file. `COVERS_SYMBOL`: spec→symbol; MAY preserve `metadata.stale`. Backends MAY vary representation but MUST preserve observable `GraphStore` semantics. Support document upsert/removal/full-text search and `contentHash` incremental matching.\n- Lifecycle: `open(): Promise<void>` prepares backend, bindings, schema/indexes, generation checks. `close(): Promise<void>` releases resources and MUST be idempotent. Operations while unopened/closed throw `StoreNotOpenError`.\n- `recreate(): Promise<void>` destructively resets persisted storage, stronger than `clear()`: remove prior graph, prepare fresh indexing, hide backend files/WAL/schema/search mechanics. `CodeGraphProvider` owns recreation decisions; hosts MUST NOT manage backend reset directly.\n- Every persisted backend stores generation marker under storage root; `recreate()` rotates it; provider caches generation at `open()` and compares before reads. Format unspecified; `graph/storage.epoch` valid.\n- `upsertFile(file: FileNode, symbols: SymbolNode[], relations: Relation[]): Promise<void>` atomically replaces file, its symbols, relations; failure preserves prior state.\n- `addRelations(relations: Relation[]): Promise<void>` purely adds cross-file relations. Re-upserting endpoint MAY remove them; indexer re-adds after upserts.\n- `removeFile(filePath: string): Promise<void>` atomically removes file, symbols with matching `filePath`, and relations referencing file or symbols.\n- Queries:\n  - `getFile(path: string): Promise<FileNode | undefined>`; `findFilesByConfigRelativePath(path: string): Promise<FileNode[]>`; `getSymbol(id: string): Promise<SymbolNode | undefined>`.\n  - `getCallers(symbolId: string): Promise<Relation[]>` / `getCallees(symbolId: string): Promise<Relation[]>`: incoming/outgoing dependency relations, minimum `CALLS`, `CONSTRUCTS`, `USES_TYPE`.\n  - `getImporters(filePath: string): Promise<Relation[]>` / `getImportees(filePath: string): Promise<Relation[]>`: incoming/outgoing `IMPORTS`.\n  - `getExtenders` / `getExtendedTargets`: incoming/outgoing `EXTENDS`; `getImplementors` / `getImplementedTargets`: incoming/outgoing `IMPLEMENTS`; `getOverriders` / `getOverriddenTargets`: incoming/outgoing `OVERRIDES`; each `(symbolId: string): Promise<Relation[]>`.\n  - `getSpec(specId: string): Promise<SpecNode | undefined>`; `getSpecDependencies` / `getSpecDependents`: outgoing/incoming `DEPENDS_ON`; `getCoveredFiles` / `getCoveredSymbols`: outgoing `COVERS_FILE` / `COVERS_SYMBOL`; `getCoveringSpecsForFile(filePath: string)` / `getCoveringSpecsForSymbol(symbolId: string)`: incoming coverage; relation queries return `Promise<Relation[]>`.\n  - `findSymbols(query: SymbolQuery): Promise<SymbolNode[]>`. `SymbolQuery`: optional `name` glob/regex, `kinds: SymbolKind[]`, `filePath` exact/glob, `comment` substring, `caseSensitive` default `false`; insensitive `name`/`comment` when false.\n- `getStatistics(): Promise<GraphStatistics>` returns `fileCount`, `symbolCount`, `specCount`, `relationCounts: Record<RelationType, number>` including `CONSTRUCTS`, `USES_TYPE`, `EXTENDS`, `IMPLEMENTS`, `OVERRIDES`; distinct `languages`; latest-upsert ISO 8601 `lastIndexedAt`; persisted VCS `lastIndexedRef` or `null`; persisted `graphFingerprint` or `null`.\n- `upsertSpec(spec: SpecNode, relations: Relation[]): Promise<void>` atomically replaces spec and outgoing `DEPENDS_ON`; `removeSpec(specId: string): Promise<void>` removes spec and all incoming/outgoing `DEPENDS_ON`.\n- Search: `searchSymbols(options: SearchOptions)`, `searchSpecs(options: SearchOptions)`, `searchDocuments(options: SearchOptions)` rank descending; `rebuildFtsIndexes(): Promise<void>`. Results MUST include match-aware snippet and 1-based `startLine`/`endLine`.\n- Primary identities: specs=`specId`; symbols=`name`,`id`; documents=`path` plus persisted alternate identity such as `configRelativePath`. Identity outranks generic content but MUST NOT replace generic retrieval. Backend MAY add identity candidates missed by tokenizer.\n- Shared lexical expansion before identity ranking: preserve normalized original token; split whitespace, `:`, `/`, `_`, `.`, `-`, CamelCase/PascalCase. Lexical only. `core:change`→`core:change`,`core`,`change`; `ArchiveChange`→`archivechange`,`archive`,`change`.\n- Ranking: exact canonical identity; exact primary name/alternate identity; primary-identity prefix/suffix/substring token; structured identity/path component above arbitrary substring. Token strength: exact `x` > prefix `x%` > suffix `%x` > substring `%x%`. Component `core` in `core:change` outranks substring in `score`. More matched expanded tokens outrank fewer. Generic BM25/equivalent ranks remaining hits.\n- `SearchOptions`: required `query`; `limit` default `20`; symbol-only `kind`, case-insensitive `filePattern` glob; `workspace`; case-insensitive glob `excludePaths`; `excludeWorkspaces`. Apply filters before limit.\n- Bulk: `clear(): Promise<void>` removes all nodes/relations; `getAllFiles(): Promise<FileNode[]>`, `getAllSpecs(): Promise<SpecNode[]>` support incremental diffing.\n\n## Constraints\n\n- Abstract class, never interface; no backend, physical schema, or filesystem layout prescribed.\n- File-level mutations atomic; no partial updates.\n- `recreate()` backend capability owned by provider/indexing flows; no caller-managed backend deletion.\n- Persisted generation markers enable cross-process stale-provider detection.\n- No `@specd/core` dependency; errors extend `CodeGraphError`.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:aae3f43e9847d831e10e9de18f977620285bd339dc2fd88544e72f4cae2b1e55",
+          "lastModified": "2026-07-20T16:47:44.500Z"
+        },
+        "verify.md": {
+          "hash": "sha256:76c4972e607632308c17d207215e5fd2d3d9cf338754c963de683494c7cfc02b",
+          "lastModified": "2026-07-20T16:51:09.232Z"
+        }
+      }
+    }
+  }
 }
