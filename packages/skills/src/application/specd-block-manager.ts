@@ -53,7 +53,7 @@ export async function injectSpecdBlock(
   // Strip redundant outer plugin-specific tags if passed in content
   if (blockId !== undefined) {
     const pluginOuterRegex = new RegExp(
-      `^<!-- <specd-plugin:${escapeRegExp(blockId)}> -->\\s*([\\s\\S]*?)\\s*<!-- /specd-plugin:${escapeRegExp(blockId)}> -->$`,
+      `^<!-- <specd-plugin:${escapeRegExp(blockId)}> -->\\s*([\\s\\S]*?)\\s*<!-- </specd-plugin:${escapeRegExp(blockId)}> -->$`,
     )
     const pluginMatch = pluginOuterRegex.exec(trimmed)
     if (pluginMatch && pluginMatch[1] !== undefined) {
@@ -74,7 +74,7 @@ export async function injectSpecdBlock(
   // Purge any legacy plugin-specific comment blocks if present
   if (blockId !== undefined) {
     const legacyRegex = new RegExp(
-      `\\n?<!-- <specd-plugin:${escapeRegExp(blockId)}> -->[\\s\\S]*?<!-- /specd-plugin:${escapeRegExp(blockId)}> -->\\n?`,
+      `\\n?<!-- <specd-plugin:${escapeRegExp(blockId)}> -->[\\s\\S]*?<!-- </specd-plugin:${escapeRegExp(blockId)}> -->\\n?`,
       'g',
     )
     existingContent = existingContent.replace(legacyRegex, '\n').trim()
@@ -145,7 +145,7 @@ export async function removeSpecdBlock(filePath: string, blockId?: string): Prom
   // Always purge legacy plugin-specific comment block if present
   if (blockId !== undefined) {
     const legacyRegex = new RegExp(
-      `\\n?<!-- <specd-plugin:${escapeRegExp(blockId)}> -->[\\s\\S]*?<!-- /specd-plugin:${escapeRegExp(blockId)}> -->\\n?`,
+      `\\n?<!-- <specd-plugin:${escapeRegExp(blockId)}> -->[\\s\\S]*?<!-- </specd-plugin:${escapeRegExp(blockId)}> -->\\n?`,
       'g',
     )
     existingContent = existingContent.replace(legacyRegex, '\n').trim()

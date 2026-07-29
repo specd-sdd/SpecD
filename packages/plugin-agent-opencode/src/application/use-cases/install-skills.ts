@@ -4,6 +4,7 @@ import type { SpecdConfig } from '@specd/core'
 import {
   createSkillRepository,
   injectSpecdBlock,
+  removeSpecdBlock,
   renderBaseAgentInstruction,
   ResolveBundle,
 } from '@specd/skills'
@@ -159,6 +160,7 @@ export class InstallSkills {
 
     // Inject prompt block into AGENTS.md with registered plugin tag
     const agentsMdPath = path.join(config.projectRoot, 'AGENTS.md')
+    await removeSpecdBlock(agentsMdPath, 'opencode')
     const prompt = await renderBaseAgentInstruction()
     await injectSpecdBlock(agentsMdPath, prompt, 'opencode')
 

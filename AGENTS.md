@@ -50,7 +50,7 @@ schema-* → (no specd deps)
 
 No circular workspace dependencies.
 
-<!-- <specd agents="opencode,codex,standard"> -->
+<!-- <specd agents="standard,codex,opencode"> -->
 
 # specd — Agent Protocol & Instructions
 
