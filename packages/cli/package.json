@@ -14,7 +14,9 @@
   },
   "scripts": {
     "build": "tsup src/index.ts --format esm --clean",
-    "dev": "tsup src/index.ts --format esm --watch",
+    "build:dev": "tsup src/index.ts --format esm --sourcemap --clean",
+    "build:debug": "tsup src/index.ts --format esm --sourcemap --clean",
+    "dev": "tsup src/index.ts --format esm --sourcemap --watch",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "release:publish": "pnpm publish --access public",

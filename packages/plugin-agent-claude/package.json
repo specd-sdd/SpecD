@@ -21,7 +21,9 @@
     "dev": "tsup src/index.ts --format esm --dts --watch",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "build:dev": "node --import tsx ../../dev/scripts/sync-plugin-manifests.ts packages/plugin-agent-claude && tsup src/index.ts --format esm --dts --sourcemap --clean",
+    "build:debug": "node --import tsx ../../dev/scripts/sync-plugin-manifests.ts packages/plugin-agent-claude && tsup src/index.ts --format esm --dts --sourcemap --clean"
   },
   "dependencies": {
     "@specd/core": "workspace:^",

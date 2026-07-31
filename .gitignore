@@ -32,7 +32,8 @@ specd.local.yaml
 .DS_Store
 
 # Editor
-.vscode/
+.vscode/*
+!.vscode/launch.json
 .idea/
 .history/
 

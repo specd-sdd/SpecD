@@ -5,6 +5,14 @@
       "dependsOn": ["^build"],
       "outputs": ["dist/**", "build/**"]
     },
+    "build:dev": {
+      "dependsOn": ["^build:dev"],
+      "outputs": ["dist/**", "build/**"]
+    },
+    "build:debug": {
+      "dependsOn": ["^build:debug"],
+      "outputs": ["dist/**", "build/**"]
+    },
     "dev": {
       "dependsOn": ["^build"],
       "persistent": true,

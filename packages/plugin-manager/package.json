@@ -22,7 +22,9 @@
     "dev": "tsup src/index.ts --format esm --dts --watch",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "build:dev": "tsup src/index.ts --format esm --dts --sourcemap --clean",
+    "build:debug": "tsup src/index.ts --format esm --dts --sourcemap --clean"
   },
   "dependencies": {
     "@specd/core": "workspace:*",

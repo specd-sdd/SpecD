@@ -1,0 +1,28 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug SpecD CLI (tsx - direct TS)",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "npx tsx packages/cli/src/index.ts ${input:cliArgs}",
+      "cwd": "${workspaceFolder}",
+      "sourceMaps": true
+    },
+    {
+      "name": "Debug SpecD CLI (dist)",
+      "type": "node-terminal",
+      "request": "launch",
+      "command": "node packages/cli/dist/index.js ${input:cliArgs}",
+      "cwd": "${workspaceFolder}"
+    }
+  ],
+  "inputs": [
+    {
+      "id": "cliArgs",
+      "type": "promptString",
+      "description": "specd CLI arguments",
+      "default": "project status"
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 {
   "name": "@specd/code-graph",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "license": "MIT",
   "private": false,
   "repository": "https://github.com/specd-sdd/SpecD",
@@ -31,7 +31,9 @@
   },
   "scripts": {
     "build": "tsup src/public.ts src/index.ts --format esm --dts --clean",
-    "dev": "tsup src/public.ts src/index.ts --format esm --dts --watch",
+    "build:dev": "tsup src/public.ts src/index.ts --format esm --dts --sourcemap --clean",
+    "build:debug": "tsup src/public.ts src/index.ts --format esm --dts --sourcemap --clean",
+    "dev": "tsup src/public.ts src/index.ts --format esm --dts --sourcemap --watch",
     "typecheck": "tsc --noEmit",
     "test": "bash test/run-vitest.sh",
     "release:publish": "pnpm publish --access public",
