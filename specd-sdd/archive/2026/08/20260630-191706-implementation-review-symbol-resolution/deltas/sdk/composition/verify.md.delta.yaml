@@ -1,0 +1,10 @@
+- op: added
+  position: { parent: { type: section, matches: 'Requirements' } }
+  content: |
+    ### Requirement: Implementation review public orchestration
+
+    #### Scenario: SDK barrel exposes review without parallel imports
+
+    - **WHEN** a delivery host imports implementation review and reference result types
+    - **THEN** all are available from `@specd/sdk`
+    - **AND** the host needs no direct Core plus Code Graph composition

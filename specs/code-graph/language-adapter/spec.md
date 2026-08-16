@@ -37,55 +37,9 @@ The code graph MUST NOT retain a parallel legacy adapter-extraction path once th
 
 ### Requirement: Language detection
 
-File-to-language mapping SHALL be determined by file extension. Each adapter declares its supported extensions via `extensions()`, and the adapter registry builds the mapping dynamically when adapters are registered. Files with unrecognized extensions SHALL be silently skipped — no error is thrown, no `FileNode` is created.
+File-to-language mapping SHALL be determined by file extension. Each adapter declares its supported extensions through `extensions()`, and the adapter registry builds the mapping dynamically when adapters are registered. Files with unrecognized extensions SHALL be silently skipped: no error is thrown and no `FileNode` is created.
 
-The following extensions are declared by the built-in TypeScript adapter:
-
-| Extension | Language ID  |
-| --------- | ------------ |
-| `.ts`     | `typescript` |
-| `.tsx`    | `tsx`        |
-| `.js`     | `javascript` |
-| `.jsx`    | `jsx`        |
-
-### Requirement: TypeScript adapter
-
-A built-in `TypeScriptLanguageAdapter` SHALL handle `typescript`, `tsx`, `javascript`, and `jsx` files using `@ast-grep/napi` for Tree-sitter parsing. Through the unified `analyzeFile` / `resolveImports` / `buildRelations` contract it MUST support:
-
-- **Symbols**: functions (named, arrow assigned to `const`/`let`/`var`, and HOF-wrapped initializers), classes, methods (class methods, class arrow fields, prototype methods, static methods, and object literal function properties), exported variables, member/namespace assignments, destructured bindings, type aliases, interfaces, enums
-- **Comments**: For each extracted symbol, the adapter extracts the raw text of the immediately preceding comment block (JSDoc `/** ... */`, block `/* ... */`, or contiguous line comments `// ...`). The comment is stored verbatim in `SymbolNode.comment`. If no comment precedes the declaration, `comment` is `undefined`.
-- **Relations**: `DEFINES` (file → symbol), `EXPORTS` (file → exported symbol, including CommonJS `module.exports`/`exports`), `IMPORTS` (file → file via import specifier resolution), `CALLS` (symbol → symbol via call expressions)
-
-The adapter maps TypeScript/JavaScript constructs to `SymbolKind` values:
-
-| Construct                           | Syntax Pattern                             | SymbolKind              |
-| :---------------------------------- | :----------------------------------------- | :---------------------- |
-| Function declaration                | `function foo() {}`                        | `function`              |
-| Arrow function assigned to variable | `const foo = () => {}`                     | `function`              |
-| HOF wrapper initializer             | `const foo = memoize(...)`                 | `function`              |
-| Class declaration                   | `class Foo {}`                             | `class`                 |
-| Method definition                   | `class Foo { bar() {} }`                   | `method`                |
-| Class arrow field                   | `class Foo { bar = () => {} }`             | `method`                |
-| Prototype method assignment         | `Foo.prototype.bar = function() {}`        | `method`                |
-| Static method assignment            | `Foo.bar = function() {}`                  | `method`                |
-| Object literal function property    | `{ bar: function() {} }` or `{ bar() {} }` | `method`                |
-| Member namespace assignment         | `App.Article = (function(){ ... })()`      | `variable`              |
-| Object literal scalar data property | `{ version: "1.0.0" }`                     | `variable`              |
-| Destructured variable binding       | `const { foo, bar } = utils`               | `variable` / `function` |
-| CommonJS export declaration         | `module.exports.foo = function() {}`       | `function` / `variable` |
-| Exported `const`/`let`/`var`        | `export const foo = 123`                   | `variable`              |
-| Type alias                          | `type Foo = string`                        | `type`                  |
-| Interface declaration               | `interface Foo {}`                         | `interface`             |
-| Enum declaration                    | `enum Foo {}`                              | `enum`                  |
-
-Extraction Rules for Extended JavaScript Syntaxes:
-
-- **Member & Namespace Assignments**: `assignment_expression` targetting a `member_expression` (e.g., `App.Article`) SHALL be extracted. If the value is callable (function, arrow function, or IIFE returning methods), assign `SymbolKind.Method` with qualified name `App.Article.methodName`. If the value is an IIFE or object literal namespace target, assign `SymbolKind.Variable`.
-- **Object Literal Methods**: `pair` and `property_definition` AST nodes in `object` literals where the value is callable SHALL be extracted as `SymbolKind.Method`.
-- **Class Arrow Fields**: `field_definition` and `public_field_definition` AST nodes in class bodies initialized with callable expressions SHALL be extracted as `SymbolKind.Method`.
-- **HOF Initializers**: `variable_declarator` AST nodes whose initializer value is a `call_expression` SHALL be extracted as `SymbolKind.Function`.
-- **Unrolled Destructuring**: `object_pattern` and `array_pattern` AST nodes SHALL be unrolled recursively to register each declared identifier as an individual symbol.
-- **CommonJS / UMD Exports**: `module.exports` and `exports.*` assignments SHALL be extracted as symbols and registered in the file's exported names set to generate `EXPORTS` relations.
+The general contract MUST NOT hardcode one built-in language's extensions or grammar behavior. Each built-in adapter's supported languages, extensions, syntax coverage, resolution semantics, hierarchy rules, and unsupported boundary SHALL be defined by its specific language-adapter spec.
 
 ### Requirement: Import declaration extraction
 
@@ -139,33 +93,14 @@ Adapters MUST silently drop binding facts whose target depends on runtime-only v
 
 ### Requirement: Built-in multi-language dependency coverage
 
-Built-in adapters SHALL improve dependency and call extraction for all currently supported built-in languages, not only languages present in the current repository graph.
+Every registered built-in adapter SHALL implement the shared analysis, import-resolution, relation-building, reference-fact, range, coverage, and capability contracts. The adapter-specific specs are authoritative for the deterministic syntax and semantic boundary of each language:
 
-The TypeScript adapter SHALL detect deterministic dependency signals from:
+- `code-graph:typescript-language-adapter`
+- `code-graph:python-language-adapter`
+- `code-graph:go-language-adapter`
+- `code-graph:php-language-adapter`
 
-- static imports, side-effect imports, dynamic `import()` with string-literal specifiers, and CommonJS `require()` with string-literal specifiers
-- constructor calls such as `new ClassName()` as `CONSTRUCTS` candidates
-- constructor parameter type annotations, ordinary parameter type annotations, return type annotations, and field/property type annotations as `USES_TYPE` candidates
-- class fields, constructor parameter properties, and `this` receiver bindings
-- member calls such as `obj.method()` and namespace/static calls such as `ns.fn()` when receiver binding or imports make the target deterministic
-- `extends` and `implements` declarations where targets resolve to known symbols
-
-The Python adapter SHALL detect deterministic dependency signals from:
-
-- `import` and `from ... import ...` declarations, including accessible local names for `import package.module`
-- string-literal `importlib.import_module()` and `__import__()` calls
-- package and submodule layouts that can be resolved without executing Python code, including common `src/` and package `__init__.py` layouts
-- constructor calls as `CONSTRUCTS`, typed parameters or attributes as `USES_TYPE` where annotations are statically available, `self` and `cls` receiver bindings, and class inheritance where targets resolve to known symbols
-
-The Go adapter SHALL detect deterministic dependency signals from:
-
-- standard, grouped, aliased, dot, and blank imports
-- file-to-file `IMPORTS` relations for resolvable package imports
-- selector expressions such as `pkg.Func()` and `obj.Method()` when package aliases or receiver bindings make the target deterministic
-- constructor-like calls and composite literals as `CONSTRUCTS` when they identify resolvable types
-- promoted methods and receiver-related composition only when they can be normalized without speculative inference
-
-The PHP adapter SHALL continue to support require/include, dynamic loader dependencies, loaded-instance calls, and framework-managed bindings, but these deterministic facts SHOULD feed the shared scoped binding model rather than remaining only in adapter-local alias maps.
+Generic indexing or resolution code MUST NOT add language-name branches to compensate for facts omitted by a built-in adapter. A language-specific capability absent from its facts SHALL remain unsupported coverage.
 
 ### Requirement: Detectable dependency boundary
 
@@ -223,70 +158,6 @@ Any metadata needed by `resolveQualifiedNameToPath` during Pass 2 (for example P
 
 The PHP adapter in particular MUST use the shared session's common file and symbol lookups for CakePHP, CodeIgniter, and namespace-driven resolution so dynamic path resolution does not regress into O(N) scans of all workspace symbols.
 
-### Requirement: PHP require/include dependencies
-
-The PHP adapter MUST detect `require`, `require_once`, `include`, and `include_once` expressions and emit `IMPORTS` relations when the path argument is a resolvable string literal.
-
-Rules:
-
-- When the argument is a plain string literal (e.g. `require_once 'lib/helper.php'`), resolve the path relative to the importing file's directory and emit an `IMPORTS` relation from the current file to the resolved path.
-- When the argument is a dynamic expression (concatenation, a PHP constant such as `APPPATH` or `__DIR__ . '/...'`, a variable), the expression MUST be silently dropped — no relation is created, no error is thrown.
-- The resolved path is not validated against the filesystem at extraction time — the indexer's existing file-existence check during Pass 2 handles missing targets.
-
-This covers legacy PHP codebases (pre-namespace) and framework bootstrappers that load files via include paths rather than autoloaders (CakePHP 1.x, CodeIgniter 1.x–3.x, Zend 1.x, Drupal 7, WordPress).
-
-### Requirement: PHP dynamic loader dependencies
-
-The PHP adapter MUST detect framework-specific dependency acquisition patterns and emit file-level `IMPORTS` relations when the referenced target can be resolved to a file path.
-
-Supported pattern families include:
-
-- CakePHP:
-  - `$this->loadModel('X')`, `loadModel('X')`
-  - `$this->loadController('X')`, `loadController('X')`
-  - `$this->loadComponent('X')`, `loadComponent('X')`
-  - `App::uses('X', 'Y')`, `App::import('Model', 'X')`, `ClassRegistry::init('X')`
-  - class-property dependency declarations such as `var $uses = array(...)`, `public $uses = [...]`, and `protected $uses = [...]` when they use literal string entries
-- CodeIgniter:
-  - `$this->load->model('X')`, `$this->load->library('X')`, `$this->load->helper('X')`
-- Yii:
-  - `Yii::import('...')`, `Yii::createObject('...')` when the target class or path is expressed as a literal and can be resolved
-- Zend:
-  - `Zend_Loader::loadClass('...')`
-- Other PHP framework or container families:
-  - explicit dependency acquisition APIs using class literals, qualified class names, or deterministic naming conventions MAY be supported when resolver rules can map them to concrete files without executing application code
-
-Rules:
-
-- When dependency-acquisition arguments are string literals or class literals and resolver rules can map them to a concrete target file, emit `IMPORTS` from source file to resolved target file.
-- When dependency declarations appear as class properties with literal entries, the adapter MUST treat them as file-level dependency signals for the declaring class.
-- Generic method names (for example `->get('x')`) MUST NOT be detected unless a resolver explicitly declares a framework-specific signature with deterministic target resolution.
-- When arguments are non-literal, container-driven without an explicit class target, or the target cannot be resolved, silently drop the relation (no fallback `DEPENDS_ON` edge for file dependencies).
-
-### Requirement: PHP loaded-instance call extraction
-
-The PHP adapter MUST perform deterministic heuristic extraction of `CALLS` from framework-managed or explicitly constructed PHP instances when their targets can be resolved statically.
-
-Rules:
-
-- Within a single method or function body, track aliases bound to resolved loaded dependencies, framework-managed properties, and simple local assignments.
-- Class-property dependency declarations (for example CakePHP `uses`) MUST make the corresponding framework-managed aliases available to methods of the declaring class.
-- Bare loader forms and receiver-based loader forms that resolve the same dependency kind MUST feed the same alias and call-resolution flow.
-- For member calls on those aliases (for example `$this->Article->save()`, `$model->find()`, `$this->email->send()`), emit `CALLS` only when both caller and callee symbols are resolvable.
-- Explicit instance construction flows such as `new X()` or class-literal service acquisition MAY emit `CALLS` when the constructed or resolved class target is statically known and the subsequent method call can be mapped to a concrete symbol.
-- Do not perform interprocedural propagation in this requirement (no cross-method alias flow, no whole-program inference).
-- Ambiguous alias targets, runtime-only service identifiers, and unresolved member calls MUST be dropped to avoid noisy false positives.
-
-### Requirement: PHP loader resolver extensibility
-
-Loader support in the PHP adapter MUST be registry-based and extensible.
-
-Rules:
-
-- Framework-specific loader detection/resolution MUST be implemented as resolver entries (or resolver modules) with a shared contract.
-- Adding a new loader API (e.g. `loadController`, `loadComponent`, or framework-specific factories) MUST be achievable by adding resolver definitions, without changing the core extraction flow.
-- Resolver behavior must be unit-tested per pattern to prevent regressions in existing loader coverage.
-
 ### Requirement: Tree-sitter query patterns
 
 The specific Tree-sitter / ast-grep query patterns used by each adapter are internal implementation details. They MUST NOT be part of the public API or exposed through the `LanguageAdapter` interface. Adapters are free to change their internal query patterns without breaking consumers.
@@ -304,6 +175,34 @@ An `AdapterRegistry` SHALL map language identifiers to `LanguageAdapter` instanc
 The extension-to-language map is built dynamically from registered adapters — there is no hardcoded extension list in the registry. Adding a new language requires only registering a new adapter.
 
 The TypeScript adapter MUST be registered by default when the registry is created. Additional adapters can be registered to extend language support.
+
+### Requirement: Resolver capability declaration
+
+Every adapter SHALL declare the semantic categories it can deterministically prove: declarations, members, public/local bindings, hierarchy, and build-context selection. A capability flag MUST be true only when the adapter emits enough shared facts and ordered provenance for the generic resolver to prove that category. A graph relation emitted only for impact traversal does not by itself satisfy the corresponding resolver capability.
+
+Missing capability support SHALL be recorded as unsupported coverage rather than guessed by the generic resolver. Emitted facts SHALL use the shared logical-symbol, binding, symbol-space, member-form, source-range, hierarchy, provenance-step, and coverage vocabulary. Adapter-specific syntax MUST NOT leak into generic resolver branches.
+
+### Requirement: Built-in adapter specialization
+
+The general language-adapter spec SHALL define the shared port, phase boundaries, fact vocabulary, determinism, capability truthfulness, and common failure behavior. Each built-in adapter SHALL have one complete specific spec defining its languages and extensions, parsed declarations, ranges, imports and exports, logical ownership, member forms and symbol spaces, scoped facts, hierarchy and provenance, package/build context, relations, and unsupported boundary.
+
+A specific adapter spec MAY impose stricter language semantics than this general contract but MUST NOT weaken shared safety or determinism. When implementation changes a built-in adapter's observable syntax or semantic coverage, its specific spec SHALL change with it.
+
+### Requirement: Logical declaring-owner facts
+
+An adapter that advertises member support SHALL derive a member's declaring owner from language syntax and map it to a logical owner identity before constructing the member identity. Raw parser-node identifiers and optional syntax-level parent fields MUST NOT be used as logical owner identities. Top-level declarations SHALL have no owner, and same-name members under different logical owners MUST remain distinct.
+
+### Requirement: Hierarchy evidence consistency
+
+An adapter that advertises `hierarchy: true` SHALL emit shared hierarchy facts and ordered provenance steps sufficient for `ResolveSymbolReference` to traverse from a child owner to an ancestor, embedded, composed, or contract owner and subsequently query a requested member under that owner. It SHALL keep those facts semantically consistent with persisted `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES` relations.
+
+Empty hierarchy/provenance output for source containing supported, resolvable hierarchy syntax is a capability violation. Unsupported precedence, build alternatives, or dynamic hierarchy semantics SHALL instead produce explicit unsupported or unresolved coverage; they MUST NOT be guessed.
+
+### Requirement: Complete symbol source ranges
+
+Every built-in adapter SHALL emit, for each symbol, the complete syntactic construct range and exact declared-name `selectionRange` using the shared half-open source-range convention. The selection range MUST be contained by the construct range.
+
+Adapters SHALL derive these ranges from parsed syntax before parser artifacts are released. They MUST NOT approximate a construct end from the next symbol or from line-oriented regular expressions when the parser exposes the authoritative node range. A candidate without trustworthy complete and selection ranges SHALL be omitted and its capability gap reported rather than emitted with misleading coordinates.
 
 ## Constraints
 

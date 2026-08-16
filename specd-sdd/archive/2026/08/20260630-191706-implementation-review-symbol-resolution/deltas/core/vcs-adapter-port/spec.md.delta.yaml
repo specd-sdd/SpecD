@@ -1,0 +1,23 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: ref returns the current short revision'
+  content: |
+    `ref()` MUST return a `Promise<string | null>` resolving to the stable short revision identifier for the current commit or changeset.
+
+    The returned revision MUST NOT encode working-tree cleanliness, a dirty suffix, status summary, current working directory, or other transient state. Consumers SHALL assess modified content separately through `modifiedFiles(baseRef)`.
+
+    When VCS is unavailable or the repository has no commits, `ref()` MUST resolve to `null`. It MUST NOT throw in these cases.
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: modifiedFiles lists changed repository files'
+  content: |
+    `modifiedFiles(baseRef)` MUST accept a baseline revision identifier and return a `Promise<readonly string[]>`.
+
+    Results SHALL be normalized, forward-slash, repository-root-relative paths and SHALL be independent of the adapter construction `cwd`. The result SHALL include every path whose current worktree state differs from the baseline, including staged, unstaged, untracked, deleted/missing paths and both the removed and added sides of a rename or move.
+
+    Git, Mercurial, SVN, external, and future adapters SHALL preserve these backend-neutral semantics using their native status/history mechanisms. The port does not expose a backend-specific diff fingerprint; consumers own filtering, content hashing, state classification, ordering, and fingerprint construction.
+
+    Empty results MUST be represented as an empty array, not `null`. Backend execution failures MAY reject and MUST NOT be converted into a falsely clean empty result.

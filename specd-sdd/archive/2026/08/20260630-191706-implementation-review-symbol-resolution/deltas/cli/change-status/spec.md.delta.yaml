@@ -1,0 +1,31 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Implementation section'
+  content: |
+    When implementation tracking is active, `--implementation` SHALL render the structured projection returned by `sdk:build-implementation-review`.
+
+    The section SHALL retain tracked-file states and confirmed stored values and SHALL expose each symbol link's status, reason, health/coverage, canonical logical target, candidates, and provenance. File-level links remain unforced.
+
+    The CLI MUST NOT enrich `GetStatus` through independent graph queries or same-file/rightmost-name fallback and MUST NOT mutate tracking or sidecars.
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - `cli:entrypoint` — output conventions
+    - `core:change` — change state model
+    - `core:get-status` — lifecycle status projection
+    - `sdk:build-implementation-review` — shared implementation resolution projection
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Constraints'
+  content: |
+    - The output includes all artifacts declared by the schema, not only those present on disk.
+    - `effectiveStatus` reflects dependency cascading.
+    - The CLI serializes lifecycle and tracking state returned by Core and symbol-resolution state returned by the SDK; it recomputes neither.
+    - The CLI MUST NOT call `SchemaRegistry`, `config show`, or another use case to recompute lifecycle data.
+    - Lifecycle semantics remain projections of `GetStatus` and `LifecycleEngine`.

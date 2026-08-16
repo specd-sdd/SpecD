@@ -19,11 +19,9 @@ Its output MUST include:
 - tracked implementation files grouped by review state (`open`, `resolved`, `ignored`, `removed`)
 - confirmed implementation links grouped by `specId` and file
 - symbol-level refinements when a link has `symbols`
-- stale-link diagnostics for symbol-level links whose target symbol no longer exists in the graph database
+- the SDK implementation-review projection for every symbol-level link, including `resolved`, `ambiguous`, `unresolved`, or `missing` status, machine-readable reason, canonical logical target, candidates, graph health/coverage, and binding or hierarchy provenance when present
 
-When a symbol-level link contains a composed member identifier such as `X.Y`, `X#Y`, or `X::Y`, and the exact stored symbol string is not found in the graph, the CLI SHOULD retry stale resolution against the same file using the rightmost member segment plus the graph-reported symbol kind.
-
-This fallback is best-effort only. It MUST NOT rewrite the stored symbol string, MUST NOT mutate change state or archived sidecars, and MUST leave the symbol marked stale when multiple same-file matches make the fallback ambiguous.
+The CLI SHALL obtain this projection from `sdk:build-implementation-review`. It MUST NOT implement exact-file, rightmost-member, same-name, re-export, or hierarchy fallback policy and MUST NOT rewrite stored link values.
 
 ### Requirement: Add subcommand
 
@@ -97,16 +95,16 @@ If the last symbol is removed from a `spec + file` set whose file-level presence
 
 ### Requirement: Review subcommand
 
-`specd changes implementation review <name>` SHALL support implementation-traceability integrity review.
+`specd changes implementation review <name>` SHALL support implementation-traceability integrity review using the same SDK projection as `list` and change status.
 
 The review flow MUST:
 
-- report stale symbol-level links whose target symbol is absent from the graph database
-- use the current tracked implementation files and confirmed implementation links as review input
-- distinguish symbol-level stale diagnostics from archive-time materialization failures and workspace-boundary validation failures
-- surface when implementation-sidecar maintenance would require updates outside the current spec scope
-
-For symbol-level stale diagnostics, the review flow SHOULD apply the same composed-member fallback used by `list` and `change status` for symbols containing `.`, `#`, or `::`, restricted to same-file matching and without mutating stored link data.
+- use current tracked implementation files and confirmed links as raw input
+- render structured `resolved`, `ambiguous`, `unresolved`, and `missing` outcomes without selecting an ambiguous candidate
+- distinguish incomplete/non-current graph evidence from a fresh, complete proof of absence
+- distinguish symbol diagnostics from archive-time materialization and workspace-boundary failures
+- surface when sidecar maintenance would require updates outside current spec scope
+- leave active tracking and archived sidecars unchanged
 
 ### Requirement: Shared path semantics
 
@@ -117,7 +115,7 @@ The CLI MUST NOT require users to enter canonical `workspace:path` identities du
 ## Spec Dependencies
 
 - [`core:change`](../../core/change/spec.md) — tracked implementation file state and confirmed link behavior
-- [`code-graph:symbol-model`](../../code-graph/symbol-model/spec.md) — file-level and symbol-level graph relations
+- [`sdk:build-implementation-review`](../../sdk/build-implementation-review/spec.md) — shared graph-enriched review projection
 - [`core:update-implementation-tracking`](../../core/update-implementation-tracking/spec.md) — core mutation primitive for tracked files and confirmed links
 - [`core:get-implementation-review`](../../core/get-implementation-review/spec.md) — core read model for implementation review
 - [`core:refresh-implementation-tracking`](../../core/refresh-implementation-tracking/spec.md) — autodetection-driven refresh path reused by implementation review flows

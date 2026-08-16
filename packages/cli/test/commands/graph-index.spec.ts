@@ -1,5 +1,17 @@
-import { describe, it, expect, vi, afterEach } from 'vitest'
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest'
+import { EventEmitter } from 'node:events'
+import { spawn } from 'node:child_process'
+import { acquireGraphIndexLock } from '@specd/code-graph/internal'
 import { captureStdout } from './helpers.js'
+
+vi.mock('node:child_process', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:child_process')>()
+  return { ...actual, spawn: vi.fn() }
+})
+vi.mock('@specd/code-graph/internal', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@specd/code-graph/internal')>()
+  return { ...actual, acquireGraphIndexLock: vi.fn(() => vi.fn()) }
+})
 
 vi.mock('../../src/helpers/sdk-host.js', () => ({
   resolveSdkHostContext: vi.fn(),
@@ -54,7 +66,17 @@ const mockIndexResult = {
       specsIndexed: 3,
     },
   ],
+  fullRebuild: false,
   fullRebuildReason: null,
+  phaseMetrics: {
+    importResolution: { count: 0, durationMs: 0 },
+    dependencyFacts: { count: 0, durationMs: 0 },
+    adapterRelations: { count: 0, durationMs: 0 },
+    reexports: { count: 0, durationMs: 0 },
+    hierarchyOverrides: { count: 0, durationMs: 0 },
+    persistence: { count: 0, durationMs: 0 },
+    searchIndexRebuild: { count: 0, durationMs: 0 },
+  },
 }
 
 async function runIndex(
@@ -116,16 +138,49 @@ function makeIndexProgram() {
 
 afterEach(() => {
   vi.restoreAllMocks()
+  vi.unstubAllEnvs()
+})
+
+beforeEach(() => {
+  vi.stubEnv('SPECD_GRAPH_INDEX_NO_WORKER', 'true')
 })
 
 describe('graph index', () => {
   it('delegates indexing to runIndexProjectGraph in configured mode', async () => {
-    setup('configured')
+    const { config, kernel } = setup('configured')
 
     const program = makeIndexProgram()
     await runIndex(program, 'graph', 'index')
 
+    expect(resolveSdkHostContext).toHaveBeenCalledWith(config, kernel)
     expect(runIndexProjectGraph).toHaveBeenCalled()
+  })
+
+  it('owns the shared lock in a parent process and propagates worker exit', async () => {
+    setup('configured')
+    vi.stubEnv('SPECD_GRAPH_INDEX_NO_WORKER', '')
+    const child = Object.assign(new EventEmitter(), { kill: vi.fn() })
+    vi.mocked(spawn).mockImplementation(() => {
+      setImmediate(() => child.emit('exit', 0, null))
+      return child as never
+    })
+
+    const program = makeIndexProgram()
+    await runIndex(program, 'graph', 'index')
+
+    expect(acquireGraphIndexLock).toHaveBeenCalledTimes(1)
+    expect(spawn).toHaveBeenCalledWith(
+      process.execPath,
+      process.argv.slice(1),
+      expect.objectContaining({
+        stdio: 'inherit',
+        env: expect.objectContaining({
+          SPECD_GRAPH_INDEX_WORKER: 'true',
+          SPECD_GRAPH_INDEX_LOCK_HELD: 'true',
+        }),
+      }),
+    )
+    expect(runIndexProjectGraph).not.toHaveBeenCalled()
   })
 
   it('does not expose a --workspace option anymore', () => {
@@ -137,11 +192,12 @@ describe('graph index', () => {
   })
 
   it('delegates indexing in bootstrap mode', async () => {
-    setup('bootstrap')
+    const { config } = setup('bootstrap')
 
     const program = makeIndexProgram()
     await runIndex(program, 'graph', 'index', '--path', '/tmp/repo')
 
+    expect(resolveSdkHostContext).toHaveBeenCalledWith(config, null)
     expect(runIndexProjectGraph).toHaveBeenCalled()
   })
 

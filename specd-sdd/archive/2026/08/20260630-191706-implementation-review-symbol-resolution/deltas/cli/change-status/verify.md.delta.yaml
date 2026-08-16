@@ -1,0 +1,13 @@
+- op: removed
+  selector: { type: section, matches: 'Requirement: Implementation section' }
+- op: added
+  position: { parent: { type: section, matches: 'Requirements' } }
+  content: |
+    ### Requirement: Implementation section
+
+    #### Scenario: Status uses the shared SDK projection
+
+    - **GIVEN** implementation links include reexport, hierarchy, ambiguity, and incomplete coverage cases
+    - **WHEN** `change status --implementation` runs
+    - **THEN** it renders the same outcomes and stored values as implementation review
+    - **AND** performs no independent graph matching or mutation

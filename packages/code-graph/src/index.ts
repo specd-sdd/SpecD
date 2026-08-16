@@ -7,13 +7,19 @@ export {
   type GraphStoreFactory,
   type GraphStoreFactoryOptions,
 } from './composition/graph-store-factory.js'
-export type { CodeGraphProvider } from './composition/code-graph-provider.js'
+export type {
+  CodeGraphProvider,
+  ExactPublicBindingResult,
+  ExactPublicBindingSelector,
+  IndexingOpenResult,
+} from './composition/code-graph-provider.js'
 
 // Host use cases
 export {
   GetGraphHealth,
   type GetGraphHealthInput,
   type GetGraphHealthResult,
+  type IndexCoverageHealthSummary,
 } from './application/use-cases/get-graph-health.js'
 export { createGetGraphHealth } from './composition/use-cases/get-graph-health.js'
 export {
@@ -33,11 +39,23 @@ export {
   type GetChangeSpecCoverageResult,
 } from './application/use-cases/get-change-spec-coverage.js'
 export { createGetChangeSpecCoverage } from './composition/use-cases/get-change-spec-coverage.js'
+export { ResolveSymbolReference } from './application/use-cases/resolve-symbol-reference.js'
+export {
+  FreshnessMode,
+  FreshnessState,
+  IndexedInputKind,
+  IndexedResourceKind,
+  type FreshnessLatches,
+  type IndexedInputObservation,
+  type IndexedResourceFreshnessResult,
+  type IndexedResourceKey,
+  type WorkspaceFreshnessResult,
+} from './domain/value-objects/indexed-input-freshness.js'
 
 // Value objects
 export { type FileNode } from './domain/value-objects/file-node.js'
 export { type DocumentNode } from './domain/value-objects/document-node.js'
-export { type SymbolNode } from './domain/value-objects/symbol-node.js'
+export { type SourceRange, type SymbolNode } from './domain/value-objects/symbol-node.js'
 export { type SpecNode } from './domain/value-objects/spec-node.js'
 export { type Relation } from './domain/value-objects/relation.js'
 export { SymbolKind } from './domain/value-objects/symbol-kind.js'
@@ -48,6 +66,28 @@ export { type LanguageAdapter } from './domain/value-objects/language-adapter.js
 export { type ImportDeclaration } from './domain/value-objects/import-declaration.js'
 export { ImportDeclarationKind } from './domain/value-objects/import-declaration-kind.js'
 export { type SourceLocation } from './domain/value-objects/source-location.js'
+export {
+  SymbolSpace,
+  MemberForm,
+  createLogicalSymbol,
+  parseLogicalSymbol,
+  createPublicBinding,
+  createLocalBinding,
+  type DeclarationOccurrence,
+  type LogicalSymbol,
+  type PublicBinding,
+  type LocalBinding,
+  type ResolutionStep,
+  type AdapterCapabilities,
+  type HierarchyFact,
+  type ReferenceFacts,
+  type ResolveSymbolReferenceInput,
+  type ResolutionStatus,
+  type ResolutionHealth,
+  type ResolutionCandidate,
+  type SymbolResolutionResult,
+} from './domain/value-objects/symbol-reference.js'
+export { IndexCoverageStatus, type IndexCoverage } from './domain/value-objects/index-session.js'
 export {
   BindingScopeKind,
   BindingSourceKind,
@@ -72,6 +112,8 @@ export {
   type IndexResult,
   type IndexError,
   type WorkspaceIndexBreakdown,
+  type IndexPhaseMetric,
+  type IndexPhaseMetrics,
 } from './domain/value-objects/index-result.js'
 export {
   type IndexSession,
@@ -83,7 +125,12 @@ export { InMemoryIndexSession } from './application/use-cases/in-memory-index-se
 // Traversal types
 export { type TraversalOptions } from './domain/value-objects/traversal-options.js'
 export { type TraversalResult } from './domain/value-objects/traversal-result.js'
-export { type ImpactResult, type FileImpactResult } from './domain/value-objects/impact-result.js'
+export {
+  type CoveringSpecEvidence,
+  type CoveringSpecImpact,
+  type ImpactResult,
+  type FileImpactResult,
+} from './domain/value-objects/impact-result.js'
 export { type ChangeDetectionResult } from './domain/value-objects/change-detection-result.js'
 export { type RiskLevel } from './domain/value-objects/risk-level.js'
 export {
@@ -95,6 +142,26 @@ export {
 
 // Search
 export { type SearchOptions } from './domain/value-objects/search-options.js'
+export type {
+  ReferenceAwareSymbolHit,
+  ReferenceAwareSymbolResult,
+  SearchCategory,
+  SearchCodeGraphInput,
+  SearchCodeGraphResult,
+  SymbolSearchMatchTier,
+  UnifiedDocumentSearchResult,
+  UnifiedSpecSearchResult,
+} from './application/use-cases/search-code-graph.js'
+export type {
+  SourceContentMatch,
+  SourceFileSearchResult,
+  SourceSearchMatchKind,
+  SourceSearchSnippet,
+} from './domain/value-objects/source-search.js'
+export type {
+  PublicBindingImpactResult,
+  ResolvedPublicBindingImpactInput,
+} from './domain/services/analyze-impact.js'
 
 // Discovery
 export {
@@ -136,6 +203,7 @@ export { StoreNotOpenError } from './domain/errors/store-not-open-error.js'
 import { readInstalledCodeGraphVersion } from './application/use-cases/_shared/installed-code-graph-version.js'
 
 export { SpecNotFoundError } from './domain/errors/spec-not-found-error.js'
+export { acquireGraphIndexLock, getGraphIndexLockPath } from './infrastructure/index-lock.js'
 
 /** Installed version of `@specd/code-graph`. */
 export const CODE_GRAPH_VERSION: string = readInstalledCodeGraphVersion()

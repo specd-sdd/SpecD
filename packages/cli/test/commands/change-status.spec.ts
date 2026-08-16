@@ -441,7 +441,7 @@ describe('Output format', () => {
           file: 'packages/core/src/change.ts',
           fileLinkExplicit: true,
           symbols: ['Change.transition'],
-          staleSymbols: [],
+          symbolResolutions: [],
         },
       ],
       graphHint: {

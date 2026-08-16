@@ -69,96 +69,18 @@
 
 ### Requirement: Language detection
 
-#### Scenario: Unrecognized extension skipped
+#### Scenario: Registry uses adapter-declared extension mapping
 
-- **GIVEN** a file `README.md` with no registered adapter for `.md`
-- **WHEN** `getAdapterForFile('README.md')` is called
-- **THEN** `undefined` is returned and no error is thrown
+- **GIVEN** adapters declare disjoint language and extension maps
+- **WHEN** files are resolved through the registry
+- **THEN** registered extensions select their declaring adapters
+- **AND** an unknown extension is skipped without a node or error
 
-#### Scenario: TypeScript extension mapped
+#### Scenario: General contract contains no built-in extension table
 
-- **WHEN** `getAdapterForFile('src/index.ts')` is called
-- **THEN** the `TypeScriptLanguageAdapter` is returned
-
-#### Scenario: JSX extension mapped
-
-- **WHEN** `getAdapterForFile('src/App.jsx')` is called
-- **THEN** the `TypeScriptLanguageAdapter` is returned (it handles jsx)
-
-### Requirement: TypeScript adapter
-
-#### Scenario: Function declaration is present in file analysis
-
-- **GIVEN** content containing `function createUser(name: string) { ... }`
-- **WHEN** `analyzeFile()` is called
-- **THEN** the returned `FileAnalysisDraft.symbols` include a `SymbolNode` with `name: 'createUser'`, `kind: 'function'`
-
-#### Scenario: Arrow function assigned to const is present in file analysis
-
-- **GIVEN** content containing `export const validate = (input: string) => { ... }`
-- **WHEN** `analyzeFile()` is called
-- **THEN** the returned `FileAnalysisDraft.symbols` include a `SymbolNode` with `name: 'validate'`, `kind: 'function'`
-
-#### Scenario: Class and method are captured separately
-
-- **GIVEN** content containing `class AuthService { login() { ... } }`
-- **WHEN** `analyzeFile()` is called
-- **THEN** the returned symbols include one `class` named `AuthService` and one `method` named `login`
-
-#### Scenario: JSDoc comment is retained with the symbol
-
-- **GIVEN** content containing a JSDoc block immediately before a declaration
-- **WHEN** `analyzeFile()` is called
-- **THEN** the corresponding symbol contains the raw comment text in `comment`
-
-#### Scenario: Exported symbol yields an EXPORTS relation during relation building
-
-- **GIVEN** a file analysis from content containing `export function createUser() { ... }`
-- **WHEN** `buildRelations()` is called for that analysis
-- **THEN** an `EXPORTS` relation from the file to the `createUser` symbol is returned
-
-#### Scenario: Member assignment to IIFE extracts namespace symbol as variable
-
-- **GIVEN** content containing `App.Article = (function(){ ... })();`
-- **WHEN** `analyzeFile()` is called
-- **THEN** a `SymbolNode` with `name: 'App.Article'` and `kind: 'variable'` is extracted
-
-#### Scenario: Member assignment to function extracts method symbol with qualified name
-
-- **GIVEN** content containing `Article.prototype.generateAltHeadlines = function(config, data) { ... }`
-- **WHEN** `analyzeFile()` is called
-- **THEN** a `SymbolNode` with `name: 'Article.prototype.generateAltHeadlines'` and `kind: 'method'` is extracted
-
-#### Scenario: Object literal method is extracted as method symbol
-
-- **GIVEN** content containing `const Article = { generateAltHeadlines: function(config, data) { ... } };`
-- **WHEN** `analyzeFile()` is called
-- **THEN** a `SymbolNode` with `name: 'generateAltHeadlines'` and `kind: 'method'` is extracted
-
-#### Scenario: Class arrow field property is extracted as method symbol
-
-- **GIVEN** content containing `class ArticleHandler { generateAltHeadlines = (config, data) => { ... }; }`
-- **WHEN** `analyzeFile()` is called
-- **THEN** a `SymbolNode` with `name: 'generateAltHeadlines'` and `kind: 'method'` is extracted
-
-#### Scenario: HOF wrapper initializer extracts function symbol
-
-- **GIVEN** content containing `const generateAltHeadlines = memoize(withAuth(function(config, data) { ... }));`
-- **WHEN** `analyzeFile()` is called
-- **THEN** a `SymbolNode` with `name: 'generateAltHeadlines'` and `kind: 'function'` is extracted
-
-#### Scenario: Destructuring pattern extracts individual variable symbols
-
-- **GIVEN** content containing `const { generateAltHeadlines, parseArticle } = articleUtils;`
-- **WHEN** `analyzeFile()` is called
-- **THEN** individual `SymbolNode` entries for `generateAltHeadlines` and `parseArticle` are extracted
-
-#### Scenario: CommonJS export assignment yields symbol and EXPORTS relation
-
-- **GIVEN** content containing `exports.generateAltHeadlines = function(config, data) { ... };`
-- **WHEN** `analyzeFile()` and `buildRelations()` are called
-- **THEN** a symbol with `name: 'generateAltHeadlines'` and `kind: 'function'` is extracted
-- **AND** an `EXPORTS` relation is emitted for that symbol
+- **WHEN** a built-in adapter adds or changes supported extensions
+- **THEN** its specific spec and adapter registration change
+- **AND** generic language detection requires no language-name branch
 
 ### Requirement: Import declaration extraction
 
@@ -268,6 +190,13 @@
 - **GIVEN** PHP content declaring `var $uses = array('Article')` and calling `$this->Article->save()`
 - **WHEN** `analyzeFile()` is called
 - **THEN** the framework-managed `Article` receiver and member call are represented as shared facts
+
+#### Scenario: Specific adapter spec owns semantic coverage
+
+- **GIVEN** one built-in adapter omits a deterministic language fact required by its specific spec
+- **WHEN** indexing and resolution run
+- **THEN** generic code does not compensate with a language-name branch
+- **AND** the gap remains unsupported until the adapter emits the shared fact
 
 ### Requirement: Detectable dependency boundary
 
@@ -457,110 +386,6 @@
 - **THEN** the adapter resolves the import from that retained metadata and shared session lookups
 - **AND** it does not probe the filesystem for each import candidate
 
-### Requirement: PHP require/include dependencies
-
-#### Scenario: require_once with relative string literal emits IMPORTS
-
-- **GIVEN** a PHP file at `app/controllers/PostsController.php` containing `require_once '../models/Post.php'`
-- **WHEN** `buildRelations()` is called from the stored file analysis
-- **THEN** an `IMPORTS` relation is returned from `app/controllers/PostsController.php` to `app/models/Post.php`
-
-#### Scenario: include with relative path emits IMPORTS
-
-- **GIVEN** a PHP file containing `include 'helpers/url_helper.php'`
-- **WHEN** `buildRelations()` is called from the stored file analysis
-- **THEN** an `IMPORTS` relation is returned pointing to `helpers/url_helper.php` relative to the file's directory
-
-#### Scenario: require with PHP constant expression is silently dropped
-
-- **GIVEN** a PHP file containing `require_once APPPATH . 'models/Post.php'`
-- **WHEN** `buildRelations()` is called
-- **THEN** no `IMPORTS` relation is created for that expression and no error is thrown
-
-#### Scenario: require with variable is silently dropped
-
-- **GIVEN** a PHP file containing `require_once $path`
-- **WHEN** `buildRelations()` is called
-- **THEN** no relation is created for that expression and no error is thrown
-
-### Requirement: PHP dynamic loader dependencies
-
-#### Scenario: loadModel emits IMPORTS when target resolves
-
-- **GIVEN** a PHP file analysis containing `$this->loadModel('User')`
-- **AND** resolver rules can map `User` to a concrete file
-- **WHEN** `buildRelations()` is called
-- **THEN** an `IMPORTS` relation is returned to that target file
-
-#### Scenario: CodeIgniter load->model emits IMPORTS when target resolves
-
-- **GIVEN** a PHP file analysis containing `$this->load->model('User_model')`
-- **AND** resolver rules can map `User_model` to a concrete file
-- **WHEN** `buildRelations()` is called
-- **THEN** an `IMPORTS` relation is returned
-
-#### Scenario: CakePHP uses property emits IMPORTS when literals resolve
-
-- **GIVEN** a controller class declaring `var $uses = array('Article', 'Category')`
-- **AND** resolver rules can map both entries to concrete files
-- **WHEN** `buildRelations()` is called
-- **THEN** `IMPORTS` relations are returned for both resolved targets
-
-#### Scenario: Dynamic argument is silently dropped
-
-- **GIVEN** a PHP file containing `$this->loadModel($modelName)`
-- **WHEN** `buildRelations()` is called
-- **THEN** no relation is created for that call and no error is thrown
-
-#### Scenario: Unresolvable target is silently dropped
-
-- **GIVEN** a PHP file containing a known loader call with literal argument
-- **AND** resolver rules cannot map it to a target file
-- **WHEN** `buildRelations()` is called
-- **THEN** no relation is created for that call and no error is thrown
-
-### Requirement: PHP loaded-instance call extraction
-
-#### Scenario: Member call on loaded alias emits CALLS
-
-- **GIVEN** a method containing `loadModel('Article')` and later `$this->Article->save()`
-- **WHEN** `buildRelations()` runs with resolvable caller and callee symbols
-- **THEN** a `CALLS` relation is emitted from caller symbol to callee symbol
-
-#### Scenario: Local variable alias emits CALLS
-
-- **GIVEN** a method containing `$model = $this->Article` and later `$model->find()`
-- **WHEN** both symbols are resolvable
-- **THEN** a `CALLS` relation is emitted
-
-#### Scenario: CakePHP uses property makes framework-managed alias available to methods
-
-- **GIVEN** a class declaring `var $uses = array('Article')`
-- **AND** one of its methods calls `$this->Article->save()`
-- **WHEN** caller and callee symbols are resolvable
-- **THEN** a `CALLS` relation is emitted from that method to `Article::save`
-
-#### Scenario: Runtime-only service identifier is not promoted to CALLS
-
-- **GIVEN** a method fetches a service using only a runtime string identifier
-- **AND** no deterministic class target can be resolved
-- **WHEN** a method call is later made on the fetched value
-- **THEN** no `CALLS` relation is emitted from that dynamic lookup
-
-### Requirement: PHP loader resolver extensibility
-
-#### Scenario: Loader detection is registry-based
-
-- **GIVEN** a PHP adapter with loader resolver registry
-- **WHEN** a new loader API pattern is registered
-- **THEN** the adapter can detect it without changing the core extraction flow
-
-#### Scenario: Adding a new loader requires resolver definition
-
-- **GIVEN** a framework-specific loader pattern
-- **WHEN** the pattern is added as a resolver definition
-- **THEN** the adapter can detect it and no core extraction code changes
-
 ### Requirement: Tree-sitter query patterns
 
 #### Scenario: Query patterns are internal implementation details
@@ -568,3 +393,58 @@
 - **GIVEN** a language adapter uses Tree-sitter query patterns internally
 - **WHEN** consumers call the adapter methods
 - **THEN** query patterns are not exposed through the public API
+
+### Requirement: Resolver capability declaration
+
+#### Scenario: Relation-only support does not satisfy resolver capability
+
+- **GIVEN** an adapter emits an `EXTENDS` relation but no shared hierarchy provenance
+- **WHEN** capabilities are recorded
+- **THEN** it cannot truthfully advertise hierarchy resolution support
+
+#### Scenario: Unsupported capability is explicit
+
+- **GIVEN** a custom adapter omits hierarchy capability
+- **WHEN** hierarchy resolution is requested
+- **THEN** coverage is unsupported and no generic guess is emitted
+
+### Requirement: Built-in adapter specialization
+
+#### Scenario: Adapter behavior changes its specific contract
+
+- **WHEN** a built-in adapter changes syntax, ownership, hierarchy, package, or unsupported behavior
+- **THEN** its complete specific spec changes with it
+- **AND** shared determinism and safety remain unchanged
+
+### Requirement: Logical declaring-owner facts
+
+#### Scenario: Syntax parent is not a logical owner
+
+- **GIVEN** two declaring types contain the same member name
+- **WHEN** an adapter emits member facts
+- **THEN** each member uses its declaring type's logical identity
+- **AND** neither member uses a parser or location-based parent ID
+
+### Requirement: Hierarchy evidence consistency
+
+#### Scenario: Supported hierarchy emits relations and resolver provenance
+
+- **GIVEN** supported source declares a resolvable owner hierarchy
+- **WHEN** an adapter advertises `hierarchy: true`
+- **THEN** hierarchy relations and shared traversal steps describe the same edges
+- **AND** the resolver can query a requested member under the reached owner
+
+### Requirement: Complete symbol source ranges
+
+#### Scenario: Built-in adapters report parser-authoritative ranges
+
+- **GIVEN** a supported multi-line declaration
+- **WHEN** a built-in language adapter extracts it
+- **THEN** the complete construct range comes from the parser node
+- **AND** the selection range covers the declared name and is contained by the construct
+
+#### Scenario: Untrustworthy third-party range is omitted
+
+- **GIVEN** a third-party parser cannot provide a valid construct or selection range
+- **WHEN** the adapter translates the declaration
+- **THEN** it omits the symbol instead of fabricating coordinates

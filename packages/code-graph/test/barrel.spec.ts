@@ -2,7 +2,13 @@ import { readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
-import { CODE_GRAPH_VERSION, type CodeGraphProvider } from '../src/public.js'
+import {
+  CODE_GRAPH_VERSION,
+  SymbolSpace,
+  createLogicalSymbol,
+  type CodeGraphProvider,
+  type LogicalSymbol,
+} from '../src/public.js'
 import { InMemoryIndexSession } from '../src/index.js'
 
 const packageRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -28,5 +34,18 @@ describe('@specd/code-graph barrel', () => {
 
     expect(provider).toBeUndefined()
     expect('CodeGraphProvider' in publicModule).toBe(false)
+  })
+
+  it('exports logical-symbol public types and constructors', () => {
+    const symbol: LogicalSymbol = createLogicalSymbol({
+      workspace: 'code-graph',
+      surface: 'src/public.ts',
+      name: 'CODE_GRAPH_VERSION',
+      space: SymbolSpace.Value,
+      ownerId: undefined,
+      memberForm: undefined,
+    })
+
+    expect(symbol.id).toContain('logical|')
   })
 })

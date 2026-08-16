@@ -1,11 +1,12 @@
 import { type GraphStore } from '../ports/graph-store.js'
 import {
   type AffectedSymbol,
+  type CoveringSpecImpact,
   type FileImpactResult,
   type ImpactResult,
 } from '../value-objects/impact-result.js'
 import { computeRiskLevel, maxRisk } from '../value-objects/risk-level.js'
-import { analyzeImpact } from './analyze-impact.js'
+import { analyzeImpact, type ImpactResolutionProvider } from './analyze-impact.js'
 
 /**
  * Analyzes the combined impact of all symbols within a file.
@@ -14,6 +15,7 @@ import { analyzeImpact } from './analyze-impact.js'
  * @param filePath - The path of the file to analyze.
  * @param direction - The traversal direction: upstream, downstream, or both.
  * @param maxDepth - Maximum traversal depth (default: 3).
+ * @param resolve - Optional provider of pre-resolved logical selectors.
  * @returns The aggregated file impact result across all symbols in the file.
  */
 export async function analyzeFileImpact(
@@ -21,13 +23,52 @@ export async function analyzeFileImpact(
   filePath: string,
   direction: 'upstream' | 'downstream' | 'both',
   maxDepth = 3,
+  resolve?: ImpactResolutionProvider,
 ): Promise<FileImpactResult> {
+  const details = await analyzeFileImpactDetails(store, filePath, direction, maxDepth, resolve)
+  return {
+    ...details.result,
+    coveringSpecs: await collectCoveringSpecs(store, details.fileDepths, details.symbolDepths),
+  }
+}
+
+/** Internal resource-depth projection reused by multi-file impact. */
+export interface FileImpactDetails {
+  readonly result: Omit<FileImpactResult, 'coveringSpecs'>
+  readonly fileDepths: ReadonlyMap<string, number>
+  readonly symbolDepths: ReadonlyMap<string, number>
+}
+
+/**
+ * Computes file impact and exact resource depths without issuing coverage queries.
+ * @param store - Graph store.
+ * @param filePath - Canonical input file.
+ * @param direction - Traversal direction.
+ * @param maxDepth - Traversal limit.
+ * @param resolve - Optional semantic target resolver.
+ * @returns Impact plus shallowest file/symbol depths.
+ */
+export async function analyzeFileImpactDetails(
+  store: GraphStore,
+  filePath: string,
+  direction: 'upstream' | 'downstream' | 'both',
+  maxDepth = 3,
+  resolve?: ImpactResolutionProvider,
+): Promise<FileImpactDetails> {
   const cachedStore = createMemoizedReadStore(store)
 
   // Symbol-level impact via CALLS
   const symbols = await cachedStore.findSymbols({ filePath })
   const symbolResults = await Promise.all(
-    symbols.map((s) => analyzeImpact(cachedStore, s.id, direction, maxDepth)),
+    symbols.map(async (symbol) =>
+      analyzeImpact(
+        cachedStore,
+        symbol.id,
+        direction,
+        maxDepth,
+        resolve === undefined ? undefined : await resolve(symbol.id),
+      ),
+    ),
   )
 
   // File-level impact via IMPORTS (BFS)
@@ -66,16 +107,33 @@ export async function analyzeFileImpact(
     overallRisk = maxRisk(overallRisk, result.riskLevel)
   }
 
+  const fileDepths = new Map<string, number>([[filePath, 0]])
+  for (const [depth, files] of fileImpact.depthFiles) {
+    for (const affectedFile of files) setMinimumDepth(fileDepths, affectedFile, depth)
+  }
+  const symbolDepths = new Map<string, number>()
+  for (const symbol of symbols) symbolDepths.set(symbol.id, 0)
+  for (const result of symbolResults) {
+    for (const symbol of result.affectedSymbols) {
+      setMinimumDepth(symbolDepths, symbol.id, symbol.depth)
+      setMinimumDepth(fileDepths, symbol.filePath, symbol.depth)
+    }
+  }
+
   return {
-    target: filePath,
-    directDependents,
-    indirectDependents,
-    transitiveDependents,
-    riskLevel: overallRisk,
-    affectedFiles: [...affectedFileSet],
-    affectedSymbols: deduplicateSymbols(symbolResults.flatMap((r) => r.affectedSymbols)),
-    affectedProcesses: [],
-    symbols: symbolResults,
+    result: {
+      target: filePath,
+      directDependents,
+      indirectDependents,
+      transitiveDependents,
+      riskLevel: overallRisk,
+      affectedFiles: [...affectedFileSet],
+      affectedSymbols: deduplicateSymbols(symbolResults.flatMap((r) => r.affectedSymbols)),
+      affectedProcesses: [],
+      symbols: symbolResults,
+    },
+    fileDepths,
+    symbolDepths,
   }
 }
 
@@ -92,7 +150,7 @@ async function analyzeFileImportImpact(
   filePath: string,
   direction: 'upstream' | 'downstream' | 'both',
   maxDepth: number,
-): Promise<ImpactResult> {
+): Promise<ImpactResult & { readonly depthFiles: ReadonlyMap<number, readonly string[]> }> {
   const visited = new Set<string>([filePath])
   const depthFiles = new Map<number, string[]>()
 
@@ -152,7 +210,104 @@ async function analyzeFileImportImpact(
     affectedFiles,
     affectedSymbols: [],
     affectedProcesses: [],
+    depthFiles,
   }
+}
+
+/**
+ * Resolves covering specs in two batch queries and folds all evidence deterministically.
+ * @param store - Graph store.
+ * @param fileDepths - Canonical file paths and shallowest depths.
+ * @param symbolDepths - Symbol ids and shallowest depths.
+ * @returns Deduplicated ordered covering specs.
+ */
+export async function collectCoveringSpecs(
+  store: GraphStore,
+  fileDepths: ReadonlyMap<string, number>,
+  symbolDepths: ReadonlyMap<string, number>,
+): Promise<CoveringSpecImpact[]> {
+  const [fileRelations, symbolRelations] = await Promise.all([
+    store.getCoveringSpecsForFiles([...fileDepths.keys()]),
+    store.getCoveringSpecsForSymbols([...symbolDepths.keys()]),
+  ])
+  const evidenceBySpec = new Map<
+    string,
+    Map<
+      string,
+      { readonly kind: 'file' | 'symbol'; readonly target: string; readonly depth: number }
+    >
+  >()
+  for (const relation of fileRelations) {
+    const depth = fileDepths.get(relation.target)
+    if (depth !== undefined)
+      addCoverageEvidence(evidenceBySpec, relation.source, 'file', relation.target, depth)
+  }
+  for (const relation of symbolRelations) {
+    const depth = symbolDepths.get(relation.target)
+    if (depth !== undefined) {
+      addCoverageEvidence(evidenceBySpec, relation.source, 'symbol', relation.target, depth)
+    }
+  }
+  return [...evidenceBySpec]
+    .map(([specId, evidenceMap]) => {
+      const evidence = [...evidenceMap.values()].sort(
+        (left, right) =>
+          left.depth - right.depth ||
+          left.kind.localeCompare(right.kind) ||
+          left.target.localeCompare(right.target),
+      )
+      return {
+        specId,
+        minDepth: Math.min(...evidence.map((item) => item.depth)),
+        evidence,
+      }
+    })
+    .sort(
+      (left, right) => left.minDepth - right.minDepth || left.specId.localeCompare(right.specId),
+    )
+}
+
+/**
+ * Adds one distinct coverage-evidence item under its owning spec.
+ * @param target - Evidence maps grouped by spec id.
+ * @param specId - Covering spec identifier.
+ * @param kind - Covered resource kind.
+ * @param resource - Covered resource identity.
+ * @param depth - Shallowest impact depth.
+ */
+function addCoverageEvidence(
+  target: Map<
+    string,
+    Map<
+      string,
+      { readonly kind: 'file' | 'symbol'; readonly target: string; readonly depth: number }
+    >
+  >,
+  specId: string,
+  kind: 'file' | 'symbol',
+  resource: string,
+  depth: number,
+): void {
+  const evidence =
+    target.get(specId) ??
+    new Map<
+      string,
+      { readonly kind: 'file' | 'symbol'; readonly target: string; readonly depth: number }
+    >()
+  const key = `${kind}:${resource}:${String(depth)}`
+  evidence.set(key, { kind, target: resource, depth })
+  target.set(specId, evidence)
+}
+
+/**
+ * Retains the shallowest observed traversal depth for one resource.
+ * @param target - Mutable resource-depth map.
+ * @param key - Resource identity.
+ * @param depth - Candidate depth.
+ */
+function setMinimumDepth(target: Map<string, number>, key: string, depth: number): void {
+  const existing = target.get(key)
+  if (existing === undefined || depth < existing) target.set(key, depth)
 }
 
 /**

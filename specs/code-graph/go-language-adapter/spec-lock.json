@@ -1,0 +1,56 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "code-graph:language-adapter",
+    "code-graph:symbol-model",
+    "code-graph:workspace-integration"
+  ],
+  "implementation": [
+    {
+      "file": "code-graph:src/infrastructure/tree-sitter/go-language-adapter.ts",
+      "symbols": ["GoLanguageAdapter"]
+    },
+    {
+      "file": "code-graph:test/infrastructure/tree-sitter/go-language-adapter.spec.ts"
+    }
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Translates Go code (.go) into package-aware symbols, scoped facts, imports, selector calls, composite literals, and interface satisfaction.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:3b97336261537520c1258e9680fd6c7cdd28d5a27e242e3b7df62e706f1b7f29",
+          "lastModified": "2026-08-16T08:12:49.032Z"
+        },
+        "verify.md": {
+          "hash": "sha256:cfedd53a091a889ed24a4519fbe1f45921be915070b92d1cc04582bdc628af0a",
+          "lastModified": "2026-08-16T08:12:49.034Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# go-language-adapter\n\n## Rules\n\n### Scope & Analysis\n- Handles `.go` as `go`.\n- Single-pass parsing via Tree-sitter/ast-grep; outputs `FileAnalysisDraft` without AST retention or Go toolchain execution.\n\n### Declarations & Owners\n- Extracts functions, receiver methods, struct types (class kind), interface types (interface kind), named types/aliases (type kind), vars, consts.\n- Complete construct range; declared-name `selectionRange`. Attached comments preserved.\n- Declaring owner = receiver type (normalized pointer syntax) or interface. Same-name methods distinct across types. Package functions/types/consts have no owner.\n- Uppercase identifiers -> public export bindings; lowercase -> non-exported.\n\n### Imports & Package Resolution\n- Extracts single, grouped, aliased, dot, and blank imports (blank -> file dependency without symbol binding).\n- Resolves import specifiers by longest `go.mod` module prefix bounded by repo root.\n\n### Scoped Bindings, Calls & Relations\n- Emits facts for scope, typed params/results, receiver bindings, selector expressions, composite literals, constructor calls.\n- Emits `IMPORTS`, `CALLS`, `CONSTRUCTS`, `USES_TYPE` only when proven by package/receiver/import facts.\n- Drops unresolved selectors, reflection, dynamic interface dispatch, uninstantiated generics.\n\n### Embedding & Interface Satisfaction\n- Embedded named interface -> `EXTENDS`. Reference facts retain child owner, embedded owner, relation kind, provenance steps.\n- Emits `IMPLEMENTS` only when concrete receiver-method facts prove full interface method set (pointer/value receiver rules enforced; NO empty method sets / name-only guesses).\n- Member-level `OVERRIDES` unsupported. Bounded cycle termination.\n- Advertises `hierarchy: true`, `buildContext: false`.\n\n### Build Boundary\n- `go.work`, `replace`, vendoring, `internal/`, build tags (`GOOS`/`GOARCH`), cgo unsupported -> remains `unresolved`/`ambiguous`.\n\n## Constraints\n- NO `go list`, compiler execution, or runtime reflection.\n- Speculative interface satisfaction, build tag guesswork -> prohibited.\n- Go-specific package/receiver/method-set logic MUST stay inside adapter.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:3b97336261537520c1258e9680fd6c7cdd28d5a27e242e3b7df62e706f1b7f29",
+          "lastModified": "2026-08-16T08:12:49.032Z"
+        },
+        "verify.md": {
+          "hash": "sha256:cfedd53a091a889ed24a4519fbe1f45921be915070b92d1cc04582bdc628af0a",
+          "lastModified": "2026-08-16T08:12:49.034Z"
+        }
+      }
+    }
+  }
+}

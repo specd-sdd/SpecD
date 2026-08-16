@@ -25,11 +25,26 @@ export interface ImpactResult {
   readonly affectedProcesses: readonly string[]
 }
 
+/** One file or symbol relation proving that a spec covers an impacted resource. */
+export interface CoveringSpecEvidence {
+  readonly kind: 'file' | 'symbol'
+  readonly target: string
+  readonly depth: number
+}
+
+/** Deduplicated covering spec with its shallowest depth and complete evidence. */
+export interface CoveringSpecImpact {
+  readonly specId: string
+  readonly minDepth: number
+  readonly evidence: readonly CoveringSpecEvidence[]
+}
+
 /**
  * Aggregated impact result for all symbols within a file.
  */
 export interface FileImpactResult extends ImpactResult {
   readonly symbols: readonly ImpactResult[]
+  readonly coveringSpecs: readonly CoveringSpecImpact[]
 }
 
 /** Impact result for a spec requirement. */

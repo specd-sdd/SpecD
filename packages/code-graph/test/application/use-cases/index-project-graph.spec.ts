@@ -16,7 +16,17 @@ const INDEX_RESULT: IndexResult = {
   workspaces: [],
   vcsRef: null,
   graphFingerprint: '',
+  fullRebuild: false,
   fullRebuildReason: null,
+  phaseMetrics: {
+    importResolution: { count: 0, durationMs: 0 },
+    dependencyFacts: { count: 0, durationMs: 0 },
+    adapterRelations: { count: 0, durationMs: 0 },
+    reexports: { count: 0, durationMs: 0 },
+    hierarchyOverrides: { count: 0, durationMs: 0 },
+    persistence: { count: 0, durationMs: 0 },
+    searchIndexRebuild: { count: 0, durationMs: 0 },
+  },
 }
 
 function makeProvider(): CodeGraphHostPort {

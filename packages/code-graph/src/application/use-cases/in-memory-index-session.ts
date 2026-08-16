@@ -4,10 +4,21 @@ import { type DocumentNode } from '../../domain/value-objects/document-node.js'
 import { type Relation } from '../../domain/value-objects/relation.js'
 import { type FileAnalysis } from '../../domain/value-objects/file-analysis.js'
 import {
+  type DeclarationOccurrence,
+  type HierarchyFact,
+  type LocalBinding,
+  type LogicalSymbol,
+  parseLogicalSymbol,
+  type PublicBinding,
+  type ResolutionStep,
+} from '../../domain/value-objects/symbol-reference.js'
+import {
   type IndexSession,
   type RegisterFileInput,
   type RegisterAnalysisInput,
 } from '../../domain/value-objects/index-session.js'
+import { type ReferenceFactsWrite } from '../../domain/ports/graph-store.js'
+import { RelationType } from '../../domain/value-objects/relation-type.js'
 
 /**
  * Concrete in-memory implementation of the IndexSession interface.
@@ -27,6 +38,13 @@ export class InMemoryIndexSession implements IndexSession {
   >()
   private readonly filePathsSet = new Set<string>()
   private readonly analyses = new Map<string, FileAnalysis>()
+  private readonly declarationsByLogicalId = new Map<string, DeclarationOccurrence[]>()
+  private readonly logicalSymbolsById = new Map<string, LogicalSymbol>()
+  private readonly publicBindingsById = new Map<string, PublicBinding>()
+  private readonly localBindingsById = new Map<string, LocalBinding>()
+  private readonly resolutionStepsByKey = new Map<string, ResolutionStep>()
+  private readonly hierarchyFactsByKey = new Map<string, HierarchyFact>()
+  private readonly logicalIdByDeclarationSymbolId = new Map<string, string>()
 
   // Symbol lookups
   private readonly symbolsById = new Map<string, SymbolNode>()
@@ -70,6 +88,61 @@ export class InMemoryIndexSession implements IndexSession {
   }
 
   /**
+   * Hydrates an unchanged persisted file and its symbols without parser analysis.
+   * @param file - Persisted file node.
+   * @param file.path - Canonical file path.
+   * @param file.configRelativePath - Config-relative selector path.
+   * @param file.language - Persisted language id.
+   * @param file.contentHash - Indexed content hash.
+   * @param file.workspace - Owning workspace.
+   * @param symbols - Persisted symbols owned by the file.
+   */
+  hydratePersistedFile(
+    file: {
+      readonly path: string
+      readonly configRelativePath: string
+      readonly language: string
+      readonly contentHash: string
+      readonly workspace: string
+    },
+    symbols: readonly SymbolNode[],
+  ): void {
+    this.registerFile({
+      filePath: file.path,
+      configRelativePath: file.configRelativePath,
+      language: file.language,
+      contentHash: file.contentHash,
+      workspace: file.workspace,
+    })
+    this.symbolsByFile.set(file.path, [...symbols])
+    for (const symbol of symbols) {
+      this.symbolsById.set(symbol.id, symbol)
+      const named = this.symbolsByName.get(symbol.name) ?? []
+      named.push(symbol)
+      this.symbolsByName.set(symbol.name, named)
+    }
+  }
+
+  /**
+   * Hydrates unchanged logical, binding, and provenance facts into the run session.
+   * @param facts - Persisted facts filtered to unaffected owners.
+   */
+  hydrateReferenceFacts(facts: ReferenceFactsWrite): void {
+    for (const logical of facts.logicalSymbols) this.logicalSymbolsById.set(logical.id, logical)
+    for (const item of facts.declarations) {
+      this.logicalIdByDeclarationSymbolId.set(item.declaration.symbolId, item.logicalSymbolId)
+      const declarations = this.declarationsByLogicalId.get(item.logicalSymbolId) ?? []
+      declarations.push(item.declaration)
+      this.declarationsByLogicalId.set(item.logicalSymbolId, declarations)
+    }
+    for (const binding of facts.publicBindings) this.publicBindingsById.set(binding.id, binding)
+    for (const binding of facts.localBindings) this.localBindingsById.set(binding.id, binding)
+    for (const step of facts.steps) {
+      this.resolutionStepsByKey.set(JSON.stringify([step.fromId, step.toId, step.kind]), step)
+    }
+  }
+
+  /**
    * Registers a file analysis draft and returns the complete FileAnalysis object.
    * @param input - The file analysis details to register.
    * @returns The registered file analysis.
@@ -93,6 +166,35 @@ export class InMemoryIndexSession implements IndexSession {
     }
 
     this.analyses.set(input.filePath, fileAnalysis)
+    for (const declaration of input.analysis.referenceFacts?.declarations ?? []) {
+      this.logicalIdByDeclarationSymbolId.set(declaration.symbolId, declaration.logicalId)
+      const declarations = this.declarationsByLogicalId.get(declaration.logicalId) ?? []
+      if (!declarations.some((existing) => existing.symbolId === declaration.symbolId)) {
+        declarations.push(declaration)
+      }
+      this.declarationsByLogicalId.set(declaration.logicalId, declarations)
+      const logicalSymbol = parseLogicalSymbol(declaration.logicalId)
+      if (logicalSymbol) this.logicalSymbolsById.set(logicalSymbol.id, logicalSymbol)
+    }
+    for (const binding of input.analysis.referenceFacts?.publicBindings ?? []) {
+      this.publicBindingsById.set(binding.id, binding)
+    }
+    for (const binding of input.analysis.referenceFacts?.localBindings ?? []) {
+      this.localBindingsById.set(binding.id, binding)
+    }
+    for (const step of input.analysis.referenceFacts?.steps ?? []) {
+      this.resolutionStepsByKey.set(JSON.stringify([step.fromId, step.toId, step.kind]), step)
+    }
+    for (const fact of input.analysis.referenceFacts?.hierarchy ?? []) {
+      const key = JSON.stringify([fact.childId, fact.parentId, fact.kind, fact.precedence])
+      this.hierarchyFactsByKey.set(key, fact)
+      const step: ResolutionStep = {
+        fromId: fact.childId,
+        toId: fact.parentId,
+        kind: `${fact.kind}:${String(fact.precedence)}`,
+      }
+      this.resolutionStepsByKey.set(JSON.stringify([step.fromId, step.toId, step.kind]), step)
+    }
 
     // Index symbols
     this.symbolsByFile.set(input.filePath, [...input.analysis.symbols])
@@ -143,6 +245,70 @@ export class InMemoryIndexSession implements IndexSession {
    */
   getAllFilePaths(): ReadonlySet<string> {
     return this.filePathsSet
+  }
+
+  /**
+   * Returns declaration occurrences grouped by logical identity.
+   * @returns Grouped declaration occurrences.
+   */
+  getDeclarationsByLogicalId(): ReadonlyMap<string, readonly DeclarationOccurrence[]> {
+    return this.declarationsByLogicalId
+  }
+
+  /**
+   * Returns logical targets reconstructed from adapter-provided grouping identities.
+   * @returns Logical symbols in deterministic order.
+   */
+  getLogicalSymbols(): readonly LogicalSymbol[] {
+    return [...this.logicalSymbolsById.values()].sort((left, right) =>
+      left.id.localeCompare(right.id),
+    )
+  }
+
+  /**
+   * Returns unique public bindings in deterministic identity order.
+   * @returns Public bindings.
+   */
+  getPublicBindings(): readonly PublicBinding[] {
+    return [...this.publicBindingsById.values()].sort((left, right) =>
+      left.id.localeCompare(right.id),
+    )
+  }
+
+  /**
+   * Returns unique lexical bindings in deterministic identity order.
+   * @returns Local bindings.
+   */
+  getLocalBindings(): readonly LocalBinding[] {
+    return [...this.localBindingsById.values()].sort((left, right) =>
+      left.id.localeCompare(right.id),
+    )
+  }
+
+  /**
+   * Returns ordered, deduplicated alias/export/hierarchy provenance.
+   * @returns Resolution steps.
+   */
+  getResolutionSteps(): readonly ResolutionStep[] {
+    return [...this.resolutionStepsByKey.values()].sort((left, right) =>
+      JSON.stringify([left.fromId, left.toId, left.kind]).localeCompare(
+        JSON.stringify([right.fromId, right.toId, right.kind]),
+      ),
+    )
+  }
+
+  /**
+   * Returns deduplicated hierarchy facts for conservative Pass 2 resolution.
+   * @returns Hierarchy facts.
+   */
+  getHierarchyFacts(): readonly HierarchyFact[] {
+    return [...this.hierarchyFactsByKey.values()].sort(
+      (left, right) =>
+        left.precedence - right.precedence ||
+        left.childId.localeCompare(right.childId) ||
+        left.parentId.localeCompare(right.parentId) ||
+        left.kind.localeCompare(right.kind),
+    )
   }
 
   /**
@@ -239,6 +405,27 @@ export class InMemoryIndexSession implements IndexSession {
       if (this.relationsKeys.has(key)) continue
       this.relationsKeys.add(key)
       this.relationsList.push(rel)
+
+      if (rel.type === RelationType.Extends || rel.type === RelationType.Implements) {
+        const childId = this.logicalIdByDeclarationSymbolId.get(rel.source)
+        const parentId = this.logicalIdByDeclarationSymbolId.get(rel.target)
+        if (childId && parentId) {
+          const rawPrecedence = rel.metadata?.['precedence']
+          const precedence = typeof rawPrecedence === 'number' ? rawPrecedence : 0
+          const kind = rel.type === RelationType.Extends ? 'extends' : 'implements'
+          const fact: HierarchyFact = { childId, parentId, kind, precedence }
+          this.hierarchyFactsByKey.set(
+            JSON.stringify([fact.childId, fact.parentId, fact.kind, fact.precedence]),
+            fact,
+          )
+          const step: ResolutionStep = {
+            fromId: fact.childId,
+            toId: fact.parentId,
+            kind: `${fact.kind}:${String(fact.precedence)}`,
+          }
+          this.resolutionStepsByKey.set(JSON.stringify([step.fromId, step.toId, step.kind]), step)
+        }
+      }
 
       // Maintain cross-lookups for spec coverage
       if (rel.type === 'COVERS_SYMBOL') {

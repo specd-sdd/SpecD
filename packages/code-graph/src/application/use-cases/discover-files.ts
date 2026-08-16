@@ -62,6 +62,8 @@ export interface DiscoverFilesOptions {
    * Must be passed explicitly as `null` outside VCS.
    */
   readonly vcsRoot: string | null
+  /** Optional diagnostics hook used when callers must distinguish unknown inspection from absence. */
+  readonly onInspectionError?: ((error: unknown, path: string) => void) | undefined
 }
 
 /**
@@ -185,7 +187,8 @@ export function discoverFiles(
     let entries: string[]
     try {
       entries = readdirSync(dir)
-    } catch {
+    } catch (error) {
+      options?.onInspectionError?.(error, dir)
       return
     }
 
@@ -201,11 +204,16 @@ export function discoverFiles(
       let stat
       try {
         stat = lstatSync(fullPath, { throwIfNoEntry: false })
-      } catch {
+      } catch (error) {
+        options?.onInspectionError?.(error, fullPath)
         continue
       }
 
-      if (!stat || stat.isSymbolicLink()) continue
+      if (!stat) {
+        options?.onInspectionError?.(new Error('Path disappeared during discovery'), fullPath)
+        continue
+      }
+      if (stat.isSymbolicLink()) continue
 
       if (stat.isDirectory()) {
         if (!isIgnored(relPath, true)) {

@@ -14,6 +14,51 @@
     {
       "file": "cli:src/commands/graph/index-graph.ts",
       "symbols": ["registerGraphIndex"]
+    },
+    {
+      "file": "cli:test/commands/graph-index.spec.ts"
+    },
+    {
+      "file": "cli:package.json"
+    },
+    {
+      "file": "cli:test/commands/graph-index-integration.spec.ts"
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Index project graph through SDK orchestration with parent locking, worker isolation, progress, repair reporting, and complete summaries.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:f4892015960ae601423a27bd755e7b8097f25814696300c531b22b31f3b8dc1b",
+          "lastModified": "2026-08-16T08:12:48.423Z"
+        },
+        "verify.md": {
+          "hash": "sha256:a4631dddfe3e9233cc7ff077fb468feb15d5249ac63f3845567e8b25ad05c79d",
+          "lastModified": "2026-08-16T08:12:48.426Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Graph Index\n\n## Rules\n\n- Signature: `specd graph index [--force] [--exclude-path <pattern>] [--config <path> | --path <path>] [--format text|json|toon]`; `--config` and `--path` mutually exclusive.\n- Execute indexing through `runIndexProjectGraph(ctx, input)` in `@specd/sdk`; `--force` passes `force: true`.\n- CLI owns parent shared lock, worker isolation (`child_process.spawn`), `onProgress` text output, signals (`SIGINT`/`SIGTERM`), exit propagation. `SPECD_GRAPH_INDEX_NO_WORKER=true` bypasses worker for tests.\n- Visible incompatibility repair: delegates provider-owned repair through `runIndexProjectGraph`. Text reports when destructive full rebuild occurred and reason; JSON/TOON expose rebuild flag and reason code.\n- Text summary reports indexed count/duration, discovered, documents, skipped, removed, specs, error count/details, plus per-workspace breakdown when present.\n- JSON/TOON emit full `IndexResult` including `documentsIndexed` and per-workspace breakdown.\n- Lock contention or infrastructure error exits 3 with retry message; per-file errors remain in `IndexResult.errors` and exit 0.\n- Documentation in `docs/cli/cli-reference.md` under `## graph` covers all flags, `--exclude-path` gitignore merging, replace semantics, bootstrap, and `graph.*` config fields.\n\n## Constraints\n\n- CLI never assembles workspace/VCS/index inputs inline.\n- Lock and worker isolation remain CLI adapter concerns.\n- Platform symbols come from `@specd/sdk`.\n- Call `process.exit(0)` after provider close.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:f4892015960ae601423a27bd755e7b8097f25814696300c531b22b31f3b8dc1b",
+          "lastModified": "2026-08-16T08:12:48.423Z"
+        },
+        "verify.md": {
+          "hash": "sha256:a4631dddfe3e9233cc7ff077fb468feb15d5249ac63f3845567e8b25ad05c79d",
+          "lastModified": "2026-08-16T08:12:48.426Z"
+        }
+      }
+    }
+  }
 }

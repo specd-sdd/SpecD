@@ -97,6 +97,66 @@ describe('UpdateImplementationTracking', () => {
     ])
   })
 
+  it('validates every resolved file before applying an atomic batch', async () => {
+    const change = changeInImplementing('resolve-batch')
+    change.trackImplementationFile('src/first.ts', 'open')
+    change.trackImplementationFile('src/missing.ts', 'open')
+    const repo = makeChangeRepository([change])
+    const uc = makeUpdate(repo, { '/test/src/first.ts': 'content' })
+
+    await expect(
+      uc.execute({
+        name: 'resolve-batch',
+        action: 'resolve',
+        file: 'src/first.ts',
+        files: ['src/first.ts', 'src/missing.ts'],
+      }),
+    ).rejects.toThrow(ImplementationFileNotFoundError)
+
+    expect(change.trackedImplementationFiles).toEqual([
+      { file: 'src/first.ts', state: 'open' },
+      { file: 'src/missing.ts', state: 'open' },
+    ])
+  })
+
+  it('does not partially unresolve when a later batch file is invalid', async () => {
+    const change = changeInImplementing('unresolve-batch')
+    change.trackImplementationFile('src/first.ts', 'resolved')
+    change.trackImplementationFile('src/missing.ts', 'resolved')
+    const repo = makeChangeRepository([change])
+    const uc = makeUpdate(repo, { '/test/src/first.ts': 'content' })
+
+    await expect(
+      uc.execute({
+        name: 'unresolve-batch',
+        action: 'unresolve',
+        file: 'src/first.ts',
+        files: ['src/first.ts', 'src/missing.ts'],
+      }),
+    ).rejects.toThrow(ImplementationFileNotFoundError)
+    expect(change.trackedImplementationFiles.map((entry) => entry.state)).toEqual([
+      'resolved',
+      'resolved',
+    ])
+  })
+
+  it('does not partially ignore when a later untracked batch file is missing', async () => {
+    const change = changeInImplementing('ignore-batch')
+    change.trackImplementationFile('src/first.ts', 'open')
+    const repo = makeChangeRepository([change])
+    const uc = makeUpdate(repo, {})
+
+    await expect(
+      uc.execute({
+        name: 'ignore-batch',
+        action: 'ignore',
+        file: 'src/first.ts',
+        files: ['src/first.ts', 'src/missing.ts'],
+      }),
+    ).rejects.toThrow(ImplementationFileNotFoundError)
+    expect(change.trackedImplementationFiles).toEqual([{ file: 'src/first.ts', state: 'open' }])
+  })
+
   it('resolve rejects files that are not already tracked', async () => {
     const change = changeInImplementing('resolve-untracked')
     const repo = makeChangeRepository([change])

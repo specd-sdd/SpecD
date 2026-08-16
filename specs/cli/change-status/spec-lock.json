@@ -3,11 +3,57 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": ["cli:entrypoint", "core:change", "core:get-status"],
+  "dependsOn": [
+    "cli:entrypoint",
+    "core:change",
+    "core:get-status",
+    "sdk:build-implementation-review"
+  ],
   "implementation": [
     {
-      "file": "cli:src/commands/change/status.ts",
-      "symbols": ["registerChangeStatus"]
+      "file": "cli:src/commands/change/status.ts"
+    },
+    {
+      "file": "cli:test/commands/change-status.spec.ts"
+    },
+    {
+      "file": "cli:test/commands/change-implementation-review-integration.spec.ts"
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Render read-only lifecycle, drift-aware artifact DAG, task progress, dependencies, and optional implementation review.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:9b29639b0257f9e5415874f52d75e34e963cbe2188df357c5a7ccab31b688951",
+          "lastModified": "2026-08-16T08:12:48.123Z"
+        },
+        "verify.md": {
+          "hash": "sha256:164a44f7766f543bd5875d1f92c1a9d5e416559cd9f1f8f87b3afead7386c23e",
+          "lastModified": "2026-08-16T08:12:48.130Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Change Status\n\n## Rules\n\n- Signature: `specd change status <name> [--implementation] [--format text|json|toon]`.\n- Invoke `GetStatus` directly; never call `RefreshImplementationTracking` or `ImplementationDetector`; use default refresh policy.\n- Drafted changes (`draftView`): render read-only, mark drafted (`isDrafted: true`), never output actionable mutating transitions.\n- Missing change: exit 1 with stderr `error:`.\n- Human/text mode: render display state (`complete-with-drift`, canonical review states over drift-only); missing remains `missing`. Structured mode includes canonical and display states; top-level `artifactDag[].state` uses display state.\n- `artifactDag`: structured output includes `hasTasks` boolean per entry. Text DAG prints `[hasTasks - N/M done]` when completion exists, else `[hasTasks]`; details append `tasks: N/M`.\n- Compare recorded schema name/version with `GetStatus.lifecycle.schemaInfo`; mismatch warns to stderr and exits 0; null skips warning.\n- Structured `schema`: includes name, version, topologically ordered `artifactDag` (`id`, `scope`, `optional`, `requires`, `children`, `hasTasks`, `output`). Use cached `schema.artifactDag()`, definition `requires`, `childrenOf(id)`, `roots()`; `hasTasks` checks explicit flag or `taskCompletionCheck`.\n- Text DAG: use same root/child order and display states; render each convergent artifact id at most once, referencing repeats.\n- `--implementation`: render structured projection from `sdk:build-implementation-review` via `GetStatus` (tracked `open|resolved|ignored` files, links, symbol statuses). Do not query graph or implement fallback policy; never mutate tracking/sidecars.\n- Text output order: top info block (name, state; omit standalone specs list), DAG/details, then \"specs and dependencies\" from manifest `specDependsOn`. Structured output includes top-level `specDependsOn`.\n- Serialize all schema-declared artifacts, including absent files.\n\n## Constraints\n\n- `effectiveStatus` includes dependency cascading.\n- CLI serializes `GetStatus` projections; never re-derive via `SchemaRegistry`, config show, or local lifecycle logic.\n- Symbol resolution provided exclusively via SDK; CLI does not recompute.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:9b29639b0257f9e5415874f52d75e34e963cbe2188df357c5a7ccab31b688951",
+          "lastModified": "2026-08-16T08:12:48.123Z"
+        },
+        "verify.md": {
+          "hash": "sha256:164a44f7766f543bd5875d1f92c1a9d5e416559cd9f1f8f87b3afead7386c23e",
+          "lastModified": "2026-08-16T08:12:48.130Z"
+        }
+      }
+    }
+  }
 }

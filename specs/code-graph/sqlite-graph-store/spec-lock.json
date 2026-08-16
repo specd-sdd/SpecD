@@ -15,7 +15,46 @@
       "symbols": ["SQLiteGraphStore"]
     },
     {
+      "file": "code-graph:src/infrastructure/sqlite/schema.ts"
+    },
+    {
       "file": "code-graph:test/infrastructure/sqlite/sqlite-graph-store.spec.ts"
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "SQLite-backed GraphStore adapter providing atomic transactions, FTS5 identity-ranked search, schema versioning, and {configPath}/graph persistence.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:6b4f7abc2e1d2272d48e5d8a9b19f5a3f26cbb32747603fb7772331d0ed297c6",
+          "lastModified": "2026-08-16T08:12:47.958Z"
+        },
+        "verify.md": {
+          "hash": "sha256:4f65021609aac5a202abefadb757d9d9063d277e1c2efd0cb3826386adc440ab",
+          "lastModified": "2026-08-16T08:12:47.966Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# SQLite Graph Store\n\n## Rules\n\n- `SQLiteGraphStore` implements `GraphStore`; backend id `sqlite`; default when `graphStoreId` omitted.\n- Open/close: defer native bindings until `open()`; `close()` idempotent; initializes DDL/versioning on first open.\n- Storage paths: database/WAL under `{configPath}/graph`, temporary scratch under `{configPath}/tmp`.\n- Schema: tables for `File`, `Symbol`, `Spec`, `Document`, `Meta`, and relations `IMPORTS`, `DEFINES`, `CALLS`, `CONSTRUCTS`, `USES_TYPE`, `EXPORTS`, `DEPENDS_ON`, `COVERS_FILE`, `COVERS_SYMBOL`, `EXTENDS`, `IMPLEMENTS`, `OVERRIDES`. `COVERS_SYMBOL` preserves stale metadata.\n- FTS5 virtual tables: `symbol_fts` (`name`, `comment`), `spec_fts` (`title`, `description`, `content`), `document_fts` (`path`, `content`), trigram source content index for queries ≥ 3 chars.\n- Query processing: sanitize multi-token queries with `OR`; supplement FTS candidates with identity hits.\n- SQL ranking: exact canonical identity > exact token > prefix > suffix > real component > substring > BM25 body text. Never replace FTS with plain `LIKE`.\n- Transactions: `upsertFile`, `removeFile`, `upsertSpec`, `removeSpec`, bulk commits are atomic transactions.\n- Bulk indexing: single transaction, set-based endpoint validation, prepared/bulk inserts, commit once, rebuild FTS once post-commit. Scratch in `{configPath}/tmp` cleaned post-run.\n- Schema versioning: tracks backend schema version; incompatible versions reject reads and require `recreate()` full rebuild, `storage.epoch` rotation, and FTS rebuild.\n- Observations: persists `IndexedInputObservation` records and workspace/global latches for incremental hydration.\n\n## Constraints\n\n- Infrastructure adapter; consumers depend on abstract `code-graph:graph-store`.\n- Backend id `sqlite`.\n- All persisted artifacts rooted under `configPath`.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:6b4f7abc2e1d2272d48e5d8a9b19f5a3f26cbb32747603fb7772331d0ed297c6",
+          "lastModified": "2026-08-16T08:12:47.958Z"
+        },
+        "verify.md": {
+          "hash": "sha256:4f65021609aac5a202abefadb757d9d9063d277e1c2efd0cb3826386adc440ab",
+          "lastModified": "2026-08-16T08:12:47.966Z"
+        }
+      }
+    }
+  }
 }

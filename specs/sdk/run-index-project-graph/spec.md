@@ -38,6 +38,12 @@ When `input.onProgress` is provided, the orchestration MUST forward progress eve
 
 `RunIndexProjectGraphResult` MUST match `IndexProjectGraph` result fields (indexed file/symbol counts, per-workspace breakdown, errors) without lossy mapping.
 
+### Requirement: Repair lifecycle passthrough
+
+`runIndexProjectGraph` SHALL carry incompatibility-repair intent and full-rebuild results without lossy mapping. When an old schema cannot open for normal reads, the SDK SHALL use the provider's indexing-specific lifecycle/repair path rather than fail before `IndexProjectGraph` can rebuild it.
+
+The SDK MUST preserve provider ownership of destructive recreation and SHALL still execute caller lifecycle hooks and cleanup exactly once.
+
 ## Spec Dependencies
 
 - [`sdk:with-open-graph-provider`](../with-open-graph-provider/spec.md) — provider lifecycle wrapper

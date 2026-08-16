@@ -1,0 +1,51 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Reference and coverage persistence
+
+    `GraphStore` SHALL atomically persist and retrieve logical-symbol identity, contributing declarations, symbol spaces, member forms, public and local bindings, binding provenance, and per-file/package coverage facts. Distinct bindings and routes between the same ordinary relation endpoints MUST remain distinct.
+
+    Query methods SHALL support indexed lookup by structured workspace, surface, simple name, symbol space, owner, member form, declaration, public exported name, local scope, and coverage status. Rendered canonical ids SHALL remain unique external identities, but backends MUST NOT parse, case-fold, or substring-search their serialized form to implement selector resolution or semantic ranking. Batch queries SHALL preserve deterministic ordering across backends and MUST NOT require a complete graph scan per reference.
+
+    The Store SHALL expose one deterministic complete reference-fact snapshot for incremental hydration and one batched direct-affected-file query over importer, call, construct, type-use, extension, implementation, and override relations. These operations SHALL allow the indexer to retain unaffected facts and expand an affected closure without one query per symbol or relation.
+
+    Search SHALL index structured simple name, owner, symbol space, member form, public surface, and exported name fields. It SHALL group public bindings with their logical target while returning every binding independently and identifying which bindings matched the request.
+
+    Reverse coverage queries SHALL accept batches of canonical file paths and symbol ids and return all matching `COVERS_FILE` or `COVERS_SYMBOL` relations in deterministic source/type/target order. Empty batches SHALL return empty results without backend work. File-impact traversal MUST be able to retrieve coverage for its complete deduplicated blast radius without one call per resource.
+
+    ### Requirement: Source-content search candidates
+
+    `GraphStore` SHALL persist complete symbol construct and selection ranges and SHALL expose a backend-neutral source-content candidate query over persisted `FileNode.content`.
+
+    Candidate input SHALL carry the shared normalized complete query, raw terms, expanded terms, category limit, path/workspace filters, exclusions, and snippet preference. Candidate output SHALL identify the file, backend relevance, and enough content or precise occurrence evidence for Code Graph to verify and group exact matches without reading files from the live filesystem.
+
+    The Store SHALL use a substring-capable content index for queries of three or more characters and a defined bounded fallback for shorter queries. It MUST NOT scan and return every stored file to the application layer for ordinary searches. Store results are candidates only: cross-category merging, match provenance, symbol-aware suppression, final ranking, grouping, and post-suppression limits belong to the Code Graph application use case.
+
+    ### Requirement: Incompatible store handling
+
+    A backend schema incompatible with the expected schema MUST reject ordinary reads and MUST NOT silently recreate an empty graph. The indexing repair path SHALL perform a destructive full rebuild, rotate the shared storage generation, and rebuild all search indexes before the store becomes readable.
+
+    Persisted graph data is derived cache state; no incremental migration is required when source re-extraction is necessary.
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Indexed-input freshness persistence
+
+    `GraphStore` SHALL persist backend-neutral `IndexedInputObservation` records separately from semantic nodes. Each record SHALL identify its workspace, logical resource kind and id, filesystem or repository input kind, non-absolute logical locator, indexed content hash, optional observed mtime/size or repository revision, and monotonic stale flag.
+
+    Files and documents SHALL normally map to one observation. Aggregate specs SHALL map to every content-artifact, metadata, and persisted-state input that produced the node. Batch reads and compare-and-set mutations SHALL support marking inputs stale, refreshing equal-content observations, and atomically marking affected workspace and global latches without allowing an assessment started before reindexing to mutate new evidence.
+
+    The store SHALL persist one monotonic `knownStaleSinceLastIndex` latch per workspace and one aggregate latch. Only successful indexing SHALL clear stale input or latch state. Transient unknown assessments MUST NOT be persisted as stale.
+
+    ### Requirement: Single-session bulk indexing
+
+    `GraphStore` SHALL expose a backend-neutral bulk indexing session that begins once, accepts bounded file, document, spec, symbol, semantic-fact, observation, and relation chunks, commits once, and rebuilds semantic and source-content search indexes once after commit.
+
+    Relation endpoint validation and hierarchy/method lookup SHALL have batch operations. Implementations MUST NOT issue existence or hierarchy queries shaped as one Store call per relation. Equivalent relations SHALL be deduplicated across chunks before persistence, and a failed session MUST NOT expose a partially committed generation.

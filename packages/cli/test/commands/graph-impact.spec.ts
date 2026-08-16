@@ -46,6 +46,10 @@ function setup() {
 
   const mockProvider = {
     analyzeImpact: vi.fn(),
+    analyzePublicBindingImpact: vi.fn(),
+    getExactPublicBinding: vi.fn().mockResolvedValue(null),
+    resolveSymbolReference: vi.fn(),
+    searchReferenceSymbols: vi.fn().mockResolvedValue([]),
     analyzeFileImpact: vi.fn(),
     analyzeFilesImpact: vi
       .fn()
@@ -103,11 +107,12 @@ function setup() {
       line: 10,
       column: 0,
     })),
-    getFile: vi.fn().mockResolvedValue({
-      path: 'core:src/auth.ts',
-      configRelativePath: 'packages/core/src/auth.ts',
+    getFile: vi.fn().mockImplementation(async (path: string) => ({
+      path,
+      configRelativePath:
+        path === 'core:src/model.ts' ? 'packages/core/src/model.ts' : 'packages/core/src/auth.ts',
       workspace: 'core',
-    }),
+    })),
     getDocument: vi.fn().mockResolvedValue(undefined),
     findFilesByConfigRelativePath: vi
       .fn()
@@ -120,7 +125,7 @@ function setup() {
         kind: 'file',
       },
     ]),
-    resolveSymbolSelector: vi.fn().mockResolvedValue([]),
+    resolveSymbolSelector: vi.fn().mockResolvedValue({ status: 'missing', candidates: [] }),
   }
   vi.mocked(withProvider).mockImplementation(async (_config, format, fn) => {
     try {
@@ -350,13 +355,14 @@ describe('graph impact', () => {
         line: 10,
         column: 0,
       }
-      mockProvider.resolveSymbolSelector.mockResolvedValue([
-        {
+      mockProvider.resolveSymbolSelector.mockResolvedValue({
+        status: 'resolved',
+        match: {
           symbolId: sym.id,
           filePath: sym.filePath,
           matchKind: 'full-id',
         },
-      ])
+      })
       mockProvider.analyzeImpact.mockResolvedValue({
         target: sym.id,
         directDependents: 0,
@@ -518,7 +524,9 @@ describe('graph impact', () => {
         /* ExitSentinel from process.exit(1) */
       }
 
-      expect(getStderr()).toContain('provide exactly one of --file, --symbol, or --spec')
+      expect(getStderr()).toContain(
+        'provide exactly one of --file, --symbol, --spec, or --export with --from',
+      )
     })
 
     it('rejects when multiple selectors are provided', async () => {
@@ -540,7 +548,9 @@ describe('graph impact', () => {
         /* ExitSentinel from process.exit(1) */
       }
 
-      expect(getStderr()).toContain('provide exactly one of --file, --symbol, or --spec')
+      expect(getStderr()).toContain(
+        'provide exactly one of --file, --symbol, --spec, or --export with --from',
+      )
     })
 
     it('rejects --config and --path together', async () => {
@@ -586,7 +596,9 @@ describe('graph impact', () => {
       }
 
       expect(process.exit).toHaveBeenCalledWith(1)
-      expect(getStderr()).toContain('no indexed file matches "packages/core/src/missing.ts"')
+      expect(getStderr()).toContain(
+        'no indexed file matches "/project/packages/core/src/missing.ts"',
+      )
     })
   })
 
@@ -719,13 +731,14 @@ describe('graph impact', () => {
         line: 10,
         column: 0,
       }
-      mockProvider.resolveSymbolSelector.mockResolvedValue([
-        {
+      mockProvider.resolveSymbolSelector.mockResolvedValue({
+        status: 'resolved',
+        match: {
           symbolId: sym.id,
           filePath: 'core:src/auth.ts',
           matchKind: 'qualified',
         },
-      ])
+      })
       mockProvider.analyzeImpact.mockResolvedValue({
         target: sym.id,
         directDependents: 2,
@@ -778,13 +791,15 @@ describe('graph impact', () => {
           column: 0,
         },
       ]
-      mockProvider.resolveSymbolSelector.mockResolvedValue(
-        symbols.map((symbol) => ({
+      mockProvider.resolveSymbolSelector.mockResolvedValue({
+        status: 'ambiguous',
+        candidates: symbols.map((symbol) => ({
           symbolId: symbol.id,
           filePath: symbol.filePath,
-          matchKind: 'name',
+          matchKind: 'name' as const,
         })),
-      )
+        totalCandidates: symbols.length,
+      })
       mockProvider.analyzeImpact.mockResolvedValue({
         target: 'sym',
         directDependents: 0,
@@ -806,12 +821,13 @@ describe('graph impact', () => {
       ])
 
       const out = getStdout()
-      expect(out).toContain('3 symbols match "parse"')
+      expect(out).toContain('3 symbols exactly match "parse"')
+      expect(mockProvider.analyzeImpact).not.toHaveBeenCalled()
     })
 
     it('reports no matching symbol without error exit', async () => {
       const { mockProvider, getStdout } = setup()
-      mockProvider.resolveSymbolSelector.mockResolvedValue([])
+      mockProvider.resolveSymbolSelector.mockResolvedValue({ status: 'missing', candidates: [] })
 
       await makeImpactProgram().parseAsync([
         'node',
@@ -1083,13 +1099,14 @@ describe('graph impact', () => {
         line: 10,
         column: 0,
       }
-      mockProvider.resolveSymbolSelector.mockResolvedValue([
-        {
+      mockProvider.resolveSymbolSelector.mockResolvedValue({
+        status: 'resolved',
+        match: {
           symbolId: sym.id,
           filePath: sym.filePath,
           matchKind: 'qualified',
         },
-      ])
+      })
       mockProvider.analyzeImpact.mockResolvedValue({
         target: sym.id,
         directDependents: 0,
@@ -1113,6 +1130,205 @@ describe('graph impact', () => {
       expect(mockProvider.resolveSymbolSelector).toHaveBeenCalledWith(
         'packages/core/src/auth.ts:function:validate',
       )
+    })
+
+    it('rejects incomplete public export selectors before opening the provider', async () => {
+      const { getStderr } = setup()
+
+      try {
+        await makeImpactProgram().parseAsync([
+          'node',
+          'specd',
+          'graph',
+          'impact',
+          '--export',
+          'createApi',
+        ])
+      } catch (error) {
+        if (!(error instanceof ExitSentinel)) throw error
+      }
+
+      expect(getStderr()).toContain('--export and --from must be provided together')
+      expect(withProvider).not.toHaveBeenCalled()
+    })
+
+    it('uses exact binding lookup when ranked search would omit the selected route', async () => {
+      const { mockProvider, getStdout } = setup()
+      const target = {
+        id: 'logical-api',
+        workspace: 'core',
+        surface: 'core:src/api.ts',
+        name: 'createApi',
+        space: 'value',
+        ownerId: undefined,
+        memberForm: undefined,
+      }
+      const binding = {
+        id: 'public-api',
+        surface: 'core:src/index.ts',
+        exportedName: 'createApi',
+        space: 'value',
+        targetId: target.id,
+      }
+      mockProvider.resolveSymbolReference.mockResolvedValue({
+        request: {
+          workspace: 'core',
+          requested: 'createApi',
+          publicSurface: 'core:src/index.ts',
+        },
+        status: 'resolved',
+        reasonCode: null,
+        health: { fresh: true, complete: true, reasonCodes: [] },
+        target,
+        candidates: [],
+        path: [{ fromId: binding.id, toId: target.id, kind: 'reexport' }],
+      })
+      mockProvider.searchReferenceSymbols.mockResolvedValue(
+        Array.from({ length: 20 }, (_, index) => ({
+          logicalTarget: { ...target, id: `decoy-${String(index)}` },
+          declarations: [],
+          publicBindings: [
+            {
+              ...binding,
+              id: `decoy-binding-${String(index)}`,
+              targetId: `decoy-${String(index)}`,
+            },
+          ],
+          matchedPublicBindings: [],
+          hits: [],
+          score: 20 - index,
+          matchTier: 'exact-public-binding',
+          matchReasons: ['public-binding-exact'],
+        })),
+      )
+      mockProvider.getExactPublicBinding.mockResolvedValue({ binding, declarations: [] })
+      const emptyImpact = {
+        target: '',
+        directDependents: 0,
+        indirectDependents: 0,
+        transitiveDependents: 0,
+        riskLevel: 'LOW',
+        affectedFiles: [],
+        affectedSymbols: [],
+        affectedProcesses: [],
+      }
+      mockProvider.analyzePublicBindingImpact.mockResolvedValue({
+        binding,
+        target,
+        path: [{ fromId: binding.id, toId: target.id, kind: 'reexport' }],
+        bindingImpact: { ...emptyImpact, target: binding.id },
+        canonicalImpact: { ...emptyImpact, target: target.id },
+      })
+
+      await makeImpactProgram().parseAsync([
+        'node',
+        'specd',
+        'graph',
+        'impact',
+        '--export',
+        'createApi',
+        '--from',
+        'core:src/index.ts',
+      ])
+
+      const out = getStdout()
+      expect(out).toContain('Exact public-binding impact:')
+      expect(out).toContain('Canonical-symbol impact:')
+      expect(mockProvider.getExactPublicBinding).toHaveBeenCalledWith({
+        surface: 'core:src/index.ts',
+        exportedName: 'createApi',
+        space: 'value',
+        targetId: target.id,
+      })
+      expect(mockProvider.searchReferenceSymbols).not.toHaveBeenCalled()
+      expect(mockProvider.analyzePublicBindingImpact).toHaveBeenCalledTimes(1)
+    })
+
+    it('renders covering specs with depth and evidence for file impact', async () => {
+      const { mockProvider, getStdout } = setup()
+      mockProvider.analyzeFileImpact.mockResolvedValue({
+        target: 'core:src/auth.ts',
+        directDependents: 0,
+        indirectDependents: 0,
+        transitiveDependents: 0,
+        riskLevel: 'LOW',
+        affectedFiles: [],
+        affectedSymbols: [],
+        affectedProcesses: [],
+        symbols: [],
+        coveringSpecs: [
+          {
+            specId: 'core:auth',
+            minDepth: 0,
+            evidence: [
+              { kind: 'file', target: 'core:src/auth.ts', depth: 0 },
+              { kind: 'symbol', target: 'logical:login', depth: 1 },
+            ],
+          },
+          {
+            specId: 'core:auth-consumer',
+            minDepth: 2,
+            evidence: [{ kind: 'file', target: 'cli:src/auth.ts', depth: 2 }],
+          },
+        ],
+      })
+
+      await makeImpactProgram().parseAsync([
+        'node',
+        'specd',
+        'graph',
+        'impact',
+        '--file',
+        'src/auth.ts',
+      ])
+
+      const rendered = getStdout()
+      expect(rendered).toContain('Covering specs:')
+      expect(rendered).toContain('Direct:')
+      expect(rendered).toContain('Blast radius:')
+      expect(rendered).toContain('core:auth (depth=0)')
+      expect(rendered).toContain('file core:src/auth.ts (depth=0)')
+      expect(rendered).toContain('symbol logical:login (depth=1)')
+    })
+
+    it('preserves complete covering-spec evidence in structured output', async () => {
+      const { mockProvider, getStdout } = setup()
+      const coveringSpecs = [
+        {
+          specId: 'core:auth',
+          minDepth: 0,
+          evidence: [
+            { kind: 'file', target: 'core:src/auth.ts', depth: 0 },
+            { kind: 'symbol', target: 'logical:login', depth: 1 },
+          ],
+        },
+      ]
+      mockProvider.analyzeFileImpact.mockResolvedValue({
+        target: 'core:src/auth.ts',
+        directDependents: 0,
+        indirectDependents: 0,
+        transitiveDependents: 0,
+        riskLevel: 'LOW',
+        affectedFiles: [],
+        affectedSymbols: [],
+        affectedProcesses: [],
+        symbols: [],
+        coveringSpecs,
+      })
+
+      await makeImpactProgram().parseAsync([
+        'node',
+        'specd',
+        'graph',
+        'impact',
+        '--file',
+        'src/auth.ts',
+        '--format',
+        'json',
+      ])
+
+      expect(JSON.parse(getStdout()).coveringSpecs).toEqual(coveringSpecs)
+      expect(mockProvider).not.toHaveProperty('getCoveringSpecsForFile')
     })
   })
 })

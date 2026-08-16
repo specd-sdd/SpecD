@@ -263,3 +263,18 @@
 - **GIVEN** `LadybugGraphStore` is executing schema DDL or a bulk COPY command
 - **WHEN** the query contains no user-supplied parameter values
 - **THEN** `conn.query()` MAY be used directly without prepared statements
+
+### Requirement: Reference schema upgrade
+
+#### Scenario: Ladybug has backend parity
+
+- **GIVEN** Ladybug is supported and schema 10 is persisted
+- **WHEN** the new contract expects 11
+- **THEN** normal reads reject and index repair rotates generation, rebuilds FTS, and matches SQLite results
+
+#### Scenario: Ladybug matches structured, source, and coverage queries
+
+- **GIVEN** Ladybug is supported
+- **WHEN** structured identity, selector precedence, source-content candidates, exact-file normalization, symbol ranges, and reverse coverage batches are queried
+- **THEN** its observable ordering, bounded ambiguity, filtering, per-file counts, fallback, and range semantics match SQLite
+- **AND** its bulk session rebuilds search indexes once

@@ -58,7 +58,7 @@ describe('change implementation', () => {
           file: 'packages/core/src/change.ts',
           fileLinkExplicit: true,
           symbols: ['GetStatus.execute'],
-          staleSymbols: ['GetStatus.execute'],
+          symbolResolutions: [],
         },
       ],
     })
@@ -71,7 +71,7 @@ describe('change implementation', () => {
     const out = stdout()
     expect(out).toContain('out-of-scope sidecars:')
     expect(out).toContain('core:get-status')
-    expect(out).toContain('stale=GetStatus.execute')
+    expect(out).toContain('symbols=GetStatus.execute')
   })
 
   it('add fails when the implementation file does not exist', async () => {
@@ -133,12 +133,9 @@ describe('change implementation', () => {
       'f1.ts, f2.ts',
     ])
 
-    expect(kernel.changes.updateImplementationTracking.execute).toHaveBeenCalledTimes(2)
+    expect(kernel.changes.updateImplementationTracking.execute).toHaveBeenCalledTimes(1)
     expect(kernel.changes.updateImplementationTracking.execute).toHaveBeenCalledWith(
-      expect.objectContaining({ file: 'f1.ts' }),
-    )
-    expect(kernel.changes.updateImplementationTracking.execute).toHaveBeenCalledWith(
-      expect.objectContaining({ file: 'f2.ts' }),
+      expect.objectContaining({ file: 'f1.ts', files: ['f1.ts', 'f2.ts'] }),
     )
   })
 
@@ -149,9 +146,9 @@ describe('change implementation', () => {
       configFilePath: null,
       kernel,
     })
-    kernel.changes.updateImplementationTracking.execute
-      .mockResolvedValueOnce({ implementationTracking: { trackedFiles: [], links: [] } })
-      .mockRejectedValueOnce(new ImplementationFileNotFoundError('missing.ts'))
+    kernel.changes.updateImplementationTracking.execute.mockRejectedValueOnce(
+      new ImplementationFileNotFoundError('missing.ts'),
+    )
     mockProcessExit()
     const stderr = captureStderr()
 
@@ -174,6 +171,7 @@ describe('change implementation', () => {
     }
 
     expect(stderr()).toContain('error: Implementation file "missing.ts" does not exist')
+    expect(kernel.changes.updateImplementationTracking.execute).toHaveBeenCalledTimes(1)
   })
 
   it('review displays removed tracked files', async () => {

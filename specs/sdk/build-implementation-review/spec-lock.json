@@ -1,0 +1,70 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "sdk:host-context",
+    "sdk:with-open-graph-provider",
+    "core:get-implementation-review",
+    "code-graph:resolve-symbol-reference",
+    "code-graph:get-graph-health"
+  ],
+  "implementation": [
+    {
+      "file": "sdk:src/orchestration/build-implementation-review.ts",
+      "symbols": [
+        "buildImplementationReview",
+        "BuildImplementationReviewInput",
+        "ReviewedImplementationSymbol",
+        "ReviewedImplementationLink",
+        "BuildImplementationReviewResult"
+      ]
+    },
+    {
+      "file": "sdk:src/orchestration/index.ts"
+    },
+    {
+      "file": "sdk:src/index.ts"
+    },
+    {
+      "file": "sdk:test/orchestration/build-implementation-review.spec.ts"
+    }
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Orchestrate implementation review combining Core tracking with Code Graph symbol resolution via single provider lifecycle.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:622555476e06b46806369c26ae77b1549b5c49fd7860243f10d8c3ec5047f876",
+          "lastModified": "2026-08-16T08:12:47.220Z"
+        },
+        "verify.md": {
+          "hash": "sha256:8945edeee114e2bdc1e495038319296ac55586902e2e37941de6d4629038b906",
+          "lastModified": "2026-08-16T08:12:47.221Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Build Implementation Review\n\n## Rules\n\n- Signature: `buildImplementationReview(ctx, input)` obtains raw review via `ctx.kernel.changes.getImplementationReview`, opens graph via `withOpenGraphProvider`, gets graph health, resolves symbol links via `ResolveSymbolReference`.\n- SDK must not parse source syntax, reimplement symbol matching, or perform presenter formatting. Core owns stored tracking; Code Graph owns resolution.\n- Result retains stored spec, file, symbol values unchanged. Symbol links gain structured resolution projection: `status`, `reason`, graph `health` and `coverage`, canonical logical `target`, declarations, `candidates`, `provenance`, and resolution `path`.\n- File-level links remain valid without symbol forcing. Never mutate active manifests, links, or archived sidecars.\n- Single health evaluation and batch symbol resolution under one opened-provider lifecycle; do not re-open provider per link.\n- Graph availability: non-current/incomplete graph yields per-link `unresolved` outcomes; provider initialization/read failures throw standard infrastructure errors, not fake missing links.\n- Shared host behavior: CLI `change implementation` and `change status --implementation` consume this identical projection; hosts must not maintain independent fallbacks.\n\n## Constraints\n\n- Returns structured data only.\n- Depends on Core and Code Graph through public APIs.\n- Resolution diagnostics do not block verification or archive.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:622555476e06b46806369c26ae77b1549b5c49fd7860243f10d8c3ec5047f876",
+          "lastModified": "2026-08-16T08:12:47.220Z"
+        },
+        "verify.md": {
+          "hash": "sha256:8945edeee114e2bdc1e495038319296ac55586902e2e37941de6d4629038b906",
+          "lastModified": "2026-08-16T08:12:47.221Z"
+        }
+      }
+    }
+  }
+}

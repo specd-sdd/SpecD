@@ -1,0 +1,81 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Language detection'
+  content: |
+    File-to-language mapping SHALL be determined by file extension. Each adapter declares its supported extensions through `extensions()`, and the adapter registry builds the mapping dynamically when adapters are registered. Files with unrecognized extensions SHALL be silently skipped: no error is thrown and no `FileNode` is created.
+
+    The general contract MUST NOT hardcode one built-in language's extensions or grammar behavior. Each built-in adapter's supported languages, extensions, syntax coverage, resolution semantics, hierarchy rules, and unsupported boundary SHALL be defined by its specific language-adapter spec.
+
+- op: removed
+  selector:
+    type: section
+    matches: 'Requirement: TypeScript adapter'
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Built-in multi-language dependency coverage'
+  content: |
+    Every registered built-in adapter SHALL implement the shared analysis, import-resolution, relation-building, reference-fact, range, coverage, and capability contracts. The adapter-specific specs are authoritative for the deterministic syntax and semantic boundary of each language:
+
+    - `code-graph:typescript-language-adapter`
+    - `code-graph:python-language-adapter`
+    - `code-graph:go-language-adapter`
+    - `code-graph:php-language-adapter`
+
+    Generic indexing or resolution code MUST NOT add language-name branches to compensate for facts omitted by a built-in adapter. A language-specific capability absent from its facts SHALL remain unsupported coverage.
+
+- op: removed
+  selector:
+    type: section
+    matches: 'Requirement: PHP require/include dependencies'
+
+- op: removed
+  selector:
+    type: section
+    matches: 'Requirement: PHP dynamic loader dependencies'
+
+- op: removed
+  selector:
+    type: section
+    matches: 'Requirement: PHP loaded-instance call extraction'
+
+- op: removed
+  selector:
+    type: section
+    matches: 'Requirement: PHP loader resolver extensibility'
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Resolver capability declaration
+
+    Every adapter SHALL declare the semantic categories it can deterministically prove: declarations, members, public/local bindings, hierarchy, and build-context selection. A capability flag MUST be true only when the adapter emits enough shared facts and ordered provenance for the generic resolver to prove that category. A graph relation emitted only for impact traversal does not by itself satisfy the corresponding resolver capability.
+
+    Missing capability support SHALL be recorded as unsupported coverage rather than guessed by the generic resolver. Emitted facts SHALL use the shared logical-symbol, binding, symbol-space, member-form, source-range, hierarchy, provenance-step, and coverage vocabulary. Adapter-specific syntax MUST NOT leak into generic resolver branches.
+
+    ### Requirement: Built-in adapter specialization
+
+    The general language-adapter spec SHALL define the shared port, phase boundaries, fact vocabulary, determinism, capability truthfulness, and common failure behavior. Each built-in adapter SHALL have one complete specific spec defining its languages and extensions, parsed declarations, ranges, imports and exports, logical ownership, member forms and symbol spaces, scoped facts, hierarchy and provenance, package/build context, relations, and unsupported boundary.
+
+    A specific adapter spec MAY impose stricter language semantics than this general contract but MUST NOT weaken shared safety or determinism. When implementation changes a built-in adapter's observable syntax or semantic coverage, its specific spec SHALL change with it.
+
+    ### Requirement: Logical declaring-owner facts
+
+    An adapter that advertises member support SHALL derive a member's declaring owner from language syntax and map it to a logical owner identity before constructing the member identity. Raw parser-node identifiers and optional syntax-level parent fields MUST NOT be used as logical owner identities. Top-level declarations SHALL have no owner, and same-name members under different logical owners MUST remain distinct.
+
+    ### Requirement: Hierarchy evidence consistency
+
+    An adapter that advertises `hierarchy: true` SHALL emit shared hierarchy facts and ordered provenance steps sufficient for `ResolveSymbolReference` to traverse from a child owner to an ancestor, embedded, composed, or contract owner and subsequently query a requested member under that owner. It SHALL keep those facts semantically consistent with persisted `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES` relations.
+
+    Empty hierarchy/provenance output for source containing supported, resolvable hierarchy syntax is a capability violation. Unsupported precedence, build alternatives, or dynamic hierarchy semantics SHALL instead produce explicit unsupported or unresolved coverage; they MUST NOT be guessed.
+
+    ### Requirement: Complete symbol source ranges
+
+    Every built-in adapter SHALL emit, for each symbol, the complete syntactic construct range and exact declared-name `selectionRange` using the shared half-open source-range convention. The selection range MUST be contained by the construct range.
+
+    Adapters SHALL derive these ranges from parsed syntax before parser artifacts are released. They MUST NOT approximate a construct end from the next symbol or from line-oriented regular expressions when the parser exposes the authoritative node range. A candidate without trustworthy complete and selection ranges SHALL be omitted and its capability gap reported rather than emitted with misleading coordinates.

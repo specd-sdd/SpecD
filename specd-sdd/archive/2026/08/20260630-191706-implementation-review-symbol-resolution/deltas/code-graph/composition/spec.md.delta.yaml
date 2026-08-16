@@ -1,0 +1,41 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Symbol-reference provider surface
+
+    `CodeGraphProvider` SHALL expose single and batch symbol-reference resolution plus canonical-symbol and public-binding impact operations. These operations SHALL delegate to the shared resolver/traversal services under the provider's existing lifecycle and availability checks.
+
+    The provider SHALL expose an exact public-binding lookup keyed by public surface, exported name, symbol space, and canonical target identity. The lookup SHALL return the selected binding and its declarations without passing through ranked or paginated search, so common export names cannot hide an already-resolved binding behind a result limit.
+
+    Selector resolution SHALL distinguish unique, ambiguous, and missing outcomes. Unqualified impact selectors SHALL use case-exact names first, fall back only to case-insensitive exact names, never widen to prefixes/text, and bound ambiguity candidates before returning them to a host.
+
+    The curated package surface SHALL export resolver input/result/status/reason/provenance types and factories, logical-symbol/public-binding/member/coverage vocabulary, and the enriched health/index result types. Concrete resolver implementations and backend storage details SHALL remain internal.
+
+    ### Requirement: Code Graph-orchestrated search surface
+
+    `CodeGraphProvider` SHALL expose one multi-category search operation accepting the query, requested `symbols | files | specs | documents` categories, shared filters, per-category limit, and snippet preference. It SHALL normalize an exact file filter from canonical workspace-relative, config/project-relative, or absolute form to one graph file; wildcard filters SHALL remain patterns.
+
+    A Code Graph application use case SHALL build the shared query plan, execute semantic-symbol and backend content lanes, locate precise file occurrences, suppress only occurrences represented by returned symbol selection ranges, group and rank results, cap general/wildcard occurrences per file, and apply category limits after logical grouping and suppression. Exact single-file searches SHALL return every retained occurrence. The provider SHALL return the unified deterministic projection under its existing lifecycle and availability checks.
+
+    Delivery adapters MUST NOT reproduce query expansion, invoke category searches independently to merge them, deduplicate symbol/file matches, or apply final limits. Existing lower-level provider search methods MAY remain for compatibility, but the unified operation is authoritative for cross-category behavior.
+
+    The curated package surface SHALL export the unified search input/result and source-match value objects needed by hosts. Backend candidate types and implementation helpers SHALL remain internal.
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`code-graph:symbol-model`](../symbol-model/spec.md) — graph and reference vocabulary
+    - [`code-graph:graph-store`](../graph-store/spec.md) — persistence contract
+    - [`code-graph:indexer`](../indexer/spec.md) — indexing pipeline
+    - [`code-graph:traversal`](../traversal/spec.md) — query-side traversal
+    - [`default:_global/architecture`](../../_global/architecture/spec.md) — hexagonal layering
+    - [`code-graph:get-graph-health`](../get-graph-health/spec.md) — health orchestration
+    - [`code-graph:index-project-graph`](../index-project-graph/spec.md) — index orchestration
+    - [`code-graph:get-spec-coverage`](../get-spec-coverage/spec.md) — spec coverage
+    - [`code-graph:get-change-spec-coverage`](../get-change-spec-coverage/spec.md) — change coverage
+    - [`code-graph:resolve-symbol-reference`](../resolve-symbol-reference/spec.md) — conservative reference resolution

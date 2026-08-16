@@ -48,6 +48,12 @@ The use case MUST NOT resolve workspaces from `specd.yaml`, acquire locks, spawn
 
 `createIndexProjectGraph()` in composition MUST return a stateless `IndexProjectGraph` instance.
 
+### Requirement: Incompatibility repair execution
+
+`IndexProjectGraph` SHALL support provider-owned repair when the persisted backend schema or graph derivation is incompatible. The indexing path MAY open or recreate through an indexing-specific provider operation even when ordinary reads reject the old store.
+
+The result SHALL report whether a full rebuild occurred and a stable rebuild reason such as explicit force, backend schema incompatibility, or derivation mismatch. Repair SHALL rotate storage generation and MUST NOT expose the store as ready until indexing and search-index rebuild complete.
+
 ## Constraints
 
 - MUST NOT open or close the provider.

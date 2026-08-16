@@ -12,6 +12,12 @@ import { type SpecdConfig, type VcsAdapter } from '@specd/core'
 import { buildProjectGraphConfig } from '../../../src/application/services/build-project-graph-config.js'
 import { GraphBusyError } from '../../../src/domain/errors/graph-busy-error.js'
 import { GraphProviderStaleError } from '../../../src/domain/errors/graph-provider-stale-error.js'
+import { IndexCoverageStatus } from '../../../src/domain/value-objects/index-session.js'
+import { FreshnessState } from '../../../src/domain/value-objects/indexed-input-freshness.js'
+import { createFileNode } from '../../../src/domain/value-objects/file-node.js'
+import { chmodSync, mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { tmpdir } from 'node:os'
 
 const createVcsAdapter = vi.fn<(projectRoot: string) => Promise<VcsAdapter>>()
 const getGraphHealth = (): GetGraphHealth => new GetGraphHealth(createVcsAdapter)
@@ -31,6 +37,15 @@ const BASE_STATS: GraphStatistics = {
 function makeProvider(stats: GraphStatistics = BASE_STATS): CodeGraphHostPort {
   return {
     getStatistics: vi.fn().mockResolvedValue(stats),
+    getAllIndexCoverage: vi.fn().mockResolvedValue([
+      {
+        filePath: 'core:src/index.ts',
+        contentHash: 'hash',
+        status: IndexCoverageStatus.Indexed,
+        reason: undefined,
+        capabilities: ['declarations'],
+      },
+    ]),
   } as unknown as CodeGraphHostPort
 }
 
@@ -115,6 +130,54 @@ describe('GetGraphHealth', () => {
     expect(result.fileCount).toBe(1)
   })
 
+  it('short-circuits discovery and VCS when the aggregate stale latch is set', async () => {
+    const provider = {
+      ...makeProvider(),
+      getFreshnessLatches: vi.fn().mockResolvedValue({
+        graph: true,
+        workspaces: { core: true },
+      }),
+    } as unknown as CodeGraphHostPort
+
+    const result = await getGraphHealth().execute({
+      config,
+      provider,
+      codeGraphVersion,
+      workspaces,
+    })
+
+    expect(result.state).toBe('stale')
+    expect(result.knownStaleSinceLastIndex).toBe(true)
+    expect(result.workspaces[0]?.knownStaleSinceLastIndex).toBe(true)
+    expect(createVcsAdapter).not.toHaveBeenCalled()
+  })
+
+  it('queries modified files once for workspaces sharing a repository root', async () => {
+    const modifiedFiles = vi.fn().mockResolvedValue([])
+    vi.mocked(createVcsAdapter).mockResolvedValue({
+      ref: vi.fn().mockResolvedValue('abc1234'),
+      rootDir: vi.fn().mockReturnValue('/project'),
+      isClean: vi.fn().mockResolvedValue(true),
+      modifiedFiles,
+    } as never)
+    const sibling = {
+      ...mockWorkspace,
+      name: 'sdk',
+      prefix: 'sdk',
+      codeRoot: '/project/packages/sdk',
+    }
+
+    await getGraphHealth().execute({
+      config,
+      provider: makeProvider(),
+      codeGraphVersion,
+      workspaces: [mockWorkspace, sibling],
+    })
+
+    expect(modifiedFiles).toHaveBeenCalledTimes(1)
+    expect(modifiedFiles).toHaveBeenCalledWith('abc1234')
+  })
+
   it('returns stale null when lastIndexedRef is null', async () => {
     vi.mocked(createVcsAdapter).mockResolvedValue({
       ref: vi.fn().mockResolvedValue('abc1234'),
@@ -141,6 +204,103 @@ describe('GetGraphHealth', () => {
     })
 
     expect(result.stale).toBe(true)
+  })
+
+  it('does not classify repository dirt outside graph visibility as content dirty', async () => {
+    vi.mocked(createVcsAdapter).mockResolvedValue({
+      ref: vi.fn().mockResolvedValue('abc1234'),
+      rootDir: vi.fn().mockReturnValue('/project'),
+      isClean: vi.fn().mockResolvedValue(false),
+    } as never)
+
+    const result = await getGraphHealth().execute({
+      config,
+      provider: makeProvider(),
+      codeGraphVersion,
+    })
+
+    expect(result.stale).toBe(false)
+    expect(result.contentFresh).toBeNull()
+    expect(result.reasonCodes).not.toContain('CONTENT_DIRTY')
+    expect(result.reasonCodes).toContain('CONTENT_UNKNOWN')
+    expect(result.schemaCompatible).toBe(true)
+    expect(result.generationCurrent).toBe(true)
+  })
+
+  it('keeps content inspection failures unknown instead of marking the graph dirty', async () => {
+    const projectRoot = mkdtempSync(join(tmpdir(), 'specd-health-read-error-'))
+    const codeRoot = join(projectRoot, 'src')
+    const sourcePath = join(codeRoot, 'index.ts')
+    mkdirSync(codeRoot, { recursive: true })
+    writeFileSync(sourcePath, 'export const value = 1\n')
+    chmodSync(sourcePath, 0o000)
+    createVcsAdapter.mockRejectedValue(new Error('no vcs'))
+    const provider = {
+      ...makeProvider(),
+      getAllFiles: vi.fn().mockResolvedValue([
+        createFileNode({
+          path: 'core:index.ts',
+          configRelativePath: 'src/index.ts',
+          language: 'typescript',
+          contentHash: 'indexed-hash',
+          workspace: 'core',
+        }),
+      ]),
+      getAllDocuments: vi.fn().mockResolvedValue([]),
+    } as unknown as CodeGraphHostPort
+
+    try {
+      const result = await getGraphHealth().execute({
+        config: { ...config, projectRoot },
+        provider,
+        codeGraphVersion,
+        workspaces: [{ ...mockWorkspace, codeRoot }],
+      })
+
+      expect(result.state).toBe(FreshnessState.Unknown)
+      expect(result.contentFresh).toBeNull()
+      expect(result.reasonCodes).toContain('CONTENT_UNKNOWN')
+      expect(result.reasonCodes).not.toContain('CONTENT_DIRTY')
+    } finally {
+      chmodSync(sourcePath, 0o600)
+      rmSync(projectRoot, { recursive: true, force: true })
+    }
+  })
+
+  it('keeps source discovery failures unknown instead of treating files as deleted', async () => {
+    const projectRoot = mkdtempSync(join(tmpdir(), 'specd-health-discovery-error-'))
+    const codeRoot = join(projectRoot, 'not-a-directory')
+    writeFileSync(codeRoot, 'not a directory')
+    createVcsAdapter.mockRejectedValue(new Error('no vcs'))
+    const provider = {
+      ...makeProvider(),
+      getAllFiles: vi.fn().mockResolvedValue([
+        createFileNode({
+          path: 'core:index.ts',
+          configRelativePath: 'not-a-directory/index.ts',
+          language: 'typescript',
+          contentHash: 'indexed-hash',
+          workspace: 'core',
+        }),
+      ]),
+      getAllDocuments: vi.fn().mockResolvedValue([]),
+    } as unknown as CodeGraphHostPort
+
+    try {
+      const result = await getGraphHealth().execute({
+        config: { ...config, projectRoot },
+        provider,
+        codeGraphVersion,
+        workspaces: [{ ...mockWorkspace, codeRoot }],
+      })
+
+      expect(result.state).toBe(FreshnessState.Unknown)
+      expect(result.contentFresh).toBeNull()
+      expect(result.reasonCodes).toContain('CONTENT_UNKNOWN')
+      expect(result.reasonCodes).not.toContain('CONTENT_DIRTY')
+    } finally {
+      rmSync(projectRoot, { recursive: true, force: true })
+    }
   })
 
   it('returns fingerprintMismatch null without workspaces', async () => {
@@ -193,6 +353,99 @@ describe('GetGraphHealth', () => {
     })
 
     expect(result.fingerprintMismatch).toBe(true)
+    expect(result.state).toBe('stale')
+  })
+
+  it('aggregates persisted incomplete coverage and never reports current health', async () => {
+    vi.mocked(createVcsAdapter).mockResolvedValue({
+      ref: vi.fn().mockResolvedValue('abc1234'),
+    } as never)
+    const provider = {
+      ...makeProvider({ ...BASE_STATS, graphFingerprint: matchingFingerprint() }),
+      getAllIndexCoverage: vi.fn().mockResolvedValue([
+        {
+          filePath: 'core:src/broken.ts',
+          contentHash: 'hash',
+          status: IndexCoverageStatus.ParseFailed,
+          reason: 'PARSER_FAILED',
+          capabilities: [],
+        },
+        {
+          filePath: 'core:src/excluded.ts',
+          contentHash: undefined,
+          status: IndexCoverageStatus.Excluded,
+          reason: 'PATH_EXCLUDED',
+          capabilities: [],
+        },
+        {
+          filePath: 'core:src/unsupported.bin',
+          contentHash: 'hash',
+          status: IndexCoverageStatus.Unsupported,
+          reason: 'ADAPTER_UNSUPPORTED',
+          capabilities: [],
+        },
+        {
+          filePath: 'core:src/partial.ts',
+          contentHash: 'hash',
+          status: IndexCoverageStatus.Partial,
+          reason: 'REFERENCE_FACTS_PARTIAL',
+          capabilities: ['declarations'],
+        },
+      ]),
+    } as unknown as CodeGraphHostPort
+
+    const result = await getGraphHealth().execute({
+      config,
+      provider,
+      codeGraphVersion,
+      workspaces,
+    })
+
+    expect(result.coverageComplete).toBe(false)
+    expect(result.coverage.byStatus['parse-failed']).toBe(1)
+    expect(result.coverage.byStatus.excluded).toBe(1)
+    expect(result.coverage.byStatus.unsupported).toBe(1)
+    expect(result.coverage.byStatus.partial).toBe(1)
+    expect(result.reasonCodes).toContain('PARSER_FAILED')
+    expect(result.state).not.toBe('current')
+  })
+
+  it('treats excluded and unsupported outcomes as terminal aggregate coverage', async () => {
+    vi.mocked(createVcsAdapter).mockResolvedValue({
+      ref: vi.fn().mockResolvedValue('abc1234'),
+    } as never)
+    const provider = {
+      ...makeProvider(),
+      getAllIndexCoverage: vi.fn().mockResolvedValue([
+        {
+          filePath: 'core:src/excluded.ts',
+          contentHash: undefined,
+          status: IndexCoverageStatus.Excluded,
+          reason: 'PATH_EXCLUDED',
+          capabilities: [],
+        },
+        {
+          filePath: 'core:README.md',
+          contentHash: 'hash',
+          status: IndexCoverageStatus.Unsupported,
+          reason: 'no-language-adapter',
+          capabilities: [],
+        },
+      ]),
+    } as unknown as CodeGraphHostPort
+
+    const result = await getGraphHealth().execute({
+      config,
+      provider,
+      codeGraphVersion,
+    })
+
+    expect(result.coverageComplete).toBe(true)
+    expect(result.coverage.byStatus.excluded).toBe(1)
+    expect(result.coverage.byStatus.unsupported).toBe(1)
+    expect(result.reasonCodes).not.toContain('COVERAGE_PARTIAL')
+    expect(result.reasonCodes).not.toContain('PATH_EXCLUDED')
+    expect(result.reasonCodes).not.toContain('no-language-adapter')
   })
 
   it('does not open or close the provider', async () => {

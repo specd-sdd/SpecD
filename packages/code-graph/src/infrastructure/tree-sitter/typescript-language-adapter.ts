@@ -22,6 +22,21 @@ import {
   type FileAnalysis,
 } from '../../domain/value-objects/file-analysis.js'
 import { type IndexSession } from '../../domain/value-objects/index-session.js'
+import {
+  MemberForm,
+  SymbolSpace,
+  createLocalBinding,
+  createPublicBinding,
+  type AdapterCapabilities,
+  type ReferenceFacts,
+} from '../../domain/value-objects/symbol-reference.js'
+import {
+  buildHierarchyReferenceFacts,
+  buildLogicalDeclarationFacts,
+  containsSymbolRange,
+  createAdapterDeclarationDescriptor,
+  type AdapterHierarchyDescriptor,
+} from './reference-fact-helpers.js'
 
 /**
  * Determines whether an import declaration is file-only/side-effect only.
@@ -226,17 +241,45 @@ interface TsTypeDeclarationInfo {
   readonly name: string
   readonly symbolId: string
   readonly methodsByName: Record<string, string>
+  readonly memberSymbolIds: readonly string[]
+  readonly memberFormsById: Readonly<Record<string, MemberForm>>
   readonly extendsNames: readonly string[]
   readonly implementsNames: readonly string[]
+}
+
+/**
+ * Classifies a TypeScript member form from its declaring syntax.
+ * @param node - Method definition or interface signature node.
+ * @param name - Declared member name.
+ * @returns Proven shared member form.
+ */
+function typeScriptMemberForm(node: SgNode, name: string): MemberForm {
+  if (name === 'constructor') return MemberForm.Constructor
+  if (nodeKind(node) === 'method_signature') return MemberForm.Signature
+  const source = node.text().trimStart()
+  if (/^(?:public\s+|protected\s+|private\s+)?static\b/.test(source)) {
+    return MemberForm.Static
+  }
+  if (/^(?:public\s+|protected\s+|private\s+)?get\b/.test(source)) return MemberForm.Getter
+  if (/^(?:public\s+|protected\s+|private\s+)?set\b/.test(source)) return MemberForm.Setter
+  return MemberForm.Instance
+}
+
+/** A statically named or star re-export retained for pass-2 target linking. */
+interface TsReExportInfo {
+  readonly specifier: string
+  readonly importedName: string
+  readonly exportedName: string
 }
 
 /**
  * Parser state representation for TypeScript.
  */
 interface TypeScriptParserState {
-  readonly kind: 'ts'
+  readonly kind: 'typescript'
   readonly exportedNames: readonly string[]
   readonly declarations: readonly TsTypeDeclarationInfo[]
+  readonly reExports: readonly TsReExportInfo[]
 }
 
 /**
@@ -244,6 +287,20 @@ interface TypeScriptParserState {
  * Uses tree-sitter via ast-grep to extract symbols and relations from source code.
  */
 export class TypeScriptLanguageAdapter implements LanguageAdapter {
+  /**
+   * Declares deterministic TypeScript and JavaScript reference semantics.
+   * @returns Supported reference capabilities.
+   */
+  capabilities(): AdapterCapabilities {
+    return {
+      declarations: true,
+      members: true,
+      publicBindings: true,
+      localBindings: true,
+      hierarchy: true,
+      buildContext: false,
+    }
+  }
   /**
    * Resolves a qualified name to a path.
    * @param _qualifiedName - Qualified name.
@@ -306,28 +363,42 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
     const symbols: SymbolNode[] = []
     const seenSymbol = new Set<string>()
     const exportedNames = new Set<string>()
+    const reExports: TsReExportInfo[] = []
 
     const addSymbol = (
       name: string,
       kind: SymbolKind,
       node: SgNode,
+      selectionNode: SgNode | null | undefined,
       comment: string | undefined,
     ): void => {
+      if (!selectionNode) return
       const line = node.range().start.line + 1
       const col = node.range().start.column
       const key = `${kind}:${name}:${line}:${col}`
       if (seenSymbol.has(key)) return
-      seenSymbol.add(key)
-      symbols.push(
-        createSymbolNode({
+      try {
+        const symbol = createSymbolNode({
           name,
           kind,
           filePath,
           line,
           column: node.range().start.column,
+          endLine: node.range().end.line + 1,
+          endColumn: node.range().end.column,
+          selectionRange: {
+            startLine: selectionNode.range().start.line + 1,
+            startColumn: selectionNode.range().start.column,
+            endLine: selectionNode.range().end.line + 1,
+            endColumn: selectionNode.range().end.column,
+          },
           comment,
-        }),
-      )
+        })
+        seenSymbol.add(key)
+        symbols.push(symbol)
+      } catch (error) {
+        if (!(error instanceof RangeError)) throw error
+      }
     }
 
     const allNodes: SgNode[] = []
@@ -336,6 +407,7 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
       'class_declaration',
       'abstract_class_declaration',
       'method_definition',
+      'method_signature',
       'type_alias_declaration',
       'interface_declaration',
       'enum_declaration',
@@ -354,33 +426,38 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
       switch (nodeKind(node)) {
         case 'function_declaration': {
           const name = getName(node)
-          if (name) addSymbol(name, SymbolKind.Function, node, extractComment(node))
+          if (name)
+            addSymbol(name, SymbolKind.Function, node, node.field('name'), extractComment(node))
           break
         }
         case 'class_declaration':
         case 'abstract_class_declaration': {
           const name = getName(node)
-          if (name) addSymbol(name, SymbolKind.Class, node, extractComment(node))
+          if (name)
+            addSymbol(name, SymbolKind.Class, node, node.field('name'), extractComment(node))
           break
         }
-        case 'method_definition': {
+        case 'method_definition':
+        case 'method_signature': {
           const name = getName(node)
-          if (name) addSymbol(name, SymbolKind.Method, node, extractComment(node))
+          if (name)
+            addSymbol(name, SymbolKind.Method, node, node.field('name'), extractComment(node))
           break
         }
         case 'type_alias_declaration': {
           const name = getName(node)
-          if (name) addSymbol(name, SymbolKind.Type, node, extractComment(node))
+          if (name) addSymbol(name, SymbolKind.Type, node, node.field('name'), extractComment(node))
           break
         }
         case 'interface_declaration': {
           const name = getName(node)
-          if (name) addSymbol(name, SymbolKind.Interface, node, extractComment(node))
+          if (name)
+            addSymbol(name, SymbolKind.Interface, node, node.field('name'), extractComment(node))
           break
         }
         case 'enum_declaration': {
           const name = getName(node)
-          if (name) addSymbol(name, SymbolKind.Enum, node, extractComment(node))
+          if (name) addSymbol(name, SymbolKind.Enum, node, node.field('name'), extractComment(node))
           break
         }
         case 'lexical_declaration':
@@ -444,12 +521,44 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
           for (const specifier of specChild.children()) {
             if (nodeKind(specifier) === 'export_specifier') {
               const nameNode = specifier.field('name')
-              if (nameNode) exportedNames.add(nameNode.text())
+              const aliasNode = specifier.field('alias')
+              const exportedName = aliasNode?.text() ?? nameNode?.text()
+              if (exportedName) exportedNames.add(exportedName)
             }
           }
         }
       }
+
+      const sourceNode = child.field('source')
+      const source = sourceNode?.text().replace(/^['"]|['"]$/g, '')
+      if (source) {
+        const exportClause = child
+          .children()
+          .find((candidate) => nodeKind(candidate) === 'export_clause')
+        if (exportClause) {
+          for (const specifier of exportClause.children()) {
+            if (nodeKind(specifier) !== 'export_specifier') continue
+            const importedName = specifier.field('name')?.text()
+            const exportedName = specifier.field('alias')?.text() ?? importedName
+            if (importedName && exportedName) {
+              reExports.push({ specifier: source, importedName, exportedName })
+            }
+          }
+        } else if (child.text().trimStart().startsWith('export *')) {
+          reExports.push({ specifier: source, importedName: '*', exportedName: '*' })
+        }
+      }
     }
+
+    const referenceFacts = this.buildReferenceFacts(
+      context.workspaceName,
+      filePath,
+      symbols,
+      imports,
+      exportedNames,
+      reExports,
+      declarations,
+    )
 
     return {
       language:
@@ -464,12 +573,154 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
       imports,
       bindingFacts,
       callFacts,
+      referenceFacts,
       parserState: {
         kind: 'typescript',
         declarations,
         exportedNames: [...exportedNames],
+        reExports,
       },
     }
+  }
+
+  /**
+   * Builds conservative semantic facts from syntax already proven by this adapter.
+   * @param workspace - Owning workspace.
+   * @param filePath - Analyzed source path.
+   * @param symbols - Extracted declarations.
+   * @param imports - Extracted static imports.
+   * @param exportedNames - Names proven to be exported by this module.
+   * @param reExports - Named and star re-exports retained for pass-2 linking.
+   * @param typeDeclarations - Syntax-proven local type owners and base clauses.
+   * @returns Additive reference facts.
+   */
+  private buildReferenceFacts(
+    workspace: string,
+    filePath: string,
+    symbols: readonly SymbolNode[],
+    imports: readonly ImportDeclaration[],
+    exportedNames: ReadonlySet<string>,
+    reExports: readonly TsReExportInfo[],
+    typeDeclarations: readonly TsTypeDeclarationInfo[],
+  ): ReferenceFacts {
+    const ownerByMemberId = new Map<string, string>()
+    const formByMemberId = new Map<string, MemberForm>()
+    for (const declaration of typeDeclarations) {
+      for (const methodId of declaration.memberSymbolIds) {
+        ownerByMemberId.set(methodId, declaration.symbolId)
+      }
+      for (const [methodId, form] of Object.entries(declaration.memberFormsById)) {
+        formByMemberId.set(methodId, form)
+      }
+    }
+    const logicalFacts = buildLogicalDeclarationFacts({
+      workspace,
+      declarations: symbols.map((symbol) =>
+        createAdapterDeclarationDescriptor({
+          symbol,
+          surface: filePath,
+          space: this.symbolSpace(symbol.kind),
+          ownerSymbolId: ownerByMemberId.get(symbol.id),
+          requiresOwner: symbol.kind === SymbolKind.Method,
+          memberForm: formByMemberId.get(symbol.id) ?? this.memberForm(symbol),
+        }),
+      ),
+    })
+    const localTypeByName = new Map(typeDeclarations.map((item) => [item.name, item]))
+    const hierarchyDescriptors: AdapterHierarchyDescriptor[] = []
+    for (const child of typeDeclarations) {
+      child.extendsNames.forEach((name, precedence) => {
+        const parent = localTypeByName.get(name)
+        if (parent) {
+          hierarchyDescriptors.push({
+            childSymbolId: child.symbolId,
+            parentSymbolId: parent.symbolId,
+            kind: 'extends',
+            precedence,
+          })
+        }
+      })
+      child.implementsNames.forEach((name, precedence) => {
+        const parent = localTypeByName.get(name)
+        if (parent) {
+          hierarchyDescriptors.push({
+            childSymbolId: child.symbolId,
+            parentSymbolId: parent.symbolId,
+            kind: 'implements',
+            precedence,
+          })
+        }
+      })
+    }
+    const hierarchyFacts = buildHierarchyReferenceFacts({
+      hierarchy: hierarchyDescriptors,
+      logicalBySymbolId: logicalFacts.logicalBySymbolId,
+    })
+    const publicBindings = symbols
+      .filter((symbol) => !ownerByMemberId.has(symbol.id) && exportedNames.has(symbol.name))
+      .map((symbol) =>
+        createPublicBinding({
+          surface: filePath,
+          exportedName: symbol.name,
+          space: this.symbolSpace(symbol.kind),
+          targetId: logicalFacts.logicalBySymbolId.get(symbol.id)?.id,
+        }),
+      )
+    for (const reExport of reExports) {
+      if (reExport.exportedName === '*') continue
+      publicBindings.push(
+        createPublicBinding({
+          surface: filePath,
+          exportedName: reExport.exportedName,
+          space: SymbolSpace.Value,
+          targetId: undefined,
+        }),
+      )
+    }
+    const localBindings = imports
+      .filter((item) => item.localName.length > 0)
+      .map((item) =>
+        createLocalBinding({
+          filePath,
+          scopeId: 'module',
+          localName: item.localName,
+          // ImportDeclarationKind intentionally preserves syntax form, not TS's
+          // separate type/value namespace. Unresolved imports therefore stay in
+          // the value space until a later, proven binding fact selects otherwise.
+          space: SymbolSpace.Value,
+          targetId: undefined,
+        }),
+      )
+    return {
+      declarations: logicalFacts.declarations,
+      publicBindings,
+      localBindings,
+      hierarchy: hierarchyFacts.hierarchy,
+      steps: hierarchyFacts.steps,
+      capabilities: this.capabilities(),
+    }
+  }
+
+  /**
+   * Maps a legacy symbol kind to a conservative namespace.
+   * @param kind - Legacy symbol kind.
+   * @returns Its conservative namespace.
+   */
+  private symbolSpace(kind: SymbolKind): SymbolSpace {
+    if (kind === SymbolKind.Type || kind === SymbolKind.Interface || kind === SymbolKind.Class) {
+      return SymbolSpace.Type
+    }
+    return SymbolSpace.Value
+  }
+
+  /**
+   * Determines a proven member form from an extracted symbol.
+   * @param symbol - Extracted symbol.
+   * @returns Proven member form, if any.
+   */
+  private memberForm(symbol: SymbolNode): MemberForm | undefined {
+    if (symbol.kind === SymbolKind.Method) return MemberForm.Instance
+    return undefined
   }
 
   /**
@@ -500,9 +751,9 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
         const resolved = this.resolveRelativeImportPath(analysis.filePath, imp.specifier)
         const candidates = Array.isArray(resolved) ? resolved : [resolved]
         for (const candidatePath of candidates) {
-          const target = session
-            .findSymbolsByFile(candidatePath)
-            .find((s) => s.name === imp.originalName)
+          const target =
+            session.findSymbolsByFile(candidatePath).find((s) => s.name === imp.originalName) ??
+            this.resolveReExportedSymbol(session, candidatePath, imp.originalName, new Set())
           if (target) {
             importMap.set(imp.localName, target.id)
             break
@@ -537,6 +788,45 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
     }
 
     return { importMap, fileImports }
+  }
+
+  /**
+   * Follows statically declared TypeScript re-export routes to a source declaration.
+   * @param session - Shared indexing session.
+   * @param filePath - Public surface being imported.
+   * @param exportedName - Name requested from that surface.
+   * @param visited - Cycle guard for malformed re-export graphs.
+   * @returns Proven source symbol, when one unique route is available.
+   */
+  private resolveReExportedSymbol(
+    session: IndexSession,
+    filePath: string,
+    exportedName: string,
+    visited: Set<string>,
+  ): SymbolNode | undefined {
+    const visitKey = JSON.stringify([filePath, exportedName])
+    if (visited.has(visitKey)) return undefined
+    visited.add(visitKey)
+
+    const analysis = session.getAnalysis(filePath)
+    const state = analysis?.parserState as TypeScriptParserState | undefined
+    if (state?.kind !== 'typescript') return undefined
+    const matches = (state.reExports ?? []).filter(
+      (route) => route.exportedName === exportedName || route.exportedName === '*',
+    )
+    const targets: SymbolNode[] = []
+    for (const route of matches) {
+      const sourceName = route.importedName === '*' ? exportedName : route.importedName
+      const resolved = this.resolveRelativeImportPath(filePath, route.specifier)
+      const candidates = Array.isArray(resolved) ? resolved : [resolved]
+      for (const candidatePath of candidates) {
+        const target =
+          session.findSymbolsByFile(candidatePath).find((symbol) => symbol.name === sourceName) ??
+          this.resolveReExportedSymbol(session, candidatePath, sourceName, visited)
+        if (target && !targets.some((candidate) => candidate.id === target.id)) targets.push(target)
+      }
+    }
+    return targets.length === 1 ? targets[0] : undefined
   }
 
   /**
@@ -623,7 +913,7 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
     const seen = new Set<string>()
 
     for (const declaration of declarations) {
-      for (const parentName of declaration.extendsNames) {
+      for (const [precedence, parentName] of declaration.extendsNames.entries()) {
         const targetId =
           context.resolvedImports.importMap.get(parentName) ??
           declarationsByName.get(parentName)?.symbolId
@@ -637,6 +927,7 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
               source: declaration.symbolId,
               target: targetId,
               type: RelationType.Extends,
+              metadata: { precedence },
             }),
           )
         }
@@ -653,7 +944,7 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
         }
       }
 
-      for (const contractName of declaration.implementsNames) {
+      for (const [precedence, contractName] of declaration.implementsNames.entries()) {
         const targetId =
           context.resolvedImports.importMap.get(contractName) ??
           declarationsByName.get(contractName)?.symbolId
@@ -667,6 +958,7 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
               source: declaration.symbolId,
               target: targetId,
               type: RelationType.Implements,
+              metadata: { precedence },
             }),
           )
         }
@@ -728,7 +1020,13 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
   private processVariableDeclarator(
     child: SgNode,
     filePath: string,
-    addSymbol: (name: string, kind: SymbolKind, node: SgNode, comment: string | undefined) => void,
+    addSymbol: (
+      name: string,
+      kind: SymbolKind,
+      node: SgNode,
+      selectionNode: SgNode | null | undefined,
+      comment: string | undefined,
+    ) => void,
     isExported: boolean,
   ): void {
     const nameNode = child.field('name')
@@ -745,7 +1043,7 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
         ) {
           const idName = n.text().trim()
           if (idName) {
-            addSymbol(idName, SymbolKind.Variable, child, extractComment(child))
+            addSymbol(idName, SymbolKind.Variable, child, n, extractComment(child))
           }
         }
         for (const c of n.children()) {
@@ -767,17 +1065,17 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
           valKind === 'function_expression' ||
           valKind === 'generator_function'
         ) {
-          addSymbol(name, SymbolKind.Function, child, extractComment(child))
+          addSymbol(name, SymbolKind.Function, child, nameNode, extractComment(child))
         } else if (valKind === 'call_expression') {
-          addSymbol(name, SymbolKind.Function, child, extractComment(child))
+          addSymbol(name, SymbolKind.Function, child, nameNode, extractComment(child))
         } else {
           if (isExported) {
-            addSymbol(name, SymbolKind.Variable, child, extractComment(child))
+            addSymbol(name, SymbolKind.Variable, child, nameNode, extractComment(child))
           }
         }
       } else {
         if (isExported) {
-          addSymbol(name, SymbolKind.Variable, child, extractComment(child))
+          addSymbol(name, SymbolKind.Variable, child, nameNode, extractComment(child))
         }
       }
     }
@@ -792,7 +1090,13 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
   private processVariableDeclaration(
     node: SgNode,
     filePath: string,
-    addSymbol: (name: string, kind: SymbolKind, node: SgNode, comment: string | undefined) => void,
+    addSymbol: (
+      name: string,
+      kind: SymbolKind,
+      node: SgNode,
+      selectionNode: SgNode | null | undefined,
+      comment: string | undefined,
+    ) => void,
   ): void {
     for (const child of node.children()) {
       if (nodeKind(child) !== 'variable_declarator') continue
@@ -809,7 +1113,13 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
   private processExportedVariableDeclaration(
     node: SgNode,
     filePath: string,
-    addSymbol: (name: string, kind: SymbolKind, node: SgNode, comment: string | undefined) => void,
+    addSymbol: (
+      name: string,
+      kind: SymbolKind,
+      node: SgNode,
+      selectionNode: SgNode | null | undefined,
+      comment: string | undefined,
+    ) => void,
   ): void {
     for (const child of node.children()) {
       if (nodeKind(child) !== 'variable_declarator') continue
@@ -827,7 +1137,13 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
   private processAssignmentExpression(
     node: SgNode,
     filePath: string,
-    addSymbol: (name: string, kind: SymbolKind, node: SgNode, comment: string | undefined) => void,
+    addSymbol: (
+      name: string,
+      kind: SymbolKind,
+      node: SgNode,
+      selectionNode: SgNode | null | undefined,
+      comment: string | undefined,
+    ) => void,
     exportedNames: Set<string>,
   ): void {
     const left = node.field('left')
@@ -836,6 +1152,7 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
 
     const rawLeftText = left.text().trim()
     if (!rawLeftText) return
+    const selectionNode = left.field('property') ?? left
 
     if (
       rawLeftText === 'module.exports' ||
@@ -853,9 +1170,9 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
           rightKind === 'function_expression' ||
           rightKind === 'generator_function'
         ) {
-          addSymbol(exportName, SymbolKind.Function, node, extractComment(node))
+          addSymbol(exportName, SymbolKind.Function, node, selectionNode, extractComment(node))
         } else {
-          addSymbol(exportName, SymbolKind.Variable, node, extractComment(node))
+          addSymbol(exportName, SymbolKind.Variable, node, selectionNode, extractComment(node))
         }
       }
       return
@@ -869,9 +1186,9 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
         rightKind === 'function_expression' ||
         rightKind === 'generator_function'
       ) {
-        addSymbol(rawLeftText, SymbolKind.Method, node, extractComment(node))
+        addSymbol(rawLeftText, SymbolKind.Method, node, selectionNode, extractComment(node))
       } else if (rightKind === 'call_expression' || rightKind === 'object') {
-        addSymbol(rawLeftText, SymbolKind.Variable, node, extractComment(node))
+        addSymbol(rawLeftText, SymbolKind.Variable, node, selectionNode, extractComment(node))
       }
     }
   }
@@ -885,7 +1202,13 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
   private processPairNode(
     node: SgNode,
     filePath: string,
-    addSymbol: (name: string, kind: SymbolKind, node: SgNode, comment: string | undefined) => void,
+    addSymbol: (
+      name: string,
+      kind: SymbolKind,
+      node: SgNode,
+      selectionNode: SgNode | null | undefined,
+      comment: string | undefined,
+    ) => void,
   ): void {
     const keyNode = node.field('key')
     const valueNode = node.field('value')
@@ -901,14 +1224,14 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
       valKind === 'function_expression' ||
       valKind === 'generator_function'
     ) {
-      addSymbol(keyName, SymbolKind.Method, keyNode, extractComment(node))
+      addSymbol(keyName, SymbolKind.Method, node, keyNode, extractComment(node))
     } else if (
       valKind === 'object' ||
       valKind === 'string' ||
       valKind === 'number' ||
       valKind === 'boolean_literal'
     ) {
-      addSymbol(keyName, SymbolKind.Variable, keyNode, extractComment(node))
+      addSymbol(keyName, SymbolKind.Variable, node, keyNode, extractComment(node))
     }
   }
 
@@ -921,7 +1244,13 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
   private processFieldDefinition(
     node: SgNode,
     filePath: string,
-    addSymbol: (name: string, kind: SymbolKind, node: SgNode, comment: string | undefined) => void,
+    addSymbol: (
+      name: string,
+      kind: SymbolKind,
+      node: SgNode,
+      selectionNode: SgNode | null | undefined,
+      comment: string | undefined,
+    ) => void,
   ): void {
     const nameNode = node.field('name')
     const valueNode = node.field('value')
@@ -937,9 +1266,9 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
         nodeKind(valueNode) === 'function_expression' ||
         nodeKind(valueNode) === 'generator_function')
     ) {
-      addSymbol(fieldName, SymbolKind.Method, node, extractComment(node))
+      addSymbol(fieldName, SymbolKind.Method, node, nameNode, extractComment(node))
     } else {
-      addSymbol(fieldName, SymbolKind.Variable, node, extractComment(node))
+      addSymbol(fieldName, SymbolKind.Variable, node, nameNode, extractComment(node))
     }
   }
 
@@ -1386,36 +1715,50 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
       new Set(['class_declaration', 'abstract_class_declaration', 'interface_declaration']),
       nodes,
     )
+    const memberNodes: SgNode[] = []
+    collectByKind(root, new Set(['method_definition', 'method_signature']), memberNodes)
 
     for (const node of nodes) {
       const name = getName(node)
       if (!name) continue
 
       const lineStart = node.range().start.line + 1
-      const lineEnd = node.range().end.line + 1
-      const symbolId = symbols.find(
+      const ownerSymbol = symbols.find(
         (symbol) =>
           symbol.name === name &&
           symbol.line === lineStart &&
+          symbol.column === node.range().start.column &&
           (symbol.kind === SymbolKind.Class || symbol.kind === SymbolKind.Interface),
-      )?.id
-      if (!symbolId) continue
+      )
+      if (!ownerSymbol) continue
+      const symbolId = ownerSymbol.id
 
       const header = node.text().split('{')[0] ?? node.text()
       const extendsMatch = header.match(/\bextends\s+([^{]+?)(?:\bimplements\b|$)/)
       const implementsMatch = header.match(/\bimplements\s+([^{]+)$/)
       const methodsByName: Record<string, string> = {}
+      const memberSymbolIds: string[] = []
+      const memberFormsById: Record<string, MemberForm> = {}
 
       for (const symbol of symbols) {
         if (symbol.kind !== SymbolKind.Method) continue
-        if (symbol.line <= lineStart || symbol.line > lineEnd) continue
+        if (!containsSymbolRange(ownerSymbol, symbol)) continue
+        const memberNode = memberNodes.find(
+          (candidate) =>
+            candidate.range().start.line + 1 === symbol.line && getName(candidate) === symbol.name,
+        )
+        if (!memberNode) continue
+        memberSymbolIds.push(symbol.id)
         methodsByName[symbol.name] = symbol.id
+        memberFormsById[symbol.id] = typeScriptMemberForm(memberNode, symbol.name)
       }
 
       declarations.push({
         name,
         symbolId,
         methodsByName,
+        memberSymbolIds,
+        memberFormsById,
         extendsNames:
           nodeKind(node) === 'interface_declaration'
             ? parseTypeNames(extendsMatch?.[1])

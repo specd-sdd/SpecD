@@ -46,4 +46,72 @@ describe('GitVcsAdapter', () => {
     expect(gitMock).toHaveBeenNthCalledWith(1, '/repo/worktree', 'config', 'user.name')
     expect(gitMock).toHaveBeenNthCalledWith(2, '/repo/worktree', 'config', 'user.email')
   })
+
+  it('returns a stable revision without consulting worktree status', async () => {
+    gitMock.mockResolvedValue('abc1234')
+    const adapter = new GitVcsAdapter('/repo/worktree', '/repo')
+
+    await expect(adapter.ref()).resolves.toBe('abc1234')
+    expect(gitMock).toHaveBeenCalledOnce()
+    expect(gitMock).toHaveBeenCalledWith('/repo', 'rev-parse', '--short', 'HEAD')
+  })
+
+  it('enumerates every worktree state from the repository root', async () => {
+    gitMock
+      .mockResolvedValueOnce(
+        [
+          'M',
+          'src/unstaged.ts',
+          'A',
+          'src/staged.ts',
+          'D',
+          'src/deleted.ts',
+          'R100',
+          'src/renamed-from.ts',
+          'src/renamed-to.ts',
+          'C100',
+          'src/copied-from.ts',
+          'src/copied-to.ts',
+          '',
+        ].join('\0'),
+      )
+      .mockResolvedValueOnce(['src/untracked.ts', 'nested\\portable.ts', ''].join('\0'))
+    const adapter = new GitVcsAdapter('/repo/nested/project', '/repo')
+
+    await expect(adapter.modifiedFiles('base123')).resolves.toEqual([
+      'src/unstaged.ts',
+      'src/staged.ts',
+      'src/deleted.ts',
+      'src/renamed-from.ts',
+      'src/renamed-to.ts',
+      'src/copied-to.ts',
+      'src/untracked.ts',
+      'nested/portable.ts',
+    ])
+    expect(gitMock).toHaveBeenNthCalledWith(
+      1,
+      '/repo',
+      'diff',
+      '--name-status',
+      '-z',
+      '--find-renames',
+      'base123',
+      '--',
+    )
+    expect(gitMock).toHaveBeenNthCalledWith(
+      2,
+      '/repo',
+      'ls-files',
+      '-z',
+      '--others',
+      '--exclude-standard',
+    )
+  })
+
+  it('rejects modified-file enumeration failures', async () => {
+    gitMock.mockRejectedValue(new Error('git failed'))
+    const adapter = new GitVcsAdapter('/repo/nested', '/repo')
+
+    await expect(adapter.modifiedFiles('base123')).rejects.toThrow('git failed')
+  })
 })

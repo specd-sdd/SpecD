@@ -1,0 +1,107 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "code-graph:symbol-model",
+    "code-graph:graph-store",
+    "code-graph:language-adapter",
+    "code-graph:workspace-integration"
+  ],
+  "implementation": [
+    {
+      "file": "code-graph:src/domain/value-objects/symbol-reference.ts",
+      "symbols": [
+        "SymbolSpace",
+        "MemberForm",
+        "DeclarationOccurrence",
+        "LogicalSymbol",
+        "createLogicalSymbol",
+        "PublicBinding",
+        "LocalBinding",
+        "ResolutionStep",
+        "createPublicBinding",
+        "createLocalBinding",
+        "ResolveSymbolReferenceInput"
+      ]
+    },
+    {
+      "file": "code-graph:src/domain/value-objects/index-session.ts",
+      "symbols": ["IndexCoverageStatus", "IndexCoverage"]
+    },
+    {
+      "file": "code-graph:src/application/use-cases/resolve-symbol-reference.ts",
+      "symbols": ["ResolveSymbolReference"]
+    },
+    {
+      "file": "code-graph:test/application/use-cases/resolve-symbol-reference.spec.ts"
+    },
+    {
+      "file": "code-graph:src/domain/ports/graph-store.ts",
+      "symbols": ["GraphStore"]
+    },
+    {
+      "file": "code-graph:src/infrastructure/sqlite/sqlite-graph-store.ts",
+      "symbols": ["SQLiteGraphStore"]
+    },
+    {
+      "file": "code-graph:src/infrastructure/ladybug/ladybug-graph-store.ts",
+      "symbols": ["LadybugGraphStore"]
+    },
+    {
+      "file": "code-graph:test/helpers/in-memory-graph-store.ts",
+      "symbols": ["InMemoryGraphStore"]
+    },
+    {
+      "file": "code-graph:test/application/use-cases/index-project-graph-integration.spec.ts"
+    },
+    {
+      "file": "code-graph:src/application/services/resolve-graph-selector.ts",
+      "symbols": ["resolveSymbolSelector"]
+    },
+    {
+      "file": "code-graph:test/application/services/resolve-graph-selector.spec.ts"
+    },
+    {
+      "file": "code-graph:src/composition/code-graph-provider.ts",
+      "symbols": ["resolveSymbolReferences"]
+    }
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Language-neutral resolution contract for identifying symbols deterministically across declarations, aliases, public bindings, and hierarchies.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:16cfb65d0ab63dc05ba94d65f822425ee3a2b742c639ce6822744560559f1dae",
+          "lastModified": "2026-08-16T08:12:47.176Z"
+        },
+        "verify.md": {
+          "hash": "sha256:7f7112eb5d8bce05ab35eb25ef695e5e9194293acbf072bb93deb506910f1d9b",
+          "lastModified": "2026-08-16T08:12:47.177Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# resolve-symbol-reference\n\n## Rules\n\n### Input & Identity\n- `ResolveSymbolReference` accepts workspace, symbol text, optional constraints (file, public surface, symbol-space, broad kind, member-form, build-context).\n- Structured identity authoritative. Rendered canonical references round-trip with escaping, no ad hoc delimiter splitting.\n- Identifier case/normalization follow language. Path/workspace normalization separate.\n\n### Canonical Targets\n- Return single logical symbol as canonical target, retaining all contributing declaration locations (overloads/merges resolve as 1 target; competing declarations separate).\n- Target exposes: workspace, module/package, owner, symbol space, simple name, member form, contributing locations, stable canonical reference (line/column independent).\n\n### Bindings\n- Public export slot selected by public surface, exported name, symbol space. Distinct aliases, duplicate re-exports, competing targets remain distinct for ambiguity reporting.\n- Local bindings retain lexical scope + source provenance (shadowed aliases non-merged; local alias resolution != public export).\n- Anonymous/default exports addressable via public binding identity.\n\n### Precedence\n1. Exact declaration in explicitly addressed file/owner\n2. Exact public binding in explicitly addressed public surface\n3. Statically proven scoped import/alias\n4. Statically proven hierarchy path (language rules)\n- Same-name symbol without proven path fails resolution. Build-context selects platform/conditional alternatives. Cyclic paths terminate without duplicates.\n\n### Outcomes\n- `resolved`: 1 target proven.\n- `ambiguous`: multiple valid targets, none selected.\n- `unresolved`: proof unsafe/unavailable (stale/dirty/parse-failed/unsupported evidence -> `unresolved`, not `missing`; unknown freshness -> `freshness-unknown`).\n- `missing`: current + complete index proves target absent in addressed file/surface.\n- Non-resolved includes machine-readable reason code, ordered candidates, typed evidence path.\n\n### Freshness & Coverage\n- VCS ref equality insufficient. Call batch `AssessIndexedResourceFreshness` on addressed resources/declaration files. Deduplicate shared inputs. No direct filesystem/hash/repo logic in resolver.\n- Exact file-anchored resolution can proceed if file fresh despite global staleness. Workspace-wide fallback/absence/ambiguity requires global completeness; if global stale/unknown -> `unresolved`.\n\n### Hierarchy Members\n- Declared/overriding member > inherited member. Contract-qualified -> contract member.\n- Traversing ancestor owner queries requested member under ancestor (owner != member). Evidence retains path + ancestor-member declaration.\n- Competing inherited members -> `ambiguous`. Getter/setter requires member-form constraint if ambiguous. Implicit interfaces require proven method sets. Bounded cycle termination.\n\n### Batch & Backend\n- Batch resolution shares health snapshot + provider lifecycle. Bounded index lookups, no whole-graph scans per query.\n- Candidate/provenance ordering, status, reason codes identical across graph backends.\n\n## Constraints\n- NO mutation of stored links or sidecars.\n- Prohibit fuzzy matching, edit distance, best-guess.\n- Runtime reflection, computed imports, monkey patching, unproven value flow -> unresolved.\n- Language syntax analysis belongs to language adapters.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:16cfb65d0ab63dc05ba94d65f822425ee3a2b742c639ce6822744560559f1dae",
+          "lastModified": "2026-08-16T08:12:47.176Z"
+        },
+        "verify.md": {
+          "hash": "sha256:7f7112eb5d8bce05ab35eb25ef695e5e9194293acbf072bb93deb506910f1d9b",
+          "lastModified": "2026-08-16T08:12:47.177Z"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,42 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: List subcommand'
+  content: |
+    `specd changes implementation list <name>` MUST return the current implementation-tracking state of the change.
+
+    Its output MUST include:
+
+    - tracked implementation files grouped by review state (`open`, `resolved`, `ignored`, `removed`)
+    - confirmed implementation links grouped by `specId` and file
+    - symbol-level refinements when a link has `symbols`
+    - the SDK implementation-review projection for every symbol-level link, including `resolved`, `ambiguous`, `unresolved`, or `missing` status, machine-readable reason, canonical logical target, candidates, graph health/coverage, and binding or hierarchy provenance when present
+
+    The CLI SHALL obtain this projection from `sdk:build-implementation-review`. It MUST NOT implement exact-file, rightmost-member, same-name, re-export, or hierarchy fallback policy and MUST NOT rewrite stored link values.
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Review subcommand'
+  content: |
+    `specd changes implementation review <name>` SHALL support implementation-traceability integrity review using the same SDK projection as `list` and change status.
+
+    The review flow MUST:
+
+    - use current tracked implementation files and confirmed links as raw input
+    - render structured `resolved`, `ambiguous`, `unresolved`, and `missing` outcomes without selecting an ambiguous candidate
+    - distinguish incomplete/non-current graph evidence from a fresh, complete proof of absence
+    - distinguish symbol diagnostics from archive-time materialization and workspace-boundary failures
+    - surface when sidecar maintenance would require updates outside current spec scope
+    - leave active tracking and archived sidecars unchanged
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`core:change`](../../core/change/spec.md) — tracked implementation file state and confirmed link behavior
+    - [`sdk:build-implementation-review`](../../sdk/build-implementation-review/spec.md) — shared graph-enriched review projection
+    - [`core:update-implementation-tracking`](../../core/update-implementation-tracking/spec.md) — core mutation primitive for tracked files and confirmed links
+    - [`core:get-implementation-review`](../../core/get-implementation-review/spec.md) — core read model for implementation review
+    - [`core:refresh-implementation-tracking`](../../core/refresh-implementation-tracking/spec.md) — autodetection-driven refresh path reused by implementation review flows

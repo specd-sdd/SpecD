@@ -1,0 +1,91 @@
+- op: added
+  position: { parent: { type: section, matches: 'Requirements' } }
+  content: |
+    ### Requirement: Reference and coverage persistence
+
+    #### Scenario: Backend round-trip preserves every binding
+
+    - **WHEN** logical declarations, parallel aliases, provenance, and failed coverage are persisted and queried in batch
+    - **THEN** every field and route round-trips in deterministic order without full scans
+
+    #### Scenario: Structured identity fields drive lookup
+
+    - **GIVEN** canonical ids whose serialized text contains overlapping names and delimiters
+    - **WHEN** lookup, ranking, and selector resolution run by workspace, surface, name, space, owner, member form, or exported name
+    - **THEN** SQLite and Ladybug use indexed structured fields and return equivalent results
+    - **AND** neither backend parses or substring-ranks the serialized canonical ids
+
+    #### Scenario: Incremental hydration and affected lookup have backend parity
+
+    - **GIVEN** persisted declarations, bindings, importers, callers, type users, and hierarchy dependents
+    - **WHEN** the complete reference snapshot and direct affected files are requested
+    - **THEN** SQLite and Ladybug return equivalent deterministically ordered facts and file paths
+    - **AND** affected lookup uses a bounded batch operation rather than one query per relation
+
+    ### Requirement: Incompatible store handling
+
+    #### Scenario: Normal open never masks incompatibility
+
+    - **GIVEN** a previous backend schema
+    - **WHEN** a read provider opens it
+    - **THEN** it rejects the store without replacing it
+    - **AND** only index repair rotates generation and exposes rebuilt FTS data
+
+    ### Requirement: Source-content search candidates
+
+    #### Scenario: Indexed content produces bounded substring candidates
+
+    - **GIVEN** indexed source contains a multi-word phrase and separator/CamelCase variants
+    - **WHEN** candidate search receives the shared full, raw, and expanded query terms
+    - **THEN** the substring-capable index returns a bounded filtered candidate set with enough evidence to verify exact occurrences
+    - **AND** ordinary search does not return every stored file to the application layer
+
+    #### Scenario: Short query uses bounded fallback
+
+    - **WHEN** a one- or two-character source query is executed
+    - **THEN** the defined short-query path remains bounded and honors path, workspace, and exclusion filters before its candidate limit
+
+    #### Scenario: Store does not own unified result semantics
+
+    - **WHEN** source candidates are returned
+    - **THEN** the Store exposes backend relevance and occurrence evidence only
+    - **AND** Code Graph owns exact verification, symbol-aware suppression, grouping, final ranking, and post-suppression limits
+
+    #### Scenario: Reverse coverage lookup is batched
+
+    - **GIVEN** duplicate file paths and symbol ids in an impact blast radius
+    - **WHEN** reverse coverage is requested
+    - **THEN** one deduplicated batch per resource kind returns deterministic `COVERS_FILE` and `COVERS_SYMBOL` evidence
+    - **AND** empty batches perform no backend work
+
+    ### Requirement: Indexed-input freshness persistence
+
+    #### Scenario: Observation cache distinguishes equal and changed content
+
+    - **GIVEN** persisted observations for file, document, aggregate-spec, and repository inputs
+    - **WHEN** batch comparison sees unchanged stamps, changed stamps with equal hashes, missing content, and changed hashes
+    - **THEN** unchanged inputs avoid reads and equal-content observations refresh
+    - **AND** missing or different content is monotonically marked stale
+    - **AND** an assessment from an older generation cannot mutate newer evidence
+
+    #### Scenario: Successful indexing alone clears freshness latches
+
+    - **GIVEN** workspace and aggregate `knownStaleSinceLastIndex` latches are true
+    - **WHEN** transient assessments return unknown
+    - **THEN** the latches remain true
+    - **AND** only a successful atomic index clears observations and latches
+
+    ### Requirement: Single-session bulk indexing
+
+    #### Scenario: Bulk indexing commits one complete generation
+
+    - **GIVEN** files, documents, specs, symbols, semantic facts, observations, and relations span multiple bounded chunks
+    - **WHEN** a bulk indexing session succeeds
+    - **THEN** it begins once, commits once, and rebuilds semantic and source-content search indexes once
+    - **AND** equivalent relations are deduplicated across chunks
+
+    #### Scenario: Bulk failure is not partially visible
+
+    - **WHEN** endpoint validation, hierarchy lookup, or persistence fails during a bulk session
+    - **THEN** no partial generation becomes readable
+    - **AND** validation and lookup are not issued as one Store call per relation

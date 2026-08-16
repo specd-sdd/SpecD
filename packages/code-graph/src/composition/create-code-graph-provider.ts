@@ -15,6 +15,9 @@ import {
 } from './graph-store-factory.js'
 import { GraphStoreRegistryError } from '../domain/errors/graph-store-registry-error.js'
 import { createSqliteGraphStoreFactory } from './create-sqlite-graph-store-factory.js'
+import { createGetGraphHealth } from './use-cases/get-graph-health.js'
+import { readInstalledCodeGraphVersion } from '../application/use-cases/_shared/installed-code-graph-version.js'
+import { type WorkspaceIndexTarget } from '../domain/value-objects/index-options.js'
 
 const DEFAULT_GRAPH_STORE_ID = 'sqlite'
 
@@ -71,7 +74,30 @@ export function createCodeGraphProvider(
 
   const indexer = new IndexCodeGraph(store, registry)
 
-  return new CodeGraphProviderImpl(store, indexer, projectRoot)
+  const graphHealth = isSpecdConfig(options)
+    ? {
+        useCase: createGetGraphHealth(),
+        input: {
+          config: options,
+          codeGraphVersion: readInstalledCodeGraphVersion(),
+          workspaces: options.workspaces.map(
+            (workspace): WorkspaceIndexTarget => ({
+              name: workspace.name,
+              prefix: workspace.prefix ?? null,
+              codeRoot: workspace.codeRoot,
+              ownership: workspace.ownership,
+              isExternal: workspace.isExternal,
+              // Fingerprinting also derives deterministic exclusions from the spec root.
+              specRepo: {
+                specsPath: workspace.specsPath,
+              } as WorkspaceIndexTarget['specRepo'],
+            }),
+          ),
+        },
+      }
+    : undefined
+
+  return new CodeGraphProviderImpl(store, indexer, projectRoot, graphHealth)
 }
 
 /**

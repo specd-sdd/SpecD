@@ -1,0 +1,43 @@
+- op: added
+  position: { parent: { type: section, matches: 'Requirements' } }
+  content: |
+    ### Requirement: Resolved canonical and public-binding impact
+
+    #### Scenario: Export impact separates route and target
+
+    - **GIVEN** one symbol is consumed through two public exports and directly
+    - **WHEN** impact targets one export
+    - **THEN** exact-binding impact includes only its proven route
+    - **AND** canonical impact includes all three routes with deterministic hierarchy traversal
+
+    #### Scenario: Symbol impact uses exact selector precedence
+
+    - **GIVEN** one `Change` declaration and many `change` variables
+    - **WHEN** unqualified symbol impact targets `Change`
+    - **THEN** only the case-exact declaration is traversed
+    - **AND** if several case-exact candidates exist, bounded ambiguity is returned with no traversal
+    - **AND** prefix and textual discovery matches are ignored
+
+    ### Requirement: File-impact covering specs
+
+    #### Scenario: Direct file coverage survives empty symbol coverage
+
+    - **GIVEN** an input file has a `COVERS_FILE` relation and the graph has no `COVERS_SYMBOL` relations
+    - **WHEN** file impact is analyzed
+    - **THEN** the covering spec is returned once with minimum depth `0`
+    - **AND** its evidence identifies the input file at depth `0`
+
+    #### Scenario: Blast radius aggregates and deduplicates coverage evidence
+
+    - **GIVEN** a spec covers a directly selected symbol and two resources reached at different depths
+    - **WHEN** impact is analyzed to the configured depth
+    - **THEN** the spec appears once at its minimum evidence depth
+    - **AND** all distinct file and symbol evidence is retained in deterministic order
+
+    #### Scenario: Multi-file inputs all start at depth zero
+
+    - **GIVEN** several input files and their declared symbols reach overlapping covered resources
+    - **WHEN** multi-file impact is analyzed
+    - **THEN** every input file and its symbols contribute depth-0 evidence
+    - **AND** reverse coverage is requested in batches over deduplicated file and symbol sets
+    - **AND** no store call is issued per affected resource

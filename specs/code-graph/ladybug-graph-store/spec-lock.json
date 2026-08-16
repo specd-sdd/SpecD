@@ -12,7 +12,49 @@
   "implementation": [
     {
       "file": "code-graph:src/infrastructure/ladybug/ladybug-graph-store.ts",
-      "symbols": ["LadybugGraphStore", "searchSpecs", "searchDocuments"]
+      "symbols": ["LadybugGraphStore"]
+    },
+    {
+      "file": "code-graph:src/infrastructure/ladybug/schema.ts"
+    },
+    {
+      "file": "code-graph:test/infrastructure/ladybug/ladybug-graph-store.spec.ts"
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "LadybugDB-backed GraphStore adapter providing Cypher query execution, FTS indexing, identity-ranked search, and CSV bulk loading.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:61e95318ffd81d9b34bd1880cc689d6e922c1281d496b2f5ee6d42e9767e72c7",
+          "lastModified": "2026-08-16T08:12:48.057Z"
+        },
+        "verify.md": {
+          "hash": "sha256:bd81a1fc577554f96873f4a937e44e1f64ba19972312546b734d398048d8054e",
+          "lastModified": "2026-08-16T08:12:48.060Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Ladybug Graph Store\n\n## Rules\n\n- `LadybugGraphStore` implements `GraphStore`; backend id `ladybug`; defer native binding readiness until `open()`; `close()` idempotent.\n- Storage paths: database/lock/WAL under `{configPath}/graph`, CSV scratch under `{configPath}/tmp` (cleaned post-run).\n- Schema & versioning: tables for `File`, `Symbol`, `Spec`, `Document`, `Meta`, and relation edges (`IMPORTS`, `DEFINES`, `CALLS`, `CONSTRUCTS`, `USES_TYPE`, `EXPORTS`, `DEPENDS_ON`, `COVERS_FILE`, `COVERS_SYMBOL`, `EXTENDS`, `IMPLEMENTS`, `OVERRIDES`). `COVERS_SYMBOL` preserves stale metadata. Versioning tracks schema; incompatible versions require `recreate()` full rebuild and `storage.epoch` rotation.\n- Cypher safety: user/external values MUST use prepared statements (`conn.prepare`, `conn.execute`, `$param`, `Record<string, LbugValue>`); direct `conn.query` restricted to DDL, compile-time constants, internal COPY paths.\n- FTS indexes: `symbol_fts` (`searchName`, `comment`), `spec_fts` (`title`, `description`, `content`), `document_fts` (`content`, paths), trigram source content index for queries ≥ 3 chars.\n- Query processing: join multi-token queries with `OR`; supplement FTS candidates with identity hits.\n- Reranking: exact canonical identity > exact token > prefix > suffix > real component > substring > content text.\n- Bulk loading: single transaction/session with bounded CSV `COPY` chunks, commits once, rebuilds FTS once post-commit. Scratch in `{configPath}/tmp` cleaned post-run.\n- Observations & latches: persists `IndexedInputObservation` records and workspace/global latches for incremental hydration.\n\n## Constraints\n\n- Infrastructure adapter; consumers depend on abstract `code-graph:graph-store`.\n- Backend id `ladybug`.\n- All persisted artifacts and scratch rooted under `configPath`.\n- Parameterized Cypher MUST use prepared statements with `$param`.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:61e95318ffd81d9b34bd1880cc689d6e922c1281d496b2f5ee6d42e9767e72c7",
+          "lastModified": "2026-08-16T08:12:48.057Z"
+        },
+        "verify.md": {
+          "hash": "sha256:bd81a1fc577554f96873f4a937e44e1f64ba19972312546b734d398048d8054e",
+          "lastModified": "2026-08-16T08:12:48.060Z"
+        }
+      }
+    }
+  }
 }

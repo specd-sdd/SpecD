@@ -8,6 +8,7 @@ import { type DocumentNode } from '../domain/value-objects/document-node.js'
 import { type SpecNode } from '../domain/value-objects/spec-node.js'
 import { type SymbolQuery } from '../domain/value-objects/symbol-query.js'
 import { type GraphStatistics } from '../domain/value-objects/graph-statistics.js'
+import { type IndexCoverage } from '../domain/value-objects/index-session.js'
 import { type TraversalOptions } from '../domain/value-objects/traversal-options.js'
 import { type TraversalResult } from '../domain/value-objects/traversal-result.js'
 import {
@@ -20,14 +21,28 @@ import { type HotspotOptions, type HotspotResult } from '../domain/value-objects
 import { type Relation } from '../domain/value-objects/relation.js'
 import { type SearchOptions } from '../domain/value-objects/search-options.js'
 import {
+  FreshnessState,
+  type FreshnessLatches,
+  type IndexedInputObservation,
+  type IndexedResourceKey,
+  type MarkIndexedInputStaleInput,
+  type UpdateIndexedInputObservationInput,
+} from '../domain/value-objects/indexed-input-freshness.js'
+import { AssessIndexedResourceFreshness } from '../application/use-cases/assess-indexed-resource-freshness.js'
+import {
   resolveFileSelector,
   resolveSymbolSelector,
   type ResolvedFileSelector,
-  type ResolvedSymbolSelector,
+  type ResolvedSymbolSelectorResult,
 } from '../application/services/resolve-graph-selector.js'
 import { getUpstream } from '../domain/services/get-upstream.js'
 import { getDownstream } from '../domain/services/get-downstream.js'
-import { analyzeImpact } from '../domain/services/analyze-impact.js'
+import {
+  analyzeImpact,
+  analyzePublicBindingImpact,
+  type PublicBindingImpactResult,
+  type ResolvedPublicBindingImpactInput,
+} from '../domain/services/analyze-impact.js'
 import { analyzeFileImpact } from '../domain/services/analyze-file-impact.js'
 import { analyzeSpecImpact } from '../domain/services/analyze-spec-impact.js'
 import { detectChanges } from '../domain/services/detect-changes.js'
@@ -39,6 +54,46 @@ import {
   assertGraphIndexUnlockedByStoragePath,
   acquireGraphIndexLockByStoragePath,
 } from '../infrastructure/index-lock.js'
+import {
+  type DeclarationOccurrence,
+  type PublicBinding,
+  type ResolveSymbolReferenceInput,
+  type ResolutionHealth,
+  type SymbolSpace,
+  type SymbolResolutionResult,
+} from '../domain/value-objects/symbol-reference.js'
+import { ResolveSymbolReference } from '../application/use-cases/resolve-symbol-reference.js'
+import {
+  GetGraphHealth,
+  type GetGraphHealthInput,
+  type GetGraphHealthResult,
+} from '../application/use-cases/get-graph-health.js'
+import {
+  SearchCodeGraph,
+  type ReferenceAwareSymbolResult,
+  type SearchCodeGraphInput,
+  type SearchCodeGraphResult,
+} from '../application/use-cases/search-code-graph.js'
+
+/** Result of opening a provider through its indexing-specific repair lifecycle. */
+export interface IndexingOpenResult {
+  readonly fullRebuild: boolean
+  readonly fullRebuildReason: string | null
+}
+
+/** Complete identity used to retrieve one already-resolved public binding. */
+export interface ExactPublicBindingSelector {
+  readonly surface: string
+  readonly exportedName: string
+  readonly space: SymbolSpace
+  readonly targetId: string
+}
+
+/** Exact public binding together with the declarations of its canonical target. */
+export interface ExactPublicBindingResult {
+  readonly binding: PublicBinding
+  readonly declarations: readonly DeclarationOccurrence[]
+}
 
 /**
  * Public, factory-created facade for the code graph subsystem.
@@ -48,6 +103,7 @@ import {
  */
 export interface CodeGraphProvider {
   open(): Promise<void>
+  openForIndexing(): Promise<IndexingOpenResult>
   close(): Promise<void>
   [Symbol.asyncDispose](): Promise<void>
   index(options: IndexOptions): Promise<IndexResult>
@@ -58,7 +114,7 @@ export interface CodeGraphProvider {
   findFilesByConfigRelativePath(configRelativePath: string): Promise<FileNode[]>
   findDocumentsByConfigRelativePath(configRelativePath: string): Promise<DocumentNode[]>
   resolveFileSelector(input: string): Promise<ResolvedFileSelector[]>
-  resolveSymbolSelector(input: string): Promise<ResolvedSymbolSelector[]>
+  resolveSymbolSelector(input: string): Promise<ResolvedSymbolSelectorResult>
   getSpec(specId: string): Promise<SpecNode | undefined>
   getSpecDependencies(specId: string): Promise<Relation[]>
   getSpecDependents(specId: string): Promise<Relation[]>
@@ -67,6 +123,18 @@ export interface CodeGraphProvider {
   getCoveredSymbols(specId: string): Promise<Relation[]>
   getCoveringSpecsForSymbol(symbolId: string): Promise<Relation[]>
   getStatistics(): Promise<GraphStatistics>
+  getGraphHealth(): Promise<GetGraphHealthResult>
+  resolveSymbolReference(
+    input: ResolveSymbolReferenceInput,
+    health?: GetGraphHealthResult,
+  ): Promise<SymbolResolutionResult>
+  resolveSymbolReferences(
+    inputs: readonly ResolveSymbolReferenceInput[],
+    health?: GetGraphHealthResult,
+  ): Promise<readonly SymbolResolutionResult[]>
+  getExactPublicBinding(
+    selector: ExactPublicBindingSelector,
+  ): Promise<ExactPublicBindingResult | null>
   getUpstream(symbolId: string, options?: TraversalOptions): Promise<TraversalResult>
   getDownstream(symbolId: string, options?: TraversalOptions): Promise<TraversalResult>
   analyzeImpact(
@@ -74,6 +142,11 @@ export interface CodeGraphProvider {
     direction: 'upstream' | 'downstream' | 'both',
     maxDepth?: number,
   ): Promise<ImpactResult>
+  analyzePublicBindingImpact(
+    input: ResolvedPublicBindingImpactInput,
+    direction: 'upstream' | 'downstream' | 'both',
+    maxDepth?: number,
+  ): Promise<PublicBindingImpactResult>
   analyzeFileImpact(
     filePath: string,
     direction: 'upstream' | 'downstream' | 'both',
@@ -101,6 +174,8 @@ export interface CodeGraphProvider {
       endLine: number
     }>
   >
+  searchReferenceSymbols(options: SearchOptions): Promise<readonly ReferenceAwareSymbolResult[]>
+  search(input: SearchCodeGraphInput): Promise<SearchCodeGraphResult>
   searchSpecs(
     options: SearchOptions,
   ): Promise<
@@ -123,18 +198,34 @@ export interface CodeGraphProvider {
 export class CodeGraphProviderImpl implements CodeGraphProvider {
   private _isOpen = false
   private _storageGeneration: StorageGenerationSnapshot | null = null
+  private readonly resolver: ResolveSymbolReference
+  private readonly referenceSearch: SearchCodeGraph
 
   /**
    * Creates a new internal graph provider.
    * @param store - The underlying graph store.
    * @param indexer - The indexing use case.
    * @param projectRoot - Optional project root path to make configuration paths relative.
+   * @param graphHealth - Optional provider-owned graph-health composition.
+   * @param graphHealth.useCase - Canonical health use case.
+   * @param graphHealth.input - Config-bound health input excluding the provider.
    */
   constructor(
     private readonly store: GraphStore,
     private readonly indexer: IndexCodeGraph,
     private readonly projectRoot?: string,
-  ) {}
+    private readonly graphHealth?: {
+      readonly useCase: GetGraphHealth
+      readonly input: Omit<GetGraphHealthInput, 'provider'>
+    },
+  ) {
+    this.resolver = new ResolveSymbolReference(
+      store,
+      async () => this.toResolutionHealth(await this.getGraphHealth()),
+      (resources) => this.assessExactResources(resources),
+    )
+    this.referenceSearch = new SearchCodeGraph(store)
+  }
 
   /**
    * Opens the underlying graph store.
@@ -147,6 +238,26 @@ export class CodeGraphProviderImpl implements CodeGraphProvider {
     await this.store.open()
     this._storageGeneration = await this.store.getStorageGeneration()
     this._isOpen = true
+  }
+
+  /**
+   * Opens the store for indexing, recreating incompatible derived storage when necessary.
+   * Ordinary {@link open} never performs this destructive repair.
+   * @returns Repair diagnostics for this open operation.
+   */
+  async openForIndexing(): Promise<IndexingOpenResult> {
+    if (this._isOpen) {
+      return { fullRebuild: false, fullRebuildReason: null }
+    }
+    try {
+      await this.open()
+      return { fullRebuild: false, fullRebuildReason: null }
+    } catch (error: unknown) {
+      if (!isIncompatibleSchemaError(error)) throw error
+      await this.store.recreate()
+      await this.open()
+      return { fullRebuild: true, fullRebuildReason: 'SCHEMA_INCOMPATIBLE' }
+    }
   }
 
   /**
@@ -217,6 +328,15 @@ export class CodeGraphProviderImpl implements CodeGraphProvider {
   }
 
   /**
+   * Returns every indexed source file for internal health snapshot comparison.
+   * @returns All indexed file nodes.
+   */
+  async getAllFiles(): Promise<FileNode[]> {
+    await this.assertAvailable()
+    return this.store.getAllFiles()
+  }
+
+  /**
    * Retrieves a document node by its path.
    * @param path - The document path.
    * @returns The document node, or undefined if not found.
@@ -224,6 +344,84 @@ export class CodeGraphProviderImpl implements CodeGraphProvider {
   async getDocument(path: string): Promise<DocumentNode | undefined> {
     await this.assertAvailable()
     return this.store.getDocument(path)
+  }
+
+  /**
+   * Returns every indexed document for internal health snapshot comparison.
+   * @returns All indexed document nodes.
+   */
+  async getAllDocuments(): Promise<DocumentNode[]> {
+    await this.assertAvailable()
+    return this.store.getAllDocuments()
+  }
+
+  /**
+   * Returns every indexed spec node.
+   * @returns Every indexed spec node.
+   */
+  async getAllSpecs(): Promise<SpecNode[]> {
+    await this.assertAvailable()
+    return this.store.getAllSpecs()
+  }
+
+  /**
+   * Returns every persisted coverage fact for canonical graph health.
+   * @returns Deterministically ordered coverage facts.
+   */
+  async getAllIndexCoverage(): Promise<readonly IndexCoverage[]> {
+    await this.assertAvailable()
+    return this.store.getAllIndexCoverage()
+  }
+
+  /**
+   * Returns persisted input evidence for logical resources.
+   * @param resources - Logical resource identities.
+   * @returns Persisted observations for the requested resources.
+   */
+  async getIndexedInputObservations(
+    resources: readonly IndexedResourceKey[],
+  ): Promise<readonly IndexedInputObservation[]> {
+    await this.assertAvailable()
+    return this.store.getIndexedInputObservations(resources)
+  }
+
+  /**
+   * Monotonically marks observations stale using compare-and-set evidence.
+   * @param updates - Guarded stale updates.
+   */
+  async markIndexedInputsStale(updates: readonly MarkIndexedInputStaleInput[]): Promise<void> {
+    await this.assertAvailable()
+    await this.store.markIndexedInputsStale(updates)
+  }
+
+  /**
+   * Refreshes filesystem stamps for equal-content observations.
+   * @param updates - Equal-content stamp updates.
+   */
+  async updateIndexedInputObservations(
+    updates: readonly UpdateIndexedInputObservationInput[],
+  ): Promise<void> {
+    await this.assertAvailable()
+    await this.store.updateIndexedInputObservations(updates)
+  }
+
+  /**
+   * Returns aggregate and workspace monotonic freshness latches.
+   * @param workspaces - Workspace names to project.
+   * @returns Aggregate and requested workspace freshness latches.
+   */
+  async getFreshnessLatches(workspaces: readonly string[]): Promise<FreshnessLatches> {
+    await this.assertAvailable()
+    return this.store.getFreshnessLatches(workspaces)
+  }
+
+  /**
+   * Monotonically sets the aggregate and affected workspace stale latches.
+   * @param workspaces - Workspace names proven stale.
+   */
+  async markWorkspacesAndGraphStaleSinceLastIndex(workspaces: readonly string[]): Promise<void> {
+    await this.assertAvailable()
+    await this.store.markWorkspacesAndGraphStaleSinceLastIndex(workspaces)
   }
 
   /**
@@ -264,7 +462,7 @@ export class CodeGraphProviderImpl implements CodeGraphProvider {
    * @param input - The raw selector string.
    * @returns Matching canonical symbol entries.
    */
-  async resolveSymbolSelector(input: string): Promise<ResolvedSymbolSelector[]> {
+  async resolveSymbolSelector(input: string): Promise<ResolvedSymbolSelectorResult> {
     await this.assertAvailable()
     return resolveSymbolSelector(input, {
       store: this.store,
@@ -352,6 +550,136 @@ export class CodeGraphProviderImpl implements CodeGraphProvider {
   }
 
   /**
+   * Returns one provider-owned canonical graph-health snapshot.
+   * @returns Canonical graph health.
+   */
+  async getGraphHealth(): Promise<GetGraphHealthResult> {
+    await this.assertAvailable()
+    if (this.graphHealth === undefined) {
+      const stats = await this.store.getStatistics()
+      return {
+        ...stats,
+        state: FreshnessState.Unknown,
+        knownStaleSinceLastIndex: false,
+        workspaces: [],
+        stale: null,
+        currentRef: null,
+        fingerprintMismatch: null,
+        contentFresh: null,
+        coverageComplete: null,
+        coverage: {
+          total: 0,
+          byStatus: {
+            indexed: 0,
+            excluded: 0,
+            unsupported: 0,
+            'parse-failed': 0,
+            partial: 0,
+          },
+          reasons: [],
+        },
+        schemaCompatible: true,
+        generationCurrent: true,
+        reasonCodes: ['GRAPH_HEALTH_UNAVAILABLE'],
+      }
+    }
+    return this.graphHealth.useCase.execute({
+      ...this.graphHealth.input,
+      provider: this,
+    })
+  }
+
+  /**
+   * Resolves one structured symbol reference under this provider lifecycle.
+   * @param input - Structured reference request.
+   * @param health - Optional already-read canonical health snapshot.
+   * @returns Conservative symbol-resolution result.
+   */
+  async resolveSymbolReference(
+    input: ResolveSymbolReferenceInput,
+    health?: GetGraphHealthResult,
+  ): Promise<SymbolResolutionResult> {
+    await this.assertAvailable()
+    const [normalizedInput] = await this.normalizeResolutionInputs([input])
+    if (health !== undefined) {
+      return new ResolveSymbolReference(
+        this.store,
+        () => Promise.resolve(this.toResolutionHealth(health)),
+        (resources) => this.assessExactResources(resources),
+      ).execute(normalizedInput!)
+    }
+    return this.resolver.execute(normalizedInput!)
+  }
+
+  /**
+   * Assesses exact graph resources against their persisted input observations.
+   * @param resources - Exact resource identities.
+   * @returns Exact tri-state freshness results.
+   */
+  private async assessExactResources(
+    resources: readonly IndexedResourceKey[],
+  ): Promise<
+    readonly import('../domain/value-objects/indexed-input-freshness.js').IndexedResourceFreshnessResult[]
+  > {
+    const projectRoot = this.projectRoot ?? this.graphHealth?.input.config.projectRoot
+    if (projectRoot === undefined) return []
+    const roots = new Map<string, string>()
+    for (const resource of resources) roots.set(resource.workspace, projectRoot)
+    return new AssessIndexedResourceFreshness(this.store).execute({
+      resources,
+      workspaceRoots: roots,
+    })
+  }
+
+  /**
+   * Resolves a batch while sharing one graph-health snapshot and prepared queries.
+   * @param inputs - Structured reference requests.
+   * @param health - Optional already-read canonical health snapshot.
+   * @returns Results corresponding to the input order.
+   */
+  async resolveSymbolReferences(
+    inputs: readonly ResolveSymbolReferenceInput[],
+    health?: GetGraphHealthResult,
+  ): Promise<readonly SymbolResolutionResult[]> {
+    await this.assertAvailable()
+    const normalizedInputs = await this.normalizeResolutionInputs(inputs)
+    if (health !== undefined) {
+      return new ResolveSymbolReference(
+        this.store,
+        () => Promise.resolve(this.toResolutionHealth(health)),
+        (resources) => this.assessExactResources(resources),
+      ).executeBatch(normalizedInputs)
+    }
+    return this.resolver.executeBatch(normalizedInputs)
+  }
+
+  /**
+   * Retrieves one public binding by its complete structured identity.
+   * @param selector - Surface, exported name, space, and canonical target identity.
+   * @returns The exact binding and target declarations, or null when it is absent.
+   */
+  async getExactPublicBinding(
+    selector: ExactPublicBindingSelector,
+  ): Promise<ExactPublicBindingResult | null> {
+    await this.assertAvailable()
+    const bindings = await this.store.findPublicBindings([
+      {
+        surface: selector.surface,
+        exportedName: selector.exportedName,
+        space: selector.space,
+      },
+    ])
+    const binding = bindings.find((candidate) => candidate.targetId === selector.targetId)
+    if (binding === undefined) return null
+
+    const declarations = await this.store.findDeclarations([selector.targetId])
+    return {
+      binding,
+      declarations: declarations.map((candidate) => candidate.declaration),
+    }
+  }
+
+  /**
    * Traverses upstream (callers/importers) from a symbol.
    * @param symbolId - The symbol identifier to start from.
    * @param options - Optional traversal depth and filtering options.
@@ -387,6 +715,22 @@ export class CodeGraphProviderImpl implements CodeGraphProvider {
   ): Promise<ImpactResult> {
     await this.assertAvailable()
     return analyzeImpact(this.store, target, direction, maxDepth)
+  }
+
+  /**
+   * Analyzes exact public-route impact separately from canonical implementation impact.
+   * @param input - Proven public binding and logical target evidence.
+   * @param direction - Direction of impact analysis.
+   * @param maxDepth - Maximum traversal depth.
+   * @returns Exact-binding and canonical impact projections.
+   */
+  async analyzePublicBindingImpact(
+    input: ResolvedPublicBindingImpactInput,
+    direction: 'upstream' | 'downstream' | 'both',
+    maxDepth?: number,
+  ): Promise<PublicBindingImpactResult> {
+    await this.assertAvailable()
+    return analyzePublicBindingImpact(this.store, input, direction, maxDepth)
   }
 
   /**
@@ -489,6 +833,41 @@ export class CodeGraphProviderImpl implements CodeGraphProvider {
   }
 
   /**
+   * Searches symbols grouped by logical identity while retaining declarations and bindings.
+   * @param options - Search query and filters.
+   * @returns Deterministically grouped reference-aware results.
+   */
+  async searchReferenceSymbols(
+    options: SearchOptions,
+  ): Promise<readonly ReferenceAwareSymbolResult[]> {
+    await this.assertAvailable()
+    return this.referenceSearch.executeSymbols(options)
+  }
+
+  /**
+   * Executes the authoritative Code Graph-orchestrated multi-category search.
+   * @param input - Query, selected categories, filters, limit, and snippet preference.
+   * @returns Unified deterministic category projection.
+   */
+  async search(input: SearchCodeGraphInput): Promise<SearchCodeGraphResult> {
+    await this.assertAvailable()
+    if (input.filePattern === undefined || hasWildcard(input.filePattern)) {
+      return this.referenceSearch.execute(input)
+    }
+    const resolvedFiles = (await this.resolveFileSelector(input.filePattern)).filter(
+      (entry) => entry.kind === 'file',
+    )
+    if (resolvedFiles.length !== 1) {
+      return this.referenceSearch.execute(input)
+    }
+    return this.referenceSearch.execute({
+      ...input,
+      filePattern: resolvedFiles[0]!.canonicalPath,
+      exactFile: true,
+    })
+  }
+
+  /**
    * Full-text search across specs (title, description, and content).
    * @param options - Search options including query, limit, and filters.
    * @returns Matching specs with BM25 scores and snippets, ordered by relevance.
@@ -561,6 +940,9 @@ export class CodeGraphProviderImpl implements CodeGraphProvider {
    * @returns The operation result.
    */
   private async withIndexLock<T>(fn: () => Promise<T>): Promise<T> {
+    if (process.env['SPECD_GRAPH_INDEX_LOCK_HELD'] === 'true') {
+      return fn()
+    }
     const release = acquireGraphIndexLockByStoragePath(this.store.storagePath)
     try {
       return await fn()
@@ -568,4 +950,80 @@ export class CodeGraphProviderImpl implements CodeGraphProvider {
       release()
     }
   }
+
+  /**
+   * Projects canonical provider health into the resolver's compact gate.
+   * @param health - Canonical graph-health result.
+   * @returns Resolution freshness and completeness gate.
+   */
+  private toResolutionHealth(health: GetGraphHealthResult): ResolutionHealth {
+    const fresh =
+      health.stale === null || health.fingerprintMismatch === null || health.contentFresh === null
+        ? null
+        : !health.stale && !health.fingerprintMismatch && health.contentFresh
+    return {
+      fresh,
+      complete: health.coverageComplete,
+      reasonCodes: health.reasonCodes,
+    }
+  }
+
+  /**
+   * Resolves project-relative file selectors into the canonical workspace paths
+   * consumed by reference and coverage queries.
+   * @param inputs - Raw structured resolution requests.
+   * @returns Requests with canonical file paths and owning workspaces when unambiguous.
+   */
+  private async normalizeResolutionInputs(
+    inputs: readonly ResolveSymbolReferenceInput[],
+  ): Promise<readonly ResolveSymbolReferenceInput[]> {
+    const selectorResults = new Map<string, Promise<ResolvedFileSelector[]>>()
+    return Promise.all(
+      inputs.map(async (input) => {
+        if (input.filePath === undefined) return input
+        let matches = selectorResults.get(input.filePath)
+        if (matches === undefined) {
+          matches = resolveFileSelector(input.filePath, {
+            store: this.store,
+            ...(this.projectRoot !== undefined ? { projectRoot: this.projectRoot } : {}),
+          })
+          selectorResults.set(input.filePath, matches)
+        }
+        const resolved = await matches
+        const workspaceMatch = resolved.filter((entry) => entry.workspace === input.workspace)
+        const selected =
+          workspaceMatch.length === 1
+            ? workspaceMatch[0]
+            : resolved.length === 1
+              ? resolved[0]
+              : undefined
+        if (selected === undefined) return input
+        return {
+          ...input,
+          workspace: selected.workspace,
+          filePath: selected.canonicalPath,
+        }
+      }),
+    )
+  }
+}
+
+/**
+ * Identifies backend schema incompatibility without coupling composition to concrete stores.
+ * @param error - Store-open failure.
+ * @returns Whether indexing may repair the failure by recreating derived storage.
+ */
+function isIncompatibleSchemaError(error: unknown): boolean {
+  return (
+    error instanceof Error && /schema .* incompatible|incompatible .* schema/i.test(error.message)
+  )
+}
+
+/**
+ * Detects whether a search file selector is a pattern rather than an exact path.
+ * @param value - Raw search selector.
+ * @returns Whether wildcard semantics must be preserved.
+ */
+function hasWildcard(value: string): boolean {
+  return value.includes('*') || value.includes('?') || value.includes('[')
 }

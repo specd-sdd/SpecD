@@ -1,0 +1,56 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "code-graph:language-adapter",
+    "code-graph:symbol-model",
+    "code-graph:workspace-integration"
+  ],
+  "implementation": [
+    {
+      "file": "code-graph:src/infrastructure/tree-sitter/typescript-language-adapter.ts",
+      "symbols": ["TypeScriptLanguageAdapter"]
+    },
+    {
+      "file": "code-graph:test/infrastructure/tree-sitter/typescript-language-adapter.spec.ts"
+    }
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Parses TS/TSX/JS/JSX into shared code-graph facts, extracting symbols, imports, exports, scoped bindings, calls, and class/interface hierarchy.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:113e0159a628e78f079888213fd9531692f7ea4233314cc1c61d8e7b8034185f",
+          "lastModified": "2026-08-16T08:12:48.910Z"
+        },
+        "verify.md": {
+          "hash": "sha256:ce21db9ddb3c4acf7984a80f4dc87cb212f23cb1ca3f71f10e485a9e29dad30e",
+          "lastModified": "2026-08-16T08:12:48.912Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# typescript-language-adapter\n\n## Rules\n\n### Scope & Languages\n- Handles `.ts` (`typescript`), `.tsx` (`tsx`), `.js` (`javascript`), `.jsx` (`jsx`).\n- Single-pass parsing via Tree-sitter/ast-grep; outputs `FileAnalysisDraft` without AST retention.\n\n### Declarations & Owners\n- Extracts functions, callable variables/arrows/HOFs, classes, methods, fields, prototype/static assignments, namespace/member assignments, destructured bindings, exports, type aliases, interfaces, enums.\n- Construct range = complete node; `selectionRange` = declared identifier. Retains attached JSDoc/block comments.\n- Declaring owner derived from construct containment. Same-name members across owners remain distinct. Top-level declarations have no owner.\n\n### Imports & Exports\n- Extracts named/default/namespace/type-only/side-effect/aliased static imports, ESM/CJS exports, literal `import()` and `require()`. Drops non-literal dynamic imports/requires.\n- Public export slots track surface, exported name, symbol space, target, re-export route (no overwriting competing routes). Relative imports evaluate extension/index candidates.\n\n### Scoped Bindings, Calls & Relations\n- Emits deterministic facts for lexical scopes, params, constructor properties, fields, return types, `this` bindings, `new` construction.\n- Emits `IMPORTS`, `CALLS`, `CONSTRUCTS`, `USES_TYPE` only when proven by local/imported/receiver facts.\n- Innermost function/method = caller. Drops module-scope calls, ambiguous receivers, unresolved globals, computed members.\n\n### Hierarchy & Evidence\n- Extracts `extends`/`implements` -> emits `EXTENDS` (class/interface), `IMPLEMENTS` (class->interface), `OVERRIDES` (member replacement).\n- Reference facts retain child owner, ancestor/contract owner, relation kind, precedence, provenance steps for `ResolveSymbolReference`. Bounded cycle termination.\n- Advertises `hierarchy: true`. Unsupported syntax (mixins, decorators, declaration merging) dropped, not guessed.\n\n### Package & Capability Boundary\n- Bounded search upward to repo root for `package.json` `name`.\n- `tsconfig` paths/baseUrl, conditional `exports`/`imports` unsupported -> advertises `buildContext: false`.\n- Parse failure/unsupported syntax reported via shared coverage; NO name-only guessing.\n\n## Constraints\n- NO code execution or TypeScript compiler invocations.\n- Runtime reflection, computed exports, monkey patching -> unsupported.\n- TS-specific syntax logic MUST stay inside adapter.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:113e0159a628e78f079888213fd9531692f7ea4233314cc1c61d8e7b8034185f",
+          "lastModified": "2026-08-16T08:12:48.910Z"
+        },
+        "verify.md": {
+          "hash": "sha256:ce21db9ddb3c4acf7984a80f4dc87cb212f23cb1ca3f71f10e485a9e29dad30e",
+          "lastModified": "2026-08-16T08:12:48.912Z"
+        }
+      }
+    }
+  }
+}

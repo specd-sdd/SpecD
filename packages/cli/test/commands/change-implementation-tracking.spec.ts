@@ -1,264 +1,135 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { enrichImplementationTracking } from '../../src/commands/change/_implementation-tracking.js'
-import { makeMockConfig } from './helpers.js'
 
 vi.mock('@specd/sdk', async () => {
   const actual = await vi.importActual<typeof import('@specd/sdk')>('@specd/sdk')
-  return {
-    ...actual,
-    createCodeGraphProvider: vi.fn(),
-    createVcsAdapter: vi.fn(),
-  }
+  return { ...actual, buildImplementationReview: vi.fn() }
 })
 
-import { createCodeGraphProvider } from '@specd/sdk'
-import { createVcsAdapter } from '@specd/sdk'
+import {
+  buildImplementationReview,
+  type GetGraphHealthResult,
+  type SdkHostContext,
+} from '@specd/sdk'
 
 afterEach(() => vi.restoreAllMocks())
 
-describe('enrichImplementationTracking', () => {
-  it('reports not-indexed graph state without stale symbol checks', async () => {
-    vi.mocked(createCodeGraphProvider).mockReturnValue({
-      open: vi.fn().mockResolvedValue(undefined),
-      close: vi.fn().mockResolvedValue(undefined),
-      getStatistics: vi.fn().mockResolvedValue({ lastIndexedAt: undefined }),
-    } as never)
+const host = {} as SdkHostContext
+const health = {
+  fileCount: 1,
+  documentCount: 0,
+  symbolCount: 1,
+  specCount: 1,
+  relationCounts: {},
+  languages: ['typescript'],
+  lastIndexedAt: '2026-07-29T00:00:00.000Z',
+  lastIndexedRef: 'HEAD',
+  graphFingerprint: 'fingerprint',
+  stale: false,
+  currentRef: 'HEAD',
+  fingerprintMismatch: false,
+  contentFresh: true,
+  coverageComplete: true,
+  schemaCompatible: true,
+  generationCurrent: true,
+  reasonCodes: [],
+} as unknown as GetGraphHealthResult
 
-    const result = await enrichImplementationTracking(makeMockConfig(), {
-      trackedFiles: [{ file: 'packages/core/src/change.ts', state: 'open' }],
+describe('enrichImplementationTracking', () => {
+  it('calls the SDK review exactly once and preserves its reviewed links', async () => {
+    const links = [
+      {
+        specId: 'core:change',
+        file: 'packages/core/src/change.ts',
+        fileLinkExplicit: true,
+        symbols: ['Change.transition'],
+        symbolResolutions: [
+          {
+            symbol: 'Change.transition',
+            resolution: {
+              request: { workspace: 'core', requested: 'Change.transition' },
+              status: 'resolved',
+              reasonCode: null,
+              health: { fresh: true, complete: true, reasonCodes: [] },
+              target: {
+                id: 'logical-change-transition',
+                workspace: 'core',
+                surface: 'core:src/change.ts',
+                name: 'transition',
+                space: 'property',
+                ownerId: 'logical-change',
+                memberForm: 'instance',
+              },
+              candidates: [],
+              path: [],
+            },
+          },
+        ],
+      },
+    ] as const
+    vi.mocked(buildImplementationReview).mockResolvedValue({
+      review: {
+        specIds: ['core:change'],
+        implementationTracking: {
+          trackedFiles: [{ file: 'packages/core/src/change.ts', state: 'open' }],
+          links: [],
+        },
+      },
+      graphHealth: health,
+      links,
+    })
+
+    const result = await enrichImplementationTracking(host, 'symbol-review')
+
+    expect(buildImplementationReview).toHaveBeenCalledTimes(1)
+    expect(buildImplementationReview).toHaveBeenCalledWith(host, {
+      changeName: 'symbol-review',
+    })
+    expect(result.links).toBe(links)
+    expect(result.graphHint.status).toBe('fresh')
+  })
+
+  it('retains every structured health reason in the CLI hint', async () => {
+    vi.mocked(buildImplementationReview).mockResolvedValue({
+      review: {
+        specIds: [],
+        implementationTracking: { trackedFiles: [], links: [] },
+      },
+      graphHealth: {
+        ...health,
+        contentFresh: false,
+        coverageComplete: false,
+        reasonCodes: ['CONTENT_DIRTY', 'COVERAGE_PARTIAL'],
+      },
       links: [],
     })
 
+    const result = await enrichImplementationTracking(host, 'symbol-review')
+
+    expect(result.graphHint).toEqual({
+      status: 'stale',
+      message: 'Code graph health: CONTENT_DIRTY, COVERAGE_PARTIAL.',
+    })
+  })
+
+  it('reports an unindexed graph without inventing link outcomes', async () => {
+    vi.mocked(buildImplementationReview).mockResolvedValue({
+      review: {
+        specIds: [],
+        implementationTracking: { trackedFiles: [], links: [] },
+      },
+      graphHealth: {
+        ...health,
+        lastIndexedAt: undefined,
+        coverageComplete: null,
+        reasonCodes: ['COVERAGE_UNKNOWN'],
+      },
+      links: [],
+    })
+
+    const result = await enrichImplementationTracking(host, 'symbol-review')
+
     expect(result.graphHint.status).toBe('not-indexed')
     expect(result.links).toEqual([])
-  })
-
-  it('marks missing symbol links as stale when the graph is fresh', async () => {
-    vi.mocked(createVcsAdapter).mockResolvedValue({
-      ref: vi.fn().mockResolvedValue('HEAD'),
-    } as never)
-    vi.mocked(createCodeGraphProvider).mockReturnValue({
-      open: vi.fn().mockResolvedValue(undefined),
-      close: vi.fn().mockResolvedValue(undefined),
-      getStatistics: vi.fn().mockResolvedValue({
-        lastIndexedAt: '2026-05-21T00:00:00.000Z',
-        lastIndexedRef: 'HEAD',
-      }),
-      findSymbols: vi.fn().mockResolvedValue([]),
-    } as never)
-
-    const config = makeMockConfig({
-      projectRoot: '/project',
-      workspaces: [
-        {
-          name: 'core',
-          specsPath: '/project/specs/core',
-          specsAdapter: { adapter: 'fs', config: { path: '/project/specs/core' } },
-          schemasPath: null,
-          schemasAdapter: null,
-          codeRoot: '/project/packages/core',
-          ownership: 'owned',
-          isExternal: false,
-        },
-      ],
-    })
-
-    const result = await enrichImplementationTracking(config, {
-      trackedFiles: [],
-      links: [
-        {
-          specId: 'core:change',
-          file: 'packages/core/src/change.ts',
-          fileLinkExplicit: true,
-          symbols: ['Change.transition'],
-        },
-      ],
-    })
-
-    expect(result.graphHint.status).toBe('fresh')
-    expect(result.links[0]?.staleSymbols).toEqual(['Change.transition'])
-  })
-
-  it('clears stale when a composed symbol resolves uniquely by same-file fallback', async () => {
-    vi.mocked(createVcsAdapter).mockResolvedValue({
-      ref: vi.fn().mockResolvedValue('HEAD'),
-    } as never)
-    vi.mocked(createCodeGraphProvider).mockReturnValue({
-      open: vi.fn().mockResolvedValue(undefined),
-      close: vi.fn().mockResolvedValue(undefined),
-      getStatistics: vi.fn().mockResolvedValue({
-        lastIndexedAt: '2026-05-21T00:00:00.000Z',
-        lastIndexedRef: 'HEAD',
-      }),
-      findSymbols: vi
-        .fn()
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([
-          {
-            id: 'core:src/change.ts:property:transition:1:1',
-            name: 'transition',
-            kind: 'property',
-            filePath: 'core:src/change.ts',
-            line: 1,
-            column: 1,
-            comment: undefined,
-          },
-        ]),
-    } as never)
-
-    const config = makeMockConfig({
-      projectRoot: '/project',
-      workspaces: [
-        {
-          name: 'core',
-          specsPath: '/project/specs/core',
-          specsAdapter: { adapter: 'fs', config: { path: '/project/specs/core' } },
-          schemasPath: null,
-          schemasAdapter: null,
-          codeRoot: '/project/packages/core',
-          ownership: 'owned',
-          isExternal: false,
-        },
-      ],
-    })
-
-    const result = await enrichImplementationTracking(config, {
-      trackedFiles: [],
-      links: [
-        {
-          specId: 'core:change',
-          file: 'packages/core/src/change.ts',
-          fileLinkExplicit: true,
-          symbols: ['Change.transition'],
-        },
-      ],
-    })
-
-    expect(result.links[0]?.staleSymbols).toEqual([])
-  })
-
-  it('keeps stale when same-file fallback only finds a wrong-kind symbol', async () => {
-    vi.mocked(createVcsAdapter).mockResolvedValue({
-      ref: vi.fn().mockResolvedValue('HEAD'),
-    } as never)
-    vi.mocked(createCodeGraphProvider).mockReturnValue({
-      open: vi.fn().mockResolvedValue(undefined),
-      close: vi.fn().mockResolvedValue(undefined),
-      getStatistics: vi.fn().mockResolvedValue({
-        lastIndexedAt: '2026-05-21T00:00:00.000Z',
-        lastIndexedRef: 'HEAD',
-      }),
-      findSymbols: vi
-        .fn()
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([
-          {
-            id: 'core:src/change.ts:method:transition:1:1',
-            name: 'transition',
-            kind: 'method',
-            filePath: 'core:src/change.ts',
-            line: 1,
-            column: 1,
-            comment: undefined,
-          },
-        ]),
-    } as never)
-
-    const config = makeMockConfig({
-      projectRoot: '/project',
-      workspaces: [
-        {
-          name: 'core',
-          specsPath: '/project/specs/core',
-          specsAdapter: { adapter: 'fs', config: { path: '/project/specs/core' } },
-          schemasPath: null,
-          schemasAdapter: null,
-          codeRoot: '/project/packages/core',
-          ownership: 'owned',
-          isExternal: false,
-        },
-      ],
-    })
-
-    const result = await enrichImplementationTracking(config, {
-      trackedFiles: [],
-      links: [
-        {
-          specId: 'core:change',
-          file: 'packages/core/src/change.ts',
-          fileLinkExplicit: true,
-          symbols: ['Change.transition'],
-        },
-      ],
-    })
-
-    expect(result.links[0]?.staleSymbols).toEqual(['Change.transition'])
-  })
-
-  it('keeps stale when composed symbol fallback is ambiguous in the same file', async () => {
-    vi.mocked(createVcsAdapter).mockResolvedValue({
-      ref: vi.fn().mockResolvedValue('HEAD'),
-    } as never)
-    vi.mocked(createCodeGraphProvider).mockReturnValue({
-      open: vi.fn().mockResolvedValue(undefined),
-      close: vi.fn().mockResolvedValue(undefined),
-      getStatistics: vi.fn().mockResolvedValue({
-        lastIndexedAt: '2026-05-21T00:00:00.000Z',
-        lastIndexedRef: 'HEAD',
-      }),
-      findSymbols: vi
-        .fn()
-        .mockResolvedValueOnce([])
-        .mockResolvedValueOnce([
-          {
-            id: 'core:src/change.ts:property:transition:1:1',
-            name: 'transition',
-            kind: 'property',
-            filePath: 'core:src/change.ts',
-            line: 1,
-            column: 1,
-            comment: undefined,
-          },
-          {
-            id: 'core:src/change.ts:property:transition:2:1',
-            name: 'transition',
-            kind: 'property',
-            filePath: 'core:src/change.ts',
-            line: 2,
-            column: 1,
-            comment: undefined,
-          },
-        ]),
-    } as never)
-
-    const config = makeMockConfig({
-      projectRoot: '/project',
-      workspaces: [
-        {
-          name: 'core',
-          specsPath: '/project/specs/core',
-          specsAdapter: { adapter: 'fs', config: { path: '/project/specs/core' } },
-          schemasPath: null,
-          schemasAdapter: null,
-          codeRoot: '/project/packages/core',
-          ownership: 'owned',
-          isExternal: false,
-        },
-      ],
-    })
-
-    const result = await enrichImplementationTracking(config, {
-      trackedFiles: [],
-      links: [
-        {
-          specId: 'core:change',
-          file: 'packages/core/src/change.ts',
-          fileLinkExplicit: true,
-          symbols: ['Change.transition'],
-        },
-      ],
-    })
-
-    expect(result.links[0]?.staleSymbols).toEqual(['Change.transition'])
   })
 })

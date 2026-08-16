@@ -33,16 +33,17 @@ export function expandSearchQuery(rawQuery: string): {
   rawTokens: string[]
   expandedTokens: string[]
 } {
-  const rawTokens = rawQuery
+  const sourceTokens = rawQuery
     .trim()
     .split(/\s+/)
-    .map((token) => token.trim().toLowerCase())
+    .map((token) => token.trim())
     .filter((token) => token.length > 0)
+  const rawTokens = sourceTokens.map((token) => token.toLowerCase())
 
   return {
     normalizedQuery: rawTokens.join(' '),
     rawTokens,
-    expandedTokens: dedupeStable(rawTokens.flatMap((token) => expandSearchToken(token))),
+    expandedTokens: dedupeStable(sourceTokens.flatMap((token) => expandSearchToken(token))),
   }
 }
 

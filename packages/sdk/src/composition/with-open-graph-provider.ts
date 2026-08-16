@@ -2,11 +2,13 @@ import { type CodeGraphProvider } from '@specd/code-graph'
 import { type SdkHostContext } from './host-context.js'
 
 /** Options for {@link withOpenGraphProvider}. */
-export interface WithOpenGraphProviderOptions {
+export interface WithOpenGraphProviderOptions<TOpen = void> {
   /** Invoked after provider creation and before {@link CodeGraphProvider.open}. */
   readonly beforeOpen?: (provider: CodeGraphProvider) => Promise<void>
   /** Invoked after the helper finishes its close path. */
   readonly afterClose?: (provider: CodeGraphProvider) => Promise<void>
+  /** Optional specialized open operation. Defaults to {@link CodeGraphProvider.open}. */
+  readonly open?: (provider: CodeGraphProvider) => Promise<TOpen>
 }
 
 /**
@@ -17,10 +19,10 @@ export interface WithOpenGraphProviderOptions {
  * @param options - Optional lifecycle hooks
  * @returns The callback result
  */
-export async function withOpenGraphProvider<T>(
+export async function withOpenGraphProvider<T, TOpen = void>(
   ctx: SdkHostContext,
-  fn: (provider: CodeGraphProvider) => Promise<T>,
-  options?: WithOpenGraphProviderOptions,
+  fn: (provider: CodeGraphProvider, openResult?: TOpen) => Promise<T>,
+  options?: WithOpenGraphProviderOptions<TOpen>,
 ): Promise<T> {
   const provider = ctx.createGraphProvider()
   let cleanupStarted = false
@@ -45,8 +47,14 @@ export async function withOpenGraphProvider<T>(
   }
   try {
     await options?.beforeOpen?.(provider)
-    await provider.open()
-    const result = await fn(provider)
+    let openResult: TOpen
+    if (options?.open !== undefined) {
+      openResult = await options.open(provider)
+    } else {
+      await provider.open()
+      openResult = undefined as TOpen
+    }
+    const result = await fn(provider, openResult)
     await close(false)
     return result
   } catch (error) {

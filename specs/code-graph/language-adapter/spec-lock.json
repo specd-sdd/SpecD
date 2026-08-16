@@ -6,45 +6,100 @@
   "dependsOn": ["code-graph:symbol-model"],
   "implementation": [
     {
+      "file": "code-graph:src/domain/value-objects/language-adapter.ts",
+      "symbols": ["LanguageAdapter"]
+    },
+    {
+      "file": "code-graph:src/domain/value-objects/file-analysis.ts",
+      "symbols": ["FileAnalysisDraft"]
+    },
+    {
+      "file": "code-graph:test/domain/value-objects/symbol-reference.spec.ts"
+    },
+    {
+      "file": "code-graph:src/infrastructure/tree-sitter/adapter-registry.ts",
+      "symbols": ["AdapterRegistry"]
+    },
+    {
       "file": "code-graph:src/infrastructure/tree-sitter/typescript-language-adapter.ts",
       "symbols": ["TypeScriptLanguageAdapter"]
     },
     {
+      "file": "code-graph:src/infrastructure/tree-sitter/python-language-adapter.ts",
+      "symbols": ["PythonLanguageAdapter"]
+    },
+    {
+      "file": "code-graph:src/infrastructure/tree-sitter/go-language-adapter.ts",
+      "symbols": ["GoLanguageAdapter"]
+    },
+    {
+      "file": "code-graph:src/infrastructure/tree-sitter/php-language-adapter.ts",
+      "symbols": ["PhpLanguageAdapter"]
+    },
+    {
       "file": "code-graph:test/infrastructure/tree-sitter/typescript-language-adapter.spec.ts"
+    },
+    {
+      "file": "code-graph:test/infrastructure/tree-sitter/python-language-adapter.spec.ts"
+    },
+    {
+      "file": "code-graph:test/infrastructure/tree-sitter/go-language-adapter.spec.ts"
+    },
+    {
+      "file": "code-graph:test/infrastructure/tree-sitter/php-language-adapter.spec.ts"
+    },
+    {
+      "file": "code-graph:src/infrastructure/tree-sitter/reference-fact-helpers.ts",
+      "symbols": [
+        "buildLogicalDeclarationFacts",
+        "buildHierarchyReferenceFacts",
+        "containsSymbolRange",
+        "createAdapterDeclarationDescriptor"
+      ]
+    },
+    {
+      "file": "code-graph:test/infrastructure/tree-sitter/reference-fact-helpers.spec.ts"
+    },
+    {
+      "file": "code-graph:src/application/use-cases/in-memory-index-session.ts",
+      "symbols": ["InMemoryIndexSession"]
+    },
+    {
+      "file": "code-graph:test/application/use-cases/symbol-index.spec.ts"
     }
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "Defines unified stateless language adapters for deterministic multi-language symbol, dependency, call, and hierarchy extraction.",
+      "value": "Stateless language adapter interface for parsing files, extracting symbols and imports, building relations, and resolving packages.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:ac1ffd5088dff5e20ce79ca07ac5bbb5b316728bc13aba292e8865ff7a64510b",
-          "lastModified": "2026-07-28T07:38:48.568Z"
+          "hash": "sha256:2b888389a2fe9870fb69515e465f9b8f41fcb726d98ff0120e19c761c662055d",
+          "lastModified": "2026-08-16T08:12:47.365Z"
         },
         "verify.md": {
-          "hash": "sha256:bfc037437722af63e21a6217504c6a3de93f691ff76972b2ab7e52225d2c6c4c",
-          "lastModified": "2026-07-28T07:38:48.608Z"
+          "hash": "sha256:6c37a6c3803b1869d4169db7c96246e208e7706400220e770b09f4dd046fc681",
+          "lastModified": "2026-08-16T08:12:47.368Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# Language Adapter\n\n## Rules\n\n### Unified interface\n- `LanguageAdapter` SHALL be stateless interface with:\n  - `languages(): string[]`\n  - `extensions(): Record<string, string>`\n  - `analyzeFile(filePath: string, content: string, context: AdapterAnalyzeContext): FileAnalysisDraft`\n  - `resolveImports(analysis: FileAnalysis, context: ImportResolutionContext): ResolvedImports`\n  - `buildRelations(analysis: FileAnalysis, context: RelationBuildContext): readonly Relation[]`\n  - optional `getPackageIdentity?(codeRoot: string, repoRoot?: string): string | undefined`\n  - optional `resolvePackageFromSpecifier?(specifier: string, knownPackages: string[]): string | undefined`\n  - optional `resolveQualifiedNameToPath?(qualifiedName: string, codeRoot: string, repoRoot?: string): string | undefined`\n- Methods synchronous, deterministic, session-scoped; no outside side effects. Analysis receives content string. Compact run cache only through `IndexSession`.\n- Single `analyzeFile` MUST emit complete `FileAnalysisDraft`: symbols, imports, deterministic binding/call facts, namespace data, optional compact parser state. No separate extractors; no AST/parser objects; plain serializable data.\n- TypeScript/JavaScript, PHP, Python, Go MUST use unified `analyzeFile`/`resolveImports`/`buildRelations`; no legacy path.\n- Code dependencies SHOULD emit concrete `IMPORTS`, `CALLS`, `CONSTRUCTS`, `USES_TYPE`, hierarchy relations; `DEPENDS_ON` reserved for specs.\n\n### Detection and registry\n- Extensions come from `extensions()`; unrecognized files silently skipped, no `FileNode`.\n- `AdapterRegistry`: `register`, `getAdapter`, `getAdapterForFile`, `getLanguageForFile`, `getAdapters`; dynamic extension mapping, unique adapters.\n- `TypeScriptLanguageAdapter` registered by default; handles `.ts`→`typescript`, `.tsx`→`tsx`, `.js`→`javascript`, `.jsx`→`jsx`.\n\n### TypeScript adapter\n- MUST use `@ast-grep/napi`.\n- Symbols: named/arrow/HOF functions; classes; class/prototype/static/object/class-arrow methods; exported variables; member/namespace assignments; recursively unrolled destructuring; type aliases; interfaces; enums; CommonJS/UMD symbols.\n- Immediately preceding JSDoc/block/contiguous line comment stored verbatim in `SymbolNode.comment`; otherwise `undefined`.\n- Relations: `DEFINES`, `EXPORTS` including `module.exports`/`exports.*`, `IMPORTS`, `CALLS`.\n- Callable member assignment yields qualified `method`; IIFE/object namespace target yields `variable`. Callable object properties/class fields yield `method`; call-expression initializer yields `function`; scalar object property yields `variable`.\n\n### Imports and calls\n- `ImportDeclaration`: `localName`, `originalName`, raw `specifier`, `isRelative`.\n- Parse during `analyzeFile`; resolve in Pass 2:\n  - TypeScript `import`: relative iff specifier starts `.`.\n  - Python `from`/`import`: relative iff starts `.`.\n  - Go imports and PHP `use`: never relative.\n- Extract call facts during analysis; `buildRelations` resolves via local symbols, imports, receiver bindings, session facts.\n- Caller = innermost function/method/arrow; drop top-level calls. Drop unresolved globals, ambiguous/dynamic callees without error.\n\n### Scoped facts and dependency boundary\n- Built-ins MUST emit deterministic scoped binding/call facts. Adapters own syntax; shared pipeline owns scope lookup, shadowing, receiver binding, cross-language filtering.\n- Facts cover clear lexical scopes; typed parameters/properties/fields; construction; receivers (`this`, `self`, `cls`, `parent`, `super`); deterministic aliases; referenced/imported types; deterministic registry-based framework bindings.\n- Persist relation only when target derives from source, imports, manifest package identity, qualified-name maps, or deterministic framework rules without executing code.\n- Drop runtime/container identifiers, reflection, monkey patching, non-literal dynamics, ambiguous receivers, unresolved facts/imports, interprocedural alias flow. Diagnostics may retain non-persisted data.\n\n### Built-in coverage\n- TypeScript: static/side-effect/string-literal dynamic imports and `require()`; `new`; parameter/return/field/property types; constructor properties; `this`; deterministic member/namespace calls; `extends`/`implements`.\n- Python: imports, string-literal `importlib.import_module()`/`__import__()`, deterministic package/`src/`/`__init__.py` layouts, constructors, annotations, `self`/`cls`, inheritance.\n- Go: standard/grouped/aliased/dot/blank imports, resolvable file `IMPORTS`, deterministic selector calls, constructors/composite literals, non-speculative promoted methods/composition.\n- PHP: require/include, dynamic loaders, loaded-instance calls, framework bindings; feed shared scoped model.\n\n### Hierarchy\n- Emit `EXTENDS` for resolvable inheritance, `IMPLEMENTS` for resolvable contract fulfillment, `OVERRIDES` for deterministic base/contract method match.\n- MAY normalize semantically equivalent constructs; drop distortive or unresolved cases rather than add relation type.\n\n### Package and import resolution\n- `getPackageIdentity` searches from `codeRoot` upward, bounded by `repoRoot` or filesystem root: TypeScript `package.json.name`; Python `pyproject.toml [project].name`; Go `go.mod module`; PHP `composer.json.name`.\n- CLI/MCP obtains `repoRoot` from `VcsAdapter.rootDir()`. Indexer builds `packageName → workspaceName`; adapters lacking method remain unresolved.\n- Resolve imports through shared `IndexSession` indexes, not all-symbol scans or Pass 2 filesystem reads.\n- `resolveImports` combines declarations, package identity, qualified-name lookup, deterministic adapter rules.\n- Pass 2 qualified-name metadata (for example PSR-4) MUST be compact state prepared during analysis/session. PHP CakePHP, CodeIgniter, namespace resolution MUST use shared file/symbol lookups, avoiding O(N) scans.\n\n### PHP dependencies and calls\n- `require`, `require_once`, `include`, `include_once`: literal string path resolves relative to importer and emits `IMPORTS`; Pass 2 validates target. Drop concatenation, constants including `APPPATH`/`__DIR__`, variables.\n- Deterministic literal/class loader targets emit file `IMPORTS`. Support CakePHP loaders/`App::uses`/`App::import`/`ClassRegistry::init`/`$uses`; CodeIgniter `$this->load->model|library|helper`; Yii `Yii::import|createObject`; Zend `Zend_Loader::loadClass`; additional deterministic resolver rules.\n- Literal class-property dependencies are file signals. Generic `->get('x')` requires explicit resolver. Drop non-literal/container/unresolved targets; never fallback to file `DEPENDS_ON`.\n- Within one function/method, track resolved loader/framework properties/simple aliases; class-property dependencies expose aliases to class methods; bare and receiver loaders share flow.\n- Emit member `CALLS` only with resolvable caller+callee. Statically constructed/class-literal flow MAY qualify. No interprocedural propagation; drop ambiguous/runtime/unresolved calls.\n- PHP loader support MUST be registry/module-based shared contract; adding API requires resolver definition, no core extraction change; unit-test each pattern.\n\n### Internal parsing\n- Tree-sitter/ast-grep queries are internal; never public interface.\n\n## Constraints\n\n- `LanguageAdapter` interface; stateless.\n- `analyzeFile`, `resolveImports`, `buildRelations`, resolution methods synchronous/deterministic.\n- `FileAnalysisDraft`, parser/cache state compact plain data.\n- Only `getPackageIdentity` and `resolveQualifiedNameToPath` may perform I/O; Pass 2 MUST NOT probe filesystem per candidate.\n- `resolveQualifiedNameToPath` SHOULD cache manifest/autoloader metadata per `codeRoot` or session.\n- Indexer MUST contain no language-specific resolution.\n- Unrecognized extensions and non-deterministic/unresolved calls, hierarchy, loaders, dynamic paths silently dropped.\n- Loader APIs registry-extensible; parser queries internal.\n- TypeScript adapter always default.\n- No fuzzy/runtime inference.\n- No dependency on `@specd/core`.",
+      "value": "# language-adapter\n\n## Rules\n\n### Unified Interface\n- `LanguageAdapter` interface (stateless, synchronous, deterministic):\n  - `languages(): string[]`\n  - `extensions(): Record<string, string>`\n  - `analyzeFile(filePath, content, context: AdapterAnalyzeContext): FileAnalysisDraft`\n  - `resolveImports(analysis, context: ImportResolutionContext): ResolvedImports`\n  - `buildRelations(analysis, context: RelationBuildContext): readonly Relation[]`\n  - Optional: `getPackageIdentity?`, `resolvePackageFromSpecifier?`, `resolveQualifiedNameToPath?`\n- Single `analyzeFile` emits complete `FileAnalysisDraft` (symbols, imports, binding/call facts, namespace data). Plain serializable data, NO retained AST/parser trees.\n- `TypeScriptLanguageAdapter` default. Unsupported extensions silently skipped.\n\n### Detection & Registry\n- `AdapterRegistry`: `register`, `getAdapter`, `getAdapterForFile`, `getLanguageForFile`, `getAdapters`. Dynamic extension mapping.\n\n### Imports, Calls & Scoped Facts\n- Extract imports during `analyzeFile`, resolve in Pass 2 via `resolveImports`.\n  - TS/Python: relative if starts `.`. Go/PHP: never relative.\n- Innermost function/method = caller. Drop top-level calls, unresolved globals, ambiguous/dynamic callees.\n- Facts cover scope, typed params/properties, construction, receivers (`this`, `self`, `cls`, `parent`, `super`), deterministic aliases, framework bindings.\n- Drop runtime reflection, monkey patching, dynamic paths, ambiguous receivers, interprocedural alias flow.\n\n### Hierarchy & Manifests\n- Emit `EXTENDS` (inheritance), `IMPLEMENTS` (contract), `OVERRIDES` (method replacement).\n- `getPackageIdentity` searches upward from `codeRoot` bounded by `repoRoot`: `package.json.name` (TS), `pyproject.toml` (Python), `go.mod` (Go), `composer.json` (PHP).\n- `resolveImports` uses shared `IndexSession` lookups, not whole-symbol scans or Pass 2 filesystem reads.\n\n### PHP Specifics\n- `require`/`include` string literals resolve relative to importer (`IMPORTS`). Drop concatenation/variables.\n- Support loader patterns (CakePHP `App::uses`, CodeIgniter `->load->model`, Yii `Yii::import`, Zend `Zend_Loader`).\n- Bare & receiver loaders share flow. Drop non-literal/container/unresolved targets; no fallback to file `DEPENDS_ON`.\n\n## Constraints\n- Interface stateless; methods synchronous and deterministic.\n- Analysis/cache state compact plain data. No parser tree retention.\n- Only `getPackageIdentity` & `resolveQualifiedNameToPath` may perform I/O (Pass 2 MUST NOT probe filesystem per candidate).\n- Indexer contains NO language-specific resolution.\n- Unrecognized extensions / non-deterministic calls / dynamic paths silently dropped.\n- TypeScript adapter default.\n- No runtime/fuzzy inference; no `@specd/core` dependency.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:ac1ffd5088dff5e20ce79ca07ac5bbb5b316728bc13aba292e8865ff7a64510b",
-          "lastModified": "2026-07-28T07:38:48.568Z"
+          "hash": "sha256:2b888389a2fe9870fb69515e465f9b8f41fcb726d98ff0120e19c761c662055d",
+          "lastModified": "2026-08-16T08:12:47.365Z"
         },
         "verify.md": {
-          "hash": "sha256:bfc037437722af63e21a6217504c6a3de93f691ff76972b2ab7e52225d2c6c4c",
-          "lastModified": "2026-07-28T07:38:48.608Z"
+          "hash": "sha256:6c37a6c3803b1869d4169db7c96246e208e7706400220e770b09f4dd046fc681",
+          "lastModified": "2026-08-16T08:12:47.368Z"
         }
       }
     }

@@ -45,11 +45,36 @@ The use case MUST NOT open or close the provider.
 
 `createGetGraphHealth()` in composition MUST return a stateless `GetGraphHealth` instance with no config capture — all inputs arrive per `execute()` call.
 
+### Requirement: Content freshness and coverage result
+
+`GetGraphHealthResult` SHALL additionally expose working-tree/content freshness, backend schema/generation compatibility, partial-index state, and queryable coverage summaries/reasons for excluded, unsupported, parse-failed, and partially indexed targets.
+
+`excluded` and `unsupported` SHALL be terminal, explicit outcomes: they remain visible in the coverage summary and targeted resolution trust, but SHALL NOT by themselves make aggregate coverage incomplete. `parse-failed` and `partial` SHALL make aggregate coverage incomplete and aggregate health non-current. Coverage reason codes SHALL participate in aggregate health reasons only for incomplete coverage.
+
+Health fields SHALL use stable machine-readable reason codes and distinguish current, stale, and unknown where evidence cannot be computed. A discovery, stat, content-read, or hashing failure SHALL yield unknown evidence for the affected scope; it MUST NOT be converted into a false content mismatch or set a stale latch. The use case SHALL compare indexed content evidence with current project state without triggering indexing. It MAY perform only semantic freshness-cache mutations: refresh equal-content observations and atomically set monotonic workspace/global stale latches.
+
+A consumer SHALL be able to determine from this result whether absence for an addressed target is trustworthy enough to declare stale.
+
+### Requirement: Aggregate and workspace health projection
+
+`GetGraphHealthResult` SHALL expose aggregate `state: current | stale | unknown`, `knownStaleSinceLastIndex`, stable reasons, and an ordered workspace collection containing workspace name, state, workspace latch, `vcs | filesystem | hybrid` assessment mode, and reasons.
+
+Aggregate precedence SHALL be stale, then unknown, then current. A true aggregate latch SHALL return stale without rescanning scopes or resources. A transient assessment failure SHALL return unknown without modifying latches. Project-global derivation or input failures MAY make the aggregate non-current without assigning a false workspace failure.
+
+Structured delivery formats SHALL retain every workspace. Text presentation SHALL show aggregate health and only non-current workspaces. Results MUST NOT expose absolute workspace or VCS roots.
+
+### Requirement: Efficient scope assessment
+
+VCS-backed workspaces SHALL be grouped by detected repository root and share one normalized modified-path evaluation. Code Graph SHALL filter complete adapter paths through effective graph visibility before stat or hashing. Excluded-only changes MUST leave workspace and aggregate latches unchanged.
+
+Non-VCS assessment SHALL compare visible membership and stored observations, hash only when mtime or size differs, refresh equal-content observations, and stop on the first proven mismatch. An inability to inspect a candidate SHALL stop or retain assessment as unknown unless another independent candidate already proves staleness. Health MUST NOT inspect every symbol or invoke targeted resource assessment across the complete graph.
+
 ## Constraints
 
-- MUST NOT mutate the graph store or trigger indexing.
+- MUST NOT trigger indexing, destructive recreation, or arbitrary graph mutation.
+- MAY mutate only semantic freshness cache state: refresh equal-content input observations and monotonically set workspace/global stale latches.
 - MUST NOT load change entities or compile project context.
-- Delegates statistics to `provider.getStatistics()` only.
+- Uses the already-open provider and MUST NOT open or close it.
 
 ## Spec Dependencies
 

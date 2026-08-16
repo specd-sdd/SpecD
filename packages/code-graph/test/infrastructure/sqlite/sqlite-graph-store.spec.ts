@@ -9,7 +9,13 @@ import { createRelation } from '../../../src/domain/value-objects/relation.js'
 import { RelationType } from '../../../src/domain/value-objects/relation-type.js'
 import { createSpecNode } from '../../../src/domain/value-objects/spec-node.js'
 import { SymbolKind } from '../../../src/domain/value-objects/symbol-kind.js'
+import { IndexedResourceKind } from '../../../src/domain/value-objects/indexed-input-freshness.js'
 import { createSymbolNode } from '../../../src/domain/value-objects/symbol-node.js'
+import {
+  createLogicalSymbol,
+  createPublicBinding,
+  SymbolSpace,
+} from '../../../src/domain/value-objects/symbol-reference.js'
 import { SQLiteGraphStore } from '../../../src/infrastructure/sqlite/sqlite-graph-store.js'
 import {
   SQLITE_SCHEMA_DDL,
@@ -31,6 +37,7 @@ graphStoreContractTests(
       tempDir = undefined
     }
   },
+  { supportsReferenceFacts: true },
 )
 
 describe('SQLiteGraphStore', () => {
@@ -39,6 +46,107 @@ describe('SQLiteGraphStore', () => {
       rmSync(tempDir, { recursive: true, force: true })
       tempDir = undefined
     }
+  })
+
+  it('batches large freshness observation lookups below SQLite expression limits', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-observation-batch-'))
+    const store = new SQLiteGraphStore(tempDir)
+    await store.open()
+
+    const observations = await store.getIndexedInputObservations(
+      Array.from({ length: 1_500 }, (_, index) => ({
+        workspace: 'core',
+        resourceKind: IndexedResourceKind.File,
+        resourceId: `core:src/file-${String(index)}.ts`,
+      })),
+    )
+
+    expect(observations).toEqual([])
+    await store.close()
+  })
+
+  it('rolls back the complete native bulk generation when persistence fails', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-bulk-rollback-'))
+    const store = new SQLiteGraphStore(tempDir)
+    await store.open()
+    const baseline = createFileNode({
+      path: 'core:src/baseline.ts',
+      configRelativePath: 'src/baseline.ts',
+      language: 'typescript',
+      contentHash: 'sha256:baseline',
+      workspace: 'core',
+      content: 'export const baseline = true',
+    })
+    await store.upsertFile(baseline, [], [])
+
+    const staged = createFileNode({
+      path: 'core:src/staged.ts',
+      configRelativePath: 'src/staged.ts',
+      language: 'typescript',
+      contentHash: 'sha256:staged',
+      workspace: 'core',
+      content: 'export const staged = true',
+    })
+    const logical = createLogicalSymbol({
+      workspace: 'core',
+      surface: staged.path,
+      name: 'staged',
+      space: SymbolSpace.Value,
+      ownerId: undefined,
+      memberForm: undefined,
+    })
+    const session = store.beginBulkIndexSession()
+    await session.writeFiles([staged])
+    await session.writeReferenceFacts({
+      logicalSymbols: [logical, logical],
+      declarations: [],
+      publicBindings: [],
+      localBindings: [],
+      steps: [],
+      coverage: [],
+    })
+
+    await expect(session.commit()).rejects.toThrow()
+    expect(await store.getFile(baseline.path)).toEqual(baseline)
+    expect(await store.getFile(staged.path)).toBeUndefined()
+    await store.close()
+  })
+
+  it('updates source-content FTS incrementally for standalone file writes', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-source-fts-'))
+    const store = new SQLiteGraphStore(tempDir)
+    await store.open()
+    const original = createFileNode({
+      path: 'core:src/incremental.ts',
+      configRelativePath: 'src/incremental.ts',
+      language: 'typescript',
+      contentHash: 'sha256:original',
+      workspace: 'core',
+      content: 'export const originalNeedle = true',
+    })
+    const replacement = createFileNode({
+      ...original,
+      contentHash: 'sha256:replacement',
+      content: 'export const replacementNeedle = true',
+    })
+    const search = (term: string) =>
+      store.searchSourceContentCandidates({
+        normalizedQuery: term,
+        rawTerms: [term],
+        expandedTerms: [],
+        limit: 10,
+      })
+
+    await store.upsertFile(original, [], [])
+    expect((await search('originalNeedle')).candidates).toHaveLength(1)
+
+    await store.upsertFile(replacement, [], [])
+    expect((await search('originalNeedle')).candidates).toHaveLength(0)
+    expect((await search('replacementNeedle')).candidates).toHaveLength(1)
+
+    await store.removeFile(replacement.path)
+    expect((await search('replacementNeedle')).candidates).toHaveLength(0)
+    await store.close()
   })
 
   it('persists hierarchy relations and statistics across reopen cycles', async () => {
@@ -229,13 +337,97 @@ describe('SQLiteGraphStore', () => {
   })
 
   it('declares sqlite schema version and fts-backed ddl', () => {
-    expect(SQLITE_SCHEMA_VERSION).toBe(5)
+    expect(SQLITE_SCHEMA_VERSION).toBe(9)
     expect(SQLITE_SCHEMA_DDL).toContain('CREATE TABLE IF NOT EXISTS files')
     expect(SQLITE_SCHEMA_DDL).toContain('content TEXT')
     expect(SQLITE_SCHEMA_DDL).toContain('CREATE TABLE IF NOT EXISTS documents')
     expect(SQLITE_SCHEMA_DDL).toContain('CREATE VIRTUAL TABLE IF NOT EXISTS symbol_fts')
     expect(SQLITE_SCHEMA_DDL).toContain('CREATE VIRTUAL TABLE IF NOT EXISTS spec_fts')
     expect(SQLITE_SCHEMA_DDL).toContain('CREATE VIRTUAL TABLE IF NOT EXISTS document_fts')
+    expect(SQLITE_SCHEMA_DDL).toContain('CREATE TABLE IF NOT EXISTS logical_declarations')
+    expect(SQLITE_SCHEMA_DDL).toContain('CREATE TABLE IF NOT EXISTS public_bindings')
+    expect(SQLITE_SCHEMA_DDL).toContain('CREATE TABLE IF NOT EXISTS local_bindings')
+    expect(SQLITE_SCHEMA_DDL).toContain('CREATE TABLE IF NOT EXISTS resolution_steps')
+    expect(SQLITE_SCHEMA_DDL).toContain('CREATE TABLE IF NOT EXISTS index_coverage')
+    expect(SQLITE_SCHEMA_DDL).toContain('selection_start_line INTEGER NOT NULL')
+  })
+
+  it('rejects an incompatible prior schema without recreating derived storage', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-test-'))
+    const graphDir = join(tempDir, 'graph')
+    const databasePath = join(graphDir, 'code-graph.sqlite')
+    const initialStore = new SQLiteGraphStore(tempDir)
+    await initialStore.open()
+    await initialStore.close()
+
+    const db = new Database(databasePath)
+    db.prepare("UPDATE meta SET value = '8' WHERE key = 'schemaVersion'").run()
+    db.close()
+
+    const incompatibleStore = new SQLiteGraphStore(tempDir)
+    await expect(incompatibleStore.open()).rejects.toThrow(
+      'SQLite graph storage schema 8 is incompatible with expected 9',
+    )
+    expect(existsSync(databasePath)).toBe(true)
+  })
+
+  it('rebuilds symbol FTS from logical and public binding identities', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-test-'))
+    const store = new SQLiteGraphStore(tempDir)
+    await store.open()
+    const file = createFileNode({
+      path: 'code-graph:src/alpha.ts',
+      configRelativePath: 'src/alpha.ts',
+      language: 'typescript',
+      contentHash: 'sha256:alpha',
+      workspace: 'code-graph',
+    })
+    const symbol = createSymbolNode({
+      name: 'AlphaImplementation',
+      kind: SymbolKind.Class,
+      filePath: file.path,
+      line: 1,
+      column: 0,
+    })
+    const logical = createLogicalSymbol({
+      workspace: 'code-graph',
+      surface: 'code-graph:src/alpha.ts',
+      name: 'Alpha',
+      space: SymbolSpace.Value,
+      ownerId: undefined,
+      memberForm: undefined,
+    })
+    await store.upsertFile(file, [symbol], [])
+    await store.replaceReferenceFacts({
+      logicalSymbols: [logical],
+      declarations: [
+        {
+          logicalSymbolId: logical.id,
+          declaration: {
+            logicalId: logical.id,
+            symbolId: symbol.id,
+            location: { filePath: file.path, line: 1, column: 0, endLine: 1, endColumn: 1 },
+            kind: SymbolKind.Class,
+          },
+        },
+      ],
+      publicBindings: [
+        createPublicBinding({
+          surface: 'code-graph',
+          exportedName: 'PublicAlpha',
+          space: SymbolSpace.Value,
+          targetId: logical.id,
+        }),
+      ],
+      localBindings: [],
+      steps: [],
+      coverage: [],
+    })
+
+    expect(
+      (await store.searchSymbols({ query: 'PublicAlpha' })).map((hit) => hit.symbol.id),
+    ).toEqual([symbol.id])
+    await store.close()
   })
 
   it('extracts symbol snippets using a line-budget windowing algorithm', async () => {

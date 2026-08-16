@@ -1,0 +1,49 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "code-graph:symbol-model",
+    "code-graph:graph-store",
+    "code-graph:language-adapter",
+    "code-graph:workspace-integration"
+  ],
+  "implementation": [],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Conservatively resolves symbol references through deterministic bindings, hierarchy evidence, and targeted freshness checks.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:49db362b304d208bcfa8283f1e381c2c6413bdb7f130cba144bc13b612b26c66",
+          "lastModified": "2026-07-29T20:29:14.524Z"
+        },
+        "verify.md": {
+          "hash": "sha256:11551173f6223386329fc2f3315cef456c3258e5bd135c659119a152bd1dd605",
+          "lastModified": "2026-08-14T11:05:53.648Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Resolve Symbol Reference\n\n## Rules\n\n- `ResolveSymbolReference`: workspace + requested symbol text; optional file, public surface, symbol-space, broad kind, member-form, build-context constraints. Structured fields authoritative. Canonical references round-trip with escaping; no ad hoc delimiter splitting. Identifier normalization follows source language; path/workspace normalization remains separate.\n- Return logical canonical target retaining every contributing declaration. Merge language-defined overload sets, declaration merging, equivalent constructs; keep genuine competitors separate. Expose workspace, module/package, declaring owner, symbol space, simple name, member form, declaration locations, line/column-independent canonical reference.\n- Public binding identity = public surface + exported name + symbol space; preserve distinct aliases/re-export routes. Local binding retains lexical scope + source-range provenance; never merge shadowed aliases or classify local alias as public export. Anonymous/default exports remain addressable through public binding identity.\n- Resolution precedence: exact declaration in addressed file/owner; exact public binding in addressed surface; statically proven scoped import/alias; statically proven hierarchy path using language precedence. Unique same-name symbol without proven path remains unresolved. Keep conditional/platform alternatives separate unless build context selects one. Terminate cyclic paths without duplicate candidates.\n- Exactly one status: `resolved` for one proven logical target; `ambiguous` for multiple unselected valid targets; `unresolved` when proof unsafe/unavailable; `missing` only when current complete index proves addressed target absent. Non-resolved results include stable reason code and deterministically ordered candidate summaries; expose ordered typed evidence path for every proven step.\n- Freshness: VCS ref equality alone insufficient. Batch `AssessIndexedResourceFreshness` for addressed source file plus every candidate-evidence declaration file; deduplicate shared inputs. Resolver MUST NOT own filesystem, repository, hashing, persistence logic.\n- Exact file-anchored resolution MAY use current targeted evidence despite unrelated global staleness. Corpus-completeness decisions for workspace fallback, absence, uniqueness, ambiguity remain `unresolved` when global health stale/unknown.\n- Unknown, dirty, stale, incompatible, excluded, unsupported, parse-failed, partial required evidence => specific `unresolved`, never `missing`. Transient assessment failure => `freshness-unknown`. Current fully indexed addressed file proving declaration absent => `missing` without persisting symbol staleness. Unsafe provider/generation failures remain infrastructure errors.\n- Declared/overriding members precede inherited members. Contract-qualified references resolve contract member; impact may follow implementations/overrides. Inherited, trait, mixin, embedded, promoted, abstract, default members follow deterministic language precedence. Competing inherited members => `ambiguous`. Same-name forms require member-form constraint when language cannot select. Implicit interface satisfaction requires proven method sets. Terminate malformed hierarchy cycles safely.\n- Batch resolution shares one health snapshot/provider lifecycle. Use indexed lookups + cycle-safe bounded traversal; never full-graph scan per reference. Equivalent graph contents yield identical candidate/provenance ordering, status, reason codes across supported backends.\n\n## Constraints\n\n- MUST NOT mutate stored implementation links or archived sidecars.\n- No fuzzy matching, edit distance, best-candidate guessing.\n- Runtime reflection, computed imports, monkey patching, unproven interprocedural value flow remain unresolved.\n- Adapter-specific syntax analysis belongs to language adapters, not resolver.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:49db362b304d208bcfa8283f1e381c2c6413bdb7f130cba144bc13b612b26c66",
+          "lastModified": "2026-07-29T20:29:14.524Z"
+        },
+        "verify.md": {
+          "hash": "sha256:11551173f6223386329fc2f3315cef456c3258e5bd135c659119a152bd1dd605",
+          "lastModified": "2026-08-14T11:05:53.648Z"
+        }
+      }
+    }
+  }
+}

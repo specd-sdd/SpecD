@@ -20,6 +20,7 @@ describe('@specd/sdk barrel', () => {
     expect(typeof sdk.openSpecdHost).toBe('function')
     expect(typeof sdk.createSdkContext).toBe('function')
     expect(typeof sdk.withOpenGraphProvider).toBe('function')
+    expect(typeof sdk.buildImplementationReview).toBe('function')
     expect(typeof sdk.buildProjectStatusSnapshot).toBe('function')
     expect(typeof sdk.runIndexProjectGraph).toBe('function')
   })

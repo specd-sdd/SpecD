@@ -123,6 +123,22 @@ describe('withOpenGraphProvider', () => {
     expect(order).toEqual(['beforeOpen', 'open', 'fn'])
   })
 
+  it('uses a specialized open operation and passes its result to the callback', async () => {
+    const provider = makeProvider()
+    const specializedOpen = vi.fn().mockResolvedValue({ repaired: true })
+
+    const result = await withOpenGraphProvider(
+      makeContext(provider),
+      async (_openedProvider, openResult) => openResult,
+      { open: specializedOpen },
+    )
+
+    expect(result).toEqual({ repaired: true })
+    expect(specializedOpen).toHaveBeenCalledWith(provider)
+    expect(provider.open).not.toHaveBeenCalled()
+    expect(provider.close).toHaveBeenCalledOnce()
+  })
+
   it('runs close and afterClose when open fails after beforeOpen', async () => {
     const provider = makeProvider()
     const order: string[] = []

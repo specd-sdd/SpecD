@@ -1,7 +1,8 @@
 import { type GraphStore } from '../ports/graph-store.js'
 import { type AffectedSymbol, type FileImpactResult } from '../value-objects/impact-result.js'
 import { maxRisk, type RiskLevel } from '../value-objects/risk-level.js'
-import { analyzeFileImpact } from './analyze-file-impact.js'
+import { analyzeFileImpactDetails, collectCoveringSpecs } from './analyze-file-impact.js'
+import { type ImpactResolutionProvider } from './analyze-impact.js'
 
 /**
  * Analyzes the combined impact of multiple files.
@@ -14,6 +15,7 @@ import { analyzeFileImpact } from './analyze-file-impact.js'
  * @param filePaths - Array of file paths to analyze.
  * @param direction - Traversal direction: upstream, downstream, or both.
  * @param maxDepth - Maximum traversal depth (default: 3).
+ * @param resolve - Optional provider of pre-resolved logical selectors.
  * @returns The aggregated multi-file impact result.
  */
 export async function analyzeFilesImpact(
@@ -21,10 +23,12 @@ export async function analyzeFilesImpact(
   filePaths: string[],
   direction: 'upstream' | 'downstream' | 'both',
   maxDepth = 3,
+  resolve?: ImpactResolutionProvider,
 ): Promise<FileImpactResult> {
-  const results = await Promise.all(
-    filePaths.map((fp) => analyzeFileImpact(store, fp, direction, maxDepth)),
+  const details = await Promise.all(
+    filePaths.map((fp) => analyzeFileImpactDetails(store, fp, direction, maxDepth, resolve)),
   )
+  const results = details.map((detail) => detail.result)
 
   const affectedFileSet = new Set<string>()
   const rawAffectedSymbols: AffectedSymbol[] = []
@@ -53,15 +57,44 @@ export async function analyzeFilesImpact(
     }
   }
 
+  const fileDepths = new Map<string, number>()
+  const symbolDepths = new Map<string, number>()
+  for (const detail of details) {
+    for (const [filePath, depth] of detail.fileDepths) {
+      setMinimumDepth(fileDepths, filePath, depth)
+    }
+    for (const [symbolId, depth] of detail.symbolDepths) {
+      setMinimumDepth(symbolDepths, symbolId, depth)
+    }
+  }
+
   return {
     target: filePaths.join(', '),
     directDependents,
     indirectDependents,
     transitiveDependents,
     riskLevel: overallRisk,
-    affectedFiles: [...affectedFileSet],
-    affectedSymbols: [...symbolMap.values()],
+    affectedFiles: [...affectedFileSet].sort(),
+    affectedSymbols: [...symbolMap.values()].sort(
+      (left, right) =>
+        left.depth - right.depth ||
+        left.filePath.localeCompare(right.filePath) ||
+        left.line - right.line ||
+        left.id.localeCompare(right.id),
+    ),
     affectedProcesses: [],
     symbols: results,
+    coveringSpecs: await collectCoveringSpecs(store, fileDepths, symbolDepths),
   }
+}
+
+/**
+ * Retains the shallowest observed depth while folding multiple file analyses.
+ * @param target - Mutable resource-depth map.
+ * @param key - Resource identity.
+ * @param depth - Candidate depth.
+ */
+function setMinimumDepth(target: Map<string, number>, key: string, depth: number): void {
+  const existing = target.get(key)
+  if (existing === undefined || depth < existing) target.set(key, depth)
 }

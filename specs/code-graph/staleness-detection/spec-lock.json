@@ -4,39 +4,61 @@
     "version": 1
   },
   "dependsOn": ["code-graph:graph-store", "code-graph:indexer", "code-graph:get-graph-health"],
-  "implementation": [],
+  "implementation": [
+    {
+      "file": "code-graph:package.json"
+    },
+    {
+      "file": "code-graph:src/application/services/graph-input-visibility.ts"
+    },
+    {
+      "file": "code-graph:src/application/use-cases/assess-indexed-resource-freshness.ts"
+    },
+    {
+      "file": "code-graph:src/domain/value-objects/indexed-input-freshness.ts"
+    },
+    {
+      "file": "code-graph:test/application/use-cases/assess-indexed-resource-freshness.spec.ts"
+    },
+    {
+      "file": "code-graph:src/application/use-cases/_shared/compute-graph-fingerprint.ts"
+    },
+    {
+      "file": "code-graph:test/application/use-cases/compute-graph-fingerprint.spec.ts"
+    }
+  ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "Detect graph stale via VCS ref + derivation fingerprint; warn-not-block reads; GetGraphHealth canonical; index repairs mismatch.",
+      "value": "Detect VCS staleness and derivation mismatches, enforce warn-not-block read policy, lock index runs, and manage configuration fallbacks.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:220a5774ff5e9f61de4227b4b7e77a778c68d0872ff761813df4f7152d74c6b5",
-          "lastModified": "2026-06-27T21:29:45.700Z"
+          "hash": "sha256:857e13b1af8f01eb1c942ca88f31f1c420a0b779048097c205ad9ffab209ff08",
+          "lastModified": "2026-08-16T08:12:47.909Z"
         },
         "verify.md": {
-          "hash": "sha256:bcc64a5832d44bdd36cd8f4c2b8b52cfea3ddabe3c9568eb4f7c2d491af9ef4f",
-          "lastModified": "2026-06-27T21:29:45.701Z"
+          "hash": "sha256:2aea6d22613353a820dd4666073ed5bed3db419803a24e1890b4d7e728e1f425",
+          "lastModified": "2026-08-16T08:12:47.911Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# Staleness Detection\n## Rules\n### VCS ref storage at index time\n- Optional `IndexOptions.vcsRef: string` → persist as `lastIndexedRef` after successful index\n- Opaque string (`VcsAdapter.ref()`); omit → `lastIndexedRef` stays `null` (unknown OK)\n\n### Staleness comparison\n- **stale**: `lastIndexedRef != null` AND current `VcsAdapter.ref()` differs\n- **fresh**: `lastIndexedRef != null` AND refs equal\n- **unknown**: `lastIndexedRef === null` — MUST NOT treat as stale\n\n### Graph derivation freshness\n- Distinct from VCS freshness\n- **derivation mismatch**: persisted fingerprint ≠ current run fingerprint\n- Fingerprint from: effective `@specd/code-graph` version + canonical hash of resolved workspaces from `specd.yaml`\n- Surface explicitly in diagnostics even if VCS-fresh\n\n### Warn-not-block policy\n- Read cmds (`graph stats|search|impact|hotspots`): warn if stale, still return results\n\n### Derivation mismatch policy\n- Reads surface mismatch metadata; MUST NOT treat mismatched as fresh\n- Repair via `graph index`: full rebuild w/ visible reason OR fail requiring force re-index\n- Independent of VCS freshness\n\n### GraphStatistics extension\n- Add `lastIndexedRef: string | null` beside `lastIndexedAt`\n\n### Staleness in graph stats output\n- Text: after Last indexed → `⚠ Graph is stale (indexed at <7-char>, current: <7-char>)`; null ref → no line; mismatch → `⚠ Derivation fingerprint mismatch — graph built with different code-graph version or workspace configuration`\n- JSON/TOON: `stale: boolean|null`, `currentRef: string|null`, `fingerprintMismatch: boolean|null`\n\n### Centralized index lock control\n- FS lock in config dir (e.g. `.specd/config/graph/index.lock`)\n- Acquire/release/assert (`assertGraphIndexUnlocked`) for concurrent-index prevention\n\n### Health orchestration use case\n- Primitives `isGraphStale` + fingerprint helpers stay here\n- Hosts MUST NOT reimplement assembly when `GetGraphHealth` available — canonical for stats/status/SDK\n\n### Effective configuration building\n- Merge workspace `allowedPaths`/`excludePaths`/`respectGitignore` + global + CLI overrides → effective `ProjectGraphConfig`\n\n### Bootstrap fallback configuration\n- No `specd.yaml` → synthetic `SpecdConfig` with single `default` workspace at repo root for graph cmds\n\n## Constraints\n- VCS-agnostic via `@specd/core` `VcsAdapter`\n- Opaque ref string; no auto-refresh on detect\n- Lock/bootstrap/merge/staleness encapsulated in `@specd/code-graph` (or core), not CLI helpers",
+      "value": "# Staleness Detection\n\n## Rules\n\n- Storage & comparison: persist `lastIndexedRef` in metadata. Compare `lastIndexedRef` with `VcsAdapter.ref()`. If unequal -> `stale: true`; equal -> `stale: false`; `lastIndexedRef === null` -> `stale: null` (unknown, not stale).\n- Derivation fingerprint: `@specd/code-graph` version + canonical hash of resolved workspaces in `specd.yaml`. Mismatch between stored and current fingerprint sets `fingerprintMismatch: true`.\n- Policy:\n  - Warn-not-block: read commands (`graph stats`, `graph search`, `graph impact`, `graph hotspots`) warn when stale/mismatched but return results.\n  - Repair: `graph index` repairs fingerprint mismatch via `recreate()` full rebuild or fails requiring force re-index.\n- Output:\n  - Text: `⚠ Graph is stale (indexed at <7-char-ref>, current: <7-char-ref>)` or `⚠ Derivation fingerprint mismatch...`.\n  - JSON/TOON: `stale: boolean|null`, `currentRef: string|null`, `fingerprintMismatch: boolean|null`.\n- Centralized lock: filesystem lock inside config directory (`.specd/config/graph/index.lock`). Managed via `assertGraphIndexUnlocked`, acquire, release.\n- Health orchestration: `GetGraphHealth` is canonical entry point for health diagnostics.\n- Config fallback & merging: merge global/workspace `allowedPaths`/`excludePaths`/`respectGitignore` into `ProjectGraphConfig`. Generate synthetic fallback `SpecdConfig` when `specd.yaml` absent.\n- Freshness latches & observations: persist `knownStaleSinceLastIndex` latches per workspace/aggregate; cleared only on successful index. Aggregate precedence: `stale > unknown > current`.\n\n## Constraints\n\n- VCS-agnostic via `VcsAdapter` from `@specd/core`.\n- Ref stored as opaque string; staleness check does NOT trigger auto-reindexing.\n- Lock control, config merging, and staleness calculations encapsulated in `@specd/code-graph` / `@specd/core`, not CLI helpers.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:220a5774ff5e9f61de4227b4b7e77a778c68d0872ff761813df4f7152d74c6b5",
-          "lastModified": "2026-06-27T21:29:45.700Z"
+          "hash": "sha256:857e13b1af8f01eb1c942ca88f31f1c420a0b779048097c205ad9ffab209ff08",
+          "lastModified": "2026-08-16T08:12:47.909Z"
         },
         "verify.md": {
-          "hash": "sha256:bcc64a5832d44bdd36cd8f4c2b8b52cfea3ddabe3c9568eb4f7c2d491af9ef4f",
-          "lastModified": "2026-06-27T21:29:45.701Z"
+          "hash": "sha256:2aea6d22613353a820dd4666073ed5bed3db419803a24e1890b4d7e728e1f425",
+          "lastModified": "2026-08-16T08:12:47.911Z"
         }
       }
     }

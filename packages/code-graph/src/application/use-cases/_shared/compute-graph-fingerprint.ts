@@ -1,4 +1,6 @@
 import { createHash } from 'node:crypto'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
+import { isAbsolute, join, relative, resolve } from 'node:path'
 import { type ProjectWorkspace } from '@specd/core'
 import { type ProjectGraphConfig } from '../../../domain/value-objects/index-options.js'
 import { resolveEffectiveGraphConfig } from './resolve-effective-graph-config.js'
@@ -18,6 +20,13 @@ interface NormalizedWorkspaceFingerprint {
   readonly allowedPaths: readonly string[]
   readonly excludePaths: readonly string[]
   readonly respectGitignore: boolean
+  readonly resolutionInputs: readonly ResolutionInputFingerprint[]
+}
+
+/** Content identity for a deterministic package or build-resolution input. */
+interface ResolutionInputFingerprint {
+  readonly path: string
+  readonly contentHash: string
 }
 
 /**
@@ -37,10 +46,11 @@ function normalizeWorkspaceFingerprintInput(
     const wsGraph = effectiveGraphConfig.workspaces.get(ws.name)
     return {
       name: ws.name,
-      codeRoot: ws.codeRoot,
+      codeRoot: normalizeRelativePath(projectRoot, ws.codeRoot),
       allowedPaths: wsGraph?.allowedPaths ? [...wsGraph.allowedPaths] : [],
       excludePaths: wsGraph?.excludePaths ? [...wsGraph.excludePaths] : [],
       respectGitignore: wsGraph?.respectGitignore ?? true,
+      resolutionInputs: discoverResolutionInputs(projectRoot, ws.codeRoot),
     }
   })
 }
@@ -93,10 +103,11 @@ export function computeWorkspaceFingerprint(
   const wsGraph = effectiveGraphConfig.workspaces.get(workspace.name)
   const normalized: NormalizedWorkspaceFingerprint = {
     name: workspace.name,
-    codeRoot: workspace.codeRoot,
+    codeRoot: normalizeRelativePath(projectRoot, workspace.codeRoot),
     allowedPaths: wsGraph?.allowedPaths ? [...wsGraph.allowedPaths] : [],
     excludePaths: wsGraph?.excludePaths ? [...wsGraph.excludePaths] : [],
     respectGitignore: wsGraph?.respectGitignore ?? true,
+    resolutionInputs: discoverResolutionInputs(projectRoot, workspace.codeRoot),
   }
   const payload = JSON.stringify({ v: codeGraphVersion, w: [normalized] })
   return createHash('sha256').update(payload).digest('hex')
@@ -125,10 +136,65 @@ export function computeRootFingerprint(
     },
     workspaces: workspaces.map((workspace) => ({
       name: workspace.name,
-      codeRoot: workspace.codeRoot,
+      codeRoot: normalizeRelativePath(projectRoot, workspace.codeRoot),
+      resolutionInputs: discoverResolutionInputs(projectRoot, workspace.codeRoot),
     })),
   })
   return createHash('sha256').update(payload).digest('hex')
+}
+
+const RESOLUTION_MANIFESTS = new Set([
+  'package.json',
+  'pyproject.toml',
+  'setup.cfg',
+  'setup.py',
+  'go.mod',
+  'go.work',
+  'composer.json',
+])
+
+/**
+ * Discovers and hashes deterministic package/build inputs without persisting roots.
+ * @param projectRoot - Absolute project root used as the stable relative-path base.
+ * @param codeRoot - Workspace code root to inspect for resolution manifests.
+ * @returns Deterministically ordered relative paths and content hashes.
+ */
+function discoverResolutionInputs(
+  projectRoot: string,
+  codeRoot: string,
+): readonly ResolutionInputFingerprint[] {
+  const roots = [...new Set([resolve(projectRoot), resolve(codeRoot)])]
+  const files = new Set<string>()
+  for (const root of roots) {
+    if (!existsSync(root)) continue
+    for (const entry of readdirSync(root, { withFileTypes: true })) {
+      if (!entry.isFile()) continue
+      if (
+        RESOLUTION_MANIFESTS.has(entry.name) ||
+        /^(?:tsconfig|jsconfig)(?:\.[^.]+)?\.json$/u.test(entry.name)
+      ) {
+        files.add(join(root, entry.name))
+      }
+    }
+  }
+  return [...files]
+    .map((filePath) => ({
+      path: normalizeRelativePath(projectRoot, filePath),
+      contentHash: createHash('sha256').update(readFileSync(filePath)).digest('hex'),
+    }))
+    .sort((left, right) => left.path.localeCompare(right.path))
+}
+
+/**
+ * Converts an absolute-or-relative path into stable project-relative form.
+ * @param projectRoot - Absolute project root used as the relative-path base.
+ * @param target - Absolute or relative target path.
+ * @returns Forward-slash normalized path without an absolute root.
+ */
+function normalizeRelativePath(projectRoot: string, target: string): string {
+  const normalized = relative(resolve(projectRoot), resolve(target)).replaceAll('\\', '/')
+  if (normalized === '') return '.'
+  return isAbsolute(normalized) ? normalized.replaceAll('\\', '/') : normalized
 }
 
 /**

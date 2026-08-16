@@ -1,0 +1,42 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Indexing behaviour'
+  content: |
+    Index execution MUST go through `runIndexProjectGraph(ctx, input)` inside `@specd/sdk`. The worker process (or current process when worker bypass is active) obtains an `SdkHostContext` through the shared SDK composition boundary. When the CLI has already resolved a configured kernel for command context or parent-lock ownership, the worker/bypass path SHALL reuse that kernel rather than reload configuration or build a parallel kernel; bootstrap mode SHALL create the equivalent SDK context from the resolved bootstrap config.
+
+    The command SHALL retain CLI-only concerns:
+
+    - shared graph indexing lock acquisition in the parent process before spawning a worker
+    - worker subprocess isolation via `child_process.spawn` unless `SPECD_GRAPH_INDEX_NO_WORKER=true`
+    - `onProgress` callback wiring for text-mode progress output
+    - passing `force: true` to `runIndexProjectGraph` when `--force` is set
+
+    The command handler invokes `runIndexProjectGraph` for index execution; workspace assembly and `IndexProjectGraph` orchestration live in `@specd/sdk`.
+
+    Unless `SPECD_GRAPH_INDEX_NO_WORKER` is set to `true` (test-only bypass), the parent CLI process SHALL spawn a child worker via `child_process.spawn` reusing the same CLI arguments. The parent acquires the shared graph indexing lock before spawning. The worker receives `SPECD_GRAPH_INDEX_WORKER=true` and `SPECD_GRAPH_INDEX_LOCK_HELD=true` in its environment, performs indexing via `runIndexProjectGraph`, and inherits stdio from the parent. The parent forwards `SIGINT` and `SIGTERM` to the worker, releases the lock when the worker exits, and propagates the worker exit code (or reports worker failure on non-zero exit).
+
+    When `SPECD_GRAPH_INDEX_NO_WORKER` is `true`, indexing runs in the current process without spawning a worker. This bypass exists only for automated tests.
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Visible incompatibility repair
+
+    `graph index` SHALL be the supported user repair path for backend schema or graph-derivation incompatibility. It SHALL delegate repair through `runIndexProjectGraph` and MUST NOT delete backend files itself.
+
+    Text output SHALL state when a destructive full rebuild occurred and why. JSON and TOON SHALL expose the same stable rebuild flag and reason. Per-file coverage/error counts SHALL remain visible after repair.
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`cli:entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
+    - [`core:config`](../../core/config/spec.md) — configured operation, explicit config path handling, and bootstrap-mode relationship
+    - [`core:list-workspaces`](../../core/list-workspaces/spec.md) — centralized project orchestration (via SDK)
+    - [`sdk:run-index-project-graph`](../../sdk/run-index-project-graph/spec.md) — index execution orchestration
+    - [`sdk:host-context`](../../sdk/host-context/spec.md) — shared SDK host composition and resolved-context reuse

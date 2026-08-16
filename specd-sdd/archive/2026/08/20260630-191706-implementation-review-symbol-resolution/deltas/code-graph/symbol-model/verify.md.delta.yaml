@@ -1,0 +1,70 @@
+- op: added
+  position: { parent: { type: section, matches: 'Requirements' } }
+  content: |
+    ### Requirement: Logical symbol and canonical reference model
+
+    #### Scenario: Merged declarations share canonical identity
+
+    - **WHEN** language-defined overload declarations are modelled
+    - **THEN** one logical symbol retains every occurrence and a round-trippable location-independent reference
+
+    #### Scenario: Canonical identity is structured data, not display location
+
+    - **WHEN** a logical symbol is searched and rendered
+    - **THEN** structured fields drive lookup and the serialized canonical id remains available for round-trip identity
+    - **AND** human text uses the actionable declaration or matched-export location instead
+
+    #### Scenario: Declaring owner is a logical identity
+
+    - **GIVEN** two owners declare a same-name member and their syntax nodes have location-based IDs
+    - **WHEN** logical member identities are constructed
+    - **THEN** each member stores its owner's canonical logical identity
+    - **AND** line movement or parser-node replacement does not become part of the owner identity
+
+    ### Requirement: Member forms and symbol spaces
+
+    #### Scenario: Same-name forms remain distinct
+
+    - **GIVEN** a type exposes a getter and setter with the same name in distinct spaces/forms
+    - **WHEN** identities are built
+    - **THEN** neither form nor language case semantics are collapsed
+
+    ### Requirement: First-class binding model
+
+    #### Scenario: Binding identity survives relation deduplication
+
+    - **GIVEN** two exports reach the same relation endpoints
+    - **WHEN** facts are deduplicated
+    - **THEN** both public binding identities and routes remain addressable
+
+    #### Scenario: Competing targets retain distinct route identities
+
+    - **GIVEN** one barrel exposes the same exported name and symbol space from two source modules
+    - **WHEN** both proven routes are indexed into the same public export slot
+    - **THEN** neither route overwrites the other
+    - **AND** their independently addressable binding identities preserve both canonical targets
+
+    ### Requirement: Index coverage facts
+
+    #### Scenario: Failed parse remains queryable
+
+    - **WHEN** a discovered file fails parsing
+    - **THEN** its persisted coverage records the failure and indexed content hash
+- op: added
+  position:
+    parent: { type: section, matches: 'Requirement: Symbol node' }
+  content: |
+    #### Scenario: Construct and selection ranges round-trip
+
+    - **GIVEN** a multi-line named declaration whose name is not at the construct start
+    - **WHEN** the symbol is extracted, persisted, and read
+    - **THEN** its half-open complete construct range contains its declared-name `selectionRange`
+    - **AND** slicing indexed content by the complete range returns the whole declaration
+    - **AND** slicing by `selectionRange` returns only the declared name
+
+    #### Scenario: Range enrichment preserves symbol identity
+
+    - **GIVEN** an existing symbol identified by file, kind, name, line, and column
+    - **WHEN** end coordinates and `selectionRange` are added
+    - **THEN** its symbol id is unchanged
+    - **AND** `line` and `column` equal the complete construct start

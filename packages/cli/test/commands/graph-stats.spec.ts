@@ -89,6 +89,7 @@ function setup(
       ...DEFAULT_STATS,
       ...statOverrides,
     }),
+    getGraphHealth: vi.fn(),
   }
   vi.mocked(withOpenGraphProvider).mockImplementation(async (_host, fn) => {
     await fn(mockProvider as never)
@@ -136,9 +137,38 @@ function setup(
             stale,
             currentRef,
             fingerprintMismatch,
+            contentFresh: true,
+            coverageComplete: true,
+            schemaCompatible: true,
+            generationCurrent: true,
+            reasonCodes:
+              stale === true
+                ? ['VCS_REF_STALE']
+                : fingerprintMismatch === true
+                  ? ['DERIVATION_MISMATCH']
+                  : [],
           }
         }),
       }) as never,
+  )
+  mockProvider.getGraphHealth.mockImplementation(async () =>
+    createGetGraphHealth().execute({
+      config,
+      provider: mockProvider as never,
+      codeGraphVersion,
+      ...(kernel !== null
+        ? {
+            workspaces: config.workspaces.map((workspace) => ({
+              name: workspace.name,
+              prefix: workspace.name,
+              codeRoot: workspace.codeRoot,
+              specRepo: {} as never,
+              ownership: workspace.ownership,
+              isExternal: workspace.isExternal,
+            })),
+          }
+        : {}),
+    }),
   )
 
   const getStdout = captureStdout()
@@ -191,7 +221,19 @@ describe('graph stats', () => {
     const order: string[] = []
     setup()
     vi.mocked(withOpenGraphProvider).mockImplementation(async (_host, fn) => {
-      await fn({ getStatistics: vi.fn().mockResolvedValue(DEFAULT_STATS) } as never)
+      await fn({
+        getGraphHealth: vi.fn().mockResolvedValue({
+          ...DEFAULT_STATS,
+          stale: false,
+          currentRef: DEFAULT_STATS.lastIndexedRef,
+          fingerprintMismatch: false,
+          contentFresh: true,
+          coverageComplete: true,
+          schemaCompatible: true,
+          generationCurrent: true,
+          reasonCodes: [],
+        }),
+      } as never)
       order.push('close')
     })
     vi.mocked(process.exit).mockImplementation(((code?: number) => {
@@ -323,7 +365,7 @@ describe('graph stats — staleness detection', () => {
     expect(stdout).toContain('Documents: 1')
     expect(stdout).toContain('Symbols:   2')
     expect(stdout).toContain('Specs:     0')
-    expect(stdout).toContain('⚠ Graph is stale')
+    expect(stdout).toContain('VCS_REF_STALE')
   })
 
   it('shows exact stale warning with truncated refs in text output', async () => {
@@ -336,7 +378,7 @@ describe('graph stats — staleness detection', () => {
     const program = makeStatsProgram()
     await runStats(program, 'graph', 'stats')
 
-    expect(getStdout()).toContain('⚠ Graph is stale (indexed at abc1234, current: fff9999)')
+    expect(getStdout()).toContain('VCS_REF_STALE')
   })
 
   it('omits staleness line when lastIndexedRef is null in text output', async () => {
@@ -454,9 +496,7 @@ describe('graph stats — staleness detection', () => {
 
     await runStats(makeStatsProgram(), 'graph', 'stats')
 
-    expect(getStderr()).toContain(
-      '⚠ Derivation fingerprint mismatch — code-graph version or workspace configuration changed since last index',
-    )
-    expect(getStdout()).not.toContain('Derivation fingerprint mismatch')
+    expect(getStderr()).toBe('')
+    expect(getStdout()).toContain('DERIVATION_MISMATCH')
   })
 })

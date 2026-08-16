@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import {
@@ -171,5 +172,44 @@ describe('Fingerprint logic', () => {
       mockGraphConfig,
     )
     expect(withInstalled).not.toBe(withZero)
+  })
+
+  it.each([
+    'package.json',
+    'tsconfig.base.json',
+    'jsconfig.json',
+    'pyproject.toml',
+    'setup.cfg',
+    'setup.py',
+    'go.mod',
+    'go.work',
+    'composer.json',
+  ])('invalidates workspace fingerprints when %s changes', (inputName) => {
+    const root = mkdtempSync(join(tmpdir(), 'specd-fingerprint-'))
+    const codeRoot = join(root, 'packages/core')
+    mkdirSync(codeRoot, { recursive: true })
+    const workspace = { ...mockWorkspace, codeRoot }
+    const graphConfig = { ...mockGraphConfig, projectRoot: root }
+    try {
+      writeFileSync(join(codeRoot, inputName), 'before')
+      const before = computeWorkspaceFingerprint(
+        codeGraphVersion,
+        root,
+        workspace,
+        [workspace],
+        graphConfig,
+      )
+      writeFileSync(join(codeRoot, inputName), 'after')
+      const after = computeWorkspaceFingerprint(
+        codeGraphVersion,
+        root,
+        workspace,
+        [workspace],
+        graphConfig,
+      )
+      expect(after).not.toBe(before)
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
   })
 })

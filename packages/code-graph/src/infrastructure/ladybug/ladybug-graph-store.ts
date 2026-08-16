@@ -1,5 +1,15 @@
 import type { Database, Connection, QueryResult, LbugValue } from 'lbug'
-import { GraphStore, type StorageGenerationSnapshot } from '../../domain/ports/graph-store.js'
+import {
+  GraphStore,
+  type IndexWriteSession,
+  type IndexWriteSessionMetadata,
+  type LogicalDeclaration,
+  type LogicalSymbolLookup,
+  type LocalBindingLookup,
+  type PublicBindingLookup,
+  type ReferenceFactsWrite,
+  type StorageGenerationSnapshot,
+} from '../../domain/ports/graph-store.js'
 import { createDocumentNode, type DocumentNode } from '../../domain/value-objects/document-node.js'
 import { type FileNode } from '../../domain/value-objects/file-node.js'
 import { type SymbolNode } from '../../domain/value-objects/symbol-node.js'
@@ -9,11 +19,28 @@ import { type SymbolQuery } from '../../domain/value-objects/symbol-query.js'
 import { type GraphStatistics } from '../../domain/value-objects/graph-statistics.js'
 import { type RelationType, RelationType as RT } from '../../domain/value-objects/relation-type.js'
 import { type SearchOptions } from '../../domain/value-objects/search-options.js'
+import {
+  type LocalBinding,
+  type LogicalSymbol,
+  type PublicBinding,
+  type ResolutionStep,
+} from '../../domain/value-objects/symbol-reference.js'
+import { type IndexCoverage } from '../../domain/value-objects/index-session.js'
+import {
+  type SourceContentCandidatePage,
+  type SourceContentCandidateQuery,
+} from '../../domain/value-objects/source-search.js'
+import {
+  type FreshnessLatches,
+  type IndexedInputObservation,
+  type IndexedResourceKey,
+  type MarkIndexedInputStaleInput,
+  type UpdateIndexedInputObservationInput,
+} from '../../domain/value-objects/indexed-input-freshness.js'
 import { StoreNotOpenError } from '../../domain/errors/store-not-open-error.js'
 import { SCHEMA_DDL, SCHEMA_VERSION } from './schema.js'
 import { expandSearchQuery } from '../../domain/services/expand-search-query.js'
 import { expandSymbolName } from '../../domain/services/expand-symbol-name.js'
-import { matchesExclude } from '../../domain/services/matches-exclude.js'
 import { mkdirSync, existsSync, writeFileSync, unlinkSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import {
@@ -31,6 +58,96 @@ interface LbugModule {
 }
 
 const SYMBOL_DEPENDENCY_RELATION_TYPES = [RT.Calls, RT.Constructs, RT.UsesType] as const
+
+// eslint-disable-next-line jsdoc/require-param, jsdoc/require-returns
+/** Compares equally-shaped string keys lexicographically. */
+function compareStrings(left: readonly string[], right: readonly string[]): number {
+  for (let index = 0; index < left.length; index += 1) {
+    const comparison = left[index]!.localeCompare(right[index]!)
+    if (comparison !== 0) return comparison
+  }
+  return 0
+}
+
+// eslint-disable-next-line jsdoc/require-param, jsdoc/require-returns
+/** Orders logical symbols consistently with the SQLite backend. */
+function compareLogicalSymbols(left: LogicalSymbol, right: LogicalSymbol): number {
+  return compareStrings(
+    [
+      left.workspace,
+      left.surface,
+      left.ownerId ?? '',
+      left.space,
+      left.name,
+      left.memberForm ?? '',
+      left.id,
+    ],
+    [
+      right.workspace,
+      right.surface,
+      right.ownerId ?? '',
+      right.space,
+      right.name,
+      right.memberForm ?? '',
+      right.id,
+    ],
+  )
+}
+
+// eslint-disable-next-line jsdoc/require-param, jsdoc/require-returns
+/** Orders declaration occurrences consistently with the SQLite backend. */
+function compareLogicalDeclarations(left: LogicalDeclaration, right: LogicalDeclaration): number {
+  return compareStrings(
+    [
+      left.logicalSymbolId,
+      left.declaration.location.filePath,
+      String(left.declaration.location.line),
+      String(left.declaration.location.column),
+      left.declaration.symbolId,
+    ],
+    [
+      right.logicalSymbolId,
+      right.declaration.location.filePath,
+      String(right.declaration.location.line),
+      String(right.declaration.location.column),
+      right.declaration.symbolId,
+    ],
+  )
+}
+
+// eslint-disable-next-line jsdoc/require-param, jsdoc/require-returns
+/** Orders public bindings consistently with the SQLite backend. */
+function comparePublicBindings(left: PublicBinding, right: PublicBinding): number {
+  return compareStrings(
+    [left.surface, left.exportedName, left.space, left.targetId ?? '', left.id],
+    [right.surface, right.exportedName, right.space, right.targetId ?? '', right.id],
+  )
+}
+
+// eslint-disable-next-line jsdoc/require-param, jsdoc/require-returns
+/** Orders local bindings consistently with the SQLite backend. */
+function compareLocalBindings(left: LocalBinding, right: LocalBinding): number {
+  return compareStrings(
+    [left.filePath, left.scopeId, left.localName, left.space, left.targetId ?? '', left.id],
+    [right.filePath, right.scopeId, right.localName, right.space, right.targetId ?? '', right.id],
+  )
+}
+
+// eslint-disable-next-line jsdoc/require-param, jsdoc/require-returns
+/** Orders resolution steps consistently with the SQLite backend. */
+function compareResolutionSteps(left: ResolutionStep, right: ResolutionStep): number {
+  return compareStrings([left.fromId, left.toId, left.kind], [right.fromId, right.toId, right.kind])
+}
+
+/**
+ * Converts a `*` glob into an anchored, case-insensitive Ladybug regex.
+ * @param pattern - Glob pattern to translate.
+ * @returns Ladybug-compatible regular expression.
+ */
+function globToLadybugRegex(pattern: string): string {
+  const escaped = pattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replaceAll('*', '.*')
+  return `(?i)^${escaped}$`
+}
 
 /**
  * Expanded token set plus FTS-ready query string for identity-aware search.
@@ -131,6 +248,82 @@ function csvEscape(value: string): string {
 }
 
 /**
+ * Returns the compound logical resource identity key.
+ * @param resource - Logical resource identity.
+ * @returns Stable compound resource key.
+ */
+function resourceKey(resource: IndexedResourceKey): string {
+  return JSON.stringify([resource.workspace, resource.resourceKind, resource.resourceId])
+}
+
+/**
+ * Returns the compound physical observation identity.
+ * @param observation - Physical observation identity fields.
+ * @returns Stable compound observation identifier.
+ */
+function observationId(
+  observation: Pick<
+    IndexedInputObservation,
+    'workspace' | 'resourceKind' | 'resourceId' | 'inputKind' | 'inputLocator'
+  >,
+): string {
+  return JSON.stringify([
+    observation.workspace,
+    observation.resourceKind,
+    observation.resourceId,
+    observation.inputKind,
+    observation.inputLocator,
+  ])
+}
+
+/**
+ * Maps an observation to Ladybug parameter primitives.
+ * @param observation - Observation to persist.
+ * @returns Ladybug-compatible parameter values.
+ */
+function toLadybugObservationParams(
+  observation: IndexedInputObservation,
+): Record<string, LbugValue> {
+  return {
+    id: observationId(observation),
+    workspace: observation.workspace,
+    resourceKind: observation.resourceKind,
+    resourceId: observation.resourceId,
+    inputKind: observation.inputKind,
+    inputLocator: observation.inputLocator,
+    indexedContentHash: observation.indexedContentHash,
+    lastObservedMtime: observation.lastObservedMtime ?? -1,
+    lastObservedSize: observation.lastObservedSize ?? -1,
+    lastObservedRevision: observation.lastObservedRevision ?? '',
+    generation: observation.generation,
+  }
+}
+
+/**
+ * Maps one Ladybug result row to persisted freshness evidence.
+ * @param row - Ladybug result row.
+ * @returns Indexed input observation.
+ */
+function toLadybugObservation(row: Record<string, LbugValue>): IndexedInputObservation {
+  const mtime = row['lastObservedMtime'] as number
+  const size = row['lastObservedSize'] as number
+  const revision = row['lastObservedRevision'] as string
+  return {
+    workspace: row['workspace'] as string,
+    resourceKind: row['resourceKind'] as IndexedInputObservation['resourceKind'],
+    resourceId: row['resourceId'] as string,
+    inputKind: row['inputKind'] as IndexedInputObservation['inputKind'],
+    inputLocator: row['inputLocator'] as string,
+    indexedContentHash: row['indexedContentHash'] as string,
+    ...(mtime >= 0 ? { lastObservedMtime: mtime } : {}),
+    ...(size >= 0 ? { lastObservedSize: size } : {}),
+    ...(revision.length > 0 ? { lastObservedRevision: revision } : {}),
+    generation: row['generation'] as string,
+    stale: row['stale'] === true,
+  }
+}
+
+/**
  * Graph store implementation backed by a Ladybug (lbug) embedded graph database.
  * Persists files, symbols, specs, and their relations as a labeled property graph.
  */
@@ -141,6 +334,7 @@ export class LadybugGraphStore extends GraphStore {
   private _lastIndexedAt: string | undefined
   private _lastIndexedRef: string | null = null
   private _graphFingerprint: string | null = null
+  private bulkSessionActive = false
   private readonly loadLbugModule: () => Promise<LbugModule> = async () => import('lbug')
 
   /**
@@ -202,6 +396,7 @@ export class LadybugGraphStore extends GraphStore {
     await this.conn.query('INSTALL fts')
     await this.conn.query('LOAD fts')
     await this.createFtsIndex('Symbol', 'symbol_fts', ['searchName', 'comment'])
+    await this.createSemanticFtsIndexesIfPopulated()
     await this.createFtsIndex('Spec', 'spec_fts', ['specId', 'title', 'description', 'content'])
     await this.createFtsIndex('Document', 'document_fts', ['path', 'content'])
 
@@ -346,8 +541,11 @@ export class LadybugGraphStore extends GraphStore {
     // Drop existing indexes
     for (const [table, name] of [
       ['Symbol', 'symbol_fts'],
+      ['LogicalSymbol', 'logical_symbol_fts'],
+      ['PublicBinding', 'public_binding_fts'],
       ['Spec', 'spec_fts'],
       ['Document', 'document_fts'],
+      ['File', 'file_content_fts'],
     ] as const) {
       try {
         await conn.query(`CALL DROP_FTS_INDEX('${table}', '${name}')`)
@@ -358,8 +556,41 @@ export class LadybugGraphStore extends GraphStore {
 
     // Recreate
     await this.createFtsIndex('Symbol', 'symbol_fts', ['searchName', 'comment'])
+    await this.createSemanticFtsIndexesIfPopulated()
     await this.createFtsIndex('Spec', 'spec_fts', ['specId', 'title', 'description', 'content'])
     await this.createFtsIndex('Document', 'document_fts', ['path', 'content'])
+    const contentRows = await exec(
+      conn,
+      `MATCH (f:File) WHERE f.content <> '' RETURN count(f) AS contentFileCount`,
+    )
+    if (Number(contentRows[0]?.['contentFileCount'] ?? 0) > 0) {
+      await this.createFtsIndex('File', 'file_content_fts', ['content'])
+    }
+  }
+
+  /** Creates semantic indexes only when their node tables contain searchable data. */
+  private async createSemanticFtsIndexesIfPopulated(): Promise<void> {
+    const definitions = [
+      {
+        table: 'LogicalSymbol',
+        index: 'logical_symbol_fts',
+        fields: ['workspace', 'surface', 'name', 'space', 'ownerId', 'memberForm'],
+      },
+      {
+        table: 'PublicBinding',
+        index: 'public_binding_fts',
+        fields: ['surface', 'exportedName', 'space'],
+      },
+    ] as const
+    for (const definition of definitions) {
+      const rows = await exec(
+        this.conn!,
+        `MATCH (n:${definition.table}) RETURN count(n) AS searchableCount`,
+      )
+      if (Number(rows[0]?.['searchableCount'] ?? 0) > 0) {
+        await this.createFtsIndex(definition.table, definition.index, [...definition.fields])
+      }
+    }
   }
 
   /**
@@ -420,7 +651,7 @@ export class LadybugGraphStore extends GraphStore {
       for (const symbol of symbols) {
         await runPrepared(
           conn,
-          `CREATE (s:Symbol {id: $id, name: $name, searchName: $searchName, kind: $kind, filePath: $filePath, line: $line, col: $col, comment: $comment})`,
+          `CREATE (s:Symbol {id: $id, name: $name, searchName: $searchName, kind: $kind, filePath: $filePath, line: $line, col: $col, endLine: $endLine, endCol: $endCol, selectionStartLine: $selectionStartLine, selectionStartCol: $selectionStartCol, selectionEndLine: $selectionEndLine, selectionEndCol: $selectionEndCol, comment: $comment})`,
           {
             id: symbol.id,
             name: symbol.name,
@@ -429,6 +660,12 @@ export class LadybugGraphStore extends GraphStore {
             filePath: file.path,
             line: symbol.line,
             col: symbol.column,
+            endLine: symbol.endLine,
+            endCol: symbol.endColumn,
+            selectionStartLine: symbol.selectionRange.startLine,
+            selectionStartCol: symbol.selectionRange.startColumn,
+            selectionEndLine: symbol.selectionRange.endLine,
+            selectionEndCol: symbol.selectionRange.endColumn,
             comment: symbol.comment ?? '',
           },
         )
@@ -571,6 +808,147 @@ export class LadybugGraphStore extends GraphStore {
   }
 
   /**
+   * Begins one Ladybug-native bulk transaction assembled from bounded chunks.
+   * @param metadata - Metadata committed with the indexed generation.
+   * @returns A bounded chunk writer whose commit is atomic.
+   * @throws When another bulk session is already active.
+   */
+  override beginBulkIndexSession(metadata: IndexWriteSessionMetadata = {}): IndexWriteSession {
+    this.ensureOpen()
+    if (this.bulkSessionActive) throw new Error('A bulk index session is already active')
+    this.bulkSessionActive = true
+    const files: FileNode[] = []
+    const documents: DocumentNode[] = []
+    const symbols: SymbolNode[] = []
+    const specs: SpecNode[] = []
+    const observations: IndexedInputObservation[] = []
+    const relations = new Map<string, Relation>()
+    const removedFiles = new Set<string>()
+    const removedDocuments = new Set<string>()
+    const removedSpecs = new Set<string>()
+    let referenceFacts: ReferenceFactsWrite | undefined
+    let finished = false
+    const assertActive = (): void => {
+      if (finished) throw new Error('Bulk index session is already finished')
+    }
+    const finish = (): void => {
+      finished = true
+      this.bulkSessionActive = false
+    }
+    return {
+      writeFiles: (chunk) => {
+        assertActive()
+        files.push(...chunk)
+        return Promise.resolve()
+      },
+      writeDocuments: (chunk) => {
+        assertActive()
+        documents.push(...chunk)
+        return Promise.resolve()
+      },
+      writeSymbols: (chunk) => {
+        assertActive()
+        symbols.push(...chunk)
+        return Promise.resolve()
+      },
+      writeSpecs: (chunk) => {
+        assertActive()
+        specs.push(...chunk)
+        return Promise.resolve()
+      },
+      writeObservations: (chunk) => {
+        assertActive()
+        observations.push(...chunk)
+        return Promise.resolve()
+      },
+      writeReferenceFacts: (chunk) => {
+        assertActive()
+        referenceFacts =
+          referenceFacts === undefined
+            ? chunk
+            : {
+                logicalSymbols: [...referenceFacts.logicalSymbols, ...chunk.logicalSymbols],
+                declarations: [...referenceFacts.declarations, ...chunk.declarations],
+                publicBindings: [...referenceFacts.publicBindings, ...chunk.publicBindings],
+                localBindings: [...referenceFacts.localBindings, ...chunk.localBindings],
+                steps: [...referenceFacts.steps, ...chunk.steps],
+                coverage: [...referenceFacts.coverage, ...chunk.coverage],
+              }
+        return Promise.resolve()
+      },
+      writeRelations: (chunk) => {
+        assertActive()
+        for (const relation of chunk) {
+          relations.set(JSON.stringify([relation.source, relation.target, relation.type]), relation)
+        }
+        return Promise.resolve()
+      },
+      removeFiles: (paths) => {
+        assertActive()
+        for (const path of paths) removedFiles.add(path)
+        return Promise.resolve()
+      },
+      removeDocuments: (paths) => {
+        assertActive()
+        for (const path of paths) removedDocuments.add(path)
+        return Promise.resolve()
+      },
+      removeSpecs: (ids) => {
+        assertActive()
+        for (const id of ids) removedSpecs.add(id)
+        return Promise.resolve()
+      },
+      commit: async () => {
+        assertActive()
+        try {
+          if (metadata.replaceCodeGraph === true) {
+            for (const file of await this.getAllFiles()) removedFiles.add(file.path)
+            for (const document of await this.getAllDocuments()) {
+              removedDocuments.add(document.path)
+            }
+          }
+          await this.bulkLoad({
+            files,
+            documents,
+            symbols,
+            specs,
+            relations: [...relations.values()],
+            observations,
+            ...(referenceFacts === undefined ? {} : { referenceFacts }),
+            removeFilePaths: [...removedFiles],
+            removeDocumentPaths: [...removedDocuments],
+            removeSpecIds: [...removedSpecs],
+            createRelationsInTransaction: true,
+            ...(metadata.onProgress === undefined ? {} : { onProgress: metadata.onProgress }),
+            ...(metadata.vcsRef === undefined ? {} : { vcsRef: metadata.vcsRef }),
+            ...(metadata.graphFingerprint === undefined
+              ? {}
+              : { graphFingerprint: metadata.graphFingerprint }),
+            ...(metadata.indexedWorkspaces === undefined
+              ? {}
+              : { indexedWorkspaces: metadata.indexedWorkspaces }),
+            ...(metadata.clearGraphStaleLatch === undefined
+              ? {}
+              : { clearGraphStaleLatch: metadata.clearGraphStaleLatch }),
+            ...(metadata.rebuildSearchIndexes === undefined
+              ? {}
+              : { rebuildSearchIndexes: metadata.rebuildSearchIndexes }),
+          })
+          finish()
+        } catch (error) {
+          finish()
+          throw error
+        }
+      },
+      rollback: () => {
+        assertActive()
+        finish()
+        return Promise.resolve()
+      },
+    }
+  }
+
+  /**
    * Bulk loads files, symbols, specs, and relations using CSV import.
    * Orders of magnitude faster than individual upserts for large datasets.
    * @param data - The data to load.
@@ -582,6 +960,15 @@ export class LadybugGraphStore extends GraphStore {
    * @param data.vcsRef - Optional VCS ref to persist as `lastIndexedRef`.
    * @param data.graphFingerprint - Optional fingerprint for derivation mismatch detection.
    * @param data.documents - Optional array of document nodes.
+   * @param data.observations - Freshness observations replacing indexed workspace state.
+   * @param data.indexedWorkspaces - Workspaces whose observation snapshots are replaced.
+   * @param data.clearGraphStaleLatch - Whether to clear the aggregate stale latch.
+   * @param data.rebuildSearchIndexes - Whether searchable content changed and FTS must rebuild.
+   * @param data.referenceFacts - Optional semantic-fact replacement snapshot.
+   * @param data.removeFilePaths - File identities removed before inserting the generation.
+   * @param data.removeDocumentPaths - Document identities removed before insertion.
+   * @param data.removeSpecIds - Spec identities removed before insertion.
+   * @param data.createRelationsInTransaction - Whether relations use transactional creates.
    */
   async bulkLoad(data: {
     files: FileNode[]
@@ -592,6 +979,15 @@ export class LadybugGraphStore extends GraphStore {
     onProgress?: (step: string) => void
     vcsRef?: string
     graphFingerprint?: string
+    observations?: readonly IndexedInputObservation[]
+    indexedWorkspaces?: readonly string[]
+    clearGraphStaleLatch?: boolean
+    rebuildSearchIndexes?: boolean
+    referenceFacts?: ReferenceFactsWrite
+    removeFilePaths?: readonly string[]
+    removeDocumentPaths?: readonly string[]
+    removeSpecIds?: readonly string[]
+    createRelationsInTransaction?: boolean
   }): Promise<void> {
     this.ensureOpen()
     const conn = this.conn!
@@ -604,6 +1000,16 @@ export class LadybugGraphStore extends GraphStore {
     const csvFiles: string[] = []
     await conn.query('BEGIN TRANSACTION')
     try {
+      report('cleanup')
+      for (const path of data.removeFilePaths ?? []) {
+        await this.deleteFileLocalState(conn, path)
+      }
+      for (const path of data.removeDocumentPaths ?? []) {
+        await this.deleteDocumentLocalState(conn, path)
+      }
+      for (const id of data.removeSpecIds ?? []) {
+        await this.deleteSpecLocalState(conn, id)
+      }
       // Write File nodes CSV — batched to avoid native module segfaults on large datasets
       report(`Loading ${data.files.length} files`)
       if (data.files.length > 0) {
@@ -631,10 +1037,12 @@ export class LadybugGraphStore extends GraphStore {
           const batch = data.symbols.slice(i, i + batchSize)
           const symCsv = prefix + `symbols-${i}.csv`
           csvFiles.push(symCsv)
-          const symRows = ['id,name,searchName,kind,filePath,parentId,line,col,comment']
+          const symRows = [
+            'id,name,searchName,kind,filePath,parentId,line,col,endLine,endCol,selectionStartLine,selectionStartCol,selectionEndLine,selectionEndCol,comment',
+          ]
           for (const s of batch) {
             symRows.push(
-              `${csvEscape(s.id)},${csvEscape(s.name)},${csvEscape(expandSymbolName(s.name))},${csvEscape(s.kind)},${csvEscape(s.filePath)},${csvEscape(s.parentId ?? '')},${s.line},${s.column},${csvEscape(s.comment ?? '')}`,
+              `${csvEscape(s.id)},${csvEscape(s.name)},${csvEscape(expandSymbolName(s.name))},${csvEscape(s.kind)},${csvEscape(s.filePath)},${csvEscape(s.parentId ?? '')},${s.line},${s.column},${s.endLine},${s.endColumn},${s.selectionRange.startLine},${s.selectionRange.startColumn},${s.selectionRange.endLine},${s.selectionRange.endColumn},${csvEscape(s.comment ?? '')}`,
             )
           }
           writeFileSync(symCsv, symRows.join('\n') + '\n')
@@ -679,10 +1087,19 @@ export class LadybugGraphStore extends GraphStore {
         }
       }
 
+      if (data.referenceFacts !== undefined) {
+        report('reference-facts')
+        await this.replaceReferenceFactsInTransaction(conn, data.referenceFacts)
+      }
+
       // Write relations CSVs — one per type
       // IGNORE_ERRORS skips rows referencing non-existent nodes (dangling imports to external files)
       const relsByType = new Map<string, Relation[]>()
+      if (data.createRelationsInTransaction === true) {
+        for (const relation of data.relations) await this.createRelation(conn, relation)
+      }
       for (const rel of data.relations) {
+        if (data.createRelationsInTransaction === true) continue
         const existing = relsByType.get(rel.type) ?? []
         existing.push(rel)
         relsByType.set(rel.type, existing)
@@ -716,6 +1133,32 @@ export class LadybugGraphStore extends GraphStore {
       if (data.graphFingerprint !== undefined) {
         await this.updateMeta(conn, 'graphFingerprint', data.graphFingerprint)
       }
+      if (data.observations !== undefined) {
+        for (const workspace of new Set(data.indexedWorkspaces ?? [])) {
+          await runPrepared(
+            conn,
+            'MATCH (o:IndexedInputObservation {workspace: $workspace}) DELETE o',
+            { workspace },
+          )
+          await this.setFreshnessLatch(conn, workspace, false)
+        }
+        if (data.clearGraphStaleLatch === true) {
+          await this.setFreshnessLatch(conn, '__graph__', false)
+        }
+        for (const observation of data.observations) {
+          await runPrepared(
+            conn,
+            `CREATE (o:IndexedInputObservation {
+              id: $id, workspace: $workspace, resourceKind: $resourceKind,
+              resourceId: $resourceId, inputKind: $inputKind, inputLocator: $inputLocator,
+              indexedContentHash: $indexedContentHash, lastObservedMtime: $lastObservedMtime,
+              lastObservedSize: $lastObservedSize, lastObservedRevision: $lastObservedRevision,
+              generation: $generation, stale: false
+            })`,
+            toLadybugObservationParams(observation),
+          )
+        }
+      }
       await conn.query('COMMIT')
       this._lastIndexedAt = now
       if (data.vcsRef !== undefined) {
@@ -737,7 +1180,701 @@ export class LadybugGraphStore extends GraphStore {
         }
       }
     }
-    await this.rebuildFtsIndexes()
+    if (data.rebuildSearchIndexes !== false) {
+      report('search-indexes')
+      await this.rebuildFtsIndexes()
+    }
+  }
+
+  /**
+   * Returns persisted observations for requested logical resources.
+   * @param resources - Logical resource identities.
+   * @returns Matching observations in deterministic order.
+   */
+  async getIndexedInputObservations(
+    resources: readonly IndexedResourceKey[],
+  ): Promise<readonly IndexedInputObservation[]> {
+    if (resources.length === 0) return []
+    this.ensureOpen()
+    const keys = new Set(resources.map(resourceKey))
+    const rows = await exec(
+      this.conn!,
+      `MATCH (o:IndexedInputObservation) RETURN
+       o.workspace AS workspace, o.resourceKind AS resourceKind, o.resourceId AS resourceId,
+       o.inputKind AS inputKind, o.inputLocator AS inputLocator,
+       o.indexedContentHash AS indexedContentHash, o.lastObservedMtime AS lastObservedMtime,
+       o.lastObservedSize AS lastObservedSize, o.lastObservedRevision AS lastObservedRevision,
+       o.generation AS generation, o.stale AS stale`,
+    )
+    return rows
+      .map(toLadybugObservation)
+      .filter((observation) => keys.has(resourceKey(observation)))
+      .sort((left, right) => observationId(left).localeCompare(observationId(right)))
+  }
+
+  /**
+   * Applies guarded monotonic stale updates.
+   * @param updates - Guarded stale updates.
+   */
+  async markIndexedInputsStale(updates: readonly MarkIndexedInputStaleInput[]): Promise<void> {
+    this.ensureOpen()
+    for (const update of updates) {
+      await runPrepared(
+        this.conn!,
+        `MATCH (o:IndexedInputObservation {id: $id})
+         WHERE o.indexedContentHash = $expectedHash AND o.generation = $generation
+           AND o.lastObservedRevision = $expectedRevision
+         SET o.stale = true`,
+        {
+          id: observationId(update),
+          expectedHash: update.expectedIndexedContentHash,
+          generation: update.expectedGeneration,
+          expectedRevision: update.expectedRevision ?? '',
+        },
+      )
+    }
+  }
+
+  /**
+   * Refreshes equal-content filesystem observation stamps.
+   * @param updates - Equal-content stamp refreshes.
+   */
+  async updateIndexedInputObservations(
+    updates: readonly UpdateIndexedInputObservationInput[],
+  ): Promise<void> {
+    this.ensureOpen()
+    for (const update of updates) {
+      await runPrepared(
+        this.conn!,
+        `MATCH (o:IndexedInputObservation {id: $id})
+         WHERE o.indexedContentHash = $expectedHash AND o.generation = $generation
+           AND o.lastObservedRevision = $expectedRevision AND o.stale = false
+         SET o.lastObservedMtime = $mtime, o.lastObservedSize = $size`,
+        {
+          id: observationId(update),
+          expectedHash: update.expectedIndexedContentHash,
+          generation: update.expectedGeneration,
+          expectedRevision: update.expectedRevision ?? '',
+          mtime: update.lastObservedMtime,
+          size: update.lastObservedSize,
+        },
+      )
+    }
+  }
+
+  /**
+   * Returns aggregate and workspace stale latches.
+   * @param workspaces - Workspace names to project.
+   * @returns Aggregate and workspace latch values.
+   */
+  async getFreshnessLatches(workspaces: readonly string[]): Promise<FreshnessLatches> {
+    this.ensureOpen()
+    const rows = await exec(
+      this.conn!,
+      'MATCH (l:FreshnessLatch) RETURN l.workspace AS workspace, l.knownStale AS knownStale',
+    )
+    const values = new Map(
+      rows.map((row) => [row['workspace'] as string, row['knownStale'] === true]),
+    )
+    return {
+      graph: values.get('__graph__') ?? false,
+      workspaces: Object.fromEntries(
+        workspaces.map((workspace) => [workspace, values.get(workspace) ?? false]),
+      ),
+    }
+  }
+
+  /**
+   * Monotonically sets aggregate and workspace stale latches.
+   * @param workspaces - Workspace names proven stale.
+   */
+  async markWorkspacesAndGraphStaleSinceLastIndex(workspaces: readonly string[]): Promise<void> {
+    this.ensureOpen()
+    await this.setFreshnessLatch(this.conn!, '__graph__', true)
+    for (const workspace of new Set(workspaces)) {
+      await this.setFreshnessLatch(this.conn!, workspace, true)
+    }
+  }
+
+  /**
+   * Replaces semantic reference facts inside a caller-owned Ladybug transaction.
+   * @param conn - Open Ladybug connection owning the transaction.
+   * @param facts - Complete semantic-fact replacement snapshot.
+   */
+  private async replaceReferenceFactsInTransaction(
+    conn: Connection,
+    facts: ReferenceFactsWrite,
+  ): Promise<void> {
+    for (const table of [
+      'ResolutionStep',
+      'LocalBinding',
+      'PublicBinding',
+      'LogicalDeclaration',
+      'LogicalSymbol',
+      'IndexCoverage',
+    ]) {
+      await conn.query(`MATCH (n:${table}) DELETE n`)
+    }
+    for (const symbol of facts.logicalSymbols) {
+      await runPrepared(
+        conn,
+        `CREATE (n:LogicalSymbol {id: $id, workspace: $workspace, surface: $surface, name: $name, space: $space, ownerId: $ownerId, memberForm: $memberForm})`,
+        {
+          id: symbol.id,
+          workspace: symbol.workspace,
+          surface: symbol.surface,
+          name: symbol.name,
+          space: symbol.space,
+          ownerId: symbol.ownerId ?? '',
+          memberForm: symbol.memberForm ?? '',
+        },
+      )
+    }
+    for (const { logicalSymbolId, declaration } of facts.declarations) {
+      await runPrepared(
+        conn,
+        `CREATE (n:LogicalDeclaration {id: $id, logicalSymbolId: $logicalSymbolId, symbolId: $symbolId, filePath: $filePath, line: $line, columnNumber: $columnNumber, endLine: $endLine, endColumn: $endColumn, kind: $kind})`,
+        {
+          id: JSON.stringify([logicalSymbolId, declaration.symbolId]),
+          logicalSymbolId,
+          symbolId: declaration.symbolId,
+          filePath: declaration.location.filePath,
+          line: declaration.location.line,
+          columnNumber: declaration.location.column,
+          endLine: declaration.location.endLine ?? declaration.location.line,
+          endColumn: declaration.location.endColumn ?? declaration.location.column,
+          kind: declaration.kind,
+        },
+      )
+    }
+    for (const binding of facts.publicBindings) {
+      await runPrepared(
+        conn,
+        `CREATE (n:PublicBinding {id: $id, surface: $surface, exportedName: $exportedName, space: $space, targetId: $targetId})`,
+        {
+          id: binding.id,
+          surface: binding.surface,
+          exportedName: binding.exportedName,
+          space: binding.space,
+          targetId: binding.targetId ?? '',
+        },
+      )
+    }
+    for (const binding of facts.localBindings) {
+      await runPrepared(
+        conn,
+        `CREATE (n:LocalBinding {id: $id, filePath: $filePath, scopeId: $scopeId, localName: $localName, space: $space, targetId: $targetId})`,
+        {
+          id: binding.id,
+          filePath: binding.filePath,
+          scopeId: binding.scopeId,
+          localName: binding.localName,
+          space: binding.space,
+          targetId: binding.targetId ?? '',
+        },
+      )
+    }
+    for (const step of facts.steps) {
+      await runPrepared(
+        conn,
+        `CREATE (n:ResolutionStep {id: $id, fromId: $fromId, toId: $toId, kind: $kind})`,
+        { id: JSON.stringify([step.fromId, step.toId, step.kind]), ...step },
+      )
+    }
+    for (const coverage of facts.coverage) {
+      await runPrepared(
+        conn,
+        `CREATE (n:IndexCoverage {filePath: $filePath, contentHash: $contentHash, status: $status, reason: $reason, capabilitiesJson: $capabilitiesJson})`,
+        {
+          filePath: coverage.filePath,
+          contentHash: coverage.contentHash ?? '',
+          status: coverage.status,
+          reason: coverage.reason ?? '',
+          capabilitiesJson: JSON.stringify(coverage.capabilities),
+        },
+      )
+    }
+  }
+
+  /**
+   * Replaces every persisted semantic reference fact as one Ladybug transaction.
+   * @param facts - Complete derived semantic snapshot.
+   * @returns A promise that resolves when the replacement commits.
+   */
+  async replaceReferenceFacts(facts: ReferenceFactsWrite): Promise<void> {
+    this.ensureOpen()
+    const conn = this.conn!
+    await conn.query('BEGIN TRANSACTION')
+    try {
+      for (const table of [
+        'ResolutionStep',
+        'LocalBinding',
+        'PublicBinding',
+        'LogicalDeclaration',
+        'LogicalSymbol',
+        'IndexCoverage',
+      ]) {
+        await conn.query(`MATCH (n:${table}) DELETE n`)
+      }
+
+      for (const symbol of facts.logicalSymbols) {
+        await runPrepared(
+          conn,
+          `CREATE (n:LogicalSymbol {id: $id, workspace: $workspace, surface: $surface, name: $name, space: $space, ownerId: $ownerId, memberForm: $memberForm})`,
+          {
+            id: symbol.id,
+            workspace: symbol.workspace,
+            surface: symbol.surface,
+            name: symbol.name,
+            space: symbol.space,
+            ownerId: symbol.ownerId ?? '',
+            memberForm: symbol.memberForm ?? '',
+          },
+        )
+      }
+      for (const { logicalSymbolId, declaration } of facts.declarations) {
+        await runPrepared(
+          conn,
+          `CREATE (n:LogicalDeclaration {id: $id, logicalSymbolId: $logicalSymbolId, symbolId: $symbolId, filePath: $filePath, line: $line, columnNumber: $columnNumber, endLine: $endLine, endColumn: $endColumn, kind: $kind})`,
+          {
+            id: JSON.stringify([logicalSymbolId, declaration.symbolId]),
+            logicalSymbolId,
+            symbolId: declaration.symbolId,
+            filePath: declaration.location.filePath,
+            line: declaration.location.line,
+            columnNumber: declaration.location.column,
+            endLine: declaration.location.endLine ?? declaration.location.line,
+            endColumn: declaration.location.endColumn ?? declaration.location.column,
+            kind: declaration.kind,
+          },
+        )
+      }
+      for (const binding of facts.publicBindings) {
+        await runPrepared(
+          conn,
+          `CREATE (n:PublicBinding {id: $id, surface: $surface, exportedName: $exportedName, space: $space, targetId: $targetId})`,
+          {
+            id: binding.id,
+            surface: binding.surface,
+            exportedName: binding.exportedName,
+            space: binding.space,
+            targetId: binding.targetId ?? '',
+          },
+        )
+      }
+      for (const binding of facts.localBindings) {
+        await runPrepared(
+          conn,
+          `CREATE (n:LocalBinding {id: $id, filePath: $filePath, scopeId: $scopeId, localName: $localName, space: $space, targetId: $targetId})`,
+          {
+            id: binding.id,
+            filePath: binding.filePath,
+            scopeId: binding.scopeId,
+            localName: binding.localName,
+            space: binding.space,
+            targetId: binding.targetId ?? '',
+          },
+        )
+      }
+      for (const step of facts.steps) {
+        await runPrepared(
+          conn,
+          `CREATE (n:ResolutionStep {id: $id, fromId: $fromId, toId: $toId, kind: $kind})`,
+          { id: JSON.stringify([step.fromId, step.toId, step.kind]), ...step },
+        )
+      }
+      for (const coverage of facts.coverage) {
+        await runPrepared(
+          conn,
+          `CREATE (n:IndexCoverage {filePath: $filePath, contentHash: $contentHash, status: $status, reason: $reason, capabilitiesJson: $capabilitiesJson})`,
+          {
+            filePath: coverage.filePath,
+            contentHash: coverage.contentHash ?? '',
+            status: coverage.status,
+            reason: coverage.reason ?? '',
+            capabilitiesJson: JSON.stringify(coverage.capabilities),
+          },
+        )
+      }
+      await conn.query('COMMIT')
+    } catch (error) {
+      await conn.query('ROLLBACK').catch(() => {})
+      throw error
+    }
+  }
+
+  /**
+   * Finds logical symbols matching structured lookup keys.
+   * @param lookups - Structured logical keys.
+   * @returns Matched logical symbols in canonical order.
+   */
+  async findLogicalSymbols(lookups: readonly LogicalSymbolLookup[]): Promise<LogicalSymbol[]> {
+    this.ensureOpen()
+    const results = new Map<string, LogicalSymbol>()
+    for (const lookup of lookups) {
+      const rows = await execPrepared(
+        this.conn!,
+        `MATCH (n:LogicalSymbol {workspace: $workspace, name: $name})
+         WHERE ($surface = '' OR n.surface = $surface) AND ($space = '' OR n.space = $space)
+           AND ($ownerId = '' OR n.ownerId = $ownerId) AND ($memberForm = '' OR n.memberForm = $memberForm)
+         RETURN n.id AS id, n.workspace AS workspace, n.surface AS surface, n.name AS name, n.space AS space, n.ownerId AS ownerId, n.memberForm AS memberForm`,
+        {
+          workspace: lookup.workspace,
+          name: lookup.name,
+          surface: lookup.surface ?? '',
+          space: lookup.space ?? '',
+          ownerId: lookup.ownerId ?? '',
+          memberForm: lookup.memberForm ?? '',
+        },
+      )
+      for (const row of rows) {
+        const symbol: LogicalSymbol = {
+          id: row['id'] as string,
+          workspace: row['workspace'] as string,
+          surface: row['surface'] as string,
+          name: row['name'] as string,
+          space: row['space'] as LogicalSymbol['space'],
+          ownerId: (row['ownerId'] as string) || undefined,
+          memberForm: ((row['memberForm'] as string) || undefined) as LogicalSymbol['memberForm'],
+        }
+        results.set(symbol.id, symbol)
+      }
+    }
+    return [...results.values()].sort(compareLogicalSymbols)
+  }
+
+  /**
+   * Returns the complete semantic snapshot used for incremental hydration.
+   * @returns Deterministically ordered persisted reference facts.
+   */
+  async getAllReferenceFacts(): Promise<ReferenceFactsWrite> {
+    this.ensureOpen()
+    const [logicalRows, declarationRows, publicRows, localRows, stepRows, coverage] =
+      await Promise.all([
+        execPrepared(
+          this.conn!,
+          'MATCH (n:LogicalSymbol) RETURN n.id AS id, n.workspace AS workspace, n.surface AS surface, n.name AS name, n.space AS space, n.ownerId AS ownerId, n.memberForm AS memberForm',
+          {},
+        ),
+        execPrepared(
+          this.conn!,
+          'MATCH (n:LogicalDeclaration) RETURN n.logicalSymbolId AS logicalSymbolId, n.symbolId AS symbolId, n.filePath AS filePath, n.line AS line, n.columnNumber AS columnNumber, n.endLine AS endLine, n.endColumn AS endColumn, n.kind AS kind',
+          {},
+        ),
+        execPrepared(
+          this.conn!,
+          'MATCH (n:PublicBinding) RETURN n.id AS id, n.surface AS surface, n.exportedName AS exportedName, n.space AS space, n.targetId AS targetId',
+          {},
+        ),
+        execPrepared(
+          this.conn!,
+          'MATCH (n:LocalBinding) RETURN n.id AS id, n.filePath AS filePath, n.scopeId AS scopeId, n.localName AS localName, n.space AS space, n.targetId AS targetId',
+          {},
+        ),
+        execPrepared(
+          this.conn!,
+          'MATCH (n:ResolutionStep) RETURN n.fromId AS fromId, n.toId AS toId, n.kind AS kind',
+          {},
+        ),
+        this.getAllIndexCoverage(),
+      ])
+    const logicalSymbols = logicalRows
+      .map(
+        (row): LogicalSymbol => ({
+          id: row['id'] as string,
+          workspace: row['workspace'] as string,
+          surface: row['surface'] as string,
+          name: row['name'] as string,
+          space: row['space'] as LogicalSymbol['space'],
+          ownerId: (row['ownerId'] as string) || undefined,
+          memberForm: ((row['memberForm'] as string) || undefined) as LogicalSymbol['memberForm'],
+        }),
+      )
+      .sort(compareLogicalSymbols)
+    const declarations = declarationRows
+      .map(
+        (row): LogicalDeclaration => ({
+          logicalSymbolId: row['logicalSymbolId'] as string,
+          declaration: {
+            logicalId: row['logicalSymbolId'] as string,
+            symbolId: row['symbolId'] as string,
+            location: {
+              filePath: row['filePath'] as string,
+              line: Number(row['line']),
+              column: Number(row['columnNumber']),
+              endLine: Number(row['endLine']),
+              endColumn: Number(row['endColumn']),
+            },
+            kind: row['kind'] as LogicalDeclaration['declaration']['kind'],
+          },
+        }),
+      )
+      .sort(compareLogicalDeclarations)
+    const publicBindings = publicRows
+      .map(
+        (row): PublicBinding => ({
+          id: row['id'] as string,
+          surface: row['surface'] as string,
+          exportedName: row['exportedName'] as string,
+          space: row['space'] as PublicBinding['space'],
+          targetId: (row['targetId'] as string) || undefined,
+        }),
+      )
+      .sort(comparePublicBindings)
+    const localBindings = localRows
+      .map(
+        (row): LocalBinding => ({
+          id: row['id'] as string,
+          filePath: row['filePath'] as string,
+          scopeId: row['scopeId'] as string,
+          localName: row['localName'] as string,
+          space: row['space'] as LocalBinding['space'],
+          targetId: (row['targetId'] as string) || undefined,
+        }),
+      )
+      .sort(compareLocalBindings)
+    const steps = stepRows
+      .map((row) => ({
+        fromId: row['fromId'] as string,
+        toId: row['toId'] as string,
+        kind: row['kind'] as string,
+      }))
+      .sort(compareResolutionSteps)
+    return { logicalSymbols, declarations, publicBindings, localBindings, steps, coverage }
+  }
+
+  /**
+   * Finds logical symbols by canonical identifiers.
+   * @param ids - Canonical logical-symbol identifiers.
+   * @returns Matching logical symbols in deterministic order.
+   */
+  async findLogicalSymbolsByIds(ids: readonly string[]): Promise<LogicalSymbol[]> {
+    this.ensureOpen()
+    if (ids.length === 0) return []
+    const rows = await execPrepared(
+      this.conn!,
+      `MATCH (n:LogicalSymbol) WHERE n.id IN $ids
+       RETURN n.id AS id, n.workspace AS workspace, n.surface AS surface, n.name AS name, n.space AS space, n.ownerId AS ownerId, n.memberForm AS memberForm`,
+      { ids: [...new Set(ids)] },
+    )
+    return rows
+      .map(
+        (row): LogicalSymbol => ({
+          id: row['id'] as string,
+          workspace: row['workspace'] as string,
+          surface: row['surface'] as string,
+          name: row['name'] as string,
+          space: row['space'] as LogicalSymbol['space'],
+          ownerId: (row['ownerId'] as string) || undefined,
+          memberForm: ((row['memberForm'] as string) || undefined) as LogicalSymbol['memberForm'],
+        }),
+      )
+      .sort(compareLogicalSymbols)
+  }
+
+  /**
+   * Finds declaration occurrences for logical targets.
+   * @param logicalSymbolIds - Logical target ids.
+   * @returns Their declaration occurrences in canonical order.
+   */
+  async findDeclarations(logicalSymbolIds: readonly string[]): Promise<LogicalDeclaration[]> {
+    this.ensureOpen()
+    if (logicalSymbolIds.length === 0) return []
+    const rows = await execPrepared(
+      this.conn!,
+      `MATCH (n:LogicalDeclaration) WHERE n.logicalSymbolId IN $ids
+       RETURN n.logicalSymbolId AS logicalSymbolId, n.symbolId AS symbolId, n.filePath AS filePath, n.line AS line, n.columnNumber AS columnNumber, n.endLine AS endLine, n.endColumn AS endColumn, n.kind AS kind`,
+      { ids: [...new Set(logicalSymbolIds)] },
+    )
+    return rows
+      .map(
+        (row): LogicalDeclaration => ({
+          logicalSymbolId: row['logicalSymbolId'] as string,
+          declaration: {
+            logicalId: row['logicalSymbolId'] as string,
+            symbolId: row['symbolId'] as string,
+            location: {
+              filePath: row['filePath'] as string,
+              line: Number(row['line']),
+              column: Number(row['columnNumber']),
+              endLine: Number(row['endLine']),
+              endColumn: Number(row['endColumn']),
+            },
+            kind: row['kind'] as LogicalDeclaration['declaration']['kind'],
+          },
+        }),
+      )
+      .sort(compareLogicalDeclarations)
+  }
+
+  /**
+   * Finds public bindings matching public route keys.
+   * @param lookups - Public route keys.
+   * @returns Matched public bindings in canonical order.
+   */
+  async findPublicBindings(lookups: readonly PublicBindingLookup[]): Promise<PublicBinding[]> {
+    this.ensureOpen()
+    const results = new Map<string, PublicBinding>()
+    for (const lookup of lookups) {
+      const rows = await execPrepared(
+        this.conn!,
+        `MATCH (n:PublicBinding {surface: $surface, exportedName: $exportedName})
+         WHERE ($space = '' OR n.space = $space)
+         RETURN n.id AS id, n.surface AS surface, n.exportedName AS exportedName, n.space AS space, n.targetId AS targetId`,
+        { surface: lookup.surface, exportedName: lookup.exportedName, space: lookup.space ?? '' },
+      )
+      for (const row of rows) {
+        const binding: PublicBinding = {
+          id: row['id'] as string,
+          surface: row['surface'] as string,
+          exportedName: row['exportedName'] as string,
+          space: row['space'] as PublicBinding['space'],
+          targetId: (row['targetId'] as string) || undefined,
+        }
+        results.set(binding.id, binding)
+      }
+    }
+    return [...results.values()].sort(comparePublicBindings)
+  }
+
+  /**
+   * Finds public bindings by exported spelling across all public surfaces.
+   * @param exportedNames - Exported spellings.
+   * @returns Matched public bindings in canonical order.
+   */
+  async findPublicBindingsByExportedNames(
+    exportedNames: readonly string[],
+  ): Promise<PublicBinding[]> {
+    this.ensureOpen()
+    const results = new Map<string, PublicBinding>()
+    for (const exportedName of new Set(exportedNames)) {
+      const rows = await execPrepared(
+        this.conn!,
+        `MATCH (n:PublicBinding {exportedName: $exportedName})
+         RETURN n.id AS id, n.surface AS surface, n.exportedName AS exportedName, n.space AS space, n.targetId AS targetId`,
+        { exportedName },
+      )
+      for (const row of rows) {
+        const binding: PublicBinding = {
+          id: row['id'] as string,
+          surface: row['surface'] as string,
+          exportedName: row['exportedName'] as string,
+          space: row['space'] as PublicBinding['space'],
+          targetId: (row['targetId'] as string) || undefined,
+        }
+        results.set(binding.id, binding)
+      }
+    }
+    return [...results.values()].sort(comparePublicBindings)
+  }
+
+  /**
+   * Finds local bindings matching lexical lookup keys.
+   * @param lookups - Lexical binding keys.
+   * @returns Matched local bindings in canonical order.
+   */
+  async findLocalBindings(lookups: readonly LocalBindingLookup[]): Promise<LocalBinding[]> {
+    this.ensureOpen()
+    const results = new Map<string, LocalBinding>()
+    for (const lookup of lookups) {
+      const rows = await execPrepared(
+        this.conn!,
+        `MATCH (n:LocalBinding {filePath: $filePath, localName: $localName})
+         WHERE ($scopeId = '' OR n.scopeId = $scopeId) AND ($space = '' OR n.space = $space)
+         RETURN n.id AS id, n.filePath AS filePath, n.scopeId AS scopeId, n.localName AS localName, n.space AS space, n.targetId AS targetId`,
+        {
+          filePath: lookup.filePath,
+          localName: lookup.localName,
+          scopeId: lookup.scopeId ?? '',
+          space: lookup.space ?? '',
+        },
+      )
+      for (const row of rows) {
+        const binding: LocalBinding = {
+          id: row['id'] as string,
+          filePath: row['filePath'] as string,
+          scopeId: row['scopeId'] as string,
+          localName: row['localName'] as string,
+          space: row['space'] as LocalBinding['space'],
+          targetId: (row['targetId'] as string) || undefined,
+        }
+        results.set(binding.id, binding)
+      }
+    }
+    return [...results.values()].sort(compareLocalBindings)
+  }
+
+  /**
+   * Finds provenance steps by source identity.
+   * @param fromIds - Provenance source ids.
+   * @returns Matching resolution steps in canonical order.
+   */
+  async findResolutionSteps(fromIds: readonly string[]): Promise<ResolutionStep[]> {
+    this.ensureOpen()
+    if (fromIds.length === 0) return []
+    const rows = await execPrepared(
+      this.conn!,
+      `MATCH (n:ResolutionStep) WHERE n.fromId IN $ids RETURN n.fromId AS fromId, n.toId AS toId, n.kind AS kind`,
+      { ids: [...new Set(fromIds)] },
+    )
+    return rows
+      .map((row) => ({
+        fromId: row['fromId'] as string,
+        toId: row['toId'] as string,
+        kind: row['kind'] as string,
+      }))
+      .sort(compareResolutionSteps)
+  }
+
+  /**
+   * Finds current index coverage evidence by source path.
+   * @param filePaths - Indexed source paths.
+   * @returns Matching coverage evidence in path order.
+   */
+  async findIndexCoverage(filePaths: readonly string[]): Promise<IndexCoverage[]> {
+    this.ensureOpen()
+    if (filePaths.length === 0) return []
+    const rows = await execPrepared(
+      this.conn!,
+      `MATCH (n:IndexCoverage) WHERE n.filePath IN $paths
+       RETURN n.filePath AS filePath, n.contentHash AS contentHash, n.status AS status, n.reason AS reason, n.capabilitiesJson AS capabilitiesJson`,
+      { paths: [...new Set(filePaths)] },
+    )
+    return rows
+      .map(
+        (row): IndexCoverage => ({
+          filePath: row['filePath'] as string,
+          contentHash: (row['contentHash'] as string) || undefined,
+          status: row['status'] as IndexCoverage['status'],
+          reason: (row['reason'] as string) || undefined,
+          capabilities: JSON.parse(row['capabilitiesJson'] as string) as string[],
+        }),
+      )
+      .sort((left, right) => left.filePath.localeCompare(right.filePath))
+  }
+
+  /**
+   * Returns all persisted coverage evidence in deterministic path order.
+   * @returns Every coverage fact ordered by file path.
+   */
+  async getAllIndexCoverage(): Promise<IndexCoverage[]> {
+    this.ensureOpen()
+    const rows = await execPrepared(
+      this.conn!,
+      `MATCH (n:IndexCoverage)
+       RETURN n.filePath AS filePath, n.contentHash AS contentHash, n.status AS status, n.reason AS reason, n.capabilitiesJson AS capabilitiesJson
+       ORDER BY filePath`,
+      {},
+    )
+    return rows.map(
+      (row): IndexCoverage => ({
+        filePath: row['filePath'] as string,
+        contentHash: (row['contentHash'] as string) || undefined,
+        status: row['status'] as IndexCoverage['status'],
+        reason: (row['reason'] as string) || undefined,
+        capabilities: JSON.parse(row['capabilitiesJson'] as string) as string[],
+      }),
+    )
   }
 
   /**
@@ -875,7 +2012,7 @@ export class LadybugGraphStore extends GraphStore {
     this.ensureOpen()
     const rows = await execPrepared(
       this.conn!,
-      `MATCH (s:Symbol {id: $id}) RETURN s.id AS id, s.name AS name, s.kind AS kind, s.filePath AS filePath, s.parentId AS parentId, s.line AS line, s.col AS col, s.comment AS comment`,
+      `MATCH (s:Symbol {id: $id}) RETURN s.id AS id, s.name AS name, s.kind AS kind, s.filePath AS filePath, s.parentId AS parentId, s.line AS line, s.col AS col, s.endLine AS endLine, s.endCol AS endCol, s.selectionStartLine AS selectionStartLine, s.selectionStartCol AS selectionStartCol, s.selectionEndLine AS selectionEndLine, s.selectionEndCol AS selectionEndCol, s.comment AS comment`,
       { id },
     )
     if (rows.length === 0 || !rows[0]) return undefined
@@ -984,6 +2121,37 @@ export class LadybugGraphStore extends GraphStore {
   }
 
   /**
+   * Finds direct importer and symbol-relation dependents in a bounded query set.
+   * @param filePaths - Target file identities.
+   * @returns Sorted dependent file identities.
+   */
+  async findDirectlyAffectedFiles(filePaths: readonly string[]): Promise<string[]> {
+    this.ensureOpen()
+    const paths = [...new Set(filePaths)]
+    if (paths.length === 0) return []
+    const relationTypes = ['CALLS', 'CONSTRUCTS', 'USES_TYPE', 'EXTENDS', 'IMPLEMENTS', 'OVERRIDES']
+    const [importRows, ...symbolRowBatches] = await Promise.all([
+      execPrepared(
+        this.conn!,
+        'MATCH (source:File)-[:IMPORTS]->(target:File) WHERE target.path IN $paths RETURN DISTINCT source.path AS filePath',
+        { paths },
+      ),
+      ...relationTypes.map((relationType) =>
+        execPrepared(
+          this.conn!,
+          `MATCH (source:Symbol)-[:${relationType}]->(target:Symbol) WHERE target.filePath IN $paths RETURN DISTINCT source.filePath AS filePath`,
+          { paths },
+        ),
+      ),
+    ])
+    return [
+      ...new Set(
+        [...importRows, ...symbolRowBatches.flat()].map((row) => row['filePath'] as string),
+      ),
+    ].sort()
+  }
+
+  /**
    * Returns all incoming EXTENDS relations targeting the given type symbol.
    * @param symbolId - The type symbol identifier.
    * @returns Incoming EXTENDS relations.
@@ -1046,7 +2214,7 @@ export class LadybugGraphStore extends GraphStore {
     this.ensureOpen()
     const rows = await execPrepared(
       this.conn!,
-      `MATCH (f:File {path: $filePath})-[:EXPORTS]->(s:Symbol) RETURN s.id AS id, s.name AS name, s.kind AS kind, s.filePath AS filePath, s.parentId AS parentId, s.line AS line, s.col AS col, s.comment AS comment`,
+      `MATCH (f:File {path: $filePath})-[:EXPORTS]->(s:Symbol) RETURN s.id AS id, s.name AS name, s.kind AS kind, s.filePath AS filePath, s.parentId AS parentId, s.line AS line, s.col AS col, s.endLine AS endLine, s.endCol AS endCol, s.selectionStartLine AS selectionStartLine, s.selectionStartCol AS selectionStartCol, s.selectionEndLine AS selectionEndLine, s.selectionEndCol AS selectionEndCol, s.comment AS comment`,
       { filePath },
     )
     return rows.map((r) => this.rowToSymbol(r))
@@ -1137,6 +2305,30 @@ export class LadybugGraphStore extends GraphStore {
   }
 
   /**
+   * Returns file coverage for many targets in one backend query.
+   * @param filePaths - Canonical file paths.
+   * @returns Deterministically ordered coverage relations.
+   */
+  async getCoveringSpecsForFiles(filePaths: readonly string[]): Promise<Relation[]> {
+    this.ensureOpen()
+    const targets = [...new Set(filePaths)].sort()
+    if (targets.length === 0) return []
+    const rows = await execPrepared(
+      this.conn!,
+      `MATCH (s:Spec)-[r:COVERS_FILE]->(f:File) WHERE f.path IN $targets RETURN s.specId AS source, f.path AS target, r.metadata_json AS metadata_json ORDER BY source, target`,
+      { targets },
+    )
+    return rows.map((row) => ({
+      source: row['source'] as string,
+      target: row['target'] as string,
+      type: RT.CoversFile as RelationType,
+      metadata: row['metadata_json']
+        ? (JSON.parse(row['metadata_json'] as string) as Record<string, unknown>)
+        : undefined,
+    }))
+  }
+
+  /**
    * Returns symbol coverage relations for a spec from the Ladybug backend.
    * @param specId - Spec identifier.
    * @returns Symbol coverage relations.
@@ -1176,6 +2368,30 @@ export class LadybugGraphStore extends GraphStore {
       type: RT.CoversSymbol as RelationType,
       metadata: r['metadata_json']
         ? (JSON.parse(r['metadata_json'] as string) as Record<string, unknown>)
+        : undefined,
+    }))
+  }
+
+  /**
+   * Returns symbol coverage for many targets in one backend query.
+   * @param symbolIds - Symbol identifiers.
+   * @returns Deterministically ordered coverage relations.
+   */
+  async getCoveringSpecsForSymbols(symbolIds: readonly string[]): Promise<Relation[]> {
+    this.ensureOpen()
+    const targets = [...new Set(symbolIds)].sort()
+    if (targets.length === 0) return []
+    const rows = await execPrepared(
+      this.conn!,
+      `MATCH (s:Spec)-[r:COVERS_SYMBOL]->(sym:Symbol) WHERE sym.id IN $targets RETURN s.specId AS source, sym.id AS target, r.metadata_json AS metadata_json ORDER BY source, target`,
+      { targets },
+    )
+    return rows.map((row) => ({
+      source: row['source'] as string,
+      target: row['target'] as string,
+      type: RT.CoversSymbol as RelationType,
+      metadata: row['metadata_json']
+        ? (JSON.parse(row['metadata_json'] as string) as Record<string, unknown>)
         : undefined,
     }))
   }
@@ -1245,7 +2461,7 @@ export class LadybugGraphStore extends GraphStore {
     const where = conditions.length > 0 ? ` WHERE ${conditions.join(' AND ')}` : ''
     const rows = await execPrepared(
       this.conn!,
-      `MATCH (s:Symbol)${where} RETURN s.id AS id, s.name AS name, s.kind AS kind, s.filePath AS filePath, s.parentId AS parentId, s.line AS line, s.col AS col, s.comment AS comment`,
+      `MATCH (s:Symbol)${where} RETURN s.id AS id, s.name AS name, s.kind AS kind, s.filePath AS filePath, s.parentId AS parentId, s.line AS line, s.col AS col, s.endLine AS endLine, s.endCol AS endCol, s.selectionStartLine AS selectionStartLine, s.selectionStartCol AS selectionStartCol, s.selectionEndLine AS selectionEndLine, s.selectionEndCol AS selectionEndCol, s.comment AS comment`,
       params,
     )
     return rows.map((r) => this.rowToSymbol(r))
@@ -1430,48 +2646,34 @@ export class LadybugGraphStore extends GraphStore {
     }
 
     const where = conditions.length > 0 ? ` WHERE ${conditions.join(' AND ')}` : ''
+    const projection =
+      'node.id AS id, node.name AS name, node.kind AS kind, node.filePath AS filePath, node.parentId AS parentId, node.line AS line, node.col AS col, node.endLine AS endLine, node.endCol AS endCol, node.selectionStartLine AS selectionStartLine, node.selectionStartCol AS selectionStartCol, node.selectionEndLine AS selectionEndLine, node.selectionEndCol AS selectionEndCol, node.comment AS comment'
     const rows = await execPrepared(
       this.conn!,
-      `CALL QUERY_FTS_INDEX('Symbol', 'symbol_fts', $query, k := 1000)${where} RETURN node.id AS id, node.name AS name, node.kind AS kind, node.filePath AS filePath, node.parentId AS parentId, node.line AS line, node.col AS col, node.comment AS comment, score AS nativeScore LIMIT 1000`,
+      `CALL QUERY_FTS_INDEX('Symbol', 'symbol_fts', $query, k := 1000)${where} RETURN ${projection}, score AS nativeScore LIMIT 1000`,
       params,
     )
 
+    // FTS supplies exact and prefix candidates. A bounded structured-name lane
+    // preserves suffix/substring discovery without loading every symbol into JS.
+    const structuredParams: Record<string, LbugValue> = {
+      ...params,
+      normalizedName: query.normalizedQuery,
+    }
+    const structuredConditions = [...conditions, 'lower(node.name) CONTAINS $normalizedName']
+    const structuredRows = await execPrepared(
+      this.conn!,
+      `MATCH (node:Symbol) WHERE ${structuredConditions.join(' AND ')} RETURN ${projection}, 0.0 AS nativeScore LIMIT 1000`,
+      structuredParams,
+    )
+
     const candidates = new Map<string, { symbol: SymbolNode; nativeScore: number }>()
-    for (const r of rows) {
+    for (const r of [...rows, ...structuredRows]) {
       const symbol = this.rowToSymbol(r)
       candidates.set(symbol.id, {
         symbol,
         nativeScore: Number(r['nativeScore'] ?? 0),
       })
-    }
-
-    const allSymbols = await this.findSymbols({})
-    for (const symbol of allSymbols) {
-      if (candidates.has(symbol.id)) continue
-      if (
-        options.kinds &&
-        options.kinds.length > 0 &&
-        !options.kinds.includes(symbol.kind as never)
-      ) {
-        continue
-      }
-      if (options.filePattern !== undefined) {
-        const pattern = new RegExp(
-          '^' + options.filePattern.replaceAll('.', '\\.').replaceAll('*', '.*') + '$',
-          'i',
-        )
-        if (!pattern.test(symbol.filePath)) continue
-      }
-      if (options.workspace !== undefined && !symbol.filePath.startsWith(options.workspace + ':')) {
-        continue
-      }
-      if (matchesExclude(symbol.filePath, options.excludePaths, options.excludeWorkspaces)) {
-        continue
-      }
-      if (!matchesExpandedIdentity(query.expandedTokens, symbol.id, symbol.name)) {
-        continue
-      }
-      candidates.set(symbol.id, { symbol, nativeScore: 0 })
     }
 
     const results: Array<{
@@ -1487,7 +2689,7 @@ export class LadybugGraphStore extends GraphStore {
           normalizedQuery: query.normalizedQuery,
           rawTokens: query.rawTokens,
           expandedTokens: query.expandedTokens,
-          canonicalIdentity: symbol.id,
+          canonicalIdentity: symbol.name,
           alternateIdentity: symbol.name,
           nativeScore,
         }),
@@ -1740,6 +2942,83 @@ export class LadybugGraphStore extends GraphStore {
   }
 
   /**
+   * Returns a deterministic page of source-content candidates.
+   * @param query - Expanded source query and filters.
+   * @returns Filtered candidate page for Code Graph verification.
+   */
+  async searchSourceContentCandidates(
+    query: SourceContentCandidateQuery,
+  ): Promise<SourceContentCandidatePage> {
+    this.ensureOpen()
+    const terms = [
+      ...new Set(
+        [query.normalizedQuery, ...query.rawTerms, ...query.expandedTerms]
+          .map((term) => term.toLowerCase())
+          .filter((term) => term.length > 0),
+      ),
+    ]
+    const requestedLimit = Number.isSafeInteger(query.limit) ? Math.max(0, query.limit) : 0
+    if (terms.length === 0 || requestedLimit === 0) return { candidates: [] }
+
+    const usesShortQueryFallback = terms.some((term) => term.length < 3)
+    const pageLimit = usesShortQueryFallback ? Math.min(requestedLimit, 512) : requestedLimit
+    const parsedOffset = Number.parseInt(query.cursor ?? '0', 10)
+    const offset = Number.isSafeInteger(parsedOffset) && parsedOffset >= 0 ? parsedOffset : 0
+    const fetchLimit = pageLimit + 1
+    const params: Record<string, LbugValue> = {}
+    const conditions: string[] = []
+
+    if (query.workspace !== undefined) {
+      params.workspace = query.workspace
+      conditions.push('node.workspace = $workspace')
+    }
+    if (query.filePattern !== undefined) {
+      params.filePattern = globToLadybugRegex(query.filePattern)
+      conditions.push('node.path =~ $filePattern')
+    }
+    query.excludePaths?.forEach((pattern, index) => {
+      const key = `excludePath${index}`
+      params[key] = globToLadybugRegex(pattern)
+      conditions.push(`NOT node.path =~ $${key}`)
+    })
+    query.excludeWorkspaces?.forEach((workspace, index) => {
+      const key = `excludeWorkspace${index}`
+      params[key] = `${workspace}:`
+      conditions.push(`NOT starts_with(node.path, $${key})`)
+    })
+
+    const termPredicates = terms.map((term, index) => {
+      const key = `term${index}`
+      params[key] = term
+      return `lower(node.content) CONTAINS $${key}`
+    })
+    conditions.push(`(${termPredicates.join(' OR ')})`)
+    const where = ` WHERE ${conditions.join(' AND ')}`
+    const source = usesShortQueryFallback
+      ? 'MATCH (node:File)'
+      : `CALL QUERY_FTS_INDEX('File', 'file_content_fts', $ftsQuery, k := ${offset + fetchLimit})`
+    const scoreExpression = usesShortQueryFallback ? '1' : 'score'
+    if (!usesShortQueryFallback) {
+      params.ftsQuery = sanitizeFtsQuery(terms)
+    }
+
+    const rows = await execPrepared(
+      this.conn!,
+      `${source}${where} RETURN node.path AS path, node.configRelativePath AS configRelativePath, node.language AS language, node.contentHash AS contentHash, node.workspace AS workspace, node.content AS content, ${scoreExpression} AS backendScore ORDER BY backendScore DESC, path ASC SKIP ${offset} LIMIT ${fetchLimit}`,
+      params,
+    )
+    const hasNextPage = rows.length > pageLimit
+    const candidates = rows.slice(0, pageLimit).map((row) => ({
+      file: this.rowToFile(row),
+      backendScore: Number(row['backendScore']),
+    }))
+    return {
+      candidates,
+      ...(hasNextPage ? { nextCursor: String(offset + candidates.length) } : {}),
+    }
+  }
+
+  /**
    * Returns all (symbol, caller) pairs in the graph for batch hotspot scoring.
    * @returns An array of objects containing the target symbol and the caller's file path.
    */
@@ -1747,7 +3026,7 @@ export class LadybugGraphStore extends GraphStore {
     this.ensureOpen()
     const rows = await exec(
       this.conn!,
-      `MATCH (caller:Symbol)-[:CALLS|CONSTRUCTS|USES_TYPE]->(s:Symbol) RETURN s.id AS id, s.name AS name, s.kind AS kind, s.filePath AS filePath, s.parentId AS parentId, s.line AS line, s.col AS col, s.comment AS comment, caller.filePath AS callerFilePath`,
+      `MATCH (caller:Symbol)-[:CALLS|CONSTRUCTS|USES_TYPE]->(s:Symbol) RETURN s.id AS id, s.name AS name, s.kind AS kind, s.filePath AS filePath, s.parentId AS parentId, s.line AS line, s.col AS col, s.endLine AS endLine, s.endCol AS endCol, s.selectionStartLine AS selectionStartLine, s.selectionStartCol AS selectionStartCol, s.selectionEndLine AS selectionEndLine, s.selectionEndCol AS selectionEndCol, s.comment AS comment, caller.filePath AS callerFilePath`,
     )
     return rows.map((r) => ({
       symbol: this.rowToSymbol(r),
@@ -1805,6 +3084,8 @@ export class LadybugGraphStore extends GraphStore {
     await conn.query('MATCH (d:Document) DELETE d')
     await conn.query('MATCH (s:Symbol) DELETE s')
     await conn.query('MATCH (s:Spec) DELETE s')
+    await conn.query('MATCH (o:IndexedInputObservation) DELETE o')
+    await conn.query('MATCH (l:FreshnessLatch) DELETE l')
     await conn.query('MATCH (m:Meta) DELETE m')
     await this.rebuildFtsIndexes()
     this._lastIndexedAt = undefined
@@ -2002,6 +3283,27 @@ export class LadybugGraphStore extends GraphStore {
   }
 
   /**
+   * Replaces one freshness latch within a caller-owned connection.
+   * @param conn - Caller-owned Ladybug connection.
+   * @param workspace - Workspace or aggregate latch identity.
+   * @param knownStale - Latch value to persist.
+   */
+  private async setFreshnessLatch(
+    conn: Connection,
+    workspace: string,
+    knownStale: boolean,
+  ): Promise<void> {
+    await runPrepared(conn, 'MATCH (l:FreshnessLatch {workspace: $workspace}) DELETE l', {
+      workspace,
+    })
+    await runPrepared(
+      conn,
+      'CREATE (l:FreshnessLatch {workspace: $workspace, knownStale: $knownStale})',
+      { workspace, knownStale },
+    )
+  }
+
+  /**
    * Extracts a match-centered snippet from text.
    * @param text - The full text.
    * @param terms - The search terms.
@@ -2074,6 +3376,14 @@ export class LadybugGraphStore extends GraphStore {
       filePath: row['filePath'] as string,
       line: Number(row['line']),
       column: Number(row['col']),
+      endLine: Number(row['endLine']),
+      endColumn: Number(row['endCol']),
+      selectionRange: {
+        startLine: Number(row['selectionStartLine']),
+        startColumn: Number(row['selectionStartCol']),
+        endLine: Number(row['selectionEndLine']),
+        endColumn: Number(row['selectionEndCol']),
+      },
       parentId: (row['parentId'] as string) || undefined,
       comment: (row['comment'] as string) || undefined,
     }

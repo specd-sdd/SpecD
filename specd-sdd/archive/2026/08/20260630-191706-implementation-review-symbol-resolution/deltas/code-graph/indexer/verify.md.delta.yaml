@@ -1,0 +1,95 @@
+- op: added
+  position: { parent: { type: section, matches: 'Requirements' } }
+  content: |
+    ### Requirement: Reference fact indexing
+
+    #### Scenario: Index run persists reference and coverage evidence
+
+    - **GIVEN** files contain overloads, reexports, shadowed aliases, hierarchy, parse failure, and ambiguous coverage links
+    - **WHEN** two-pass indexing completes
+    - **THEN** proven logical/binding/hierarchy facts and per-file outcomes are atomic
+    - **AND** guessed `COVERS_SYMBOL` relations are absent
+
+    #### Scenario: High-cardinality relation construction remains bounded
+
+    - **GIVEN** an indexing session with thousands of declarations, imports, calls, and re-export routes
+    - **WHEN** Pass 2 builds dependency and public-binding relations
+    - **THEN** declaration, logical-symbol, import, symbol, and binding indexes are built once for the session or file
+    - **AND** resolving each relation uses indexed lookup instead of scanning all declarations, logical symbols, or public bindings
+    - **AND** relation persistence remains chunked and deduplicated
+
+    #### Scenario: Source content and symbol ranges are indexed atomically
+
+    - **GIVEN** a source file contains multi-line named declarations and searchable body text
+    - **WHEN** indexing completes
+    - **THEN** FileNode content, complete construct ranges, declared-name selection ranges, and semantic facts are committed in the same generation
+    - **AND** source-content candidates are available without reading the live filesystem
+
+    ### Requirement: Incompatible derivation rebuild
+
+    #### Scenario: Incompatibility triggers visible full rebuild
+
+    - **GIVEN** schema or derivation mismatch
+    - **WHEN** project indexing runs
+    - **THEN** generation rotates, all source is re-extracted, and the result reports the reason
+
+    #### Scenario: Full rebuild prepares every search index once
+
+    - **WHEN** incompatible derivation forces a rebuild
+    - **THEN** semantic and source-content indexes are rebuilt after the single committed bulk session
+    - **AND** no partially indexed generation becomes readable
+
+    ### Requirement: Indexed-input observation capture
+
+    #### Scenario: Indexing records every semantic input
+
+    - **GIVEN** files, documents, aggregate specs, and repository-backed inputs are indexed
+    - **WHEN** the bulk generation commits
+    - **THEN** observations record logical identity, non-absolute locator, content hash, and available mtime, size, or revision evidence
+    - **AND** workspace and aggregate stale latches are cleared only after success
+
+    ### Requirement: Bounded incremental relation construction
+
+    #### Scenario: Incremental relation work is proportional to affected evidence
+
+    - **GIVEN** a small changed-file set in a large graph
+    - **WHEN** incremental relation construction runs
+    - **THEN** reusable declaration, import, symbol, hierarchy, and binding indexes avoid full candidate scans per relation
+    - **AND** Store validation and hierarchy operations are batched
+    - **AND** persistence remains bounded, deduplicated, and part of the single bulk session
+
+    #### Scenario: A small semantic change processes only its affected closure
+
+    - **GIVEN** one source changes in a large graph containing importers, relation or hierarchy dependents, and unrelated files
+    - **WHEN** the indexer updates the atomic semantic subgraph
+    - **THEN** only the changed source and its transitive affected closure are re-extracted
+    - **AND** unrelated files retain their persisted nodes, relations, and reference facts without adapter work
+    - **AND** changed/skipped counts remain accurate and incremental output equals a full index of the same source state
+    - **AND** the result exposes counts and timings for import resolution, dependency facts, adapter relations, re-exports, hierarchy/overrides, persistence, and search-index rebuilding
+
+    #### Scenario: A newly added target repairs imports absent from native storage
+
+    - **GIVEN** a native graph store omitted an import relation because its target file did not exist
+    - **WHEN** that target file is added during an ordinary incremental run
+    - **THEN** existing code files are conservatively re-extracted so the importer relation is created
+    - **AND** unchanged files remain counted as skipped rather than content-indexed
+    - **AND** the run does not perform a destructive full rebuild
+
+    #### Scenario: Unchanged targets avoid semantic and search rebuild work
+
+    - **GIVEN** an indexed corpus includes code, documents, and an unsupported non-text target with persisted coverage hash
+    - **WHEN** the same source state is indexed again
+    - **THEN** every target is reported skipped and zero files are processed
+    - **AND** relation phase counts are zero
+    - **AND** no search-index rebuild is requested
+    - **AND** matching persisted mtime/size observations avoid rereading unchanged textual content
+    - **AND** no reference-fact write or replacement operation is invoked
+    - **AND** logical declarations and public/local bindings are byte-for-byte equivalent before and after the unchanged run
+
+    #### Scenario: Persistence and search timing are disjoint
+
+    - **GIVEN** one run that rebuilds search indexes and a second fully unchanged run
+    - **WHEN** phase metrics are returned
+    - **THEN** persistence includes all non-search transactional work
+    - **AND** search-index timing covers only the backend search-index step in the changed run
+    - **AND** the unchanged run reports zero search-index items and zero search-index duration

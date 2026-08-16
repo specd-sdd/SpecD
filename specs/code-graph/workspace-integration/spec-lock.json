@@ -4,44 +4,39 @@
     "version": 1
   },
   "dependsOn": ["core:config"],
-  "implementation": [
-    {
-      "file": "code-graph:src/application/use-cases/index-code-graph.ts",
-      "symbols": ["IndexCodeGraph"]
-    }
-  ],
+  "implementation": [],
   "optimizations": {
     "optimizedDescription": {
-      "value": "Indexes workspace code and specs into one graph with collision-free identities, config-relative lookup, and cross-workspace resolution.",
+      "value": "Indexes multi-workspace code and specs into unified graph with collision-free identities, config-relative lookups, and cross-workspace resolution.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:136d5c15c32a721fca02733c38bdf3d397d05bde8171412efdac7b02d69ef384",
-          "lastModified": "2026-07-23T00:34:57.232Z"
+          "hash": "sha256:4869ca3b8ea71cfff6c36ae603e3843bde45fec3da94a951db18dcd4bafe39d3",
+          "lastModified": "2026-08-16T08:12:48.299Z"
         },
         "verify.md": {
-          "hash": "sha256:f637ae8331d07a7bbd073990099a9515844adfc710cf386dad66f7740c15b0e9",
-          "lastModified": "2026-07-23T00:34:57.232Z"
+          "hash": "sha256:2b226d4b01784fdbe8ce88a2b2ccbd5f4a40a1194efdd7348692d72c01512e74",
+          "lastModified": "2026-08-16T08:12:48.302Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# Workspace Integration\n\n## Rules\n\n### Identity and lookup\n- Files/documents MUST use globally unique identity:\n  - Workspace: `{workspaceName}:{relativeToCodeRoot}` (example `core:src/index.ts`).\n  - Project-global `graph.includePaths` outside workspaces: reserved `root:{projectRelativePath}`.\n- Workspace `codeRoot` ownership wins over `root:`; physical file MUST NOT have both identities.\n- `path` remains canonical identity for `SymbolNode.filePath`, symbol IDs, relations.\n- Every node MUST store `configRelativePath`, relative to active `specd.yaml` directory; forward slashes, no leading `./`; outside files may contain `..`.\n- CLI file selectors MAY resolve unprefixed config-relative paths; canonical identity unchanged.\n- `SymbolNode.id = {filePath}:{kind}:{name}:{line}:{column}`.\n- `SpecNode.workspace: string` MUST identify owning workspace. Spec IDs follow `{workspace}:{specPath}`; prefix comes from workspace `specd.yaml` configuration.\n\n### Discovery and specs\n- For each workspace `codeRoot`, discover from absolute `SpecdWorkspaceConfig.codeRoot`; prefix stored paths with workspace name.\n- `discoverFiles` accepts root and emits root-relative paths; remains workspace-unaware.\n- Index specs directly from each orchestrated workspace `SpecRepository`:\n  1. identities: `repo.list()`;\n  2. freshness: `repo.persistedStateHash()` (formerly `specHash`);\n  3. content: `repo.artifact()` for `spec.artifacts[].filename` only; exclude metadata/lock sidecars; concatenate `spec.md` first when present, then remaining filenames alphabetically;\n  4. metadata: `repo.metadata()`; when `null`, default title=`specId`, description=`''`, `dependsOn=[]`; never parse `spec.md` fallback;\n  5. dependencies: `repo.readPersistedDependsOn()`;\n  6. coverage: `repo.readPersistedImplementation()`.\n- Indexer MUST NOT rely on CLI-precomputed semantics/callbacks.\n\n### Cross-workspace resolution\n- Pass 2 resolves relative imports within workspace; package imports via `packageName → workspaceName` from `LanguageAdapter.getPackageIdentity`; PHP qualified names globally.\n- `SymbolIndex` MUST contain all workspace symbols before Pass 2.\n\n### Index contract\n- `IndexOptions` SHALL contain `projectRoot: string`, `workspaces: readonly ProjectWorkspace[]`, `graphConfig: ProjectGraphConfig`, optional `onProgress: IndexProgressCallback`, `chunkBytes: number`, `vcsRef: string`, and `vcsRoot: string | null`.\n- `ProjectGraphConfig`: optional `includePaths`, `excludePaths`; optional workspace map with `allowedPaths`, `excludePaths`, `respectGitignore`.\n- Remove `WorkspaceIndexTarget.specs` callback; pull from each `ProjectWorkspace` repository.\n- CLI/MCP maps `SpecdConfig.graph` into `ProjectGraphConfig`.\n- `IndexResult.workspaces` SHALL contain `WorkspaceIndexBreakdown[]`; each: `name`, `filesDiscovered`, `filesIndexed`, `filesSkipped`, `filesRemoved`, `specsDiscovered`, `specsIndexed`.\n\n### `.gitignore`\n- Per-workspace `respectGitignore` defaults `true`.\n- True + non-null `vcsRoot`: load root and nested `.gitignore`; apply relative to containing directory; gitignore exclusion overrides `excludePaths` re-inclusion.\n- Null `vcsRoot`: do not load repository-root `.gitignore`; MUST NOT probe `.git/`, `.hg/`, `.svn/`.\n- False: ignore all `.gitignore`; only `excludePaths` controls exclusion.\n\n## Constraints\n\n- `@specd/code-graph` runtime-depends on `@specd/core`.\n- One `.specd/code-graph.lbug` per project.\n- `discoverFiles` workspace-agnostic; indexer owns prefix and `configRelativePath`.\n- Spec resolution exclusively via `SpecRepository`; no filesystem fallback.\n- File identity metadata changes, including `configRelativePath`, require full rebuild; existing stores incompatible.",
+      "value": "# Workspace Integration\n\n## Rules\n\n- Identity & lookup:\n  - File/Document ID: `{workspaceName}:{relativeToCodeRoot}` (e.g. `core:src/index.ts`); project-global resources outside workspaces use `root:{projectRelativePath}`. Workspace `codeRoot` wins over `root:`.\n  - `SymbolNode.id`: `{filePath}:{kind}:{name}:{line}:{column}`.\n  - `SpecNode.workspace`: workspace name string (e.g. `core`, `_global`). Spec ID format: `{workspace}:{specPath}`.\n  - `configRelativePath`: path relative to active `specd.yaml` directory (forward slashes, no leading `./`); supports unprefixed CLI file selectors.\n- Discovery & Specs:\n  - Discover code from `SpecdWorkspaceConfig.codeRoot`; `discoverFiles` returns root-relative paths, indexer applies workspace prefix.\n  - Index specs directly via workspace `SpecRepository`: `repo.list()`, `repo.persistedStateHash()`, concatenate artifacts from `repo.artifact()` (`spec.md` first, then alphabetical), `repo.metadata()` (title, description), `repo.readPersistedDependsOn()`, `repo.readPersistedImplementation()`. No pre-computed CLI callbacks.\n- Cross-workspace import resolution:\n  - Pass 2 resolves relative imports within workspace; package imports via `packageName → workspaceName` (`LanguageAdapter.getPackageIdentity`); PHP qualified names globally. `SymbolIndex` holds all workspace symbols before Pass 2.\n- Index contract:\n  - `IndexOptions`: `projectRoot`, `workspaces: readonly ProjectWorkspace[]`, `graphConfig: ProjectGraphConfig`, `onProgress`, `chunkBytes`, `vcsRef`, `vcsRoot: string | null`. `specs` callback on `WorkspaceIndexTarget` removed.\n  - `IndexResult`: includes `workspaces: readonly WorkspaceIndexBreakdown[]` (`name`, `filesDiscovered`, `filesIndexed`, `filesSkipped`, `filesRemoved`, `specsDiscovered`, `specsIndexed`).\n- `.gitignore` handling:\n  - `respectGitignore: true` + non-null `vcsRoot`: load root and nested `.gitignore`; gitignore exclusion has absolute priority over `excludePaths`.\n  - Null `vcsRoot`: skip root `.gitignore`; MUST NOT probe VCS directory markers (`.git/`, `.hg/`, `.svn/`).\n  - `respectGitignore: false`: skip all `.gitignore` files; only `excludePaths` applies.\n\n## Constraints\n\n- `@specd/code-graph` depends on `@specd/core`.\n- Single `.specd/code-graph.lbug` database per project.\n- `discoverFiles` workspace-agnostic; indexer owns prefixing and `configRelativePath`.\n- Spec resolution exclusively via `SpecRepository`; no filesystem fallback.\n- File identity changes require full graph rebuild.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:136d5c15c32a721fca02733c38bdf3d397d05bde8171412efdac7b02d69ef384",
-          "lastModified": "2026-07-23T00:34:57.232Z"
+          "hash": "sha256:4869ca3b8ea71cfff6c36ae603e3843bde45fec3da94a951db18dcd4bafe39d3",
+          "lastModified": "2026-08-16T08:12:48.299Z"
         },
         "verify.md": {
-          "hash": "sha256:f637ae8331d07a7bbd073990099a9515844adfc710cf386dad66f7740c15b0e9",
-          "lastModified": "2026-07-23T00:34:57.232Z"
+          "hash": "sha256:2b226d4b01784fdbe8ce88a2b2ccbd5f4a40a1194efdd7348692d72c01512e74",
+          "lastModified": "2026-08-16T08:12:48.302Z"
         }
       }
     }

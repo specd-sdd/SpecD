@@ -20,6 +20,23 @@ export interface WorkspaceIndexBreakdown {
   readonly specsIndexed: number
 }
 
+/** Stable count and elapsed time for one observable indexing phase. */
+export interface IndexPhaseMetric {
+  readonly count: number
+  readonly durationMs: number
+}
+
+/** Named semantic and persistence phase metrics for performance diagnostics. */
+export interface IndexPhaseMetrics {
+  readonly importResolution: IndexPhaseMetric
+  readonly dependencyFacts: IndexPhaseMetric
+  readonly adapterRelations: IndexPhaseMetric
+  readonly reexports: IndexPhaseMetric
+  readonly hierarchyOverrides: IndexPhaseMetric
+  readonly persistence: IndexPhaseMetric
+  readonly searchIndexRebuild: IndexPhaseMetric
+}
+
 /**
  * Summary of an indexing operation including counts and errors.
  */
@@ -36,5 +53,7 @@ export interface IndexResult {
   readonly workspaces: readonly WorkspaceIndexBreakdown[]
   readonly vcsRef: string | null
   readonly graphFingerprint: string
+  readonly fullRebuild: boolean
   readonly fullRebuildReason: string | null
+  readonly phaseMetrics: IndexPhaseMetrics
 }

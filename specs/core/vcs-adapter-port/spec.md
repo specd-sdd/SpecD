@@ -24,7 +24,9 @@ When the repository is in a detached or unknown-head state, `branch()` MUST retu
 
 ### Requirement: ref returns the current short revision
 
-`ref()` MUST return a `Promise<string | null>`. It MUST resolve to the short revision identifier (e.g. abbreviated commit hash) for the current commit or changeset.
+`ref()` MUST return a `Promise<string | null>` resolving to the stable short revision identifier for the current commit or changeset.
+
+The returned revision MUST NOT encode working-tree cleanliness, a dirty suffix, status summary, current working directory, or other transient state. Consumers SHALL assess modified content separately through `modifiedFiles(baseRef)`.
 
 When VCS is unavailable or the repository has no commits, `ref()` MUST resolve to `null`. It MUST NOT throw in these cases.
 
@@ -44,11 +46,13 @@ When the revision and file exist, `show()` MUST resolve to the file content as a
 
 ### Requirement: modifiedFiles lists changed repository files
 
-`modifiedFiles(baseRef)` MUST accept a baseline revision identifier (`baseRef`) as a string and return a `Promise<readonly string[]>`.
+`modifiedFiles(baseRef)` MUST accept a baseline revision identifier and return a `Promise<readonly string[]>`.
 
-The returned array contains repository-relative file paths that differ between the current worktree state and the specified baseline reference.
+Results SHALL be normalized, forward-slash, repository-root-relative paths and SHALL be independent of the adapter construction `cwd`. The result SHALL include every path whose current worktree state differs from the baseline, including staged, unstaged, untracked, deleted/missing paths and both the removed and added sides of a rename or move.
 
-Missing or empty results MUST be represented as an empty array, not as `null`.
+Git, Mercurial, SVN, external, and future adapters SHALL preserve these backend-neutral semantics using their native status/history mechanisms. The port does not expose a backend-specific diff fingerprint; consumers own filtering, content hashing, state classification, ordering, and fingerprint construction.
+
+Empty results MUST be represented as an empty array, not `null`. Backend execution failures MAY reject and MUST NOT be converted into a falsely clean empty result.
 
 ### Requirement: Abstract class base
 

@@ -2,7 +2,7 @@ import { execSync } from 'node:child_process'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ExitSentinel, captureStdout, makeProgram, mockProcessExit } from './helpers.js'
 import { registerGraphIndex } from '../../src/commands/graph/index-graph.js'
 
@@ -17,9 +17,14 @@ describe('graph index integration', () => {
   let tmpDir: string
 
   afterEach(() => {
+    vi.unstubAllEnvs()
     if (tmpDir !== undefined) {
       rmSync(tmpDir, { recursive: true, force: true })
     }
+  })
+
+  beforeEach(() => {
+    vi.stubEnv('SPECD_GRAPH_INDEX_NO_WORKER', 'true')
   })
 
   it('indexes a bootstrap repository through the real SDK path with --force', async () => {

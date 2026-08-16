@@ -1,0 +1,99 @@
+- op: modified
+  selector: { type: section, matches: 'Requirement: Language detection' }
+  content: |
+    #### Scenario: Registry uses adapter-declared extension mapping
+
+    - **GIVEN** adapters declare disjoint language and extension maps
+    - **WHEN** files are resolved through the registry
+    - **THEN** registered extensions select their declaring adapters
+    - **AND** an unknown extension is skipped without a node or error
+
+    #### Scenario: General contract contains no built-in extension table
+
+    - **WHEN** a built-in adapter adds or changes supported extensions
+    - **THEN** its specific spec and adapter registration change
+    - **AND** generic language detection requires no language-name branch
+
+- op: removed
+  selector: { type: section, matches: 'Requirement: TypeScript adapter' }
+
+- op: added
+  position:
+    parent: { type: section, matches: 'Requirement: Built-in multi-language dependency coverage' }
+  content: |
+    #### Scenario: Specific adapter spec owns semantic coverage
+
+    - **GIVEN** one built-in adapter omits a deterministic language fact required by its specific spec
+    - **WHEN** indexing and resolution run
+    - **THEN** generic code does not compensate with a language-name branch
+    - **AND** the gap remains unsupported until the adapter emits the shared fact
+
+- op: removed
+  selector: { type: section, matches: 'Requirement: PHP require/include dependencies' }
+
+- op: removed
+  selector: { type: section, matches: 'Requirement: PHP dynamic loader dependencies' }
+
+- op: removed
+  selector: { type: section, matches: 'Requirement: PHP loaded-instance call extraction' }
+
+- op: removed
+  selector: { type: section, matches: 'Requirement: PHP loader resolver extensibility' }
+
+- op: added
+  position: { parent: { type: section, matches: 'Requirements' } }
+  content: |
+    ### Requirement: Resolver capability declaration
+
+    #### Scenario: Relation-only support does not satisfy resolver capability
+
+    - **GIVEN** an adapter emits an `EXTENDS` relation but no shared hierarchy provenance
+    - **WHEN** capabilities are recorded
+    - **THEN** it cannot truthfully advertise hierarchy resolution support
+
+    #### Scenario: Unsupported capability is explicit
+
+    - **GIVEN** a custom adapter omits hierarchy capability
+    - **WHEN** hierarchy resolution is requested
+    - **THEN** coverage is unsupported and no generic guess is emitted
+
+    ### Requirement: Built-in adapter specialization
+
+    #### Scenario: Adapter behavior changes its specific contract
+
+    - **WHEN** a built-in adapter changes syntax, ownership, hierarchy, package, or unsupported behavior
+    - **THEN** its complete specific spec changes with it
+    - **AND** shared determinism and safety remain unchanged
+
+    ### Requirement: Logical declaring-owner facts
+
+    #### Scenario: Syntax parent is not a logical owner
+
+    - **GIVEN** two declaring types contain the same member name
+    - **WHEN** an adapter emits member facts
+    - **THEN** each member uses its declaring type's logical identity
+    - **AND** neither member uses a parser or location-based parent ID
+
+    ### Requirement: Hierarchy evidence consistency
+
+    #### Scenario: Supported hierarchy emits relations and resolver provenance
+
+    - **GIVEN** supported source declares a resolvable owner hierarchy
+    - **WHEN** an adapter advertises `hierarchy: true`
+    - **THEN** hierarchy relations and shared traversal steps describe the same edges
+    - **AND** the resolver can query a requested member under the reached owner
+
+    ### Requirement: Complete symbol source ranges
+
+    #### Scenario: Built-in adapters report parser-authoritative ranges
+
+    - **GIVEN** a supported multi-line declaration
+    - **WHEN** a built-in language adapter extracts it
+    - **THEN** the complete construct range comes from the parser node
+    - **AND** the selection range covers the declared name and is contained by the construct
+
+    #### Scenario: Untrustworthy third-party range is omitted
+
+    - **GIVEN** a third-party parser cannot provide a valid construct or selection range
+    - **WHEN** the adapter translates the declaration
+    - **THEN** it omits the symbol instead of fabricating coordinates

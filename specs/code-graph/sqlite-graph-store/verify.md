@@ -270,3 +270,32 @@
 - **THEN** all of those files live under `{configPath}/graph`
 - **AND** callers do not configure or address those files individually through the
   abstract port
+
+### Requirement: Reference schema upgrade
+
+#### Scenario: SQLite old schema rebuilds safely
+
+- **GIVEN** schema version 5 and the new reference schema expects 6
+- **WHEN** normal read and then graph index are attempted
+- **THEN** read rejects without empty recreation
+- **AND** index rotates generation, rebuilds fields/FTS, and opens the new version
+
+#### Scenario: SQLite source search preserves occurrence and range semantics
+
+- **GIVEN** source content, construct ranges, and selection ranges were bulk indexed
+- **WHEN** full, raw, expanded, and short source queries are executed with filters
+- **THEN** SQLite returns bounded substring candidates equivalent to the abstract Store contract
+- **AND** ranges round-trip without converting half-open coordinates
+
+#### Scenario: SQLite semantic queries use structured indexes
+
+- **GIVEN** logical symbols and bindings with canonical ids containing overlapping serialized components
+- **WHEN** exact-name, owner/member, surface/export, case-precedence, and ambiguity queries run
+- **THEN** SQLite resolves them through indexed structured columns without parsing or substring-ranking canonical ids
+- **AND** provider-visible canonical ids remain unchanged
+
+#### Scenario: SQLite batches reverse coverage and rebuilds FTS once
+
+- **WHEN** a bulk generation containing coverage and source content commits
+- **THEN** reverse file/symbol coverage is queryable in batches
+- **AND** semantic and source-content FTS structures are rebuilt once after commit

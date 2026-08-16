@@ -25,6 +25,8 @@ export interface UpdateImplementationTrackingInput {
   readonly action: UpdateImplementationTrackingAction
   /** Raw project-relative file path. */
   readonly file: string
+  /** Optional complete file batch applied atomically; `file` remains the compatibility primary. */
+  readonly files?: readonly string[]
   /** Canonical spec ID for link mutations. */
   readonly specId?: string
   /** Optional symbol refinements. */
@@ -82,21 +84,24 @@ export class UpdateImplementationTracking {
     input: UpdateImplementationTrackingInput,
   ): Promise<UpdateImplementationTrackingResult> {
     const { result } = await this._changes.mutate(input.name, async (change) => {
+      const files = input.files === undefined ? [input.file] : [...new Set(input.files)]
+      await Promise.all(files.map(async (file) => this._validateMutation(change, input, file)))
+
       switch (input.action) {
         case 'add':
-          await this._applyAdd(change, input)
+          this._applyAdd(change, input)
           break
         case 'remove':
           this._applyRemove(change, input)
           break
         case 'ignore':
-          await this._applyIgnore(change, input.file)
+          for (const file of files) this._applyIgnore(change, file)
           break
         case 'resolve':
-          await this._applyResolve(change, input.file)
+          for (const file of files) this._applyResolve(change, file)
           break
         case 'unresolve':
-          await this._applyUnresolve(change, input.file)
+          for (const file of files) this._applyUnresolve(change, file)
           break
       }
 
@@ -104,6 +109,34 @@ export class UpdateImplementationTracking {
     })
 
     return { implementationTracking: result.implementationTracking }
+  }
+
+  /**
+   * Validates one member of a mutation batch before any entity mutation occurs.
+   *
+   * @param change - Persisted change being mutated
+   * @param input - Complete mutation input
+   * @param file - Batch member to validate
+   */
+  private async _validateMutation(
+    change: Change,
+    input: UpdateImplementationTrackingInput,
+    file: string,
+  ): Promise<void> {
+    if (input.action === 'remove') return
+    if (input.action === 'add' && input.specId === undefined) {
+      throw new ChangeNotFoundError(change.name)
+    }
+
+    const entry = this._trackedEntry(change, file)
+    if (input.action === 'resolve' || input.action === 'unresolve') {
+      if (entry === undefined || entry.state === 'removed') {
+        throw new ImplementationFileNotFoundError(file)
+      }
+    }
+
+    if (input.action === 'ignore' && entry !== undefined) return
+    this._requireExists(file, await this._fileExists(file))
   }
 
   /**
@@ -145,25 +178,6 @@ export class UpdateImplementationTracking {
   }
 
   /**
-   * Requires a file to already be tracked by the change.
-   *
-   * @param change - The persisted change under mutation
-   * @param file - Raw project-relative file path
-   * @returns The tracked entry
-   * @throws {ImplementationFileNotFoundError} When the file is not tracked
-   */
-  private _requireTracked(
-    change: Change,
-    file: string,
-  ): Change['trackedImplementationFiles'][number] {
-    const entry = this._trackedEntry(change, file)
-    if (entry === undefined) {
-      throw new ImplementationFileNotFoundError(file)
-    }
-    return entry
-  }
-
-  /**
    * Applies an `add` mutation, validating file existence first.
    *
    * @param change - The persisted change under mutation
@@ -171,13 +185,10 @@ export class UpdateImplementationTracking {
    * @throws {ChangeNotFoundError} When `specId` is absent from the mutation input
    * @throws {ImplementationFileNotFoundError} When the file does not exist on disk
    */
-  private async _applyAdd(change: Change, input: UpdateImplementationTrackingInput): Promise<void> {
+  private _applyAdd(change: Change, input: UpdateImplementationTrackingInput): void {
     if (input.specId === undefined) {
       throw new ChangeNotFoundError(change.name)
     }
-
-    const exists = await this._fileExists(input.file)
-    this._requireExists(input.file, exists)
 
     const hasSymbols = input.symbols !== undefined && input.symbols.length > 0
     change.addImplementationLink({
@@ -221,14 +232,7 @@ export class UpdateImplementationTracking {
    * @param file - Raw project-relative file path to ignore
    * @throws {ImplementationFileNotFoundError} If the file is untracked and missing on disk
    */
-  private async _applyIgnore(change: Change, file: string): Promise<void> {
-    const entry = this._trackedEntry(change, file)
-
-    if (entry === undefined) {
-      const exists = await this._fileExists(file)
-      this._requireExists(file, exists)
-    }
-
+  private _applyIgnore(change: Change, file: string): void {
     change.trackImplementationFile(file, 'ignored')
   }
 
@@ -239,15 +243,7 @@ export class UpdateImplementationTracking {
    * @param file - Raw project-relative file path to resolve
    * @throws {ImplementationFileNotFoundError} If the file does not exist on disk
    */
-  private async _applyResolve(change: Change, file: string): Promise<void> {
-    const entry = this._requireTracked(change, file)
-    const exists = await this._fileExists(file)
-    this._requireExists(file, exists)
-
-    if (entry.state === 'removed') {
-      throw new ImplementationFileNotFoundError(file)
-    }
-
+  private _applyResolve(change: Change, file: string): void {
     change.trackImplementationFile(file, 'resolved')
   }
 
@@ -261,15 +257,7 @@ export class UpdateImplementationTracking {
    * @param file - Raw project-relative file path to reopen
    * @throws {ImplementationFileNotFoundError} If the file does not exist or is `removed`
    */
-  private async _applyUnresolve(change: Change, file: string): Promise<void> {
-    const entry = this._requireTracked(change, file)
-    const exists = await this._fileExists(file)
-    this._requireExists(file, exists)
-
-    if (entry.state === 'removed') {
-      throw new ImplementationFileNotFoundError(file)
-    }
-
+  private _applyUnresolve(change: Change, file: string): void {
     change.trackImplementationFile(file, 'open')
   }
 }

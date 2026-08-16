@@ -1,0 +1,43 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Current-content and coverage freshness
+
+    Canonical graph health SHALL distinguish VCS-ref freshness, working-tree/content freshness, derivation fingerprint compatibility, backend schema/generation compatibility, and index coverage completeness.
+
+    A matching VCS ref MUST NOT imply fresh content when tracked or untracked working-tree files differ from indexed content. Health SHALL expose stable machine-readable reasons for dirty, unknown, partial, excluded, unsupported, parse-failed, fingerprint-mismatched, and schema-incompatible states.
+
+    Consumers MAY declare a missing symbol stale only when the addressed target has current content and complete supported coverage. Every other absence is inconclusive.
+
+    ### Requirement: Code Graph version invalidation
+
+    The installed `@specd/code-graph` package version SHALL participate in project and workspace derivation fingerprints. A release containing the enriched reference model MUST change that version. Backend schema versions remain separate from package derivation and from `schema-std`.
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Monotonic workspace and graph freshness
+
+    Every workspace and the aggregate graph SHALL persist a `knownStaleSinceLastIndex` latch. Health SHALL return immediately from a true aggregate latch without rescanning inputs. The first proven stale workspace or project-global input SHALL atomically set the affected workspace latch when applicable and the aggregate latch. Only a successful index SHALL clear latches.
+
+    Freshness state SHALL be `current`, `stale`, or `unknown`, with aggregate precedence `stale > unknown > current`. Read, stat, hash, repository, or VCS failures SHALL return transient `unknown`, MUST NOT set stale flags or latches, and SHALL be retried by a later assessment.
+
+    ### Requirement: Indexed resource freshness assessment
+
+    A batch-capable `AssessIndexedResourceFreshness` use case SHALL assess exact files, documents, and specs from persisted indexed-input observations. Matching filesystem mtime and size SHALL avoid content reads. Changed stamps SHALL trigger hashing; equal content SHALL refresh observations, while different or missing content SHALL monotonically mark the input stale. Repository inputs SHALL use their stable revision or fingerprint.
+
+    A resource SHALL be stale when any input is stale and unknown when no input is stale but at least one input cannot be assessed. Exact resource consumers MAY rely on current targeted evidence despite unrelated global staleness. Corpus-wide absence, uniqueness, ranking, or workspace fallback MUST retain global stale/unknown diagnostics because validating returned resources cannot prove completeness.
+
+    ### Requirement: VCS and filesystem freshness scopes
+
+    VCS-backed workspaces sharing one repository root SHALL share one diff evaluation while retaining independent workspace latches. Scope identity SHALL derive from sorted workspace names and MUST NOT persist or hash absolute paths. The normalized fingerprint SHALL sort graph-visible `{ path, state, contentHash }` entries and distinguish present and missing paths.
+
+    Code Graph SHALL filter `VcsAdapter.modifiedFiles()` through the same effective `excludePaths`, `allowedPaths`, gitignore, default exclusion, and explicit code/document/spec channels used by indexing before stat or hashing. Additions, modifications, deletions, or either rename side excluded from every applicable channel MUST NOT affect workspace or graph health. Mixed diffs SHALL include only visible paths. Changes to the effective visibility configuration SHALL invalidate the derivation fingerprint.
+
+    Non-VCS workspaces SHALL compare visible membership and persisted observations, stopping at the first proven mismatch. Workspaces with `respectGitignore: false` under VCS SHALL use hybrid VCS and filesystem assessment for ignored untracked graph inputs.

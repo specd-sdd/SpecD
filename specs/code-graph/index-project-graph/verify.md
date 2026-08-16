@@ -53,3 +53,12 @@
 
 - **WHEN** `createIndexProjectGraph()` is called
 - **THEN** it returns an `IndexProjectGraph` with no captured config
+
+### Requirement: Incompatibility repair execution
+
+#### Scenario: Index result records completed repair
+
+- **GIVEN** provider indexing detects schema incompatibility
+- **WHEN** `IndexProjectGraph` executes
+- **THEN** provider-owned recreation and search rebuild complete before readiness
+- **AND** the result reports full rebuild and schema reason

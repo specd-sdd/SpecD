@@ -1,5 +1,11 @@
 import { Command, Option } from 'commander'
-import { runIndexProjectGraph, type IndexResult } from '@specd/sdk'
+import { spawn, type ChildProcess } from 'node:child_process'
+import { acquireGraphIndexLock } from '@specd/code-graph/internal'
+import {
+  runIndexProjectGraph,
+  type IndexPhaseMetric,
+  type RunIndexProjectGraphResult,
+} from '@specd/sdk'
 import { output, parseFormat } from '../../formatter.js'
 import { cliError } from '../../handle-error.js'
 import { resolveSdkHostContext } from '../../helpers/sdk-host.js'
@@ -41,7 +47,9 @@ JSON/TOON output schema:
     workspaces: Array<{ name, filesDiscovered, filesIndexed, documentsIndexed, filesSkipped, filesRemoved, specsDiscovered, specsIndexed }>
     vcsRef: string | null
     graphFingerprint: string
+    fullRebuild: boolean
     fullRebuildReason: string | null
+    phaseMetrics: Record<string, { count: number, durationMs: number }>
   }
 `,
     )
@@ -75,6 +83,18 @@ JSON/TOON output schema:
 
         const { config, kernel } = context
 
+        if (
+          process.env['SPECD_GRAPH_INDEX_WORKER'] !== 'true' &&
+          process.env['SPECD_GRAPH_INDEX_NO_WORKER'] !== 'true'
+        ) {
+          try {
+            await runIndexWorker(config)
+          } catch (err) {
+            cliError(err instanceof Error ? err.message : 'index worker failed', opts.format, 3)
+          }
+          return
+        }
+
         try {
           const host = await resolveSdkHostContext(config, kernel)
           const result = await runIndexProjectGraph(host, {
@@ -103,12 +123,53 @@ JSON/TOON output schema:
 }
 
 /**
+ * Runs indexing in a child process while this parent owns the shared graph lock.
+ * @param config - Resolved project configuration owning graph storage.
+ */
+async function runIndexWorker(config: Parameters<typeof acquireGraphIndexLock>[0]): Promise<void> {
+  let child: ChildProcess | undefined
+  const forwardSignal = (signal: NodeJS.Signals): void => {
+    child?.kill(signal)
+  }
+  const onSigint = (): void => forwardSignal('SIGINT')
+  const onSigterm = (): void => forwardSignal('SIGTERM')
+  process.prependListener('SIGINT', onSigint)
+  process.prependListener('SIGTERM', onSigterm)
+  const release = acquireGraphIndexLock(config)
+  try {
+    child = spawn(process.execPath, process.argv.slice(1), {
+      stdio: 'inherit',
+      env: {
+        ...process.env,
+        SPECD_GRAPH_INDEX_WORKER: 'true',
+        SPECD_GRAPH_INDEX_LOCK_HELD: 'true',
+      },
+    })
+    const exitCode = await new Promise<number>((resolve, reject) => {
+      child!.once('error', reject)
+      child!.once('exit', (code, signal) => {
+        if (code !== null) resolve(code)
+        else resolve(signal === 'SIGINT' ? 130 : signal === 'SIGTERM' ? 143 : 3)
+      })
+    })
+    release()
+    process.removeListener('SIGINT', onSigint)
+    process.removeListener('SIGTERM', onSigterm)
+    process.exit(exitCode)
+  } finally {
+    release()
+    process.removeListener('SIGINT', onSigint)
+    process.removeListener('SIGTERM', onSigterm)
+  }
+}
+
+/**
  * Formats an index result according to the text-mode CLI contract.
  *
  * @param result - The completed indexing result.
  * @returns Human-readable text output.
  */
-function formatTextIndexResult(result: IndexResult): string {
+function formatTextIndexResult(result: RunIndexProjectGraphResult): string {
   const lines = [
     `Indexed ${String(result.filesIndexed)} file(s) in ${String(result.duration)}ms`,
     `  discovered: ${String(result.filesDiscovered)}`,
@@ -128,8 +189,18 @@ function formatTextIndexResult(result: IndexResult): string {
     }
   }
 
-  if (result.fullRebuildReason !== null) {
-    lines.push(`  full rebuild: ${result.fullRebuildReason}`)
+  lines.push('  phases:')
+  const phaseMetrics = Object.entries(result.phaseMetrics) as Array<[string, IndexPhaseMetric]>
+  for (const [phase, metric] of phaseMetrics) {
+    lines.push(
+      `    ${phase}: ${String(metric.count)} item(s), ${String(Math.round(metric.durationMs))}ms`,
+    )
+  }
+
+  if (result.fullRebuild) {
+    lines.push(`  full rebuild: yes (${result.fullRebuildReason ?? 'FORCED'})`)
+  } else {
+    lines.push('  full rebuild: no')
   }
 
   for (const error of result.errors) {

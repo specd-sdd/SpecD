@@ -3,6 +3,33 @@ import { type SpecNode } from './spec-node.js'
 import { type DocumentNode } from './document-node.js'
 import { type Relation } from './relation.js'
 import { type FileAnalysis, type FileAnalysisDraft } from './file-analysis.js'
+import { type DeclarationOccurrence } from './symbol-reference.js'
+
+/** The evidence state recorded for every source target considered by an index run. */
+export const IndexCoverageStatus = {
+  Indexed: 'indexed',
+  Excluded: 'excluded',
+  Unsupported: 'unsupported',
+  ParseFailed: 'parse-failed',
+  Partial: 'partial',
+} as const
+
+/** A stable index-coverage state. */
+export type IndexCoverageStatus = (typeof IndexCoverageStatus)[keyof typeof IndexCoverageStatus]
+
+/** Persisted evidence that explains whether a source target can support absence claims. */
+export interface IndexCoverage {
+  /** Workspace-prefixed source path. */
+  readonly filePath: string
+  /** Content hash observed while considering the target. */
+  readonly contentHash: string | undefined
+  /** Indexing outcome. */
+  readonly status: IndexCoverageStatus
+  /** Stable machine-readable explanation for non-complete evidence. */
+  readonly reason: string | undefined
+  /** Adapter capabilities used while producing this evidence. */
+  readonly capabilities: readonly string[]
+}
 
 /**
  * Input parameters for registering a discovered file in the index session.
@@ -112,4 +139,7 @@ export interface IndexSession {
    * Retrieves the qualified name mapping.
    */
   getQualifiedNames(): ReadonlyMap<string, string>
+
+  /** Returns declaration occurrences grouped by their logical identity. */
+  getDeclarationsByLogicalId(): ReadonlyMap<string, readonly DeclarationOccurrence[]>
 }

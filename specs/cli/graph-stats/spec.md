@@ -22,11 +22,9 @@ specd graph stats [--config <path> | --path <path>] [--format text|json|toon]
 
 ### Requirement: Statistics retrieval
 
-The command obtains host context via `openSpecdHost` from `@specd/sdk`, opens the graph provider through the SDK lifecycle helper, and delegates health computation to `createGetGraphHealth`.
+The command SHALL open the project host and graph provider through the standard composition lifecycle and call the provider's canonical `getGraphHealth` operation exactly once for the requested project.
 
-For `--config`, the command uses the explicit configuration path. For `--path` and the no-config fallback, it calls `openSpecdHost` with `allowBootstrapFallback: true` so the SDK first discovers a project configuration and otherwise creates a synthetic graph host from the resolved VCS root. `graph stats` MUST NOT call `resolveGraphCliContext`.
-
-The command MUST pass `ListWorkspaces` results when the host has a configured kernel; synthetic bootstrap uses its generated default workspace.
+Provider composition SHALL use the same resolved configuration and kernel workspace definitions as the host. The CLI MUST NOT independently repeat workspace discovery, recompute freshness, or merge a second health interpretation. Project bootstrap and configuration errors remain standard command errors.
 
 ### Requirement: Concurrent indexing guard
 
@@ -36,46 +34,9 @@ Instead, the command relies on provider-owned availability checks surfaced throu
 
 ### Requirement: Output format
 
-In `text` mode (default), the output is a labelled summary:
+Human-readable output SHALL retain the existing labeled graph counts and append canonical health diagnostics: aggregate state, global stale latch, content freshness, coverage completeness, schema/generation compatibility, non-current workspace details, and stable reason codes. It SHALL not reduce dirty, partial, unknown, or incompatible health to an unqualified fresh/current message.
 
-```text
-Files:     459
-Documents: 18
-Symbols:   1497
-Specs:     122
-Languages: javascript, typescript
-Relations:
-  IMPORTS: 1227
-  DEFINES: 1497
-Last indexed: 2026-03-14T10:38:30.178Z
-```
-
-- `Files`, `Documents`, `Symbols`, `Specs` show `fileCount`, `documentCount`, `symbolCount`, `specCount`
-- `Languages` shows the `languages` array joined by `, `
-- `Relations` shows only non-zero relation counts from `relationCounts`, each on its own indented line
-- `Last indexed` shows `lastIndexedAt` as an ISO 8601 timestamp
-
-If the graph is stale, a warning line SHALL be appended after `Last indexed`:
-
-```text
-⚠ Graph is stale (indexed at <short-ref>, current: <short-ref>)
-```
-
-Where `<short-ref>` is the first 7 characters of the ref. If `lastIndexedRef` is `null`, no staleness line is shown.
-
-If the stored derivation fingerprint differs from the fingerprint computed for the current effective graph configuration, a warning line SHALL be appended to stderr in text mode:
-
-```text
-⚠ Derivation fingerprint mismatch — code-graph version or workspace configuration changed since last index
-```
-
-This warning is independent from the VCS staleness line. Both MAY appear when the graph is stale by ref and mismatched by derivation fingerprint.
-
-In `json` or `toon` mode, the full `GraphStatistics` object is output as-is, with three additional fields:
-
-- `stale: boolean | null` — `true` if stale, `false` if fresh, `null` if unknown
-- `currentRef: string | null` — the current VCS ref, or `null` if unavailable
-- `fingerprintMismatch: boolean | null` — `true` when the stored derivation fingerprint differs from the current effective graph configuration, `false` when it matches, `null` when the comparison cannot be computed
+JSON and TOON output SHALL expose the complete structured result returned by `getGraphHealth` without presenter-side health recomputation. Legacy fields such as `stale`, `currentRef`, and `fingerprintMismatch` MAY remain as compatibility projections, but no exact legacy warning prose or stderr-only presentation is required.
 
 ### Requirement: Error cases
 
@@ -84,6 +45,12 @@ If the provider reports `GRAPH_BUSY`, the command SHALL fail with the standard g
 If the provider reports `GRAPH_PROVIDER_STALE`, the command SHALL fail with the standard infrastructure error path and exit code 3.
 
 If the provider cannot be opened or statistics retrieval fails due to another infrastructure error, the command SHALL exit with code 3.
+
+### Requirement: Content freshness and coverage diagnostics
+
+Graph stats SHALL render VCS, working-tree/content, derivation, backend schema/generation, and partial-index health as distinct diagnostics. It SHALL summarize excluded, unsupported, parse-failed, and partial coverage with stable reason codes.
+
+Text output SHALL explain why the graph cannot prove symbol absence. JSON and TOON SHALL emit the complete structured health and coverage fields unchanged. Dirty or partial state MUST NOT be labelled simply as a fresh graph.
 
 ## Constraints
 

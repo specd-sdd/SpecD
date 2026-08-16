@@ -4,6 +4,7 @@ import { type SymbolNode } from './symbol-node.js'
 import { type ImportDeclaration } from './import-declaration.js'
 import { type BindingFact } from './binding-fact.js'
 import { type CallFact } from './call-fact.js'
+import { type ReferenceFacts } from './symbol-reference.js'
 
 /**
  * ParserState allows adapters to preserve small, compact, per-file parser-specific
@@ -35,6 +36,8 @@ export interface FileAnalysisDraft {
   readonly imports: readonly ImportDeclaration[]
   readonly bindingFacts: readonly BindingFact[]
   readonly callFacts: readonly CallFact[]
+  /** Optional language-semantic reference facts, additive to legacy nodes and relations. */
+  readonly referenceFacts?: ReferenceFacts
   readonly parserState?: ParserState
 }
 

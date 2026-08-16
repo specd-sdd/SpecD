@@ -5,17 +5,62 @@
   },
   "dependsOn": [
     "core:change",
-    "code-graph:symbol-model",
+    "sdk:build-implementation-review",
     "core:update-implementation-tracking",
     "core:get-implementation-review",
     "core:refresh-implementation-tracking"
   ],
   "implementation": [
     {
+      "file": "cli:src/commands/change/_implementation-tracking.ts"
+    },
+    {
       "file": "cli:src/commands/change/implementation.ts"
     },
     {
-      "file": "cli:src/commands/change/_implementation-tracking.ts"
+      "file": "cli:test/commands/change-implementation-tracking.spec.ts"
+    },
+    {
+      "file": "cli:test/commands/change-implementation.spec.ts"
+    },
+    {
+      "file": "cli:test/commands/change-implementation-review-integration.spec.ts"
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Manage tracked implementation files and confirmed spec-file-symbol links throughout active change reviews.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:f8f3a786f7409a015c81fb0dcab587294e4028ecca83c4cd45cdd3899ade9eb8",
+          "lastModified": "2026-08-16T08:12:47.116Z"
+        },
+        "verify.md": {
+          "hash": "sha256:8e90b89ab48cf3798fe2de1c4d35199243af539fbf06de6fc61dd9bdab00c6d5",
+          "lastModified": "2026-08-16T08:12:47.119Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Change Implementation\n\n## Rules\n\n- Expose under `specd changes implementation`.\n- `list <name>`: return tracked files (`open`, `resolved`, `ignored`, `removed`), confirmed links by `specId` and file, symbol refinements, and SDK projection (`sdk:build-implementation-review`). Rely on SDK projection; do not implement fallback policy or rewrite stored links.\n- `add <name> --spec <specId> --file <path> [--symbol <name> ...]`: use raw project-relative path; require file exists else throw `ImplementationFileNotFoundError`; create/confirm link; add symbols; set tracked file state `open`; preserve explicit file-level links vs symbol containers.\n- `resolve <name> --file <paths...>`: comma-separated paths; require all files exist and are tracked; reject `removed`; update review state to `resolved` only without modifying links.\n- `unresolve <name> --file <paths...>`: comma-separated paths; require all files exist and are tracked (`resolved` or `ignored`); reject `removed`; set state `open` only.\n- `ignore <name> --file <paths...>`: comma-separated paths; existing tracked files (including `removed`) can be missing; new untracked files require physical existence else throw `ImplementationFileNotFoundError`; set state `ignored`, preserve links.\n- `remove <name> --spec <specId> --file <path> [--symbol <name> ...]`: with symbols, remove named refinements; without symbols, remove entire spec-file set. Removing last symbol removes implicit container but preserves explicit file-level link.\n- `review <name>`: inspect tracked files/links via SDK projection; render `resolved`, `ambiguous`, `unresolved`, `missing` outcomes; distinguish incomplete graph from total absence, symbol diagnostics from archive/workspace failures, sidecar updates outside spec scope; never mutate state/links.\n- Manual management and autodetection use raw project-relative paths during active change; canonical `workspace:path` normalization occurs at archive.\n\n## Constraints\n\n- State subcommands validate atomically.\n- Link mutations and tracked-file review-state mutations remain distinct.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:f8f3a786f7409a015c81fb0dcab587294e4028ecca83c4cd45cdd3899ade9eb8",
+          "lastModified": "2026-08-16T08:12:47.116Z"
+        },
+        "verify.md": {
+          "hash": "sha256:8e90b89ab48cf3798fe2de1c4d35199243af539fbf06de6fc61dd9bdab00c6d5",
+          "lastModified": "2026-08-16T08:12:47.119Z"
+        }
+      }
+    }
+  }
 }

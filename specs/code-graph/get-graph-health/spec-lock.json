@@ -12,44 +12,55 @@
   "implementation": [
     {
       "file": "code-graph:src/application/use-cases/get-graph-health.ts",
-      "symbols": ["GetGraphHealth"]
+      "symbols": ["GetGraphHealth", "GetGraphHealthInput", "GetGraphHealthResult"]
     },
     {
       "file": "code-graph:test/application/use-cases/get-graph-health.spec.ts"
+    },
+    {
+      "file": "code-graph:src/application/ports/code-graph-host-port.ts",
+      "symbols": ["CodeGraphHostPort"]
+    },
+    {
+      "file": "code-graph:test/application/use-cases/index-project-graph-integration.spec.ts"
+    },
+    {
+      "file": "code-graph:src/application/use-cases/discover-files.ts",
+      "symbols": ["discoverFiles"]
     }
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "Use case: GraphStatistics + VCS stale/currentRef + fingerprintMismatch on already-open CodeGraphProvider; no lock/open/close.",
+      "value": "GetGraphHealth aggregates GraphStatistics, VCS ref staleness, derivation fingerprint mismatches, and workspace health on an open provider.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:1e02ae06c74070365fb1ac3158fc1e786ec4402e14515cdb57f47871e67d8abe",
-          "lastModified": "2026-07-20T16:47:44.370Z"
+          "hash": "sha256:a83a32a04eb506afef9f60c8008ce61e4c8c36eb111ca54dbceb7137659a28a3",
+          "lastModified": "2026-08-16T08:12:48.242Z"
         },
         "verify.md": {
-          "hash": "sha256:3f64ffe19bd4b2fa5e562b6deddea8ab9947745c671ec4e35d602cbde624c5c3",
-          "lastModified": "2026-07-20T16:47:44.371Z"
+          "hash": "sha256:d7bd080c049f1afb821c5604a155d2d4a36f1e3c254f5951bd600fcc304e3e20",
+          "lastModified": "2026-08-16T08:12:48.245Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# GetGraphHealth\n## Rules\n### Returns enriched graph health\n- `GetGraphHealth.execute(input)` → `GetGraphHealthResult` = all `GraphStatistics` +\n  - `stale: boolean | null` — per `code-graph:staleness-detection`\n  - `currentRef: string | null` — `createVcsAdapter(config.projectRoot)` or null\n  - `fingerprintMismatch: boolean | null` — when workspaces + `codeGraphVersion` allow, else null\n\n### Provider-owned availability and error propagation\n- Availability via `provider.getStatistics()` only\n- MUST NOT call external lock helpers or accept lock-assertion escape hatch\n- Busy/stale provider errors propagate unchanged\n\n### Computes VCS staleness\n- Resolve ref via `createVcsAdapter`; apply `isGraphStale(lastIndexedRef, currentRef)`\n- `lastIndexedRef === null` → `stale: null` (not true)\n\n### Computes derivation fingerprint mismatch\n- If `input.workspaces` + `stats.graphFingerprint != null`: parse map, build effective graph config from `input.config`, call `detectFingerprintMismatch` with `codeGraphVersion`, `projectRoot`, workspaces, graph config\n- Else `fingerprintMismatch: null`\n\n### Accepts open provider and project inputs\n- `GetGraphHealthInput`: `config: SpecdConfig`, `provider: CodeGraphProvider` (open), `codeGraphVersion: string`, optional workspaces\n- MUST NOT open/close provider\n\n### Factory wires dependencies\n- `createGetGraphHealth()` → stateless instance; no config capture; all inputs per `execute()`\n\n## Constraints\n- MUST NOT mutate store or trigger indexing\n- MUST NOT load change entities or compile project context\n- Statistics via `provider.getStatistics()` only",
+      "value": "# Get Graph Health\n\n## Rules\n\n- Returns enriched health: `GetGraphHealth.execute(input)` -> `GetGraphHealthResult` containing all `GraphStatistics` plus:\n  - `stale: boolean | null` (VCS staleness via `isGraphStale`).\n  - `currentRef: string | null` (VCS ref via `createVcsAdapter(config.projectRoot)`).\n  - `fingerprintMismatch: boolean | null` (derivation mismatch when workspaces/version allow comparison).\n  - `state: 'current' | 'stale' | 'unknown'`, `knownStaleSinceLastIndex`, stable reason codes, and per-workspace health breakdowns (`name`, `state`, latch, mode, reasons).\n- Provider availability: relies on `provider.getStatistics()`; busy/stale provider errors propagate unchanged. No external lock helpers or lock-assertion escape hatches.\n- Staleness calculation: compares `lastIndexedRef` with `currentRef`. `lastIndexedRef === null` -> `stale: null`.\n- Derivation mismatch: when `workspaces` provided and `stats.graphFingerprint != null`, calls `detectFingerprintMismatch` with `codeGraphVersion`, `projectRoot`, `workspaces`, effective graph config.\n- Input & Lifecycle: `GetGraphHealthInput` contains `config: SpecdConfig`, `provider: CodeGraphProvider` (must be open), `codeGraphVersion: string`, optional `workspaces`. MUST NOT open or close provider.\n- Factory: `createGetGraphHealth()` returns stateless instance; all inputs passed per `execute()`.\n- Scope assessment: VCS workspaces sharing repo root share modified-path evaluation filtered by effective graph config. Non-VCS workspaces compare visible membership and stored observations, stop on first mismatch. Aggregate precedence: `stale > unknown > current`.\n\n## Constraints\n\n- MUST NOT trigger indexing, destructive recreation, or arbitrary graph mutation.\n- MUST NOT open or close the provider.\n- MUST NOT load change entities or compile project context.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:1e02ae06c74070365fb1ac3158fc1e786ec4402e14515cdb57f47871e67d8abe",
-          "lastModified": "2026-07-20T16:47:44.370Z"
+          "hash": "sha256:a83a32a04eb506afef9f60c8008ce61e4c8c36eb111ca54dbceb7137659a28a3",
+          "lastModified": "2026-08-16T08:12:48.242Z"
         },
         "verify.md": {
-          "hash": "sha256:3f64ffe19bd4b2fa5e562b6deddea8ab9947745c671ec4e35d602cbde624c5c3",
-          "lastModified": "2026-07-20T16:47:44.371Z"
+          "hash": "sha256:d7bd080c049f1afb821c5604a155d2d4a36f1e3c254f5951bd600fcc304e3e20",
+          "lastModified": "2026-08-16T08:12:48.245Z"
         }
       }
     }

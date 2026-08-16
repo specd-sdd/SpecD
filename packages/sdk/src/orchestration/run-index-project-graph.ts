@@ -3,13 +3,11 @@ import {
   type CodeGraphProvider,
   type IndexProgressCallback,
   type IndexResult,
+  type IndexingOpenResult,
 } from '@specd/code-graph'
 import { createVcsAdapter } from '@specd/core'
 import { type SdkHostContext } from '../composition/host-context.js'
-import {
-  withOpenGraphProvider,
-  type WithOpenGraphProviderOptions,
-} from '../composition/with-open-graph-provider.js'
+import { withOpenGraphProvider } from '../composition/with-open-graph-provider.js'
 import { InvalidProviderLifecycleError } from '../domain/errors/index.js'
 import { codeGraphVersion } from '../shared/code-graph-version.js'
 
@@ -32,7 +30,15 @@ export interface RunIndexProjectGraphInput {
 }
 
 /** Result of project graph indexing. */
-export type RunIndexProjectGraphResult = IndexResult
+export type RunIndexProjectGraphResult = IndexResult & {
+  readonly fullRebuild: boolean
+  readonly fullRebuildReason: string | null
+}
+
+/** Provider surface required by the indexing-specific SDK lifecycle. */
+interface IndexingCodeGraphProvider extends CodeGraphProvider {
+  openForIndexing(): Promise<IndexingOpenResult>
+}
 
 /**
  * Lists workspaces, resolves VCS ref, and runs project graph indexing.
@@ -78,8 +84,11 @@ export async function runIndexProjectGraph(
     ...(input.excludePaths !== undefined ? { excludePaths: [...input.excludePaths] } : {}),
   })
 
-  const executeIndex = async (provider: CodeGraphProvider): Promise<RunIndexProjectGraphResult> => {
-    return provider.index({
+  const executeIndex = async (
+    provider: CodeGraphProvider,
+    repair = { fullRebuild: false, fullRebuildReason: null as string | null },
+  ): Promise<RunIndexProjectGraphResult> => {
+    const result = await provider.index({
       projectRoot,
       workspaces,
       graphConfig,
@@ -90,19 +99,24 @@ export async function runIndexProjectGraph(
       ...(vcsRef !== undefined ? { vcsRef } : {}),
       ...(input.onProgress !== undefined ? { onProgress: input.onProgress } : {}),
     })
+    return {
+      ...result,
+      fullRebuild: repair.fullRebuild || result.fullRebuild || input.force === true,
+      fullRebuildReason: repair.fullRebuildReason ?? result.fullRebuildReason ?? null,
+    }
   }
 
   if (input.provider !== undefined) {
     return executeIndex(input.provider)
   }
 
-  const providerOptions: WithOpenGraphProviderOptions | undefined =
-    input.beforeOpen !== undefined || input.afterClose !== undefined
-      ? {
-          ...(input.beforeOpen !== undefined ? { beforeOpen: input.beforeOpen } : {}),
-          ...(input.afterClose !== undefined ? { afterClose: input.afterClose } : {}),
-        }
-      : undefined
-
-  return withOpenGraphProvider(ctx, executeIndex, providerOptions)
+  return withOpenGraphProvider<RunIndexProjectGraphResult, IndexingOpenResult>(
+    ctx,
+    (provider, repair) => executeIndex(provider, repair),
+    {
+      ...(input.beforeOpen === undefined ? {} : { beforeOpen: input.beforeOpen }),
+      ...(input.afterClose === undefined ? {} : { afterClose: input.afterClose }),
+      open: (provider) => (provider as IndexingCodeGraphProvider).openForIndexing(),
+    },
+  )
 }

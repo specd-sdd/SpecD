@@ -11,10 +11,11 @@ import {
   type BindingFact,
 } from '../../../src/domain/value-objects/binding-fact.js'
 import { CallForm, type CallFact } from '../../../src/domain/value-objects/call-fact.js'
-import { type SymbolNode } from '../../../src/domain/value-objects/symbol-node.js'
+import { type SourceRange, type SymbolNode } from '../../../src/domain/value-objects/symbol-node.js'
 import { type Relation } from '../../../src/domain/value-objects/relation.js'
 import { type ImportDeclaration } from '../../../src/domain/value-objects/import-declaration.js'
 import { InMemoryIndexSession } from '../../../src/application/use-cases/in-memory-index-session.js'
+import { parseLogicalSymbol } from '../../../src/domain/value-objects/symbol-reference.js'
 
 interface TestAdapter {
   languages(): string[]
@@ -48,6 +49,16 @@ interface TestAdapter {
 
 const baseAdapter = new PhpLanguageAdapter()
 const adapter = baseAdapter as unknown as TestAdapter
+
+function sliceRange(content: string, range: SourceRange): string {
+  const lines = content.split('\n')
+  const offsetAt = (line: number, column: number): number =>
+    lines.slice(0, line - 1).reduce((offset, value) => offset + value.length + 1, 0) + column
+  return content.slice(
+    offsetAt(range.startLine, range.startColumn),
+    offsetAt(range.endLine, range.endColumn),
+  )
+}
 
 adapter.extractSymbols = (filePath: string, content: string): SymbolNode[] => {
   const session = new InMemoryIndexSession()
@@ -213,6 +224,114 @@ describe('PhpLanguageAdapter', () => {
     expect(adapter.languages()).toEqual(['php'])
   })
 
+  it('keeps use aliases as local bindings rather than public exports', () => {
+    const session = new InMemoryIndexSession()
+    const facts = baseAdapter.analyzeFile(
+      'src/Service.php',
+      '<?php\nnamespace App;\nuse Vendor\\Package\\Canonical as Alias;\nclass Service {}\n',
+      { session, workspaceName: 'workspace' },
+    ).referenceFacts
+
+    expect(baseAdapter.capabilities()).toMatchObject({
+      publicBindings: false,
+      localBindings: true,
+      hierarchy: true,
+    })
+    expect(facts?.localBindings.map((item) => item.localName)).toContain('Alias')
+    expect(facts?.publicBindings).toEqual([])
+    expect(facts?.hierarchy).toEqual([])
+  })
+
+  it('owner-qualifies methods and emits local hierarchy evidence', () => {
+    const session = new InMemoryIndexSession()
+    const facts = baseAdapter.analyzeFile(
+      'src/Service.php',
+      `<?php
+namespace App;
+interface Persistable {
+  public function save(): void;
+}
+class BaseService {
+  public function save(): void {}
+}
+class ChildService extends BaseService implements Persistable {
+  public function save(): void {}
+}
+`,
+      { session, workspaceName: 'workspace' },
+    ).referenceFacts!
+
+    const saves = facts.declarations
+      .map((declaration) => parseLogicalSymbol(declaration.logicalId))
+      .filter((logical) => logical?.name === 'save')
+    expect(saves.length).toBeGreaterThanOrEqual(2)
+    expect(new Set(saves.map((logical) => logical?.ownerId)).size).toBe(saves.length)
+    expect(facts.hierarchy.map((fact) => fact.kind)).toEqual(['extends', 'implements'])
+    expect(facts.steps.map((step) => step.kind)).toEqual(['extends:0', 'implements:0'])
+  })
+
+  it('retains static and constructor forms and simple trait composition', () => {
+    const facts = baseAdapter.analyzeFile(
+      'src/Forms.php',
+      `<?php
+namespace App;
+trait Saves {
+  public function save(): void {}
+}
+class Service {
+  use Saves;
+  public function __construct() {}
+  public static function create(): void {}
+}
+`,
+      { session: new InMemoryIndexSession(), workspaceName: 'workspace' },
+    ).referenceFacts!
+
+    const forms = facts.declarations
+      .map((declaration) => parseLogicalSymbol(declaration.logicalId))
+      .filter((logical) => logical?.ownerId !== undefined)
+      .map((logical) => [logical?.name, logical?.memberForm])
+    expect(forms).toEqual(
+      expect.arrayContaining([
+        ['save', 'instance'],
+        ['__construct', 'constructor'],
+        ['create', 'static'],
+      ]),
+    )
+    expect(facts.hierarchy).toEqual([expect.objectContaining({ kind: 'trait', precedence: 0 })])
+    expect(facts.steps).toEqual([expect.objectContaining({ kind: 'trait:0' })])
+  })
+
+  it('does not guess trait precedence when adaptation syntax is present', () => {
+    const facts = baseAdapter.analyzeFile(
+      'src/Traits.php',
+      `<?php
+trait FirstTrait { public function save(): void {} }
+trait SecondTrait { public function save(): void {} }
+class Service {
+  use FirstTrait, SecondTrait { FirstTrait::save insteadof SecondTrait; }
+}
+`,
+      { session: new InMemoryIndexSession(), workspaceName: 'workspace' },
+    ).referenceFacts!
+
+    expect(facts.hierarchy.filter((fact) => fact.kind === 'trait')).toEqual([])
+    expect(facts.steps.filter((step) => step.kind.startsWith('trait:'))).toEqual([])
+  })
+
+  it('owner-qualifies a compact same-line class method', () => {
+    const facts = baseAdapter.analyzeFile(
+      'src/Compact.php',
+      '<?php class Service { public function run(): void {} }',
+      { session: new InMemoryIndexSession(), workspaceName: 'workspace' },
+    ).referenceFacts!
+    const run = facts.declarations
+      .map((declaration) => parseLogicalSymbol(declaration.logicalId))
+      .find((logical) => logical?.name === 'run')
+
+    expect(run?.ownerId).toBeDefined()
+  })
+
   describe('extractSymbols', () => {
     it('extracts function definitions', () => {
       const code = '<?php\nfunction greet(string $name): string { return $name; }'
@@ -220,6 +339,28 @@ describe('PhpLanguageAdapter', () => {
       expect(
         symbols.some((s: SymbolNode) => s.name === 'greet' && s.kind === SymbolKind.Function),
       ).toBe(true)
+    })
+
+    it('extracts parser-authoritative construct and declared-name ranges', () => {
+      const code = `<?php
+class UserService {
+  public function execute(): void {}
+}`
+      const symbol = adapter
+        .extractSymbols('main.php', code)
+        .find((candidate) => candidate.name === 'UserService')!
+      const construct = sliceRange(code, {
+        startLine: symbol.line,
+        startColumn: symbol.column,
+        endLine: symbol.endLine,
+        endColumn: symbol.endColumn,
+      })
+
+      expect(construct).toBe(`class UserService {
+  public function execute(): void {}
+}`)
+      expect(sliceRange(code, symbol.selectionRange)).toBe('UserService')
+      expect(symbol.id).toBe('main.php:class:UserService:2:0')
     })
 
     it('extracts class declarations', () => {

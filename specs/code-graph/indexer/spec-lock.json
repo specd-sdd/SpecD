@@ -14,39 +14,60 @@
     "code-graph:document-model",
     "core:get-spec-metadata"
   ],
-  "implementation": [],
+  "implementation": [
+    {
+      "file": "code-graph:src/application/use-cases/in-memory-index-session.ts",
+      "symbols": ["InMemoryIndexSession"]
+    },
+    {
+      "file": "code-graph:src/application/use-cases/index-code-graph.ts",
+      "symbols": ["IndexCodeGraph"]
+    },
+    {
+      "file": "code-graph:test/application/use-cases/symbol-index.spec.ts"
+    },
+    {
+      "file": "code-graph:test/application/use-cases/workspace-indexing.spec.ts"
+    },
+    {
+      "file": "code-graph:test/application/use-cases/index-project-graph-integration.spec.ts"
+    },
+    {
+      "file": "code-graph:src/domain/value-objects/index-result.ts"
+    }
+  ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "IndexCodeGraph incrementally discovers, analyzes, resolves, and atomically persists multi-workspace code, documents, specs, and relations.",
+      "value": "IndexCodeGraph orchestrates two-pass extraction, incremental hashing, cross-workspace binding resolution, spec metadata indexing, and bulk persistence.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:dfde702218356f3296e9c797b13b70833a79f07a03590e622e5733c5d6e8feb5",
-          "lastModified": "2026-07-25T13:14:44.434Z"
+          "hash": "sha256:71f310444400f0b2163396e00c8a58342348ec8c5514b3375fd653aba1948d22",
+          "lastModified": "2026-08-16T08:12:47.841Z"
         },
         "verify.md": {
-          "hash": "sha256:80a236b8c934679e17fdf464f0551b77a4b3bdc9efab884d948ce618e074c16c",
-          "lastModified": "2026-07-25T13:14:44.459Z"
+          "hash": "sha256:35bc4f9695b3c4979464cc6af93e7bab6b03bdfccc63a5dac308d43a927f7d7a",
+          "lastModified": "2026-08-16T08:12:47.843Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# Indexer\n\n## Rules\n\n- `IndexCodeGraph`: primary application write path. Pipeline: discover workspace plus global resources; diff hashes/spec fingerprints; extract code or text documents; index specs through `SpecRepository` + `GetSpecMetadata`; store nodes/relations; remove deleted resources; persist `lastIndexedRef`. Include `EXTENDS`, `IMPLEMENTS`, `OVERRIDES`. Consume `SpecRepository.list`, `artifact`, `readPersistedImplementation` and `GetSpecMetadata`; never parse raw sidecars or raw metadata snapshots when self-healing projection exists.\n- Incremental run compares discovered file `contentHash` and persisted graph fingerprint. Current fingerprint combines running `@specd/code-graph` version plus canonical hash of resolved workspace objects. If fingerprint matches: process new/changed/deleted only; unchanged files skip parsing/I/O beyond hash comparison. Delete only files belonging to indexed workspaces. Remove changed files before CSV `COPY FROM` bulk load.\n- Fingerprint mismatch triggers active-store full rebuild, preferably `recreate()` plus visible version/config reason; backend MAY fail fast requiring explicit force reindex. Force full reindex invokes graph-store recreation before `execute()`.\n- Effective discovery fingerprint MUST include project `graph.includePaths`, global `graph.excludePaths`, each workspace `allowedPaths`, `excludePaths`, `respectGitignore`, and synthetic filesystem-backed `specsPath` exclusions.\n- Workspace discovery: for each `ProjectWorkspace`, combine global exclusions, repository spec-root exclusions, workspace exclusions; call `discoverFiles(codeRoot, allowedPaths?)`; prefix `{workspaceName}:`; diff by workspace prefix.\n- Project-global discovery: call `discoverFiles(projectRoot)` with `graphConfig.includePaths`; prefix `root:`; accept only resources outside every workspace `codeRoot`. Adapter-backed resources become `FileNode`; other textual resources become `DocumentNode`. Filesystem-backed repository `specsPath` is synthetically excluded; specs index only through spec phase.\n- Text fallback: accept BOM `utf-8`, `utf-16le`, `utf-16be`; else try `utf-8`; else matching UTF-16 null-byte layout; else `windows-1252` only without NUL; otherwise skip non-text.\n- `discoverFiles` options: `respectGitignore` default `true`, hierarchical `.gitignore` absolute priority; `excludePaths` default built-ins including `.git/`, `.hg/`, `.svn/`; `vcsRoot: string | null` bounds `.gitignore` search and MUST be explicit; discovery MUST NOT probe VCS markers.\n- Filter known binary/non-source extensions before decoding, including `.gif`, `.png`, `.jpg`, `.jpeg`, `.pdf`, `.sql`, `.zip`, `.tiff`, `.pack`.\n- Memory: reuse session lookups; retain compact per-file analyses, never parser ASTs/trees across run. Pass 1 MAY allocate heavyweight parser state only transiently per file.\n- Two-pass extraction via shared in-memory `IndexSession`:\n  1. Pass 1 per workspace/chunk: read, derive complete adapter `FileAnalysis`, register analysis, emit `DEFINES`/`EXPORTS`; no store queries.\n  2. Pass 2 after Pass 1 for all workspaces: resolve imports and scoped bindings from session facts; derive deterministic `IMPORTS`, `CALLS`, `CONSTRUCTS`, `USES_TYPE`, hierarchy, other relations without reparse/store queries.\n  3. Specs per workspace via `SpecRepository`.\n  4. Commit once with `GraphStore.bulkLoad()`; then `GraphStore.rebuildFtsIndexes()`.\n- `IndexSession` run scope: stable numeric file IDs; analyses by ID/workspace path; symbols by file/name/qualified name; documents/specs; file↔symbol/spec↔symbol indexes; parser facts; deduplicated relations. Common API required for adapters/phases; adapter compact cache allowed only through API. Session never alters persisted schemas, IDs, relation semantics.\n- Pass 2 builds shared per-file scoped binding environment from adapter binding/call facts, symbols, imports/maps, namespace maps, session indexes. Deterministic lookup covers enclosing scope, shadowing, local/parameter/property/class-managed/inherited/file/global/framework/imported types; receivers `this`, `self`, `cls`, `parent`, `super` and equivalents; free/member/static/constructor candidates.\n- Resolve `CALLS`, `CONSTRUCTS`, `USES_TYPE`, `IMPORTS`, `EXTENDS`, `IMPLEMENTS`, `OVERRIDES` only when deterministic. Drop symbol self-relations. Unresolved/ambiguous facts produce no persisted relation; non-persisted diagnostics MAY remain. Shared logic owns resolution; `IndexCodeGraph` contains no language-specific resolution.\n- Chunk files by total source size, default `20 MB`; sequential chunks allow collection. Configure via `IndexOptions.chunkBytes`. Optional spill artifacts MUST use configured graph temp directory, current-run scope, cleanup after success, SHOULD cleanup after failure.\n- `IndexOptions.onProgress?: (percent: number, phase: string) => void`: discovery/hash 0–5%; diff/cleanup 5–7%; Pass 1 7–50%; Pass 2 50–80%; specs 80–83%; bulk load 83–95%; done 100%. Per-item phases include detail such as `150/460 files`. Fire phase completion before next synchronous/heavy work.\n- Log major phase durations at `debug`: discovery, Pass 1, Pass 2, spec indexing, bulk load.\n- Cross-workspace packages: before Pass 2, build `packageName → workspaceName` by calling every adapter `getPackageIdentity(codeRoot)`; first defined wins. For non-relative import, extract package, map workspace, search session symbols by imported name within workspace. Language/manifest-agnostic; works mono/multirepo.\n- Per-file extraction/storage errors: catch, record `{ filePath, message }`, continue. Only infrastructure failures such as lost store/disk-full abort.\n- `IndexResult`: `filesDiscovered`, `filesIndexed`, `filesRemoved`, `filesSkipped`, `specsDiscovered`, `specsIndexed`, `errors`, `duration`, per-workspace `{ name, filesDiscovered, filesIndexed, filesSkipped, filesRemoved, specsDiscovered, specsIndexed }`, persisted `vcsRef | null`, persisted `graphFingerprint`, `fullRebuildReason | null`.\n- Spec indexing: `repo.count()` for progress; `repo.list()` identities; `GetSpecMetadata.execute({ specId })`; compare semantic `metadataFingerprint` with stored `SpecNode`; load materialized title/description; `repo.readPersistedImplementation()` for `COVERS_FILE`/`COVERS_SYMBOL`; `repo.readPersistedDependsOn()` for `DEPENDS_ON`. No CLI pre-extraction; indexer owns mapping. Prefer non-empty `optimizedDescription` over `description` for BM25/display.\n\n## Constraints\n\n- `GraphStore` already open; indexer never manages lifecycle.\n- Normalize discovery paths to forward-slash workspace-relative form.\n- Omitted `excludePaths`: built-ins `node_modules/`, `.git/`, `.specd/`, `dist/`, `build/`, `coverage/`, `.next/`, `.nuxt/`; provided value replaces defaults, never merges. `.gitignore` has absolute priority when enabled.\n- Pass 1 completes for ALL workspaces before Pass 2; never interleave per file/workspace.\n- Per-file errors collected; only infrastructure errors thrown.\n- Specs only through workspace `specs()` callback; no filesystem fallback.\n- Scoped resolution uses in-memory pass facts only; no graph-store queries, language rules in `IndexCodeGraph`, unresolved relations, or self-relations.",
+      "value": "# Indexer\n\n## Rules\n\n- `IndexCodeGraph`: main write path for code graph indexing.\n- Pipeline: discover workspaces and global resources; diff content hashes and derivation fingerprints; extract code/documents (Pass 1); resolve scoped bindings/relations (Pass 2); index specs via `SpecRepository` and `GetSpecMetadata`; bulk commit to `GraphStore`; persist `lastIndexedRef` and `IndexedInputObservation` records.\n- Fingerprint diffing: matches running `@specd/code-graph` version plus canonical hash of resolved workspaces. Fingerprint or backend schema mismatch triggers destructive full rebuild via `recreate()` with reported reason (`fullRebuildReason`, `fullRebuild: boolean`).\n- Workspace discovery: combines global `includePaths`/`excludePaths`, repository spec-root exclusions, workspace `allowedPaths`/`excludePaths`/`respectGitignore`. `specsPath` synthetically excluded from document discovery.\n- File decoding: handles UTF-8, UTF-16LE, UTF-16BE, Windows-1252 (without NUL); filters binary extensions (`.gif`, `.png`, `.jpg`, `.pdf`, `.zip`, etc.).\n- `IndexSession` & 2-Pass extraction:\n  1. Pass 1 (all workspaces/chunks): read files, generate adapter `FileAnalysis`, store `DEFINES`/`EXPORTS`.\n  2. Pass 2 (after Pass 1 for all workspaces): resolve `IMPORTS`, `CALLS`, `CONSTRUCTS`, `USES_TYPE`, `EXTENDS`, `IMPLEMENTS`, `OVERRIDES` deterministically from in-memory session facts. Self-relations and unresolved facts dropped. No store queries in Pass 2.\n  3. Specs phase: list spec IDs via `repo.list()`; call `GetSpecMetadata.execute({ specId })`; compare `metadataFingerprint`; load title/description (prefer `optimizedDescription`), `COVERS_FILE`/`COVERS_SYMBOL`, `DEPENDS_ON`.\n  4. Single-session bulk commit: `GraphStore.bulkLoad()`; then `GraphStore.rebuildFtsIndexes()`.\n- Cross-workspace package resolution: maps `packageName → workspaceName` via `LanguageAdapter.getPackageIdentity`.\n- Progress & Error handling: `onProgress` callback reports phase percentages (0–100%); per-file extraction errors captured in `IndexResult.errors`; only infrastructure failures (disk full, store lost) abort run.\n- `IndexResult`: contains `filesDiscovered`, `filesIndexed`, `filesRemoved`, `filesSkipped`, `specsDiscovered`, `specsIndexed`, `errors`, `duration`, per-workspace breakdowns, `vcsRef`, `graphFingerprint`, `fullRebuild`, `fullRebuildReason`.\n\n## Constraints\n\n- `GraphStore` must be open before running; indexer does not manage store lifecycle.\n- Forward-slash relative paths; `excludePaths` replaces defaults when supplied; `.gitignore` absolute priority when `respectGitignore: true`.\n- Pass 1 must finish for ALL workspaces before Pass 2 starts.\n- Pass 2 binding environment uses in-memory pass facts only; no store queries, no language-specific rules in `IndexCodeGraph`, no self-relations.\n- Specs indexed exclusively via `SpecRepository`.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:dfde702218356f3296e9c797b13b70833a79f07a03590e622e5733c5d6e8feb5",
-          "lastModified": "2026-07-25T13:14:44.434Z"
+          "hash": "sha256:71f310444400f0b2163396e00c8a58342348ec8c5514b3375fd653aba1948d22",
+          "lastModified": "2026-08-16T08:12:47.841Z"
         },
         "verify.md": {
-          "hash": "sha256:80a236b8c934679e17fdf464f0551b77a4b3bdc9efab884d948ce618e074c16c",
-          "lastModified": "2026-07-25T13:14:44.459Z"
+          "hash": "sha256:35bc4f9695b3c4979464cc6af93e7bab6b03bdfccc63a5dac308d43a927f7d7a",
+          "lastModified": "2026-08-16T08:12:47.843Z"
         }
       }
     }

@@ -1,0 +1,37 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Resolved canonical and public-binding impact
+
+    Symbol impact SHALL resolve a selector to one logical canonical target before traversal. For unqualified names, resolution SHALL prefer case-exact candidates, fall back to case-insensitive exact names only when none exist, and MUST NOT use prefix/component/textual discovery matches. A unique candidate proceeds to traversal; multiple candidates produce bounded deterministic ambiguity and no traversal. Qualified and full occurrence selectors preserve exact semantics. Public-export impact SHALL accept one public-binding identity and return two explicit views:
+
+    - consumers proven to use that exact surface and exported name, including downstream re-export chains; and
+    - all dependents of the canonical logical symbol through every known route.
+
+    The selected binding, canonical target, and ordered binding chain SHALL be retained. An ambiguous export MUST NOT merge unrelated candidates or select one.
+
+    Hierarchy traversal SHALL preserve edge direction and language precedence for contracts, overrides, inherited members, traits, mixins, embedding, promotion, and provable interface satisfaction. Cycles SHALL terminate and a logical symbol with multiple declaration occurrences SHALL be counted once.
+
+    Traversal ordering SHALL be deterministic across backends and SHALL use indexed lookups and bounded cycle-safe traversal.
+
+    ### Requirement: File-impact covering specs
+
+    `FileImpactResult` SHALL include a deterministically ordered `coveringSpecs` collection derived from reverse `COVERS_FILE` and `COVERS_SYMBOL` relations. Each spec SHALL appear once with its minimum impact depth and every distinct evidence item `{ kind: 'file' | 'symbol', target, depth }`.
+
+    The input file and its defined symbols have depth `0`. Files and symbols reached through the selected impact direction use their shallowest traversal depth from `1` through `maxDepth`. A multi-file impact SHALL treat every input file and each of its defined symbols as depth `0`, aggregate all evidence, and preserve deterministic ordering by minimum depth, spec id, evidence depth, kind, and target.
+
+    File coverage SHALL remain independently visible when no symbol-coverage relations exist. Symbol coverage SHALL augment, not gate or replace, file coverage. Reverse coverage retrieval MUST be batched over deduplicated file and symbol sets and MUST NOT issue one store query per affected result.
+
+    Traversal remains read-only. It SHALL project the coverage present in the open graph; graph-health and freshness consumers remain responsible for reporting whether corpus-wide coverage is complete.
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`code-graph:symbol-model`](../symbol-model/spec.md) — logical symbols, public bindings, relations, and hierarchy semantics
+    - [`code-graph:graph-store`](../graph-store/spec.md) — backend-neutral indexed query methods
+    - [`code-graph:resolve-symbol-reference`](../resolve-symbol-reference/spec.md) — canonical and public-binding target selection

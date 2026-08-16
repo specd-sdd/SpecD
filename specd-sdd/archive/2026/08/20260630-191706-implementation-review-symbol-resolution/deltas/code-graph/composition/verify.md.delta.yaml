@@ -1,0 +1,52 @@
+- op: added
+  position: { parent: { type: section, matches: 'Requirements' } }
+  content: |
+    ### Requirement: Symbol-reference provider surface
+
+    #### Scenario: Public facade delegates resolver lifecycle
+
+    - **WHEN** a host invokes batch resolution and export impact
+    - **THEN** the provider delegates under its availability checks
+    - **AND** only public reference/result types are exported from `"."`
+
+    #### Scenario: Provider returns bounded selector ambiguity
+
+    - **GIVEN** an unqualified selector has several case-exact candidates
+    - **WHEN** a host resolves it for impact
+    - **THEN** the provider returns a bounded deterministic ambiguity without traversal
+    - **AND** it does not widen the selector to prefix or textual matches
+
+    #### Scenario: Exact public binding lookup bypasses search pagination
+
+    - **GIVEN** more than one search page of bindings shares an exported name
+    - **WHEN** a host requests one binding by surface, exported name, space, and target identity
+    - **THEN** the provider returns that exact binding and its declarations
+    - **AND** no ranked or paginated symbol search is used
+
+    ### Requirement: Code Graph-orchestrated search surface
+
+    #### Scenario: One provider call owns the unified search
+
+    - **GIVEN** symbols, files, specs, and documents are requested together
+    - **WHEN** a host invokes unified search
+    - **THEN** one Code Graph application use case expands the query, executes candidate lanes, suppresses duplicates, ranks, groups, and applies limits
+    - **AND** the provider returns one deterministic category-grouped result
+
+    #### Scenario: Provider normalizes exact file filters
+
+    - **GIVEN** canonical, config-relative, and absolute selectors identify one source file
+    - **WHEN** unified search receives each selector
+    - **THEN** it returns the same file with all retained occurrences
+    - **AND** wildcard search keeps its pattern and per-file cap
+
+    #### Scenario: Delivery adapter cannot recreate cross-category behavior
+
+    - **WHEN** the CLI invokes graph search
+    - **THEN** it delegates one unified request
+    - **AND** lower-level compatibility methods are not used to merge, rerank, deduplicate, or limit the response
+
+    #### Scenario: Public surface exposes contracts but not backend candidates
+
+    - **WHEN** a host imports unified search types from the curated package entrypoint
+    - **THEN** request, result, and source-match value objects are available
+    - **AND** backend candidate helpers remain internal

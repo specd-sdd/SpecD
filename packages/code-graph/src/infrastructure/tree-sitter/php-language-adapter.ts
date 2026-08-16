@@ -24,6 +24,20 @@ import {
   type FileAnalysis,
 } from '../../domain/value-objects/file-analysis.js'
 import { type IndexSession } from '../../domain/value-objects/index-session.js'
+import {
+  MemberForm,
+  SymbolSpace,
+  createLocalBinding,
+  type AdapterCapabilities,
+  type ReferenceFacts,
+} from '../../domain/value-objects/symbol-reference.js'
+import {
+  buildHierarchyReferenceFacts,
+  buildLogicalDeclarationFacts,
+  containsSymbolRange,
+  createAdapterDeclarationDescriptor,
+  type AdapterHierarchyDescriptor,
+} from './reference-fact-helpers.js'
 
 /**
  * Represents a dynamic loader fact extracted from a PHP file.
@@ -51,10 +65,13 @@ interface PhpScopeInfo {
 interface SerializedPhpTypeInfo {
   readonly name: string
   readonly symbolId: string
-  readonly kind: 'class' | 'interface' | 'type'
+  readonly kind: 'class' | 'interface' | 'type' | 'enum'
   readonly extendsNames: readonly string[]
   readonly implementsNames: readonly string[]
+  readonly traitNames: readonly string[]
   readonly methodsByName: Record<string, string>
+  readonly memberSymbolIds: readonly string[]
+  readonly memberFormsById: Readonly<Record<string, MemberForm>>
 }
 
 /**
@@ -326,6 +343,19 @@ function getPhpClassTail(value: string): string {
 }
 
 /**
+ * Classifies a PHP method from its declaration name and modifier line.
+ * @param symbol - Extracted method declaration.
+ * @param lines - Complete source split into lines.
+ * @returns Proven shared member form.
+ */
+function phpMemberForm(symbol: SymbolNode, lines: readonly string[]): MemberForm {
+  if (symbol.name.toLowerCase() === '__construct') return MemberForm.Constructor
+  const declarationLine = lines[symbol.line - 1] ?? ''
+  if (/\bstatic\s+function\b/i.test(declarationLine)) return MemberForm.Static
+  return MemberForm.Instance
+}
+
+/**
  * Builds the unique alias names associated with a PHP dependency reference.
  * @param value - Raw loader or class-literal value.
  * @returns Unique alias names.
@@ -365,10 +395,13 @@ interface LoaderResolver {
 interface PhpTypeInfo {
   readonly name: string
   readonly symbolId: string
-  readonly kind: 'class' | 'interface' | 'type'
+  readonly kind: 'class' | 'interface' | 'type' | 'enum'
   readonly extendsNames: readonly string[]
   readonly implementsNames: readonly string[]
+  readonly traitNames: readonly string[]
   readonly methodsByName: ReadonlyMap<string, string>
+  readonly memberSymbolIds: readonly string[]
+  readonly memberFormsById: ReadonlyMap<string, MemberForm>
 }
 
 /**
@@ -999,6 +1032,20 @@ export const LOADER_RESOLVERS: ReadonlyArray<LoaderResolver> = [
  * Extracts functions, classes, methods, interfaces, enums, traits, and constants.
  */
 export class PhpLanguageAdapter implements LanguageAdapter {
+  /**
+   * Declares deterministic PHP reference semantics.
+   * @returns Supported reference capabilities.
+   */
+  capabilities(): AdapterCapabilities {
+    return {
+      declarations: true,
+      members: true,
+      publicBindings: false,
+      localBindings: true,
+      hierarchy: true,
+      buildContext: false,
+    }
+  }
   private readonly psr4Cache = new Map<string, Array<[string, string]>>()
 
   /**
@@ -1065,23 +1112,36 @@ export class PhpLanguageAdapter implements LanguageAdapter {
       name: string,
       kind: SymbolKind,
       node: SgNode,
+      selectionNode: SgNode | null | undefined,
       comment: string | undefined,
     ): void => {
+      if (!selectionNode) return
       const line = node.range().start.line + 1
       const col = node.range().start.column
       const key = `${kind}:${name}:${line}:${col}`
       if (seenSymbol.has(key)) return
-      seenSymbol.add(key)
-      symbols.push(
-        createSymbolNode({
+      try {
+        const symbol = createSymbolNode({
           name,
           kind,
           filePath,
           line,
           column: node.range().start.column,
+          endLine: node.range().end.line + 1,
+          endColumn: node.range().end.column,
+          selectionRange: {
+            startLine: selectionNode.range().start.line + 1,
+            startColumn: selectionNode.range().start.column,
+            endLine: selectionNode.range().end.line + 1,
+            endColumn: selectionNode.range().end.column,
+          },
           comment,
-        }),
-      )
+        })
+        seenSymbol.add(key)
+        symbols.push(symbol)
+      } catch (error) {
+        if (!(error instanceof RangeError)) throw error
+      }
     }
 
     this.extractSymbolsFromNode(root, filePath, addSymbol)
@@ -1110,12 +1170,15 @@ export class PhpLanguageAdapter implements LanguageAdapter {
     const typeInfos = this.collectPhpTypeInfo(filePath, content, symbols)
     const serializedInfos = typeInfos.map((info) => {
       const methodsByName: Record<string, string> = {}
+      const memberFormsById: Record<string, MemberForm> = {}
       for (const [mName, mId] of info.methodsByName.entries()) {
         methodsByName[mName] = mId
       }
+      for (const [memberId, form] of info.memberFormsById) memberFormsById[memberId] = form
       return {
         ...info,
         methodsByName,
+        memberFormsById,
       }
     })
 
@@ -1142,6 +1205,14 @@ export class PhpLanguageAdapter implements LanguageAdapter {
     }
     walkScopes(root)
 
+    const referenceFacts = this.buildReferenceFacts(
+      context.workspaceName,
+      filePath,
+      namespace,
+      symbols,
+      imports,
+      typeInfos,
+    )
     return {
       language: 'php',
       ...(namespace ? { namespace } : {}),
@@ -1149,6 +1220,7 @@ export class PhpLanguageAdapter implements LanguageAdapter {
       imports,
       bindingFacts,
       callFacts,
+      referenceFacts,
       parserState: {
         kind: 'php',
         typeInfos: serializedInfos,
@@ -1156,6 +1228,121 @@ export class PhpLanguageAdapter implements LanguageAdapter {
         dynamicLoaders: rawDynamicLoaders,
         scopes,
       },
+    }
+  }
+
+  /**
+   * Builds conservative PHP namespace declarations and use-alias bindings.
+   * @param workspace - Owning workspace.
+   * @param filePath - Analyzed source path.
+   * @param namespace - Declared PHP namespace, when present.
+   * @param symbols - Extracted declarations.
+   * @param imports - Extracted static use imports.
+   * @param typeInfos - Syntax-proven class-like owners and hierarchy clauses.
+   * @returns Additive reference facts.
+   */
+  private buildReferenceFacts(
+    workspace: string,
+    filePath: string,
+    namespace: string | undefined,
+    symbols: readonly SymbolNode[],
+    imports: readonly ImportDeclaration[],
+    typeInfos: readonly PhpTypeInfo[],
+  ): ReferenceFacts {
+    const surface = namespace ?? filePath
+    const ownerByMemberSymbolId = new Map<string, string>()
+    const formByMemberSymbolId = new Map<string, MemberForm>()
+    const typeSymbolIdByName = new Map<string, string>()
+    for (const info of typeInfos) {
+      typeSymbolIdByName.set(info.name, info.symbolId)
+      for (const methodId of info.memberSymbolIds) {
+        ownerByMemberSymbolId.set(methodId, info.symbolId)
+      }
+      for (const [methodId, form] of info.memberFormsById) {
+        formByMemberSymbolId.set(methodId, form)
+      }
+    }
+    const declarationDescriptors = symbols.map((symbol) =>
+      createAdapterDeclarationDescriptor({
+        symbol,
+        surface,
+        space:
+          symbol.kind === SymbolKind.Class ||
+          symbol.kind === SymbolKind.Interface ||
+          symbol.kind === SymbolKind.Enum ||
+          symbol.kind === SymbolKind.Type
+            ? SymbolSpace.Type
+            : SymbolSpace.Value,
+        ownerSymbolId: ownerByMemberSymbolId.get(symbol.id),
+        requiresOwner: symbol.kind === SymbolKind.Method,
+        memberForm:
+          symbol.kind === SymbolKind.Method
+            ? (formByMemberSymbolId.get(symbol.id) ?? MemberForm.Instance)
+            : undefined,
+      }),
+    )
+    const logicalFacts = buildLogicalDeclarationFacts({
+      workspace,
+      declarations: declarationDescriptors,
+    })
+    const hierarchyDescriptors: AdapterHierarchyDescriptor[] = []
+    for (const info of typeInfos) {
+      info.extendsNames.forEach((parentName, precedence) => {
+        const parentSymbolId = typeSymbolIdByName.get(parentName)
+        if (parentSymbolId) {
+          hierarchyDescriptors.push({
+            childSymbolId: info.symbolId,
+            parentSymbolId,
+            kind: 'extends',
+            precedence,
+          })
+        }
+      })
+      info.implementsNames.forEach((parentName, precedence) => {
+        const parentSymbolId = typeSymbolIdByName.get(parentName)
+        if (parentSymbolId) {
+          hierarchyDescriptors.push({
+            childSymbolId: info.symbolId,
+            parentSymbolId,
+            kind: 'implements',
+            precedence,
+          })
+        }
+      })
+      info.traitNames.forEach((parentName, precedence) => {
+        const parentSymbolId = typeSymbolIdByName.get(parentName)
+        if (parentSymbolId) {
+          hierarchyDescriptors.push({
+            childSymbolId: info.symbolId,
+            parentSymbolId,
+            kind: 'trait',
+            precedence,
+          })
+        }
+      })
+    }
+    const hierarchyFacts = buildHierarchyReferenceFacts({
+      hierarchy: hierarchyDescriptors,
+      logicalBySymbolId: logicalFacts.logicalBySymbolId,
+    })
+    const localBindings = imports
+      .filter((item) => item.localName.length > 0)
+      .map((item) =>
+        createLocalBinding({
+          filePath,
+          scopeId: 'namespace',
+          localName: item.localName,
+          space: SymbolSpace.Type,
+          targetId: undefined,
+        }),
+      )
+    return {
+      declarations: logicalFacts.declarations,
+      publicBindings: [],
+      localBindings,
+      hierarchy: hierarchyFacts.hierarchy,
+      steps: hierarchyFacts.steps,
+      capabilities: this.capabilities(),
     }
   }
 
@@ -1390,7 +1577,7 @@ export class PhpLanguageAdapter implements LanguageAdapter {
     const seen = new Set<string>()
 
     for (const info of infos) {
-      for (const parentName of info.extendsNames) {
+      for (const [precedence, parentName] of info.extendsNames.entries()) {
         const importedId = context.resolvedImports.importMap.get(parentName)
         const localTarget = infoByName.get(parentName)
         const targetId = importedId ?? localTarget?.symbolId
@@ -1404,6 +1591,7 @@ export class PhpLanguageAdapter implements LanguageAdapter {
               source: info.symbolId,
               target: targetId,
               type: RelationType.Extends,
+              metadata: { precedence },
             }),
           )
         }
@@ -1413,7 +1601,7 @@ export class PhpLanguageAdapter implements LanguageAdapter {
         }
       }
 
-      for (const contractName of info.implementsNames) {
+      for (const [precedence, contractName] of info.implementsNames.entries()) {
         const importedId = context.resolvedImports.importMap.get(contractName)
         const localTarget = infoByName.get(contractName)
         const targetId = importedId ?? localTarget?.symbolId
@@ -1427,6 +1615,7 @@ export class PhpLanguageAdapter implements LanguageAdapter {
               source: info.symbolId,
               target: targetId,
               type: RelationType.Implements,
+              metadata: { precedence },
             }),
           )
         }
@@ -1506,7 +1695,7 @@ export class PhpLanguageAdapter implements LanguageAdapter {
     const infos: PhpTypeInfo[] = []
     const lines = content.split('\n')
     const typeRegex =
-      /\b(class|interface|trait)\s+([A-Za-z_][A-Za-z0-9_]*)\b(?:\s+extends\s+([A-Za-z0-9_\\,\s]+?))?(?:\s+implements\s+([A-Za-z0-9_\\,\s]+?))?\s*\{/g
+      /\b(class|interface|trait|enum)\s+([A-Za-z_][A-Za-z0-9_]*)\b(?:\s*:\s*[A-Za-z0-9_\\]+)?(?:\s+extends\s+([A-Za-z0-9_\\,\s]+?))?(?:\s+implements\s+([A-Za-z0-9_\\,\s]+?))?\s*\{/g
 
     for (const match of content.matchAll(typeRegex)) {
       const rawKind = match[1]
@@ -1518,15 +1707,18 @@ export class PhpLanguageAdapter implements LanguageAdapter {
           ? SymbolKind.Class
           : rawKind === 'interface'
             ? SymbolKind.Interface
-            : SymbolKind.Type
-      const symbolId = symbols.find(
+            : rawKind === 'enum'
+              ? SymbolKind.Enum
+              : SymbolKind.Type
+      const ownerSymbol = symbols.find(
         (symbol) =>
           symbol.filePath === filePath &&
           symbol.kind === kind &&
           symbol.name === name &&
           symbol.line === line,
-      )?.id
-      if (!symbolId) continue
+      )
+      if (!ownerSymbol) continue
+      const symbolId = ownerSymbol.id
 
       let endLine = lines.length
       let braceDepth = 0
@@ -1541,11 +1733,30 @@ export class PhpLanguageAdapter implements LanguageAdapter {
       }
 
       const methodsByName = new Map<string, string>()
+      const memberSymbolIds: string[] = []
+      const memberFormsById = new Map<string, MemberForm>()
       for (const symbol of symbols) {
-        if (symbol.filePath !== filePath || symbol.kind !== SymbolKind.Method) continue
-        if (symbol.line <= line || symbol.line > endLine) continue
+        if (
+          symbol.filePath !== filePath ||
+          (symbol.kind !== SymbolKind.Method && symbol.kind !== SymbolKind.Variable)
+        ) {
+          continue
+        }
+        if (!containsSymbolRange(ownerSymbol, symbol)) continue
+        memberSymbolIds.push(symbol.id)
+        if (symbol.kind !== SymbolKind.Method) continue
         methodsByName.set(symbol.name, symbol.id)
+        memberFormsById.set(symbol.id, phpMemberForm(symbol, lines))
       }
+
+      const traitNames = lines
+        .slice(line, endLine - 1)
+        .flatMap((entry) => {
+          const traitUse = entry.match(/^\s*use\s+([^;{]+);\s*$/i)?.[1]
+          return traitUse === undefined ? [] : traitUse.split(',')
+        })
+        .map((entry) => getPhpClassTail(entry.trim()))
+        .filter((entry) => entry.length > 0)
 
       infos.push({
         name,
@@ -1559,7 +1770,10 @@ export class PhpLanguageAdapter implements LanguageAdapter {
           .split(',')
           .map((entry) => getPhpClassTail(entry.trim()))
           .filter((entry) => entry.length > 0),
+        traitNames,
         methodsByName,
+        memberSymbolIds,
+        memberFormsById,
       })
     }
 
@@ -1758,37 +1972,48 @@ export class PhpLanguageAdapter implements LanguageAdapter {
   private extractSymbolsFromNode(
     node: SgNode,
     filePath: string,
-    addSymbol: (name: string, kind: SymbolKind, node: SgNode, comment: string | undefined) => void,
+    addSymbol: (
+      name: string,
+      kind: SymbolKind,
+      node: SgNode,
+      selectionNode: SgNode | null | undefined,
+      comment: string | undefined,
+    ) => void,
   ): void {
     const commentFor = (target: SgNode): string | undefined => extractComment(target)
 
     for (const child of node.children()) {
       switch (nodeKind(child)) {
         case 'function_definition': {
-          const name = child.field('name')?.text()
-          if (name) addSymbol(name, SymbolKind.Function, child, commentFor(child))
+          const nameNode = child.field('name')
+          const name = nameNode?.text()
+          if (name) addSymbol(name, SymbolKind.Function, child, nameNode, commentFor(child))
           break
         }
         case 'class_declaration': {
-          const name = child.field('name')?.text()
-          if (name) addSymbol(name, SymbolKind.Class, child, commentFor(child))
+          const nameNode = child.field('name')
+          const name = nameNode?.text()
+          if (name) addSymbol(name, SymbolKind.Class, child, nameNode, commentFor(child))
           this.walkClassBody(child, addSymbol)
           break
         }
         case 'interface_declaration': {
-          const name = child.field('name')?.text()
-          if (name) addSymbol(name, SymbolKind.Interface, child, commentFor(child))
+          const nameNode = child.field('name')
+          const name = nameNode?.text()
+          if (name) addSymbol(name, SymbolKind.Interface, child, nameNode, commentFor(child))
           this.walkClassBody(child, addSymbol)
           break
         }
         case 'enum_declaration': {
-          const name = child.field('name')?.text()
-          if (name) addSymbol(name, SymbolKind.Enum, child, commentFor(child))
+          const nameNode = child.field('name')
+          const name = nameNode?.text()
+          if (name) addSymbol(name, SymbolKind.Enum, child, nameNode, commentFor(child))
           break
         }
         case 'trait_declaration': {
-          const name = child.field('name')?.text()
-          if (name) addSymbol(name, SymbolKind.Type, child, commentFor(child))
+          const nameNode = child.field('name')
+          const name = nameNode?.text()
+          if (name) addSymbol(name, SymbolKind.Type, child, nameNode, commentFor(child))
           this.walkClassBody(child, addSymbol)
           break
         }
@@ -1797,7 +2022,13 @@ export class PhpLanguageAdapter implements LanguageAdapter {
             if (nodeKind(constChild) !== 'const_element') continue
             const nameNode = constChild.child(0)
             if (nameNode && nodeKind(nameNode) === 'name') {
-              addSymbol(nameNode.text(), SymbolKind.Variable, constChild, commentFor(child))
+              addSymbol(
+                nameNode.text(),
+                SymbolKind.Variable,
+                constChild,
+                nameNode,
+                commentFor(child),
+              )
             }
           }
           break
@@ -1822,7 +2053,13 @@ export class PhpLanguageAdapter implements LanguageAdapter {
    */
   private walkClassBody(
     classNode: SgNode,
-    addSymbol: (name: string, kind: SymbolKind, node: SgNode, comment: string | undefined) => void,
+    addSymbol: (
+      name: string,
+      kind: SymbolKind,
+      node: SgNode,
+      selectionNode: SgNode | null | undefined,
+      comment: string | undefined,
+    ) => void,
   ): void {
     const commentFor = (target: SgNode): string | undefined => extractComment(target)
 
@@ -1830,15 +2067,16 @@ export class PhpLanguageAdapter implements LanguageAdapter {
       if (nodeKind(child) !== 'declaration_list') continue
       for (const member of child.children()) {
         if (nodeKind(member) === 'method_declaration') {
-          const name = member.field('name')?.text()
-          if (name) addSymbol(name, SymbolKind.Method, member, commentFor(member))
+          const nameNode = member.field('name')
+          const name = nameNode?.text()
+          if (name) addSymbol(name, SymbolKind.Method, member, nameNode, commentFor(member))
         } else if (nodeKind(member) === 'property_declaration') {
           for (const propChild of member.children()) {
             if (nodeKind(propChild) !== 'property_element') continue
             const varName = propChild.field('name')
             if (!varName) continue
             const name = varName.text().replace(/^\$/, '')
-            if (name) addSymbol(name, SymbolKind.Variable, member, commentFor(member))
+            if (name) addSymbol(name, SymbolKind.Variable, member, varName, commentFor(member))
           }
         }
       }

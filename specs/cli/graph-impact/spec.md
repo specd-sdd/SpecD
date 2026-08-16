@@ -9,32 +9,16 @@ Before modifying code, developers and agents need to understand the blast radius
 ### Requirement: Command signature
 
 ```text
-specd graph impact [--file <paths...>] [--symbol <name>] [--spec <id>] [--direction dependents|dependencies|upstream|downstream|both] [--depth <n>] [--config <path> | --path <path>] [--format text|json|toon]
+specd graph impact [--file <paths...> | --symbol <reference> | --spec <id> | --export <public-name> --from <file-or-surface>] [--direction dependents|dependencies|upstream|downstream|both] [--depth <n>] [--config <path> | --path <path>] [--format text|json|toon]
 ```
 
-Exactly one of `--file`, `--symbol`, or `--spec` must be provided.
+Exactly one target family SHALL be supplied. `--export` and `--from` MUST appear together and are mutually exclusive with file, symbol, and spec targets. A missing half of the export selector is a usage error before provider open.
 
-- `--file` — analyze impact of one or more files. Each path MAY be workspace-prefixed, config-relative, or absolute.
-- `--symbol` — analyze impact of a symbol by name. If multiple symbols match, all are analyzed and results listed
-- `--spec` — analyze impact of one spec by fully-qualified spec id
-- `--direction` — optional; analysis direction, defaults to `upstream`. Values:
-  - `dependents` — find symbols, files, and specs that depend on the target; alias of `upstream`
-  - `dependencies` — find symbols, files, and specs that the target depends on; alias of `downstream`
-  - `upstream` — compatibility value for `dependents`
-  - `downstream` — compatibility value for `dependencies`
-  - `both` — combined dependents and dependencies analysis
-- `--depth` — optional; maximum traversal depth, defaults to `3`. Must be a positive integer. Passed through to `analyzeImpact`, `analyzeFileImpact`, or `analyzeSpecImpact` as `maxDepth`
-- `--config <path>` — optional; explicit path to `specd.yaml`, matching the standard CLI meaning
-- `--path <path>` — optional; repo-root bootstrap mode
-- `--format text|json|toon` — optional; output format, defaults to `text`
+Existing direction, depth, context, and format options retain their meanings. `--symbol` selects canonical logical-symbol impact; `--export` selects one public binding on one surface.
 
-The CLI SHALL normalize `dependents` to `upstream` and `dependencies` to `downstream` before calling graph impact analysis. Invalid direction values SHALL fail with a CLI usage error before opening the graph provider.
+The CLI SHALL normalize direction aliases before delegation and MUST NOT implement symbol or export resolution itself.
 
-User-facing documentation for this command MUST prefer the concrete aliases `dependents` and `dependencies` before the compatibility graph-theory terms `upstream` and `downstream`. Documentation MAY mention the compatibility values, but it MUST NOT describe `downstream` as dependents.
-
-`--config` and `--path` are mutually exclusive.
-
-`--path` and no-config fallback are bootstrap mechanisms for setup and early repository exploration, not the intended steady-state mode for configured projects.
+For an unqualified `--symbol`, Code Graph SHALL select a unique case-exact name match when one exists. If several case-exact candidates exist it SHALL return a bounded deterministic ambiguity result and perform no traversal. Only when no case-exact candidate exists SHALL it consider case-insensitive exact-name candidates. Prefix, component, and textual matches MUST NOT be accepted as impact targets. Qualified and full occurrence selectors retain their existing exact semantics.
 
 ### Requirement: File impact analysis
 
@@ -172,6 +156,22 @@ If the provider reports `GRAPH_BUSY` or `GRAPH_PROVIDER_STALE`, the command SHAL
 
 If the provider cannot be opened, the command exits with code 3.
 
+### Requirement: Public export impact analysis
+
+An export query SHALL render the selected public binding, canonical logical target, and ordered binding chain. It SHALL report exact-binding consumers separately from the complete canonical-symbol impact through all routes.
+
+After conservative reference resolution selects one target, the command SHALL obtain that target's binding through the provider's exact public-binding lookup. It MUST NOT recover the selected binding by filtering a capped or ranked symbol-search page.
+
+Ambiguous exports SHALL display deterministic candidates and MUST NOT merge or select them. Text, JSON, and TOON SHALL preserve both impact views and structured provenance.
+
+### Requirement: File-impact covering-spec presentation
+
+Single- and multi-file impact SHALL render the covering specs returned by Code Graph without independently querying or deriving coverage in the CLI.
+
+Text output SHALL group specs with depth-0 evidence under direct target coverage and specs whose minimum depth is greater than zero under blast-radius coverage. A spec with both kinds of evidence SHALL be shown once in the direct group with its complete evidence available in structured formats.
+
+JSON and TOON SHALL expose the ordered `coveringSpecs` entries and every `{ kind, target, depth }` evidence item. File coverage MUST still be rendered when symbol coverage is empty. Existing graph-health warnings SHALL continue to communicate when the indexed projection may be incomplete.
+
 ## Constraints
 
 - The CLI does not compute impact traversal, risk levels, or aggregate multi-file impacts — it delegates to the provider opened via `@specd/sdk` lifecycle helpers
@@ -212,8 +212,9 @@ $ specd graph impact --file /repo/packages/core/src/auth.ts --format json
 
 ## Spec Dependencies
 
-- [`cli:entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
-- [`cli:graph-cli-context`](../graph-cli-context/spec.md) — shared graph context and provider lifecycle
-- [`core:config`](../../core/config/spec.md) — configured operation, explicit config path handling, and bootstrap-mode relationship
-- [`code-graph:traversal`](../../code-graph/traversal/spec.md) — impact analysis semantics
-- [`code-graph:workspace-integration`](../../code-graph/workspace-integration/spec.md) — canonical workspace paths and config-relative file lookup semantics
+- `cli:entrypoint` — command and output conventions
+- `cli:graph-cli-context` — graph bootstrap and provider lifecycle
+- `core:config` — project graph configuration
+- `code-graph:traversal` — canonical and public-binding impact
+- `code-graph:workspace-integration` — selector identity
+- `code-graph:resolve-symbol-reference` — target resolution and ambiguity

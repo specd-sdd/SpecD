@@ -1,0 +1,50 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Command signature'
+  content: |
+    ```text
+    specd graph impact [--file <paths...> | --symbol <reference> | --spec <id> | --export <public-name> --from <file-or-surface>] [--direction dependents|dependencies|upstream|downstream|both] [--depth <n>] [--config <path> | --path <path>] [--format text|json|toon]
+    ```
+
+    Exactly one target family SHALL be supplied. `--export` and `--from` MUST appear together and are mutually exclusive with file, symbol, and spec targets. A missing half of the export selector is a usage error before provider open.
+
+    Existing direction, depth, context, and format options retain their meanings. `--symbol` selects canonical logical-symbol impact; `--export` selects one public binding on one surface.
+
+    The CLI SHALL normalize direction aliases before delegation and MUST NOT implement symbol or export resolution itself.
+
+    For an unqualified `--symbol`, Code Graph SHALL select a unique case-exact name match when one exists. If several case-exact candidates exist it SHALL return a bounded deterministic ambiguity result and perform no traversal. Only when no case-exact candidate exists SHALL it consider case-insensitive exact-name candidates. Prefix, component, and textual matches MUST NOT be accepted as impact targets. Qualified and full occurrence selectors retain their existing exact semantics.
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Public export impact analysis
+
+    An export query SHALL render the selected public binding, canonical logical target, and ordered binding chain. It SHALL report exact-binding consumers separately from the complete canonical-symbol impact through all routes.
+
+    After conservative reference resolution selects one target, the command SHALL obtain that target's binding through the provider's exact public-binding lookup. It MUST NOT recover the selected binding by filtering a capped or ranked symbol-search page.
+
+    Ambiguous exports SHALL display deterministic candidates and MUST NOT merge or select them. Text, JSON, and TOON SHALL preserve both impact views and structured provenance.
+
+    ### Requirement: File-impact covering-spec presentation
+
+    Single- and multi-file impact SHALL render the covering specs returned by Code Graph without independently querying or deriving coverage in the CLI.
+
+    Text output SHALL group specs with depth-0 evidence under direct target coverage and specs whose minimum depth is greater than zero under blast-radius coverage. A spec with both kinds of evidence SHALL be shown once in the direct group with its complete evidence available in structured formats.
+
+    JSON and TOON SHALL expose the ordered `coveringSpecs` entries and every `{ kind, target, depth }` evidence item. File coverage MUST still be rendered when symbol coverage is empty. Existing graph-health warnings SHALL continue to communicate when the indexed projection may be incomplete.
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - `cli:entrypoint` — command and output conventions
+    - `cli:graph-cli-context` — graph bootstrap and provider lifecycle
+    - `core:config` — project graph configuration
+    - `code-graph:traversal` — canonical and public-binding impact
+    - `code-graph:workspace-integration` — selector identity
+    - `code-graph:resolve-symbol-reference` — target resolution and ambiguity

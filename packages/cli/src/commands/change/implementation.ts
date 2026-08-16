@@ -4,6 +4,7 @@ import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
 import { enrichImplementationTracking } from './_implementation-tracking.js'
+import { resolveSdkHostContext } from '../../helpers/sdk-host.js'
 
 /**
  * Registers the `change implementation` command group.
@@ -161,10 +162,10 @@ async function renderImplementationState(
 ): Promise<void> {
   try {
     const { config, kernel } = await resolveCliContext({ configPath: opts.config })
-    const result = await kernel.changes.getImplementationReview.execute({ name })
-    const enriched = await enrichImplementationTracking(config, result.implementationTracking)
+    const host = await resolveSdkHostContext(config, kernel)
+    const enriched = await enrichImplementationTracking(host, name)
     const outOfScopeSpecIds = [...new Set(enriched.links.map((link) => link.specId))].filter(
-      (specId) => !result.specIds.includes(specId),
+      (specId) => !(enriched.specIds ?? []).includes(specId),
     )
     const fmt = parseFormat(opts.format)
 
@@ -194,9 +195,26 @@ async function renderImplementationState(
             link.symbols !== undefined && link.symbols.length > 0
               ? link.symbols.join(', ')
               : '(file-level)'
-          const stale =
-            link.staleSymbols.length > 0 ? `  stale=${link.staleSymbols.join(', ')}` : ''
-          lines.push(`  - ${link.specId} -> ${link.file}  symbols=${symbols}${stale}`)
+          lines.push(`  - ${link.specId} -> ${link.file}  symbols=${symbols}`)
+          for (const reviewed of link.symbolResolutions ?? []) {
+            const { resolution } = reviewed
+            lines.push(
+              `      ${reviewed.symbol}: ${resolution.status}${resolution.reasonCode === null ? '' : ` (${resolution.reasonCode})`}`,
+            )
+            if (resolution.target !== null) {
+              lines.push(`        target: ${resolution.target.id}`)
+            }
+            if (resolution.candidates.length > 0) {
+              lines.push(
+                `        candidates: ${resolution.candidates.map((candidate) => candidate.target.id).join(', ')}`,
+              )
+            }
+            if (resolution.path.length > 0) {
+              lines.push(
+                `        provenance: ${resolution.path.map((step) => `${step.kind}:${step.fromId}->${step.toId}`).join(' | ')}`,
+              )
+            }
+          }
         }
       }
       output(lines.join('\n'), 'text')
@@ -208,6 +226,7 @@ async function renderImplementationState(
         name,
         trackedFiles: enriched.trackedFiles,
         links: enriched.links,
+        graphHealth: enriched.graphHealth,
         graphHint: enriched.graphHint,
         outOfScopeSpecIds,
       },
@@ -221,9 +240,8 @@ async function renderImplementationState(
 /**
  * Applies one or more implementation-tracking mutations and renders the result.
  *
- * File-existence validation is delegated to the core use case. The CLI does
- * not perform its own `stat(...)` preflight — all validation errors surface
- * from `UpdateImplementationTracking`.
+ * Batch validation and mutation are delegated together to the Core use case so
+ * every file is validated before the first entity mutation.
  *
  * @param name - Change name
  * @param input - Mutation input and CLI options
@@ -251,18 +269,19 @@ async function mutateImplementationTracking(
 
     const expandedFiles = input.files.flatMap((f) => f.split(',').map((p) => p.trim()))
 
-    let lastResult: UpdateImplementationTrackingResult | undefined
-    for (const file of expandedFiles) {
-      lastResult = await kernel.changes.updateImplementationTracking.execute({
+    const primaryFile = expandedFiles[0]
+    if (primaryFile === undefined) return
+    const lastResult: UpdateImplementationTrackingResult =
+      await kernel.changes.updateImplementationTracking.execute({
         name,
         action: input.action,
-        file,
+        file: primaryFile,
+        files: expandedFiles,
         ...(input.specId !== undefined ? { specId: input.specId } : {}),
         ...(input.symbols !== undefined && input.symbols.length > 0
           ? { symbols: input.symbols }
           : {}),
       })
-    }
 
     const fmt = parseFormat(input.format)
     if (fmt === 'text') {

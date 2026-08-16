@@ -22,7 +22,7 @@ specd graph index [--force] [--exclude-path <pattern>] [--config <path> | --path
 
 ### Requirement: Indexing behaviour
 
-Index execution MUST go through `runIndexProjectGraph(ctx, input)` inside `@specd/sdk`. The worker process (or current process when worker bypass is active) obtains host context via `openSpecdHost`.
+Index execution MUST go through `runIndexProjectGraph(ctx, input)` inside `@specd/sdk`. The worker process (or current process when worker bypass is active) obtains an `SdkHostContext` through the shared SDK composition boundary. When the CLI has already resolved a configured kernel for command context or parent-lock ownership, the worker/bypass path SHALL reuse that kernel rather than reload configuration or build a parallel kernel; bootstrap mode SHALL create the equivalent SDK context from the resolved bootstrap config.
 
 The command SHALL retain CLI-only concerns:
 
@@ -83,6 +83,12 @@ For `graph index`, the documentation MUST include:
 
 For each other subcommand (`search`, `hotspots`, `stats`, `impact`), the documentation MUST include: command signature, flag descriptions, at least one usage example, and the graph CLI context model (`--config`, `--path`, bootstrap-only fallback semantics) when the command supports those flags.
 
+### Requirement: Visible incompatibility repair
+
+`graph index` SHALL be the supported user repair path for backend schema or graph-derivation incompatibility. It SHALL delegate repair through `runIndexProjectGraph` and MUST NOT delete backend files itself.
+
+Text output SHALL state when a destructive full rebuild occurred and why. JSON and TOON SHALL expose the same stable rebuild flag and reason. Per-file coverage/error counts SHALL remain visible after repair.
+
 ## Constraints
 
 - Index execution orchestration lives in `@specd/sdk` — the CLI does not assemble workspace targets, VCS refs, or `IndexProjectGraph` inputs inline
@@ -126,4 +132,4 @@ $ specd graph index --format json
 - [`core:config`](../../core/config/spec.md) — configured operation, explicit config path handling, and bootstrap-mode relationship
 - [`core:list-workspaces`](../../core/list-workspaces/spec.md) — centralized project orchestration (via SDK)
 - [`sdk:run-index-project-graph`](../../sdk/run-index-project-graph/spec.md) — index execution orchestration
-- [`sdk:host-context`](../../sdk/host-context/spec.md) — host bootstrap via `openSpecdHost`
+- [`sdk:host-context`](../../sdk/host-context/spec.md) — shared SDK host composition and resolved-context reuse

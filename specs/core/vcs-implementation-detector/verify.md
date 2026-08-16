@@ -42,6 +42,28 @@
 - **WHEN** the detector maps them into detector output
 - **THEN** the detector returns forward-slash-normalized project-relative paths
 
+#### Scenario: Repository paths are rebased to the nested project
+
+- **GIVEN** the configured project root is nested below the VCS repository root
+- **AND** the adapter returns changed paths inside and outside that project
+- **WHEN** the detector maps candidates
+- **THEN** inside paths are rebased to normalized project-relative paths
+- **AND** outside paths are omitted
+
+#### Scenario: Rename and deletion candidates survive mapping
+
+- **GIVEN** both sides of a rename and a deleted path are inside the project
+- **WHEN** candidates are mapped
+- **THEN** all paths remain present, deduplicated, and sorted
+
+#### Scenario: Detector separates generic exclusions from graph policy
+
+- **GIVEN** generic implementation exclusions were supplied by the caller
+- **WHEN** modified candidates are rebased and mapped
+- **THEN** those generic exclusions MAY remove matching implementation candidates
+- **AND** no Code Graph configuration, allowed-path, channel, default-exclusion, or graph-specific visibility policy is loaded or inferred
+- **AND** no graph freshness fingerprint is derived
+
 ### Requirement: No workspace normalization
 
 #### Scenario: Detector does not emit workspace-prefixed identities
@@ -49,3 +71,10 @@
 - **WHEN** the VCS-backed detector returns candidate files
 - **THEN** the returned values are not normalized to `workspace:path`
 - **AND** workspace validation remains deferred to archive-time materialization
+
+#### Scenario: Detector remains workspace-agnostic
+
+- **GIVEN** repository-relative modified paths and caller-provided implementation exclusions
+- **WHEN** the detector maps candidates
+- **THEN** it rebases to the project root and applies only the generic implementation exclusions
+- **AND** it performs no workspace discovery or Code Graph visibility evaluation

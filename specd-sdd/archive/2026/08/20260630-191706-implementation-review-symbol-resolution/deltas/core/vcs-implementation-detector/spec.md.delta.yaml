@@ -1,0 +1,20 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Modified-file candidate mapping'
+  content: |
+    When asked for modified files since a baseline reference, the detector MUST return project-relative candidate paths derived from the complete VCS adapter result.
+
+    Because `VcsAdapter.modifiedFiles(...)` returns repository-root-relative paths independently of its construction cwd, the detector SHALL resolve the adapter repository root and deterministically rebase each candidate to the configured project root. It SHALL normalize separators to forward slashes, deduplicate, and sort the result.
+
+    Paths outside the configured project root MUST NOT be returned as project-relative implementation candidates. Deleted/missing paths and both rename sides that are inside the project remain candidates; later implementation-review or materialization policy determines how they are presented.
+
+    The detector MAY apply the caller-provided generic implementation/internal `excludePaths` owned by the `ImplementationDetector` port after repository-to-project rebasing. It MUST NOT read Code Graph configuration, apply Code Graph effective visibility (`allowedPaths`, graph channel selection, graph defaults, or graph-specific exclusions), or derive a graph freshness fingerprint.
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: No workspace normalization'
+  content: |
+    The VCS implementation detector SHALL remain workspace-agnostic. It SHALL rebase repository-root-relative VCS paths to the configured project root, normalize separators, and MAY apply the generic caller-provided implementation/internal `excludePaths` required by the `ImplementationDetector` port.
+
+    Workspace identity validation and Code Graph effective visibility are not responsibilities of this detector. In particular, the detector MUST NOT load graph configuration or infer graph `allowedPaths`, graph channel selection, default graph exclusions, or graph-specific exclusion policy.

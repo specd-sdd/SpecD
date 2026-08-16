@@ -1,0 +1,27 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Content freshness and coverage diagnostics
+
+    Graph stats SHALL render VCS, working-tree/content, derivation, backend schema/generation, and partial-index health as distinct diagnostics. It SHALL summarize excluded, unsupported, parse-failed, and partial coverage with stable reason codes.
+
+    Text output SHALL explain why the graph cannot prove symbol absence. JSON and TOON SHALL emit the complete structured health and coverage fields unchanged. Dirty or partial state MUST NOT be labelled simply as a fresh graph.
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Statistics retrieval'
+  content: |
+    The command SHALL open the project host and graph provider through the standard composition lifecycle and call the provider's canonical `getGraphHealth` operation exactly once for the requested project.
+
+    Provider composition SHALL use the same resolved configuration and kernel workspace definitions as the host. The CLI MUST NOT independently repeat workspace discovery, recompute freshness, or merge a second health interpretation. Project bootstrap and configuration errors remain standard command errors.
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Output format'
+  content: |
+    Human-readable output SHALL retain the existing labeled graph counts and append canonical health diagnostics: aggregate state, global stale latch, content freshness, coverage completeness, schema/generation compatibility, non-current workspace details, and stable reason codes. It SHALL not reduce dirty, partial, unknown, or incompatible health to an unqualified fresh/current message.
+
+    JSON and TOON output SHALL expose the complete structured result returned by `getGraphHealth` without presenter-side health recomputation. Legacy fields such as `stale`, `currentRef`, and `fingerprintMismatch` MAY remain as compatibility projections, but no exact legacy warning prose or stderr-only presentation is required.

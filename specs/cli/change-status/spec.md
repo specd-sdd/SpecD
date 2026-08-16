@@ -109,19 +109,11 @@ Default `GetStatus` refresh behaviour applies unless a future CLI flag explicitl
 
 ### Requirement: Implementation section
 
-When implementation tracking is active for a change, the status display SHALL include an `Implementation` section derived from the `GetStatus` result **ONLY if the `--implementation` flag is provided**.
+When implementation tracking is active, `--implementation` SHALL render the structured projection returned by `sdk:build-implementation-review`.
 
-That section MUST expose:
+The section SHALL retain tracked-file states and confirmed stored values and SHALL expose each symbol link's status, reason, health/coverage, canonical logical target, candidates, and provenance. File-level links remain unforced.
 
-- tracked implementation files grouped or labeled by review state (`open`, `resolved`, `ignored`)
-- confirmed implementation links, showing file-level links and any symbol-level refinements
-- stale-link warnings for symbol-level links whose symbol is absent from the graph database
-
-The CLI section is based on the `GetStatus` projection. It MUST NOT recompute implementation tracking state independently, but it MAY enrich symbol-level links with stale diagnostics and graph-state hints by querying the code graph.
-
-When a symbol-level link contains a composed member identifier such as `X.Y`, `X#Y`, or `X::Y`, and the exact stored symbol string is not found in the graph, the CLI SHOULD retry stale resolution against the same file using the rightmost member segment plus the graph-reported symbol kind.
-
-This fallback is best-effort only. It MUST NOT rewrite the stored symbol string, MUST NOT mutate change state or archived sidecars, and MUST leave the symbol marked stale when multiple same-file matches make the fallback ambiguous.
+The CLI MUST NOT enrich `GetStatus` through independent graph queries or same-file/rightmost-name fallback and MUST NOT mutate tracking or sidecars.
 
 ### Requirement: Task completion in details section
 
@@ -148,13 +140,11 @@ In structured output (JSON/toon), the `specDependsOn` object from the change man
 
 ## Constraints
 
-- The output includes all artifacts declared by the schema, not only those present on disk
-- `effectiveStatus` reflects dependency cascading — an artifact may be `in-progress` because a dependency is incomplete even if its own hash matches
-- The CLI command serializes lifecycle and implementation-tracking state returned by `GetStatus`; it does not recompute core state independently
-- The CLI command MAY enrich implementation output with stale symbol diagnostics and graph-state hints by querying the code graph
-- When applying stale-symbol enrichment, the CLI MAY use a same-file composed-member fallback for symbols containing `.`, `#`, or `::`, but MUST treat it as review-time enrichment only
-- The CLI command MUST NOT call `SchemaRegistry`, `config show`, or any other use case to compute lifecycle data — it serializes what `GetStatus` returns for lifecycle interpretation
-- Lifecycle semantics shown by the command (effective artifact status, blockers, available transitions, next artifact, review summary, next action) are projections of the `GetStatus` result, which is itself derived from `LifecycleEngine`; the CLI must not re-derive them independently
+- The output includes all artifacts declared by the schema, not only those present on disk.
+- `effectiveStatus` reflects dependency cascading.
+- The CLI serializes lifecycle and tracking state returned by Core and symbol-resolution state returned by the SDK; it recomputes neither.
+- The CLI MUST NOT call `SchemaRegistry`, `config show`, or another use case to recompute lifecycle data.
+- Lifecycle semantics remain projections of `GetStatus` and `LifecycleEngine`.
 
 ## Examples
 
@@ -183,6 +173,7 @@ blockers:
 
 ## Spec Dependencies
 
-- [`cli:entrypoint`](../entrypoint/spec.md) — CLI config discovery, exit codes, and output conventions
-- [`core:change`](../../core/change/spec.md) — change and artifact state model
-- [`core:get-status`](../../core/get-status/spec.md) — status payload and default refresh orchestration
+- `cli:entrypoint` — output conventions
+- `core:change` — change state model
+- `core:get-status` — lifecycle status projection
+- `sdk:build-implementation-review` — shared implementation resolution projection

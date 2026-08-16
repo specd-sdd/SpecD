@@ -1,0 +1,33 @@
+- op: removed
+  selector:
+    type: section
+    matches: 'Requirement: List subcommand'
+
+- op: removed
+  selector:
+    type: section
+    matches: 'Requirement: Review subcommand'
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: List subcommand
+
+    #### Scenario: List renders SDK outcomes without fallback
+
+    - **GIVEN** stored links resolve through a re-export, hierarchy path, ambiguity, and incomplete coverage
+    - **WHEN** `changes implementation list` runs
+    - **THEN** it renders the SDK projection with stored values unchanged
+    - **AND** no CLI same-file or rightmost-segment query occurs
+
+    ### Requirement: Review subcommand
+
+    #### Scenario: Review distinguishes missing from inconclusive absence
+
+    - **GIVEN** one absent symbol has current complete coverage and another has dirty or parse-failed coverage
+    - **WHEN** implementation review runs
+    - **THEN** the first is missing and the second unresolved
+    - **AND** neither stored link is mutated

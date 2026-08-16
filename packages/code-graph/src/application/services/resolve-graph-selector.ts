@@ -31,6 +31,18 @@ export interface ResolvedSymbolSelector {
   readonly matchKind: 'name' | 'qualified' | 'full-id'
 }
 
+/** Deterministic outcome of resolving one symbol selector for impact. */
+export type ResolvedSymbolSelectorResult =
+  | { readonly status: 'resolved'; readonly match: ResolvedSymbolSelector }
+  | {
+      readonly status: 'ambiguous'
+      readonly candidates: readonly ResolvedSymbolSelector[]
+      readonly totalCandidates: number
+    }
+  | { readonly status: 'missing'; readonly candidates: readonly [] }
+
+const MAX_AMBIGUITY_CANDIDATES = 10
+
 /**
  * Resolves a raw file selector into canonical graph identities.
  * @param input - The raw selector string.
@@ -78,7 +90,7 @@ export async function resolveFileSelector(
 export async function resolveSymbolSelector(
   input: string,
   options: ResolveSelectorOptions,
-): Promise<ResolvedSymbolSelector[]> {
+): Promise<ResolvedSymbolSelectorResult> {
   const trimmed = input.trim()
   if (trimmed.length === 0) {
     throw new Error('empty symbol selector')
@@ -86,7 +98,9 @@ export async function resolveSymbolSelector(
 
   const direct = await options.store.getSymbol(trimmed)
   if (direct) {
-    return [{ symbolId: direct.id, filePath: direct.filePath, matchKind: 'full-id' }]
+    return resolvedResult([
+      { symbolId: direct.id, filePath: direct.filePath, matchKind: 'full-id' },
+    ])
   }
 
   const fullId = parseFullIdSelector(trimmed)
@@ -101,14 +115,16 @@ export async function resolveSymbolSelector(
         }),
       ),
     )
-    return symbolMatches
-      .flat()
-      .filter((symbol) => symbol.line === fullId.line && symbol.column === fullId.column)
-      .map((symbol) => ({
-        symbolId: symbol.id,
-        filePath: symbol.filePath,
-        matchKind: 'full-id' as const,
-      }))
+    return resolvedResult(
+      symbolMatches
+        .flat()
+        .filter((symbol) => symbol.line === fullId.line && symbol.column === fullId.column)
+        .map((symbol) => ({
+          symbolId: symbol.id,
+          filePath: symbol.filePath,
+          matchKind: 'full-id' as const,
+        })),
+    )
   }
 
   const qualified = parseQualifiedSelector(trimmed)
@@ -123,18 +139,53 @@ export async function resolveSymbolSelector(
         }),
       ),
     )
-    return symbolMatches.flat().map((symbol) => ({
-      symbolId: symbol.id,
-      filePath: symbol.filePath,
-      matchKind: 'qualified' as const,
-    }))
+    return resolvedResult(
+      symbolMatches.flat().map((symbol) => ({
+        symbolId: symbol.id,
+        filePath: symbol.filePath,
+        matchKind: 'qualified' as const,
+      })),
+    )
   }
 
-  return (await options.store.findSymbols({ name: trimmed })).map((symbol) => ({
-    symbolId: symbol.id,
-    filePath: symbol.filePath,
-    matchKind: 'name' as const,
-  }))
+  const caseExact = await options.store.findSymbols({ name: trimmed, caseSensitive: true })
+  const symbols =
+    caseExact.length > 0
+      ? caseExact
+      : await options.store.findSymbols({ name: trimmed, caseSensitive: false })
+  return resolvedResult(
+    symbols.map((symbol) => ({
+      symbolId: symbol.id,
+      filePath: symbol.filePath,
+      matchKind: 'name' as const,
+    })),
+  )
+}
+
+/**
+ * Converts exact selector candidates into one bounded public outcome.
+ * @param matches - Exact candidates returned by structured store queries.
+ * @returns Resolved, ambiguous, or missing selector result.
+ */
+function resolvedResult(matches: readonly ResolvedSymbolSelector[]): ResolvedSymbolSelectorResult {
+  const ordered = [
+    ...new Map(
+      [...matches]
+        .sort(
+          (left, right) =>
+            left.filePath.localeCompare(right.filePath) ||
+            left.symbolId.localeCompare(right.symbolId),
+        )
+        .map((match) => [match.symbolId, match]),
+    ).values(),
+  ]
+  if (ordered.length === 0) return { status: 'missing', candidates: [] }
+  if (ordered.length === 1) return { status: 'resolved', match: ordered[0]! }
+  return {
+    status: 'ambiguous',
+    candidates: ordered.slice(0, MAX_AMBIGUITY_CANDIDATES),
+    totalCandidates: ordered.length,
+  }
 }
 
 /**

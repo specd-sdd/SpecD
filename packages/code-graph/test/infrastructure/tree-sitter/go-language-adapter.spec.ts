@@ -11,10 +11,11 @@ import {
   type BindingFact,
 } from '../../../src/domain/value-objects/binding-fact.js'
 import { CallForm, type CallFact } from '../../../src/domain/value-objects/call-fact.js'
-import { type SymbolNode } from '../../../src/domain/value-objects/symbol-node.js'
+import { type SourceRange, type SymbolNode } from '../../../src/domain/value-objects/symbol-node.js'
 import { type Relation } from '../../../src/domain/value-objects/relation.js'
 import { type ImportDeclaration } from '../../../src/domain/value-objects/import-declaration.js'
 import { InMemoryIndexSession } from '../../../src/application/use-cases/in-memory-index-session.js'
+import { parseLogicalSymbol } from '../../../src/domain/value-objects/symbol-reference.js'
 
 interface TestAdapter {
   languages(): string[]
@@ -41,6 +42,16 @@ interface TestAdapter {
 
 const baseAdapter = new GoLanguageAdapter()
 const adapter = baseAdapter as unknown as TestAdapter
+
+function sliceRange(content: string, range: SourceRange): string {
+  const lines = content.split('\n')
+  const offsetAt = (line: number, column: number): number =>
+    lines.slice(0, line - 1).reduce((offset, value) => offset + value.length + 1, 0) + column
+  return content.slice(
+    offsetAt(range.startLine, range.startColumn),
+    offsetAt(range.endLine, range.endColumn),
+  )
+}
 
 adapter.extractSymbols = (filePath: string, content: string): SymbolNode[] => {
   const session = new InMemoryIndexSession()
@@ -159,6 +170,104 @@ describe('GoLanguageAdapter', () => {
     expect(adapter.languages()).toEqual(['go'])
   })
 
+  it('emits exported package bindings and import aliases', () => {
+    const session = new InMemoryIndexSession()
+    const facts = baseAdapter.analyzeFile(
+      'example/service.go',
+      'package example\nimport alias "example.org/dependency"\ntype Service struct{}\nfunc hidden() {}\n',
+      { session, workspaceName: 'workspace' },
+    ).referenceFacts
+
+    expect(baseAdapter.capabilities()).toMatchObject({
+      hierarchy: true,
+      buildContext: false,
+    })
+    expect(facts?.publicBindings.map((item) => item.exportedName)).toContain('Service')
+    expect(facts?.publicBindings.map((item) => item.exportedName)).not.toContain('hidden')
+    expect(facts?.localBindings.map((item) => item.localName)).toContain('alias')
+  })
+
+  it('uses one workspace-root package surface for root-level Go files', () => {
+    const first = baseAdapter.analyzeFile(
+      'workspace:first.go',
+      'package root\ntype First struct{}',
+      {
+        session: new InMemoryIndexSession(),
+        workspaceName: 'workspace',
+      },
+    ).referenceFacts!
+    const second = baseAdapter.analyzeFile(
+      'workspace:second.go',
+      'package root\ntype Second struct{}',
+      { session: new InMemoryIndexSession(), workspaceName: 'workspace' },
+    ).referenceFacts!
+
+    expect(first.publicBindings[0]?.surface).toBe('workspace:')
+    expect(second.publicBindings[0]?.surface).toBe('workspace:')
+  })
+
+  it('owner-qualifies receiver methods and emits interface evidence', () => {
+    const session = new InMemoryIndexSession()
+    const facts = baseAdapter.analyzeFile(
+      'service/readers.go',
+      `package service
+type Reader interface {
+  Read()
+}
+type First struct {}
+func (f *First) Read() {}
+type Second struct {}
+func (Second) Read() {}
+`,
+      { session, workspaceName: 'workspace' },
+    ).referenceFacts!
+
+    const reads = facts.declarations
+      .map((declaration) => parseLogicalSymbol(declaration.logicalId))
+      .filter((logical) => logical?.name === 'Read')
+    expect(reads).toHaveLength(3)
+    expect(new Set(reads.map((logical) => logical?.ownerId)).size).toBe(3)
+    expect(reads.map((logical) => logical?.memberForm)).toContain('signature')
+    expect(facts.hierarchy.filter((fact) => fact.kind === 'implements')).toHaveLength(2)
+    expect(facts.steps.filter((step) => step.kind === 'implements:0')).toHaveLength(2)
+    expect(facts.publicBindings.some((binding) => binding.exportedName === 'Read')).toBe(false)
+  })
+
+  it('retains pointer receiver evidence and does not infer incomplete method sets', () => {
+    const session = new InMemoryIndexSession()
+    const draft = baseAdapter.analyzeFile(
+      'service/readers.go',
+      `package service
+type Reader interface {
+  Read()
+  Close()
+}
+type Partial struct {}
+func (p *Partial) Read() {}
+`,
+      { session, workspaceName: 'workspace' },
+    )
+
+    expect(draft.parserState).toMatchObject({
+      pointerReceiverMethodIds: [expect.any(String)],
+    })
+    expect(draft.referenceFacts?.hierarchy.some((fact) => fact.kind === 'implements')).toBe(false)
+  })
+
+  it('owner-qualifies a compact same-line interface method', () => {
+    const facts = baseAdapter.analyzeFile(
+      'service/compact.go',
+      'package service\ntype Reader interface { Read() }',
+      { session: new InMemoryIndexSession(), workspaceName: 'workspace' },
+    ).referenceFacts!
+    const read = facts.declarations
+      .map((declaration) => parseLogicalSymbol(declaration.logicalId))
+      .find((logical) => logical?.name === 'Read')
+
+    expect(read?.ownerId).toBeDefined()
+    expect(read?.memberForm).toBe('signature')
+  })
+
   describe('extractSymbols', () => {
     it('extracts function declarations', () => {
       const code = 'package main\n\nfunc greet(name string) string {\n    return name\n}'
@@ -166,6 +275,29 @@ describe('GoLanguageAdapter', () => {
       expect(
         symbols.some((s: SymbolNode) => s.name === 'greet' && s.kind === SymbolKind.Function),
       ).toBe(true)
+    })
+
+    it('extracts parser-authoritative construct and declared-name ranges', () => {
+      const code = `package main
+
+type UserService struct {
+    Name string
+}`
+      const symbol = adapter
+        .extractSymbols('main.go', code)
+        .find((candidate) => candidate.name === 'UserService')!
+      const construct = sliceRange(code, {
+        startLine: symbol.line,
+        startColumn: symbol.column,
+        endLine: symbol.endLine,
+        endColumn: symbol.endColumn,
+      })
+
+      expect(construct).toBe(`UserService struct {
+    Name string
+}`)
+      expect(sliceRange(code, symbol.selectionRange)).toBe('UserService')
+      expect(symbol.id).toBe('main.go:class:UserService:3:5')
     })
 
     it('extracts method declarations', () => {

@@ -102,8 +102,25 @@
 - **AND** the parent forwards `SIGINT` and `SIGTERM` to the worker
 - **AND** the parent releases the indexing lock when the worker exits
 
-#### Scenario: Host context from openSpecdHost
+#### Scenario: Worker reuses resolved configured host state
 
-- **WHEN** `specd graph index` executes in the worker
-- **THEN** it obtains host context via `openSpecdHost` from `@specd/sdk`
-- **AND** platform symbols come from `@specd/sdk`
+- **GIVEN** graph-index command context already contains a configured kernel
+- **WHEN** the worker or in-process test bypass delegates to `runIndexProjectGraph`
+- **THEN** it builds the SDK host context around that same kernel
+- **AND** it does not reload configuration or construct a parallel kernel
+
+#### Scenario: Bootstrap context remains explicit
+
+- **GIVEN** graph index runs from the resolved bootstrap configuration
+- **WHEN** the worker or in-process test bypass prepares SDK orchestration
+- **THEN** it creates the equivalent SDK context from that bootstrap configuration
+- **AND** it does not discover and substitute a configured project implicitly
+
+### Requirement: Visible incompatibility repair
+
+#### Scenario: CLI reports provider-owned repair
+
+- **GIVEN** an incompatible schema or derivation fingerprint
+- **WHEN** `graph index` runs in text and structured modes
+- **THEN** SDK/provider repair performs the rebuild
+- **AND** output includes stable full-rebuild flag, reason, and coverage/error counts

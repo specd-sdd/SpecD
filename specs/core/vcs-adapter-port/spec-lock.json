@@ -6,23 +6,61 @@
   "dependsOn": ["default:_global/architecture", "core:vcs-adapter"],
   "implementation": [
     {
-      "file": "core:src/public.ts"
+      "file": "core:src/application/ports/vcs-adapter.ts"
     },
     {
-      "file": "core:test/barrel.spec.ts"
+      "file": "core:src/infrastructure/git/vcs-adapter.ts"
     },
     {
-      "file": "core:test/composition/vcs-adapter.spec.ts"
+      "file": "core:src/infrastructure/hg/vcs-adapter.ts"
     },
     {
-      "file": "core:src/application/ports/index.ts"
+      "file": "core:src/infrastructure/svn/vcs-adapter.ts"
     },
     {
-      "file": "core:src/ports.ts"
+      "file": "core:test/infrastructure/git/vcs-adapter.spec.ts"
     },
     {
-      "file": "core:src/application/ports/vcs-adapter.ts",
-      "symbols": ["VcsAdapter"]
+      "file": "core:test/infrastructure/hg/vcs-adapter.spec.ts"
+    },
+    {
+      "file": "core:test/infrastructure/svn/vcs-adapter.spec.ts"
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Defines technology-neutral VCS access to repository state, history, identity, detection, and null-safe fallbacks.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:1609fd95c41169aa76bf661b0fa50a0264448d1575d26229501519e0c411f1fd",
+          "lastModified": "2026-08-16T08:12:48.722Z"
+        },
+        "verify.md": {
+          "hash": "sha256:f8a0a397e3ac09e5cb85a74e80cba0611c9cebb696b48423a23a243dc86039f4",
+          "lastModified": "2026-08-16T08:12:48.726Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# VCS Adapter Port\n\n## Rules\n\n- `VcsAdapter`: application-layer abstract class, not TypeScript interface. Constructor accepts protected read-only `cwd` working-directory context.\n- `rootDir(): string`: absolute repository-root path; never relative. Outside VCS repository, throw `Error`.\n- `branch(): Promise<string>`: current branch. Detached/unknown head returns `\"HEAD\"` for git or backend-equivalent sentinel; never throws for detached head.\n- `isClean(): Promise<boolean>`: `true` only with no uncommitted changes; otherwise `false`.\n- `ref(): Promise<string | null>`: current short revision identifier. Does not encode cleanliness, dirty suffix, or working dir. VCS unavailable or no commits returns `null`; never throws.\n- `refAt(at): Promise<string | null>`: `at` is ISO-8601 timestamp string; return most recent revision at/before timestamp. Unavailable VCS, no matching revision, or unsupported lookup returns `null`; never throws.\n- `show(ref, filePath): Promise<string | null>`: string revision + repository-relative string path. Existing revision/file returns content; missing revision/path returns `null`, never throws.\n- `modifiedFiles(baseRef): Promise<readonly string[]>`: string baseline revision; return normalized forward-slash repository-relative paths differing between worktree and baseline (staged, unstaged, untracked, deleted, moves). Missing/empty results use `[]`, never `null`. Execution failures reject.\n- `identity(): Promise<VcsIdentity>` returns configured author identity. `VcsIdentity` = `{ readonly name: string; readonly email: string; readonly provider: string }`. Successful `name` non-empty; `email` may be empty for backends without native email (e.g. SVN).\n- `static detect(cwd: string): Promise<VcsAdapter | null>`: base implementation returns `null`. Subclasses asynchronously detect repository type, resolve root, return instance when `cwd` inside repository.\n- Export `VcsAdapter` runtime value from `@specd/core` public API. Consumers import from `@specd/core`, never internal application path.\n- `NullVcsAdapter`: required when no VCS detected. `rootDir()` throws `Error` indicating no VCS; `branch()` => `\"none\"`; `isClean()` => `true`; `ref()`/`refAt()`/`show()` => `null`; `modifiedFiles()` => `[]`; `identity()` => `{ name: \"unknown\", email: \"\", provider: \"null\" }`.\n\n## Constraints\n\n- All methods async returning Promise values.\n- No-data methods (`ref`, `refAt`, `show`) return `null`, not throw.\n- No-fallback method (`rootDir`) throws when VCS absent.\n- `branch` uses sentinel string, not `null`, for string interpolation.\n- Port: `application/ports/vcs-adapter.ts`; implementations: `infrastructure/<vcs>/vcs-adapter.ts`.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:1609fd95c41169aa76bf661b0fa50a0264448d1575d26229501519e0c411f1fd",
+          "lastModified": "2026-08-16T08:12:48.722Z"
+        },
+        "verify.md": {
+          "hash": "sha256:f8a0a397e3ac09e5cb85a74e80cba0611c9cebb696b48423a23a243dc86039f4",
+          "lastModified": "2026-08-16T08:12:48.726Z"
+        }
+      }
+    }
+  }
 }

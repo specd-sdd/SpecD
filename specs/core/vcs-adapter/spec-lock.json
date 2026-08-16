@@ -12,5 +12,41 @@
       "file": "core:src/composition/vcs-adapter.ts",
       "symbols": ["createVcsAdapter"]
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Auto-detects external, git, hg, or svn backends and returns a complete `VcsAdapter`, safely falling back to `NullVcsAdapter`.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:85bd5fdc6d5402a4296594807c61d837205934834f04dfccf6b6494c34d26f76",
+          "lastModified": "2026-07-20T16:47:44.598Z"
+        },
+        "verify.md": {
+          "hash": "sha256:270725eb5017c53692c4fa15174f95b37750fbe90e4d972c72efddcbb46f22f5",
+          "lastModified": "2026-07-20T16:47:44.598Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# VCS Adapter Factory\n\n## Rules\n\n- `createVcsAdapter(cwd?)` asynchronously returns `Promise<VcsAdapter>`; omitted or `undefined` `cwd` defaults to `process.cwd()`.\n- Probe additive external providers in registration order, then built-ins git, hg, svn. First success selects adapter; never execute subsequent probes. Non-zero VCS CLI exit means absent.\n- No provider match => `NullVcsAdapter`; detection miss never throws.\n- Returned implementation satisfies full `core:vcs-adapter-port`, including identity resolution and modified-file enumeration used by implementation detection. Concrete type remains hidden.\n- Factory only composes and selects backend; never performs implementation detection. Callers never construct concrete adapters.\n\n## Constraints\n\n- Detection spawns external processes.\n- `GitVcsAdapter`, `HgVcsAdapter`, `SvnVcsAdapter`, `NullVcsAdapter` never appear in public exports; composition-layer internals.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:85bd5fdc6d5402a4296594807c61d837205934834f04dfccf6b6494c34d26f76",
+          "lastModified": "2026-07-20T16:47:44.598Z"
+        },
+        "verify.md": {
+          "hash": "sha256:270725eb5017c53692c4fa15174f95b37750fbe90e4d972c72efddcbb46f22f5",
+          "lastModified": "2026-07-20T16:47:44.598Z"
+        }
+      }
+    }
+  }
 }

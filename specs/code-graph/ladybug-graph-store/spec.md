@@ -232,6 +232,16 @@ compile-time constant values (such as `RelationType` enum values used as relatio
 labels), COPY commands with internally generated file paths, and backend-specific
 administrative queries where no external values are involved.
 
+### Requirement: Reference schema upgrade
+
+Ladybug SHALL remain a supported registered backend and SHALL persist and query the same logical-symbol, declaration, member, symbol-space, binding, provenance, coverage, complete construct/selection ranges, batched reverse coverage, and reference-search semantics as SQLite. Structured workspace, surface, name, symbol-space, owner, member-form, and exported-name properties SHALL be indexed and SHALL drive lookup/ranking without parsing or substring-ranking serialized canonical ids.
+
+Ladybug SHALL provide a substring-capable source-content candidate index with the same shared complete/raw/expanded query plan, filter-before-candidate-limit behavior, deterministic ordering, and bounded short-query fallback. Code Graph, not Ladybug-specific orchestration, SHALL verify precise occurrences, perform symbol/file suppression, and apply per-file occurrence caps.
+
+The backend SHALL increment its schema version exactly once relative to its then-current version; absent an intervening change this is `10` to `11`. An incompatible store MUST reject normal reads. Index repair SHALL rebuild destructively, rotate the shared storage generation, and rebuild FTS before readiness.
+
+Ladybug SHALL persist the same indexed-input observations, workspace/global latches, VCS-scope evidence, compact incremental facts, case precedence, bounded ambiguity, exact-file normalization results, and total/omitted match behavior as SQLite. One indexing run SHALL use one transaction/session with bounded `COPY` chunks, one commit, and one semantic/content search-index rebuild; chunk appends MUST NOT rebuild search indexes independently.
+
 ## Constraints
 
 - `LadybugGraphStore` is an infrastructure adapter, not part of the abstract graph-store contract

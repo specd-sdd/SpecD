@@ -2,41 +2,6 @@
 
 ## Requirements
 
-### Requirement: Command signature
-
-#### Scenario: Explicit config path bypasses discovery
-
-- **GIVEN** the current directory would autodiscover a different `specd.yaml`
-- **WHEN** `specd graph impact --file src/auth.ts --config /tmp/other/specd.yaml` is run
-- **THEN** the command uses `/tmp/other/specd.yaml` directly
-
-#### Scenario: Explicit path enters bootstrap mode
-
-- **GIVEN** a `specd.yaml` exists under the current repository
-- **WHEN** `specd graph impact --file src/auth.ts --path /tmp/repo` is run
-- **THEN** config discovery is ignored
-- **AND** the command analyzes impact against a synthetic single workspace `default` rooted at `/tmp/repo`
-
-#### Scenario: Invalid direction fails before provider access
-
-- **WHEN** `specd graph impact --file src/auth.ts --direction sideways` is run
-- **THEN** the command exits with code 1
-- **AND** stderr explains that the direction value is invalid
-- **AND** no graph provider is opened
-
-#### Scenario: Removed --changes flag is rejected
-
-- **WHEN** `specd graph impact --changes src/auth.ts` is run
-- **THEN** the command exits with code 1
-- **AND** stderr does not present `--changes` as a supported selector
-
-#### Scenario: Spec selector enters requirement impact mode
-
-- **GIVEN** spec `core:change` is indexed in the graph
-- **WHEN** `specd graph impact --spec core:change` is run
-- **THEN** the command analyzes requirement impact for that spec
-- **AND** no file or symbol selector is required
-
 ### Requirement: File impact analysis
 
 #### Scenario: Upstream file analysis with defaults
@@ -230,3 +195,67 @@
 - **WHEN** `specd graph impact --file core:src/auth.ts` is run
 - **THEN** stderr contains a `fatal:` prefixed error message
 - **AND** the process exits with code 3
+
+### Requirement: Command signature
+
+#### Scenario: Export selector requires both flags
+
+- **WHEN** only `--export X` or only `--from barrel.ts` is supplied
+- **THEN** the command fails usage validation before provider open
+
+#### Scenario: Target families are exclusive
+
+- **WHEN** export flags are combined with file, symbol, or spec
+- **THEN** the command rejects the invocation
+
+#### Scenario: Case-exact symbol selector wins
+
+- **GIVEN** one declaration named `Change` and many variables named `change`
+- **WHEN** impact receives `--symbol Change`
+- **THEN** Code Graph selects the unique case-exact declaration and traverses only it
+
+#### Scenario: Exact ambiguity is bounded and not traversed
+
+- **GIVEN** several declarations have the same case-exact unqualified name
+- **WHEN** impact receives that name
+- **THEN** it returns a bounded deterministic ambiguity list and performs no traversal
+- **AND** prefix or textual candidates are never accepted as targets
+
+### Requirement: Public export impact analysis
+
+#### Scenario: Structured output preserves two impact views
+
+- **WHEN** one public export is analyzed in text, JSON, and TOON
+- **THEN** each output identifies binding, target, chain, exact-route consumers, and complete canonical impact
+- **AND** ambiguous candidates are not merged
+
+#### Scenario: Common export name cannot hide the selected binding
+
+- **GIVEN** more than twenty logical targets expose the same public name
+- **AND** conservative resolution selects a target outside the first ranked search page
+- **WHEN** public-export impact is requested for that target and surface
+- **THEN** the command obtains the exact selected binding and reports its routes
+- **AND** it does not filter a capped symbol-search page to recover the binding
+
+### Requirement: File-impact covering-spec presentation
+
+#### Scenario: Text separates direct and blast-radius coverage
+
+- **GIVEN** one spec has direct evidence and another has only depth-greater-than-zero evidence
+- **WHEN** file impact is rendered as text
+- **THEN** the first appears under direct target coverage
+- **AND** the second appears under blast-radius coverage
+
+#### Scenario: Mixed evidence renders one spec
+
+- **GIVEN** one spec has both direct and blast-radius evidence
+- **WHEN** file impact is rendered
+- **THEN** text shows it once in the direct group
+- **AND** JSON and TOON preserve every ordered evidence item
+
+#### Scenario: CLI projects provider coverage without re-querying
+
+- **GIVEN** Code Graph returns file-only covering evidence
+- **WHEN** the CLI renders single- or multi-file impact
+- **THEN** it renders that evidence even when symbol coverage is empty
+- **AND** it performs no independent coverage query or derivation

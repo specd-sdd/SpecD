@@ -1,7 +1,7 @@
 {
   "name": "code-graph-symbol-semantic-context",
   "createdAt": "2026-07-15T14:01:36.552Z",
-  "updatedAt": "2026-07-28T07:32:15.483Z",
+  "updatedAt": "2026-08-16T08:12:44.010Z",
   "description": "Add deterministic symbol ownership and range context to support hierarchical purpose extraction and semantic search in code graph.",
   "schema": {
     "name": "schema-std",
@@ -1126,6 +1126,325 @@
         {
           "type": "verify",
           "files": ["code-graph:language-adapter"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-16T08:08:54.397Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'implementation-review-symbol-resolution' was archived with overlapping specs: code-graph:indexer, code-graph:language-adapter, code-graph:symbol-model",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:symbol-model", "code-graph:language-adapter", "code-graph:indexer"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:symbol-model", "code-graph:language-adapter", "code-graph:indexer"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-16T08:08:56.443Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'implementation-review-symbol-resolution' was archived with overlapping specs: code-graph:indexer, code-graph:language-adapter, code-graph:symbol-model",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:symbol-model", "code-graph:language-adapter", "code-graph:indexer"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:symbol-model", "code-graph:language-adapter", "code-graph:indexer"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-16T08:09:18.925Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'implementation-review-symbol-resolution' was archived with overlapping specs: code-graph:indexer, code-graph:language-adapter, code-graph:symbol-model",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:symbol-model", "code-graph:language-adapter", "code-graph:indexer"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:symbol-model", "code-graph:language-adapter", "code-graph:indexer"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-16T08:09:58.591Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'implementation-review-symbol-resolution' was archived with overlapping specs: code-graph:indexer, code-graph:language-adapter, code-graph:symbol-model",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:symbol-model", "code-graph:language-adapter", "code-graph:indexer"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:symbol-model", "code-graph:language-adapter", "code-graph:indexer"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-16T08:10:03.347Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'implementation-review-symbol-resolution' was archived with overlapping specs: code-graph:indexer, code-graph:language-adapter, code-graph:symbol-model",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:symbol-model", "code-graph:language-adapter", "code-graph:indexer"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:symbol-model", "code-graph:language-adapter", "code-graph:indexer"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-16T08:10:16.293Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'implementation-review-symbol-resolution' was archived with overlapping specs: code-graph:indexer, code-graph:language-adapter, code-graph:symbol-model",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:symbol-model", "code-graph:language-adapter", "code-graph:indexer"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:symbol-model", "code-graph:language-adapter", "code-graph:indexer"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-16T08:10:23.994Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'implementation-review-symbol-resolution' was archived with overlapping specs: code-graph:indexer, code-graph:language-adapter, code-graph:symbol-model",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:symbol-model", "code-graph:language-adapter", "code-graph:indexer"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:symbol-model", "code-graph:language-adapter", "code-graph:indexer"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-16T08:11:56.411Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'implementation-review-symbol-resolution' was archived with overlapping specs: code-graph:indexer, code-graph:language-adapter, code-graph:symbol-model",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:symbol-model", "code-graph:language-adapter", "code-graph:indexer"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:symbol-model", "code-graph:language-adapter", "code-graph:indexer"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-16T08:12:11.001Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'implementation-review-symbol-resolution' was archived with overlapping specs: code-graph:indexer, code-graph:language-adapter, code-graph:symbol-model",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:symbol-model", "code-graph:language-adapter", "code-graph:indexer"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:symbol-model", "code-graph:language-adapter", "code-graph:indexer"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-16T08:12:29.377Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'implementation-review-symbol-resolution' was archived with overlapping specs: code-graph:indexer, code-graph:language-adapter, code-graph:symbol-model",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:symbol-model", "code-graph:language-adapter", "code-graph:indexer"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:symbol-model", "code-graph:language-adapter", "code-graph:indexer"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-16T08:12:44.004Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'implementation-review-symbol-resolution' was archived with overlapping specs: code-graph:indexer, code-graph:language-adapter, code-graph:symbol-model",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:symbol-model", "code-graph:language-adapter", "code-graph:indexer"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:symbol-model", "code-graph:language-adapter", "code-graph:indexer"]
         },
         {
           "type": "design",

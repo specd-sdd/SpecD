@@ -88,26 +88,99 @@ describe('resolve-graph-selector', () => {
     )
     const bareMatches = await resolveSymbolSelector('invalidate', { store })
 
-    expect(fullIdMatches).toEqual([
-      {
+    expect(fullIdMatches).toEqual({
+      status: 'resolved',
+      match: {
         symbolId: symbol.id,
         filePath: file.path,
         matchKind: 'full-id',
       },
-    ])
-    expect(qualifiedMatches).toEqual([
-      {
+    })
+    expect(qualifiedMatches).toEqual({
+      status: 'resolved',
+      match: {
         symbolId: symbol.id,
         filePath: file.path,
         matchKind: 'qualified',
       },
-    ])
-    expect(bareMatches).toEqual([
-      {
+    })
+    expect(bareMatches).toEqual({
+      status: 'resolved',
+      match: {
         symbolId: symbol.id,
         filePath: file.path,
         matchKind: 'name',
       },
-    ])
+    })
+  })
+
+  it('prefers case-exact bare names and bounds exact ambiguity', async () => {
+    const file = createFileNode({
+      path: 'core:src/change.ts',
+      configRelativePath: 'packages/core/src/change.ts',
+      language: 'typescript',
+      contentHash: 'sha256:change',
+      workspace: 'core',
+    })
+    const exact = createSymbolNode({
+      name: 'Change',
+      kind: 'class',
+      filePath: file.path,
+      line: 1,
+      column: 0,
+    })
+    const lower = Array.from({ length: 12 }, (_, index) =>
+      createSymbolNode({
+        name: 'change',
+        kind: 'variable',
+        filePath: file.path,
+        line: index + 2,
+        column: 0,
+      }),
+    )
+    await store.upsertFile(file, [exact, ...lower], [])
+
+    expect(await resolveSymbolSelector('Change', { store })).toEqual({
+      status: 'resolved',
+      match: { symbolId: exact.id, filePath: file.path, matchKind: 'name' },
+    })
+
+    expect(await resolveSymbolSelector('change', { store })).toMatchObject({
+      status: 'ambiguous',
+      totalCandidates: 12,
+      candidates: expect.arrayContaining([
+        expect.objectContaining({ symbolId: lower[0]!.id, matchKind: 'name' }),
+      ]),
+    })
+    const ambiguous = await resolveSymbolSelector('change', { store })
+    expect(ambiguous.status === 'ambiguous' ? ambiguous.candidates : []).toHaveLength(10)
+  })
+
+  it('does not widen bare impact selectors to prefixes', async () => {
+    const file = createFileNode({
+      path: 'core:src/validate.ts',
+      configRelativePath: 'packages/core/src/validate.ts',
+      language: 'typescript',
+      contentHash: 'sha256:validate',
+      workspace: 'core',
+    })
+    await store.upsertFile(
+      file,
+      [
+        createSymbolNode({
+          name: 'ValidateArtifacts',
+          kind: 'class',
+          filePath: file.path,
+          line: 1,
+          column: 0,
+        }),
+      ],
+      [],
+    )
+
+    expect(await resolveSymbolSelector('ValidateArtifact', { store })).toEqual({
+      status: 'missing',
+      candidates: [],
+    })
   })
 })

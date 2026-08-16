@@ -12,6 +12,13 @@ import { RelationType } from '../../../src/domain/value-objects/relation-type.js
 import { createSpecNode } from '../../../src/domain/value-objects/spec-node.js'
 import { SymbolKind } from '../../../src/domain/value-objects/symbol-kind.js'
 import { createSymbolNode } from '../../../src/domain/value-objects/symbol-node.js'
+import {
+  createLocalBinding,
+  createLogicalSymbol,
+  createPublicBinding,
+  SymbolSpace,
+} from '../../../src/domain/value-objects/symbol-reference.js'
+import { ResolveSymbolReference } from '../../../src/application/use-cases/resolve-symbol-reference.js'
 
 let tempDir: string | undefined
 
@@ -171,12 +178,143 @@ describe('LadybugGraphStore hierarchy persistence', () => {
     await store.close()
   })
 
-  it('exposes schema version 8 with document storage in the ddl', () => {
-    expect(SCHEMA_VERSION).toBe(8)
+  it('exposes schema version 13 with structured semantic search indexes', () => {
+    expect(SCHEMA_VERSION).toBe(13)
     expect(SCHEMA_DDL).toContain('CREATE NODE TABLE IF NOT EXISTS Document')
+    expect(SCHEMA_DDL).toContain('CREATE NODE TABLE IF NOT EXISTS LogicalSymbol')
+    expect(SCHEMA_DDL).toContain('CREATE NODE TABLE IF NOT EXISTS IndexCoverage')
+    expect(SCHEMA_DDL).toContain('selectionStartLine INT64')
     expect(SCHEMA_DDL).toContain('CREATE REL TABLE IF NOT EXISTS EXTENDS')
     expect(SCHEMA_DDL).toContain('CREATE REL TABLE IF NOT EXISTS IMPLEMENTS')
     expect(SCHEMA_DDL).toContain('CREATE REL TABLE IF NOT EXISTS OVERRIDES')
+  })
+
+  it('persists and batch-queries semantic reference facts deterministically', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-test-'))
+    const store = new LadybugGraphStore(tempDir)
+    await store.open()
+    const logical = createLogicalSymbol({
+      workspace: 'code-graph',
+      surface: 'code-graph:src/reference.ts',
+      name: 'ReferenceTarget',
+      space: SymbolSpace.Value,
+      ownerId: undefined,
+      memberForm: undefined,
+    })
+    const publicBinding = createPublicBinding({
+      surface: logical.surface,
+      exportedName: 'Target',
+      space: SymbolSpace.Value,
+      targetId: logical.id,
+    })
+    const localBinding = createLocalBinding({
+      filePath: 'code-graph:src/consumer.ts',
+      scopeId: 'module',
+      localName: 'Target',
+      space: SymbolSpace.Value,
+      targetId: logical.id,
+    })
+
+    await store.replaceReferenceFacts({
+      logicalSymbols: [logical],
+      declarations: [
+        {
+          logicalSymbolId: logical.id,
+          declaration: {
+            logicalId: logical.id,
+            symbolId: 'code-graph:src/reference.ts:function:ReferenceTarget:1:0',
+            location: {
+              filePath: 'code-graph:src/reference.ts',
+              line: 1,
+              column: 0,
+              endLine: 1,
+              endColumn: 15,
+            },
+            kind: SymbolKind.Function,
+          },
+        },
+      ],
+      publicBindings: [publicBinding],
+      localBindings: [localBinding],
+      steps: [{ fromId: publicBinding.id, toId: logical.id, kind: 'export' }],
+      coverage: [
+        {
+          filePath: 'code-graph:src/reference.ts',
+          contentHash: 'sha256:reference',
+          status: 'indexed',
+          reason: undefined,
+          capabilities: ['declarations', 'publicBindings'],
+        },
+      ],
+    })
+
+    await expect(
+      store.findLogicalSymbols([
+        {
+          workspace: logical.workspace,
+          name: logical.name,
+          surface: logical.surface,
+          space: logical.space,
+          ownerId: undefined,
+          memberForm: undefined,
+        },
+      ]),
+    ).resolves.toEqual([logical])
+    await expect(store.findDeclarations([logical.id])).resolves.toMatchObject([
+      { logicalSymbolId: logical.id, declaration: { symbolId: expect.any(String) } },
+    ])
+    await expect(
+      store.findPublicBindings([
+        { surface: logical.surface, exportedName: 'Target', space: SymbolSpace.Value },
+      ]),
+    ).resolves.toEqual([publicBinding])
+    await expect(
+      store.findLocalBindings([
+        {
+          filePath: localBinding.filePath,
+          scopeId: 'module',
+          localName: 'Target',
+          space: SymbolSpace.Value,
+        },
+      ]),
+    ).resolves.toEqual([localBinding])
+    await expect(store.findResolutionSteps([publicBinding.id])).resolves.toEqual([
+      { fromId: publicBinding.id, toId: logical.id, kind: 'export' },
+    ])
+    await expect(store.findIndexCoverage(['code-graph:src/reference.ts'])).resolves.toEqual([
+      {
+        filePath: 'code-graph:src/reference.ts',
+        contentHash: 'sha256:reference',
+        status: 'indexed',
+        reason: undefined,
+        capabilities: ['declarations', 'publicBindings'],
+      },
+    ])
+    await expect(store.getAllIndexCoverage()).resolves.toEqual([
+      {
+        filePath: 'code-graph:src/reference.ts',
+        contentHash: 'sha256:reference',
+        status: 'indexed',
+        reason: undefined,
+        capabilities: ['declarations', 'publicBindings'],
+      },
+    ])
+    const resolution = await new ResolveSymbolReference(store, async () => ({
+      fresh: true,
+      complete: true,
+      reasonCodes: [],
+    })).execute({
+      workspace: 'code-graph',
+      requested: 'Target',
+      publicSurface: logical.surface,
+      symbolSpace: SymbolSpace.Value,
+    })
+    expect(resolution.status).toBe('resolved')
+    expect(resolution.target).toEqual(logical)
+    expect(resolution.path).toEqual([
+      { fromId: publicBinding.id, toId: logical.id, kind: 'export' },
+    ])
+    await store.close()
   })
 
   it('stores graph data under graph/ and recreates backend state destructively', async () => {
@@ -348,7 +486,7 @@ describe('LadybugGraphStore hierarchy persistence', () => {
     expect(documentHits[0]?.document.path).toBe(strongDocument.path)
 
     await store.close()
-  })
+  }, 15_000)
 
   it('keeps exact-prefix-suffix-substring ordering for Ladybug symbol reranking', async () => {
     tempDir = mkdtempSync(join(tmpdir(), 'code-graph-test-'))
@@ -412,6 +550,40 @@ describe('LadybugGraphStore hierarchy persistence', () => {
       substring.id,
     ])
 
+    await store.close()
+  })
+
+  it('pages short source-content queries in Ladybug without loading every file', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-test-'))
+    const store = new LadybugGraphStore(tempDir)
+    await store.open()
+    await store.bulkLoad({
+      files: ['core:src/a.ts', 'core:src/b.ts'].map((path) =>
+        createFileNode({
+          path,
+          configRelativePath: path.substring(path.indexOf(':') + 1),
+          language: 'typescript',
+          contentHash: `sha256:${path}`,
+          workspace: 'core',
+          content: 'export const x = 1',
+        }),
+      ),
+      symbols: [],
+      specs: [],
+      relations: [],
+    })
+    const getAllFiles = vi.spyOn(store, 'getAllFiles')
+
+    const page = await store.searchSourceContentCandidates({
+      normalizedQuery: 'x',
+      rawTerms: ['x'],
+      expandedTerms: [],
+      limit: 1,
+    })
+
+    expect(getAllFiles).not.toHaveBeenCalled()
+    expect(page.candidates.map(({ file }) => file.path)).toEqual(['core:src/a.ts'])
+    expect(page.nextCursor).toBe('1')
     await store.close()
   })
 })

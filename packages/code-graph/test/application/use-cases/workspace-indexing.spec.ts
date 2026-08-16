@@ -3,17 +3,19 @@ import { makeSpec } from '../../helpers/make-spec.js'
 import { makeListResult, makeMockSpecRepository } from '../../helpers/make-mock-spec-repository.js'
 
 const makeMockRepo = makeMockSpecRepository
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync, mkdirSync, utimesSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { tmpdir } from 'node:os'
 import { SpecRepository, Spec, SpecPath } from '@specd/core'
 import { IndexCodeGraph } from '../../../src/application/use-cases/index-code-graph.js'
 import { InMemoryGraphStore } from '../../helpers/in-memory-graph-store.js'
 import { type GraphStore } from '../../../src/domain/ports/graph-store.js'
+import { type IndexOptions } from '../../../src/domain/value-objects/index-options.js'
 import { AdapterRegistry } from '../../../src/infrastructure/tree-sitter/adapter-registry.js'
 import { TypeScriptLanguageAdapter } from '../../../src/infrastructure/tree-sitter/typescript-language-adapter.js'
 import { computeContentHash } from '../../../src/application/use-cases/compute-content-hash.js'
 import { CODE_GRAPH_VERSION } from '../../../src/index.js'
+import { SymbolSpace } from '../../../src/domain/value-objects/symbol-reference.js'
 import {
   buildExpectedFingerprintMap,
   expectStoredFingerprintMap,
@@ -57,6 +59,158 @@ describe('Workspace indexing', () => {
   afterEach(async () => {
     await store.close()
     rmSync(tempDir, { recursive: true, force: true })
+  })
+
+  it('persists one durable coverage outcome for every considered source target', async () => {
+    const wsDir = createWorkspaceDir(tempDir, 'ws', {
+      'src/code.ts': 'export const value = 1',
+      'README.txt': 'documentation',
+      'asset.bin': new Uint8Array([0, 1, 2, 3]),
+    })
+
+    const indexer = new IndexCodeGraph(store, registry)
+    const options: IndexOptions = {
+      projectRoot: tempDir,
+      vcsRoot: tempDir,
+      workspaces: [
+        {
+          name: 'ws',
+          prefix: null,
+          codeRoot: wsDir,
+          specRepo: makeMockRepo(),
+          ownership: 'owned',
+          isExternal: false,
+        },
+      ],
+      graphConfig: { includePaths: [], workspaces: new Map() },
+    }
+    await indexer.execute(options)
+
+    await expect(
+      store.findIndexCoverage(['ws:src/code.ts', 'ws:README.txt', 'ws:asset.bin']),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        filePath: 'ws:asset.bin',
+        status: 'unsupported',
+        reason: 'non-text-content',
+      }),
+      expect.objectContaining({
+        filePath: 'ws:README.txt',
+        status: 'unsupported',
+        reason: 'no-language-adapter',
+      }),
+      expect.objectContaining({
+        filePath: 'ws:src/code.ts',
+        status: 'indexed',
+      }),
+    ])
+
+    const publicBindingQuery = [
+      {
+        surface: 'ws:src/code.ts',
+        exportedName: 'value',
+        space: SymbolSpace.Value,
+      },
+    ]
+    const bindingsBeforeNoop = await store.findPublicBindings(publicBindingQuery)
+    expect(bindingsBeforeNoop).toHaveLength(1)
+    const refreshedStamp = new Date(Date.now() + 2_000)
+    utimesSync(join(wsDir, 'src/code.ts'), refreshedStamp, refreshedStamp)
+    const rebuildFtsIndexes = vi.spyOn(store, 'rebuildFtsIndexes')
+    const replaceReferenceFacts = vi.spyOn(store, 'replaceReferenceFacts')
+    const unchanged = await indexer.execute(options)
+    expect(unchanged.filesIndexed).toBe(0)
+    expect(unchanged.filesSkipped).toBe(3)
+    expect(unchanged.phaseMetrics.dependencyFacts.count).toBe(0)
+    expect(unchanged.phaseMetrics.adapterRelations.count).toBe(0)
+    expect(unchanged.phaseMetrics.searchIndexRebuild).toEqual({ count: 0, durationMs: 0 })
+    expect(rebuildFtsIndexes).not.toHaveBeenCalled()
+    expect(replaceReferenceFacts).not.toHaveBeenCalled()
+    await expect(store.findPublicBindings(publicBindingQuery)).resolves.toEqual(bindingsBeforeNoop)
+  })
+
+  it('re-extracts only a changed file and its transitive affected closure', async () => {
+    const wsDir = createWorkspaceDir(tempDir, 'ws', {
+      'src/target.ts': 'export function target(): number { return 1 }',
+      'src/importer.ts':
+        "import { target } from './target.js'; export function callTarget(): number { return target() }",
+      'src/unrelated.ts': 'export function unrelated(): number { return 7 }',
+    })
+    const adapter = new TypeScriptLanguageAdapter()
+    const localRegistry = new AdapterRegistry()
+    localRegistry.register(adapter)
+    const analyzeFile = vi.spyOn(adapter, 'analyzeFile')
+    const indexer = new IndexCodeGraph(store, localRegistry)
+    const options: IndexOptions = {
+      projectRoot: tempDir,
+      vcsRoot: null,
+      workspaces: [
+        {
+          name: 'ws',
+          prefix: null,
+          codeRoot: wsDir,
+          specRepo: makeMockRepo(),
+          ownership: 'owned',
+          isExternal: false,
+        },
+      ],
+      graphConfig: { includePaths: [], workspaces: new Map() },
+    }
+    await indexer.execute(options)
+    analyzeFile.mockClear()
+
+    writeFileSync(join(wsDir, 'src/target.ts'), 'export function target(): number { return 2 }')
+    const result = await indexer.execute(options)
+    const analyzedPaths = analyzeFile.mock.calls.map(([filePath]) => filePath).sort()
+
+    expect(analyzedPaths).toEqual(['ws:src/importer.ts', 'ws:src/target.ts'])
+    expect(result.filesIndexed).toBe(1)
+    expect(result.filesSkipped).toBe(2)
+    expect(await store.findSymbols({ filePath: 'ws:src/unrelated.ts' })).toHaveLength(1)
+  })
+
+  it('reprocesses unresolved importers when a previously missing target is added', async () => {
+    const wsDir = createWorkspaceDir(tempDir, 'ws', {
+      'src/importer.ts':
+        "import { target } from './target.js'; export function callTarget(): number { return target() }",
+      'src/unrelated.ts': 'export function unrelated(): number { return 7 }',
+    })
+    const adapter = new TypeScriptLanguageAdapter()
+    const localRegistry = new AdapterRegistry()
+    localRegistry.register(adapter)
+    const analyzeFile = vi.spyOn(adapter, 'analyzeFile')
+    const indexer = new IndexCodeGraph(store, localRegistry)
+    const options: IndexOptions = {
+      projectRoot: tempDir,
+      vcsRoot: null,
+      workspaces: [
+        {
+          name: 'ws',
+          prefix: null,
+          codeRoot: wsDir,
+          specRepo: makeMockRepo(),
+          ownership: 'owned',
+          isExternal: false,
+        },
+      ],
+      graphConfig: { includePaths: [], workspaces: new Map() },
+    }
+    await indexer.execute(options)
+    await expect(store.getImporters('ws:src/target.ts')).resolves.toEqual([
+      expect.objectContaining({ source: 'ws:src/importer.ts', target: 'ws:src/target.ts' }),
+    ])
+    analyzeFile.mockClear()
+
+    writeFileSync(join(wsDir, 'src/target.ts'), 'export function target(): number { return 1 }')
+    const result = await indexer.execute(options)
+    const analyzedPaths = analyzeFile.mock.calls.map(([filePath]) => filePath).sort()
+
+    expect(analyzedPaths).toEqual(['ws:src/importer.ts', 'ws:src/target.ts', 'ws:src/unrelated.ts'])
+    expect(result.filesIndexed).toBe(1)
+    expect(result.filesSkipped).toBe(2)
+    await expect(store.getImporters('ws:src/target.ts')).resolves.toEqual([
+      expect.objectContaining({ source: 'ws:src/importer.ts', target: 'ws:src/target.ts' }),
+    ])
   })
 
   it('indexes multiple workspaces with package identities', async () => {

@@ -1,0 +1,56 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "code-graph:language-adapter",
+    "code-graph:symbol-model",
+    "code-graph:workspace-integration"
+  ],
+  "implementation": [
+    {
+      "file": "code-graph:src/infrastructure/tree-sitter/php-language-adapter.ts",
+      "symbols": ["PhpLanguageAdapter"]
+    },
+    {
+      "file": "code-graph:test/infrastructure/tree-sitter/php-language-adapter.spec.ts"
+    }
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Translates PHP source (.php) into code-graph symbols, namespaces, Composer PSR-4 imports, framework loaders, and class/trait hierarchy.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:06eddeddc58113de6af4ba2f18d10758793692ccf6c103fa7290d5d08df9449d",
+          "lastModified": "2026-08-16T08:12:49.064Z"
+        },
+        "verify.md": {
+          "hash": "sha256:f0a2d332e48ccc0cfeb916e8ce8573a6ae37900697c0016e6c71de8e7c17cc6f",
+          "lastModified": "2026-08-16T08:12:49.066Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# php-language-adapter\n\n## Rules\n\n### Scope & Analysis\n- Handles `.php` as `php`.\n- Single-pass parsing via Tree-sitter/ast-grep; outputs `FileAnalysisDraft` without AST retention or PHP execution/autoloading.\n\n### Declarations & Owners\n- Extracts functions, classes, interfaces, traits, enums, methods, properties, top-level constants. Drops class constants & enum cases.\n- Complete construct range; declared-name `selectionRange`. Preserves comments.\n- Declaring owner = namespace-qualified class/interface/trait. Same-name methods distinct across owners. Case-preserving identities.\n\n### Namespaces, Use & Composer\n- Namespace `use X as Y` creates namespace-scoped local binding (NO public export or hierarchy edge).\n- Resolves qualified names through Composer `composer.json` `name` & PSR-4 mappings via longest prefix.\n- Drops variable/concatenated `require`/`include` unless proven by registered rules.\n\n### Framework Loaders & Scoped Facts\n- Statically recognizes framework patterns (CakePHP, CodeIgniter, Yii, Laravel, Symfony, Zend).\n- Loader facts emit `IMPORTS` and receiver bindings only for literal values with proven indexed targets. Method-local instance aliases emit `CALLS` (no cross-method leakage).\n- Emits facts for `new`, ``, `self`, `static`, `parent` receivers, typed params/returns/properties. Emits `IMPORTS`, `CALLS`, `CONSTRUCTS`, `USES_TYPE` when target is proven.\n- Drops reflection, variable class names, dynamic properties, container lookups.\n\n### Hierarchy & Evidence\n- Emits `EXTENDS` (class/interface), `IMPLEMENTS` (class->interface), `OVERRIDES` (matching method replacement), trait composition.\n- Reference facts retain child owner, ancestor/trait owner, relation kind, provenance steps.\n- Trait conflict/adaptation (`insteadof`/aliases) unsupported -> remains `ambiguous` or `unresolved`. Bounded cycle termination.\n- Advertises `hierarchy: true`, `buildContext: false`.\n\n## Constraints\n- NO PHP execution, framework container instantiation, or autoloader invocation.\n- Dynamic reflection, dynamic container lookups -> prohibited.\n- PHP-specific namespace/loader/trait logic MUST stay inside adapter.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:06eddeddc58113de6af4ba2f18d10758793692ccf6c103fa7290d5d08df9449d",
+          "lastModified": "2026-08-16T08:12:49.064Z"
+        },
+        "verify.md": {
+          "hash": "sha256:f0a2d332e48ccc0cfeb916e8ce8573a6ae37900697c0016e6c71de8e7c17cc6f",
+          "lastModified": "2026-08-16T08:12:49.066Z"
+        }
+      }
+    }
+  }
+}

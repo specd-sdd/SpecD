@@ -70,10 +70,17 @@ Custom storage implementers MAY import port contracts from `@specd/core/ports` o
 
 The package SHALL export `SDK_VERSION` as a string constant matching `package.json` version.
 
+### Requirement: Implementation review public orchestration
+
+The SDK public barrel SHALL export `buildImplementationReview` and its input/result types. It SHALL also re-export the public Code Graph reference, logical-symbol, binding, member, coverage, health, and resolver result types required by delivery hosts.
+
+CLI and other hosts using implementation review MUST import this orchestration through `@specd/sdk`; they MUST NOT compose Core and Code Graph independently.
+
 ## Spec Dependencies
 
-- [`default:_global/architecture`](../../_global/architecture/spec.md) — hexagonal layering applied to the SDK package
-- [`core:composition`](../../core/composition/spec.md) — core composition surface the SDK re-exports and wraps
-- [`code-graph:composition`](../../code-graph/composition/spec.md) — code-graph composition surface the SDK re-exports and wraps
-- [`cli:host-context`](../../cli/host-context/spec.md) — consumer of host-adapter barrel re-exports
-- [`sdk:context-markdown`](../context-markdown/spec.md) — presentation helpers exported from the public barrel
+- `default:_global/architecture` — SDK layering
+- `core:composition` — Core public composition
+- `code-graph:composition` — Code Graph public composition
+- `cli:host-context` — host consumer
+- `sdk:context-markdown` — presentation helpers
+- `sdk:build-implementation-review` — shared review orchestration

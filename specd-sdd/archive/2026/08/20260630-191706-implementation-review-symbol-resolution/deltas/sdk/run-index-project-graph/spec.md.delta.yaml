@@ -1,0 +1,11 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Repair lifecycle passthrough
+
+    `runIndexProjectGraph` SHALL carry incompatibility-repair intent and full-rebuild results without lossy mapping. When an old schema cannot open for normal reads, the SDK SHALL use the provider's indexing-specific lifecycle/repair path rather than fail before `IndexProjectGraph` can rebuild it.
+
+    The SDK MUST preserve provider ownership of destructive recreation and SHALL still execute caller lifecycle hooks and cleanup exactly once.

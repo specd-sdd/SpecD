@@ -1,7 +1,7 @@
 {
   "name": "deprecate-ladybug-store",
   "createdAt": "2026-07-06T08:41:08.887Z",
-  "updatedAt": "2026-07-27T16:48:29.863Z",
+  "updatedAt": "2026-08-16T08:12:43.908Z",
   "description": "Deprecate Ladybug graph store, implement Symbol.asyncDispose in CodeGraphProvider, and refactor hosts to use await using",
   "schema": {
     "name": "schema-std",
@@ -3282,6 +3282,523 @@
         {
           "type": "verify",
           "files": ["sdk:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-16T08:08:54.377Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'implementation-review-symbol-resolution' was archived with overlapping specs: cli:graph-impact, cli:graph-search, cli:graph-stats, code-graph:composition, code-graph:ladybug-graph-store, code-graph:sqlite-graph-store, sdk:composition, sdk:run-index-project-graph",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:ladybug-graph-store",
+            "code-graph:composition",
+            "sdk:composition",
+            "sdk:run-index-project-graph",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "cli:graph-search",
+            "code-graph:sqlite-graph-store"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:ladybug-graph-store",
+            "code-graph:composition",
+            "sdk:composition",
+            "sdk:run-index-project-graph",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "cli:graph-search",
+            "code-graph:sqlite-graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-16T08:08:56.409Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'implementation-review-symbol-resolution' was archived with overlapping specs: cli:graph-impact, cli:graph-search, cli:graph-stats, code-graph:composition, code-graph:ladybug-graph-store, code-graph:sqlite-graph-store, sdk:composition, sdk:run-index-project-graph",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:ladybug-graph-store",
+            "code-graph:composition",
+            "sdk:composition",
+            "sdk:run-index-project-graph",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "cli:graph-search",
+            "code-graph:sqlite-graph-store"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:ladybug-graph-store",
+            "code-graph:composition",
+            "sdk:composition",
+            "sdk:run-index-project-graph",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "cli:graph-search",
+            "code-graph:sqlite-graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-16T08:09:18.903Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'implementation-review-symbol-resolution' was archived with overlapping specs: cli:graph-impact, cli:graph-search, cli:graph-stats, code-graph:composition, code-graph:ladybug-graph-store, code-graph:sqlite-graph-store, sdk:composition, sdk:run-index-project-graph",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:ladybug-graph-store",
+            "code-graph:composition",
+            "sdk:composition",
+            "sdk:run-index-project-graph",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "cli:graph-search",
+            "code-graph:sqlite-graph-store"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:ladybug-graph-store",
+            "code-graph:composition",
+            "sdk:composition",
+            "sdk:run-index-project-graph",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "cli:graph-search",
+            "code-graph:sqlite-graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-16T08:09:58.565Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'implementation-review-symbol-resolution' was archived with overlapping specs: cli:graph-impact, cli:graph-search, cli:graph-stats, code-graph:composition, code-graph:ladybug-graph-store, code-graph:sqlite-graph-store, sdk:composition, sdk:run-index-project-graph",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:ladybug-graph-store",
+            "code-graph:composition",
+            "sdk:composition",
+            "sdk:run-index-project-graph",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "cli:graph-search",
+            "code-graph:sqlite-graph-store"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:ladybug-graph-store",
+            "code-graph:composition",
+            "sdk:composition",
+            "sdk:run-index-project-graph",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "cli:graph-search",
+            "code-graph:sqlite-graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-16T08:10:03.231Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'implementation-review-symbol-resolution' was archived with overlapping specs: cli:graph-impact, cli:graph-search, cli:graph-stats, code-graph:composition, code-graph:ladybug-graph-store, code-graph:sqlite-graph-store, sdk:composition, sdk:run-index-project-graph",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:ladybug-graph-store",
+            "code-graph:composition",
+            "sdk:composition",
+            "sdk:run-index-project-graph",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "cli:graph-search",
+            "code-graph:sqlite-graph-store"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:ladybug-graph-store",
+            "code-graph:composition",
+            "sdk:composition",
+            "sdk:run-index-project-graph",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "cli:graph-search",
+            "code-graph:sqlite-graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-16T08:10:16.201Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'implementation-review-symbol-resolution' was archived with overlapping specs: cli:graph-impact, cli:graph-search, cli:graph-stats, code-graph:composition, code-graph:ladybug-graph-store, code-graph:sqlite-graph-store, sdk:composition, sdk:run-index-project-graph",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:ladybug-graph-store",
+            "code-graph:composition",
+            "sdk:composition",
+            "sdk:run-index-project-graph",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "cli:graph-search",
+            "code-graph:sqlite-graph-store"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:ladybug-graph-store",
+            "code-graph:composition",
+            "sdk:composition",
+            "sdk:run-index-project-graph",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "cli:graph-search",
+            "code-graph:sqlite-graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-16T08:10:23.973Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'implementation-review-symbol-resolution' was archived with overlapping specs: cli:graph-impact, cli:graph-search, cli:graph-stats, code-graph:composition, code-graph:ladybug-graph-store, code-graph:sqlite-graph-store, sdk:composition, sdk:run-index-project-graph",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:ladybug-graph-store",
+            "code-graph:composition",
+            "sdk:composition",
+            "sdk:run-index-project-graph",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "cli:graph-search",
+            "code-graph:sqlite-graph-store"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:ladybug-graph-store",
+            "code-graph:composition",
+            "sdk:composition",
+            "sdk:run-index-project-graph",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "cli:graph-search",
+            "code-graph:sqlite-graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-16T08:11:56.321Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'implementation-review-symbol-resolution' was archived with overlapping specs: cli:graph-impact, cli:graph-search, cli:graph-stats, code-graph:composition, code-graph:ladybug-graph-store, code-graph:sqlite-graph-store, sdk:composition, sdk:run-index-project-graph",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:ladybug-graph-store",
+            "code-graph:composition",
+            "sdk:composition",
+            "sdk:run-index-project-graph",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "cli:graph-search",
+            "code-graph:sqlite-graph-store"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:ladybug-graph-store",
+            "code-graph:composition",
+            "sdk:composition",
+            "sdk:run-index-project-graph",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "cli:graph-search",
+            "code-graph:sqlite-graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-16T08:12:10.858Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'implementation-review-symbol-resolution' was archived with overlapping specs: cli:graph-impact, cli:graph-search, cli:graph-stats, code-graph:composition, code-graph:ladybug-graph-store, code-graph:sqlite-graph-store, sdk:composition, sdk:run-index-project-graph",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:ladybug-graph-store",
+            "code-graph:composition",
+            "sdk:composition",
+            "sdk:run-index-project-graph",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "cli:graph-search",
+            "code-graph:sqlite-graph-store"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:ladybug-graph-store",
+            "code-graph:composition",
+            "sdk:composition",
+            "sdk:run-index-project-graph",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "cli:graph-search",
+            "code-graph:sqlite-graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-16T08:12:29.268Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'implementation-review-symbol-resolution' was archived with overlapping specs: cli:graph-impact, cli:graph-search, cli:graph-stats, code-graph:composition, code-graph:ladybug-graph-store, code-graph:sqlite-graph-store, sdk:composition, sdk:run-index-project-graph",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:ladybug-graph-store",
+            "code-graph:composition",
+            "sdk:composition",
+            "sdk:run-index-project-graph",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "cli:graph-search",
+            "code-graph:sqlite-graph-store"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:ladybug-graph-store",
+            "code-graph:composition",
+            "sdk:composition",
+            "sdk:run-index-project-graph",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "cli:graph-search",
+            "code-graph:sqlite-graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-16T08:12:43.897Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'implementation-review-symbol-resolution' was archived with overlapping specs: cli:graph-impact, cli:graph-search, cli:graph-stats, code-graph:composition, code-graph:ladybug-graph-store, code-graph:sqlite-graph-store, sdk:composition, sdk:run-index-project-graph",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:ladybug-graph-store",
+            "code-graph:composition",
+            "sdk:composition",
+            "sdk:run-index-project-graph",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "cli:graph-search",
+            "code-graph:sqlite-graph-store"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:ladybug-graph-store",
+            "code-graph:composition",
+            "sdk:composition",
+            "sdk:run-index-project-graph",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "cli:graph-search",
+            "code-graph:sqlite-graph-store"
+          ]
         },
         {
           "type": "design",

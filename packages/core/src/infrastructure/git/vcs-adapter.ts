@@ -4,8 +4,9 @@ import { git, gitSync } from './exec.js'
 /**
  * Git CLI implementation of the {@link VcsAdapter} port.
  *
- * Shells out to the `git` binary for all queries. All methods operate relative
- * to `cwd`, which defaults to `process.cwd()` when not specified.
+ * Shells out to the `git` binary for all queries. Repository-wide operations
+ * execute from the resolved root; detection still starts from `cwd`, which
+ * defaults to `process.cwd()` when not specified.
  */
 export class GitVcsAdapter extends VcsAdapter {
   private readonly _rootDir: string | null
@@ -59,7 +60,7 @@ export class GitVcsAdapter extends VcsAdapter {
   /** @inheritdoc */
   async ref(): Promise<string | null> {
     try {
-      return await git(this.cwd, 'rev-parse', '--short', 'HEAD')
+      return await git(this.rootDir(), 'rev-parse', '--short', 'HEAD')
     } catch {
       return null
     }
@@ -68,9 +69,10 @@ export class GitVcsAdapter extends VcsAdapter {
   /** @inheritdoc */
   async refAt(at: string): Promise<string | null> {
     try {
-      const revision = await git(this.cwd, 'rev-list', '-1', `--before=${at}`, 'HEAD')
+      const rootDir = this.rootDir()
+      const revision = await git(rootDir, 'rev-list', '-1', `--before=${at}`, 'HEAD')
       if (revision.length === 0) return null
-      return await git(this.cwd, 'rev-parse', '--short', revision)
+      return await git(rootDir, 'rev-parse', '--short', revision)
     } catch {
       return null
     }
@@ -78,16 +80,18 @@ export class GitVcsAdapter extends VcsAdapter {
 
   /** @inheritdoc */
   async modifiedFiles(baseRef: string): Promise<readonly string[]> {
+    const rootDir = this.rootDir()
     const diffOutput = await git(
-      this.cwd,
+      rootDir,
       'diff',
-      '--name-only',
-      '--diff-filter=ACMR',
+      '--name-status',
+      '-z',
+      '--find-renames',
       baseRef,
       '--',
     )
-    const untrackedOutput = await git(this.cwd, 'ls-files', '--others', '--exclude-standard')
-    return normalizePaths(diffOutput, untrackedOutput)
+    const untrackedOutput = await git(rootDir, 'ls-files', '-z', '--others', '--exclude-standard')
+    return normalizeGitPaths(diffOutput, untrackedOutput)
   }
 
   /** @inheritdoc */
@@ -110,20 +114,62 @@ export class GitVcsAdapter extends VcsAdapter {
 }
 
 /**
- * Normalizes one or more newline-delimited path lists into a unique path array.
+ * Parses null-delimited Git diff and untracked-file output into unique paths.
  *
- * @param outputs - Raw command outputs containing newline-delimited file paths
+ * @param diffOutput - Output from `git diff --name-status -z`
+ * @param untrackedOutput - Output from `git ls-files -z --others`
  * @returns Unique, non-empty repository-relative file paths
  */
-function normalizePaths(...outputs: readonly string[]): readonly string[] {
+function normalizeGitPaths(diffOutput: string, untrackedOutput: string): readonly string[] {
   const files = new Set<string>()
-  for (const output of outputs) {
-    for (const line of output.split('\n')) {
-      const normalized = line.trim()
-      if (normalized.length > 0) {
-        files.add(normalized)
+
+  const fields = diffOutput.split('\0')
+  for (let index = 0; index < fields.length; ) {
+    const status = fields[index]
+    if (status === undefined || status.length === 0) {
+      index += 1
+      continue
+    }
+
+    const firstPath = fields[index + 1]
+    index += 2
+
+    if (status.startsWith('R')) {
+      if (firstPath !== undefined) {
+        addPortablePath(files, firstPath)
       }
+      const secondPath = fields[index]
+      if (secondPath !== undefined) {
+        addPortablePath(files, secondPath)
+      }
+      index += 1
+    } else if (status.startsWith('C')) {
+      const secondPath = fields[index]
+      if (secondPath !== undefined) {
+        addPortablePath(files, secondPath)
+      }
+      index += 1
+    } else if (firstPath !== undefined) {
+      addPortablePath(files, firstPath)
     }
   }
+
+  for (const untrackedPath of untrackedOutput.split('\0')) {
+    addPortablePath(files, untrackedPath)
+  }
+
   return [...files]
+}
+
+/**
+ * Adds one non-empty path using the port's portable separator convention.
+ *
+ * @param files - Accumulated unique paths
+ * @param filePath - Repository-relative path emitted by Git
+ */
+function addPortablePath(files: Set<string>, filePath: string): void {
+  const normalized = filePath.replaceAll('\\', '/')
+  if (normalized.length > 0) {
+    files.add(normalized)
+  }
 }

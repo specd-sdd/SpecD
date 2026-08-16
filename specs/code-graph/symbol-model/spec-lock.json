@@ -10,42 +10,88 @@
   ],
   "implementation": [
     {
-      "file": "code-graph:src/domain/services/scoped-binding-environment.ts",
-      "symbols": ["lookupBindingFacts"]
+      "file": "code-graph:src/domain/value-objects/symbol-reference.ts",
+      "symbols": [
+        "SymbolSpace",
+        "MemberForm",
+        "DeclarationOccurrence",
+        "LogicalSymbol",
+        "createLogicalSymbol",
+        "PublicBinding",
+        "LocalBinding",
+        "ResolutionStep",
+        "createPublicBinding",
+        "createLocalBinding",
+        "AdapterCapabilities",
+        "HierarchyFact",
+        "ReferenceFacts"
+      ]
+    },
+    {
+      "file": "code-graph:src/domain/value-objects/index-session.ts",
+      "symbols": ["IndexCoverageStatus", "IndexCoverage"]
+    },
+    {
+      "file": "code-graph:src/public.ts"
+    },
+    {
+      "file": "code-graph:src/index.ts"
+    },
+    {
+      "file": "code-graph:test/barrel.spec.ts"
+    },
+    {
+      "file": "code-graph:test/domain/value-objects/symbol-reference.spec.ts"
+    },
+    {
+      "file": "code-graph:src/domain/value-objects/symbol-node.ts"
+    },
+    {
+      "file": "code-graph:src/domain/value-objects/index.ts"
+    },
+    {
+      "file": "code-graph:test/domain/value-objects/symbol-node.spec.ts"
+    },
+    {
+      "file": "code-graph:test/application/use-cases/index-project-graph-integration.spec.ts"
+    },
+    {
+      "file": "code-graph:src/infrastructure/tree-sitter/reference-fact-helpers.ts",
+      "symbols": ["buildLogicalDeclarationFacts", "buildHierarchyReferenceFacts"]
     }
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "Defines immutable language-agnostic graph nodes, compact analysis facts, deterministic lookups, and typed relations.",
+      "value": "Immutable language-agnostic code graph nodes, compact facts, deterministic lookups, scoped bindings, and typed relations.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:50781010b48e2c620c569f99b9984a71853c57ca1c5b080d05b1471085251fcb",
-          "lastModified": "2026-06-16T10:39:58.799Z"
+          "hash": "sha256:41eaa6985a90d97e15186c33340b2a57a795e947190daacdaaed7521b25f8bc0",
+          "lastModified": "2026-08-16T08:12:47.271Z"
         },
         "verify.md": {
-          "hash": "sha256:921cc393f3e819e2e43e5ad91768c6cf2b1235e0134b40cbac1fc95886e14753",
-          "lastModified": "2026-06-16T10:40:58.953Z"
+          "hash": "sha256:e77ea2eb90600a9afb2a292a9e73764b3ee23149f0b6dccefa71731ce34e5712",
+          "lastModified": "2026-08-16T08:12:47.274Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# Symbol Model\n\n## Rules\n\n- `FileNode`: source file; `path: string` canonical globally unique `{workspaceName}:{relativeToCodeRoot}`, forward-slash-normalized; `configRelativePath: string` config-directory-relative, normalized, MAY contain `..`, never identity; `language: string`; `contentHash: string`; `workspace: string`; `embedding: Float32Array | undefined`. Equality iff `path` matches.\n- `SpecNode`: spec directory; `specId: string` identity in `workspace:package/topic`; workspace-relative `path`; metadata `title` default `specId`; metadata `description` default empty; `contentHash` and `content` from artifacts excluding `.specd-metadata.yaml`, ordered `spec.md` then others alphabetically; ordered metadata `dependsOn`, default `[]`; `workspace`. Equality iff `specId` matches.\n- `SymbolNode`: named construct; deterministic globally unique `id` from `filePath + kind + name + line + column`; `name`; `kind: SymbolKind`; workspace-prefixed `filePath`; 1-based `line`; 0-based `column`; optional raw `comment`. Specs, Files, Symbols, Documents MUST use workspace-qualified canonical primary keys.\n- Runtime analysis MUST be immutable, compact, separate from persisted graph-store entities: `FileAnalysisDraft` before run-local identity; `FileAnalysis` with run-local ID, workspace-prefixed path, language, content hash, compact facts, optional per-file state; optional `ParserState` only to avoid repeated same-run deterministic work; optional `AdapterSessionState` only for deterministic same-run cross-file caches. Draft/analysis include symbols, imports, binding facts, call facts, supported namespace/qualified-name context, optional normalized file/document metadata. MUST NOT alter persisted symbol IDs, relation IDs, or schemas.\n- Run-scoped shared lookups MUST bound resolution by relevant matches: files by workspace-prefixed path/run-local ID; symbols by file/simple/qualified name; file↔symbols; same-run specs/documents; spec↔covered symbols when needed; relation deduplication before persistence. `IndexSession` and `SymbolIndex` MAY collaborate; all built-in adapters/indexer phases MUST share common contract.\n- Retained `ParserState`, `AdapterSessionState`, bindings, calls, imports, indexes MUST use compact immutable plain data; MUST NOT retain AST nodes, parser trees, parser cursors, or equivalent heavyweight objects after per-file analysis.\n- `DocumentNode`: searchable full-text non-code file identified by path. Document identity matches `FileNode` format `workspace:path`, including reserved `root:`.\n- `SymbolKind` closed string enum: `function`, `class`, `method`, `variable`, `type`, `interface`, `enum`. Adapters MUST map constructs to these or skip them.\n- Relations: typed edges with `source`, `target`, `type`:\n\n| Type | Source→Target | Meaning | Phase |\n|---|---|---|---|\n| `IMPORTS` | File→File | imports | v1.5 |\n| `DEFINES` | File→Symbol | declaration containment | v2 |\n| `CALLS` | Symbol→Symbol | invocation | v2 |\n| `CONSTRUCTS` | Symbol→Symbol | construction/instantiation | v2 |\n| `USES_TYPE` | Symbol→Symbol | static signature/binding type reference | v2 |\n| `EXPORTS` | File→Symbol | public API export | v2 |\n| `DEPENDS_ON` | Spec→Spec | spec dependency | v1.5 |\n| `COVERS_FILE` | Spec→File | file-level implementation link | v2+ |\n| `COVERS_SYMBOL` | Spec→Symbol | symbol-level implementation link | v2+ |\n| `EXTENDS` | Symbol→Symbol | inheritance | v2 |\n| `IMPLEMENTS` | Symbol→Symbol | contract/type fulfillment | v2 |\n| `OVERRIDES` | Symbol→Symbol | method replacement/concrete fulfillment | v2 |\n\n- `Relation`: `source: string`, `target: string`, `type: RelationType`, optional `metadata: Record<string, unknown>`. Equality iff source, target, type match. Metadata MAY contain `stale: boolean`; `stale` applies only to `COVERS_SYMBOL` with currently undetectable target, never generic workspace-boundary/archive-materialization failure.\n- Hierarchy normalization: `EXTENDS` type→inherited type; `IMPLEMENTS` type→contract-bearing symbol; `OVERRIDES` method→replaced/concretized/fulfilled inherited or contract method. `OVERRIDES` is persisted, not derived. Adapters MAY normalize inheritance-adjacent constructs only when useful semantics remain for understanding, impact, hotspots, affected specs.\n- `ImportDeclaration`: `localName: string`; `originalName: string`; raw `specifier: string`; `isRelative: boolean`; optional `kind: 'named' | 'namespace' | 'default' | 'side-effect' | 'dynamic' | 'require' | 'blank' | undefined`, where `undefined` equals `named`. Pure syntax; indexer resolves files/symbol IDs via adapter registry and monorepo map. Side-effect, string-literal dynamic, CommonJS `require()`, Go blank imports MUST support file-only declarations with empty local/original names and no fake symbols.\n- Scoped binding model MUST provide immutable language-agnostic, source-aware facts for deterministic resolution: file/class/type/method/function/block scope ownership; bindings from local, parameter, property/field, class-managed, inherited, file/global, imported type, framework-managed, constructor call, alias-from-known-binding sources; free/member/static/constructor call facts with enclosing caller when known; deterministic reason plus optional confidence/diagnostics for accepted/dropped candidates. Facts MUST have `readonly` properties and workspace-prefixed paths/IDs. Parent-scope traversal MUST detect cycles, abort, return no result.\n- First scoped-binding iteration MUST NOT model arbitrary runtime state, reflection, runtime container identifiers, interprocedural propagation, or whole-program data flow.\n- Deterministic output: `IMPORTS` resolved files; `CALLS` callable invocations; `CONSTRUCTS` constructor-like instantiations; `USES_TYPE` resolved type/class/interface/enum references; `EXTENDS`, `IMPLEMENTS`, `OVERRIDES` hierarchy/fulfillment. Constructor injection plus typed parameters, returns, properties/fields, imported annotations SHALL emit `USES_TYPE` when deterministically resolved. Constructor-like calls SHALL emit `CONSTRUCTS` when deterministically resolved. Drop all self symbol→same-symbol dependency relations before persistence. Unresolved facts MUST NOT create speculative edges; MAY remain non-persisted diagnostics/debug metadata.\n- All model types and aggregates MUST be immutable value objects with `readonly` properties. Graph mutation only through atomic `GraphStore` upserts replacing whole file-scoped slices; no in-place mutation API.\n- `SpecdCodeGraphError` MUST extend `SpecdError` from `@specd/core`; all package errors MUST extend it and inherit Specd Error Contract (`specd: true`, machine-readable `code`). Errors: `InvalidSymbolKindError`, `InvalidRelationTypeError`, `DuplicateSymbolIdError`, `StoreNotOpenError`.\n\n## Constraints\n\n- Model identity only structural equality, except deterministic `SymbolNode.id`.\n- `SymbolKind` closed; new kind requires spec change.\n- `RelationType` closed; new type requires spec change.\n- Runtime dependency: `@specd/core`.\n- `FileNode.embedding` deferred v2+; adapters MUST NOT populate before embedding pipeline.\n- `COVERS_FILE`/`COVERS_SYMBOL` types exist but no v1.5/v2 process populates them; deferred v2+.\n- Indexer populates `DEPENDS_ON` in v1.5 from `.specd-metadata.yaml` or `spec.md`.\n- `CONSTRUCTS`, `USES_TYPE`, `EXTENDS`, `IMPLEMENTS`, `OVERRIDES` are first-class persisted v2 base vocabulary for supported languages.",
+      "value": "# symbol-model\n\n## Rules\n\n### Core Entities\n- `FileNode`: `path` (`workspace:relative/path`), `configRelativePath`, `language`, `contentHash`, `workspace`, optional `embedding: Float32Array`. Equality by `path`.\n- `SpecNode`: `specId` (`workspace:package/topic`), `path`, `title`, `description`, `contentHash`, `content`, `dependsOn`, `workspace`. Equality by `specId`.\n- `SymbolNode`: `id` (`filePath+kind+name+line+column`), `name`, `kind: SymbolKind`, `filePath`, 1-based `line`, 0-based `column`, optional `comment`.\n- `DocumentNode`: searchable non-code file (`workspace:path`).\n\n### Analysis & State\n- Immutable compact `FileAnalysisDraft` & `FileAnalysis` (symbols, imports, binding/call facts, namespace context). Plain data, no AST/parser tree retention.\n- Optional `ParserState` & `AdapterSessionState` for same-run deterministic caching.\n- `IndexSession` & `SymbolIndex` bound lookups by relevant matches.\n\n### Closed Enums & Relations\n- `SymbolKind`: `function`, `class`, `method`, `variable`, `type`, `interface`, `enum`.\n- `Relation`: `source`, `target`, `type: RelationType`, optional `metadata` (e.g. `stale: boolean`).\n- `RelationType`: `IMPORTS` (v1.5), `DEPENDS_ON` (v1.5), `DEFINES` (v2), `EXPORTS` (v2), `CALLS` (v2), `CONSTRUCTS` (v2), `USES_TYPE` (v2), `EXTENDS` (v2), `IMPLEMENTS` (v2), `OVERRIDES` (v2), `COVERS_FILE` (v2+), `COVERS_SYMBOL` (v2+).\n\n### Hierarchy & Imports\n- `EXTENDS`: inherited type; `IMPLEMENTS`: contract symbol; `OVERRIDES`: concrete/replaced method. `OVERRIDES` persisted, not derived.\n- `ImportDeclaration`: `localName`, `originalName`, `specifier`, `isRelative`, optional `kind` (`named`|`namespace`|`default`|`side-effect`|`dynamic`|`require`|`blank`).\n\n### Scoped Bindings & Resolution\n- Immutable facts for scopes (file/class/type/method/block), bindings (local, param, property, inherited, imported, alias), calls (caller, receiver, kind).\n- Cycle detection on scope traversal: abort, return no result.\n- No runtime reflection/interprocedural data flow modeling.\n- Self-relations (`source === target`) dropped before persistence. Unresolved facts remain diagnostics, no speculative edges.\n\n### Errors & Identity\n- `SpecdCodeGraphError` extends `SpecdError`. Specific errors: `InvalidSymbolKindError`, `InvalidRelationTypeError`, `DuplicateSymbolIdError`, `StoreNotOpenError`.\n- Structured logical symbols (workspace, module/package, owner, symbol space, simple name, member form) distinct from occurrences; canonical ref stable across line shifts.\n- Case sensitivity follows language rules.\n- Coverage facts track index status (`indexed`, `excluded`, `parse-failed`, etc.) + content hash.\n\n## Constraints\n- Structural equality for value objects (except deterministic `SymbolNode.id`).\n- Closed `SymbolKind` and `RelationType`.\n- Runtime dependency: `@specd/core`.\n- `FileNode.embedding` deferred v2+.\n- `COVERS_FILE`/`COVERS_SYMBOL` deferred v2+.\n- `DEPENDS_ON` populated in v1.5 from `.specd-metadata.yaml`/`spec.md`.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:50781010b48e2c620c569f99b9984a71853c57ca1c5b080d05b1471085251fcb",
-          "lastModified": "2026-06-16T10:39:58.799Z"
+          "hash": "sha256:41eaa6985a90d97e15186c33340b2a57a795e947190daacdaaed7521b25f8bc0",
+          "lastModified": "2026-08-16T08:12:47.271Z"
         },
         "verify.md": {
-          "hash": "sha256:921cc393f3e819e2e43e5ad91768c6cf2b1235e0134b40cbac1fc95886e14753",
-          "lastModified": "2026-06-16T10:40:58.953Z"
+          "hash": "sha256:e77ea2eb90600a9afb2a292a9e73764b3ee23149f0b6dccefa71731ce34e5712",
+          "lastModified": "2026-08-16T08:12:47.274Z"
         }
       }
     }

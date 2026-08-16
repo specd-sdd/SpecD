@@ -1,0 +1,50 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "sdk:host-context",
+    "sdk:with-open-graph-provider",
+    "core:get-implementation-review",
+    "code-graph:resolve-symbol-reference",
+    "code-graph:get-graph-health"
+  ],
+  "implementation": [],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Builds delivery-neutral implementation reviews from Core tracking, one graph-health snapshot, and batched symbol resolution.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:622555476e06b46806369c26ae77b1549b5c49fd7860243f10d8c3ec5047f876",
+          "lastModified": "2026-07-29T20:29:25.633Z"
+        },
+        "verify.md": {
+          "hash": "sha256:8945edeee114e2bdc1e495038319296ac55586902e2e37941de6d4629038b906",
+          "lastModified": "2026-07-29T20:33:00.126Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# SDK Build Implementation Review\n\n## Rules\n\n- `buildImplementationReview(ctx, input)`: fetch raw review from `ctx.kernel.changes.getImplementationReview`; open graph via `withOpenGraphProvider`; obtain canonical graph health once; batch-resolve all symbol links through `ResolveSymbolReference` under one provider lifecycle. Never open provider or scan full graph per link.\n- SDK MUST NOT parse source syntax, duplicate symbol matching, or format presentation. Core owns stored tracking; Code Graph owns resolution.\n- Preserve every stored spec, file, symbol value unchanged. Symbol links add status, reason code, graph health/coverage, canonical logical target, declarations, candidates, public/local binding provenance, ordered resolution path when available.\n- File links remain valid without symbol resolution. MUST NOT mutate active manifests, confirmed links, archived sidecars.\n- Readable non-current/incomplete graph => per-link `unresolved`. Provider availability, generation, lifecycle failures preventing safe reads => standard SDK infrastructure error; never rewrite as missing links.\n- All implementation-review hosts, including change implementation commands and change status enrichment, consume same projection. No independent same-file, rightmost-segment, workspace-name fallbacks.\n\n## Constraints\n\n- Structured data only.\n- Core and Code Graph public APIs only.\n- Resolution diagnostics do not block verification or archive in this change.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:622555476e06b46806369c26ae77b1549b5c49fd7860243f10d8c3ec5047f876",
+          "lastModified": "2026-07-29T20:29:25.633Z"
+        },
+        "verify.md": {
+          "hash": "sha256:8945edeee114e2bdc1e495038319296ac55586902e2e37941de6d4629038b906",
+          "lastModified": "2026-07-29T20:33:00.126Z"
+        }
+      }
+    }
+  }
+}

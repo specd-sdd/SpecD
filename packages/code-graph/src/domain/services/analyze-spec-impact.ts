@@ -1,6 +1,7 @@
 import { type GraphStore } from '../ports/graph-store.js'
 import { type SpecImpactResult, type AffectedSymbol } from '../value-objects/impact-result.js'
 import { computeRiskLevel } from '../value-objects/risk-level.js'
+import { type ImpactResolutionProvider } from './analyze-impact.js'
 
 /**
  * Computes requirement-aware impact for a spec using spec, file, and symbol coverage relations.
@@ -9,6 +10,7 @@ import { computeRiskLevel } from '../value-objects/risk-level.js'
  * @param specId - Target spec identifier
  * @param direction - Traversal direction
  * @param maxDepth - Maximum spec traversal depth
+ * @param resolve - Optional provider of pre-resolved logical selectors
  * @returns Requirement-aware spec impact result
  */
 export async function analyzeSpecImpact(
@@ -16,6 +18,7 @@ export async function analyzeSpecImpact(
   specId: string,
   direction: 'upstream' | 'downstream' | 'both',
   maxDepth = 3,
+  resolve?: ImpactResolutionProvider,
 ): Promise<SpecImpactResult> {
   const affectedSpecs = new Set<string>()
   const affectedFiles = new Set<string>()
@@ -67,10 +70,13 @@ export async function analyzeSpecImpact(
     for (const relation of symbolRelations) {
       const symbol = await store.getSymbol(relation.target)
       if (symbol === undefined) continue
+      const resolution = resolve === undefined ? undefined : await resolve(symbol.id)
+      if (resolution !== undefined && resolution.status !== 'resolved') continue
+      const canonicalId = resolution?.target?.id ?? symbol.id
       affectedFiles.add(symbol.filePath)
-      if (!affectedSymbols.has(symbol.id)) {
-        affectedSymbols.set(symbol.id, {
-          id: symbol.id,
+      if (!affectedSymbols.has(canonicalId)) {
+        affectedSymbols.set(canonicalId, {
+          id: canonicalId,
           name: symbol.name,
           filePath: symbol.filePath,
           line: symbol.line,

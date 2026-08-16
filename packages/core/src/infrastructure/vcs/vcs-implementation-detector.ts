@@ -25,7 +25,7 @@ export class VcsImplementationDetector implements ImplementationDetector {
    * @param vcs - Backend-agnostic VCS adapter or async provider
    */
   constructor(projectRoot: string, vcs: VcsAdapter | (() => Promise<VcsAdapter>)) {
-    this._projectRoot = projectRoot
+    this._projectRoot = path.resolve(projectRoot)
     this._resolveVcs = typeof vcs === 'function' ? vcs : async () => Promise.resolve(vcs)
   }
 
@@ -81,7 +81,7 @@ export class VcsImplementationDetector implements ImplementationDetector {
       excludedFiles: projectFiles.length - filtered.length,
     })
 
-    return filtered
+    return [...filtered].sort()
   }
 
   /**
@@ -114,27 +114,32 @@ export class VcsImplementationDetector implements ImplementationDetector {
     vcs: VcsAdapter,
     repoFiles: readonly string[],
   ): readonly string[] {
-    let repoRoot: string
-    try {
-      repoRoot = vcs.rootDir()
-    } catch {
-      return []
-    }
+    const repoRoot = path.resolve(vcs.rootDir())
 
     const normalized = new Set<string>()
     for (const repoFile of repoFiles) {
-      const absoluteFile = path.resolve(repoRoot, repoFile)
+      const filesystemPath = repoFile.replace(/[\\/]+/g, path.sep)
+      const absoluteFile = path.resolve(repoRoot, filesystemPath)
+      const relativeToRepository = path.relative(repoRoot, absoluteFile)
+      if (
+        relativeToRepository === '..' ||
+        relativeToRepository.startsWith(`..${path.sep}`) ||
+        path.isAbsolute(relativeToRepository)
+      ) {
+        continue
+      }
       const relativeToProject = path.relative(this._projectRoot, absoluteFile)
       if (
         relativeToProject.length === 0 ||
         relativeToProject.startsWith(`..${path.sep}`) ||
-        relativeToProject === '..'
+        relativeToProject === '..' ||
+        path.isAbsolute(relativeToProject)
       ) {
         continue
       }
       normalized.add(toPortablePath(relativeToProject))
     }
-    return [...normalized]
+    return [...normalized].sort()
   }
 }
 

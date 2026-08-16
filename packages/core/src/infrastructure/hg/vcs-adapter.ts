@@ -4,8 +4,9 @@ import { hg, hgSync } from './exec.js'
 /**
  * Mercurial CLI implementation of the {@link VcsAdapter} port.
  *
- * Shells out to the `hg` binary for all queries. All methods operate relative
- * to `cwd`, which defaults to `process.cwd()` when not specified.
+ * Shells out to the `hg` binary for all queries. Repository-wide operations
+ * execute from the resolved root; detection still starts from `cwd`, which
+ * defaults to `process.cwd()` when not specified.
  */
 export class HgVcsAdapter extends VcsAdapter {
   private readonly _rootDir: string | null
@@ -55,7 +56,8 @@ export class HgVcsAdapter extends VcsAdapter {
   /** @inheritdoc */
   async ref(): Promise<string | null> {
     try {
-      return await hg(this.cwd, 'id', '-i')
+      const revision = await hg(this.rootDir(), 'log', '-r', '.', '--template', '{node|short}')
+      return revision.length > 0 ? revision : null
     } catch {
       return null
     }
@@ -65,7 +67,7 @@ export class HgVcsAdapter extends VcsAdapter {
   async refAt(at: string): Promise<string | null> {
     try {
       const revision = await hg(
-        this.cwd,
+        this.rootDir(),
         'log',
         '-d',
         `<${at}`,
@@ -82,16 +84,19 @@ export class HgVcsAdapter extends VcsAdapter {
 
   /** @inheritdoc */
   async modifiedFiles(baseRef: string): Promise<readonly string[]> {
-    const output = await hg(this.cwd, 'status', '--rev', baseRef)
-    return output
-      .split('\n')
-      .map((line) => line.trimEnd())
-      .filter((line) => {
-        const status = line[0]
-        return status === 'M' || status === 'A' || status === 'R' || status === '?'
-      })
-      .map((line) => line.slice(2).trim())
-      .filter((line) => line.length > 0)
+    const output = await hg(this.rootDir(), 'status', '--rev', baseRef, '--print0')
+    const files = new Set<string>()
+    for (const entry of output.split('\0')) {
+      const status = entry[0]
+      if (status !== 'M' && status !== 'A' && status !== 'R' && status !== '!' && status !== '?') {
+        continue
+      }
+      const filePath = entry.slice(2).replaceAll('\\', '/')
+      if (filePath.length > 0) {
+        files.add(filePath)
+      }
+    }
+    return [...files]
   }
 
   /** @inheritdoc */

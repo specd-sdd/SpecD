@@ -1,0 +1,67 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Logical symbol and canonical reference model
+
+    The graph SHALL distinguish syntax-level declaration occurrences from logical symbols. A logical symbol MAY contain multiple declarations when the source language defines an overload set, declaration merge, augmentation, or equivalent single semantic identity. Competing declarations that do not form one language-defined symbol MUST remain distinct.
+
+    Every logical symbol SHALL expose structured workspace, module/package, declaring owner, symbol space, simple name, and member-form identity plus a rendered canonical reference. Structured fields are authoritative and SHALL drive semantic lookup; rendered references are external identities that MUST round-trip with escaping and remain stable across line/column movement. Human text presentations MUST NOT treat their serialized representation as the primary actionable location.
+
+    The existing location-based `SymbolNode.id` and closed `SymbolKind` remain valid. Symbol space and member form are additive dimensions and MUST NOT overload `SymbolKind`.
+
+    A logical member's `declaringOwner` SHALL be the canonical logical identity of the type, namespace, module, object, receiver type, trait, contract, or other language-defined owner that syntactically declares it. It MUST NOT contain a parser-node identifier, a location-based child/parent ID, or a display-only qualified name. Adapters SHALL create or locate the logical owner before constructing member identities. Only declarations that are top-level in their language surface MAY omit the owner.
+
+    Same-name members under different declaring owners SHALL always have different logical identities. Moving a declaration within the same logical owner without changing its semantic identity MUST NOT change its canonical reference merely because its source line or parser node changes.
+
+    ### Requirement: Member forms and symbol spaces
+
+    The common model SHALL represent methods, properties, getters, setters, constructors, fields, static members, and interface/contract members without collapsing distinct same-name forms. It SHALL preserve language-defined lookup spaces such as type, value, namespace/module, function, and constant.
+
+    Identifier normalization and case comparison SHALL be language-sensitive. No shared model operation may globally lowercase symbol identifiers.
+
+    ### Requirement: First-class binding model
+
+    A public export slot SHALL be looked up by public surface, exported name, and symbol space. Each proven route occupying that slot SHALL have an independently addressable binding identity that also distinguishes its canonical target or ordered re-export provenance, so competing routes cannot overwrite one another. Anonymous and default exports SHALL remain addressable through binding identity.
+
+    A local binding SHALL preserve lexical scope and source range. Distinct aliases, shadowed bindings, multiple public routes between identical relation endpoints, and competing targets exposed through the same public slot MUST NOT collapse because ordinary `Relation` equality ignores metadata.
+
+    ### Requirement: Index coverage facts
+
+    The model SHALL represent persisted per-file/package indexing coverage and failure reasons, including indexed, excluded, unsupported adapter/capability, parse-failed, and partial states. Coverage facts SHALL include the indexed content hash needed to determine whether absence is trustworthy.
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Symbol node'
+  content: |
+    A `SymbolNode` SHALL represent a named code construct extracted from a file. It contains:
+
+    - **`id`** (`string`) — deterministic identifier computed from `filePath + kind + name + line + column`; the existing start-location identity remains unchanged.
+    - **`name`** (`string`) — the symbol's declared name.
+    - **`kind`** (`SymbolKind`) — the category of this symbol.
+    - **`filePath`** (`string`) — workspace-prefixed path of the file containing this symbol.
+    - **`line`** (`number`) — 1-based start line of the complete syntactic construct.
+    - **`column`** (`number`) — 0-based start column of the complete syntactic construct.
+    - **`endLine`** (`number`) — 1-based end line of the complete syntactic construct.
+    - **`endColumn`** (`number`) — 0-based exclusive end column of the complete syntactic construct.
+    - **`selectionRange`** (`SourceRange`) — exact range of the declared name or equivalent addressable selection.
+    - **`comment`** (`string | undefined`) — the raw comment text.
+
+    `SourceRange` SHALL contain 1-based `startLine`/`endLine` and 0-based `startColumn`/exclusive `endColumn`. The complete construct range SHALL be non-empty, SHALL contain `selectionRange`, and SHALL be suitable for extracting the whole declaration or body from the indexed content. `line` and `column` remain aliases of the construct range start for compatibility and symbol-id construction.
+
+    All node families (Specs, Files, Symbols, Documents) SHALL use workspace-qualified canonical identities as their unique primary keys.
+
+- op: added
+  position:
+    parent:
+      type: document
+    after:
+      type: section
+      matches: 'Spec Dependencies'
+  content: |
+    ## ADRs
+
+    - [ADR-0024: Logical symbol resolution](../../../docs/adr/0024-logical-symbol-resolution.md)

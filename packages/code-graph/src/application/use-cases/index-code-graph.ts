@@ -3,7 +3,7 @@ import { join, relative } from 'node:path'
 import { setImmediate } from 'node:timers'
 import { performance } from 'node:perf_hooks'
 import { type Spec, SpecPath, Logger } from '@specd/core'
-import { type GraphStore } from '../../domain/ports/graph-store.js'
+import { type GraphStore, type ReferenceFactsWrite } from '../../domain/ports/graph-store.js'
 import { type FileNode, createFileNode } from '../../domain/value-objects/file-node.js'
 import { type DocumentNode, createDocumentNode } from '../../domain/value-objects/document-node.js'
 import { type SymbolNode, createSymbolNode } from '../../domain/value-objects/symbol-node.js'
@@ -19,13 +19,21 @@ import {
 } from '../../domain/value-objects/index-result.js'
 import { type AdapterRegistryPort } from '../../domain/ports/adapter-registry-port.js'
 import { type ResolvedImports } from '../../domain/value-objects/language-adapter.js'
-import { type IndexSession } from '../../domain/value-objects/index-session.js'
+import {
+  type IndexCoverage,
+  IndexCoverageStatus,
+  type IndexSession,
+} from '../../domain/value-objects/index-session.js'
+import {
+  createPublicBinding,
+  type LogicalSymbol,
+  type PublicBinding,
+  type ResolutionStep,
+} from '../../domain/value-objects/symbol-reference.js'
 import {
   buildScopedBindingEnvironment,
   resolveDependencyFacts,
   type SymbolLookup,
-  getUpstream,
-  getDownstream,
 } from '../../domain/services/index.js'
 import { discoverFiles } from './discover-files.js'
 import { computeContentHash } from './compute-content-hash.js'
@@ -39,6 +47,11 @@ import {
 } from './_shared/compute-graph-fingerprint.js'
 import { resolveEffectiveGraphConfig } from './_shared/resolve-effective-graph-config.js'
 import { readInstalledCodeGraphVersion } from './_shared/installed-code-graph-version.js'
+import {
+  IndexedInputKind,
+  IndexedResourceKind,
+  type IndexedInputObservation,
+} from '../../domain/value-objects/indexed-input-freshness.js'
 
 const DEFAULT_CHUNK_BYTES = 20 * 1024 * 1024
 
@@ -74,6 +87,46 @@ function deduplicateRelations(relations: readonly Relation[]): Relation[] {
 }
 
 /**
+ * Retains the complete reference-fact subgraph whose owning files are unchanged.
+ * @param facts - Persisted semantic snapshot.
+ * @param replacedPaths - Changed, dependent, or deleted file paths.
+ * @returns Snapshot safe to hydrate before re-extracting replaced paths.
+ */
+function retainReferenceFactsOutsidePaths(
+  facts: ReferenceFactsWrite,
+  replacedPaths: ReadonlySet<string>,
+): ReferenceFactsWrite {
+  const declarations = facts.declarations.filter(
+    (item) => !replacedPaths.has(item.declaration.location.filePath),
+  )
+  const logicalIds = new Set(declarations.map((item) => item.logicalSymbolId))
+  const logicalSymbols = facts.logicalSymbols.filter((symbol) => logicalIds.has(symbol.id))
+  const publicBindings = facts.publicBindings.filter(
+    (binding) =>
+      !replacedPaths.has(binding.surface) &&
+      (binding.targetId === undefined || logicalIds.has(binding.targetId)),
+  )
+  const localBindings = facts.localBindings.filter(
+    (binding) =>
+      !replacedPaths.has(binding.filePath) &&
+      (binding.targetId === undefined || logicalIds.has(binding.targetId)),
+  )
+  const retainedIds = new Set([
+    ...logicalIds,
+    ...publicBindings.map((binding) => binding.id),
+    ...localBindings.map((binding) => binding.id),
+  ])
+  return {
+    logicalSymbols,
+    declarations,
+    publicBindings,
+    localBindings,
+    steps: facts.steps.filter((step) => retainedIds.has(step.fromId) && retainedIds.has(step.toId)),
+    coverage: facts.coverage.filter((coverage) => !replacedPaths.has(coverage.filePath)),
+  }
+}
+
+/**
  * Groups method symbols by their inferred declaring type for override derivation.
  */
 interface MethodOwnershipIndex {
@@ -94,6 +147,19 @@ interface FilesAndSymbolsStageChunk {
  */
 interface RelationsStageChunk {
   readonly relations: Relation[]
+}
+
+/** TypeScript re-export metadata retained by the adapter for pass-2 linking. */
+interface TypeScriptReExport {
+  readonly specifier: string
+  readonly importedName: string
+  readonly exportedName: string
+}
+
+/** Minimal parser-state shape needed to link TypeScript re-exports. */
+interface TypeScriptReExportState {
+  readonly kind: 'typescript'
+  readonly reExports?: readonly TypeScriptReExport[]
 }
 
 /**
@@ -326,6 +392,206 @@ export class IndexCodeGraph {
   ) {}
 
   /**
+   * Links TypeScript named and star re-exports after every declaration is available.
+   * @param session - Completed pass-1 indexing session.
+   * @returns Resolved public bindings and their provenance steps.
+   */
+  private linkTypeScriptReExports(session: InMemoryIndexSession): {
+    publicBindings: readonly PublicBinding[]
+    steps: readonly ResolutionStep[]
+    relations: readonly Relation[]
+  } {
+    const logicalSymbols = session.getLogicalSymbols()
+    const logicalById = new Map(logicalSymbols.map((symbol) => [symbol.id, symbol]))
+    const logicalIdByDeclaration = new Map<string, string>()
+    for (const [logicalId, declarations] of session.getDeclarationsByLogicalId()) {
+      for (const declaration of declarations) {
+        logicalIdByDeclaration.set(declaration.symbolId, logicalId)
+      }
+    }
+
+    const bindingsById = new Map(
+      session.getPublicBindings().map((binding) => [binding.id, binding]),
+    )
+    const bindingsBySurface = new Map<string, Map<string, PublicBinding>>()
+    const bindingsByRoute = new Map<string, Map<string, PublicBinding>>()
+    const routeKey = (surface: string, exportedName: string): string =>
+      `${surface}\u0000${exportedName}`
+    const indexBinding = (binding: PublicBinding): void => {
+      bindingsById.set(binding.id, binding)
+      const surfaceBindings =
+        bindingsBySurface.get(binding.surface) ?? new Map<string, PublicBinding>()
+      surfaceBindings.set(binding.id, binding)
+      bindingsBySurface.set(binding.surface, surfaceBindings)
+      const routeBindings =
+        bindingsByRoute.get(routeKey(binding.surface, binding.exportedName)) ??
+        new Map<string, PublicBinding>()
+      routeBindings.set(binding.id, binding)
+      bindingsByRoute.set(routeKey(binding.surface, binding.exportedName), routeBindings)
+    }
+    const replaceUnresolvedRoute = (binding: PublicBinding): void => {
+      const key = routeKey(binding.surface, binding.exportedName)
+      const routeBindings = bindingsByRoute.get(key)
+      if (routeBindings !== undefined) {
+        for (const [bindingId, candidate] of routeBindings) {
+          if (
+            candidate.space !== binding.space ||
+            candidate.targetId !== undefined ||
+            bindingId === binding.id
+          ) {
+            continue
+          }
+          bindingsById.delete(bindingId)
+          bindingsBySurface.get(candidate.surface)?.delete(bindingId)
+          routeBindings.delete(bindingId)
+        }
+      }
+      indexBinding(binding)
+    }
+    for (const binding of bindingsById.values()) indexBinding(binding)
+
+    const stepsByKey = new Map(
+      session
+        .getResolutionSteps()
+        .map((step) => [JSON.stringify([step.fromId, step.toId, step.kind]), step]),
+    )
+
+    const maxPasses = Math.max(session.getAllFilePaths().size, 1)
+    for (let pass = 0; pass < maxPasses; pass++) {
+      let changed = false
+      for (const filePath of session.getAllFilePaths()) {
+        const analysis = session.getAnalysis(filePath)
+        const state = analysis?.parserState as TypeScriptReExportState | undefined
+        if (state?.kind !== 'typescript' || !state.reExports?.length) continue
+
+        const relPath = filePath.substring(filePath.indexOf(':') + 1)
+        const adapter = this.registry.getAdapterForFile(relPath)
+        if (!adapter?.resolveRelativeImportPath) continue
+
+        for (const reExport of state.reExports) {
+          const resolved = adapter.resolveRelativeImportPath(filePath, reExport.specifier)
+          const candidates = Array.isArray(resolved) ? resolved : [resolved]
+          const sourcePath = candidates.find(
+            (candidate) => session.getFileId(candidate) !== undefined,
+          )
+          if (!sourcePath) continue
+
+          const sourceBindings = [...(bindingsBySurface.get(sourcePath)?.values() ?? [])].filter(
+            (binding) => binding.targetId !== undefined && logicalById.has(binding.targetId),
+          )
+          const routes =
+            reExport.importedName === '*'
+              ? sourceBindings.filter((binding) => binding.exportedName !== 'default')
+              : [
+                  ...(bindingsByRoute.get(routeKey(sourcePath, reExport.importedName))?.values() ??
+                    []),
+                ].filter(
+                  (binding) => binding.targetId !== undefined && logicalById.has(binding.targetId),
+                )
+
+          for (const route of routes) {
+            const exportedName =
+              reExport.exportedName === '*' ? route.exportedName : reExport.exportedName
+            const binding = createPublicBinding({
+              surface: filePath,
+              exportedName,
+              space: route.space,
+              targetId: route.targetId,
+            })
+            const previous = bindingsById.get(binding.id)
+            if (previous?.targetId !== binding.targetId) changed = true
+            replaceUnresolvedRoute(binding)
+            const step: ResolutionStep = {
+              fromId: binding.id,
+              toId: route.targetId!,
+              kind: reExport.importedName === '*' ? 're-export:star' : 're-export:named',
+            }
+            stepsByKey.set(JSON.stringify([step.fromId, step.toId, step.kind]), step)
+          }
+
+          if (reExport.importedName !== '*' && routes.length === 0) {
+            const target = session
+              .findSymbolsByFile(sourcePath)
+              .find((symbol) => symbol.name === reExport.importedName)
+            const logicalId = target && logicalIdByDeclaration.get(target.id)
+            const logical: LogicalSymbol | undefined =
+              logicalId === undefined ? undefined : logicalById.get(logicalId)
+            if (!logical) continue
+            const binding = createPublicBinding({
+              surface: filePath,
+              exportedName: reExport.exportedName,
+              space: logical.space,
+              targetId: logical.id,
+            })
+            const previous = bindingsById.get(binding.id)
+            if (previous?.targetId !== binding.targetId) changed = true
+            replaceUnresolvedRoute(binding)
+            const step: ResolutionStep = {
+              fromId: binding.id,
+              toId: logical.id,
+              kind: 're-export:named',
+            }
+            stepsByKey.set(JSON.stringify([step.fromId, step.toId, step.kind]), step)
+          }
+        }
+      }
+      if (!changed) break
+    }
+
+    const publicBindings = [...bindingsById.values()]
+    const relations: Relation[] = []
+    for (const filePath of session.getAllFilePaths()) {
+      const analysis = session.getAnalysis(filePath)
+      if (!analysis) continue
+      const relPath = filePath.substring(filePath.indexOf(':') + 1)
+      const adapter = this.registry.getAdapterForFile(relPath)
+      if (!adapter?.resolveRelativeImportPath) continue
+      const importsByLocalName = new Map(
+        analysis.imports.filter((item) => item.isRelative).map((item) => [item.localName, item]),
+      )
+      const symbolsById = new Map(analysis.symbols.map((symbol) => [symbol.id, symbol]))
+      const symbolsByDescendingLine = [...analysis.symbols].sort(
+        (left, right) => right.line - left.line,
+      )
+      for (const call of analysis.callFacts) {
+        const imported = importsByLocalName.get(call.targetName ?? call.name)
+        if (!imported) continue
+        const resolved = adapter.resolveRelativeImportPath(filePath, imported.specifier)
+        const candidates = Array.isArray(resolved) ? resolved : [resolved]
+        const surface = candidates.find((candidate) => session.getFileId(candidate) !== undefined)
+        const binding =
+          surface === undefined
+            ? undefined
+            : [
+                ...(bindingsByRoute.get(routeKey(surface, imported.originalName))?.values() ?? []),
+              ].find((candidate) => candidate.targetId !== undefined)
+        const source =
+          (call.callerSymbolId && symbolsById.get(call.callerSymbolId)) ??
+          symbolsByDescendingLine.find((symbol) => symbol.line <= call.location.line)
+        if (!binding || !source) continue
+        relations.push(
+          createRelation({
+            source: source.id,
+            target: binding.id,
+            type: call.form === 'constructor' ? RelationType.Constructs : RelationType.Calls,
+            metadata: {
+              reason: 'public binding route',
+              line: call.location.line,
+              column: call.location.column,
+            },
+          }),
+        )
+      }
+    }
+
+    return {
+      publicBindings,
+      steps: [...stepsByKey.values()],
+      relations,
+    }
+  }
+
+  /**
    * Executes the indexing pipeline for the given project workspaces and graph config.
    *
    * This is the primary write path into the code graph. It handles both code files
@@ -337,6 +603,15 @@ export class IndexCodeGraph {
   async execute(options: IndexOptions): Promise<IndexResult> {
     const start = performance.now()
     const errors: IndexError[] = []
+    const phaseMetrics = {
+      importResolution: { count: 0, durationMs: 0 },
+      dependencyFacts: { count: 0, durationMs: 0 },
+      adapterRelations: { count: 0, durationMs: 0 },
+      reexports: { count: 0, durationMs: 0 },
+      hierarchyOverrides: { count: 0, durationMs: 0 },
+      persistence: { count: 0, durationMs: 0 },
+      searchIndexRebuild: { count: 0, durationMs: 0 },
+    }
     const onProgress = options.onProgress ?? noop
     const chunkBudget = options.chunkBytes ?? DEFAULT_CHUNK_BYTES
     const runId = `index-stage-${Date.now()}`
@@ -351,6 +626,7 @@ export class IndexCodeGraph {
       progress(0, 'Discovering files')
       const allDiscoveredPaths: string[] = []
       const fileHashes = new Map<string, string>()
+      const coverageByFilePath = new Map<string, IndexCoverage>()
       const absolutePaths = new Map<string, string>()
       const configRelativePaths = new Map<string, string>()
       const wsBreakdowns = new Map<string, MutableWorkspaceIndexBreakdown>()
@@ -434,9 +710,21 @@ export class IndexCodeGraph {
       const existingFiles = await this.store.getAllFiles()
       const existingDocuments = await this.store.getAllDocuments()
       const existingArtifactHashes = new Map<string, string>()
-      for (const file of existingFiles) existingArtifactHashes.set(file.path, file.contentHash)
+      const indexedResourceKinds = new Map<string, IndexedResourceKind>()
+      for (const file of existingFiles) {
+        existingArtifactHashes.set(file.path, file.contentHash)
+        indexedResourceKinds.set(file.path, IndexedResourceKind.File)
+      }
       for (const document of existingDocuments) {
         existingArtifactHashes.set(document.path, document.contentHash)
+        indexedResourceKinds.set(document.path, IndexedResourceKind.Document)
+      }
+      const existingCoverage = await this.store.findIndexCoverage(allDiscoveredPaths)
+      for (const coverage of existingCoverage) {
+        coverageByFilePath.set(coverage.filePath, coverage)
+        if (coverage.contentHash !== undefined && !existingArtifactHashes.has(coverage.filePath)) {
+          existingArtifactHashes.set(coverage.filePath, coverage.contentHash)
+        }
       }
 
       // ── Fingerprint comparison ──
@@ -480,13 +768,17 @@ export class IndexCodeGraph {
         }
       }
 
-      let fullRebuildReason: string | null = null
+      let fullRebuildReason: string | null =
+        options.force === true ? 'Forced graph storage recreation requested by indexing' : null
+      let fullRebuild = options.force === true
       const newFiles: string[] = []
       const changedFiles: string[] = []
       const deletedFiles: string[] = []
       const skippedFiles: string[] = []
+      const fingerprintInvalidatedPaths = new Set<string>()
 
       if (fingerprintMismatch) {
+        fullRebuild = true
         fullRebuildReason =
           'Graph derivation fingerprint mismatch — code-graph version or workspace configuration changed since last index'
         progress(5, 'Fingerprint mismatch', 'Forcing re-index of mismatched workspaces')
@@ -496,27 +788,65 @@ export class IndexCodeGraph {
           const storedFp = storedFingerprintMap.get(ef.workspace)
           const currentFp = currentFingerprintMap.get(ef.workspace)
           if (storedFp !== undefined && currentFp !== undefined && storedFp !== currentFp) {
-            await this.store.removeFile(ef.path)
-            await this.store.removeDocument(ef.path)
+            fingerprintInvalidatedPaths.add(ef.path)
           }
         }
         // Treat all discovered files as new — no content hash skip for mismatched workspaces
         newFiles.push(...allDiscoveredPaths)
       } else {
-        // Hash all files
-        progress(2, 'Hashing files', `${String(allDiscoveredPaths.length)} files`)
+        const observationResources = [
+          ...existingFiles.map((file) => ({
+            workspace: file.workspace,
+            resourceKind: IndexedResourceKind.File,
+            resourceId: file.path,
+          })),
+          ...existingDocuments.map((document) => ({
+            workspace: document.workspace,
+            resourceKind: IndexedResourceKind.Document,
+            resourceId: document.path,
+          })),
+        ]
+        const observationByResource = new Map<string, IndexedInputObservation>()
+        try {
+          for (const observation of await this.store.getIndexedInputObservations(
+            observationResources,
+          )) {
+            if (observation.inputKind === IndexedInputKind.Filesystem && !observation.stale) {
+              observationByResource.set(observation.resourceId, observation)
+            }
+          }
+        } catch {
+          // Stores without observation support retain content-hash diff behavior.
+        }
+
+        // Reuse indexed hashes when filesystem stamps match; hash only changed stamps
+        // and targets (such as non-text coverage) without a persisted observation.
+        progress(2, 'Checking files', `${String(allDiscoveredPaths.length)} files`)
         for (let i = 0; i < allDiscoveredPaths.length; i++) {
           const prefixedPath = allDiscoveredPaths[i]!
           const absPath = absolutePaths.get(prefixedPath)!
           try {
-            fileHashes.set(prefixedPath, computeContentHash(readFileSync(absPath, 'utf-8')))
+            const observation = observationByResource.get(prefixedPath)
+            const existingHash = existingArtifactHashes.get(prefixedPath)
+            const stat = statSync(absPath)
+            if (
+              observation !== undefined &&
+              existingHash !== undefined &&
+              observation.indexedContentHash === existingHash &&
+              observation.lastObservedMtime === stat.mtimeMs &&
+              observation.lastObservedSize === stat.size
+            ) {
+              fileHashes.set(prefixedPath, existingHash)
+            } else {
+              fileHashes.set(prefixedPath, computeContentHash(readFileSync(absPath, 'utf-8')))
+            }
           } catch (err) {
             errors.push({ filePath: prefixedPath, message: String(err) })
           }
           if (i % 200 === 0) {
             progress(
               2 + Math.round((i / allDiscoveredPaths.length) * 3),
-              'Hashing files',
+              'Checking files',
               `${String(i)}/${String(allDiscoveredPaths.length)}`,
             )
           }
@@ -538,38 +868,68 @@ export class IndexCodeGraph {
         }
 
         // Only consider files from the workspaces being indexed as candidates for deletion
-        for (const existing of [...existingFiles, ...existingDocuments]) {
-          if (!discoveredSet.has(existing.path) && indexedWorkspaceNames.has(existing.workspace)) {
-            deletedFiles.push(existing.path)
+        const existingPaths = new Set([
+          ...existingFiles.map((existing) => existing.path),
+          ...existingDocuments.map((existing) => existing.path),
+          ...existingCoverage.map((coverage) => coverage.filePath),
+        ])
+        for (const existingPath of existingPaths) {
+          const workspace = existingPath.slice(0, existingPath.indexOf(':'))
+          if (!discoveredSet.has(existingPath) && indexedWorkspaceNames.has(workspace)) {
+            deletedFiles.push(existingPath)
           }
         }
       }
 
-      const hierarchyDependentFiles = await this.collectHierarchyDependentFiles(changedFiles)
-      const filesToReprocess = [...hierarchyDependentFiles].filter(
+      const semanticRefreshRequired =
+        existingCoverage.length > 0 &&
+        (newFiles.length > 0 || changedFiles.length > 0 || deletedFiles.length > 0)
+      const persistedReferenceFacts = semanticRefreshRequired
+        ? await this.store.getAllReferenceFacts()
+        : undefined
+      // Native stores enforce relation endpoint integrity, so an import whose target did not
+      // exist at the previous generation cannot be recovered from persisted relations alone.
+      // Reconsider every existing code file only when additions may satisfy such imports.
+      const additionCandidates =
+        newFiles.length === 0 ? [] : existingFiles.map((existing) => existing.path)
+      const affectedClosure =
+        persistedReferenceFacts === undefined
+          ? new Set<string>()
+          : await this.collectAffectedFileClosure(
+              [...newFiles, ...changedFiles, ...deletedFiles, ...additionCandidates],
+              new Set(allDiscoveredPaths),
+              persistedReferenceFacts,
+            )
+      const filesToReprocess = [...affectedClosure].filter(
         (filePath) =>
           !newFiles.includes(filePath) &&
           !changedFiles.includes(filePath) &&
           !deletedFiles.includes(filePath),
       )
-      const filesToProcess = [...newFiles, ...changedFiles, ...filesToReprocess]
+      const filesToProcess = [...new Set([...newFiles, ...changedFiles, ...filesToReprocess])]
+      const contentChangedPaths = new Set([...newFiles, ...changedFiles])
+      const preservedFileCoverageRelations = await this.store.getCoveringSpecsForFiles([
+        ...changedFiles,
+        ...filesToReprocess,
+      ])
       // ── Cleanup (6%) ──
-      const toRemove = [...deletedFiles, ...changedFiles, ...filesToReprocess]
+      const toRemove = [
+        ...new Set([
+          ...fingerprintInvalidatedPaths,
+          ...deletedFiles,
+          ...changedFiles,
+          ...filesToReprocess,
+        ]),
+      ]
       const deletedSet = new Set(deletedFiles)
       progress(6, 'Cleaning up', `${String(toRemove.length)} to remove`)
       let filesRemovedCount = 0
       for (const filePath of toRemove) {
-        try {
-          await this.store.removeFile(filePath)
-          await this.store.removeDocument(filePath)
-          if (deletedSet.has(filePath)) {
-            filesRemovedCount++
-            const wsName = filePath.substring(0, filePath.indexOf(':'))
-            const breakdown = wsBreakdowns.get(wsName)
-            if (breakdown) breakdown.filesRemoved++
-          }
-        } catch (err) {
-          errors.push({ filePath, message: String(err) })
+        if (deletedSet.has(filePath)) {
+          filesRemovedCount++
+          const wsName = filePath.substring(0, filePath.indexOf(':'))
+          const breakdown = wsBreakdowns.get(wsName)
+          if (breakdown) breakdown.filesRemoved++
         }
       }
       Logger.debug(
@@ -588,6 +948,25 @@ export class IndexCodeGraph {
       let filesIndexed = 0
       let documentsIndexed = 0
       const session = new InMemoryIndexSession()
+      if (persistedReferenceFacts !== undefined) {
+        const replacedPaths = new Set([...filesToProcess, ...deletedFiles])
+        const retainedFiles = existingFiles.filter((file) => !replacedPaths.has(file.path))
+        const retainedSymbols = await this.store.findSymbols({
+          filePaths: retainedFiles.map((file) => file.path),
+        })
+        const symbolsByFile = new Map<string, SymbolNode[]>()
+        for (const symbol of retainedSymbols) {
+          const symbols = symbolsByFile.get(symbol.filePath) ?? []
+          symbols.push(symbol)
+          symbolsByFile.set(symbol.filePath, symbols)
+        }
+        for (const file of retainedFiles) {
+          session.hydratePersistedFile(file, symbolsByFile.get(file.path) ?? [])
+        }
+        session.hydrateReferenceFacts(
+          retainReferenceFactsOutsidePaths(persistedReferenceFacts, replacedPaths),
+        )
+      }
 
       // Build package-name → workspace-name map for cross-workspace import resolution.
       const packageToWorkspace = new Map<string, string>()
@@ -617,8 +996,8 @@ export class IndexCodeGraph {
       let stagedFileCount = 0
       let stagedSymbolCount = 0
       let stagedRelationCount = 0
-      const changedTypeIds = new Set<string>()
       const seenOverrideKeys = new Set<string>()
+      const hierarchyTargetsByType = new Map<string, Set<string>>()
 
       progress(7, 'Analyzing files')
 
@@ -646,6 +1025,13 @@ export class IndexCodeGraph {
             const adapter = this.registry.getAdapterForFile(relPath)
             if (!adapter) {
               if (decodedContent === null) {
+                coverageByFilePath.set(prefixedPath, {
+                  filePath: prefixedPath,
+                  contentHash: fileHashes.get(prefixedPath),
+                  status: IndexCoverageStatus.Unsupported,
+                  reason: 'non-text-content',
+                  capabilities: [],
+                })
                 const elapsed = performance.now() - fileStart
                 if (elapsed > 500) {
                   Logger.debug(
@@ -664,12 +1050,22 @@ export class IndexCodeGraph {
                 workspace: wsName,
               })
               chunkDocuments.push(document)
+              indexedResourceKinds.set(prefixedPath, IndexedResourceKind.Document)
               session.registerDocument(document)
-              documentsIndexed++
-              const breakdown = wsBreakdowns.get(wsName)
-              if (breakdown) {
-                breakdown.filesIndexed++
-                breakdown.documentsIndexed++
+              coverageByFilePath.set(prefixedPath, {
+                filePath: prefixedPath,
+                contentHash: hash,
+                status: IndexCoverageStatus.Unsupported,
+                reason: 'no-language-adapter',
+                capabilities: [],
+              })
+              if (contentChangedPaths.has(prefixedPath)) {
+                documentsIndexed++
+                const breakdown = wsBreakdowns.get(wsName)
+                if (breakdown) {
+                  breakdown.filesIndexed++
+                  breakdown.documentsIndexed++
+                }
               }
               const elapsed = performance.now() - fileStart
               if (elapsed > 500) {
@@ -708,6 +1104,25 @@ export class IndexCodeGraph {
               filePath: prefixedPath,
               analysis: finalDraft,
             })
+            const capabilities = finalDraft.referenceFacts?.capabilities ?? adapter.capabilities?.()
+            const enabledCapabilities =
+              capabilities === undefined
+                ? []
+                : Object.entries(capabilities)
+                    .filter(([, enabled]) => enabled)
+                    .map(([capability]) => capability)
+                    .sort()
+            coverageByFilePath.set(prefixedPath, {
+              filePath: prefixedPath,
+              contentHash: hash,
+              status:
+                finalDraft.referenceFacts === undefined
+                  ? IndexCoverageStatus.Partial
+                  : IndexCoverageStatus.Indexed,
+              reason:
+                finalDraft.referenceFacts === undefined ? 'reference-facts-unavailable' : undefined,
+              capabilities: enabledCapabilities,
+            })
 
             chunkFiles.push(
               createFileNode({
@@ -719,17 +1134,14 @@ export class IndexCodeGraph {
                 content,
               }),
             )
+            indexedResourceKinds.set(prefixedPath, IndexedResourceKind.File)
             fileLanguages.set(prefixedPath, language)
             chunkSymbols.push(...symbols)
-            for (const symbol of symbols) {
-              if (symbol.kind === 'class' || symbol.kind === 'interface') {
-                changedTypeIds.add(symbol.id)
-              }
+            if (contentChangedPaths.has(prefixedPath)) {
+              filesIndexed++
+              const breakdown = wsBreakdowns.get(wsName)
+              if (breakdown) breakdown.filesIndexed++
             }
-            filesIndexed++
-
-            const breakdown = wsBreakdowns.get(wsName)
-            if (breakdown) breakdown.filesIndexed++
 
             const elapsed = performance.now() - fileStart
             if (elapsed > 500) {
@@ -739,6 +1151,13 @@ export class IndexCodeGraph {
             }
           } catch (err) {
             errors.push({ filePath: prefixedPath, message: String(err) })
+            coverageByFilePath.set(prefixedPath, {
+              filePath: prefixedPath,
+              contentHash: fileHashes.get(prefixedPath),
+              status: IndexCoverageStatus.ParseFailed,
+              reason: 'analysis-failed',
+              capabilities: [],
+            })
           }
 
           if (processed % 50 === 0) {
@@ -806,6 +1225,7 @@ export class IndexCodeGraph {
         const resolvedImportsMap = new Map<string, ResolvedImports>()
 
         // 1. Resolve imports first for all files in this chunk
+        const importResolutionStart = performance.now()
         for (const [prefixedPath] of chunk) {
           resolvedImportsProcessed++
           if (resolvedImportsProcessed % 50 === 0 || resolvedImportsProcessed === 1) {
@@ -834,10 +1254,12 @@ export class IndexCodeGraph {
               repoRoot: options.projectRoot,
             })
             resolvedImportsMap.set(prefixedPath, resolvedImports)
+            phaseMetrics.importResolution.count += resolvedImports.fileImports.length
           } catch (err) {
             errors.push({ filePath: prefixedPath, message: String(err) })
           }
         }
+        phaseMetrics.importResolution.durationMs += performance.now() - importResolutionStart
 
         // 2. Build relations from stored facts plus session lookups
         for (const [prefixedPath] of chunk) {
@@ -863,6 +1285,7 @@ export class IndexCodeGraph {
             const resolvedImports = resolvedImportsMap.get(prefixedPath)
             if (!resolvedImports) continue
 
+            const dependencyStart = performance.now()
             const scopedEnvironment = buildScopedBindingEnvironment({
               analysis,
               importMap: resolvedImports.importMap,
@@ -873,12 +1296,17 @@ export class IndexCodeGraph {
               analysis,
               symbolLookup,
             })
+            phaseMetrics.dependencyFacts.durationMs += performance.now() - dependencyStart
+            phaseMetrics.dependencyFacts.count += resolvedDependencies.length
+            const adapterRelationsStart = performance.now()
             const relations = adapter.buildRelations(analysis, {
               session,
               resolvedImports,
               ...(ws?.codeRoot !== undefined ? { codeRoot: ws.codeRoot } : {}),
               repoRoot: options.projectRoot,
             })
+            phaseMetrics.adapterRelations.durationMs += performance.now() - adapterRelationsStart
+            phaseMetrics.adapterRelations.count += relations.length
 
             chunkRelations.push(...relations)
             for (const dependency of resolvedDependencies) {
@@ -913,6 +1341,11 @@ export class IndexCodeGraph {
           if (relation.type === RelationType.Overrides) {
             seenOverrideKeys.add(`${relation.source}:${relation.type}:${relation.target}`)
           }
+          if (relation.type === RelationType.Extends || relation.type === RelationType.Implements) {
+            const targets = hierarchyTargetsByType.get(relation.source) ?? new Set<string>()
+            targets.add(relation.target)
+            hierarchyTargetsByType.set(relation.source, targets)
+          }
         }
         const stageFile = `pass2-${String(chunkIndex).padStart(5, '0')}.json`
         const uniqueRelations = deduplicateRelations(chunkRelations)
@@ -941,7 +1374,9 @@ export class IndexCodeGraph {
       let specsProcessed = 0
       let specsIndexed = 0
       const allSpecs: SpecNode[] = []
+      const specObservations: IndexedInputObservation[] = []
       const specRelations: Relation[] = []
+      const obsoleteSpecIds = new Set<string>()
 
       const getAllSpecsStart = performance.now()
       const existingSpecs = await this.store.getAllSpecs()
@@ -1055,6 +1490,36 @@ export class IndexCodeGraph {
               }
             }
 
+            if (ws.specRepo.specsPath !== undefined) {
+              const specName = repoSpec.name.toString()
+              const repositorySpecName =
+                ws.prefix !== null && specName.startsWith(`${ws.prefix}/`)
+                  ? specName.slice(ws.prefix.length + 1)
+                  : specName
+              for (const filename of repoSpec.filenames) {
+                const absoluteInput = join(ws.specRepo.specsPath, repositorySpecName, filename)
+                if (!existsSync(absoluteInput)) continue
+                const inputLocator = relative(options.projectRoot, absoluteInput).replaceAll(
+                  '\\',
+                  '/',
+                )
+                if (inputLocator === '..' || inputLocator.startsWith('../')) continue
+                const inputStat = statSync(absoluteInput)
+                specObservations.push({
+                  workspace: ws.name,
+                  resourceKind: IndexedResourceKind.Spec,
+                  resourceId: specId,
+                  inputKind: IndexedInputKind.Filesystem,
+                  inputLocator,
+                  indexedContentHash: computeContentHash(readFileSync(absoluteInput, 'utf8')),
+                  lastObservedMtime: inputStat.mtimeMs,
+                  lastObservedSize: inputStat.size,
+                  generation: serializeFingerprintMap(currentFingerprintMap),
+                  stale: false,
+                })
+              }
+            }
+
             if (existing?.contentHash === metadataFingerprint) {
               if (wsBreakdown) wsBreakdown.specsIndexed++
               continue
@@ -1110,11 +1575,24 @@ export class IndexCodeGraph {
                     const matchingSymbols = session
                       .findSymbolsByFile(link.file)
                       .filter((s: SymbolNode) => s.name === symbolName)
+                    const logicalTargets = new Set<string>()
                     for (const symbol of matchingSymbols) {
+                      for (const [
+                        logicalId,
+                        declarations,
+                      ] of session.getDeclarationsByLogicalId()) {
+                        if (
+                          declarations.some((declaration) => declaration.symbolId === symbol.id)
+                        ) {
+                          logicalTargets.add(logicalId)
+                        }
+                      }
+                    }
+                    if (logicalTargets.size === 1) {
                       specRelations.push(
                         createRelation({
                           source: specId,
-                          target: symbol.id,
+                          target: [...logicalTargets][0]!,
                           type: RelationType.CoversSymbol,
                         }),
                       )
@@ -1134,11 +1612,7 @@ export class IndexCodeGraph {
 
         if (specIdsToRemove.length > 0) {
           const cleanupStart = performance.now()
-          try {
-            await this.store.removeSpecs([...new Set(specIdsToRemove)])
-          } catch (err) {
-            errors.push({ filePath: ws.name, message: String(err) })
-          }
+          for (const specId of specIdsToRemove) obsoleteSpecIds.add(specId)
           specCleanupDuration += performance.now() - cleanupStart
         }
       }
@@ -1172,77 +1646,169 @@ export class IndexCodeGraph {
         `${String(stagedFileCount)} files, ${String(stagedSymbolCount)} symbols, ${String(stagedRelationCount + specRelations.length)} relations`,
       )
       const serializedFingerprintMap = serializeFingerprintMap(currentFingerprintMap)
-      if (
-        stagedFileCount > 0 ||
-        allSpecs.length > 0 ||
-        stagedRelationCount > 0 ||
-        specRelations.length > 0
-      ) {
-        let bulkStep = 0
-        const onBulkStep = (step: string): void => {
-          bulkStep++
-          progress(83 + Math.min(Math.round(bulkStep * 2), 12), 'Bulk loading', step)
-        }
-        for (const chunkFile of pass1ChunkFiles) {
-          const staged = readFilesAndSymbolsStageChunk(stageDir, chunkFile)
-          await this.store.bulkLoad({
-            files: staged.files,
-            documents: staged.documents,
-            symbols: staged.symbols,
-            specs: [],
-            relations: [],
-            onProgress: onBulkStep,
-          })
-        }
-        if (allSpecs.length > 0) {
-          await this.store.bulkLoad({
-            files: [],
-            documents: [],
-            symbols: [],
-            specs: allSpecs,
-            relations: [],
-            onProgress: onBulkStep,
-          })
-        }
-        for (const chunkFile of pass2ChunkFiles) {
-          const staged = readRelationsStageChunk(stageDir, chunkFile)
-          if (staged.relations.length === 0) continue
-          await this.store.bulkLoad({
-            files: [],
-            symbols: [],
-            specs: [],
-            relations: staged.relations,
-            onProgress: onBulkStep,
-          })
-        }
-        if (specRelations.length > 0 || options.vcsRef !== undefined || serializedFingerprintMap) {
-          await this.store.bulkLoad({
-            files: [],
-            symbols: [],
-            specs: [],
-            relations: specRelations,
-            onProgress: onBulkStep,
-            ...(options.vcsRef !== undefined ? { vcsRef: options.vcsRef } : {}),
-            graphFingerprint: serializedFingerprintMap,
+      const observations: IndexedInputObservation[] = []
+      if (errors.length === 0) {
+        observations.push(...specObservations)
+        for (const resourceId of allDiscoveredPaths) {
+          const resourceKind = indexedResourceKinds.get(resourceId)
+          const absolutePath = absolutePaths.get(resourceId)
+          const inputLocator = configRelativePaths.get(resourceId)
+          const indexedContentHash =
+            fileHashes.get(resourceId) ?? existingArtifactHashes.get(resourceId)
+          if (
+            resourceKind === undefined ||
+            absolutePath === undefined ||
+            inputLocator === undefined ||
+            indexedContentHash === undefined
+          ) {
+            continue
+          }
+          const stat = statSync(absolutePath)
+          observations.push({
+            workspace: resourceId.slice(0, resourceId.indexOf(':')),
+            resourceKind,
+            resourceId,
+            inputKind: IndexedInputKind.Filesystem,
+            inputLocator,
+            indexedContentHash,
+            lastObservedMtime: stat.mtimeMs,
+            lastObservedSize: stat.size,
+            generation: serializedFingerprintMap,
+            stale: false,
           })
         }
       }
-
-      const crossFileOverrides = await this.deriveCrossFileOverrideRelations(
-        changedTypeIds,
+      const hierarchyStart = performance.now()
+      const crossFileOverrides = this.deriveCrossFileOverrideRelations(
+        hierarchyTargetsByType,
         ownershipIndex,
         seenOverrideKeys,
       )
-      if (crossFileOverrides.length > 0) {
-        await this.store.addRelations(crossFileOverrides)
+      phaseMetrics.hierarchyOverrides.durationMs += performance.now() - hierarchyStart
+      phaseMetrics.hierarchyOverrides.count = crossFileOverrides.length
+
+      const logicalSymbols = session.getLogicalSymbols()
+      const logicalIds = new Set(logicalSymbols.map((symbol) => symbol.id))
+      const reexportStart = performance.now()
+      const linkedReferences = this.linkTypeScriptReExports(session)
+      phaseMetrics.reexports.durationMs += performance.now() - reexportStart
+      phaseMetrics.reexports.count =
+        linkedReferences.relations.length + linkedReferences.steps.length
+      const publicBindings = linkedReferences.publicBindings.map((binding) => ({
+        ...binding,
+        targetId:
+          binding.targetId !== undefined && logicalIds.has(binding.targetId)
+            ? binding.targetId
+            : undefined,
+      }))
+      const localBindings = session.getLocalBindings().map((binding) => ({
+        ...binding,
+        targetId:
+          binding.targetId !== undefined && logicalIds.has(binding.targetId)
+            ? binding.targetId
+            : undefined,
+      }))
+      const knownReferenceIds = new Set([
+        ...logicalIds,
+        ...publicBindings.map((binding) => binding.id),
+        ...localBindings.map((binding) => binding.id),
+      ])
+      const referenceFacts: ReferenceFactsWrite = {
+        logicalSymbols,
+        declarations: [...session.getDeclarationsByLogicalId()].flatMap(
+          ([logicalSymbolId, declarations]) =>
+            declarations.map((declaration) => ({ logicalSymbolId, declaration })),
+        ),
+        publicBindings,
+        localBindings,
+        steps: linkedReferences.steps.filter(
+          (step) => knownReferenceIds.has(step.fromId) && knownReferenceIds.has(step.toId),
+        ),
+        coverage: allDiscoveredPaths.map(
+          (filePath): IndexCoverage =>
+            coverageByFilePath.get(filePath) ?? {
+              filePath,
+              contentHash: fileHashes.get(filePath) ?? existingArtifactHashes.get(filePath),
+              status: IndexCoverageStatus.Partial,
+              reason: 'coverage-not-recorded',
+              capabilities: [],
+            },
+        ),
+      }
+
+      const rebuildSearchIndexes =
+        semanticRefreshRequired ||
+        stagedFileCount > 0 ||
+        allSpecs.length > 0 ||
+        obsoleteSpecIds.size > 0 ||
+        toRemove.length > 0
+      let bulkStep = 0
+      let searchRebuildStart: number | undefined
+      const onBulkStep = (step: string): void => {
+        if (step === 'search-indexes' && searchRebuildStart === undefined) {
+          searchRebuildStart = performance.now()
+        }
+        bulkStep++
+        progress(83 + Math.min(Math.round(bulkStep * 2), 13), 'Bulk loading', step)
+      }
+      const writeSession = this.store.beginBulkIndexSession({
+        onProgress: onBulkStep,
+        replaceCodeGraph: fullRebuild,
+        rebuildSearchIndexes,
+        ...(options.vcsRef === undefined ? {} : { vcsRef: options.vcsRef }),
+        graphFingerprint: serializedFingerprintMap,
+        ...(errors.length === 0
+          ? {
+              indexedWorkspaces: [...indexedWorkspaceNames],
+              clearGraphStaleLatch: true,
+            }
+          : {}),
+      })
+      try {
+        const persistenceStart = performance.now()
+        await writeSession.removeFiles(toRemove)
+        await writeSession.removeDocuments(toRemove)
+        await writeSession.removeSpecs([...obsoleteSpecIds])
+        for (const chunkFile of pass1ChunkFiles) {
+          const staged = readFilesAndSymbolsStageChunk(stageDir, chunkFile)
+          await writeSession.writeFiles(staged.files)
+          await writeSession.writeDocuments(staged.documents)
+          await writeSession.writeSymbols(staged.symbols)
+        }
+        await writeSession.writeSpecs(allSpecs)
+        for (const chunkFile of pass2ChunkFiles) {
+          const staged = readRelationsStageChunk(stageDir, chunkFile)
+          await writeSession.writeRelations(staged.relations)
+        }
+        if (semanticRefreshRequired || existingCoverage.length === 0) {
+          await writeSession.writeReferenceFacts(referenceFacts)
+        }
+        if (observations.length > 0) await writeSession.writeObservations(observations)
+        await writeSession.writeRelations([
+          ...specRelations,
+          ...preservedFileCoverageRelations,
+          ...crossFileOverrides,
+          ...linkedReferences.relations,
+        ])
+        phaseMetrics.persistence.durationMs += performance.now() - persistenceStart
+        phaseMetrics.persistence.count =
+          stagedFileCount + stagedSymbolCount + stagedRelationCount + specRelations.length
+        const commitStart = performance.now()
+        await writeSession.commit()
+        const commitEnd = performance.now()
+        phaseMetrics.persistence.durationMs += (searchRebuildStart ?? commitEnd) - commitStart
+        phaseMetrics.searchIndexRebuild.durationMs =
+          searchRebuildStart === undefined ? 0 : commitEnd - searchRebuildStart
+        phaseMetrics.searchIndexRebuild.count = rebuildSearchIndexes
+          ? stagedFileCount + allSpecs.length
+          : 0
+      } catch (error) {
+        await writeSession.rollback().catch(() => {})
+        throw error
       }
 
       Logger.debug(`[IndexCodeGraph] Bulk Load took ${Math.round(performance.now() - bulkStart)}ms`)
       Logger.debug(`[IndexCodeGraph] Total Run took ${Math.round(performance.now() - start)}ms`)
-
-      // Rebuild FTS indexes after data changes
-      progress(96, 'Rebuilding search indexes')
-      await this.store.rebuildFtsIndexes()
 
       progress(100, 'Done')
 
@@ -1288,7 +1854,9 @@ export class IndexCodeGraph {
         workspaces,
         vcsRef: options.vcsRef ?? null,
         graphFingerprint: serializedFingerprintMap,
+        fullRebuild,
         fullRebuildReason,
+        phaseMetrics,
       }
     } finally {
       rmSync(stageDir, { recursive: true, force: true })
@@ -1320,111 +1888,114 @@ export class IndexCodeGraph {
   }
 
   /**
-   * Collects files that must be re-processed because they contain classes/interfaces
-   * that extend or implement modified types from the current changed set.
-   * @param changedFiles - Files that were already identified as new or changed.
-   * @returns Set of additional file paths to re-extract.
+   * Computes the transitive persisted-file closure whose derived facts can change.
+   * @param seedFiles - New, changed, deleted, or conservative addition-candidate files.
+   * @param visibleFiles - Files visible in the current discovery generation.
+   * @param facts - Complete persisted reference snapshot.
+   * @returns Visible affected files, including the supplied seeds when still present.
    */
-  private async collectHierarchyDependentFiles(changedFiles: string[]): Promise<Set<string>> {
-    const toReprocess = new Set<string>()
-    if (changedFiles.length === 0) return toReprocess
-
-    const changedSymbols = await this.store.findSymbols({ filePaths: changedFiles })
-    const typeIds = new Set<string>()
-    for (const s of changedSymbols) {
-      if (s.kind === 'class' || s.kind === 'interface') {
-        typeIds.add(s.id)
-      }
+  private async collectAffectedFileClosure(
+    seedFiles: readonly string[],
+    visibleFiles: ReadonlySet<string>,
+    facts: ReferenceFactsWrite,
+  ): Promise<Set<string>> {
+    const affected = new Set(seedFiles.filter((filePath) => visibleFiles.has(filePath)))
+    let frontier = [...new Set(seedFiles)]
+    const publicOwnerById = new Map(
+      facts.publicBindings.map((binding) => [binding.id, binding.surface]),
+    )
+    const localOwnerById = new Map(
+      facts.localBindings.map((binding) => [binding.id, binding.filePath]),
+    )
+    const declarationIdsByFile = new Map<string, Set<string>>()
+    for (const item of facts.declarations) {
+      const ids = declarationIdsByFile.get(item.declaration.location.filePath) ?? new Set<string>()
+      ids.add(item.logicalSymbolId)
+      declarationIdsByFile.set(item.declaration.location.filePath, ids)
+    }
+    const bindingIdsByFile = new Map<string, Set<string>>()
+    for (const binding of facts.publicBindings) {
+      const ids = bindingIdsByFile.get(binding.surface) ?? new Set<string>()
+      ids.add(binding.id)
+      bindingIdsByFile.set(binding.surface, ids)
+    }
+    for (const binding of facts.localBindings) {
+      const ids = bindingIdsByFile.get(binding.filePath) ?? new Set<string>()
+      ids.add(binding.id)
+      bindingIdsByFile.set(binding.filePath, ids)
+    }
+    const reverseSteps = new Map<string, Set<string>>()
+    for (const step of facts.steps) {
+      const sources = reverseSteps.get(step.toId) ?? new Set<string>()
+      sources.add(step.fromId)
+      reverseSteps.set(step.toId, sources)
     }
 
-    if (typeIds.size === 0) return toReprocess
-
-    for (const typeId of typeIds) {
-      const dependents = await getUpstream(this.store, typeId, { maxDepth: 1 })
-      for (const level of dependents.levels.values()) {
-        for (const dep of level) {
-          // We don't have relation type in SymbolNode, but getUpstream includes hierarchy relations.
-          // This is a bit broader than strictly needed (includes CALLS), but safe for correctness.
-          toReprocess.add(dep.filePath)
+    while (frontier.length > 0) {
+      const next = new Set(await this.store.findDirectlyAffectedFiles(frontier))
+      const changedReferenceIds = new Set<string>()
+      for (const filePath of frontier) {
+        for (const id of declarationIdsByFile.get(filePath) ?? []) changedReferenceIds.add(id)
+        for (const id of bindingIdsByFile.get(filePath) ?? []) changedReferenceIds.add(id)
+      }
+      const referenceQueue = [...changedReferenceIds]
+      for (let index = 0; index < referenceQueue.length; index++) {
+        for (const sourceId of reverseSteps.get(referenceQueue[index]!) ?? []) {
+          if (changedReferenceIds.has(sourceId)) continue
+          changedReferenceIds.add(sourceId)
+          referenceQueue.push(sourceId)
+          const owner = publicOwnerById.get(sourceId) ?? localOwnerById.get(sourceId)
+          if (owner !== undefined) next.add(owner)
         }
       }
-    }
 
-    return toReprocess
+      frontier = [...next]
+        .filter((filePath) => visibleFiles.has(filePath) && !affected.has(filePath))
+        .sort()
+      for (const filePath of frontier) affected.add(filePath)
+    }
+    return affected
   }
 
   /**
-   * Derives COVERS_FILE and COVERS_SYMBOL relations for class methods when the
-   * owner type is linked to a spec.
-   * @param changedTypeIds - IDs of classes/interfaces that were re-extracted.
+   * Derives cross-file OVERRIDES relations from the current in-memory hierarchy.
+   * @param hierarchyTargetsByType - Direct EXTENDS/IMPLEMENTS targets keyed by subtype.
    * @param ownershipIndex - Owner-to-method mapping.
    * @param seenOverrideKeys - Relations already identified by Pass 2.
    * @returns Additional relations to add.
    */
-  private async deriveCrossFileOverrideRelations(
-    changedTypeIds: Set<string>,
+  private deriveCrossFileOverrideRelations(
+    hierarchyTargetsByType: ReadonlyMap<string, ReadonlySet<string>>,
     ownershipIndex: MethodOwnershipIndex,
     seenOverrideKeys: Set<string>,
-  ): Promise<Relation[]> {
+  ): Relation[] {
     const relations: Relation[] = []
-    if (changedTypeIds.size === 0) return relations
-
-    for (const typeId of changedTypeIds) {
-      // Traverse DOWN to find base types
-      const hierarchy = await getDownstream(this.store, typeId, { maxDepth: 10 })
-
-      for (const [, symbols] of hierarchy.levels) {
-        for (const symbol of symbols) {
-          const superTypeId = symbol.id
-          // Verify if this is actually a base type (Extends/Implements)
-          const baseTargets = await this.store.getExtendedTargets(typeId)
-          const implementedTargets = await this.store.getImplementedTargets(typeId)
-
-          const isBase = [...baseTargets, ...implementedTargets].some(
-            (r) => r.target === superTypeId,
-          )
-          if (!isBase) continue
-
-          const subMethods = ownershipIndex.methodsByOwnerId.get(typeId)
-          if (!subMethods) continue
-
-          const superMethods = await this.fetchMethodsForType(superTypeId)
-          for (const [name, subMethodIds] of subMethods.entries()) {
-            const superMethodId = superMethods.get(name)
-            if (superMethodId) {
-              for (const subId of subMethodIds) {
-                const key = `${subId}:${RelationType.Overrides}:${superMethodId}`
-                if (!seenOverrideKeys.has(key)) {
-                  relations.push(
-                    createRelation({
-                      source: subId,
-                      target: superMethodId,
-                      type: RelationType.Overrides,
-                    }),
-                  )
-                  seenOverrideKeys.add(key)
-                }
-              }
-            }
+    for (const [typeId, superTypeIds] of hierarchyTargetsByType) {
+      const subMethods = ownershipIndex.methodsByOwnerId.get(typeId)
+      if (subMethods === undefined) continue
+      for (const superTypeId of superTypeIds) {
+        const superMethods = ownershipIndex.methodsByOwnerId.get(superTypeId)
+        if (superMethods === undefined) continue
+        for (const [name, subMethodIds] of subMethods) {
+          const superMethodId = superMethods.get(name)?.[0]
+          if (superMethodId === undefined) continue
+          for (const subId of subMethodIds) {
+            const key = `${subId}:${RelationType.Overrides}:${superMethodId}`
+            if (seenOverrideKeys.has(key)) continue
+            relations.push(
+              createRelation({
+                source: subId,
+                target: superMethodId,
+                type: RelationType.Overrides,
+              }),
+            )
+            seenOverrideKeys.add(key)
           }
         }
       }
     }
 
     return relations
-  }
-
-  /**
-   * Helper to fetch all methods of a type from the store.
-   * @param typeId - ID of the class or interface.
-   * @returns Map of method name to symbol id.
-   */
-  private async fetchMethodsForType(typeId: string): Promise<Map<string, string>> {
-    const methods = await this.store.findSymbols({
-      parentSymbolId: typeId,
-      kind: SymbolKind.Method,
-    })
-    return new Map(methods.map((m) => [m.name, m.id]))
   }
 
   /**

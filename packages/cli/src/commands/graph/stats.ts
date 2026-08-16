@@ -1,10 +1,5 @@
 import { Command } from 'commander'
-import {
-  codeGraphVersion,
-  createGetGraphHealth,
-  openSpecdHost,
-  withOpenGraphProvider,
-} from '@specd/sdk'
+import { openSpecdHost, withOpenGraphProvider } from '@specd/sdk'
 import { output, parseFormat } from '../../formatter.js'
 import { cliError } from '../../handle-error.js'
 
@@ -57,31 +52,38 @@ JSON/TOON output schema:
           1,
         ),
       )
-      const { config, kernel } = host
-
-      const getGraphHealth = createGetGraphHealth()
-
       await withOpenGraphProvider(host, async (provider) => {
-        const workspaces =
-          kernel !== null
-            ? (await kernel.project.listWorkspaces.execute()).map((ws) => ({
-                name: ws.name,
-                prefix: ws.prefix,
-                codeRoot: ws.codeRoot,
-                specRepo: ws.specRepo,
-                ownership: ws.ownership,
-                isExternal: ws.isExternal,
-              }))
-            : undefined
+        const health = await provider.getGraphHealth()
 
-        const health = await getGraphHealth.execute({
-          config,
-          provider,
-          codeGraphVersion,
-          ...(workspaces !== undefined ? { workspaces } : {}),
-        })
-
-        const { stale, currentRef, fingerprintMismatch, ...stats } = health
+        const {
+          stale,
+          currentRef,
+          fingerprintMismatch,
+          state,
+          knownStaleSinceLastIndex,
+          workspaces,
+          contentFresh,
+          coverageComplete,
+          coverage,
+          schemaCompatible,
+          generationCurrent,
+          reasonCodes,
+          ...stats
+        } = health
+        const coverageSummary = coverage ?? {
+          total: 0,
+          byStatus: {
+            indexed: 0,
+            excluded: 0,
+            unsupported: 0,
+            'parse-failed': 0,
+            partial: 0,
+          },
+          reasons: [],
+        }
+        const workspaceHealth = workspaces ?? []
+        const aggregateState = state ?? 'unknown'
+        const aggregateLatch = knownStaleSinceLastIndex ?? false
 
         if (fmt === 'text') {
           const lines = [
@@ -104,21 +106,51 @@ JSON/TOON output schema:
             lines.push(`Last indexed: ${stats.lastIndexedAt}`)
           }
 
-          if (stale === true && stats.lastIndexedRef !== null && currentRef !== null) {
-            lines.push(
-              `⚠ Graph is stale (indexed at ${stats.lastIndexedRef.slice(0, 7)}, current: ${currentRef.slice(0, 7)})`,
-            )
+          lines.push(`Content fresh:    ${String(contentFresh)}`)
+          lines.push(`Graph state:      ${aggregateState}`)
+          lines.push(`Known stale:      ${String(aggregateLatch)}`)
+          lines.push(`Coverage complete: ${String(coverageComplete)}`)
+          lines.push(
+            `Coverage: indexed=${String(coverageSummary.byStatus.indexed)}, excluded=${String(coverageSummary.byStatus.excluded)}, unsupported=${String(coverageSummary.byStatus.unsupported)}, parse-failed=${String(coverageSummary.byStatus['parse-failed'])}, partial=${String(coverageSummary.byStatus.partial)}`,
+          )
+          lines.push(`Schema compatible: ${String(schemaCompatible)}`)
+          lines.push(`Generation current: ${String(generationCurrent)}`)
+          const nonCurrentWorkspaces = workspaceHealth.filter(
+            (workspace) => workspace.state !== 'current',
+          )
+          if (nonCurrentWorkspaces.length > 0) {
+            lines.push('Non-current workspaces:')
+            for (const workspace of nonCurrentWorkspaces) {
+              lines.push(
+                `  ${workspace.workspace}: ${workspace.state} (${workspace.mode}) ${workspace.reasons.join(', ')}`,
+              )
+            }
           }
-
-          if (fingerprintMismatch === true) {
-            process.stderr.write(
-              '⚠ Derivation fingerprint mismatch — code-graph version or workspace configuration changed since last index\n',
-            )
+          if (reasonCodes.length > 0) {
+            lines.push('Health reasons:')
+            for (const reason of reasonCodes) lines.push(`  ${reason}`)
           }
 
           output(lines.join('\n'), 'text')
         } else {
-          output({ ...stats, stale, currentRef, fingerprintMismatch }, fmt)
+          output(
+            {
+              ...stats,
+              stale,
+              currentRef,
+              fingerprintMismatch,
+              state: aggregateState,
+              knownStaleSinceLastIndex: aggregateLatch,
+              workspaces: workspaceHealth,
+              contentFresh,
+              coverageComplete,
+              coverage: coverageSummary,
+              schemaCompatible,
+              generationCurrent,
+              reasonCodes,
+            },
+            fmt,
+          )
         }
       })
       process.exit(0)

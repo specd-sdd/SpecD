@@ -1,0 +1,56 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "code-graph:language-adapter",
+    "code-graph:symbol-model",
+    "code-graph:workspace-integration"
+  ],
+  "implementation": [
+    {
+      "file": "code-graph:src/infrastructure/tree-sitter/python-language-adapter.ts",
+      "symbols": ["PythonLanguageAdapter"]
+    },
+    {
+      "file": "code-graph:test/infrastructure/tree-sitter/python-language-adapter.spec.ts"
+    }
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Translates Python source (.py) and stubs (.pyi) into shared code-graph symbols, scoped bindings, imports, calls, and inheritance facts.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:6e9374a9bba7b27141c3dc87532813d9138d129ea0b6ac9ba47dec2cbdf35351",
+          "lastModified": "2026-08-16T08:12:48.966Z"
+        },
+        "verify.md": {
+          "hash": "sha256:0025a62cb07d9af889bd5b7387b5d3839c95b23abef39b667b29a7edf737168d",
+          "lastModified": "2026-08-16T08:12:48.969Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# python-language-adapter\n\n## Rules\n\n### Scope & Analysis\n- Handles `.py`, `.pyi` as `python`.\n- Single-pass parsing via Tree-sitter/ast-grep; returns `FileAnalysisDraft` without AST retention or module execution.\n\n### Declarations & Owners\n- Extracts module functions, classes, nested classes, methods, module assignments. Drops nested functions in function bodies & class assignments.\n- Complete construct range; declared-name `selectionRange`. Attached comments preserved.\n- Declaring owner = nearest enclosing class. Same-name methods distinct across classes. Top-level declarations have no owner.\n- Classifies `@classmethod`, `@staticmethod`, properties, setters; omits unknown decorators.\n\n### Imports & Package Resolution\n- Extracts `import`, `from ... import ...`, aliases, relative imports, literal `importlib.import_module()` & `__import__()`. Drops variable dynamic imports.\n- Relative imports handle leading dots, package `__init__.py`, stubs, `src/` layouts.\n- Reads `pyproject.toml` `name` (with `_`/`-` normalization) bounded by repo root.\n\n### Scoped Bindings, Calls & Relations\n- Emits facts for scope, params, return/assignment annotations, `self`/`cls` receivers, `new` construction calls.\n- Emits `IMPORTS`, `CALLS`, `CONSTRUCTS`, `USES_TYPE` only when proven by indexed facts.\n- Innermost function/method = caller. Drops module-scope calls, monkey patching, reflection, dynamic attributes.\n\n### Hierarchy & Evidence\n- Preserves declared base order. Emits `EXTENDS` (class), `IMPLEMENTS` (protocol/interface), `OVERRIDES` (method replacement).\n- Reference facts retain child owner, base order, ancestor/contract owner, relation kind, provenance steps.\n- C3 MRO / descriptors / `__mro_entries__` unsupported -> complex dynamic bases remain `ambiguous` or `unresolved`. Cycle-safe.\n- Advertises `hierarchy: true`, `buildContext: false`.\n\n### Public Surface & Stubs\n- `.pyi` stubs participate without runtime execution. `__all__`, star exports, namespace packages unsupported unless explicitly proven. No underscore-name heuristic guessing.\n\n## Constraints\n- NO Python module execution, imports, or runtime inspection.\n- Monkey patching, dynamic attribute hooks, reflection, interprocedural flow -> unsupported.\n- Python-specific logic MUST stay inside adapter.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:6e9374a9bba7b27141c3dc87532813d9138d129ea0b6ac9ba47dec2cbdf35351",
+          "lastModified": "2026-08-16T08:12:48.966Z"
+        },
+        "verify.md": {
+          "hash": "sha256:0025a62cb07d9af889bd5b7387b5d3839c95b23abef39b667b29a7edf737168d",
+          "lastModified": "2026-08-16T08:12:48.969Z"
+        }
+      }
+    }
+  }
+}

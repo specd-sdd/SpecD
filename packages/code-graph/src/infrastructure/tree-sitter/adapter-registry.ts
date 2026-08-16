@@ -1,5 +1,6 @@
 import { type LanguageAdapter } from '../../domain/value-objects/language-adapter.js'
 import { type AdapterRegistryPort } from '../../domain/ports/adapter-registry-port.js'
+import { type AdapterCapabilities } from '../../domain/value-objects/symbol-reference.js'
 
 /**
  * Maps file extensions to language adapters. Implements {@link AdapterRegistryPort}
@@ -32,6 +33,16 @@ export class AdapterRegistry implements AdapterRegistryPort {
    */
   getAdapter(languageId: string): LanguageAdapter | undefined {
     return this.adapters.get(languageId)
+  }
+
+  /**
+   * Returns the semantic reference capabilities declared by a registered adapter.
+   * Absence is intentional: consumers must treat an undeclared capability as unsupported.
+   * @param languageId - Registered language identifier.
+   * @returns Declared capabilities, or undefined when unsupported or unregistered.
+   */
+  getCapabilities(languageId: string): AdapterCapabilities | undefined {
+    return this.adapters.get(languageId)?.capabilities?.()
   }
 
   /**

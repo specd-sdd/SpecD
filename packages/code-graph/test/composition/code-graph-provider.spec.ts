@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from 'vitest'
+import { describe, it, expect, afterEach, vi } from 'vitest'
 import { mkdtempSync, readdirSync, rmSync, writeFileSync, mkdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
@@ -9,6 +9,14 @@ import { StoreNotOpenError } from '../../src/domain/errors/store-not-open-error.
 import { GraphProviderStaleError } from '../../src/domain/errors/graph-provider-stale-error.js'
 import { InMemoryGraphStore } from '../helpers/in-memory-graph-store.js'
 import { makeMockSpecRepository } from '../helpers/make-mock-spec-repository.js'
+import { createFileNode } from '../../src/domain/value-objects/file-node.js'
+import { createSymbolNode } from '../../src/domain/value-objects/symbol-node.js'
+import {
+  createLogicalSymbol,
+  createPublicBinding,
+  SymbolSpace,
+} from '../../src/domain/value-objects/symbol-reference.js'
+import { SymbolKind } from '../../src/domain/value-objects/symbol-kind.js'
 
 const makeMockRepo = makeMockSpecRepository
 
@@ -223,5 +231,217 @@ describe('CodeGraphProvider', () => {
     await provider[Symbol.asyncDispose]()
 
     await expect(provider.getStatistics()).rejects.toThrow(StoreNotOpenError)
+  })
+
+  it('exposes batch resolution under the open provider lifecycle', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'specd-graph-provider-resolver-'))
+    const provider = createCodeGraphProvider({
+      storagePath: tempDir,
+      projectRoot: tempDir,
+      graphStoreFactories: {
+        custom: {
+          create: () => new InMemoryGraphStore(),
+        },
+      },
+      graphStoreId: 'custom',
+    })
+    await provider.open()
+    const health = await provider.getGraphHealth()
+
+    await expect(provider.resolveSymbolReferences([], health)).resolves.toEqual([])
+    expect(health.reasonCodes).toContain('GRAPH_HEALTH_UNAVAILABLE')
+
+    await provider.close()
+  })
+
+  it('retrieves an exact public binding without ranked search pagination', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'specd-graph-provider-exact-binding-'))
+    const store = new InMemoryGraphStore()
+    const provider = createCodeGraphProvider({
+      storagePath: tempDir,
+      projectRoot: tempDir,
+      graphStoreFactories: { custom: { create: () => store } },
+      graphStoreId: 'custom',
+    })
+    await provider.open()
+
+    const entries = Array.from({ length: 25 }, (_, index) => {
+      const surface = `fixture:src/barrel-${String(index).padStart(2, '0')}.ts`
+      const logical = createLogicalSymbol({
+        workspace: 'fixture',
+        surface,
+        name: `run${index}`,
+        space: SymbolSpace.Value,
+        ownerId: undefined,
+        memberForm: undefined,
+      })
+      const symbol = createSymbolNode({
+        name: logical.name,
+        kind: SymbolKind.Function,
+        filePath: surface,
+        line: 1,
+        column: 0,
+      })
+      return {
+        logical,
+        symbol,
+        binding: createPublicBinding({
+          surface,
+          exportedName: 'run',
+          space: SymbolSpace.Value,
+          targetId: logical.id,
+        }),
+      }
+    })
+    await store.replaceReferenceFacts({
+      logicalSymbols: entries.map(({ logical }) => logical),
+      declarations: entries.map(({ logical, symbol }) => ({
+        logicalSymbolId: logical.id,
+        declaration: {
+          logicalId: logical.id,
+          symbolId: symbol.id,
+          location: {
+            filePath: symbol.filePath,
+            line: symbol.line,
+            column: symbol.column,
+            endLine: symbol.endLine,
+            endColumn: symbol.endColumn,
+          },
+          kind: symbol.kind,
+        },
+      })),
+      publicBindings: entries.map(({ binding }) => binding),
+      localBindings: [],
+      steps: [],
+      coverage: [],
+    })
+    const search = vi.spyOn(store, 'searchSymbols')
+    const selected = entries[24]!
+
+    const result = await provider.getExactPublicBinding({
+      surface: selected.binding.surface,
+      exportedName: selected.binding.exportedName,
+      space: selected.binding.space,
+      targetId: selected.logical.id,
+    })
+
+    expect(result?.binding).toEqual(selected.binding)
+    expect(result?.declarations.map(({ symbolId }) => symbolId)).toEqual([selected.symbol.id])
+    expect(search).not.toHaveBeenCalled()
+    await provider.close()
+  })
+
+  it('exposes one unified Code Graph-owned search operation', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'specd-graph-provider-search-'))
+    const store = new InMemoryGraphStore()
+    const provider = createCodeGraphProvider({
+      storagePath: tempDir,
+      projectRoot: tempDir,
+      graphStoreFactories: { custom: { create: () => store } },
+      graphStoreId: 'custom',
+    })
+    await provider.open()
+    await store.upsertFile(
+      createFileNode({
+        path: 'root:src/messages.ts',
+        configRelativePath: 'src/messages.ts',
+        language: 'typescript',
+        contentHash: 'hash',
+        workspace: 'root',
+        content: 'const message = "graph search"',
+      }),
+      [],
+      [],
+    )
+
+    const result = await provider.search({
+      query: 'graph search',
+      categories: ['files'],
+      limit: 10,
+      includeSnippet: false,
+    })
+
+    expect(result.files.map(({ file }) => file.path)).toEqual(['root:src/messages.ts'])
+    expect(result.symbols).toEqual([])
+    expect(result.specs).toEqual([])
+    expect(result.documents).toEqual([])
+    await provider.close()
+  })
+
+  it('normalizes an exact config-relative search file and keeps every occurrence', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'specd-graph-provider-file-search-'))
+    const store = new InMemoryGraphStore()
+    const provider = createCodeGraphProvider({
+      storagePath: tempDir,
+      projectRoot: tempDir,
+      graphStoreFactories: { custom: { create: () => store } },
+      graphStoreId: 'custom',
+    })
+    await provider.open()
+    await store.upsertFile(
+      createFileNode({
+        path: 'root:src/messages.ts',
+        configRelativePath: 'packages/root/src/messages.ts',
+        language: 'typescript',
+        contentHash: 'hash',
+        workspace: 'root',
+        content: Array.from({ length: 15 }, () => 'const message = "needle"').join('\n'),
+      }),
+      [],
+      [],
+    )
+
+    const result = await provider.search({
+      query: 'needle',
+      categories: ['files'],
+      filePattern: 'packages/root/src/messages.ts',
+      limit: 10,
+      includeSnippet: false,
+    })
+
+    expect(result.files[0]).toMatchObject({ totalMatches: 15, omittedMatches: 0 })
+    expect(result.files[0]?.matches).toHaveLength(15)
+    await provider.close()
+  })
+
+  it('repairs incompatible storage only through the indexing-specific open path', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'specd-graph-provider-repair-'))
+    class IncompatibleStore extends InMemoryGraphStore {
+      incompatible = true
+      recreateCount = 0
+
+      override async open(): Promise<void> {
+        if (this.incompatible) {
+          throw new Error('SQLite graph storage schema 10 is incompatible with expected 11')
+        }
+        await super.open()
+      }
+
+      override async recreate(): Promise<void> {
+        this.recreateCount += 1
+        this.incompatible = false
+        await super.recreate()
+      }
+    }
+    const store = new IncompatibleStore()
+    const createProvider = () =>
+      createCodeGraphProvider({
+        storagePath: tempDir,
+        projectRoot: tempDir,
+        graphStoreFactories: { custom: { create: () => store } },
+        graphStoreId: 'custom',
+      })
+
+    const readProvider = createProvider()
+    await expect(readProvider.open()).rejects.toThrow('incompatible')
+    expect(store.recreateCount).toBe(0)
+
+    const indexingProvider = createProvider()
+    await expect(indexingProvider.openForIndexing()).resolves.toEqual({
+      fullRebuild: true,
+      fullRebuildReason: 'SCHEMA_INCOMPATIBLE',
+    })
+    expect(store.recreateCount).toBe(1)
+    await indexingProvider.close()
   })
 })

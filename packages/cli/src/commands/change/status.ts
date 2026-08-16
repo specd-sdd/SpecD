@@ -4,6 +4,7 @@ import { output, parseFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
 import { ArtifactDag, type ArtifactStatusEntry, type ArtifactType } from '@specd/sdk'
 import { enrichImplementationTracking } from './_implementation-tracking.js'
+import { resolveSdkHostContext } from '../../helpers/sdk-host.js'
 
 /** Resolved active schema from the kernel. */
 type ActiveSchemaResult = Awaited<
@@ -149,7 +150,7 @@ JSON/TOON output schema:
           const change = statusResult.change!
           const { artifactStatuses, lifecycle, review, blockers, nextAction } = statusResult
           const implementationTracking = opts.implementation
-            ? await enrichImplementationTracking(config, statusResult.implementationTracking)
+            ? await enrichImplementationTracking(await resolveSdkHostContext(config, kernel), name)
             : undefined
 
           // Schema version warning
@@ -240,13 +241,30 @@ JSON/TOON output schema:
               if (implementationTracking.links.length > 0) {
                 lines.push('  links:')
                 for (const link of implementationTracking.links) {
-                  const staleSuffix =
-                    link.staleSymbols.length > 0 ? `  [stale: ${link.staleSymbols.join(', ')}]` : ''
                   const symbolSuffix =
                     link.symbols !== undefined && link.symbols.length > 0
                       ? `  symbols=${link.symbols.join(', ')}`
                       : '  file-level'
-                  lines.push(`    - ${link.specId} -> ${link.file}${symbolSuffix}${staleSuffix}`)
+                  lines.push(`    - ${link.specId} -> ${link.file}${symbolSuffix}`)
+                  for (const reviewed of link.symbolResolutions ?? []) {
+                    const { resolution } = reviewed
+                    lines.push(
+                      `        ${reviewed.symbol}: ${resolution.status}${resolution.reasonCode === null ? '' : ` (${resolution.reasonCode})`}`,
+                    )
+                    if (resolution.target !== null) {
+                      lines.push(`          target: ${resolution.target.id}`)
+                    }
+                    if (resolution.candidates.length > 0) {
+                      lines.push(
+                        `          candidates: ${resolution.candidates.map((candidate) => candidate.target.id).join(', ')}`,
+                      )
+                    }
+                    if (resolution.path.length > 0) {
+                      lines.push(
+                        `          provenance: ${resolution.path.map((step) => `${step.kind}:${step.fromId}->${step.toId}`).join(' | ')}`,
+                      )
+                    }
+                  }
                 }
               } else {
                 lines.push('  links:         (none)')
@@ -410,6 +428,7 @@ JSON/TOON output schema:
                       implementationTracking: {
                         trackedFiles: implementationTracking.trackedFiles,
                         links: implementationTracking.links,
+                        graphHealth: implementationTracking.graphHealth,
                         graphHint: implementationTracking.graphHint,
                       },
                     }

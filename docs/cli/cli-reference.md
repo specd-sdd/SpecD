@@ -342,7 +342,13 @@ When non-full entries are present, the command partitions them by source and pri
 
 If `--fingerprint <hash>` matches the current compiled fingerprint, `text` mode still prints `Context Fingerprint: <sha256...>` first and then `Context unchanged since last call.`. Structured output keeps the fingerprint plus the current step availability, available steps, and warnings, while omitting the full context body.
 
-`change status` also renders implementation tracking when the change has tracked files or confirmed links. The implementation block shows tracked files grouped by `open`, `resolved`, `ignored`, and `removed`, then confirmed links and any stale symbol diagnostics available from the current code graph. When the graph is not indexed or stale, the command prints a graph-state hint instead of failing.
+`change status` also renders implementation tracking when the change has tracked files or confirmed links. Pass `--implementation` to request the full SDK-built implementation-review projection. The implementation block shows tracked files grouped by `open`, `resolved`, `ignored`, and `removed`, then confirmed links with their symbol-resolution outcome.
+
+Symbol links use the same projection as `changes implementation list` and `review`:
+`resolved`, `ambiguous`, `unresolved`, or `missing`, accompanied by a stable reason
+code, graph health and relevant coverage, canonical target, candidates, and proven
+resolution path. File-only links bypass symbol resolution. If the graph is unavailable,
+the command reports that condition; storage/generation failures remain command errors.
 
 ### change implementation
 
@@ -361,6 +367,27 @@ Available subcommands:
 - `ignore` — mark a tracked file as ignored (already-tracked missing files may be ignored)
 - `resolve` — mark a tracked file as reviewed/resolved
 - `unresolve` — reopen a resolved file back to `open`
+
+`list` and `review` use one delivery-neutral SDK projection. For symbol links they
+report the original stored file and symbol plus:
+
+- `status`: `resolved`, `ambiguous`, `unresolved`, or `missing`
+- `reasonCode`: a stable machine-readable explanation
+- graph health and the addressed target's index coverage
+- the canonical logical target and its declaration occurrences when proven
+- all deterministic candidates and the ordered resolution path
+
+`resolved` means exactly one target is proven. `ambiguous` preserves all competing
+targets without selecting one. `unresolved` covers stale/dirty graph state, excluded,
+unsupported, partial or parse-failed coverage, missing build context, and runtime-only
+behavior. `missing` is reserved for absence proven by current targeted file evidence
+and complete coverage. Staleness remains a health/input dimension rather than a symbol
+status. Reason-code families include `GRAPH_*`, `COVERAGE_*`, `REFERENCE_*`,
+`AMBIGUOUS_*`, and `RUNTIME_UNSUPPORTED`.
+
+Review is read-only: it never rewrites tracked file paths, stored symbol strings,
+implementation sidecars, or the change manifest. Resolution is deterministic and
+does not fall back to fuzzy, rightmost-member, or same-name candidate selection.
 
 Tracked file states: `open`, `resolved`, `ignored`, `removed`. The `removed` state is assigned automatically by `refresh` when a tracked file no longer exists on disk; it cannot be set manually. Files in the `removed` state are excluded from `unresolve` — only a subsequent `refresh` can restore them to `open` if they reappear.
 
@@ -1166,6 +1193,22 @@ specd graph index [options]
 
 Indexes project graph inputs into the code graph. When a `specd.yaml` is supplied with `--config` or discovered automatically, indexing always uses all configured workspaces plus any configured project-global graph include paths. When no config is available, or when `--path` is provided, the command enters bootstrap mode and indexes a synthetic `default` workspace rooted at the repository root. Bootstrap mode is intended for initial graph bootstrapping, not normal configured project operation.
 
+Indexing is also the recovery path for incompatible derived storage. Ordinary graph
+reads do not migrate or repair a schema, derivation fingerprint, or storage generation.
+`graph index` recreates incompatible derived data, rotates the generation, re-extracts
+all source facts, and reports `fullRebuildReason` in structured output (and
+`full rebuild: <reason>` in text). `--force` remains available for an explicit rebuild.
+No change manifest, spec, or implementation link is modified by this recovery.
+Completed results also include counts and elapsed milliseconds for import resolution,
+dependency facts, adapter relations, re-exports, hierarchy/overrides, persistence,
+and search-index rebuilding in text and structured output.
+
+The CLI parent owns the shared graph-index lock and runs indexing in a child process,
+forwarding `SIGINT`/`SIGTERM` and returning the child's exit status. The child is marked
+with `SPECD_GRAPH_INDEX_WORKER=true` and `SPECD_GRAPH_INDEX_LOCK_HELD=true` so the
+provider does not reacquire the parent lock. `SPECD_GRAPH_INDEX_NO_WORKER=true` is the
+explicit in-process bypass for controlled embedding and tests.
+
 | Option                      | Description                                                           |
 | --------------------------- | --------------------------------------------------------------------- |
 | `--force`                   | Recreate the graph backend and run a full re-index.                   |
@@ -1240,20 +1283,23 @@ specd graph index --exclude-path "packages/generated/*" --exclude-path "tmp/"
 specd graph search <query> [options]
 ```
 
-Search for symbols, specs, or documents in the code graph. Context resolution follows the same configured-vs-bootstrap rules as `graph index`.
+Search symbols, indexed source files, specs, or documents through one Code
+Graph-owned query plan. Context resolution follows the same configured-vs-bootstrap
+rules as `graph index`.
 
 If a graph index is currently running, this command may return `GRAPH_BUSY` with the message: `The code graph is currently being indexed. Try again in a few seconds.`
 
 | Option                       | Description                                                                     |
 | ---------------------------- | ------------------------------------------------------------------------------- |
 | `--symbols`                  | Search only symbols.                                                            |
+| `--files`                    | Search only indexed source-file content.                                        |
 | `--specs`                    | Search only specs.                                                              |
 | `--documents`                | Search only documents.                                                          |
 | `--snippet`                  | Include snippet previews. Without it, output stays compact and location-first.  |
 | `--kind <list>`              | Filter symbol results by comma-separated kinds, for example `class,method`.     |
 | `--config <path>`            | Config file path. Mutually exclusive with `--path`.                             |
 | `--path <path>`              | Repository root bootstrap path. Ignores any discovered config.                  |
-| `--file <path>`              | Restrict symbol results to file paths matching the wildcard pattern.            |
+| `--file <path>`              | Restrict selected categories to paths matching the wildcard pattern.            |
 | `--workspace <name>`         | Restrict results to the named workspace.                                        |
 | `--exclude-path <pattern>`   | Exclude symbols/specs whose file path matches the wildcard pattern. Repeatable. |
 | `--exclude-workspace <name>` | Exclude results from the named workspace. Repeatable.                           |
@@ -1261,21 +1307,57 @@ If a graph index is currently running, this command may return `GRAPH_BUSY` with
 | `--spec-content`             | Include full spec content in `json` or `toon` output.                           |
 | `--format text\|json\|toon`  | Output format.                                                                  |
 
+With no category flag, the command requests symbols, files, specs, and documents in
+one provider call. Category flags narrow that request. `--files` selects source
+content; it is intentionally different from `--file`, which is a path filter and
+never enables a category.
+
+Code Graph owns expansion, candidate paging, exact-first semantic ranking, grouping,
+deduplication, declaration-name suppression, and post-suppression limit refill. The
+CLI renders the returned category order and does not merge independent searches.
+
 By default, text output shows a compact identity block plus location metadata:
 
-- symbols show `path:line:column`
+- symbols show `declaration: path:line:column`; a directly matched public route is
+  shown first as `matched export: path::name`
+- files show one path block with ordered source matches
 - specs show `match @ L<start>-L<end>`
 - documents show `match @ L<start>-L<end>`
+
+Each file match includes the original matched text and a zero-based, half-open
+`range` (`start` inclusive, `end` exclusive). When `--snippet` is requested, its
+optional `snippetRange` is separate from the exact occurrence range. If the same
+range is found through multiple query terms, only the strongest provenance is kept:
+`full-query`, then `raw-token`, then `expanded-token`. Only an occurrence overlapping
+the returned symbol's selection/name range is suppressed; calls, strings, comments,
+and matches elsewhere in the declaration body remain visible.
+
+General and wildcard source searches retain at most ten occurrences per file after
+symbol suppression and append `<n> more matches in this file`. Structured output
+keeps `totalMatches` and `omittedMatches`. An exact `--file` selector accepts canonical,
+config-relative, or absolute paths and returns every occurrence in that one file;
+wildcard selectors remain capped.
 
 Pass `--snippet` when you want preview text. In `json` and `toon`, the `snippet` field
 is omitted unless `--snippet` is passed. `--spec-content` remains independent and only
 controls whether full spec content is included in structured output.
 
-Exact identifier matches are ranked ahead of fuzzy matches:
+Exact case-sensitive identity matches are ranked ahead of normalized, prefix,
+component, and content matches:
 
 - spec search boosts exact `specId` matches such as `core:change`
-- symbol search boosts exact symbol names and full symbol ids
+- symbol search boosts exact structured declaration and exported names; serialized
+  canonical ids remain in JSON/TOON but are omitted from text
 - document search boosts exact canonical paths and exact project-relative paths
+
+Symbol results are reference-aware: structured logical identity fields, member names,
+and public/local bindings are searchable. Declaration occurrences are grouped by
+logical target while distinct public routes and their ordered provenance remain
+visible in structured output. `--kind` continues to filter the existing syntax-level
+symbol kinds; it does not replace symbol-space or member-form semantics.
+
+Search is discovery, not resolution. A unique same-name hit does not prove a reference
+without an exact declaration, binding, or deterministic hierarchy path.
 
 Text output renders file-bearing results using paths relative to `projectRoot`.
 
@@ -1286,6 +1368,34 @@ Search for references to "SpecRepository" (symbols only, including snippets):
 ```
 specd graph search "SpecRepository" --symbols --snippet
 ```
+
+Search indexed source content under one path:
+
+```
+specd graph search "implementation review" --files --file "packages/sdk/**" --snippet
+```
+
+The equivalent JSON/TOON result keeps the same category and occurrence fields:
+
+```json
+{
+  "files": [
+    {
+      "path": "sdk:src/review.ts",
+      "matches": [
+        {
+          "text": "implementation review",
+          "range": { "start": { "line": 8, "column": 3 }, "end": { "line": 8, "column": 24 } },
+          "provenance": "full-query"
+        }
+      ]
+    }
+  ]
+}
+```
+
+Use `--format toon` for the same structure in compact TOON form; coordinates and
+half-open range meaning do not change.
 
 Search for "archive" across specs:
 
@@ -1348,7 +1458,31 @@ specd graph hotspots --kind class,method --workspace core
 specd graph stats [options]
 ```
 
-Print summary statistics for the current code graph. Text output includes files, documents, symbols, specs, relation counts, and the last indexed timestamp. JSON/TOON output also includes `stale`, `currentRef`, and `fingerprintMismatch`. Context resolution follows the same configured-vs-bootstrap rules as `graph index`.
+Print summary statistics and health for the current code graph. Text output includes
+files, documents, symbols, specs, relation counts, the last indexed timestamp, and
+actionable aggregate and non-current workspace diagnostics. JSON/TOON keeps every
+workspace scope, freshness mode (`vcs`, `filesystem`, or `hybrid`), monotonic latch,
+reason, VCS visibility, derivation fingerprint, schema/generation, and index coverage
+dimension separate. A current VCS ref alone does not prove current indexed content.
+Text output includes persisted coverage counts for indexed, excluded, unsupported,
+parse-failed, and partial inputs; structured output preserves the same summary.
+
+VCS workspaces assess normalized graph-visible staged, unstaged, untracked, deleted,
+and renamed paths once per repository. Non-VCS workspaces compare persisted
+observations with filesystem membership, using mtime/size as a fast path and hashes
+only when needed. Hybrid mode also observes configured graph inputs hidden by VCS
+ignore rules. Excluded-only changes remain current; mixed visible and excluded
+changes report only the visible reasons. Unknown transient reads are retryable and
+are never persisted as stale.
+
+For a non-VCS workspace, additions, edits, deletions, and membership changes come from
+the filesystem observation set. Run `specd graph index` after an intentional visible
+change to clear the monotonic stale latch. Excluded-only changes require no recovery.
+
+When schema or derivation health is incompatible, run `specd graph index`; indexing
+owns the full-rebuild repair path. Excluded, unsupported, partial, and parse-failed
+coverage are diagnostics rather than proof that a missing symbol is stale. Context
+resolution follows the same configured-vs-bootstrap rules as `graph index`.
 
 If a graph index is currently running, this command may return `GRAPH_BUSY` with the message: `The code graph is currently being indexed. Try again in a few seconds.`
 
@@ -1374,7 +1508,9 @@ specd graph stats --format toon
 specd graph impact [options]
 ```
 
-Analyze dependents or dependencies of a spec, a symbol, or one or more files. Context resolution follows the same configured-vs-bootstrap rules as `graph index`.
+Analyze dependents or dependencies of a spec, a logical symbol, one or more files, or
+one exact public export. Context resolution follows the same configured-vs-bootstrap
+rules as `graph index`.
 
 If a graph index is currently running, this command may return `GRAPH_BUSY` with the message: `The code graph is currently being indexed. Try again in a few seconds.`
 
@@ -1394,11 +1530,41 @@ Symbol selectors accept progressively more specific forms:
 
 Multiple `--file` flags aggregate impact across all specified files.
 
+File impact also returns `coveringSpecs`. Text groups specs whose minimum evidence
+depth is zero as direct coverage and the remainder as blast-radius coverage. A spec
+with both kinds appears once in the direct group. JSON and TOON retain its minimum
+depth and every ordered, deduplicated file/symbol evidence item, including file-only
+`COVERS_FILE` evidence when no covered symbol exists. This projection comes from the
+provider; the CLI issues no independent coverage queries.
+
+Public export selectors use both parts of the public-binding identity:
+
+```bash
+specd graph impact --export <public-name> --from <file-or-public-surface>
+```
+
+`--export` and `--from` must be supplied together and are mutually exclusive with
+`--spec`, `--symbol`, and `--file`. The result keeps two views:
+
+- `bindingImpact`: consumers proven to use that exact public surface/name route
+- `canonicalImpact`: consumers of the resolved logical implementation through every
+  proven route
+
+It also includes the selected `binding`, canonical `target`, and ordered resolution
+`path`. A `--symbol` query resolves and traverses the canonical logical target, so
+overloads or declaration occurrences do not fragment the result. Ambiguity is
+surfaced with at most ten deterministic candidates and the complete candidate count;
+traversal does not run. Bare names first require an exact case-sensitive declaration
+name, fall back to case-insensitive exact lookup only when none exists, and never
+widen prefixes or partial search hits into impact targets.
+
 | Option                                                             | Description                                                                           |
 | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------- |
 | `--spec <id>`                                                      | Spec ID to analyze.                                                                   |
 | `--symbol <name>`                                                  | Symbol selector to analyze. Supports bare names, qualified selectors, and full ids.   |
 | `--file <path...>`                                                 | One or more file paths to analyze (config-relative, workspace-prefixed, or absolute). |
+| `--export <name>`                                                  | Exact public export name; requires `--from`.                                          |
+| `--from <surface>`                                                 | File or public surface containing `--export`.                                         |
 | `--direction dependents\|dependencies\|upstream\|downstream\|both` | Impact direction (default: `dependents`).                                             |
 | `--depth <n>`                                                      | Maximum traversal depth (default: `3`).                                               |
 | `--config <path>`                                                  | Config file path. Mutually exclusive with `--path`.                                   |
@@ -1418,6 +1584,7 @@ specd graph impact --spec core:change --direction dependents
 specd graph impact --symbol "mergeSpecs" --direction both
 specd graph impact --symbol "packages/core/src/domain/entities/change.ts:method:invalidate" --direction dependents
 specd graph impact --file packages/core/src/model.ts --direction dependents
+specd graph impact --export createKernel --from packages/core/src/public.ts --direction dependents
 ```
 
 ---

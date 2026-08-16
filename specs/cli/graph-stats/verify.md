@@ -55,6 +55,12 @@
 - **WHEN** `specd graph stats` is executed
 - **THEN** it obtains host context via `openSpecdHost` from `@specd/sdk`
 
+#### Scenario: Stats consumes one canonical provider health result
+
+- **WHEN** graph stats executes
+- **THEN** it opens the standard provider lifecycle and calls `getGraphHealth` exactly once
+- **AND** it does not independently repeat workspace discovery or recompute health
+
 ### Requirement: Concurrent indexing guard
 
 #### Scenario: Stats surface provider busy after open
@@ -110,6 +116,13 @@
 - **THEN** `stale` SHALL be `true`
 - **AND** `currentRef` SHALL be the current VCS ref string
 
+#### Scenario: Structured output preserves canonical diagnostics
+
+- **GIVEN** canonical health contains non-current workspace, coverage, schema, generation, and reason-code diagnostics
+- **WHEN** JSON or TOON output is requested
+- **THEN** every canonical field is preserved without presenter-side reinterpretation
+- **AND** compatibility fields do not replace the canonical diagnostics
+
 ### Requirement: Error cases
 
 #### Scenario: Infrastructure error exits with code 3
@@ -120,3 +133,12 @@
 - **WHEN** `specd graph stats` is run
 - **THEN** stderr contains a `fatal:` prefixed error message
 - **AND** the process exits with code 3
+
+### Requirement: Content freshness and coverage diagnostics
+
+#### Scenario: Stats distinguishes inconclusive health causes
+
+- **GIVEN** matching VCS refs with dirty content, exclusions, and parse failures
+- **WHEN** stats is rendered in text, JSON, and TOON
+- **THEN** text explains each reason and structured output preserves all fields
+- **AND** the graph is not labelled simply fresh

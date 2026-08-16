@@ -9,124 +9,53 @@ The code graph contains symbols with names and comments, and specs with titles, 
 ### Requirement: Command signature
 
 ```text
-specd graph search <query> [--symbols] [--specs] [--documents] [--snippet] [--kind <kinds>] [--file <path>] [--workspace <name>] [--exclude-path <pattern>] [--exclude-workspace <name>] [--limit <n>] [--spec-content] [--config <path> | --path <path>] [--format text|json|toon]
+specd graph search <query> [--symbols] [--files] [--specs] [--documents] [--snippet] [--kind <kinds>] [--file <path>] [--workspace <name>] [--exclude-path <pattern>] [--exclude-workspace <name>] [--limit <n>] [--spec-content] [--config <path> | --path <path>] [--format text|json|toon]
 ```
 
-- `<query>` — required; the search terms (supports multiple words, stemming via porter stemmer)
-- `--symbols` — optional; search only symbols
-- `--specs` — optional; search only specs
-- `--documents` — optional; search only textual non-code resources
-- `--snippet` — optional; include snippet previews in command output. In `text` mode it enables snippet blocks; in `json` and `toon` it enables the `snippet` field
-- `--kind <kinds>` — optional; comma-separated symbol kinds filter such as `function,class,method`
-- `--file <path>` — optional; filter symbols by file path (supports `*` wildcards, case-insensitive)
-- `--workspace <name>` — optional; filter both symbols and specs to a single workspace
-- `--exclude-path <pattern>` — optional, repeatable; exclude symbols/specs whose file path matches glob pattern (supports `*` wildcards, case-insensitive)
-- `--exclude-workspace <name>` — optional, repeatable; exclude results from the given workspace
-- `--limit <n>` — optional; maximum results per category, defaults to `10`
-- `--spec-content` — optional; include full spec content in output. Only valid with `--format json` or `--format toon` — exits with code 1 if used with text format
-- `--config <path>` — optional; explicit path to `specd.yaml`, matching the standard CLI meaning
-- `--path <path>` — optional; repo-root bootstrap mode
-- `--format text|json|toon` — optional; output format, defaults to `text`
+`<query>` is required and supports multiple whitespace-delimited terms plus the shared separator/CamelCase expansion. `--symbols`, `--files`, `--specs`, and `--documents` select only those categories; when none is supplied, all four are searched.
 
-`--config` and `--path` are mutually exclusive.
+`--files` selects arbitrary indexed source-content results. It is distinct from `--file <path>`, which remains a path filter and applies to symbol and source-file categories. An exact file selector SHALL accept canonical workspace-relative, config/project-relative, and absolute path forms. A selector containing wildcards SHALL retain case-insensitive pattern semantics. Existing workspace, exclusion, kind, limit, snippet, spec-content, context, and format options retain their meanings.
 
-When no category flags (`--symbols`, `--specs`, `--documents`) are provided, all categories are searched.
+Category flags MAY be combined. The CLI SHALL send the query, selected categories, filters, per-category limit, and snippet preference in one unified Code Graph search request. `--config` and `--path` remain mutually exclusive.
 
-All filters (`--kind`, `--file`, `--workspace`, `--exclude-path`, `--exclude-workspace`) are applied at the store level before LIMIT — not as post-query filters. The CLI passes them via `SearchOptions` to `CodeGraphProvider.searchSymbols` / `CodeGraphProvider.searchSpecs`.
-
-`--path` and no-config fallback are bootstrap mechanisms for setup and early repository exploration, not the intended steady-state mode for configured projects.
-
-Search ranking MUST prioritize primary identities at the top of the result set ahead of generic content-only matches. Exact canonical identity matches remain the strongest signal, but strong non-exact identity-oriented matches such as token-aware primary-name equality, identity-prefix matches, identity-suffix matches, identity-substring matches, and identity-segment/path-component matches MUST also outrank results that match only through generic body, comment, or document-content relevance.
+The requested limit is per category and SHALL be applied by Code Graph after logical grouping and symbol/file occurrence suppression. The CLI MUST NOT pre-limit, merge, rerank, or deduplicate category results.
 
 ### Requirement: Search behaviour
 
-The command uses the shared graph CLI context model (`cli:graph-cli-context`) to resolve host bootstrap and provider lifecycle.
+The command uses the shared graph CLI context to resolve bootstrap and provider lifecycle, obtains platform types from `@specd/sdk`, and delegates exactly once to the unified Code Graph search operation.
 
-Platform symbols MUST come from `@specd/sdk`.
+Code Graph owns query expansion, semantic and content candidate lanes, cross-category symbol/file deduplication, deterministic ranking/grouping, and final limits. The CLI MUST NOT call lower-level symbol, source-file, spec, or document search methods independently to reconstruct the result.
 
-It delegates to:
+The shared query plan preserves the normalized complete query, raw whitespace-delimited terms, and separator/CamelCase-expanded terms. Observable ranking SHALL prefer:
 
-- `provider.searchSymbols(options)` — search across symbol search text and symbol comments
-- `provider.searchSpecs(options)` — search across spec title, description, and content
-- `provider.searchDocuments(options)` — search across document paths and textual content
+1. a contiguous complete-query match;
+2. candidates containing all raw terms;
+3. individual raw-term matches; and
+4. expanded-component-only matches.
 
-The concrete scoring and indexing strategy are implementation concerns of the active backend, subject to the shared ranking guarantees of `code-graph:graph-store`.
+Source-file results SHALL contain precise occurrences verified against indexed content. An occurrence SHALL be suppressed only when it overlaps the declared-name `selectionRange` of a symbol group that survives the requested symbol-category limit and represents the same query match. Symbol candidates omitted by that limit MUST NOT suppress source occurrences. Other occurrences inside the symbol's complete construct range, including strings, comments, calls, and body text, SHALL remain.
 
-Backends MUST apply a shared specd/code-aware lexical token expansion before identity-aware ranking, including examples such as:
+Code Graph SHALL consume every backend candidate page needed to establish the complete visible file candidate set, or SHALL use a backend order proven equivalent to the final semantic file score, before applying the requested file-category limit. It MUST NOT stop after the first page containing `limit` visible files and then rerank only that prefix. A later complete-query or all-raw-terms match SHALL therefore outrank earlier expanded-token-only candidates.
 
-- `core:change` into tokens including `core:change`, `core`, and `change`
-- `ArchiveChange` into tokens including `archivechange`, `archive`, and `change`
+A source file SHALL be omitted only when every occurrence was suppressed. For general and wildcard-path searches, Code Graph SHALL rank visible occurrences before retaining at most ten per file. Occurrence ordering SHALL prefer `full-query`, then `raw-token`, then `expanded-token`, with source range as the deterministic tie-breaker inside each tier. Consequently, a later complete-query occurrence MUST NOT be omitted merely because earlier expanded-token occurrences filled the cap.
 
-Observable ranking semantics MUST hold across backends:
+Each file result SHALL expose `totalMatches`, the retained `matches`, and `omittedMatches`, with counts computed from the complete visible occurrence set before capping. An exact selector resolving to one source file SHALL retain every visible occurrence and SHALL order those exhaustive matches by source range for inspection rather than by relevance tier. Category limits SHALL be applied after suppression, so duplicate file hits do not consume result slots. Search MUST NOT read live source files or perform a repository-wide filesystem scan.
 
-- exact canonical identity matches MUST rank ahead of every non-exact result in the same category
-- exact primary-name matches for symbols and exact spec-id/path-component matches for specs/documents MUST rank ahead of body-only or comment-only hits
-- exact token identity matches MUST rank ahead of prefix token matches
-- prefix token matches MUST rank ahead of suffix token matches
-- suffix token matches MUST rank ahead of arbitrary substring token matches
-- real identity-component or path-component matches MUST rank ahead of arbitrary substring-only hits on the same identity field
-- candidates matching more expanded identity tokens MUST rank ahead of candidates matching fewer expanded identity tokens when generic text relevance is otherwise competing
-- prefix, suffix, substring, segment, or path-component matches on a primary identity MUST rank ahead of results that match only through generic textual frequency in descriptions, comments, or document/spec body content
-- symbol results matching on declared identity MUST outrank otherwise stronger comment-only hits for the same query intent
-
-Search results SHALL carry preview context together with the ranked hit, including line-range information suitable for text and structured output.
-
-The command MUST NOT perform a host-managed pre-open lock probe. Busy and stale availability semantics are owned by the provider.
+The command MUST NOT perform a host-managed pre-open lock probe. Busy and stale availability semantics remain provider-owned.
 
 ### Requirement: Output format
 
-In `text` mode, results are grouped by category.
+Text, JSON, and TOON SHALL remain category-grouped in deterministic `symbols`, `files`, `specs`, and `documents` order. Text category headers SHALL show the number returned and active per-category limit.
 
-Text mode SHALL include a category header for each category that has results. The header SHALL make the active result limit explicit.
+Structured symbol entries SHALL expose logical identity, declarations, bindings, directly matched bindings, match tier/reasons, and the symbol's complete construct plus declared-name selection ranges. Text symbol entries SHALL show real declaration locations and SHALL NOT print serialized canonical identifiers by default. When a public export or barrel alias caused the match, text SHALL show `matched export: <project-relative-path>::<exported-name>` followed by the underlying declaration location; other bindings MAY be summarized by count rather than enumerated.
 
-Format: `<Category> (<N> shown, limit <limit>):`
-Example: `Symbols (10 shown, limit 10):`
+Source-file entries SHALL expose file identity, retained precise matches, `totalMatches`, and `omittedMatches`; each match identifies whether it came from the complete query, a raw term, or an expanded term. General and wildcard-path output SHALL preserve the relevance-tier ordering of retained occurrences, while exact single-file output SHALL preserve source order. Text SHALL render `N more matches in this file` when matches were omitted. Spec and document entries retain their existing identities and match locations.
 
-Each result SHALL render as a compact identity block:
+Without `--snippet`, structured output omits snippet content but retains precise match ranges, and text renders compact locations. With `--snippet`, every category MAY include sanitized match-centered preview blocks with a snippet range distinct from the underlying match or symbol range.
 
-- the first line identifies the result entry (`[workspace]`, symbol/spec/document identity, and kind when applicable)
-- a second line SHALL show location context for the result
-- preview content SHALL render only when `--snippet` is explicitly passed
+A file containing several occurrences SHALL be rendered once with its ordered matches. A file whose declaration occurrence duplicates a symbol result but also contains a call, string, comment, or other non-symbol occurrence SHALL render only the remaining occurrences.
 
-Default compact location context SHALL follow these rules:
-
-- symbol results SHALL show the workspace-relative file path and the symbol line and column
-- spec results SHALL show that the hit came from the spec and SHALL include the match line range derived from `startLine` and `endLine`
-- document results SHALL show the config-relative document path and SHALL include the match line range derived from `startLine` and `endLine`
-
-When `--snippet` is passed, preview content SHALL render in a separate snippet block preceded by a line range indicator.
-
-Format: `snippet @ L<startLine>-L<endLine>:`
-Example: `snippet @ L10-L15:`
-
-To avoid collision with markdown formatting in the source text, snippets SHALL be wrapped in custom markers: `>>>` for the start and `<<<` for the end.
-
-Before any snippet is rendered in text mode, the CLI SHALL sanitize terminal-control content. ANSI escape sequences and non-printable control characters other than newline and tab MUST NOT be emitted literally in the rendered snippet block.
-
-Text-mode symbol snippets SHALL use line-oriented source context around the matched symbol location:
-
-- include the matched line and a small window around it, with a baseline of 2-3 non-blank lines above and 2-3 non-blank lines below
-- blank lines do not count toward the context budget
-- preserve the original line order
-- expand tabs to spaces using tab width 2 before indentation normalization
-- compute the smallest common leading indentation across non-blank snippet lines
-- remove that common leading indentation from every snippet line before rendering
-- apply a fixed outer indent when rendering the snippet block
-
-Text-mode spec and document snippets SHALL also be match-centered and rendered in a separate `snippet @ L<start>-L<end>:` block with `>>>` and `<<<` markers. They do not require code-specific indentation normalization beyond preserving readable literal text.
-
-Text mode SHALL avoid misleading fixed-field truncation and SHALL NOT rely on raw boosted score magnitudes as the primary readability cue for exact matches.
-
-When no results are found, output `No results found.`
-
-In `json` or `toon` mode, output remains category-grouped as `{ symbols: [...], specs: [...], documents: [...] }`.
-
-Structured output details:
-
-- symbol entries include the symbol payload plus `workspace`, `score`, `startLine`, and `endLine`
-- spec entries include `specId`, `path`, `title`, `description`, `workspace`, `score`, `startLine`, and `endLine`. Full spec `content` SHALL be omitted unless `--spec-content` is passed.
-- document entries include `path`, `configRelativePath`, `workspace`, `score`, `startLine`, and `endLine`. Full document `content` SHALL be omitted.
-- the `snippet` field SHALL be omitted from `json` and `toon` output unless `--snippet` is passed
+`--spec-content` continues to include full spec content only in JSON/TOON. When every selected category is empty, text output SHALL be `No results found.`
 
 ### Requirement: Error cases
 
@@ -144,12 +73,31 @@ The command accepts the following filter options applied at the store level:
 - `--exclude-path <pattern>` — exclude symbols/specs matching the glob pattern
 - `--exclude-workspace <name>` — exclude results from the given workspace
 
+### Requirement: Reference-aware symbol results
+
+Symbol search SHALL match simple names and rendered canonical owner-qualified references. Structured results SHALL expose the logical target, contributing declarations, symbol space, member form, all public-binding summaries, and the public binding or bindings that directly caused the match.
+
+Bindings SHALL be grouped under their canonical logical target without losing independently addressable aliases or re-export routes. Ordering SHALL be deterministic and backend-independent.
+
+Existing `--kind` behavior SHALL remain based on the closed broad `SymbolKind`; symbol space and member form are additive output/filter dimensions and MUST NOT redefine `--kind`.
+
+### Requirement: Semantic-first candidate lanes
+
+Symbol search SHALL obtain semantic-identity candidates independently from backend full-text/raw-symbol candidates. It SHALL merge and logically group both lanes before applying the requested limit.
+
+An exact rendered canonical logical ID SHALL add its logical target directly to the result candidate set even when that target has no public binding and its rendered ID produces no backend text hit. Its declarations SHALL be loaded from logical identity and it SHALL receive the exact-logical-identity tier. Matching only a logical target's simple name MUST NOT be labeled exact logical identity.
+
+Ordering SHALL prioritize exact logical identity, exact public binding, exact declaration with matching case, exact declaration after language-appropriate case normalization, logical prefix or structural-component match, exact local symbol, then textual relevance. Declaration tiers SHALL apply only to hits proven to belong to a logical target; a case-exact hit without a logical target SHALL use the exact-local-symbol tier, which MUST remain reachable after logical-component candidates. Backend-native scores SHALL order candidates only within the same semantic tier.
+
+Structured output SHALL expose stable `matchTier` and `matchReasons`. Explicit kind, workspace, and path filters SHALL remain authoritative. An unfiltered search for `Change` MUST rank the exact `Change` logical declaration ahead of CLI/test variables or helper functions named `change`; `--kind variable` SHALL continue to expose those local values.
+
 ## Constraints
 
-- The CLI does not contain search logic — it delegates to `CodeGraphProvider.searchSymbols`, `CodeGraphProvider.searchSpecs`, and `CodeGraphProvider.searchDocuments`
-- Search depends on the active graph-store backend having prepared its search indexes during indexing or store maintenance
-- Busy and stale availability semantics are enforced by the provider after open; the CLI does not fail fast through a separate pre-open lock probe
-- The `process.exit(0)` pattern is required after closing the provider
+- The CLI contains no search-plan, candidate-merging, ranking, deduplication, or limit logic; it delegates one request to the Code Graph search use case.
+- Search depends on active graph-store semantic and source-content indexes prepared during indexing or store maintenance.
+- `--file` remains a Code Graph-normalized path filter; `--files` is the source-content category selector.
+- Busy and stale availability semantics are enforced by the provider after open.
+- The `process.exit(0)` pattern remains required after closing the provider.
 
 ## Examples
 
@@ -188,9 +136,10 @@ Documents (10 shown, limit 10):
 
 ## Spec Dependencies
 
-- [`cli:entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
-- [`cli:graph-cli-context`](../graph-cli-context/spec.md) — shared graph context and provider lifecycle
-- [`core:config`](../../core/config/spec.md) — bootstrap vs configured mode
-- [`code-graph:composition`](../../code-graph/composition/spec.md) — `CodeGraphProvider` facade
-- [`code-graph:document-model`](../../code-graph/document-model/spec.md) — defines document node category
-- [`code-graph:graph-store`](../../code-graph/graph-store/spec.md) — abstract graph-store search capabilities
+- `cli:entrypoint` — CLI conventions
+- `core:config` — graph configuration
+- `code-graph:composition` — provider search surface
+- `code-graph:document-model` — document results
+- `code-graph:graph-store` — indexed reference fields
+- `cli:graph-cli-context` — lifecycle and selectors
+- `code-graph:resolve-symbol-reference` — canonical reference semantics

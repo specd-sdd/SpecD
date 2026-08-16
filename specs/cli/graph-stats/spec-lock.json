@@ -14,11 +14,49 @@
   ],
   "implementation": [
     {
-      "file": "cli:src/commands/graph/stats.ts",
-      "symbols": ["registerGraphStats"]
+      "file": "cli:src/commands/graph/stats.ts"
+    },
+    {
+      "file": "cli:src/commands/graph/warn-graph-staleness.ts"
     },
     {
       "file": "cli:test/commands/graph-stats.spec.ts"
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Display SDK-computed graph counts, content freshness, derivation compatibility, and coverage diagnostics in text or structured form.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:4287ebd884ccb6dc87f2d6e92c371b4bff5a087583a627967973b5d57e97622d",
+          "lastModified": "2026-08-16T08:12:48.646Z"
+        },
+        "verify.md": {
+          "hash": "sha256:8902b180a1789a56033fb9dd34d4ab22b22a2a41e9fc13c10c3bd5360119a159",
+          "lastModified": "2026-08-16T08:12:48.649Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Graph Stats\n\n## Rules\n\n- Signature: `specd graph stats [--config <path> | --path <path>] [--format text|json|toon]`; `--config` and `--path` mutually exclusive.\n- Obtain host via `openSpecdHost` from `@specd/sdk`; explicit config uses its path; `--path`/fallback use `allowBootstrapFallback: true`.\n- Open via `withOpenGraphProvider`; call provider `getGraphHealth` once. No CLI pre-open lock probe.\n- Output format: text shows labeled counts (`Files`, `Documents`, `Symbols`, `Specs`, `Languages`, `Relations`, `Last indexed`) and canonical health diagnostics (aggregate state, global stale latch, content freshness, coverage completeness, schema/generation compatibility, stable reason codes). Explains why graph cannot prove symbol absence.\n- Dirty, partial, unknown, or incompatible health MUST NOT be reduced to an unqualified fresh/current message.\n- JSON/TOON emit complete `getGraphHealth` result without presenter-side recomputation. Legacy fields (`stale`, `currentRef`, `fingerprintMismatch`) preserved for compatibility.\n- Infrastructure error (`GRAPH_BUSY`, `GRAPH_PROVIDER_STALE`, open failure) exits 3.\n\n## Constraints\n\n- CLI does not manage provider lifecycle or health computation inline.\n- Zero-value relation counts omitted only from text.\n- Call `process.exit(0)` after SDK closes provider.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:4287ebd884ccb6dc87f2d6e92c371b4bff5a087583a627967973b5d57e97622d",
+          "lastModified": "2026-08-16T08:12:48.646Z"
+        },
+        "verify.md": {
+          "hash": "sha256:8902b180a1789a56033fb9dd34d4ab22b22a2a41e9fc13c10c3bd5360119a159",
+          "lastModified": "2026-08-16T08:12:48.649Z"
+        }
+      }
+    }
+  }
 }

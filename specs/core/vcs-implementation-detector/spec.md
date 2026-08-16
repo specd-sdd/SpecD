@@ -28,15 +28,19 @@ If no historical `implementing` timestamp exists or the VCS backend cannot resol
 
 ### Requirement: Modified-file candidate mapping
 
-When asked for modified files since a baseline reference, the detector MUST return project-relative candidate file paths derived from the VCS adapter result.
+When asked for modified files since a baseline reference, the detector MUST return project-relative candidate paths derived from the complete VCS adapter result.
 
-The detector MUST normalize path separators to forward slashes before returning them.
+Because `VcsAdapter.modifiedFiles(...)` returns repository-root-relative paths independently of its construction cwd, the detector SHALL resolve the adapter repository root and deterministically rebase each candidate to the configured project root. It SHALL normalize separators to forward slashes, deduplicate, and sort the result.
+
+Paths outside the configured project root MUST NOT be returned as project-relative implementation candidates. Deleted/missing paths and both rename sides that are inside the project remain candidates; later implementation-review or materialization policy determines how they are presented.
+
+The detector MAY apply the caller-provided generic implementation/internal `excludePaths` owned by the `ImplementationDetector` port after repository-to-project rebasing. It MUST NOT read Code Graph configuration, apply Code Graph effective visibility (`allowedPaths`, graph channel selection, graph defaults, or graph-specific exclusions), or derive a graph freshness fingerprint.
 
 ### Requirement: No workspace normalization
 
-The VCS-backed detector MUST NOT resolve files to canonical `workspace:path` identities.
+The VCS implementation detector SHALL remain workspace-agnostic. It SHALL rebase repository-root-relative VCS paths to the configured project root, normalize separators, and MAY apply the generic caller-provided implementation/internal `excludePaths` required by the `ImplementationDetector` port.
 
-Workspace validation, `graph.excludePaths` filtering, and canonical normalization belong to archive-time materialization, not to detection.
+Workspace identity validation and Code Graph effective visibility are not responsibilities of this detector. In particular, the detector MUST NOT load graph configuration or infer graph `allowedPaths`, graph channel selection, default graph exclusions, or graph-specific exclusion policy.
 
 ## Constraints
 

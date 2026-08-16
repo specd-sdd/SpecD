@@ -23,6 +23,20 @@ import {
   type FileAnalysis,
 } from '../../domain/value-objects/file-analysis.js'
 import { type IndexSession } from '../../domain/value-objects/index-session.js'
+import {
+  MemberForm,
+  SymbolSpace,
+  createLocalBinding,
+  type AdapterCapabilities,
+  type ReferenceFacts,
+} from '../../domain/value-objects/symbol-reference.js'
+import {
+  buildHierarchyReferenceFacts,
+  buildLogicalDeclarationFacts,
+  containsSymbolRange,
+  createAdapterDeclarationDescriptor,
+  type AdapterHierarchyDescriptor,
+} from './reference-fact-helpers.js'
 
 /**
  * Determines whether an import declaration is file-only/side-effect only.
@@ -67,7 +81,8 @@ function extractComment(node: SgNode): string | undefined {
  */
 function isMethod(node: SgNode): boolean {
   // Hierarchy: class_definition > block > function_definition
-  const block = node.parent()
+  const parent = node.parent()
+  const block = parent && nodeKind(parent) === 'decorated_definition' ? parent.parent() : parent
   if (!block || nodeKind(block) !== 'block') return false
   const classDef = block.parent()
   return classDef !== null && nodeKind(classDef) === 'class_definition'
@@ -80,6 +95,28 @@ function isMethod(node: SgNode): boolean {
  */
 function normalizePythonTypeName(reference: string): string {
   return reference.trim().split('.').at(-1) ?? reference.trim()
+}
+
+/**
+ * Classifies a Python method from its name and immediately attached decorators.
+ * @param symbol - Extracted method declaration.
+ * @param lines - Complete source split into lines.
+ * @returns Proven shared member form.
+ */
+function pythonMemberForm(symbol: SymbolNode, lines: readonly string[]): MemberForm {
+  if (symbol.name === '__init__' || symbol.name === '__new__') return MemberForm.Constructor
+  const decorators: string[] = []
+  for (let index = symbol.line - 2; index >= 0; index -= 1) {
+    const line = lines[index]?.trim() ?? ''
+    if (!line.startsWith('@')) break
+    decorators.unshift(line)
+  }
+  if (decorators.some((line) => line === '@staticmethod' || line === '@classmethod')) {
+    return MemberForm.Static
+  }
+  if (decorators.some((line) => line.endsWith('.setter'))) return MemberForm.Setter
+  if (decorators.some((line) => line === '@property')) return MemberForm.Getter
+  return MemberForm.Instance
 }
 
 /**
@@ -127,7 +164,12 @@ interface PythonClassInfo {
   readonly symbolId: string
   readonly kind: 'class' | 'interface'
   readonly baseNames: readonly string[]
+  readonly ownerSymbolId?: string
+  readonly indent: number
+  readonly endLine: number
   readonly methodsByName: ReadonlyMap<string, string>
+  readonly memberSymbolIds: readonly string[]
+  readonly memberFormsById: ReadonlyMap<string, MemberForm>
 }
 
 /**
@@ -138,7 +180,12 @@ interface SerializedPythonClassInfo {
   readonly symbolId: string
   readonly kind: 'class' | 'interface'
   readonly baseNames: readonly string[]
+  readonly ownerSymbolId?: string
+  readonly indent: number
+  readonly endLine: number
   readonly methodsByName: Record<string, string>
+  readonly memberSymbolIds: readonly string[]
+  readonly memberFormsById: Readonly<Record<string, MemberForm>>
 }
 
 /**
@@ -154,6 +201,20 @@ interface PythonParserState {
  * Extracts functions, classes, methods, and module-level assignments.
  */
 export class PythonLanguageAdapter implements LanguageAdapter {
+  /**
+   * Declares deterministic Python reference semantics.
+   * @returns Supported reference capabilities.
+   */
+  capabilities(): AdapterCapabilities {
+    return {
+      declarations: true,
+      members: true,
+      publicBindings: true,
+      localBindings: true,
+      hierarchy: true,
+      buildContext: false,
+    }
+  }
   /**
    * Resolves a qualified name to a file path.
    * @param _qualifiedName - Qualified name.
@@ -220,23 +281,36 @@ export class PythonLanguageAdapter implements LanguageAdapter {
       name: string,
       kind: SymbolKind,
       node: SgNode,
+      selectionNode: SgNode | null | undefined,
       comment: string | undefined,
     ): void => {
+      if (!selectionNode) return
       const line = node.range().start.line + 1
       const col = node.range().start.column
       const key = `${kind}:${name}:${line}:${col}`
       if (seenSymbol.has(key)) return
-      seenSymbol.add(key)
-      symbols.push(
-        createSymbolNode({
+      try {
+        const symbol = createSymbolNode({
           name,
           kind,
           filePath,
           line,
           column: node.range().start.column,
+          endLine: node.range().end.line + 1,
+          endColumn: node.range().end.column,
+          selectionRange: {
+            startLine: selectionNode.range().start.line + 1,
+            startColumn: selectionNode.range().start.column,
+            endLine: selectionNode.range().end.line + 1,
+            endColumn: selectionNode.range().end.column,
+          },
           comment,
-        }),
-      )
+        })
+        seenSymbol.add(key)
+        symbols.push(symbol)
+      } catch (error) {
+        if (!(error instanceof RangeError)) throw error
+      }
     }
 
     this.walk(root, addSymbol)
@@ -341,25 +415,121 @@ export class PythonLanguageAdapter implements LanguageAdapter {
     const classes = this.collectClassInfo(content, filePath, symbols)
     const serializedClasses = classes.map((cls) => {
       const methodsByName: Record<string, string> = {}
+      const memberFormsById: Record<string, MemberForm> = {}
       for (const [mName, mId] of cls.methodsByName.entries()) {
         methodsByName[mName] = mId
       }
+      for (const [memberId, form] of cls.memberFormsById) memberFormsById[memberId] = form
       return {
         ...cls,
         methodsByName,
+        memberFormsById,
       }
     })
 
+    const referenceFacts = this.buildReferenceFacts(
+      context.workspaceName,
+      filePath,
+      symbols,
+      imports,
+      classes,
+    )
     return {
       language: 'python',
       symbols,
       imports,
       bindingFacts,
       callFacts,
+      referenceFacts,
       parserState: {
         kind: 'python',
         classes: serializedClasses,
       },
+    }
+  }
+
+  /**
+   * Builds conservative Python declaration and binding facts.
+   * @param workspace - Owning workspace.
+   * @param filePath - Analyzed source path.
+   * @param symbols - Extracted declarations.
+   * @param imports - Extracted static imports.
+   * @param classes - Syntax-proven class owners and declared bases.
+   * @returns Additive reference facts.
+   */
+  private buildReferenceFacts(
+    workspace: string,
+    filePath: string,
+    symbols: readonly SymbolNode[],
+    imports: readonly ImportDeclaration[],
+    classes: readonly PythonClassInfo[],
+  ): ReferenceFacts {
+    const surface = filePath.replace(/(?:\/__init__)?\.pyi?$/, '')
+    const ownerByMemberId = new Map<string, string>()
+    const formByMemberId = new Map<string, MemberForm>()
+    for (const cls of classes) {
+      if (cls.ownerSymbolId !== undefined) ownerByMemberId.set(cls.symbolId, cls.ownerSymbolId)
+      for (const methodId of cls.memberSymbolIds) {
+        ownerByMemberId.set(methodId, cls.symbolId)
+      }
+      for (const [methodId, form] of cls.memberFormsById) formByMemberId.set(methodId, form)
+    }
+    const logicalFacts = buildLogicalDeclarationFacts({
+      workspace,
+      declarations: symbols.map((symbol) =>
+        createAdapterDeclarationDescriptor({
+          symbol,
+          surface,
+          space:
+            symbol.kind === SymbolKind.Class || symbol.kind === SymbolKind.Type
+              ? SymbolSpace.Type
+              : SymbolSpace.Value,
+          ownerSymbolId: ownerByMemberId.get(symbol.id),
+          requiresOwner: symbol.kind === SymbolKind.Method,
+          memberForm:
+            symbol.kind === SymbolKind.Method
+              ? (formByMemberId.get(symbol.id) ?? MemberForm.Instance)
+              : undefined,
+        }),
+      ),
+    })
+    const localClassByName = new Map(classes.map((item) => [item.name, item]))
+    const hierarchyDescriptors: AdapterHierarchyDescriptor[] = []
+    for (const child of classes) {
+      child.baseNames.forEach((name, precedence) => {
+        const parent = localClassByName.get(name)
+        if (!parent) return
+        hierarchyDescriptors.push({
+          childSymbolId: child.symbolId,
+          parentSymbolId: parent.symbolId,
+          kind: parent.kind === SymbolKind.Interface ? 'implements' : 'extends',
+          precedence,
+        })
+      })
+    }
+    const hierarchyFacts = buildHierarchyReferenceFacts({
+      hierarchy: hierarchyDescriptors,
+      logicalBySymbolId: logicalFacts.logicalBySymbolId,
+    })
+    const publicBindings: ReferenceFacts['publicBindings'] = []
+    const localBindings = imports
+      .filter((item) => item.localName.length > 0)
+      .map((item) =>
+        createLocalBinding({
+          filePath,
+          scopeId: 'module',
+          localName: item.localName,
+          space: SymbolSpace.Value,
+          targetId: undefined,
+        }),
+      )
+    return {
+      declarations: logicalFacts.declarations,
+      publicBindings,
+      localBindings,
+      hierarchy: hierarchyFacts.hierarchy,
+      steps: hierarchyFacts.steps,
+      capabilities: this.capabilities(),
     }
   }
 
@@ -503,7 +673,7 @@ export class PythonLanguageAdapter implements LanguageAdapter {
     const seen = new Set<string>()
 
     for (const cls of classes) {
-      for (const baseName of cls.baseNames) {
+      for (const [precedence, baseName] of cls.baseNames.entries()) {
         const importedId = context.resolvedImports.importMap.get(baseName)
         const localBase = classesByName.get(baseName)
         const targetId = importedId ?? localBase?.symbolId
@@ -520,6 +690,7 @@ export class PythonLanguageAdapter implements LanguageAdapter {
               source: cls.symbolId,
               target: targetId,
               type: relationType,
+              metadata: { precedence },
             }),
           )
         }
@@ -631,7 +802,7 @@ export class PythonLanguageAdapter implements LanguageAdapter {
     symbols: SymbolNode[],
   ): PythonClassInfo[] {
     const infos: PythonClassInfo[] = []
-    const classRegex = /^class\s+([A-Za-z_][A-Za-z0-9_]*)(?:\(([^)]*)\))?:/gm
+    const classRegex = /^([ \t]*)class\s+([A-Za-z_][A-Za-z0-9_]*)(?:\(([^)]*)\))?:/gm
     const symbolMap = new Map(
       symbols
         .filter((symbol) => symbol.filePath === filePath)
@@ -640,14 +811,15 @@ export class PythonLanguageAdapter implements LanguageAdapter {
     const lines = content.split('\n')
 
     for (const match of content.matchAll(classRegex)) {
-      const name = match[1]
+      const indentation = match[1] ?? ''
+      const name = match[2]
       if (!name) continue
       const line = content.slice(0, match.index ?? 0).split('\n').length
       const symbolId = symbolMap.get(`${SymbolKind.Class}:${name}:${line}`)
-      if (!symbolId) continue
+      const ownerSymbol = symbols.find((symbol) => symbol.id === symbolId)
+      if (!symbolId || !ownerSymbol) continue
 
-      const headerLine = lines[line - 1] ?? ''
-      const indent = headerLine.match(/^\s*/)?.[0].length ?? 0
+      const indent = indentation.length
       let endLine = lines.length
       for (let idx = line; idx < lines.length; idx++) {
         const current = lines[idx] ?? ''
@@ -660,23 +832,38 @@ export class PythonLanguageAdapter implements LanguageAdapter {
       }
 
       const methodsByName = new Map<string, string>()
+      const memberSymbolIds: string[] = []
+      const memberFormsById = new Map<string, MemberForm>()
       for (const symbol of symbols) {
         if (symbol.filePath !== filePath || symbol.kind !== SymbolKind.Method) continue
-        if (symbol.line <= line || symbol.line > endLine) continue
+        if (!containsSymbolRange(ownerSymbol, symbol)) continue
+        memberSymbolIds.push(symbol.id)
         methodsByName.set(symbol.name, symbol.id)
+        memberFormsById.set(symbol.id, pythonMemberForm(symbol, lines))
       }
 
-      const baseNames = (match[2] ?? '')
+      const baseNames = (match[3] ?? '')
         .split(',')
         .map((entry) => normalizePythonTypeName(entry))
         .filter((entry) => entry.length > 0)
+
+      const ownerSymbolId = [...infos]
+        .filter((candidate) => candidate.indent < indent && candidate.endLine >= line)
+        .sort(
+          (left, right) => right.indent - left.indent || right.endLine - left.endLine,
+        )[0]?.symbolId
 
       infos.push({
         name,
         symbolId,
         kind: baseNames.includes('Protocol') ? SymbolKind.Interface : SymbolKind.Class,
         baseNames,
+        ...(ownerSymbolId !== undefined ? { ownerSymbolId } : {}),
+        indent,
+        endLine,
         methodsByName,
+        memberSymbolIds,
+        memberFormsById,
       })
     }
 
@@ -886,7 +1073,13 @@ export class PythonLanguageAdapter implements LanguageAdapter {
    */
   private walk(
     node: SgNode,
-    addSymbol: (name: string, kind: SymbolKind, node: SgNode, comment: string | undefined) => void,
+    addSymbol: (
+      name: string,
+      kind: SymbolKind,
+      node: SgNode,
+      selectionNode: SgNode | null | undefined,
+      comment: string | undefined,
+    ) => void,
   ): void {
     for (const child of node.children()) {
       const kind = nodeKind(child)
@@ -896,14 +1089,14 @@ export class PythonLanguageAdapter implements LanguageAdapter {
           const name = child.field('name')?.text()
           if (name) {
             const symKind = isMethod(child) ? SymbolKind.Method : SymbolKind.Function
-            addSymbol(name, symKind, child, extractComment(child))
+            addSymbol(name, symKind, child, child.field('name'), extractComment(child))
           }
           break
         }
         case 'class_definition': {
           const name = child.field('name')?.text()
           if (name) {
-            addSymbol(name, SymbolKind.Class, child, extractComment(child))
+            addSymbol(name, SymbolKind.Class, child, child.field('name'), extractComment(child))
           }
           // Walk into class body (block) for methods
           this.walk(child, addSymbol)
@@ -911,6 +1104,10 @@ export class PythonLanguageAdapter implements LanguageAdapter {
         }
         case 'block': {
           // Recurse into block to find methods inside class bodies
+          this.walk(child, addSymbol)
+          break
+        }
+        case 'decorated_definition': {
           this.walk(child, addSymbol)
           break
         }
@@ -922,7 +1119,7 @@ export class PythonLanguageAdapter implements LanguageAdapter {
             if (firstChild && nodeKind(firstChild) === 'assignment') {
               const left = firstChild.field('left')
               if (left && nodeKind(left) === 'identifier') {
-                addSymbol(left.text(), SymbolKind.Variable, child, extractComment(child))
+                addSymbol(left.text(), SymbolKind.Variable, child, left, extractComment(child))
               }
             }
           }

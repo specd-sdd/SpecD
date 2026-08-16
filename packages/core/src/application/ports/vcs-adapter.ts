@@ -72,6 +72,9 @@ export abstract class VcsAdapter {
   /**
    * Returns the short revision identifier for the current commit/changeset.
    *
+   * The identifier is stable for the revision and does not encode working-tree
+   * cleanliness or any other transient state.
+   *
    * Returns `null` when VCS is unavailable or the repository has no commits.
    *
    * @returns Short revision hash/id, or `null`
@@ -91,7 +94,13 @@ export abstract class VcsAdapter {
   /**
    * Returns repository-relative file paths modified since a baseline revision.
    *
-   * Missing or empty results are represented as an empty array.
+   * Paths use forward slashes and are relative to the repository root regardless
+   * of the adapter construction directory. Implementations include committed,
+   * staged, unstaged, untracked, deleted or missing paths, plus both sides of a
+   * rename. Missing or empty results are represented as an empty array.
+   *
+   * Backend execution failures reject; they are not converted into a falsely
+   * clean empty result.
    *
    * @param baseRef - Baseline revision identifier
    * @returns Repository-relative changed file paths

@@ -54,3 +54,12 @@
 
 - **WHEN** indexing completes
 - **THEN** returned counts and per-workspace breakdown match `IndexProjectGraph` output
+
+### Requirement: Repair lifecycle passthrough
+
+#### Scenario: SDK can repair a store normal reads cannot open
+
+- **GIVEN** provider normal-open rejects an old schema
+- **WHEN** project indexing is requested
+- **THEN** the indexing-specific lifecycle reaches repair
+- **AND** hooks, cleanup, rebuild reason, and result fields occur exactly once

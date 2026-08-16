@@ -116,7 +116,7 @@ describe('VcsImplementationDetector', () => {
 
     expect(calls.some((call) => call.startsWith('refAt:'))).toBe(true)
     expect(calls).toContain('modifiedFiles:base-123')
-    expect(result).toEqual(['packages/core/src/change.ts', 'README.md'])
+    expect(result).toEqual(['README.md', 'packages/core/src/change.ts'])
   })
 
   it('falls back to current ref when historical lookup is unavailable', async () => {
@@ -146,6 +146,45 @@ describe('VcsImplementationDetector', () => {
     await expect(detector.detectModifiedFiles(makeChange())).resolves.toEqual([
       'packages/core/src/change.ts',
     ])
+  })
+
+  it('rebases nested-project candidates, omits outside paths, and returns a sorted set', async () => {
+    const adapter = createAdapter({
+      rootDir() {
+        return '/repo'
+      },
+      async modifiedFiles() {
+        return [
+          'outside.ts',
+          'project/src/renamed-to.ts',
+          'project\\src\\deleted.ts',
+          'project/src/renamed-from.ts',
+          'project/src/deleted.ts',
+          '../escaped.ts',
+        ]
+      },
+    })
+    const detector = new VcsImplementationDetector('/repo/project', adapter)
+
+    await expect(detector.detectModifiedFiles(makeChange())).resolves.toEqual([
+      'src/deleted.ts',
+      'src/renamed-from.ts',
+      'src/renamed-to.ts',
+    ])
+  })
+
+  it('rejects repository-root failures instead of reporting a clean result', async () => {
+    const adapter = createAdapter({
+      rootDir() {
+        throw new Error('root failed')
+      },
+      async modifiedFiles() {
+        return ['src/changed.ts']
+      },
+    })
+    const detector = new VcsImplementationDetector('/repo', adapter)
+
+    await expect(detector.detectModifiedFiles(makeChange())).rejects.toThrow('root failed')
   })
 })
 

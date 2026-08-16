@@ -18,6 +18,7 @@ Use `@specd/sdk` when building a host that needs:
 - Project config + kernel bootstrap
 - Code graph provider lifecycle
 - Cross-package orchestration (`project status --graph`, `graph index`)
+- Delivery-neutral implementation review with Code Graph resolution
 
 ## Bootstrap
 
@@ -96,7 +97,10 @@ const provider = host.createGraphProvider()
 await provider.open()
 
 try {
-  await provider.searchSymbols({ query: 'openSpecdHost' })
+  await provider.search({
+    query: 'openSpecdHost',
+    categories: ['symbols', 'files', 'specs', 'documents'],
+  })
 } catch (error) {
   if (error instanceof GraphProviderStaleError) {
     await provider.close()
@@ -127,8 +131,69 @@ Both are pure synchronous functions: no I/O, no kernel access, no process side e
 | ---------------------------- | ---------------------------------------------------------- |
 | `buildProjectStatusSnapshot` | `GetProjectSummary` + optional `GetGraphHealth` / hotspots |
 | `runIndexProjectGraph`       | `listWorkspaces` + VCS ref + `IndexProjectGraph`           |
+| `buildImplementationReview`  | Core raw tracking + one Code Graph resolution batch        |
 
-Both return structured data — formatting stays in CLI presenters.
+All return structured data — formatting stays in delivery presenters.
+
+### Unified graph operations
+
+Hosts open one provider through the SDK lifecycle and call Code Graph's curated
+operations. `provider.search(input)` receives all selected categories, filters,
+limits, and snippet preference once. Code Graph owns expansion, semantic ranking,
+candidate paging, source occurrence ranges, declaration-name suppression,
+deduplication, grouping, and post-suppression limit refill. A host may render
+`--files` as a category selector and `--file` as a path filter, but must not run and
+merge lower-level searches.
+
+Graph health is likewise a Code Graph projection. It exposes aggregate and workspace
+states for VCS, filesystem, and hybrid visibility scopes, including monotonic stale
+latches and stable reasons. Hosts render those values without rescanning repositories
+or files. Targeted freshness assessment belongs to Code Graph and is reused by symbol
+resolution; the SDK does not invent missing/stale policy.
+
+### Implementation review
+
+```typescript
+import { buildImplementationReview, openSpecdHost } from '@specd/sdk'
+
+const host = await openSpecdHost({ startDir: process.cwd() })
+const result = await buildImplementationReview(host, { changeName: 'my-change' })
+```
+
+`buildImplementationReview` reads Core's raw implementation tracking once, opens one
+Code Graph provider lifecycle, reads one health snapshot, and resolves all symbol
+links in one batch. File-only links bypass resolution. The result contains the raw
+review, canonical `graphHealth`, and deterministic reviewed links with the original
+stored values, status/reason, targeted freshness/coverage, target, candidates, and
+provenance path.
+
+The operation is read-only: it does not rewrite the manifest, sidecars, paths, or
+symbol strings. Expected graph unavailability is represented by the documented
+unavailable diagnostics; incompatible schema/generation and storage failures propagate
+as infrastructure errors rather than being converted to a link status. Link status is
+`resolved`, `ambiguous`, `unresolved`, or `missing`: stale or unknown input evidence
+stays `unresolved`, while `missing` requires current targeted evidence and complete
+coverage. Staleness remains visible in graph health and freshness fields.
+
+Resolution policy remains in `@specd/code-graph`. Core remains the graph-agnostic
+source of raw tracking, SDK owns cross-package orchestration, and CLI/MCP hosts only
+present the returned projection.
+
+### Indexing repair
+
+`runIndexProjectGraph` uses the shared `withOpenGraphProvider` lifecycle with the
+indexing-specific open operation. Its `IndexResult` passes through `fullRebuild` and
+`fullRebuildReason`: `null` for a compatible incremental run, or the stable reason for
+recreating incompatible derived storage. Normal
+`withOpenGraphProvider` reads never repair a store. After recreation, old long-lived
+providers fail generation validation and must be reopened.
+
+Code Graph performs the write through one bulk index session: bounded chunks share one
+atomic generation, relation endpoints are validated in batches, and semantic/source
+search indexes are rebuilt once. The SDK preserves progress and repair diagnostics but
+does not split the transaction, write graph facts, or clear freshness latches itself.
+It also passes through Code Graph's named phase counts and timings without recomputing
+them in the SDK or CLI.
 
 ## Subpaths
 
@@ -149,6 +214,7 @@ Both return structured data — formatting stays in CLI presenters.
 | `graph stats`                          | `withOpenGraphProvider` + `createGetGraphHealth` |
 | `graph index`                          | `runIndexProjectGraph`                           |
 | `graph search` / `hotspots` / `impact` | `withOpenGraphProvider` via `withProvider`       |
+| `changes implementation` / status      | `buildImplementationReview`                      |
 
 ## Re-exports
 
@@ -156,7 +222,7 @@ The SDK root exports explicit symbols from the curated `@specd/core` and `@specd
 
 - `createDefaultConfigLoader`, `createConfigWriter`, `createKernel`, kernel-equivalent `createX` factories, and repository factories
 - Standalone `createX` factories (e.g. `createGetStatus`, `createResolveSchema`) for hosts that need a single use case without `createKernel`
-- Host orchestration: `openSpecdHost`, `withOpenGraphProvider`, `buildProjectStatusSnapshot`, `runIndexProjectGraph`
+- Host orchestration: `openSpecdHost`, `withOpenGraphProvider`, `buildProjectStatusSnapshot`, `runIndexProjectGraph`, `buildImplementationReview`
 - Graph helpers: `createGetGraphHealth`, `GetGraphHealthResult`, `IndexResult`, `HotspotResult`, `GraphProviderStaleError`
 - `SDK_VERSION`, `CORE_VERSION`, `CODE_GRAPH_VERSION`
 

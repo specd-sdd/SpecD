@@ -1,0 +1,17 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Reference schema upgrade
+
+    SQLite SHALL persist the enriched logical-symbol, declaration, member, symbol-space, binding, provenance, coverage, complete construct range, and declared-name selection range fields required by `GraphStore`. Structured workspace, surface, name, symbol-space, owner, member-form, and exported-name columns SHALL have indexes supporting semantic search and selector resolution without parsing or substring-ranking serialized canonical ids. Canonical ids remain unique external identities. Backend-local integer row keys MAY be used for physical joins when they do not change provider-visible ids.
+
+    SQLite SHALL maintain a dedicated source-file content FTS index using substring-capable trigram tokenization. Candidate queries SHALL use the shared complete/raw/expanded query plan, honor filters before candidate limits, and return indexed content or precise evidence for Code Graph verification. Queries shorter than three characters SHALL use a bounded indexed/SQL fallback defined by the shared Store contract rather than returning every file for application-layer scanning.
+
+    Batched reverse coverage lookup SHALL use set-based predicates over deduplicated file paths and symbol ids and deterministic ordering.
+
+    The backend SHALL increment its schema version exactly once relative to the version current when implementation begins; absent an intervening change this is `5` to `6`. An incompatible database MUST reject ordinary reads. `graph index` SHALL rebuild it destructively, rotate `storage.epoch`, and complete FTS rebuild before marking it ready.
+
+    SQLite SHALL persist indexed-input observations, workspace/global latches, VCS-scope evidence, and compact unchanged-file facts required by incremental hydration. One indexing run SHALL use one database transaction, set-based relation endpoint validation, bounded prepared/bulk inserts, one commit, and one rebuild of all semantic and content FTS indexes. Chunk appends MUST NOT rebuild FTS independently.

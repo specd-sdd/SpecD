@@ -1,6 +1,7 @@
 import { type Relation } from './relation.js'
 import { type IndexSession } from './index-session.js'
 import { type FileAnalysisDraft, type FileAnalysis } from './file-analysis.js'
+import { type AdapterCapabilities } from './symbol-reference.js'
 
 /**
  * Exposes the shared run context available while analyzing a single file.
@@ -46,6 +47,9 @@ export interface RelationBuildContext {
  * All methods are synchronous and pure — they receive content as a string, not file handles.
  */
 export interface LanguageAdapter {
+  /** Declares the semantic reference features this adapter can prove without guessing. */
+  capabilities?(): AdapterCapabilities
+
   /**
    * Returns the language identifiers this adapter supports.
    * @returns An array of language identifier strings.

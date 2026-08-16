@@ -1,0 +1,203 @@
+- op: added
+  position: { parent: { type: section, matches: 'Requirements' } }
+  content: |
+    ### Requirement: Reference-aware symbol results
+
+    #### Scenario: Search groups target without losing aliases
+
+    - **GIVEN** one logical symbol has multiple declarations and public bindings
+    - **WHEN** searched by owner-qualified reference or alias
+    - **THEN** one target group exposes every declaration, binding, directly matched binding, space, and form in deterministic order
+    - **AND** existing `--kind` semantics remain unchanged
+
+    ### Requirement: Semantic-first candidate lanes
+
+    #### Scenario: Exact logical identity outranks local textual names
+
+    - **GIVEN** a logical class `Change` and CLI/test variables or helper functions named `change`
+    - **WHEN** an unfiltered search for `Change` runs
+    - **THEN** the exact logical declaration ranks first
+    - **AND** `--kind variable` still exposes the local values
+
+    #### Scenario: Logical-name equality is not canonical-identity equality
+
+    - **GIVEN** a logical target is named `run` and an exact public binding also exports `run`
+    - **WHEN** symbol search receives the ordinary text `run` rather than the target's canonical id
+    - **THEN** the public binding receives the exact-public-binding tier
+    - **AND** the logical target is not labeled exact-logical-identity solely because its name equals the query
+
+    #### Scenario: Canonical identity returns a non-exported target without text hits
+
+    - **GIVEN** a non-exported logical target has declarations but no public binding or backend text hit for its rendered canonical ID
+    - **WHEN** symbol search receives that exact canonical ID
+    - **THEN** the target is included directly with its declarations
+    - **AND** it receives the exact-logical-identity tier
+
+    #### Scenario: Prefix discovery remains visibly partial
+
+    - **GIVEN** `ValidateArtifacts` exists and `ValidateArtifact` does not
+    - **WHEN** symbol search receives `ValidateArtifact`
+    - **THEN** `ValidateArtifacts` MAY be returned after exact candidates as a prefix match
+    - **AND** its structured tier does not claim an exact match
+
+    #### Scenario: Semantic and textual lanes are limited after merge
+
+    - **GIVEN** semantic and backend text lanes return overlapping logical symbols
+    - **WHEN** the requested category limit is applied
+    - **THEN** duplicates are grouped before limiting
+    - **AND** stable `matchTier` and `matchReasons` explain the deterministic order
+
+    #### Scenario: Exact local tier remains reachable after logical components
+
+    - **GIVEN** one case-exact local symbol has no logical target
+    - **AND** another logical target matches only through a structural identity component
+    - **WHEN** both semantic lanes are classified and ordered
+    - **THEN** the logical component uses `logical-component`
+    - **AND** the local symbol uses `exact-local-symbol` rather than a declaration tier
+
+- op: added
+  position:
+    parent: { type: section, matches: '^Requirement: Command signature$' }
+  content: |
+    #### Scenario: Files category is distinct from file-path filter
+
+    - **WHEN** `graph search "needle" --files --file "src/*.ts"` is run
+    - **THEN** only indexed source-content results matching the path filter are requested
+    - **AND** `--files` is not interpreted as a path filter
+
+    #### Scenario: Default request includes four categories
+
+    - **WHEN** no category flag is supplied
+    - **THEN** symbols, files, specs, and documents are selected in one request
+
+    #### Scenario: CLI delegates one unified request
+
+    - **GIVEN** several category flags, filters, a limit, and snippet preference
+    - **WHEN** the command executes
+    - **THEN** the CLI sends all inputs in exactly one Code Graph search call
+    - **AND** it does not pre-limit or combine category responses
+
+    #### Scenario: Exact file selector accepts every supported path form
+
+    - **GIVEN** one indexed source file
+    - **WHEN** `--file` receives its canonical workspace path, config-relative path, or absolute path
+    - **THEN** each form selects the same one file
+    - **AND** a wildcard selector retains pattern semantics
+
+- op: added
+  position:
+    parent: { type: section, matches: 'Requirement: Search behaviour' }
+  content: |
+    #### Scenario: Shared query plan preserves multi-word intent
+
+    - **GIVEN** a query containing several whitespace terms and a CamelCase or separator-shaped token
+    - **WHEN** unified search builds its plan
+    - **THEN** it preserves the normalized complete query, raw terms, and expanded components
+    - **AND** contiguous full-query matches outrank all-raw-term, individual-raw-term, and expanded-only matches
+
+    #### Scenario: Declaration occurrence is suppressed but body matches remain
+
+    - **GIVEN** a returned symbol whose declared name matches the query
+    - **AND** the same file also contains the query in a call, string, comment, or function body
+    - **WHEN** file occurrences are grouped
+    - **THEN** only the occurrence overlapping that symbol's declared-name `selectionRange` is suppressed
+    - **AND** occurrences elsewhere in the complete construct range remain in the file result
+
+    #### Scenario: A fully represented file result disappears
+
+    - **GIVEN** every matching occurrence in a file is a returned symbol declaration for the same query
+    - **WHEN** cross-category suppression runs
+    - **THEN** the file is omitted
+    - **AND** its suppressed hits do not consume the file-category limit
+
+    #### Scenario: Symbol omitted by the limit does not suppress its file occurrence
+
+    - **GIVEN** more symbol groups match than the requested symbol-category limit
+    - **AND** a declaration occurrence belongs only to a symbol group omitted by that limit
+    - **WHEN** cross-category suppression runs
+    - **THEN** the omitted symbol group does not suppress the occurrence
+    - **AND** the matching source file remains eligible for the file-category result
+
+    #### Scenario: Source matching uses indexed content only
+
+    - **WHEN** unified source search verifies and groups exact occurrences
+    - **THEN** it uses persisted FileNode content and Store candidates
+    - **AND** it does not read live files or scan the repository with a delivery-layer tool
+
+    #### Scenario: Code Graph owns all cross-category semantics
+
+    - **WHEN** unified search executes through the provider
+    - **THEN** Code Graph expands, merges, suppresses, ranks, groups, and applies final limits
+    - **AND** the CLI performs none of those operations
+
+    #### Scenario: General matches are ranked before the per-file cap
+
+    - **GIVEN** one file has more than ten early expanded-token occurrences and a later full-query occurrence after symbol suppression
+    - **WHEN** a general or wildcard-path search runs
+    - **THEN** the retained matches place the full-query occurrence before raw-token and expanded-token occurrences
+    - **AND** source range orders matches within each relevance tier
+    - **AND** `totalMatches` and `omittedMatches` describe the complete visible set before capping
+
+    #### Scenario: Later candidate page can win the final file limit
+
+    - **GIVEN** an early backend page fills the requested file limit with expanded-token-only matches
+    - **AND** a later page contains a full-query or all-raw-terms file match
+    - **WHEN** Code Graph produces final file results
+    - **THEN** it evaluates all required candidate pages before limiting
+    - **AND** the later stronger match displaces a weaker early candidate
+
+    #### Scenario: Exact single-file matches remain exhaustive source inspection
+
+    - **GIVEN** one exact file selector resolves to a file with more than ten visible occurrences across several match kinds
+    - **WHEN** source-content search runs
+    - **THEN** every visible occurrence is returned
+    - **AND** the matches are ordered by source range rather than relevance tier
+
+- op: added
+  position:
+    parent: { type: section, matches: 'Requirement: Output format' }
+  content: |
+    #### Scenario: File result groups precise occurrences
+
+    - **GIVEN** one indexed file has complete-query, raw-token, and expanded-token matches
+    - **WHEN** it is emitted in text, JSON, or TOON
+    - **THEN** the file appears once with ordered exact match ranges
+    - **AND** every match exposes `matchKind`, matched text, and `sourceToken`
+
+    #### Scenario: Match and snippet ranges remain distinct
+
+    - **WHEN** `--snippet` is enabled for a file or symbol result
+    - **THEN** exact match, symbol construct, symbol selection, and preview ranges retain their separate meanings
+    - **AND** omitting `--snippet` removes preview content without removing exact ranges
+
+    #### Scenario: Structured category order includes files
+
+    - **WHEN** JSON or TOON output contains all categories
+    - **THEN** it is grouped deterministically as `symbols`, `files`, `specs`, and `documents`
+
+    #### Scenario: Structured symbol output retains matched bindings
+
+    - **GIVEN** a public alias directly causes one logical-symbol match
+    - **WHEN** JSON or TOON output is rendered
+    - **THEN** the symbol group includes both `publicBindings` and `matchedPublicBindings`
+    - **AND** a machine consumer can identify the exact public route that caused the match
+
+    #### Scenario: Text favors declaration and matched export
+
+    - **GIVEN** a query matches a barrel export whose target is declared in another file
+    - **WHEN** text output is rendered
+    - **THEN** it prints the project-relative matched-export path and exported name followed by the declaration location
+    - **AND** it does not print the serialized canonical id or enumerate unrelated bindings by default
+
+    #### Scenario: Omitted file matches are summarized
+
+    - **GIVEN** a general file result has more visible occurrences than its per-file cap
+    - **WHEN** text, JSON, and TOON are rendered
+    - **THEN** text reports `N more matches in this file`
+    - **AND** structured output preserves retained, total, and omitted counts
+
+    #### Scenario: Structured file output retains truncation counts
+
+    - **GIVEN** one source file has more than ten visible matches
+    - **WHEN** JSON or TOON output is rendered
+    - **THEN** its file result includes `totalMatches` and `omittedMatches` alongside retained `matches`

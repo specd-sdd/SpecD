@@ -1,8 +1,20 @@
 import { type GraphStore } from '../ports/graph-store.js'
 import { type ImpactResult, type AffectedSymbol } from '../value-objects/impact-result.js'
+import {
+  type DeclarationOccurrence,
+  type LogicalSymbol,
+  type PublicBinding,
+  type ResolutionStep,
+  type SymbolResolutionResult,
+} from '../value-objects/symbol-reference.js'
 import { computeRiskLevel } from '../value-objects/risk-level.js'
 import { getUpstream } from './get-upstream.js'
 import { getDownstream } from './get-downstream.js'
+
+/** Supplies an optional pre-resolved selector without coupling domain services to a use case. */
+export type ImpactResolutionProvider = (
+  symbolId: string,
+) => Promise<SymbolResolutionResult | undefined>
 
 /**
  * Analyzes the impact of modifying a symbol by traversing its dependents.
@@ -12,6 +24,7 @@ import { getDownstream } from './get-downstream.js'
  * @param target - The id of the symbol to analyze impact for.
  * @param direction - The traversal direction: upstream, downstream, or both.
  * @param maxDepth - Maximum traversal depth (default: 3).
+ * @param resolution - Optional application-layer resolution evidence.
  * @returns The impact result with dependent counts, risk level, and affected files.
  */
 export async function analyzeImpact(
@@ -19,14 +32,106 @@ export async function analyzeImpact(
   target: string,
   direction: 'upstream' | 'downstream' | 'both',
   maxDepth = 3,
+  resolution?: SymbolResolutionResult,
+): Promise<ImpactResult> {
+  if (resolution !== undefined && resolution.status !== 'resolved') {
+    return emptyImpact(target)
+  }
+
+  const canonicalTarget = resolution?.target ?? null
+  const declarations =
+    resolution?.candidates.find((candidate) => candidate.target.id === canonicalTarget?.id)
+      ?.declarations ?? []
+  const traversalTargets =
+    declarations.length === 0 ? [target] : declarations.map((declaration) => declaration.symbolId)
+
+  return analyzeTraversalTargets(
+    store,
+    traversalTargets,
+    canonicalTarget?.id ?? target,
+    direction,
+    maxDepth,
+  )
+}
+
+/** Input for exact-public-binding impact after application-layer resolution. */
+export interface ResolvedPublicBindingImpactInput {
+  readonly binding: PublicBinding
+  readonly target: LogicalSymbol
+  readonly declarations: readonly DeclarationOccurrence[]
+  readonly path: readonly ResolutionStep[]
+}
+
+/** Separates consumers of one public route from all consumers of its logical target. */
+export interface PublicBindingImpactResult {
+  readonly bindingImpact: ImpactResult
+  readonly canonicalImpact: ImpactResult
+  readonly binding: PublicBinding
+  readonly target: LogicalSymbol
+  readonly path: readonly ResolutionStep[]
+}
+
+/**
+ * Computes exact-route and canonical impact views from a proven public binding.
+ * Resolution remains an application-layer concern; this helper only traverses the
+ * supplied immutable evidence.
+ * @param store - Graph store to query.
+ * @param input - Proven binding, target, declarations, and evidence path.
+ * @param direction - Traversal direction.
+ * @param maxDepth - Maximum traversal depth.
+ * @returns Separate exact-binding and canonical impact projections.
+ */
+export async function analyzePublicBindingImpact(
+  store: GraphStore,
+  input: ResolvedPublicBindingImpactInput,
+  direction: 'upstream' | 'downstream' | 'both',
+  maxDepth = 3,
+): Promise<PublicBindingImpactResult> {
+  const [bindingImpact, canonicalImpact] = await Promise.all([
+    analyzeTraversalTargets(store, [input.binding.id], input.binding.id, direction, maxDepth),
+    analyzeTraversalTargets(
+      store,
+      input.declarations.map((declaration) => declaration.symbolId),
+      input.target.id,
+      direction,
+      maxDepth,
+    ),
+  ])
+
+  return {
+    bindingImpact,
+    canonicalImpact,
+    binding: input.binding,
+    target: input.target,
+    path: [...input.path],
+  }
+}
+
+/**
+ * Traverses one or more declaration/binding identities as one logical target.
+ * @param store - Graph store to query.
+ * @param traversalTargets - Location or binding identities forming the target.
+ * @param resultTarget - Canonical identity exposed in the result.
+ * @param direction - Traversal direction.
+ * @param maxDepth - Maximum traversal depth.
+ * @returns Deduplicated logical impact.
+ */
+async function analyzeTraversalTargets(
+  store: GraphStore,
+  traversalTargets: readonly string[],
+  resultTarget: string,
+  direction: 'upstream' | 'downstream' | 'both',
+  maxDepth: number,
 ): Promise<ImpactResult> {
   // CALLS-based traversal (symbol-level)
   const results = []
-  if (direction === 'upstream' || direction === 'both') {
-    results.push(await getUpstream(store, target, { maxDepth, includeFiles: false }))
-  }
-  if (direction === 'downstream' || direction === 'both') {
-    results.push(await getDownstream(store, target, { maxDepth, includeFiles: false }))
+  for (const traversalTarget of [...new Set(traversalTargets)].sort()) {
+    if (direction === 'upstream' || direction === 'both') {
+      results.push(await getUpstream(store, traversalTarget, { maxDepth, includeFiles: false }))
+    }
+    if (direction === 'downstream' || direction === 'both') {
+      results.push(await getDownstream(store, traversalTarget, { maxDepth, includeFiles: false }))
+    }
   }
 
   const affectedFileSet = new Set<string>()
@@ -58,10 +163,13 @@ export async function analyzeImpact(
   // IMPORTS-based traversal (file-level) — tracked separately to avoid
   // conflating file-level and symbol-level dependent counts.
   const filesByDepth = new Map<number, Set<string>>()
-  const symbol = await store.getSymbol(target)
-  if (symbol) {
-    const visited = new Set<string>([symbol.filePath])
-    let currentFiles = [symbol.filePath]
+  const rootSymbols = (
+    await Promise.all(traversalTargets.map((traversalTarget) => store.getSymbol(traversalTarget)))
+  ).filter((symbol) => symbol !== undefined)
+  if (rootSymbols.length > 0) {
+    const rootFiles = [...new Set(rootSymbols.map((symbol) => symbol.filePath))].sort()
+    const visited = new Set<string>(rootFiles)
+    let currentFiles = rootFiles
 
     for (let depth = 1; depth <= maxDepth; depth++) {
       const nextFiles: string[] = []
@@ -135,13 +243,31 @@ export async function analyzeImpact(
   const affectedSymbols = [...affectedSymbolMap.values()].sort(compareAffectedSymbols)
 
   return {
-    target,
+    target: resultTarget,
     directDependents,
     indirectDependents,
     transitiveDependents,
     riskLevel,
     affectedFiles,
     affectedSymbols,
+    affectedProcesses: [],
+  }
+}
+
+/**
+ * Creates a conservative empty result for non-resolved selectors.
+ * @param target - Original selector.
+ * @returns Empty impact without merging ambiguous candidates.
+ */
+function emptyImpact(target: string): ImpactResult {
+  return {
+    target,
+    directDependents: 0,
+    indirectDependents: 0,
+    transitiveDependents: 0,
+    riskLevel: 'LOW',
+    affectedFiles: [],
+    affectedSymbols: [],
     affectedProcesses: [],
   }
 }

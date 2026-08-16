@@ -1,0 +1,23 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Implementation review public orchestration
+
+    The SDK public barrel SHALL export `buildImplementationReview` and its input/result types. It SHALL also re-export the public Code Graph reference, logical-symbol, binding, member, coverage, health, and resolver result types required by delivery hosts.
+
+    CLI and other hosts using implementation review MUST import this orchestration through `@specd/sdk`; they MUST NOT compose Core and Code Graph independently.
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - `default:_global/architecture` — SDK layering
+    - `core:composition` — Core public composition
+    - `code-graph:composition` — Code Graph public composition
+    - `cli:host-context` — host consumer
+    - `sdk:context-markdown` — presentation helpers
+    - `sdk:build-implementation-review` — shared review orchestration

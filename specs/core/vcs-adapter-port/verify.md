@@ -57,6 +57,13 @@
 - **THEN** the promise MUST resolve to `null`
 - **AND** the method MUST NOT throw
 
+#### Scenario: Revision identity is independent of dirty state
+
+- **GIVEN** the current revision does not change
+- **WHEN** the worktree transitions between clean and dirty states
+- **THEN** `ref()` returns the same stable short revision
+- **AND** it contains no dirty suffix or status fingerprint
+
 ### Requirement: refAt resolves the revision active at a timestamp
 
 #### Scenario: refAt returns a historical revision when one exists
@@ -93,6 +100,31 @@
 - **WHEN** `modifiedFiles(baseRef)` is called
 - **THEN** it returns repository-relative changed file paths
 - **AND** missing matches are represented as an empty array
+
+#### Scenario: Enumeration is independent of construction directory
+
+- **GIVEN** two adapters are constructed in different subdirectories of the same repository
+- **WHEN** both enumerate changes from the same baseline
+- **THEN** both return the same normalized repository-root-relative paths
+
+#### Scenario: Every worktree state is represented
+
+- **GIVEN** staged, unstaged, untracked, deleted, and renamed paths differ from the baseline
+- **WHEN** `modifiedFiles(baseRef)` is called
+- **THEN** every changed path is returned
+- **AND** both the removed and added rename sides are present
+
+#### Scenario: Backend failures are not falsely clean
+
+- **GIVEN** the native Git, Mercurial, SVN, or external status operation fails
+- **WHEN** `modifiedFiles(baseRef)` is called
+- **THEN** the operation rejects instead of returning an empty array
+
+#### Scenario: Adapter result has no graph policy
+
+- **WHEN** changed repository paths are enumerated
+- **THEN** the adapter does not filter Code Graph exclusions
+- **AND** it does not expose or construct a backend-specific diff fingerprint
 
 ### Requirement: Null fallback implementation
 

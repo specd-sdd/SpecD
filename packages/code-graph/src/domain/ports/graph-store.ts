@@ -6,6 +6,100 @@ import { type Relation } from '../value-objects/relation.js'
 import { type SymbolQuery } from '../value-objects/symbol-query.js'
 import { type GraphStatistics } from '../value-objects/graph-statistics.js'
 import { type SearchOptions } from '../value-objects/search-options.js'
+import {
+  type DeclarationOccurrence,
+  type LocalBinding,
+  type LogicalSymbol,
+  type PublicBinding,
+  type ResolutionStep,
+} from '../value-objects/symbol-reference.js'
+import { type IndexCoverage } from '../value-objects/index-session.js'
+import {
+  type SourceContentCandidatePage,
+  type SourceContentCandidateQuery,
+} from '../value-objects/source-search.js'
+import {
+  type FreshnessLatches,
+  type IndexedInputObservation,
+  type IndexedResourceKey,
+  type MarkIndexedInputStaleInput,
+  type UpdateIndexedInputObservationInput,
+} from '../value-objects/indexed-input-freshness.js'
+
+/** Backend-neutral replacement payload for semantic reference facts derived during indexing. */
+export interface ReferenceFactsWrite {
+  readonly logicalSymbols: readonly LogicalSymbol[]
+  readonly declarations: readonly LogicalDeclaration[]
+  readonly publicBindings: readonly PublicBinding[]
+  readonly localBindings: readonly LocalBinding[]
+  readonly steps: readonly ResolutionStep[]
+  readonly coverage: readonly IndexCoverage[]
+}
+
+/** Metadata committed atomically with one bulk-index generation. */
+export interface IndexWriteSessionMetadata {
+  readonly vcsRef?: string
+  readonly graphFingerprint?: string
+  readonly indexedWorkspaces?: readonly string[]
+  readonly clearGraphStaleLatch?: boolean
+  /** Replaces the complete derived code/document subgraph while preserving spec state. */
+  readonly replaceCodeGraph?: boolean
+  /** Rebuilds full-text search indexes when staged searchable content changed. */
+  readonly rebuildSearchIndexes?: boolean
+  readonly onProgress?: (step: string) => void
+}
+
+/**
+ * Backend-neutral writer for one atomic indexing generation.
+ *
+ * Chunk methods only stage data. A backend makes staged changes visible when
+ * {@link commit} succeeds; {@link rollback} discards the complete session.
+ */
+export interface IndexWriteSession {
+  writeFiles(files: readonly FileNode[]): Promise<void>
+  writeDocuments(documents: readonly DocumentNode[]): Promise<void>
+  writeSymbols(symbols: readonly SymbolNode[]): Promise<void>
+  writeSpecs(specs: readonly SpecNode[]): Promise<void>
+  writeReferenceFacts(facts: ReferenceFactsWrite): Promise<void>
+  writeObservations(observations: readonly IndexedInputObservation[]): Promise<void>
+  writeRelations(relations: readonly Relation[]): Promise<void>
+  removeFiles(filePaths: readonly string[]): Promise<void>
+  removeDocuments(documentPaths: readonly string[]): Promise<void>
+  removeSpecs(specIds: readonly string[]): Promise<void>
+  commit(): Promise<void>
+  rollback(): Promise<void>
+}
+
+/** Associates a location-backed declaration with its stable logical target. */
+export interface LogicalDeclaration {
+  readonly logicalSymbolId: string
+  readonly declaration: DeclarationOccurrence
+}
+
+/** Structured canonical lookup keys for logical targets. */
+export interface LogicalSymbolLookup {
+  readonly workspace: string
+  readonly surface: string | undefined
+  readonly name: string
+  readonly space: string | undefined
+  readonly ownerId: string | undefined
+  readonly memberForm: string | undefined
+}
+
+/** Indexed lookup key for a named public route. */
+export interface PublicBindingLookup {
+  readonly surface: string
+  readonly exportedName: string
+  readonly space: string | undefined
+}
+
+/** Indexed lookup key for a lexical binding. */
+export interface LocalBindingLookup {
+  readonly filePath: string
+  readonly scopeId: string | undefined
+  readonly localName: string
+  readonly space: string | undefined
+}
 
 /**
  * Persisted graph-storage generation snapshot used for stale-provider detection.
@@ -133,7 +227,187 @@ export abstract class GraphStore {
     onProgress?: (step: string) => void
     vcsRef?: string
     graphFingerprint?: string
+    observations?: readonly IndexedInputObservation[]
+    indexedWorkspaces?: readonly string[]
+    clearGraphStaleLatch?: boolean
+    rebuildSearchIndexes?: boolean
   }): Promise<void>
+
+  /**
+   * Reads every persisted input observation for the requested logical resources.
+   * @param resources - Deduplicated resource identities to retrieve.
+   * @returns Matching observations in deterministic identity order.
+   */
+  getIndexedInputObservations(
+    resources: readonly IndexedResourceKey[],
+  ): Promise<readonly IndexedInputObservation[]> {
+    void resources
+    return Promise.reject(new Error('Indexed input freshness is not supported by this graph store'))
+  }
+
+  /**
+   * Monotonically marks observations stale using indexed-evidence compare-and-set guards.
+   * @param updates - Expected evidence for observations proven stale.
+   * @returns A promise resolved after guarded updates complete.
+   */
+  markIndexedInputsStale(updates: readonly MarkIndexedInputStaleInput[]): Promise<void> {
+    void updates
+    return Promise.reject(new Error('Indexed input freshness is not supported by this graph store'))
+  }
+
+  /**
+   * Refreshes filesystem stamps only when indexed evidence is unchanged and current.
+   * @param updates - Equal-content observation refreshes.
+   * @returns A promise resolved after guarded refreshes complete.
+   */
+  updateIndexedInputObservations(
+    updates: readonly UpdateIndexedInputObservationInput[],
+  ): Promise<void> {
+    void updates
+    return Promise.reject(new Error('Indexed input freshness is not supported by this graph store'))
+  }
+
+  /**
+   * Reads the aggregate and requested workspace monotonic stale latches.
+   * @param workspaces - Workspace names to project.
+   * @returns Persisted graph and workspace latch state.
+   */
+  getFreshnessLatches(workspaces: readonly string[]): Promise<FreshnessLatches> {
+    void workspaces
+    return Promise.reject(new Error('Indexed input freshness is not supported by this graph store'))
+  }
+
+  /**
+   * Atomically sets affected workspace latches and the aggregate graph latch.
+   * @param workspaces - Workspace names proven stale; may be empty for global input staleness.
+   * @returns A promise resolved after latch persistence completes.
+   */
+  markWorkspacesAndGraphStaleSinceLastIndex(workspaces: readonly string[]): Promise<void> {
+    void workspaces
+    return Promise.reject(new Error('Indexed input freshness is not supported by this graph store'))
+  }
+
+  /**
+   * Begins one backend-neutral bulk indexing session.
+   *
+   * Concrete persisted backends override this compatibility implementation with
+   * a native atomic transaction. The fallback retains compatibility for custom
+   * stores while presenting the same bounded writer surface.
+   * @param metadata - Metadata and progress callback committed with the generation.
+   * @returns A new, initially empty write session.
+   */
+  beginBulkIndexSession(metadata: IndexWriteSessionMetadata = {}): IndexWriteSession {
+    return new CompatibilityIndexWriteSession(this, metadata)
+  }
+
+  /**
+   * Atomically replaces all derived logical-reference, binding, provenance, and
+   * coverage facts. Backends that do not yet support semantic facts reject this
+   * operation explicitly rather than partially persisting a replacement.
+   * @param facts - Complete replacement snapshot for derived semantic facts.
+   * @returns A promise that rejects when the backend lacks semantic-fact support.
+   */
+  replaceReferenceFacts(facts: ReferenceFactsWrite): Promise<void> {
+    void facts
+    return Promise.reject(new Error('Reference facts are not supported by this graph store'))
+  }
+
+  /**
+   * Returns the complete persisted semantic-reference snapshot for incremental hydration.
+   * @returns Deterministically ordered reference facts.
+   */
+  getAllReferenceFacts(): Promise<ReferenceFactsWrite> {
+    return Promise.reject(new Error('Reference facts are not supported by this graph store'))
+  }
+
+  /**
+   * Batch-looks up logical symbols by their structured canonical identity.
+   * Results must use the canonical logical-symbol ordering.
+   * @param lookups - Keys to resolve in one backend operation.
+   * @returns Matching logical symbols in deterministic order.
+   */
+  findLogicalSymbols(lookups: readonly LogicalSymbolLookup[]): Promise<LogicalSymbol[]> {
+    void lookups
+    return Promise.reject(new Error('Reference facts are not supported by this graph store'))
+  }
+
+  /**
+   * Batch-retrieves logical symbols by canonical ids.
+   * @param ids - Canonical logical-symbol identifiers.
+   * @returns Matching logical symbols in deterministic order.
+   */
+  findLogicalSymbolsByIds(ids: readonly string[]): Promise<LogicalSymbol[]> {
+    void ids
+    return Promise.reject(new Error('Reference facts are not supported by this graph store'))
+  }
+
+  /**
+   * Batch-retrieves all declaration occurrences for logical targets.
+   * @param logicalSymbolIds - Logical target identifiers to retrieve.
+   * @returns Matching logical declarations in deterministic order.
+   */
+  findDeclarations(logicalSymbolIds: readonly string[]): Promise<LogicalDeclaration[]> {
+    void logicalSymbolIds
+    return Promise.reject(new Error('Reference facts are not supported by this graph store'))
+  }
+
+  /**
+   * Batch-looks up public bindings by surface, exported spelling, and space.
+   * @param lookups - Public route keys to resolve in one backend operation.
+   * @returns Matching public bindings in deterministic order.
+   */
+  findPublicBindings(lookups: readonly PublicBindingLookup[]): Promise<PublicBinding[]> {
+    void lookups
+    return Promise.reject(new Error('Reference facts are not supported by this graph store'))
+  }
+
+  /**
+   * Batch-looks up public bindings by exported spelling across all public surfaces.
+   * @param exportedNames - Exported spellings to resolve in one backend operation.
+   * @returns Matching public bindings in deterministic order.
+   */
+  findPublicBindingsByExportedNames(exportedNames: readonly string[]): Promise<PublicBinding[]> {
+    void exportedNames
+    return Promise.reject(new Error('Reference facts are not supported by this graph store'))
+  }
+
+  /**
+   * Batch-looks up lexical bindings by file, scope, spelling, and space.
+   * @param lookups - Lexical binding keys to resolve in one backend operation.
+   * @returns Matching lexical bindings in deterministic order.
+   */
+  findLocalBindings(lookups: readonly LocalBindingLookup[]): Promise<LocalBinding[]> {
+    void lookups
+    return Promise.reject(new Error('Reference facts are not supported by this graph store'))
+  }
+
+  /**
+   * Batch-retrieves ordered provenance steps whose source is one of the given ids.
+   * @param fromIds - Binding or logical ids from which to retrieve steps.
+   * @returns Matching provenance steps in deterministic order.
+   */
+  findResolutionSteps(fromIds: readonly string[]): Promise<ResolutionStep[]> {
+    void fromIds
+    return Promise.reject(new Error('Reference facts are not supported by this graph store'))
+  }
+
+  /**
+   * Batch-retrieves current coverage evidence for source targets.
+   * @param filePaths - Workspace-prefixed source paths to retrieve.
+   * @returns Matching coverage facts in deterministic order.
+   */
+  findIndexCoverage(filePaths: readonly string[]): Promise<IndexCoverage[]> {
+    void filePaths
+    return Promise.reject(new Error('Reference facts are not supported by this graph store'))
+  }
+
+  /**
+   * Returns every persisted source-coverage fact for aggregate health projection.
+   * @returns Deterministically ordered coverage facts.
+   */
+  getAllIndexCoverage(): Promise<IndexCoverage[]> {
+    return Promise.reject(new Error('Reference facts are not supported by this graph store'))
+  }
 
   abstract getFile(path: string): Promise<FileNode | undefined>
 
@@ -199,6 +473,39 @@ export abstract class GraphStore {
    * @returns An array of import relations originating from this file.
    */
   abstract getImportees(filePath: string): Promise<Relation[]>
+
+  /**
+   * Finds files whose persisted derived relations depend directly on any supplied file.
+   * Implementations SHALL batch this lookup rather than query once per relation.
+   * @param filePaths - Workspace-prefixed target file identities.
+   * @returns Deterministically ordered dependent file paths.
+   */
+  async findDirectlyAffectedFiles(filePaths: readonly string[]): Promise<string[]> {
+    const affected = new Set<string>()
+    for (const filePath of new Set(filePaths)) {
+      for (const relation of await this.getImporters(filePath)) affected.add(relation.source)
+    }
+    const symbols = await this.findSymbols({ filePaths })
+    for (const symbol of symbols) {
+      for (const relation of await this.getCallers(symbol.id)) {
+        const source = await this.getSymbol(relation.source)
+        if (source !== undefined) affected.add(source.filePath)
+      }
+      for (const relation of await this.getExtenders(symbol.id)) {
+        const source = await this.getSymbol(relation.source)
+        if (source !== undefined) affected.add(source.filePath)
+      }
+      for (const relation of await this.getImplementors(symbol.id)) {
+        const source = await this.getSymbol(relation.source)
+        if (source !== undefined) affected.add(source.filePath)
+      }
+      for (const relation of await this.getOverriders(symbol.id)) {
+        const source = await this.getSymbol(relation.source)
+        if (source !== undefined) affected.add(source.filePath)
+      }
+    }
+    return [...affected].sort()
+  }
 
   /**
    * Returns all hierarchy relations where the given type is the target of EXTENDS.
@@ -271,6 +578,14 @@ export abstract class GraphStore {
   abstract getCoveringSpecsForFile(filePath: string): Promise<Relation[]>
 
   /**
+   * Returns file-coverage relations targeting any requested file in one batch.
+   * Empty input must return without backend work.
+   * @param filePaths - Canonical workspace-prefixed file paths.
+   * @returns Deterministically ordered COVERS_FILE relations.
+   */
+  abstract getCoveringSpecsForFiles(filePaths: readonly string[]): Promise<Relation[]>
+
+  /**
    * Returns all symbol-coverage relations originating from the given spec.
    * @param specId - The spec id to find covered symbols for.
    * @returns An array of COVERS_SYMBOL relations.
@@ -283,6 +598,14 @@ export abstract class GraphStore {
    * @returns An array of COVERS_SYMBOL relations.
    */
   abstract getCoveringSpecsForSymbol(symbolId: string): Promise<Relation[]>
+
+  /**
+   * Returns symbol-coverage relations targeting any requested symbol in one batch.
+   * Empty input must return without backend work.
+   * @param symbolIds - Symbol identifiers.
+   * @returns Deterministically ordered COVERS_SYMBOL relations.
+   */
+  abstract getCoveringSpecsForSymbols(symbolIds: readonly string[]): Promise<Relation[]>
 
   /**
    * Returns all symbols exported by the given file.
@@ -370,6 +693,18 @@ export abstract class GraphStore {
   >
 
   /**
+   * Returns one filtered, deterministic page of source-content candidates.
+   *
+   * The Store supplies candidates only. Exact occurrence verification, symbol-aware
+   * suppression, grouping, ranking, and final limits belong to SearchCodeGraph.
+   * @param query - Expanded query, filters, cursor, and bounded page size.
+   * @returns One candidate page and an optional opaque continuation cursor.
+   */
+  abstract searchSourceContentCandidates(
+    query: SourceContentCandidateQuery,
+  ): Promise<SourceContentCandidatePage>
+
+  /**
    * Rebuilds full-text search indexes after data changes.
    * Must be called after bulk load or significant data mutations.
    * @returns A promise that resolves when indexes are rebuilt.
@@ -407,4 +742,251 @@ export abstract class GraphStore {
    * @returns Current generation token and modification time.
    */
   abstract getStorageGeneration(): Promise<StorageGenerationSnapshot>
+}
+
+/** Compatibility buffer used by custom stores that have not adopted native sessions. */
+class CompatibilityIndexWriteSession implements IndexWriteSession {
+  private readonly files: FileNode[] = []
+  private readonly documents: DocumentNode[] = []
+  private readonly symbols: SymbolNode[] = []
+  private readonly specs: SpecNode[] = []
+  private readonly relations = new Map<string, Relation>()
+  private readonly observations: IndexedInputObservation[] = []
+  private readonly removedFiles = new Set<string>()
+  private readonly removedDocuments = new Set<string>()
+  private readonly removedSpecs = new Set<string>()
+  private referenceFacts: ReferenceFactsWrite | undefined
+  private finished = false
+
+  /**
+   * Creates a compatibility session for a store without native session support.
+   * @param store - Store receiving buffered writes on commit.
+   * @param metadata - Generation metadata forwarded during commit.
+   */
+  constructor(
+    private readonly store: GraphStore,
+    private readonly metadata: IndexWriteSessionMetadata,
+  ) {}
+
+  /**
+   * Stages file nodes.
+   * @param files - File nodes to stage.
+   * @returns A promise resolved after staging.
+   */
+  writeFiles(files: readonly FileNode[]): Promise<void> {
+    this.assertActive()
+    this.files.push(...files)
+    return Promise.resolve()
+  }
+
+  /**
+   * Stages document nodes.
+   * @param documents - Document nodes to stage.
+   * @returns A promise resolved after staging.
+   */
+  writeDocuments(documents: readonly DocumentNode[]): Promise<void> {
+    this.assertActive()
+    this.documents.push(...documents)
+    return Promise.resolve()
+  }
+
+  /**
+   * Stages symbol nodes.
+   * @param symbols - Symbol nodes to stage.
+   * @returns A promise resolved after staging.
+   */
+  writeSymbols(symbols: readonly SymbolNode[]): Promise<void> {
+    this.assertActive()
+    this.symbols.push(...symbols)
+    return Promise.resolve()
+  }
+
+  /**
+   * Stages spec nodes.
+   * @param specs - Spec nodes to stage.
+   * @returns A promise resolved after staging.
+   */
+  writeSpecs(specs: readonly SpecNode[]): Promise<void> {
+    this.assertActive()
+    this.specs.push(...specs)
+    return Promise.resolve()
+  }
+
+  /**
+   * Stages semantic facts.
+   * @param facts - Semantic fact chunk to append.
+   * @returns A promise resolved after staging.
+   */
+  writeReferenceFacts(facts: ReferenceFactsWrite): Promise<void> {
+    this.assertActive()
+    this.referenceFacts = appendReferenceFacts(this.referenceFacts, facts)
+    return Promise.resolve()
+  }
+
+  /**
+   * Stages freshness observations.
+   * @param observations - Observations to stage.
+   * @returns A promise resolved after staging.
+   */
+  writeObservations(observations: readonly IndexedInputObservation[]): Promise<void> {
+    this.assertActive()
+    this.observations.push(...observations)
+    return Promise.resolve()
+  }
+
+  /**
+   * Stages deduplicated relations.
+   * @param relations - Relations to stage.
+   * @returns A promise resolved after staging.
+   */
+  writeRelations(relations: readonly Relation[]): Promise<void> {
+    this.assertActive()
+    for (const relation of relations) {
+      this.relations.set(relationKey(relation), relation)
+    }
+    return Promise.resolve()
+  }
+
+  /**
+   * Stages file removals.
+   * @param filePaths - File identities to remove.
+   * @returns A promise resolved after staging.
+   */
+  removeFiles(filePaths: readonly string[]): Promise<void> {
+    this.assertActive()
+    for (const filePath of filePaths) this.removedFiles.add(filePath)
+    return Promise.resolve()
+  }
+
+  /**
+   * Stages document removals.
+   * @param documentPaths - Document identities to remove.
+   * @returns A promise resolved after staging.
+   */
+  removeDocuments(documentPaths: readonly string[]): Promise<void> {
+    this.assertActive()
+    for (const documentPath of documentPaths) this.removedDocuments.add(documentPath)
+    return Promise.resolve()
+  }
+
+  /**
+   * Stages spec removals.
+   * @param specIds - Spec identities to remove.
+   * @returns A promise resolved after staging.
+   */
+  removeSpecs(specIds: readonly string[]): Promise<void> {
+    this.assertActive()
+    for (const specId of specIds) this.removedSpecs.add(specId)
+    return Promise.resolve()
+  }
+
+  /** Commits all staged compatibility writes. */
+  async commit(): Promise<void> {
+    this.assertActive()
+    this.finished = true
+    if (this.metadata.replaceCodeGraph === true) {
+      for (const file of await this.store.getAllFiles()) this.removedFiles.add(file.path)
+      for (const document of await this.store.getAllDocuments()) {
+        this.removedDocuments.add(document.path)
+      }
+    }
+    for (const filePath of this.removedFiles) await this.store.removeFile(filePath)
+    for (const documentPath of this.removedDocuments) {
+      await this.store.removeDocument(documentPath)
+    }
+    await this.store.removeSpecs([...this.removedSpecs])
+    await this.store.bulkLoad({
+      files: this.files,
+      documents: this.documents,
+      symbols: this.symbols,
+      specs: this.specs,
+      relations: [],
+      ...(this.metadata.onProgress === undefined ? {} : { onProgress: this.metadata.onProgress }),
+      ...(this.metadata.vcsRef === undefined ? {} : { vcsRef: this.metadata.vcsRef }),
+      ...(this.metadata.graphFingerprint === undefined
+        ? {}
+        : { graphFingerprint: this.metadata.graphFingerprint }),
+      ...(this.observations.length === 0 ? {} : { observations: this.observations }),
+      ...(this.metadata.indexedWorkspaces === undefined
+        ? {}
+        : { indexedWorkspaces: this.metadata.indexedWorkspaces }),
+      ...(this.metadata.clearGraphStaleLatch === undefined
+        ? {}
+        : { clearGraphStaleLatch: this.metadata.clearGraphStaleLatch }),
+      ...(this.metadata.rebuildSearchIndexes === undefined
+        ? {}
+        : { rebuildSearchIndexes: this.metadata.rebuildSearchIndexes }),
+    })
+    if (this.referenceFacts !== undefined) {
+      await this.store.replaceReferenceFacts(this.referenceFacts)
+    }
+    await this.store.addRelations([...this.relations.values()])
+    if (this.metadata.rebuildSearchIndexes !== false) {
+      this.metadata.onProgress?.('search-indexes')
+      await this.store.rebuildFtsIndexes()
+    }
+  }
+
+  /**
+   * Discards all staged compatibility writes.
+   * @returns A promise resolved after the buffers are cleared.
+   */
+  rollback(): Promise<void> {
+    this.assertActive()
+    this.finished = true
+    this.clear()
+    return Promise.resolve()
+  }
+
+  /**
+   * Ensures the session has not already completed.
+   * @throws When the session already completed.
+   */
+  private assertActive(): void {
+    if (this.finished) throw new Error('Bulk index session is already finished')
+  }
+
+  /** Clears every staged buffer. */
+  private clear(): void {
+    this.files.length = 0
+    this.documents.length = 0
+    this.symbols.length = 0
+    this.specs.length = 0
+    this.relations.clear()
+    this.observations.length = 0
+    this.removedFiles.clear()
+    this.removedDocuments.clear()
+    this.removedSpecs.clear()
+    this.referenceFacts = undefined
+  }
+}
+
+/**
+ * Appends bounded semantic-fact chunks into one replacement snapshot.
+ * @param current - Existing optional replacement snapshot.
+ * @param next - Next semantic-fact chunk.
+ * @returns Merged replacement snapshot.
+ */
+function appendReferenceFacts(
+  current: ReferenceFactsWrite | undefined,
+  next: ReferenceFactsWrite,
+): ReferenceFactsWrite {
+  if (current === undefined) return next
+  return {
+    logicalSymbols: [...current.logicalSymbols, ...next.logicalSymbols],
+    declarations: [...current.declarations, ...next.declarations],
+    publicBindings: [...current.publicBindings, ...next.publicBindings],
+    localBindings: [...current.localBindings, ...next.localBindings],
+    steps: [...current.steps, ...next.steps],
+    coverage: [...current.coverage, ...next.coverage],
+  }
+}
+
+/**
+ * Returns the persisted relation uniqueness key.
+ * @param relation - Relation to identify.
+ * @returns Stable uniqueness key.
+ */
+function relationKey(relation: Relation): string {
+  return JSON.stringify([relation.source, relation.target, relation.type])
 }

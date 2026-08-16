@@ -9,48 +9,6 @@
 - **WHEN** `specd changes implementation --help` is run
 - **THEN** it lists `list`, `add`, `resolve`, `ignore`, `remove`, and `review` as subcommands
 
-### Requirement: List subcommand
-
-#### Scenario: List shows tracked files by review state
-
-- **GIVEN** a change with tracked implementation files in `open`, `resolved`, `ignored`, and `removed` state
-- **WHEN** `specd changes implementation list <name>` is run
-- **THEN** the output distinguishes those tracked-file review states
-
-#### Scenario: List shows file-level and symbol-level links
-
-- **GIVEN** a change with one file-level link and one symbol-level refinement
-- **WHEN** `specd changes implementation list <name>` is run
-- **THEN** the output shows the confirmed links grouped by spec and file
-- **AND** symbol refinements are shown only on the symbol-level link
-
-#### Scenario: List resolves composed member links by same-file fallback
-
-- **GIVEN** a symbol-level link stores `VcsAdapter.rootDir`
-- **AND** the graph does not expose that exact stored string
-- **AND** the same file contains one graph symbol named `rootDir` with the expected kind
-- **WHEN** `specd changes implementation list <name>` is run
-- **THEN** the CLI uses the same-file fallback on the rightmost member segment
-- **AND** the symbol is not reported as stale
-
-#### Scenario: List keeps composed member links stale when fallback kind does not match
-
-- **GIVEN** a symbol-level link stores `X::render`
-- **AND** the graph does not expose that exact stored string
-- **AND** the same file contains one graph symbol named `render` with a different kind than the stored link
-- **WHEN** `specd changes implementation list <name>` is run
-- **THEN** the CLI leaves the symbol marked stale
-- **AND** it does not treat the wrong-kind same-file symbol as a match
-
-#### Scenario: List keeps composed member links stale when fallback is ambiguous
-
-- **GIVEN** a symbol-level link stores `X::Y`
-- **AND** the graph does not expose that exact stored string
-- **AND** the same file contains multiple graph symbols named `Y`
-- **WHEN** `specd changes implementation list <name>` is run
-- **THEN** the CLI leaves the symbol marked stale
-- **AND** it does not guess between the candidate same-file matches
-
 ### Requirement: Add subcommand
 
 #### Scenario: Add creates tracked file when none existed
@@ -177,25 +135,6 @@
 - **WHEN** that last symbol is removed
 - **THEN** the explicit file-level link remains
 
-### Requirement: Review subcommand
-
-#### Scenario: Review reports stale symbol-level links only
-
-- **GIVEN** a confirmed symbol-level implementation link
-- **AND** the target symbol no longer exists in the graph database
-- **WHEN** `specd changes implementation review <name>` is run
-- **THEN** the review reports that link as stale
-- **AND** the stale diagnosis is tied to missing symbol presence, not generic archive materialization errors
-
-#### Scenario: Review retries composed member links before reporting stale
-
-- **GIVEN** a confirmed symbol-level implementation link stores `CodeGraphProvider.analyzeSpecImpact`
-- **AND** the graph does not expose that exact stored string
-- **AND** the same file contains one graph symbol named `analyzeSpecImpact` with the expected kind
-- **WHEN** `specd changes implementation review <name>` is run
-- **THEN** the review uses the same-file composed-member fallback
-- **AND** it does not report that link as stale
-
 ### Requirement: Shared path semantics
 
 #### Scenario: Manual add uses raw project-relative path instead of workspace:path
@@ -203,3 +142,21 @@
 - **WHEN** `specd changes implementation add <name> --spec core:change --file packages/core/src/domain/entities/change.ts` is run
 - **THEN** the command accepts the raw project-relative path
 - **AND** it does not require the user to provide `core:src/domain/entities/change.ts`
+
+### Requirement: List subcommand
+
+#### Scenario: List renders SDK outcomes without fallback
+
+- **GIVEN** stored links resolve through a re-export, hierarchy path, ambiguity, and incomplete coverage
+- **WHEN** `changes implementation list` runs
+- **THEN** it renders the SDK projection with stored values unchanged
+- **AND** no CLI same-file or rightmost-segment query occurs
+
+### Requirement: Review subcommand
+
+#### Scenario: Review distinguishes missing from inconclusive absence
+
+- **GIVEN** one absent symbol has current complete coverage and another has dirty or parse-failed coverage
+- **WHEN** implementation review runs
+- **THEN** the first is missing and the second unresolved
+- **AND** neither stored link is mutated

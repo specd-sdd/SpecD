@@ -84,3 +84,11 @@
 
 - **WHEN** reading `SDK_VERSION` from `@specd/sdk`
 - **THEN** it equals the `version` field in `packages/sdk/package.json`
+
+### Requirement: Implementation review public orchestration
+
+#### Scenario: SDK barrel exposes review without parallel imports
+
+- **WHEN** a delivery host imports implementation review and reference result types
+- **THEN** all are available from `@specd/sdk`
+- **AND** the host needs no direct Core plus Code Graph composition

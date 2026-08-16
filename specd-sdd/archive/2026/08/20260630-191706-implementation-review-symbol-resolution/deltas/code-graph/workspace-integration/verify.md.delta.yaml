@@ -1,0 +1,18 @@
+- op: added
+  position: { parent: { type: section, matches: 'Requirements' } }
+  content: |
+    ### Requirement: Canonical module and package resolution identity
+
+    #### Scenario: Package configuration beats global name uniqueness
+
+    - **GIVEN** two workspaces contain the same symbol name
+    - **WHEN** an import is resolved through configured package identity and language case/visibility rules
+    - **THEN** only the proven workspace target is selected
+    - **AND** changing resolution configuration invalidates the fingerprint
+
+    #### Scenario: File identity normalizes exact forms but preserves wildcards
+
+    - **GIVEN** canonical workspace-relative, config-relative, and absolute paths identify one indexed file
+    - **WHEN** each is resolved as an exact graph selector
+    - **THEN** they produce the same canonical file identity
+    - **AND** a wildcard input remains a pattern rather than selecting one file

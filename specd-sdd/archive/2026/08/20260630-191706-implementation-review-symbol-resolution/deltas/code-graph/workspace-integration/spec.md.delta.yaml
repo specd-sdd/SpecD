@@ -1,0 +1,15 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+  content: |
+    ### Requirement: Canonical module and package resolution identity
+
+    Cross-workspace resolution SHALL produce structured workspace, module/package, public-surface, and symbol-space identity from configured code roots and language adapter package facts.
+
+    Resolution SHALL apply language-specific case and visibility rules and supported package/project configuration. It MUST NOT infer cross-workspace targets from a global same-name match.
+
+    Changes to workspace roots, package identities, project references, autoload mappings, or other deterministic resolution inputs SHALL change the derivation fingerprint and require reindexing.
+
+    Exact graph file selectors SHALL normalize canonical workspace-relative paths, config/project-relative paths, and absolute paths to the same file identity. Wildcard selectors SHALL preserve pattern semantics and MUST NOT be coerced to one file.

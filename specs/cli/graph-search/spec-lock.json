@@ -9,7 +9,54 @@
     "code-graph:composition",
     "code-graph:document-model",
     "code-graph:graph-store",
-    "cli:graph-cli-context"
+    "cli:graph-cli-context",
+    "code-graph:resolve-symbol-reference"
   ],
-  "implementation": []
+  "implementation": [
+    {
+      "file": "cli:src/commands/graph/search.ts"
+    },
+    {
+      "file": "cli:test/commands/graph-search.spec.ts"
+    },
+    {
+      "file": "cli:src/commands/graph/resolve-impact-file-selectors.ts"
+    }
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Search graph symbols, files, specs, and documents via Code Graph multi-category query plan with semantic tiers, occurrence capping, and snippets.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:149d1fa47d6027e3e85ad82b7774498e0a2a38fe074ddfe002a3a8b76a8f832a",
+          "lastModified": "2026-08-16T08:12:47.787Z"
+        },
+        "verify.md": {
+          "hash": "sha256:820ca16b56043bcf609fc0734fe6ed321534638e4fc8b08395135b7fe4069c44",
+          "lastModified": "2026-08-16T08:12:47.789Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Graph Search\n\n## Rules\n\n- Signature: `specd graph search <query> [--symbols] [--files] [--specs] [--documents] [--snippet] [--kind <kinds>] [--file <path>] [--workspace <name>] [--exclude-path <pattern>] [--exclude-workspace <name>] [--limit <n>] [--spec-content] [--config <path> | --path <path>] [--format text|json|toon]`.\n- Query required; default limit `10`. Category flags pick target categories (all if none). `--config`/`--path` mutually exclusive.\n- Delegate search to Code Graph search use case; CLI performs no query-plan, ranking, snippet, or candidate-merging logic.\n- Shared query plan ranks: (1) contiguous complete-query, (2) all raw terms, (3) raw term, (4) expanded component. Semantic tiers: exact logical ID, exact public binding, exact declaration (matching/norm case), prefix/component, exact local symbol, textual relevance. Structured results expose `matchTier` & `matchReasons`.\n- Occurrence suppression & capping: symbol selection range suppresses duplicate source file matches. Wildcard/general file search caps at 10 matches per file (`full-query` > `raw-term` > `expanded-term`). Exact single-file returns all matches in source order. Exposes `totalMatches`, `matches`, `omittedMatches`.\n- Output format: grouped by `symbols`, `files`, `specs`, `documents`. Text shows match export info (`matched export: <path>::<name>`). Text renders `N more matches in this file`. `--snippet` includes match-centered preview blocks. Empty output: `No results found.`\n- Provider errors (`GRAPH_BUSY`, `GRAPH_PROVIDER_STALE`, open failure) exit 3.\n\n## Constraints\n\n- CLI contains no search, ranking, or snippet logic.\n- Store filters (`--kind`, `--file`, `--workspace`, `--exclude-*`) applied before limits.\n- Provider availability owned by provider after open.\n- Call `process.exit(0)` after provider closes.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:149d1fa47d6027e3e85ad82b7774498e0a2a38fe074ddfe002a3a8b76a8f832a",
+          "lastModified": "2026-08-16T08:12:47.787Z"
+        },
+        "verify.md": {
+          "hash": "sha256:820ca16b56043bcf609fc0734fe6ed321534638e4fc8b08395135b7fe4069c44",
+          "lastModified": "2026-08-16T08:12:47.789Z"
+        }
+      }
+    }
+  }
 }

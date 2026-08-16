@@ -1,6 +1,6 @@
 import { Command, Option } from 'commander'
-import { isAbsolute, relative } from 'node:path'
 import {
+  type CoveringSpecImpact,
   createCodeGraphProvider,
   type FileImpactResult,
   GraphSpecNotFoundError as SpecNotFoundError,
@@ -10,27 +10,10 @@ import { output, parseFormat } from '../../formatter.js'
 import { resolveGraphCliContext } from './resolve-graph-cli-context.js'
 import { withProvider } from './with-provider.js'
 import { warnGraphStale } from './warn-graph-staleness.js'
+import { resolveImpactFileSelectors, toGraphDisplayPath } from './resolve-impact-file-selectors.js'
 
 /** Provider-supported graph impact traversal directions. */
 type ImpactDirection = 'upstream' | 'downstream' | 'both'
-
-/**
- * Converts a CLI file selector into the config-relative form used in messages.
- * @param input - Raw file selector supplied by the user.
- * @param projectRoot - Optional project root for absolute selectors.
- * @returns The normalized display path.
- */
-function normalizeFileSelectorPath(input: string, projectRoot?: string): string {
-  const trimmed = input.trim()
-  const relativePath = isAbsolute(trimmed)
-    ? projectRoot === undefined
-      ? null
-      : relative(projectRoot, trimmed)
-    : trimmed
-  if (relativePath === null) return trimmed
-  const normalized = relativePath.replaceAll('\\', '/')
-  return normalized.startsWith('./') ? normalized.slice(2) : normalized
-}
 
 /** Shared impact payload shape used by text formatters in this command. */
 type FormattedImpactResult = {
@@ -45,6 +28,31 @@ type FormattedImpactResult = {
 /** Spec impact payload shape used by text formatters in this command. */
 type FormattedSpecImpactResult = FormattedImpactResult & {
   affectedSpecs: readonly string[]
+}
+
+/**
+ * Appends deterministic covering-spec evidence to text impact output.
+ * @param coveringSpecs - Provider-derived direct and blast-radius coverage.
+ * @returns Ordered text lines, or an empty list when no spec covers the impact.
+ */
+function formatCoveringSpecs(coveringSpecs: readonly CoveringSpecImpact[] | undefined): string[] {
+  if (coveringSpecs === undefined || coveringSpecs.length === 0) return []
+  const lines = ['', 'Covering specs:']
+  const groups = [
+    { label: 'Direct:', values: coveringSpecs.filter((item) => item.minDepth === 0) },
+    { label: 'Blast radius:', values: coveringSpecs.filter((item) => item.minDepth > 0) },
+  ]
+  for (const group of groups) {
+    if (group.values.length === 0) continue
+    lines.push(`  ${group.label}`)
+    for (const covering of group.values) {
+      lines.push(`    ${covering.specId} (depth=${String(covering.minDepth)})`)
+      for (const evidence of covering.evidence) {
+        lines.push(`      ${evidence.kind} ${evidence.target} (depth=${String(evidence.depth)})`)
+      }
+    }
+  }
+  return lines
 }
 
 /**
@@ -174,6 +182,8 @@ export function registerGraphImpact(parent: Command): void {
     )
     .option('--symbol <name>', 'analyze impact of a symbol by name')
     .option('--spec <id>', 'analyze impact of a spec by identifier')
+    .option('--export <name>', 'analyze one public export route')
+    .option('--from <surface>', 'public surface containing --export')
     .addOption(
       new Option(
         '--direction <dir>',
@@ -217,6 +227,8 @@ JSON/TOON output schema:
         file?: string[]
         symbol?: string
         spec?: string
+        export?: string
+        from?: string
         direction: string
         depth: string
         config?: string
@@ -230,9 +242,17 @@ JSON/TOON output schema:
           cliError('--depth must be a positive integer', opts.format, 1)
         }
 
-        const selectorCount = (opts.symbol ? 1 : 0) + (opts.file ? 1 : 0) + (opts.spec ? 1 : 0)
+        if ((opts.export === undefined) !== (opts.from === undefined)) {
+          cliError('--export and --from must be provided together', opts.format, 1)
+        }
+        const selectorCount =
+          (opts.symbol ? 1 : 0) + (opts.file ? 1 : 0) + (opts.spec ? 1 : 0) + (opts.export ? 1 : 0)
         if (selectorCount !== 1) {
-          cliError('provide exactly one of --file, --symbol, or --spec', opts.format, 1)
+          cliError(
+            'provide exactly one of --file, --symbol, --spec, or --export with --from',
+            opts.format,
+            1,
+          )
         }
         if (opts.config !== undefined && opts.path !== undefined) {
           cliError('--config and --path are mutually exclusive', opts.format, 1)
@@ -250,7 +270,16 @@ JSON/TOON output schema:
         )
         await withProvider(config, opts.format, async (provider) => {
           await warnGraphStale(provider, config, kernel)
-          if (opts.symbol) {
+          if (opts.export !== undefined && opts.from !== undefined) {
+            await handlePublicExportImpact(
+              provider,
+              opts.export,
+              opts.from,
+              direction,
+              maxDepth,
+              fmt,
+            )
+          } else if (opts.symbol) {
             await handleSymbolImpact(provider, opts.symbol, direction, maxDepth, fmt)
           } else if (opts.spec) {
             await handleSpecImpact(provider, opts.spec, direction, maxDepth, fmt)
@@ -270,6 +299,120 @@ JSON/TOON output schema:
 }
 
 /**
+ * Resolves and renders one exact public export independently from its canonical target.
+ *
+ * @param provider - Open code graph provider
+ * @param exportedName - Public exported spelling
+ * @param surface - Public surface containing the export
+ * @param direction - Traversal direction
+ * @param maxDepth - Maximum traversal depth
+ * @param fmt - Output format
+ * @returns When rendering completes
+ */
+async function handlePublicExportImpact(
+  provider: Awaited<ReturnType<typeof createCodeGraphProvider>>,
+  exportedName: string,
+  surface: string,
+  direction: ImpactDirection,
+  maxDepth: number,
+  fmt: 'text' | 'json' | 'toon',
+): Promise<void> {
+  let canonicalSurface = surface
+  if (!surface.includes(':')) {
+    const matches = await provider.resolveFileSelector(surface)
+    if (matches.length > 1) {
+      cliError(
+        `ambiguous public surface "${surface}": ${matches.map((match) => match.canonicalPath).join(', ')}`,
+        fmt,
+        1,
+      )
+    }
+    if (matches.length === 1) canonicalSurface = matches[0]!.canonicalPath
+  }
+  const workspaceSeparator = canonicalSurface.indexOf(':')
+  const workspace =
+    workspaceSeparator > 0 ? canonicalSurface.slice(0, workspaceSeparator) : 'default'
+  const resolution = await provider.resolveSymbolReference({
+    workspace,
+    requested: exportedName,
+    publicSurface: canonicalSurface,
+  })
+
+  if (resolution.status !== 'resolved' || resolution.target === null) {
+    if (fmt === 'text') {
+      const reason = resolution.reasonCode === null ? '' : ` (${resolution.reasonCode})`
+      output(`Public export ${surface}::${exportedName}: ${resolution.status}${reason}`, 'text')
+    } else {
+      output({ export: exportedName, from: surface, resolution }, fmt)
+    }
+    return
+  }
+
+  const selected = await provider.getExactPublicBinding({
+    surface: canonicalSurface,
+    exportedName,
+    space: resolution.target.space,
+    targetId: resolution.target.id,
+  })
+
+  if (selected === null) {
+    const candidates: readonly never[] = []
+    if (fmt === 'text') {
+      output(
+        `Public export ${surface}::${exportedName}: ambiguous (${String(candidates.length)} routes)`,
+        'text',
+      )
+    } else {
+      output(
+        {
+          export: exportedName,
+          from: surface,
+          resolution: {
+            ...resolution,
+            status: 'ambiguous',
+            reasonCode: 'AMBIGUOUS_PUBLIC_BINDING',
+          },
+          candidates,
+        },
+        fmt,
+      )
+    }
+    return
+  }
+
+  const result = await provider.analyzePublicBindingImpact(
+    {
+      binding: selected.binding,
+      target: resolution.target,
+      declarations: selected.declarations,
+      path: resolution.path,
+    },
+    direction,
+    maxDepth,
+  )
+
+  if (fmt === 'text') {
+    const lines = [
+      `Public export impact for ${surface}::${exportedName}`,
+      `  Binding: ${result.binding.id}`,
+      `  Target:  ${result.target.id}`,
+      `  Path:    ${result.path.map((step) => `${step.kind}:${step.fromId}->${step.toId}`).join(' | ') || '(direct)'}`,
+      '',
+      'Exact public-binding impact:',
+      ...formatImpact(result.binding.id, result.bindingImpact, maxDepth).map((line) => `  ${line}`),
+      '',
+      'Canonical-symbol impact:',
+      ...formatImpact(result.target.id, result.canonicalImpact, maxDepth).map(
+        (line) => `  ${line}`,
+      ),
+    ]
+    output(lines.join('\n'), 'text')
+  } else {
+    output({ export: exportedName, from: surface, resolution, ...result }, fmt)
+  }
+}
+
+/**
  * Handles file-level impact analysis.
  * @param provider - The code graph provider.
  * @param rawSelectors - The file selectors to resolve and analyze.
@@ -286,30 +429,18 @@ async function handleFilesImpact(
   fmt: 'text' | 'json' | 'toon',
   projectRoot: string,
 ): Promise<void> {
-  const resolved = []
-  for (const rawSelector of rawSelectors) {
-    const matches = await provider.resolveFileSelector(rawSelector)
-    if (matches.length === 0) {
-      const searchedPath = normalizeFileSelectorPath(rawSelector, projectRoot)
-      cliError(`no indexed file matches "${searchedPath}"`, fmt, 1)
-    }
-    if (matches.length > 1) {
-      cliError(
-        `ambiguous selector "${rawSelector}": ${matches.map((m) => m.canonicalPath).join(', ')}`,
-        fmt,
-        1,
-      )
-    }
-    resolved.push(matches[0]!)
-  }
-
-  const toDisplayPath = async (canonicalPath: string): Promise<string> => {
-    const file = await provider.getFile(canonicalPath)
-    if (file) return file.configRelativePath
-    const document = await provider.getDocument(canonicalPath)
-    if (document) return document.configRelativePath
-    return canonicalPath
-  }
+  void projectRoot
+  const resolvedFiles = await resolveImpactFileSelectors(provider, rawSelectors)
+  const resolved = await Promise.all(
+    resolvedFiles.map(async (file) => ({
+      canonicalPath: file.path,
+      configRelativePath: await toGraphDisplayPath(provider, file.path),
+      workspace: file.workspace,
+      kind: 'file' as const,
+    })),
+  )
+  const toDisplayPath = (canonicalPath: string): Promise<string> =>
+    toGraphDisplayPath(provider, canonicalPath)
 
   if (resolved.length === 1) {
     const file = resolved[0]!
@@ -350,6 +481,7 @@ async function handleFilesImpact(
           lines.push(`  ${s.target}  risk=${s.riskLevel} direct=${String(s.directDependents)}`)
         }
       }
+      lines.push(...formatCoveringSpecs(result.coveringSpecs))
       output(lines.join('\n'), 'text')
     } else {
       output(
@@ -421,6 +553,7 @@ async function handleFilesImpact(
         `  ${file.configRelativePath}  risk=${r.riskLevel} direct=${String(r.directDependents)} files=${String(r.affectedFiles.length)}`,
       )
     }
+    lines.push(...formatCoveringSpecs(result.coveringSpecs))
     output(lines.join('\n'), 'text')
   } else {
     output(
@@ -437,6 +570,7 @@ async function handleFilesImpact(
         indirectDependents: result.indirectDependents,
         transitiveDependents: result.transitiveDependents,
         affectedFiles: await Promise.all(result.affectedFiles.map((path) => toDisplayPath(path))),
+        coveringSpecs: result.coveringSpecs,
         perFile: await Promise.all(
           perFile.map(async ({ file, result: r }) => ({
             file: file.canonicalPath,
@@ -468,15 +602,56 @@ async function handleSymbolImpact(
   maxDepth: number,
   fmt: 'text' | 'json' | 'toon',
 ): Promise<void> {
-  const toDisplayPath = async (canonicalPath: string): Promise<string> => {
-    const file = await provider.getFile(canonicalPath)
-    if (file) return file.configRelativePath
-    const document = await provider.getDocument(canonicalPath)
-    if (document) return document.configRelativePath
-    return canonicalPath
-  }
+  const toDisplayPath = (canonicalPath: string): Promise<string> =>
+    toGraphDisplayPath(provider, canonicalPath)
   const resolved = await provider.resolveSymbolSelector(symbolSelector)
-  const uniqueIds = [...new Set(resolved.map((symbol) => symbol.symbolId))]
+  if (resolved.status === 'missing') {
+    if (fmt === 'text') {
+      output(`No symbol found matching "${symbolSelector}".`, 'text')
+    } else {
+      output({ error: 'not_found', symbol: symbolSelector }, fmt)
+    }
+    return
+  }
+
+  if (resolved.status === 'ambiguous') {
+    const candidates = await Promise.all(
+      resolved.candidates.map(async (candidate) => {
+        const symbol = await provider.getSymbol(candidate.symbolId)
+        return symbol === undefined
+          ? null
+          : { symbol, displayPath: await toDisplayPath(symbol.filePath) }
+      }),
+    )
+    const present = candidates.filter((candidate) => candidate !== null)
+    if (fmt === 'text') {
+      const lines = [
+        `${String(resolved.totalCandidates)} symbols exactly match "${symbolSelector}"; qualify the selector:`,
+      ]
+      for (const { symbol, displayPath } of present) {
+        lines.push(
+          `  ${displayPath}:${symbol.kind}:${symbol.name}:${String(symbol.line)}:${String(symbol.column)}`,
+        )
+      }
+      if (resolved.totalCandidates > present.length) {
+        lines.push(`  ${String(resolved.totalCandidates - present.length)} more candidates`)
+      }
+      output(lines.join('\n'), 'text')
+    } else {
+      output(
+        {
+          error: 'ambiguous',
+          symbol: symbolSelector,
+          totalCandidates: resolved.totalCandidates,
+          candidates: present,
+        },
+        fmt,
+      )
+    }
+    return
+  }
+
+  const uniqueIds = [resolved.match.symbolId]
   const symbols = (await Promise.all(uniqueIds.map((id) => provider.getSymbol(id)))).filter(
     (symbol) => symbol !== undefined,
   )
@@ -529,59 +704,6 @@ async function handleSymbolImpact(
     }
     return
   }
-
-  // Multiple matches — analyze each
-  if (fmt === 'text') {
-    const allLines = [`${String(symbols.length)} symbols match "${symbolSelector}":\n`]
-
-    for (const sym of symbols) {
-      const result = await provider.analyzeImpact(sym.id, direction, maxDepth)
-      const displayPath = await toDisplayPath(sym.filePath)
-      const displayResult = {
-        ...result,
-        affectedFiles: await Promise.all(result.affectedFiles.map((path) => toDisplayPath(path))),
-        affectedSymbols: await Promise.all(
-          result.affectedSymbols.map(async (symbol) => ({
-            ...symbol,
-            filePath: await toDisplayPath(symbol.filePath),
-          })),
-        ),
-      }
-      allLines.push(
-        ...formatImpact(
-          `${sym.kind} ${sym.name} (${displayPath}:${String(sym.line)})`,
-          displayResult,
-          maxDepth,
-        ),
-      )
-      allLines.push('')
-    }
-
-    output(allLines.join('\n'), 'text')
-  } else {
-    const results = await Promise.all(
-      symbols.map(async (sym) => {
-        const impact = await provider.analyzeImpact(sym.id, direction, maxDepth)
-        return {
-          symbol: sym,
-          displayPath: await toDisplayPath(sym.filePath),
-          impact: {
-            ...impact,
-            affectedFiles: await Promise.all(
-              impact.affectedFiles.map((path) => toDisplayPath(path)),
-            ),
-            affectedSymbols: await Promise.all(
-              impact.affectedSymbols.map(async (symbol) => ({
-                ...symbol,
-                filePath: await toDisplayPath(symbol.filePath),
-              })),
-            ),
-          },
-        }
-      }),
-    )
-    output(results, fmt)
-  }
 }
 
 /**
@@ -605,13 +727,8 @@ async function handleSpecImpact(
   }
 
   const result = await provider.analyzeSpecImpact(specId, direction, maxDepth)
-  const toDisplayPath = async (canonicalPath: string): Promise<string> => {
-    const file = await provider.getFile(canonicalPath)
-    if (file) return file.configRelativePath
-    const document = await provider.getDocument(canonicalPath)
-    if (document) return document.configRelativePath
-    return canonicalPath
-  }
+  const toDisplayPath = (canonicalPath: string): Promise<string> =>
+    toGraphDisplayPath(provider, canonicalPath)
   const displayResult = {
     ...result,
     affectedFiles: await Promise.all(result.affectedFiles.map((path) => toDisplayPath(path))),

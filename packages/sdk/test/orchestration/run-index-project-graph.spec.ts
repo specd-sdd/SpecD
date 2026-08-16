@@ -11,21 +11,21 @@ const {
   listWorkspaces,
   getSpecMetadata,
   createIndexProjectGraph,
-  withOpenGraphProvider,
   createVcsAdapter,
   indexExecute,
+  createGraphProvider,
+  openForIndexing,
+  closeProvider,
 } = vi.hoisted(() => ({
   getConfig: { execute: vi.fn() },
   listWorkspaces: { execute: vi.fn() },
   getSpecMetadata: { execute: vi.fn() },
   createIndexProjectGraph: vi.fn(),
-  withOpenGraphProvider: vi.fn(),
   createVcsAdapter: vi.fn(),
   indexExecute: vi.fn(),
-}))
-
-vi.mock('../../src/composition/with-open-graph-provider.js', () => ({
-  withOpenGraphProvider,
+  createGraphProvider: vi.fn(),
+  openForIndexing: vi.fn(),
+  closeProvider: vi.fn(),
 }))
 
 vi.mock('@specd/code-graph', async (importOriginal) => {
@@ -57,6 +57,7 @@ const ctx = {
       getMetadata: getSpecMetadata,
     },
   },
+  createGraphProvider,
 } as unknown as SdkHostContext
 
 describe('runIndexProjectGraph', () => {
@@ -70,10 +71,12 @@ describe('runIndexProjectGraph', () => {
     createVcsAdapter.mockResolvedValue({ ref: async () => 'abc123' })
     indexExecute.mockResolvedValue({ filesIndexed: 3 })
     createIndexProjectGraph.mockReturnValue({ execute: indexExecute })
-    withOpenGraphProvider.mockImplementation(
-      async (_ctx: SdkHostContext, fn: (provider: object) => Promise<unknown>) =>
-        fn({ index: indexExecute }),
-    )
+    openForIndexing.mockResolvedValue({ fullRebuild: false, fullRebuildReason: null })
+    createGraphProvider.mockReturnValue({
+      openForIndexing,
+      close: closeProvider,
+      index: indexExecute,
+    })
   })
 
   it('filters workspaces when a subset is requested', async () => {
@@ -121,16 +124,15 @@ describe('runIndexProjectGraph', () => {
     expect(codeGraphPackageJson.version).not.toBe('0.0.0')
   })
 
-  it('forwards beforeOpen and afterClose hooks to withOpenGraphProvider when provider is omitted', async () => {
+  it('runs indexing lifecycle hooks once when provider is omitted', async () => {
     const beforeOpen = vi.fn()
     const afterClose = vi.fn()
     await runIndexProjectGraph(ctx, { beforeOpen, afterClose })
 
-    expect(withOpenGraphProvider).toHaveBeenCalledWith(
-      ctx,
-      expect.any(Function),
-      expect.objectContaining({ beforeOpen, afterClose }),
-    )
+    expect(beforeOpen).toHaveBeenCalledOnce()
+    expect(openForIndexing).toHaveBeenCalledOnce()
+    expect(closeProvider).toHaveBeenCalledOnce()
+    expect(afterClose).toHaveBeenCalledOnce()
   })
 
   it('bypasses withOpenGraphProvider and does not close provider when existing provider is supplied', async () => {
@@ -139,9 +141,44 @@ describe('runIndexProjectGraph', () => {
 
     const result = await runIndexProjectGraph(ctx, { provider: mockProvider })
 
-    expect(withOpenGraphProvider).not.toHaveBeenCalled()
     expect(closeSpy).not.toHaveBeenCalled()
-    expect(result).toEqual({ filesIndexed: 3 })
+    expect(result).toEqual({
+      filesIndexed: 3,
+      fullRebuild: false,
+      fullRebuildReason: null,
+    })
+  })
+
+  it('preserves provider-owned schema repair diagnostics', async () => {
+    openForIndexing.mockResolvedValue({
+      fullRebuild: true,
+      fullRebuildReason: 'SCHEMA_INCOMPATIBLE',
+    })
+
+    const result = await runIndexProjectGraph(ctx)
+
+    expect(result).toEqual({
+      filesIndexed: 3,
+      fullRebuild: true,
+      fullRebuildReason: 'SCHEMA_INCOMPATIBLE',
+    })
+    expect(openForIndexing).toHaveBeenCalledOnce()
+    expect(closeProvider).toHaveBeenCalledOnce()
+  })
+
+  it('reports an explicitly forced index as a full rebuild', async () => {
+    indexExecute.mockResolvedValue({
+      filesIndexed: 3,
+      fullRebuildReason: 'Forced graph storage recreation requested by indexing',
+    })
+
+    const result = await runIndexProjectGraph(ctx, { force: true })
+
+    expect(result).toEqual({
+      filesIndexed: 3,
+      fullRebuild: true,
+      fullRebuildReason: 'Forced graph storage recreation requested by indexing',
+    })
   })
 
   it('throws InvalidProviderLifecycleError when provider is passed together with beforeOpen or afterClose', async () => {

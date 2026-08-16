@@ -17,7 +17,13 @@ export {
   type IndexProgressCallback,
   type ProjectGraphConfig,
 } from './index-options.js'
-export { type IndexResult, type IndexError, type WorkspaceIndexBreakdown } from './index-result.js'
+export {
+  type IndexResult,
+  type IndexError,
+  type WorkspaceIndexBreakdown,
+  type IndexPhaseMetric,
+  type IndexPhaseMetrics,
+} from './index-result.js'
 export {
   type LanguageAdapter,
   type AdapterAnalyzeContext,

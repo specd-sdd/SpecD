@@ -8,12 +8,55 @@
     "cli:graph-cli-context",
     "core:config",
     "code-graph:traversal",
-    "code-graph:workspace-integration"
+    "code-graph:workspace-integration",
+    "code-graph:resolve-symbol-reference"
   ],
   "implementation": [
     {
       "file": "cli:src/commands/graph/impact.ts",
-      "symbols": ["handleFilesImpact"]
+      "symbols": ["handlePublicExportImpact"]
+    },
+    {
+      "file": "cli:test/commands/graph-impact.spec.ts"
+    },
+    {
+      "file": "cli:src/commands/graph/resolve-impact-file-selectors.ts"
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Report provider-computed blast radius for files, symbols, specs, public exports, and covering specs with normalized paths and risk aggregates.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:2f7bd0fd9041d9b98262dc6776de6819fbd6cce67a5bc9f259c313b9331681cb",
+          "lastModified": "2026-08-16T08:12:47.633Z"
+        },
+        "verify.md": {
+          "hash": "sha256:5d10484cb23dcfcceaace48bff12f4c2154d58785be26b197a80ed52d0286e4d",
+          "lastModified": "2026-08-16T08:12:47.638Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Graph Impact\n\n## Rules\n\n- Signature: `specd graph impact [--file <paths...>] [--symbol <name>] [--spec <id>] [--direction dependents|dependencies|upstream|downstream|both] [--depth <n>] [--config <path> | --path <path>] [--format text|json|toon]`.\n- Require exactly 1 target (`--file`, `--symbol`, `--spec`). `--depth` positive, default `3`; `--config` and `--path` mutually exclusive.\n- Normalize `dependents`->`upstream`, `dependencies`->`downstream`; default `upstream`. Docs explain counts per direction.\n- Normalize file paths relative to project root. Single/multi-file delegate calculations to `CodeGraphProvider` via `withProvider`.\n- Symbol target: `resolveSymbolSelector` supports bare/qualified/full IDs. 0 matches prints `No symbol found matching \"<selector>\".` and exits 0; 1/many match calls `analyzeImpact`.\n- Spec target: load `getSpec(specId)`; missing throws `SpecNotFoundError`/exit 1/`SPEC_NOT_FOUND`. Uses `DEPENDS_ON`, `COVERS_FILE`, `COVERS_SYMBOL`.\n- Public export target: renders selected public binding, canonical target, ordered binding chain. Reports exact-binding consumers separately from canonical symbol dependents. Ambiguous exports list deterministic candidates.\n- Covering specs: single/multi-file impact renders provider `coveringSpecs`. Text groups depth-0 evidence under direct target coverage, min-depth > 0 under blast-radius. JSON/TOON emit `coveringSpecs` with evidence `{ kind, target, depth }`.\n- Provider availability: `GRAPH_BUSY`, `GRAPH_PROVIDER_STALE`, open failure exit 3.\n- Output: paths project-relative. Text shows target/depth, risk, counts, affected files with symbol depth `name:line (d=N)`. JSON/TOON emit full result + aggregate fields (`riskLevel`, `directDepsCount`, `indirectDepsCount`, `transitiveDepsCount`, `affectedFilesCount`).\n\n## Constraints\n\n- CLI never computes impact, risk, or multi-file aggregation.\n- Provider lifecycle uses `@specd/sdk`; CLI owns formatting.\n- Call `process.exit(0)` after provider closes.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:2f7bd0fd9041d9b98262dc6776de6819fbd6cce67a5bc9f259c313b9331681cb",
+          "lastModified": "2026-08-16T08:12:47.633Z"
+        },
+        "verify.md": {
+          "hash": "sha256:5d10484cb23dcfcceaace48bff12f4c2154d58785be26b197a80ed52d0286e4d",
+          "lastModified": "2026-08-16T08:12:47.638Z"
+        }
+      }
+    }
+  }
 }

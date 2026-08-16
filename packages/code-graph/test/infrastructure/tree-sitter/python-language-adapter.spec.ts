@@ -11,10 +11,11 @@ import {
   type BindingFact,
 } from '../../../src/domain/value-objects/binding-fact.js'
 import { CallForm, type CallFact } from '../../../src/domain/value-objects/call-fact.js'
-import { type SymbolNode } from '../../../src/domain/value-objects/symbol-node.js'
+import { type SourceRange, type SymbolNode } from '../../../src/domain/value-objects/symbol-node.js'
 import { type Relation } from '../../../src/domain/value-objects/relation.js'
 import { type ImportDeclaration } from '../../../src/domain/value-objects/import-declaration.js'
 import { InMemoryIndexSession } from '../../../src/application/use-cases/in-memory-index-session.js'
+import { parseLogicalSymbol } from '../../../src/domain/value-objects/symbol-reference.js'
 
 interface TestAdapter {
   languages(): string[]
@@ -42,6 +43,16 @@ interface TestAdapter {
 
 const baseAdapter = new PythonLanguageAdapter()
 const adapter = baseAdapter as unknown as TestAdapter
+
+function sliceRange(content: string, range: SourceRange): string {
+  const lines = content.split('\n')
+  const offsetAt = (line: number, column: number): number =>
+    lines.slice(0, line - 1).reduce((offset, value) => offset + value.length + 1, 0) + column
+  return content.slice(
+    offsetAt(range.startLine, range.startColumn),
+    offsetAt(range.endLine, range.endColumn),
+  )
+}
 
 adapter.extractSymbols = (filePath: string, content: string): SymbolNode[] => {
   const session = new InMemoryIndexSession()
@@ -160,12 +171,146 @@ describe('PythonLanguageAdapter', () => {
     expect(adapter.languages()).toEqual(['python'])
   })
 
+  it('emits package identities and preserves import aliases conservatively', () => {
+    const session = new InMemoryIndexSession()
+    const facts = baseAdapter.analyzeFile(
+      'pkg/__init__.pyi',
+      'from .models import User as PublicUser\nclass Service:\n    pass\n',
+      { session, workspaceName: 'workspace' },
+    ).referenceFacts
+
+    expect(baseAdapter.capabilities()).toMatchObject({
+      hierarchy: true,
+      buildContext: false,
+    })
+    expect(facts?.declarations.some((item) => item.logicalId.includes('Service'))).toBe(true)
+    expect(facts?.publicBindings).toEqual([])
+    expect(facts?.localBindings.map((item) => item.localName)).toContain('PublicUser')
+  })
+
+  it('owner-qualifies methods and emits ordered base evidence', () => {
+    const facts = baseAdapter.analyzeFile(
+      'workspace:pkg/services.py',
+      'class Base:\n    def save(self):\n        pass\n\nclass First(Base):\n    def save(self):\n        pass\n\nclass Second:\n    def save(self):\n        pass\n',
+      { session: new InMemoryIndexSession(), workspaceName: 'workspace' },
+    ).referenceFacts
+
+    const methods = facts?.declarations
+      .map((item) => parseLogicalSymbol(item.logicalId))
+      .filter((item) => item?.name === 'save')
+    expect(methods).toHaveLength(3)
+    expect(new Set(methods?.map((item) => item?.ownerId)).size).toBe(3)
+    expect(facts?.hierarchy).toEqual([expect.objectContaining({ kind: 'extends', precedence: 0 })])
+    expect(facts?.steps).toEqual([expect.objectContaining({ kind: 'extends:0' })])
+    expect(facts?.publicBindings.some((binding) => binding.exportedName === 'save')).toBe(false)
+  })
+
+  it('retains constructor and deterministic decorator member forms', () => {
+    const facts = baseAdapter.analyzeFile(
+      'workspace:pkg/service.py',
+      `class Service:
+    def __init__(self):
+        pass
+
+    @staticmethod
+    def create():
+        pass
+
+    @property
+    def value(self):
+        return 1
+`,
+      { session: new InMemoryIndexSession(), workspaceName: 'workspace' },
+    ).referenceFacts!
+
+    const forms = facts.declarations
+      .map((item) => parseLogicalSymbol(item.logicalId))
+      .filter((item) => item?.ownerId !== undefined)
+      .map((item) => [item?.name, item?.memberForm])
+    expect(forms).toEqual(
+      expect.arrayContaining([
+        ['__init__', 'constructor'],
+        ['create', 'static'],
+        ['value', 'getter'],
+      ]),
+    )
+  })
+
+  it('uses the declaring class as owner for nested classes and their methods', () => {
+    const facts = baseAdapter.analyzeFile(
+      'workspace:pkg/nested.py',
+      `class Outer:
+    class Inner:
+        def run(self):
+            pass
+`,
+      { session: new InMemoryIndexSession(), workspaceName: 'workspace' },
+    ).referenceFacts!
+    const logical = facts.declarations
+      .map((declaration) => parseLogicalSymbol(declaration.logicalId))
+      .filter((item) => item !== null)
+    const outer = logical.find((item) => item?.name === 'Outer')!
+    const inner = logical.find((item) => item?.name === 'Inner')!
+    const run = logical.find((item) => item?.name === 'run')!
+
+    expect(inner.ownerId).toBe(outer.id)
+    expect(run.ownerId).toBe(inner.id)
+  })
+
+  it('preserves declared multiple-base order and protocol evidence', () => {
+    const facts = baseAdapter.analyzeFile(
+      'workspace:pkg/hierarchy.py',
+      `class Protocol:
+    pass
+class Contract(Protocol):
+    pass
+class Left:
+    pass
+class Right:
+    pass
+class Child(Left, Right, Contract):
+    pass
+`,
+      { session: new InMemoryIndexSession(), workspaceName: 'workspace' },
+    ).referenceFacts!
+    const child = facts.declarations
+      .map((declaration) => parseLogicalSymbol(declaration.logicalId))
+      .find((logical) => logical?.name === 'Child')!
+    const childFacts = facts.hierarchy.filter((fact) => fact.childId === child.id)
+
+    expect(childFacts.map((fact) => [fact.kind, fact.precedence])).toEqual([
+      ['extends', 0],
+      ['extends', 1],
+      ['implements', 2],
+    ])
+  })
+
   describe('extractSymbols', () => {
     it('extracts function definitions', () => {
       const symbols = adapter.extractSymbols('main.py', 'def greet(name):\n    return name')
       expect(symbols).toHaveLength(1)
       expect(symbols[0]!.name).toBe('greet')
       expect(symbols[0]!.kind).toBe(SymbolKind.Function)
+    })
+
+    it('extracts parser-authoritative construct and declared-name ranges', () => {
+      const code = `class UserService:
+    def execute(self):
+        return None`
+      const symbol = adapter
+        .extractSymbols('main.py', code)
+        .find((candidate) => candidate.name === 'UserService')!
+
+      expect(
+        sliceRange(code, {
+          startLine: symbol.line,
+          startColumn: symbol.column,
+          endLine: symbol.endLine,
+          endColumn: symbol.endColumn,
+        }),
+      ).toBe(code)
+      expect(sliceRange(code, symbol.selectionRange)).toBe('UserService')
+      expect(symbol.id).toBe('main.py:class:UserService:1:0')
     })
 
     it('extracts class definitions', () => {

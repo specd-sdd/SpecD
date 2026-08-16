@@ -1,0 +1,6188 @@
+{
+  "name": "implementation-review-symbol-resolution",
+  "createdAt": "2026-06-30T19:17:06.571Z",
+  "updatedAt": "2026-08-16T08:12:46.917Z",
+  "description": "Provide conservative multilang symbol resolution for implementation review and impact across public exports, aliases, members, and inheritance.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "cli:change-implementation",
+    "code-graph:resolve-symbol-reference",
+    "sdk:build-implementation-review",
+    "code-graph:symbol-model",
+    "code-graph:language-adapter",
+    "code-graph:traversal",
+    "code-graph:composition",
+    "cli:graph-impact",
+    "code-graph:graph-store",
+    "cli:graph-search",
+    "code-graph:indexer",
+    "code-graph:staleness-detection",
+    "code-graph:sqlite-graph-store",
+    "code-graph:ladybug-graph-store",
+    "cli:change-status",
+    "sdk:composition",
+    "code-graph:get-graph-health",
+    "code-graph:workspace-integration",
+    "cli:graph-index",
+    "sdk:run-index-project-graph",
+    "code-graph:index-project-graph",
+    "cli:graph-stats",
+    "core:vcs-adapter-port",
+    "core:vcs-implementation-detector",
+    "code-graph:typescript-language-adapter",
+    "code-graph:python-language-adapter",
+    "code-graph:go-language-adapter",
+    "code-graph:php-language-adapter"
+  ],
+  "specDependsOn": {
+    "cli:change-implementation": [
+      "core:change",
+      "sdk:build-implementation-review",
+      "core:update-implementation-tracking",
+      "core:get-implementation-review",
+      "core:refresh-implementation-tracking"
+    ],
+    "code-graph:resolve-symbol-reference": [
+      "code-graph:symbol-model",
+      "code-graph:graph-store",
+      "code-graph:language-adapter",
+      "code-graph:workspace-integration"
+    ],
+    "sdk:build-implementation-review": [
+      "sdk:host-context",
+      "sdk:with-open-graph-provider",
+      "core:get-implementation-review",
+      "code-graph:resolve-symbol-reference",
+      "code-graph:get-graph-health"
+    ],
+    "code-graph:symbol-model": [
+      "default:_global/conventions",
+      "default:_global/error-handling-conventions",
+      "code-graph:document-model"
+    ],
+    "code-graph:language-adapter": ["code-graph:symbol-model"],
+    "code-graph:traversal": [
+      "code-graph:symbol-model",
+      "code-graph:graph-store",
+      "code-graph:resolve-symbol-reference"
+    ],
+    "code-graph:composition": [
+      "code-graph:symbol-model",
+      "code-graph:graph-store",
+      "code-graph:indexer",
+      "code-graph:traversal",
+      "default:_global/architecture",
+      "code-graph:get-graph-health",
+      "code-graph:index-project-graph",
+      "code-graph:get-spec-coverage",
+      "code-graph:get-change-spec-coverage",
+      "code-graph:resolve-symbol-reference"
+    ],
+    "cli:graph-impact": [
+      "cli:entrypoint",
+      "cli:graph-cli-context",
+      "core:config",
+      "code-graph:traversal",
+      "code-graph:workspace-integration",
+      "code-graph:resolve-symbol-reference"
+    ],
+    "code-graph:graph-store": [
+      "code-graph:symbol-model",
+      "default:_global/architecture",
+      "code-graph:staleness-detection",
+      "code-graph:document-model"
+    ],
+    "cli:graph-search": [
+      "cli:entrypoint",
+      "core:config",
+      "code-graph:composition",
+      "code-graph:document-model",
+      "code-graph:graph-store",
+      "cli:graph-cli-context",
+      "code-graph:resolve-symbol-reference"
+    ],
+    "code-graph:indexer": [
+      "code-graph:graph-store",
+      "code-graph:language-adapter",
+      "code-graph:symbol-model",
+      "code-graph:workspace-integration",
+      "core:config",
+      "core:spec-repository-port",
+      "core:list-workspaces",
+      "code-graph:document-model",
+      "core:get-spec-metadata"
+    ],
+    "code-graph:staleness-detection": [
+      "code-graph:graph-store",
+      "code-graph:indexer",
+      "code-graph:get-graph-health"
+    ],
+    "code-graph:sqlite-graph-store": [
+      "code-graph:graph-store",
+      "core:config",
+      "code-graph:symbol-model",
+      "code-graph:workspace-integration"
+    ],
+    "code-graph:ladybug-graph-store": [
+      "code-graph:graph-store",
+      "core:config",
+      "code-graph:symbol-model",
+      "code-graph:workspace-integration"
+    ],
+    "cli:change-status": [
+      "cli:entrypoint",
+      "core:change",
+      "core:get-status",
+      "sdk:build-implementation-review"
+    ],
+    "sdk:composition": [
+      "default:_global/architecture",
+      "core:composition",
+      "code-graph:composition",
+      "cli:host-context",
+      "sdk:context-markdown",
+      "sdk:build-implementation-review"
+    ],
+    "code-graph:get-graph-health": [
+      "code-graph:composition",
+      "code-graph:staleness-detection",
+      "core:config",
+      "core:list-workspaces"
+    ],
+    "code-graph:workspace-integration": ["core:config"],
+    "cli:graph-index": [
+      "cli:entrypoint",
+      "core:config",
+      "core:list-workspaces",
+      "sdk:run-index-project-graph",
+      "sdk:host-context"
+    ],
+    "sdk:run-index-project-graph": [
+      "sdk:with-open-graph-provider",
+      "code-graph:index-project-graph",
+      "core:list-workspaces"
+    ],
+    "code-graph:index-project-graph": [
+      "code-graph:composition",
+      "code-graph:indexer",
+      "code-graph:graph-store",
+      "core:config"
+    ],
+    "cli:graph-stats": [
+      "cli:entrypoint",
+      "core:config",
+      "code-graph:staleness-detection",
+      "core:list-workspaces",
+      "code-graph:get-graph-health",
+      "sdk:with-open-graph-provider",
+      "sdk:host-context"
+    ],
+    "core:vcs-adapter-port": ["default:_global/architecture", "core:vcs-adapter"],
+    "core:vcs-implementation-detector": [
+      "core:implementation-detector-port",
+      "core:vcs-adapter-port"
+    ],
+    "code-graph:typescript-language-adapter": [
+      "code-graph:language-adapter",
+      "code-graph:symbol-model",
+      "code-graph:workspace-integration"
+    ],
+    "code-graph:python-language-adapter": [
+      "code-graph:language-adapter",
+      "code-graph:symbol-model",
+      "code-graph:workspace-integration"
+    ],
+    "code-graph:go-language-adapter": [
+      "code-graph:language-adapter",
+      "code-graph:symbol-model",
+      "code-graph:workspace-integration"
+    ],
+    "code-graph:php-language-adapter": [
+      "code-graph:language-adapter",
+      "code-graph:symbol-model",
+      "code-graph:workspace-integration"
+    ]
+  },
+  "invalidationPolicy": "downstream",
+  "trackedImplementationFiles": [
+    {
+      "file": "packages/code-graph/src/domain/value-objects/symbol-reference.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/domain/value-objects/symbol-reference.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/value-objects/index-session.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/value-objects/language-adapter.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/value-objects/file-analysis.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/public.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/barrel.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/ports/graph-store.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/helpers/in-memory-graph-store.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/domain/ports/graph-store.contract.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/sqlite/schema.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/sqlite/sqlite-graph-store.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/use-cases/in-memory-index-session.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/sqlite/sqlite-graph-store.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/ladybug/ladybug-graph-store.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/ladybug/schema.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/ladybug/ladybug-graph-store.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/cli/cli-reference.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/code-graph/index.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/sdk/index.md",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/use-cases/index-code-graph.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/storage-generation.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/adapter-registry.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/go-language-adapter.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/php-language-adapter.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/python-language-adapter.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/typescript-language-adapter.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/index-project-graph-integration.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/symbol-index.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/workspace-indexing.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/tree-sitter/go-language-adapter.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/tree-sitter/php-language-adapter.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/tree-sitter/python-language-adapter.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/tree-sitter/typescript-language-adapter.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/adr/0024-logical-symbol-resolution.md",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/use-cases/resolve-symbol-reference.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/resolve-symbol-reference.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/services/analyze-impact.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/package.json",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/use-cases/get-graph-health.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/composition/code-graph-provider.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/composition/create-code-graph-provider.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/services/analyze-file-impact.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/services/analyze-files-impact.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/services/analyze-spec-impact.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/use-cases/search-code-graph.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/search-code-graph.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/orchestration/build-implementation-review.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/domain/services/analyze-files-impact.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/orchestration/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/test/orchestration/build-implementation-review.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/test/barrel.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/get-graph-health.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/composition/code-graph-provider.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/orchestration/run-index-project-graph.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/test/orchestration/run-index-project-graph.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/change/_implementation-tracking.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/change/implementation.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/change/status.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/impact.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/search.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/index-graph.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/stats.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/warn-graph-staleness.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/change-implementation-tracking.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/change-implementation.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/change-status.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/graph-impact.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/graph-search.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/graph-index.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/graph-stats.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/ports/code-graph-host-port.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/change-implementation-review-integration.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/project-dashboard.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/project/status.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/vcs-adapter-port/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/vcs-adapter/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/value-objects/impact-result.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/value-objects/symbol-node.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/domain/value-objects/symbol-node.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/ports/vcs-adapter.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/infrastructure/git/vcs-adapter.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/infrastructure/hg/vcs-adapter.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/infrastructure/svn/vcs-adapter.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/infrastructure/vcs/vcs-implementation-detector.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/infrastructure/git/vcs-adapter.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/infrastructure/hg/vcs-adapter.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/infrastructure/svn/vcs-adapter.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/infrastructure/vcs/vcs-implementation-detector.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/value-objects/source-search.ts",
+      "state": "resolved"
+    },
+    {
+      "file": ".gitignore",
+      "state": "ignored"
+    },
+    {
+      "file": ".vscode/launch.json",
+      "state": "ignored"
+    },
+    {
+      "file": "dev/scripts/test-internal-agent.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "package.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/package.json",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/package.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/mcp/package.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/plugin-agent-claude/package.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/plugin-agent-codex/package.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/plugin-agent-copilot/package.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/plugin-agent-opencode/package.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/plugin-agent-standard/package.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/plugin-manager/package.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/sdk/package.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/skills/package.json",
+      "state": "ignored"
+    },
+    {
+      "file": "tmp_output.txt",
+      "state": "ignored"
+    },
+    {
+      "file": "turbo.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/application/services/graph-input-visibility.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/use-cases/assess-indexed-resource-freshness.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/services/expand-search-query.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/value-objects/indexed-input-freshness.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/assess-indexed-resource-freshness.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/domain/services/expand-search-query.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/cli/change-implementation/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/cli/change-status/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/cli/graph-impact/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/cli/graph-index/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/cli/graph-search/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/cli/graph-stats/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/code-graph/ladybug-graph-store/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/code-graph/sqlite-graph-store/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/vcs-implementation-detector/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/use-cases/_shared/compute-graph-fingerprint.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/value-objects/index-result.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/value-objects/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/compute-graph-fingerprint.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/index-project-graph.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/update-implementation-tracking.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/update-implementation-tracking.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/composition/with-open-graph-provider.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "pnpm-lock.yaml",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/graph-index-integration.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/test/composition/with-open-graph-provider.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "dev/scripts/.spec-implementation-cache.json",
+      "state": "ignored"
+    },
+    {
+      "file": "dev/scripts/spec-implementation-cache.json",
+      "state": "ignored"
+    },
+    {
+      "file": "dev/scripts/suggest-spec-implementation.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "log/specd.log",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/resolve-impact-file-selectors.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/services/resolve-graph-selector.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/services/resolve-graph-selector.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": ".specd-opt-config.yaml",
+      "state": "removed"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/reference-fact-helpers.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/tree-sitter/reference-fact-helpers.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/use-cases/discover-files.ts",
+      "state": "resolved"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "code-graph:symbol-model",
+      "file": "packages/code-graph/src/domain/value-objects/symbol-reference.ts",
+      "fileLinkExplicit": false,
+      "symbols": [
+        "SymbolSpace",
+        "MemberForm",
+        "DeclarationOccurrence",
+        "LogicalSymbol",
+        "createLogicalSymbol",
+        "PublicBinding",
+        "LocalBinding",
+        "ResolutionStep",
+        "createPublicBinding",
+        "createLocalBinding",
+        "AdapterCapabilities",
+        "HierarchyFact",
+        "ReferenceFacts"
+      ]
+    },
+    {
+      "specId": "code-graph:resolve-symbol-reference",
+      "file": "packages/code-graph/src/domain/value-objects/symbol-reference.ts",
+      "fileLinkExplicit": false,
+      "symbols": [
+        "SymbolSpace",
+        "MemberForm",
+        "DeclarationOccurrence",
+        "LogicalSymbol",
+        "createLogicalSymbol",
+        "PublicBinding",
+        "LocalBinding",
+        "ResolutionStep",
+        "createPublicBinding",
+        "createLocalBinding",
+        "ResolveSymbolReferenceInput"
+      ]
+    },
+    {
+      "specId": "code-graph:symbol-model",
+      "file": "packages/code-graph/src/domain/value-objects/index-session.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["IndexCoverageStatus", "IndexCoverage"]
+    },
+    {
+      "specId": "code-graph:resolve-symbol-reference",
+      "file": "packages/code-graph/src/domain/value-objects/index-session.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["IndexCoverageStatus", "IndexCoverage"]
+    },
+    {
+      "specId": "code-graph:language-adapter",
+      "file": "packages/code-graph/src/domain/value-objects/language-adapter.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["LanguageAdapter"]
+    },
+    {
+      "specId": "code-graph:language-adapter",
+      "file": "packages/code-graph/src/domain/value-objects/file-analysis.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["FileAnalysisDraft"]
+    },
+    {
+      "specId": "code-graph:symbol-model",
+      "file": "packages/code-graph/src/public.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:symbol-model",
+      "file": "packages/code-graph/src/index.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:symbol-model",
+      "file": "packages/code-graph/test/barrel.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:language-adapter",
+      "file": "packages/code-graph/test/domain/value-objects/symbol-reference.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:graph-store",
+      "file": "packages/code-graph/src/domain/ports/graph-store.ts",
+      "fileLinkExplicit": true,
+      "symbols": [
+        "GraphStore",
+        "ReferenceFactsWrite",
+        "LogicalDeclaration",
+        "LogicalSymbolLookup",
+        "PublicBindingLookup",
+        "LocalBindingLookup"
+      ]
+    },
+    {
+      "specId": "code-graph:graph-store",
+      "file": "packages/code-graph/test/helpers/in-memory-graph-store.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["InMemoryGraphStore"]
+    },
+    {
+      "specId": "code-graph:graph-store",
+      "file": "packages/code-graph/test/domain/ports/graph-store.contract.ts",
+      "fileLinkExplicit": true,
+      "symbols": ["graphStoreContractTests"]
+    },
+    {
+      "specId": "code-graph:graph-store",
+      "file": "packages/code-graph/src/infrastructure/sqlite/sqlite-graph-store.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["SQLiteGraphStore"]
+    },
+    {
+      "specId": "code-graph:sqlite-graph-store",
+      "file": "packages/code-graph/src/infrastructure/sqlite/sqlite-graph-store.ts",
+      "fileLinkExplicit": true,
+      "symbols": ["SQLiteGraphStore"]
+    },
+    {
+      "specId": "code-graph:ladybug-graph-store",
+      "file": "packages/code-graph/src/infrastructure/ladybug/ladybug-graph-store.ts",
+      "fileLinkExplicit": true,
+      "symbols": ["LadybugGraphStore"]
+    },
+    {
+      "specId": "code-graph:indexer",
+      "file": "packages/code-graph/src/application/use-cases/in-memory-index-session.ts",
+      "fileLinkExplicit": true,
+      "symbols": ["InMemoryIndexSession"]
+    },
+    {
+      "specId": "code-graph:indexer",
+      "file": "packages/code-graph/src/application/use-cases/index-code-graph.ts",
+      "fileLinkExplicit": true,
+      "symbols": ["IndexCodeGraph"]
+    },
+    {
+      "specId": "code-graph:index-project-graph",
+      "file": "packages/code-graph/src/application/use-cases/index-code-graph.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["IndexCodeGraph"]
+    },
+    {
+      "specId": "code-graph:index-project-graph",
+      "file": "packages/code-graph/src/infrastructure/storage-generation.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:indexer",
+      "file": "packages/code-graph/test/application/use-cases/symbol-index.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:indexer",
+      "file": "packages/code-graph/test/application/use-cases/workspace-indexing.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:index-project-graph",
+      "file": "packages/code-graph/test/application/use-cases/index-project-graph-integration.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:language-adapter",
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/adapter-registry.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["AdapterRegistry"]
+    },
+    {
+      "specId": "code-graph:language-adapter",
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/typescript-language-adapter.ts",
+      "fileLinkExplicit": true,
+      "symbols": ["TypeScriptLanguageAdapter"]
+    },
+    {
+      "specId": "code-graph:language-adapter",
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/python-language-adapter.ts",
+      "fileLinkExplicit": true,
+      "symbols": ["PythonLanguageAdapter"]
+    },
+    {
+      "specId": "code-graph:language-adapter",
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/go-language-adapter.ts",
+      "fileLinkExplicit": true,
+      "symbols": ["GoLanguageAdapter"]
+    },
+    {
+      "specId": "code-graph:language-adapter",
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/php-language-adapter.ts",
+      "fileLinkExplicit": true,
+      "symbols": ["PhpLanguageAdapter"]
+    },
+    {
+      "specId": "code-graph:language-adapter",
+      "file": "packages/code-graph/test/infrastructure/tree-sitter/typescript-language-adapter.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:language-adapter",
+      "file": "packages/code-graph/test/infrastructure/tree-sitter/python-language-adapter.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:language-adapter",
+      "file": "packages/code-graph/test/infrastructure/tree-sitter/go-language-adapter.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:language-adapter",
+      "file": "packages/code-graph/test/infrastructure/tree-sitter/php-language-adapter.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:resolve-symbol-reference",
+      "file": "packages/code-graph/src/application/use-cases/resolve-symbol-reference.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["ResolveSymbolReference"]
+    },
+    {
+      "specId": "code-graph:resolve-symbol-reference",
+      "file": "packages/code-graph/test/application/use-cases/resolve-symbol-reference.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:resolve-symbol-reference",
+      "file": "packages/code-graph/src/domain/ports/graph-store.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["GraphStore"]
+    },
+    {
+      "specId": "code-graph:resolve-symbol-reference",
+      "file": "packages/code-graph/src/infrastructure/sqlite/sqlite-graph-store.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["SQLiteGraphStore"]
+    },
+    {
+      "specId": "code-graph:resolve-symbol-reference",
+      "file": "packages/code-graph/src/infrastructure/ladybug/ladybug-graph-store.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["LadybugGraphStore"]
+    },
+    {
+      "specId": "code-graph:resolve-symbol-reference",
+      "file": "packages/code-graph/test/helpers/in-memory-graph-store.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["InMemoryGraphStore"]
+    },
+    {
+      "specId": "code-graph:staleness-detection",
+      "file": "packages/code-graph/package.json",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:traversal",
+      "file": "packages/code-graph/src/domain/services/analyze-impact.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["analyzeImpact", "analyzePublicBindingImpact"]
+    },
+    {
+      "specId": "code-graph:traversal",
+      "file": "packages/code-graph/src/domain/services/analyze-file-impact.ts",
+      "fileLinkExplicit": true,
+      "symbols": ["analyzeFileImpact"]
+    },
+    {
+      "specId": "code-graph:traversal",
+      "file": "packages/code-graph/src/domain/services/analyze-files-impact.ts",
+      "fileLinkExplicit": true,
+      "symbols": ["analyzeFilesImpact"]
+    },
+    {
+      "specId": "code-graph:traversal",
+      "file": "packages/code-graph/src/domain/services/analyze-spec-impact.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["analyzeSpecImpact"]
+    },
+    {
+      "specId": "code-graph:traversal",
+      "file": "packages/code-graph/test/domain/services/analyze-files-impact.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "sdk:build-implementation-review",
+      "file": "packages/sdk/src/orchestration/build-implementation-review.ts",
+      "fileLinkExplicit": false,
+      "symbols": [
+        "buildImplementationReview",
+        "BuildImplementationReviewInput",
+        "ReviewedImplementationSymbol",
+        "ReviewedImplementationLink",
+        "BuildImplementationReviewResult"
+      ]
+    },
+    {
+      "specId": "sdk:build-implementation-review",
+      "file": "packages/sdk/src/orchestration/index.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "sdk:build-implementation-review",
+      "file": "packages/sdk/src/index.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "sdk:build-implementation-review",
+      "file": "packages/sdk/test/orchestration/build-implementation-review.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "sdk:composition",
+      "file": "packages/sdk/test/barrel.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:get-graph-health",
+      "file": "packages/code-graph/src/application/use-cases/get-graph-health.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["GetGraphHealth", "GetGraphHealthInput", "GetGraphHealthResult"]
+    },
+    {
+      "specId": "code-graph:get-graph-health",
+      "file": "packages/code-graph/test/application/use-cases/get-graph-health.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:composition",
+      "file": "packages/code-graph/src/composition/code-graph-provider.ts",
+      "fileLinkExplicit": true,
+      "symbols": [
+        "CodeGraphProvider",
+        "CodeGraphProviderImpl",
+        "IndexingOpenResult",
+        "resolveSymbolReferences",
+        "getExactPublicBinding"
+      ]
+    },
+    {
+      "specId": "code-graph:composition",
+      "file": "packages/code-graph/src/composition/create-code-graph-provider.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["createCodeGraphProvider"]
+    },
+    {
+      "specId": "code-graph:composition",
+      "file": "packages/code-graph/test/composition/code-graph-provider.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:composition",
+      "file": "packages/code-graph/src/public.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:composition",
+      "file": "packages/code-graph/src/index.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "sdk:run-index-project-graph",
+      "file": "packages/sdk/src/orchestration/run-index-project-graph.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["runIndexProjectGraph", "RunIndexProjectGraphResult"]
+    },
+    {
+      "specId": "sdk:run-index-project-graph",
+      "file": "packages/sdk/test/orchestration/run-index-project-graph.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:change-implementation",
+      "file": "packages/cli/src/commands/change/_implementation-tracking.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:change-implementation",
+      "file": "packages/cli/src/commands/change/implementation.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:change-status",
+      "file": "packages/cli/src/commands/change/status.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:graph-impact",
+      "file": "packages/cli/src/commands/graph/impact.ts",
+      "fileLinkExplicit": true,
+      "symbols": ["handlePublicExportImpact"]
+    },
+    {
+      "specId": "cli:graph-search",
+      "file": "packages/cli/src/commands/graph/search.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:graph-index",
+      "file": "packages/cli/src/commands/graph/index-graph.ts",
+      "fileLinkExplicit": true,
+      "symbols": ["registerGraphIndex"]
+    },
+    {
+      "specId": "cli:graph-stats",
+      "file": "packages/cli/src/commands/graph/stats.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:graph-stats",
+      "file": "packages/cli/src/commands/graph/warn-graph-staleness.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:change-implementation",
+      "file": "packages/cli/test/commands/change-implementation-tracking.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:change-implementation",
+      "file": "packages/cli/test/commands/change-implementation.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:change-status",
+      "file": "packages/cli/test/commands/change-status.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:graph-impact",
+      "file": "packages/cli/test/commands/graph-impact.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:graph-search",
+      "file": "packages/cli/test/commands/graph-search.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:graph-index",
+      "file": "packages/cli/test/commands/graph-index.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:graph-stats",
+      "file": "packages/cli/test/commands/graph-stats.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:get-graph-health",
+      "file": "packages/code-graph/src/application/ports/code-graph-host-port.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["CodeGraphHostPort"]
+    },
+    {
+      "specId": "cli:change-implementation",
+      "file": "packages/cli/test/commands/change-implementation-review-integration.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:change-status",
+      "file": "packages/cli/test/commands/change-implementation-review-integration.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:indexer",
+      "file": "packages/code-graph/test/application/use-cases/index-project-graph-integration.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:resolve-symbol-reference",
+      "file": "packages/code-graph/test/application/use-cases/index-project-graph-integration.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:traversal",
+      "file": "packages/code-graph/test/application/use-cases/index-project-graph-integration.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:get-graph-health",
+      "file": "packages/code-graph/test/application/use-cases/index-project-graph-integration.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:symbol-model",
+      "file": "packages/code-graph/test/domain/value-objects/symbol-reference.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:symbol-model",
+      "file": "packages/code-graph/src/domain/value-objects/symbol-node.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:graph-store",
+      "file": "packages/code-graph/src/domain/value-objects/source-search.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:traversal",
+      "file": "packages/code-graph/src/domain/value-objects/impact-result.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:vcs-adapter-port",
+      "file": "packages/core/src/application/ports/vcs-adapter.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:vcs-adapter-port",
+      "file": "packages/core/src/infrastructure/git/vcs-adapter.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:vcs-adapter-port",
+      "file": "packages/core/src/infrastructure/hg/vcs-adapter.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:vcs-adapter-port",
+      "file": "packages/core/src/infrastructure/svn/vcs-adapter.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:vcs-implementation-detector",
+      "file": "packages/core/src/infrastructure/vcs/vcs-implementation-detector.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:sqlite-graph-store",
+      "file": "packages/code-graph/src/infrastructure/sqlite/schema.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:ladybug-graph-store",
+      "file": "packages/code-graph/src/infrastructure/ladybug/schema.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:staleness-detection",
+      "file": "packages/code-graph/src/application/services/graph-input-visibility.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:staleness-detection",
+      "file": "packages/code-graph/src/application/use-cases/assess-indexed-resource-freshness.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:staleness-detection",
+      "file": "packages/code-graph/src/domain/value-objects/indexed-input-freshness.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:staleness-detection",
+      "file": "packages/code-graph/test/application/use-cases/assess-indexed-resource-freshness.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:graph-store",
+      "file": "packages/code-graph/src/domain/services/expand-search-query.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:graph-store",
+      "file": "packages/code-graph/test/domain/services/expand-search-query.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:composition",
+      "file": "packages/code-graph/src/application/index.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:vcs-adapter-port",
+      "file": "packages/core/test/infrastructure/git/vcs-adapter.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:vcs-adapter-port",
+      "file": "packages/core/test/infrastructure/hg/vcs-adapter.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:vcs-adapter-port",
+      "file": "packages/core/test/infrastructure/svn/vcs-adapter.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:vcs-implementation-detector",
+      "file": "packages/core/test/infrastructure/vcs/vcs-implementation-detector.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:indexer",
+      "file": "packages/code-graph/src/domain/value-objects/index-result.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:graph-index",
+      "file": "packages/cli/package.json",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "sdk:run-index-project-graph",
+      "file": "packages/sdk/src/composition/with-open-graph-provider.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["withOpenGraphProvider"]
+    },
+    {
+      "specId": "sdk:run-index-project-graph",
+      "file": "packages/sdk/test/composition/with-open-graph-provider.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:graph-impact",
+      "file": "packages/cli/src/commands/graph/resolve-impact-file-selectors.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:graph-search",
+      "file": "packages/cli/src/commands/graph/resolve-impact-file-selectors.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:graph-index",
+      "file": "packages/cli/test/commands/graph-index-integration.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:composition",
+      "file": "packages/code-graph/src/application/services/resolve-graph-selector.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["resolveSymbolSelector"]
+    },
+    {
+      "specId": "code-graph:resolve-symbol-reference",
+      "file": "packages/code-graph/src/application/services/resolve-graph-selector.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["resolveSymbolSelector"]
+    },
+    {
+      "specId": "code-graph:staleness-detection",
+      "file": "packages/code-graph/src/application/use-cases/_shared/compute-graph-fingerprint.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:symbol-model",
+      "file": "packages/code-graph/src/domain/value-objects/index.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:composition",
+      "file": "packages/code-graph/test/application/services/resolve-graph-selector.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:resolve-symbol-reference",
+      "file": "packages/code-graph/test/application/services/resolve-graph-selector.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:staleness-detection",
+      "file": "packages/code-graph/test/application/use-cases/compute-graph-fingerprint.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:index-project-graph",
+      "file": "packages/code-graph/test/application/use-cases/index-project-graph.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:symbol-model",
+      "file": "packages/code-graph/test/domain/value-objects/symbol-node.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:ladybug-graph-store",
+      "file": "packages/code-graph/test/infrastructure/ladybug/ladybug-graph-store.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:sqlite-graph-store",
+      "file": "packages/code-graph/test/infrastructure/sqlite/sqlite-graph-store.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:resolve-symbol-reference",
+      "file": "packages/code-graph/src/composition/code-graph-provider.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["resolveSymbolReferences"]
+    },
+    {
+      "specId": "sdk:composition",
+      "file": "packages/sdk/src/index.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:symbol-model",
+      "file": "packages/code-graph/test/application/use-cases/index-project-graph-integration.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:language-adapter",
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/reference-fact-helpers.ts",
+      "fileLinkExplicit": false,
+      "symbols": [
+        "buildLogicalDeclarationFacts",
+        "buildHierarchyReferenceFacts",
+        "containsSymbolRange",
+        "createAdapterDeclarationDescriptor"
+      ]
+    },
+    {
+      "specId": "code-graph:symbol-model",
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/reference-fact-helpers.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["buildLogicalDeclarationFacts", "buildHierarchyReferenceFacts"]
+    },
+    {
+      "specId": "code-graph:language-adapter",
+      "file": "packages/code-graph/test/infrastructure/tree-sitter/reference-fact-helpers.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:typescript-language-adapter",
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/typescript-language-adapter.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["TypeScriptLanguageAdapter"]
+    },
+    {
+      "specId": "code-graph:typescript-language-adapter",
+      "file": "packages/code-graph/test/infrastructure/tree-sitter/typescript-language-adapter.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:python-language-adapter",
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/python-language-adapter.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["PythonLanguageAdapter"]
+    },
+    {
+      "specId": "code-graph:python-language-adapter",
+      "file": "packages/code-graph/test/infrastructure/tree-sitter/python-language-adapter.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:go-language-adapter",
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/go-language-adapter.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["GoLanguageAdapter"]
+    },
+    {
+      "specId": "code-graph:go-language-adapter",
+      "file": "packages/code-graph/test/infrastructure/tree-sitter/go-language-adapter.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:php-language-adapter",
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/php-language-adapter.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["PhpLanguageAdapter"]
+    },
+    {
+      "specId": "code-graph:php-language-adapter",
+      "file": "packages/code-graph/test/infrastructure/tree-sitter/php-language-adapter.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:language-adapter",
+      "file": "packages/code-graph/src/application/use-cases/in-memory-index-session.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["InMemoryIndexSession"]
+    },
+    {
+      "specId": "code-graph:language-adapter",
+      "file": "packages/code-graph/test/application/use-cases/symbol-index.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:get-graph-health",
+      "file": "packages/code-graph/src/application/use-cases/discover-files.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["discoverFiles"]
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:f635283b83c8213439d54534c60bff4c0644c5b86edde9180ccbc4cb63aa8dd9"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "cli:change-implementation",
+          "filename": "deltas/cli/change-implementation/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:39f86d7fd54ac58ed1703163fde96b448ee678b723fa33d13c2649f04b09071d"
+        },
+        {
+          "key": "code-graph:resolve-symbol-reference",
+          "filename": "specs/code-graph/resolve-symbol-reference/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:16cfb65d0ab63dc05ba94d65f822425ee3a2b742c639ce6822744560559f1dae"
+        },
+        {
+          "key": "sdk:build-implementation-review",
+          "filename": "specs/sdk/build-implementation-review/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:622555476e06b46806369c26ae77b1549b5c49fd7860243f10d8c3ec5047f876"
+        },
+        {
+          "key": "code-graph:symbol-model",
+          "filename": "deltas/code-graph/symbol-model/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:a726db857cd0c012100485073c3b2fba39b1c093f4455f1f4d4194b3c8bb1455"
+        },
+        {
+          "key": "code-graph:language-adapter",
+          "filename": "deltas/code-graph/language-adapter/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:4cda95ba6affdda4c48a1514b3eaef7779bd2f8a116925af8be6f2630ea11c4c"
+        },
+        {
+          "key": "code-graph:traversal",
+          "filename": "deltas/code-graph/traversal/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b356def3d1de44a794cde3168bb47802c2f9f82fed46b65df38eed8ab537cc67"
+        },
+        {
+          "key": "code-graph:composition",
+          "filename": "deltas/code-graph/composition/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b7db6c6069162e63ca6eeb8f4f164e09e9465979a69ac3bda203642b013925e8"
+        },
+        {
+          "key": "cli:graph-impact",
+          "filename": "deltas/cli/graph-impact/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:c9c3587117d1103dde6e882f6f63f345eb7433b7476d78dfa29c27a201aff2a3"
+        },
+        {
+          "key": "code-graph:graph-store",
+          "filename": "deltas/code-graph/graph-store/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:22b290fbcef5162463aeb54c3f077f5510382109206268d6d48ab228fda647f6"
+        },
+        {
+          "key": "cli:graph-search",
+          "filename": "deltas/cli/graph-search/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:ed58ddc8bb0f549a0a08033d3315fb36b918e1d9b92f6f1cdc1ee6e6349f6472"
+        },
+        {
+          "key": "code-graph:indexer",
+          "filename": "deltas/code-graph/indexer/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:c112f19dd1e57ad7a95489a8c47c5431ae19c87891d69a7f9de6086239ee6c1b"
+        },
+        {
+          "key": "code-graph:staleness-detection",
+          "filename": "deltas/code-graph/staleness-detection/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:2d6ec86d7ccff14a303ccca0596db3366258fd70db0a1648cad3dc29fe08fca0"
+        },
+        {
+          "key": "code-graph:sqlite-graph-store",
+          "filename": "deltas/code-graph/sqlite-graph-store/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:f6ca71676044d79174cf4af8ebb76f97d3196d876c63b29847af0d7a26c2392e"
+        },
+        {
+          "key": "code-graph:ladybug-graph-store",
+          "filename": "deltas/code-graph/ladybug-graph-store/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:1683a579de27dc80d47ba95c2480dbfc2441b255cdf2c38614cd2d71d7fe2502"
+        },
+        {
+          "key": "cli:change-status",
+          "filename": "deltas/cli/change-status/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:0101076d0c4157d07c87556b75126b0364b1ed3c034a72b2ad3fb859467f9ea3"
+        },
+        {
+          "key": "sdk:composition",
+          "filename": "deltas/sdk/composition/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:31b683372581f6a19e44b0193c09d4ae577b0a830c14da44b06917992fcd8309"
+        },
+        {
+          "key": "code-graph:get-graph-health",
+          "filename": "deltas/code-graph/get-graph-health/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:4c5f83d7da7a8318dc3493cbc6783a9671737e79573fa46f553b36d9f0729e87"
+        },
+        {
+          "key": "code-graph:workspace-integration",
+          "filename": "deltas/code-graph/workspace-integration/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:3e38d71b11e6e412dcc043f4a42239ff2cf3340d644df34b819ea2658cfe095a"
+        },
+        {
+          "key": "cli:graph-index",
+          "filename": "deltas/cli/graph-index/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:815ed96534ee4f980b118f5b73683572d484d3cabaa99dbde3c7264b4085498d"
+        },
+        {
+          "key": "sdk:run-index-project-graph",
+          "filename": "deltas/sdk/run-index-project-graph/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:a07f56023bddef13df1028998367d98d034c8c854e9ee11768a73f1e12502010"
+        },
+        {
+          "key": "code-graph:index-project-graph",
+          "filename": "deltas/code-graph/index-project-graph/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:3d4ba9bdea58911b27a208146a57a33c18a6655d30fbfe39013c483a19f22324"
+        },
+        {
+          "key": "cli:graph-stats",
+          "filename": "deltas/cli/graph-stats/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:a8d56b05578b4a9a2f75878aad0f72dfc518885f0abb0760a7280de88d61fa41"
+        },
+        {
+          "key": "core:vcs-adapter-port",
+          "filename": "deltas/core/vcs-adapter-port/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:e6c6c535c2e07ff4a7126fbeea02b19fee91f86565479c611410724e96305257"
+        },
+        {
+          "key": "core:vcs-implementation-detector",
+          "filename": "deltas/core/vcs-implementation-detector/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:7855cbe6cffc0d5d48cded9a9c50861b118947fd1f385f74559f18b455fb4bf6"
+        },
+        {
+          "key": "code-graph:typescript-language-adapter",
+          "filename": "specs/code-graph/typescript-language-adapter/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:113e0159a628e78f079888213fd9531692f7ea4233314cc1c61d8e7b8034185f"
+        },
+        {
+          "key": "code-graph:python-language-adapter",
+          "filename": "specs/code-graph/python-language-adapter/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:6e9374a9bba7b27141c3dc87532813d9138d129ea0b6ac9ba47dec2cbdf35351"
+        },
+        {
+          "key": "code-graph:go-language-adapter",
+          "filename": "specs/code-graph/go-language-adapter/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:3b97336261537520c1258e9680fd6c7cdd28d5a27e242e3b7df62e706f1b7f29"
+        },
+        {
+          "key": "code-graph:php-language-adapter",
+          "filename": "specs/code-graph/php-language-adapter/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:06eddeddc58113de6af4ba2f18d10758793692ccf6c103fa7290d5d08df9449d"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "cli:change-implementation",
+          "filename": "deltas/cli/change-implementation/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:006edeebf355a718ff4ccb0f38df0d5659dca595e5ec72a11688c1e419da176a"
+        },
+        {
+          "key": "code-graph:resolve-symbol-reference",
+          "filename": "specs/code-graph/resolve-symbol-reference/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:7f7112eb5d8bce05ab35eb25ef695e5e9194293acbf072bb93deb506910f1d9b"
+        },
+        {
+          "key": "sdk:build-implementation-review",
+          "filename": "specs/sdk/build-implementation-review/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:8945edeee114e2bdc1e495038319296ac55586902e2e37941de6d4629038b906"
+        },
+        {
+          "key": "code-graph:symbol-model",
+          "filename": "deltas/code-graph/symbol-model/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:2c7a74a8082ee3a222cca5f100e5061bfa68d91a5a84ce05dc2ced3a262ed8b2"
+        },
+        {
+          "key": "code-graph:language-adapter",
+          "filename": "deltas/code-graph/language-adapter/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:009ca0fb94297855d555a6895b37dcbecc2b8caf0f36bb65c51eb14a65fb0a7f"
+        },
+        {
+          "key": "code-graph:traversal",
+          "filename": "deltas/code-graph/traversal/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b1303fda732a1dae461709d90b49fd871d9596a737c8f5e384259215a9541e99"
+        },
+        {
+          "key": "code-graph:composition",
+          "filename": "deltas/code-graph/composition/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:e38f9eb739e8f3046f09feb55fd01a120d48fbf46c1b2e624ab8303147d42d51"
+        },
+        {
+          "key": "cli:graph-impact",
+          "filename": "deltas/cli/graph-impact/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:70681ea9a65ec6dfee49a65b3579cfe2984c4c092575f965189c4de093bfac64"
+        },
+        {
+          "key": "code-graph:graph-store",
+          "filename": "deltas/code-graph/graph-store/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:a695ee7aac99aa122f13a39acced6ba34fb2ffbbcb727a628c0adad12c1f393e"
+        },
+        {
+          "key": "cli:graph-search",
+          "filename": "deltas/cli/graph-search/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:62b05ffb68db1de4a0888694382940c628209c8cd25ffb14e5790d27864c3a94"
+        },
+        {
+          "key": "code-graph:indexer",
+          "filename": "deltas/code-graph/indexer/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:55b776e03fbc2ad90983f3496e73a41673f164f33db3cf83c008d76e341dfee4"
+        },
+        {
+          "key": "code-graph:staleness-detection",
+          "filename": "deltas/code-graph/staleness-detection/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:d0f919a1c95b7ef74fb30711d5a8ea6058c0c2176a0b9118b00855ff66747272"
+        },
+        {
+          "key": "code-graph:sqlite-graph-store",
+          "filename": "deltas/code-graph/sqlite-graph-store/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:bf90fc25167234cde8174db1c442317e387b2a3b8bc724f28372c7bfd6118ed4"
+        },
+        {
+          "key": "code-graph:ladybug-graph-store",
+          "filename": "deltas/code-graph/ladybug-graph-store/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:7364f3cd84512c359aa08b7bc3717a9e87d1663efc8c21409cbd5c5f9fe96520"
+        },
+        {
+          "key": "cli:change-status",
+          "filename": "deltas/cli/change-status/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:69b59d5db96dcfe1a1af56a3a1792703da8c8924f7483dc86f7b7189008ea4c0"
+        },
+        {
+          "key": "sdk:composition",
+          "filename": "deltas/sdk/composition/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b8374059de7c0bc16f0321b84c5e79bd887703991b551e19a21b0c6f2d271212"
+        },
+        {
+          "key": "code-graph:get-graph-health",
+          "filename": "deltas/code-graph/get-graph-health/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:0e68a7e58c65068a2d6a32d58dad7c79bb9a63e1f795c5fc9e29f5d373bf1d6e"
+        },
+        {
+          "key": "code-graph:workspace-integration",
+          "filename": "deltas/code-graph/workspace-integration/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:76855bc2293f8307858191e079d71cee0d0d0b52999d3f0712d148fc5b1ea9f6"
+        },
+        {
+          "key": "cli:graph-index",
+          "filename": "deltas/cli/graph-index/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:ecef93c090489c31f9d5a83c6b95a5bf3b6904b669132a2aa3d7c9f90e31aeb8"
+        },
+        {
+          "key": "sdk:run-index-project-graph",
+          "filename": "deltas/sdk/run-index-project-graph/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:ac36eb5e38cd0955de7ddc5e593431b08557b49364cbff40db1610c2aae85f00"
+        },
+        {
+          "key": "code-graph:index-project-graph",
+          "filename": "deltas/code-graph/index-project-graph/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:44d0fb8193ad4da8ac9df3e32c26bfb7f498053d0e04a6fc430483b0e4d5f529"
+        },
+        {
+          "key": "cli:graph-stats",
+          "filename": "deltas/cli/graph-stats/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:033534ab39adacfc45c8ab5ca06ead8aad9584601f6aa6f7ae4415fe02deec51"
+        },
+        {
+          "key": "core:vcs-adapter-port",
+          "filename": "deltas/core/vcs-adapter-port/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:2ae81346ba08ff855f728a047423e9caab8955dda64f1d63a3c2ef7cd6c3cf8f"
+        },
+        {
+          "key": "core:vcs-implementation-detector",
+          "filename": "deltas/core/vcs-implementation-detector/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:26caeff443b2a4da46d2be99d8b17420cf86e1cc57386c21d53d22b4a1fd6c2f"
+        },
+        {
+          "key": "code-graph:typescript-language-adapter",
+          "filename": "specs/code-graph/typescript-language-adapter/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:ce21db9ddb3c4acf7984a80f4dc87cb212f23cb1ca3f71f10e485a9e29dad30e"
+        },
+        {
+          "key": "code-graph:python-language-adapter",
+          "filename": "specs/code-graph/python-language-adapter/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:0025a62cb07d9af889bd5b7387b5d3839c95b23abef39b667b29a7edf737168d"
+        },
+        {
+          "key": "code-graph:go-language-adapter",
+          "filename": "specs/code-graph/go-language-adapter/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:cfedd53a091a889ed24a4519fbe1f45921be915070b92d1cc04582bdc628af0a"
+        },
+        {
+          "key": "code-graph:php-language-adapter",
+          "filename": "specs/code-graph/php-language-adapter/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:f0a2d332e48ccc0cfeb916e8ce8573a6ae37900697c0016e6c71de8e7c17cc6f"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:c8484cc7d2e3e3da9e34dc59fb30e999db208349e859ff64a022607fe29ad896"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:5ba6a8618a70730a3b5dc3a3a1042391b4545c3fd4cf6d9b0c7ccab2932d2e8b"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-06-30T19:17:06.571Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": ["cli:change-implementation"],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-06-30T19:17:06.593Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "cli:change-implementation"
+        },
+        {
+          "type": "verify",
+          "key": "cli:change-implementation"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-06T14:21:45.915Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'decouple-composition-factories' was archived with overlapping specs: cli:change-implementation",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["cli:change-implementation"]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:change-implementation"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-06T14:21:45.915Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-06T14:22:18.942Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'decouple-composition-factories' was archived with overlapping specs: cli:change-implementation",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["cli:change-implementation"]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:change-implementation"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-06T14:22:34.766Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'decouple-composition-factories' was archived with overlapping specs: cli:change-implementation",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["cli:change-implementation"]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:change-implementation"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-06T14:22:52.417Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'decouple-composition-factories' was archived with overlapping specs: cli:change-implementation",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["cli:change-implementation"]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:change-implementation"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-28T09:33:56.776Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-28T10:34:53.722Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-28T11:03:41.719Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["cli:change-implementation"]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:change-implementation"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-28T11:03:41.722Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "code-graph:resolve-symbol-reference"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:resolve-symbol-reference"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-28T11:03:49.865Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["cli:change-implementation", "code-graph:resolve-symbol-reference"]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:change-implementation", "code-graph:resolve-symbol-reference"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-28T11:03:49.866Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "sdk:build-implementation-review"
+        },
+        {
+          "type": "verify",
+          "key": "sdk:build-implementation-review"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-28T11:03:55.277Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:change-implementation",
+            "code-graph:resolve-symbol-reference",
+            "sdk:build-implementation-review"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:change-implementation",
+            "code-graph:resolve-symbol-reference",
+            "sdk:build-implementation-review"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-28T11:03:55.283Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "code-graph:symbol-model"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:symbol-model"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-28T11:04:00.094Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:change-implementation",
+            "code-graph:resolve-symbol-reference",
+            "sdk:build-implementation-review",
+            "code-graph:symbol-model"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:change-implementation",
+            "code-graph:resolve-symbol-reference",
+            "sdk:build-implementation-review",
+            "code-graph:symbol-model"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-28T11:04:00.099Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "code-graph:language-adapter"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:language-adapter"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-28T11:04:05.275Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:change-implementation",
+            "code-graph:resolve-symbol-reference",
+            "sdk:build-implementation-review",
+            "code-graph:symbol-model",
+            "code-graph:language-adapter"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:change-implementation",
+            "code-graph:resolve-symbol-reference",
+            "sdk:build-implementation-review",
+            "code-graph:symbol-model",
+            "code-graph:language-adapter"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-28T11:04:05.281Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "code-graph:traversal"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:traversal"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-28T11:04:10.876Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:change-implementation",
+            "code-graph:resolve-symbol-reference",
+            "sdk:build-implementation-review",
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:traversal"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:change-implementation",
+            "code-graph:resolve-symbol-reference",
+            "sdk:build-implementation-review",
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:traversal"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-28T11:04:10.883Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "code-graph:composition"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:composition"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-28T11:04:16.144Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:change-implementation",
+            "code-graph:resolve-symbol-reference",
+            "sdk:build-implementation-review",
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:traversal",
+            "code-graph:composition"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:change-implementation",
+            "code-graph:resolve-symbol-reference",
+            "sdk:build-implementation-review",
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:traversal",
+            "code-graph:composition"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-28T11:04:16.151Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "cli:graph-impact"
+        },
+        {
+          "type": "verify",
+          "key": "cli:graph-impact"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "description-updated",
+      "at": "2026-07-28T11:07:39.205Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "description": "Provide conservative multilang symbol resolution for implementation review and impact across public exports, aliases, members, and inheritance."
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-28T11:10:56.130Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:change-implementation",
+            "code-graph:resolve-symbol-reference",
+            "sdk:build-implementation-review",
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:traversal",
+            "code-graph:composition",
+            "cli:graph-impact"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:change-implementation",
+            "code-graph:resolve-symbol-reference",
+            "sdk:build-implementation-review",
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:traversal",
+            "code-graph:composition",
+            "cli:graph-impact"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-28T11:10:56.136Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "code-graph:graph-store"
+        },
+        {
+          "type": "specs",
+          "key": "cli:graph-search"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:graph-store"
+        },
+        {
+          "type": "verify",
+          "key": "cli:graph-search"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-28T11:18:31.190Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-28T11:18:41.629Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Expand the proposal into an exhaustive, unambiguous contract before writing spec artifacts.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-28T11:21:04.551Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:change-implementation",
+            "code-graph:resolve-symbol-reference",
+            "sdk:build-implementation-review",
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:traversal",
+            "code-graph:composition",
+            "cli:graph-impact",
+            "code-graph:graph-store",
+            "cli:graph-search"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:change-implementation",
+            "code-graph:resolve-symbol-reference",
+            "sdk:build-implementation-review",
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:traversal",
+            "code-graph:composition",
+            "cli:graph-impact",
+            "code-graph:graph-store",
+            "cli:graph-search"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-28T11:21:04.559Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "code-graph:indexer"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:indexer"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-28T11:29:22.257Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-28T11:29:28.344Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Clarify graph derivation, backend schema versioning, and mandatory reindex behavior for persisted model changes.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-28T11:29:44.053Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:change-implementation",
+            "code-graph:resolve-symbol-reference",
+            "sdk:build-implementation-review",
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:traversal",
+            "code-graph:composition",
+            "cli:graph-impact",
+            "code-graph:graph-store",
+            "cli:graph-search",
+            "code-graph:indexer"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:change-implementation",
+            "code-graph:resolve-symbol-reference",
+            "sdk:build-implementation-review",
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:traversal",
+            "code-graph:composition",
+            "cli:graph-impact",
+            "code-graph:graph-store",
+            "cli:graph-search",
+            "code-graph:indexer"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-28T11:29:44.070Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "code-graph:staleness-detection"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:sqlite-graph-store"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:ladybug-graph-store"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:staleness-detection"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:sqlite-graph-store"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:ladybug-graph-store"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-28T11:36:12.664Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:change-implementation",
+            "code-graph:resolve-symbol-reference",
+            "sdk:build-implementation-review",
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:traversal",
+            "code-graph:composition",
+            "cli:graph-impact",
+            "code-graph:graph-store",
+            "cli:graph-search",
+            "code-graph:indexer",
+            "code-graph:staleness-detection",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:change-implementation",
+            "code-graph:resolve-symbol-reference",
+            "sdk:build-implementation-review",
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:traversal",
+            "code-graph:composition",
+            "cli:graph-impact",
+            "code-graph:graph-store",
+            "cli:graph-search",
+            "code-graph:indexer",
+            "code-graph:staleness-detection",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-28T11:36:12.678Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "cli:change-status"
+        },
+        {
+          "type": "specs",
+          "key": "sdk:composition"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:get-graph-health"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:workspace-integration"
+        },
+        {
+          "type": "specs",
+          "key": "cli:graph-index"
+        },
+        {
+          "type": "specs",
+          "key": "sdk:run-index-project-graph"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:index-project-graph"
+        },
+        {
+          "type": "specs",
+          "key": "cli:graph-stats"
+        },
+        {
+          "type": "verify",
+          "key": "cli:change-status"
+        },
+        {
+          "type": "verify",
+          "key": "sdk:composition"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:get-graph-health"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:workspace-integration"
+        },
+        {
+          "type": "verify",
+          "key": "cli:graph-index"
+        },
+        {
+          "type": "verify",
+          "key": "sdk:run-index-project-graph"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:index-project-graph"
+        },
+        {
+          "type": "verify",
+          "key": "cli:graph-stats"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-28T14:32:39.691Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-28T14:38:38.342Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:change-status]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["cli:change-status"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:change-implementation",
+            "code-graph:resolve-symbol-reference",
+            "sdk:build-implementation-review",
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:traversal",
+            "code-graph:composition",
+            "cli:graph-impact",
+            "code-graph:graph-store",
+            "cli:graph-search",
+            "code-graph:indexer",
+            "code-graph:staleness-detection",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:change-status",
+            "sdk:composition",
+            "code-graph:get-graph-health",
+            "code-graph:workspace-integration",
+            "cli:graph-index",
+            "sdk:run-index-project-graph",
+            "code-graph:index-project-graph",
+            "cli:graph-stats"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-28T14:55:48.743Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [code-graph:resolve-symbol-reference, code-graph:symbol-model, sdk:build-implementation-review]; design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:resolve-symbol-reference",
+            "code-graph:symbol-model",
+            "sdk:build-implementation-review"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:change-implementation",
+            "code-graph:resolve-symbol-reference",
+            "sdk:build-implementation-review",
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:traversal",
+            "code-graph:composition",
+            "cli:graph-impact",
+            "code-graph:graph-store",
+            "cli:graph-search",
+            "code-graph:indexer",
+            "code-graph:staleness-detection",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:change-status",
+            "sdk:composition",
+            "code-graph:get-graph-health",
+            "code-graph:workspace-integration",
+            "cli:graph-index",
+            "sdk:run-index-project-graph",
+            "code-graph:index-project-graph",
+            "cli:graph-stats"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-28T15:24:44.479Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-29T11:02:17.497Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-29T17:27:12.958Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [code-graph:indexer]; design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:change-implementation",
+            "code-graph:resolve-symbol-reference",
+            "sdk:build-implementation-review",
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:traversal",
+            "code-graph:composition",
+            "cli:graph-impact",
+            "code-graph:graph-store",
+            "cli:graph-search",
+            "code-graph:indexer",
+            "code-graph:staleness-detection",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:change-status",
+            "sdk:composition",
+            "code-graph:get-graph-health",
+            "code-graph:workspace-integration",
+            "cli:graph-index",
+            "sdk:run-index-project-graph",
+            "code-graph:index-project-graph",
+            "cli:graph-stats"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-29T17:27:12.958Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-29T17:32:57.543Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-29T17:34:46.704Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-29T17:35:06.961Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-29T17:53:23.530Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [code-graph:staleness-detection]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["code-graph:staleness-detection"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-29T17:53:23.530Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-29T17:59:07.038Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-29T17:59:21.887Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-29T18:24:24.066Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:change-implementation",
+            "code-graph:resolve-symbol-reference",
+            "sdk:build-implementation-review",
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:traversal",
+            "code-graph:composition",
+            "cli:graph-impact",
+            "code-graph:graph-store",
+            "cli:graph-search",
+            "code-graph:indexer",
+            "code-graph:staleness-detection",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:change-status",
+            "sdk:composition",
+            "code-graph:get-graph-health",
+            "code-graph:workspace-integration",
+            "cli:graph-index",
+            "sdk:run-index-project-graph",
+            "code-graph:index-project-graph",
+            "cli:graph-stats"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:change-implementation",
+            "code-graph:resolve-symbol-reference",
+            "sdk:build-implementation-review",
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:traversal",
+            "code-graph:composition",
+            "cli:graph-impact",
+            "code-graph:graph-store",
+            "cli:graph-search",
+            "code-graph:indexer",
+            "code-graph:staleness-detection",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:change-status",
+            "sdk:composition",
+            "code-graph:get-graph-health",
+            "code-graph:workspace-integration",
+            "cli:graph-index",
+            "sdk:run-index-project-graph",
+            "code-graph:index-project-graph",
+            "cli:graph-stats"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-29T18:24:24.066Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-29T19:18:21.173Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:change-implementation",
+            "code-graph:resolve-symbol-reference",
+            "sdk:build-implementation-review",
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:traversal",
+            "code-graph:composition",
+            "cli:graph-impact",
+            "code-graph:graph-store",
+            "cli:graph-search",
+            "code-graph:indexer",
+            "code-graph:staleness-detection",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:change-status",
+            "sdk:composition",
+            "code-graph:get-graph-health",
+            "code-graph:workspace-integration",
+            "cli:graph-index",
+            "sdk:run-index-project-graph",
+            "code-graph:index-project-graph",
+            "cli:graph-stats"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:change-implementation",
+            "code-graph:resolve-symbol-reference",
+            "sdk:build-implementation-review",
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:traversal",
+            "code-graph:composition",
+            "cli:graph-impact",
+            "code-graph:graph-store",
+            "cli:graph-search",
+            "code-graph:indexer",
+            "code-graph:staleness-detection",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:change-status",
+            "sdk:composition",
+            "code-graph:get-graph-health",
+            "code-graph:workspace-integration",
+            "cli:graph-index",
+            "sdk:run-index-project-graph",
+            "code-graph:index-project-graph",
+            "cli:graph-stats"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-29T19:18:21.271Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:change-implementation",
+            "code-graph:resolve-symbol-reference",
+            "sdk:build-implementation-review",
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:traversal",
+            "code-graph:composition",
+            "cli:graph-impact",
+            "code-graph:graph-store",
+            "cli:graph-search",
+            "code-graph:indexer",
+            "code-graph:staleness-detection",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:change-status",
+            "sdk:composition",
+            "code-graph:get-graph-health",
+            "code-graph:workspace-integration",
+            "cli:graph-index",
+            "sdk:run-index-project-graph",
+            "code-graph:index-project-graph",
+            "cli:graph-stats"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:change-implementation",
+            "code-graph:resolve-symbol-reference",
+            "sdk:build-implementation-review",
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:traversal",
+            "code-graph:composition",
+            "cli:graph-impact",
+            "code-graph:graph-store",
+            "cli:graph-search",
+            "code-graph:indexer",
+            "code-graph:staleness-detection",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:change-status",
+            "sdk:composition",
+            "code-graph:get-graph-health",
+            "code-graph:workspace-integration",
+            "cli:graph-index",
+            "sdk:run-index-project-graph",
+            "code-graph:index-project-graph",
+            "cli:graph-stats"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-29T19:18:21.282Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:vcs-adapter-port"
+        },
+        {
+          "type": "verify",
+          "key": "core:vcs-adapter-port"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-29T19:18:26.123Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:change-implementation",
+            "code-graph:resolve-symbol-reference",
+            "sdk:build-implementation-review",
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:traversal",
+            "code-graph:composition",
+            "cli:graph-impact",
+            "code-graph:graph-store",
+            "cli:graph-search",
+            "code-graph:indexer",
+            "code-graph:staleness-detection",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:change-status",
+            "sdk:composition",
+            "code-graph:get-graph-health",
+            "code-graph:workspace-integration",
+            "cli:graph-index",
+            "sdk:run-index-project-graph",
+            "code-graph:index-project-graph",
+            "cli:graph-stats",
+            "core:vcs-adapter-port"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:change-implementation",
+            "code-graph:resolve-symbol-reference",
+            "sdk:build-implementation-review",
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:traversal",
+            "code-graph:composition",
+            "cli:graph-impact",
+            "code-graph:graph-store",
+            "cli:graph-search",
+            "code-graph:indexer",
+            "code-graph:staleness-detection",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:change-status",
+            "sdk:composition",
+            "code-graph:get-graph-health",
+            "code-graph:workspace-integration",
+            "cli:graph-index",
+            "sdk:run-index-project-graph",
+            "code-graph:index-project-graph",
+            "cli:graph-stats",
+            "core:vcs-adapter-port"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-07-29T19:18:26.145Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:vcs-implementation-detector"
+        },
+        {
+          "type": "verify",
+          "key": "core:vcs-implementation-detector"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-29T19:33:23.144Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:change-implementation",
+            "code-graph:resolve-symbol-reference",
+            "sdk:build-implementation-review",
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:traversal",
+            "code-graph:composition",
+            "cli:graph-impact",
+            "code-graph:graph-store",
+            "cli:graph-search",
+            "code-graph:indexer",
+            "code-graph:staleness-detection",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:change-status",
+            "sdk:composition",
+            "code-graph:get-graph-health",
+            "code-graph:workspace-integration",
+            "cli:graph-index",
+            "sdk:run-index-project-graph",
+            "code-graph:index-project-graph",
+            "cli:graph-stats",
+            "core:vcs-adapter-port",
+            "core:vcs-implementation-detector"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:change-implementation",
+            "code-graph:resolve-symbol-reference",
+            "sdk:build-implementation-review",
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:traversal",
+            "code-graph:composition",
+            "cli:graph-impact",
+            "code-graph:graph-store",
+            "cli:graph-search",
+            "code-graph:indexer",
+            "code-graph:staleness-detection",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:change-status",
+            "sdk:composition",
+            "code-graph:get-graph-health",
+            "code-graph:workspace-integration",
+            "cli:graph-index",
+            "sdk:run-index-project-graph",
+            "code-graph:index-project-graph",
+            "cli:graph-stats",
+            "core:vcs-adapter-port",
+            "core:vcs-implementation-detector"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-29T20:05:42.837Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:change-implementation",
+            "code-graph:resolve-symbol-reference",
+            "sdk:build-implementation-review",
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:traversal",
+            "code-graph:composition",
+            "cli:graph-impact",
+            "code-graph:graph-store",
+            "cli:graph-search",
+            "code-graph:indexer",
+            "code-graph:staleness-detection",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:change-status",
+            "sdk:composition",
+            "code-graph:get-graph-health",
+            "code-graph:workspace-integration",
+            "cli:graph-index",
+            "sdk:run-index-project-graph",
+            "code-graph:index-project-graph",
+            "cli:graph-stats",
+            "core:vcs-adapter-port",
+            "core:vcs-implementation-detector"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:change-implementation",
+            "code-graph:resolve-symbol-reference",
+            "sdk:build-implementation-review",
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:traversal",
+            "code-graph:composition",
+            "cli:graph-impact",
+            "code-graph:graph-store",
+            "cli:graph-search",
+            "code-graph:indexer",
+            "code-graph:staleness-detection",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:change-status",
+            "sdk:composition",
+            "code-graph:get-graph-health",
+            "code-graph:workspace-integration",
+            "cli:graph-index",
+            "sdk:run-index-project-graph",
+            "code-graph:index-project-graph",
+            "cli:graph-stats",
+            "core:vcs-adapter-port",
+            "core:vcs-implementation-detector"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-29T20:13:19.704Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Absorb file-impact-covering-specs with provenance-aware batched reverse coverage projection",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:change-implementation",
+            "code-graph:resolve-symbol-reference",
+            "sdk:build-implementation-review",
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:traversal",
+            "code-graph:composition",
+            "cli:graph-impact",
+            "code-graph:graph-store",
+            "cli:graph-search",
+            "code-graph:indexer",
+            "code-graph:staleness-detection",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:change-status",
+            "sdk:composition",
+            "code-graph:get-graph-health",
+            "code-graph:workspace-integration",
+            "cli:graph-index",
+            "sdk:run-index-project-graph",
+            "code-graph:index-project-graph",
+            "cli:graph-stats",
+            "core:vcs-adapter-port",
+            "core:vcs-implementation-detector"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:change-implementation",
+            "code-graph:resolve-symbol-reference",
+            "sdk:build-implementation-review",
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:traversal",
+            "code-graph:composition",
+            "cli:graph-impact",
+            "code-graph:graph-store",
+            "cli:graph-search",
+            "code-graph:indexer",
+            "code-graph:staleness-detection",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:change-status",
+            "sdk:composition",
+            "code-graph:get-graph-health",
+            "code-graph:workspace-integration",
+            "cli:graph-index",
+            "sdk:run-index-project-graph",
+            "code-graph:index-project-graph",
+            "cli:graph-stats",
+            "core:vcs-adapter-port",
+            "core:vcs-implementation-detector"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-29T20:17:29.937Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Add source-file content search with symbol-aware deduplication and complete symbol source ranges",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:change-implementation",
+            "code-graph:resolve-symbol-reference",
+            "sdk:build-implementation-review",
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:traversal",
+            "code-graph:composition",
+            "cli:graph-impact",
+            "code-graph:graph-store",
+            "cli:graph-search",
+            "code-graph:indexer",
+            "code-graph:staleness-detection",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:change-status",
+            "sdk:composition",
+            "code-graph:get-graph-health",
+            "code-graph:workspace-integration",
+            "cli:graph-index",
+            "sdk:run-index-project-graph",
+            "code-graph:index-project-graph",
+            "cli:graph-stats",
+            "core:vcs-adapter-port",
+            "core:vcs-implementation-detector"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:change-implementation",
+            "code-graph:resolve-symbol-reference",
+            "sdk:build-implementation-review",
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:traversal",
+            "code-graph:composition",
+            "cli:graph-impact",
+            "code-graph:graph-store",
+            "cli:graph-search",
+            "code-graph:indexer",
+            "code-graph:staleness-detection",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:change-status",
+            "sdk:composition",
+            "code-graph:get-graph-health",
+            "code-graph:workspace-integration",
+            "cli:graph-index",
+            "sdk:run-index-project-graph",
+            "code-graph:index-project-graph",
+            "cli:graph-stats",
+            "core:vcs-adapter-port",
+            "core:vcs-implementation-detector"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-07-29T20:36:18.942Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [code-graph:get-graph-health, code-graph:graph-store, code-graph:staleness-detection]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:get-graph-health",
+            "code-graph:graph-store",
+            "code-graph:staleness-detection"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-29T20:44:22.779Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-07-29T20:45:01.168Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-02T13:26:34.901Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:change-implementation",
+            "code-graph:resolve-symbol-reference",
+            "sdk:build-implementation-review",
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:traversal",
+            "code-graph:composition",
+            "cli:graph-impact",
+            "code-graph:graph-store",
+            "cli:graph-search",
+            "code-graph:indexer",
+            "code-graph:staleness-detection",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:change-status",
+            "sdk:composition",
+            "code-graph:get-graph-health",
+            "code-graph:workspace-integration",
+            "cli:graph-index",
+            "sdk:run-index-project-graph",
+            "code-graph:index-project-graph",
+            "cli:graph-stats",
+            "core:vcs-adapter-port",
+            "core:vcs-implementation-detector"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:change-implementation",
+            "code-graph:resolve-symbol-reference",
+            "sdk:build-implementation-review",
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:traversal",
+            "code-graph:composition",
+            "cli:graph-impact",
+            "code-graph:graph-store",
+            "cli:graph-search",
+            "code-graph:indexer",
+            "code-graph:staleness-detection",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:change-status",
+            "sdk:composition",
+            "code-graph:get-graph-health",
+            "code-graph:workspace-integration",
+            "cli:graph-index",
+            "sdk:run-index-project-graph",
+            "code-graph:index-project-graph",
+            "cli:graph-stats",
+            "core:vcs-adapter-port",
+            "core:vcs-implementation-detector"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-02T13:26:34.901Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-02T13:33:23.613Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [code-graph:language-adapter]; verify [code-graph:language-adapter]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:language-adapter"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:language-adapter"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-02T13:35:33.447Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-02T13:35:39.712Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-02T14:00:40.637Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [code-graph:indexer]; verify [code-graph:indexer]; design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-02T14:00:40.637Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-02T14:06:35.931Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [code-graph:indexer]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:change-implementation",
+            "code-graph:resolve-symbol-reference",
+            "sdk:build-implementation-review",
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:traversal",
+            "code-graph:composition",
+            "cli:graph-impact",
+            "code-graph:graph-store",
+            "cli:graph-search",
+            "code-graph:indexer",
+            "code-graph:staleness-detection",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:change-status",
+            "sdk:composition",
+            "code-graph:get-graph-health",
+            "code-graph:workspace-integration",
+            "cli:graph-index",
+            "sdk:run-index-project-graph",
+            "code-graph:index-project-graph",
+            "cli:graph-stats",
+            "core:vcs-adapter-port",
+            "core:vcs-implementation-detector"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-02T14:08:19.250Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Re-review final compliance remediation artifacts before verification",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:change-implementation",
+            "code-graph:resolve-symbol-reference",
+            "sdk:build-implementation-review",
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:traversal",
+            "code-graph:composition",
+            "cli:graph-impact",
+            "code-graph:graph-store",
+            "cli:graph-search",
+            "code-graph:indexer",
+            "code-graph:staleness-detection",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:change-status",
+            "sdk:composition",
+            "code-graph:get-graph-health",
+            "code-graph:workspace-integration",
+            "cli:graph-index",
+            "sdk:run-index-project-graph",
+            "code-graph:index-project-graph",
+            "cli:graph-stats",
+            "core:vcs-adapter-port",
+            "core:vcs-implementation-detector"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:change-implementation",
+            "code-graph:resolve-symbol-reference",
+            "sdk:build-implementation-review",
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:traversal",
+            "code-graph:composition",
+            "cli:graph-impact",
+            "code-graph:graph-store",
+            "cli:graph-search",
+            "code-graph:indexer",
+            "code-graph:staleness-detection",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:change-status",
+            "sdk:composition",
+            "code-graph:get-graph-health",
+            "code-graph:workspace-integration",
+            "cli:graph-index",
+            "sdk:run-index-project-graph",
+            "code-graph:index-project-graph",
+            "cli:graph-stats",
+            "core:vcs-adapter-port",
+            "core:vcs-implementation-detector"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-02T14:08:56.853Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-02T14:08:59.369Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-02T14:30:40.858Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [code-graph:get-graph-health, code-graph:indexer]; verify [code-graph:get-graph-health, code-graph:indexer]; design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:get-graph-health", "code-graph:indexer"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:get-graph-health", "code-graph:indexer"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-02T14:30:40.858Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-02T14:34:56.448Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [code-graph:indexer]; verify [code-graph:indexer]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-02T14:42:27.675Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-02T14:46:03.703Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [code-graph:indexer]; verify [code-graph:indexer]; design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-02T14:46:45.301Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-02T14:47:08.441Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-02T15:10:42.593Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [code-graph:graph-store, code-graph:indexer]; verify [code-graph:graph-store]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:graph-store", "code-graph:indexer"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:graph-store"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-02T15:10:42.593Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-02T15:19:03.110Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-02T15:20:04.645Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-02T15:35:40.082Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:graph-index]; verify [cli:graph-index]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["cli:graph-index"]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:graph-index"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-02T15:35:40.082Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-02T15:36:11.530Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [cli:graph-index]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["cli:graph-index"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-02T15:43:15.627Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [code-graph:indexer]; verify [code-graph:indexer]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-14T08:37:54.126Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-14T08:38:18.574Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-14T09:15:14.954Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-14T09:16:28.850Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-14T09:16:57.917Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-14T09:41:55.008Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:change-implementation",
+            "code-graph:resolve-symbol-reference",
+            "sdk:build-implementation-review",
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:traversal",
+            "code-graph:composition",
+            "cli:graph-impact",
+            "code-graph:graph-store",
+            "cli:graph-search",
+            "code-graph:indexer",
+            "code-graph:staleness-detection",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:change-status",
+            "sdk:composition",
+            "code-graph:get-graph-health",
+            "code-graph:workspace-integration",
+            "cli:graph-index",
+            "sdk:run-index-project-graph",
+            "code-graph:index-project-graph",
+            "cli:graph-stats",
+            "core:vcs-adapter-port",
+            "core:vcs-implementation-detector"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:change-implementation",
+            "code-graph:resolve-symbol-reference",
+            "sdk:build-implementation-review",
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:traversal",
+            "code-graph:composition",
+            "cli:graph-impact",
+            "code-graph:graph-store",
+            "cli:graph-search",
+            "code-graph:indexer",
+            "code-graph:staleness-detection",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:change-status",
+            "sdk:composition",
+            "code-graph:get-graph-health",
+            "code-graph:workspace-integration",
+            "cli:graph-index",
+            "sdk:run-index-project-graph",
+            "code-graph:index-project-graph",
+            "cli:graph-stats",
+            "core:vcs-adapter-port",
+            "core:vcs-implementation-detector"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-14T09:41:55.008Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-14T09:52:45.657Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-14T09:53:20.771Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-14T11:02:25.647Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:change-implementation",
+            "code-graph:resolve-symbol-reference",
+            "sdk:build-implementation-review",
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:traversal",
+            "code-graph:composition",
+            "cli:graph-impact",
+            "code-graph:graph-store",
+            "cli:graph-search",
+            "code-graph:indexer",
+            "code-graph:staleness-detection",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:change-status",
+            "sdk:composition",
+            "code-graph:get-graph-health",
+            "code-graph:workspace-integration",
+            "cli:graph-index",
+            "sdk:run-index-project-graph",
+            "code-graph:index-project-graph",
+            "cli:graph-stats",
+            "core:vcs-adapter-port",
+            "core:vcs-implementation-detector"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:change-implementation",
+            "code-graph:resolve-symbol-reference",
+            "sdk:build-implementation-review",
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:traversal",
+            "code-graph:composition",
+            "cli:graph-impact",
+            "code-graph:graph-store",
+            "cli:graph-search",
+            "code-graph:indexer",
+            "code-graph:staleness-detection",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:change-status",
+            "sdk:composition",
+            "code-graph:get-graph-health",
+            "code-graph:workspace-integration",
+            "cli:graph-index",
+            "sdk:run-index-project-graph",
+            "code-graph:index-project-graph",
+            "cli:graph-stats",
+            "core:vcs-adapter-port",
+            "core:vcs-implementation-detector"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-14T11:02:25.647Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-14T11:13:00.479Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-14T11:13:40.045Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-15T16:36:12.803Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:change-implementation",
+            "code-graph:resolve-symbol-reference",
+            "sdk:build-implementation-review",
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:traversal",
+            "code-graph:composition",
+            "cli:graph-impact",
+            "code-graph:graph-store",
+            "cli:graph-search",
+            "code-graph:indexer",
+            "code-graph:staleness-detection",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:change-status",
+            "sdk:composition",
+            "code-graph:get-graph-health",
+            "code-graph:workspace-integration",
+            "cli:graph-index",
+            "sdk:run-index-project-graph",
+            "code-graph:index-project-graph",
+            "cli:graph-stats",
+            "core:vcs-adapter-port",
+            "core:vcs-implementation-detector"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:change-implementation",
+            "code-graph:resolve-symbol-reference",
+            "sdk:build-implementation-review",
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:traversal",
+            "code-graph:composition",
+            "cli:graph-impact",
+            "code-graph:graph-store",
+            "cli:graph-search",
+            "code-graph:indexer",
+            "code-graph:staleness-detection",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:change-status",
+            "sdk:composition",
+            "code-graph:get-graph-health",
+            "code-graph:workspace-integration",
+            "cli:graph-index",
+            "sdk:run-index-project-graph",
+            "code-graph:index-project-graph",
+            "cli:graph-stats",
+            "core:vcs-adapter-port",
+            "core:vcs-implementation-detector"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-15T16:36:12.803Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-15T16:46:29.036Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-15T16:48:56.335Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-15T17:51:52.696Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:change-implementation",
+            "code-graph:resolve-symbol-reference",
+            "sdk:build-implementation-review",
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:traversal",
+            "code-graph:composition",
+            "cli:graph-impact",
+            "code-graph:graph-store",
+            "cli:graph-search",
+            "code-graph:indexer",
+            "code-graph:staleness-detection",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:change-status",
+            "sdk:composition",
+            "code-graph:get-graph-health",
+            "code-graph:workspace-integration",
+            "cli:graph-index",
+            "sdk:run-index-project-graph",
+            "code-graph:index-project-graph",
+            "cli:graph-stats",
+            "core:vcs-adapter-port",
+            "core:vcs-implementation-detector"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:change-implementation",
+            "code-graph:resolve-symbol-reference",
+            "sdk:build-implementation-review",
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:traversal",
+            "code-graph:composition",
+            "cli:graph-impact",
+            "code-graph:graph-store",
+            "cli:graph-search",
+            "code-graph:indexer",
+            "code-graph:staleness-detection",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:change-status",
+            "sdk:composition",
+            "code-graph:get-graph-health",
+            "code-graph:workspace-integration",
+            "cli:graph-index",
+            "sdk:run-index-project-graph",
+            "code-graph:index-project-graph",
+            "cli:graph-stats",
+            "core:vcs-adapter-port",
+            "core:vcs-implementation-detector"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-15T17:51:52.696Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-15T18:00:46.322Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-15T18:01:42.670Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-15T18:15:45.692Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-15T18:15:45.692Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-15T18:20:15.738Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-15T18:20:39.053Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-16T06:23:13.351Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:change-implementation",
+            "code-graph:resolve-symbol-reference",
+            "sdk:build-implementation-review",
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:traversal",
+            "code-graph:composition",
+            "cli:graph-impact",
+            "code-graph:graph-store",
+            "cli:graph-search",
+            "code-graph:indexer",
+            "code-graph:staleness-detection",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:change-status",
+            "sdk:composition",
+            "code-graph:get-graph-health",
+            "code-graph:workspace-integration",
+            "cli:graph-index",
+            "sdk:run-index-project-graph",
+            "code-graph:index-project-graph",
+            "cli:graph-stats",
+            "core:vcs-adapter-port",
+            "core:vcs-implementation-detector"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:change-implementation",
+            "code-graph:resolve-symbol-reference",
+            "sdk:build-implementation-review",
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:traversal",
+            "code-graph:composition",
+            "cli:graph-impact",
+            "code-graph:graph-store",
+            "cli:graph-search",
+            "code-graph:indexer",
+            "code-graph:staleness-detection",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:change-status",
+            "sdk:composition",
+            "code-graph:get-graph-health",
+            "code-graph:workspace-integration",
+            "cli:graph-index",
+            "sdk:run-index-project-graph",
+            "code-graph:index-project-graph",
+            "cli:graph-stats",
+            "core:vcs-adapter-port",
+            "core:vcs-implementation-detector"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-16T06:23:13.351Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-16T06:24:04.981Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:change-implementation",
+            "code-graph:resolve-symbol-reference",
+            "sdk:build-implementation-review",
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:traversal",
+            "code-graph:composition",
+            "cli:graph-impact",
+            "code-graph:graph-store",
+            "cli:graph-search",
+            "code-graph:indexer",
+            "code-graph:staleness-detection",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:change-status",
+            "sdk:composition",
+            "code-graph:get-graph-health",
+            "code-graph:workspace-integration",
+            "cli:graph-index",
+            "sdk:run-index-project-graph",
+            "code-graph:index-project-graph",
+            "cli:graph-stats",
+            "core:vcs-adapter-port",
+            "core:vcs-implementation-detector"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:change-implementation",
+            "code-graph:resolve-symbol-reference",
+            "sdk:build-implementation-review",
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:traversal",
+            "code-graph:composition",
+            "cli:graph-impact",
+            "code-graph:graph-store",
+            "cli:graph-search",
+            "code-graph:indexer",
+            "code-graph:staleness-detection",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:change-status",
+            "sdk:composition",
+            "code-graph:get-graph-health",
+            "code-graph:workspace-integration",
+            "cli:graph-index",
+            "sdk:run-index-project-graph",
+            "code-graph:index-project-graph",
+            "cli:graph-stats",
+            "core:vcs-adapter-port",
+            "core:vcs-implementation-detector"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-08-16T06:24:04.987Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "code-graph:typescript-language-adapter"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:typescript-language-adapter"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-16T06:24:05.553Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:change-implementation",
+            "code-graph:resolve-symbol-reference",
+            "sdk:build-implementation-review",
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:traversal",
+            "code-graph:composition",
+            "cli:graph-impact",
+            "code-graph:graph-store",
+            "cli:graph-search",
+            "code-graph:indexer",
+            "code-graph:staleness-detection",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:change-status",
+            "sdk:composition",
+            "code-graph:get-graph-health",
+            "code-graph:workspace-integration",
+            "cli:graph-index",
+            "sdk:run-index-project-graph",
+            "code-graph:index-project-graph",
+            "cli:graph-stats",
+            "core:vcs-adapter-port",
+            "core:vcs-implementation-detector",
+            "code-graph:typescript-language-adapter"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:change-implementation",
+            "code-graph:resolve-symbol-reference",
+            "sdk:build-implementation-review",
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:traversal",
+            "code-graph:composition",
+            "cli:graph-impact",
+            "code-graph:graph-store",
+            "cli:graph-search",
+            "code-graph:indexer",
+            "code-graph:staleness-detection",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:change-status",
+            "sdk:composition",
+            "code-graph:get-graph-health",
+            "code-graph:workspace-integration",
+            "cli:graph-index",
+            "sdk:run-index-project-graph",
+            "code-graph:index-project-graph",
+            "cli:graph-stats",
+            "core:vcs-adapter-port",
+            "core:vcs-implementation-detector",
+            "code-graph:typescript-language-adapter"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-08-16T06:24:05.559Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "code-graph:python-language-adapter"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:python-language-adapter"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-16T06:24:06.113Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:change-implementation",
+            "code-graph:resolve-symbol-reference",
+            "sdk:build-implementation-review",
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:traversal",
+            "code-graph:composition",
+            "cli:graph-impact",
+            "code-graph:graph-store",
+            "cli:graph-search",
+            "code-graph:indexer",
+            "code-graph:staleness-detection",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:change-status",
+            "sdk:composition",
+            "code-graph:get-graph-health",
+            "code-graph:workspace-integration",
+            "cli:graph-index",
+            "sdk:run-index-project-graph",
+            "code-graph:index-project-graph",
+            "cli:graph-stats",
+            "core:vcs-adapter-port",
+            "core:vcs-implementation-detector",
+            "code-graph:typescript-language-adapter",
+            "code-graph:python-language-adapter"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:change-implementation",
+            "code-graph:resolve-symbol-reference",
+            "sdk:build-implementation-review",
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:traversal",
+            "code-graph:composition",
+            "cli:graph-impact",
+            "code-graph:graph-store",
+            "cli:graph-search",
+            "code-graph:indexer",
+            "code-graph:staleness-detection",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:change-status",
+            "sdk:composition",
+            "code-graph:get-graph-health",
+            "code-graph:workspace-integration",
+            "cli:graph-index",
+            "sdk:run-index-project-graph",
+            "code-graph:index-project-graph",
+            "cli:graph-stats",
+            "core:vcs-adapter-port",
+            "core:vcs-implementation-detector",
+            "code-graph:typescript-language-adapter",
+            "code-graph:python-language-adapter"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-08-16T06:24:06.120Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "code-graph:go-language-adapter"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:go-language-adapter"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-16T06:24:06.694Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:change-implementation",
+            "code-graph:resolve-symbol-reference",
+            "sdk:build-implementation-review",
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:traversal",
+            "code-graph:composition",
+            "cli:graph-impact",
+            "code-graph:graph-store",
+            "cli:graph-search",
+            "code-graph:indexer",
+            "code-graph:staleness-detection",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:change-status",
+            "sdk:composition",
+            "code-graph:get-graph-health",
+            "code-graph:workspace-integration",
+            "cli:graph-index",
+            "sdk:run-index-project-graph",
+            "code-graph:index-project-graph",
+            "cli:graph-stats",
+            "core:vcs-adapter-port",
+            "core:vcs-implementation-detector",
+            "code-graph:typescript-language-adapter",
+            "code-graph:python-language-adapter",
+            "code-graph:go-language-adapter"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:change-implementation",
+            "code-graph:resolve-symbol-reference",
+            "sdk:build-implementation-review",
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:traversal",
+            "code-graph:composition",
+            "cli:graph-impact",
+            "code-graph:graph-store",
+            "cli:graph-search",
+            "code-graph:indexer",
+            "code-graph:staleness-detection",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:change-status",
+            "sdk:composition",
+            "code-graph:get-graph-health",
+            "code-graph:workspace-integration",
+            "cli:graph-index",
+            "sdk:run-index-project-graph",
+            "code-graph:index-project-graph",
+            "cli:graph-stats",
+            "core:vcs-adapter-port",
+            "core:vcs-implementation-detector",
+            "code-graph:typescript-language-adapter",
+            "code-graph:python-language-adapter",
+            "code-graph:go-language-adapter"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-08-16T06:24:06.701Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "code-graph:php-language-adapter"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:php-language-adapter"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-16T06:43:02.358Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-16T06:45:38.866Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-16T07:21:18.433Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:change-implementation",
+            "code-graph:resolve-symbol-reference",
+            "sdk:build-implementation-review",
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:traversal",
+            "code-graph:composition",
+            "cli:graph-impact",
+            "code-graph:graph-store",
+            "cli:graph-search",
+            "code-graph:indexer",
+            "code-graph:staleness-detection",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:change-status",
+            "sdk:composition",
+            "code-graph:get-graph-health",
+            "code-graph:workspace-integration",
+            "cli:graph-index",
+            "sdk:run-index-project-graph",
+            "code-graph:index-project-graph",
+            "cli:graph-stats",
+            "core:vcs-adapter-port",
+            "core:vcs-implementation-detector",
+            "code-graph:typescript-language-adapter",
+            "code-graph:python-language-adapter",
+            "code-graph:go-language-adapter",
+            "code-graph:php-language-adapter"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:change-implementation",
+            "code-graph:resolve-symbol-reference",
+            "sdk:build-implementation-review",
+            "code-graph:symbol-model",
+            "code-graph:language-adapter",
+            "code-graph:traversal",
+            "code-graph:composition",
+            "cli:graph-impact",
+            "code-graph:graph-store",
+            "cli:graph-search",
+            "code-graph:indexer",
+            "code-graph:staleness-detection",
+            "code-graph:sqlite-graph-store",
+            "code-graph:ladybug-graph-store",
+            "cli:change-status",
+            "sdk:composition",
+            "code-graph:get-graph-health",
+            "code-graph:workspace-integration",
+            "cli:graph-index",
+            "sdk:run-index-project-graph",
+            "code-graph:index-project-graph",
+            "cli:graph-stats",
+            "core:vcs-adapter-port",
+            "core:vcs-implementation-detector",
+            "code-graph:typescript-language-adapter",
+            "code-graph:python-language-adapter",
+            "code-graph:go-language-adapter",
+            "code-graph:php-language-adapter"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-16T07:21:18.433Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-16T07:31:29.429Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-16T07:32:03.888Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-16T07:32:44.272Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-16T07:58:09.109Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-16T08:03:39.611Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-16T08:03:56.173Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-08-16T08:08:54.423Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Implementation link \"code-graph:symbol-model\" points outside workspace \"code-graph\" codeRoot.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-08-16T08:08:56.529Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Implementation link \"code-graph:symbol-model\" points outside workspace \"code-graph\" codeRoot.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-08-16T08:09:18.954Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Implementation link \"code-graph:resolve-symbol-reference\" points outside workspace \"code-graph\" codeRoot.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-08-16T08:09:58.624Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Implementation link \"cli:graph-search\" points outside workspace \"cli\" codeRoot.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-08-16T08:10:03.508Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Implementation link \"cli:graph-search\" points outside workspace \"cli\" codeRoot.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-08-16T08:10:16.375Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Implementation link \"cli:graph-search\" points outside workspace \"cli\" codeRoot.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-08-16T08:10:24.028Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Implementation link \"code-graph:get-graph-health\" points outside workspace \"code-graph\" codeRoot.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-08-16T08:11:58.453Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'code-graph:get-graph-health': extracted dependencies [code-graph:composition, code-graph:staleness-detection, core:config, core:list-workspaces] do not match persisted dependencies [code-graph:composition, code-graph:staleness-detection, core:config, core:list-workspaces, core:vcs-adapter-port]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-08-16T08:12:13.208Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'code-graph:get-graph-health': extracted dependencies [code-graph:composition, code-graph:staleness-detection, core:config, core:list-workspaces] do not match persisted dependencies [code-graph:composition, code-graph:staleness-detection, core:config, core:list-workspaces, core:vcs-adapter-port]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-08-16T08:12:31.517Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'sdk:run-index-project-graph': extracted dependencies [sdk:with-open-graph-provider, code-graph:index-project-graph, core:list-workspaces] do not match persisted dependencies [sdk:with-open-graph-provider, code-graph:index-project-graph, core:list-workspaces, core:vcs-adapter]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-16T08:12:46.840Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-08-16T08:12:49.128Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

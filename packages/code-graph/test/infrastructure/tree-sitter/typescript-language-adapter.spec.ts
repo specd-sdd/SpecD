@@ -12,10 +12,11 @@ import {
   type BindingFact,
 } from '../../../src/domain/value-objects/binding-fact.js'
 import { CallForm, type CallFact } from '../../../src/domain/value-objects/call-fact.js'
-import { type SymbolNode } from '../../../src/domain/value-objects/symbol-node.js'
+import { type SourceRange, type SymbolNode } from '../../../src/domain/value-objects/symbol-node.js'
 import { type Relation } from '../../../src/domain/value-objects/relation.js'
 import { type ImportDeclaration } from '../../../src/domain/value-objects/import-declaration.js'
 import { InMemoryIndexSession } from '../../../src/application/use-cases/in-memory-index-session.js'
+import { parseLogicalSymbol } from '../../../src/domain/value-objects/symbol-reference.js'
 
 interface TestAdapter {
   languages(): string[]
@@ -43,6 +44,16 @@ interface TestAdapter {
 
 const baseAdapter = new TypeScriptLanguageAdapter()
 const adapter = baseAdapter as unknown as TestAdapter
+
+function sliceRange(content: string, range: SourceRange): string {
+  const lines = content.split('\n')
+  const offsetAt = (line: number, column: number): number =>
+    lines.slice(0, line - 1).reduce((offset, value) => offset + value.length + 1, 0) + column
+  return content.slice(
+    offsetAt(range.startLine, range.startColumn),
+    offsetAt(range.endLine, range.endColumn),
+  )
+}
 
 adapter.extractSymbols = (filePath: string, content: string): SymbolNode[] => {
   const session = new InMemoryIndexSession()
@@ -161,6 +172,178 @@ describe('TypeScriptLanguageAdapter', () => {
     expect(adapter.languages()).toEqual(['typescript', 'tsx', 'javascript', 'jsx'])
   })
 
+  it('emits logical declarations, exports, aliases, and explicit capabilities', () => {
+    const session = new InMemoryIndexSession()
+    const facts = baseAdapter.analyzeFile(
+      'src/index.ts',
+      "import { Source as Alias } from './source.js'\nexport class PublicApi { get value() { return Alias } }",
+      { session, workspaceName: 'workspace' },
+    ).referenceFacts
+
+    expect(baseAdapter.capabilities()).toMatchObject({
+      declarations: true,
+      publicBindings: true,
+      localBindings: true,
+      hierarchy: true,
+      buildContext: false,
+    })
+    expect(facts?.declarations.some((item) => item.logicalId.includes('PublicApi'))).toBe(true)
+    expect(facts?.publicBindings.map((item) => item.exportedName)).toContain('PublicApi')
+    expect(facts?.localBindings.map((item) => item.localName)).toContain('Alias')
+  })
+
+  it('owner-qualifies methods and emits hierarchy evidence', () => {
+    const facts = baseAdapter.analyzeFile(
+      'workspace:src/services.ts',
+      'class Base {\n  save() {}\n}\nclass First extends Base {\n  save() {}\n}\nclass Second {\n  save() {}\n}',
+      { session: new InMemoryIndexSession(), workspaceName: 'workspace' },
+    ).referenceFacts
+
+    const methods = facts?.declarations
+      .map((item) => parseLogicalSymbol(item.logicalId))
+      .filter((item) => item?.name === 'save')
+    expect(methods).toHaveLength(3)
+    expect(new Set(methods?.map((item) => item?.ownerId)).size).toBe(3)
+    expect(facts?.hierarchy).toEqual([expect.objectContaining({ kind: 'extends', precedence: 0 })])
+    expect(facts?.steps).toEqual([expect.objectContaining({ kind: 'extends:0' })])
+  })
+
+  it('retains static, instance, constructor, and interface-signature member forms', () => {
+    const facts = baseAdapter.analyzeFile(
+      'workspace:src/forms.ts',
+      `interface Contract {
+  save(): void
+}
+class Service {
+  constructor() {}
+  static create() {}
+  save() {}
+}`,
+      { session: new InMemoryIndexSession(), workspaceName: 'workspace' },
+    ).referenceFacts!
+
+    const forms = facts.declarations
+      .map((item) => parseLogicalSymbol(item.logicalId))
+      .filter((item) => item?.ownerId !== undefined)
+      .map((item) => [item?.name, item?.memberForm])
+
+    expect(forms).toEqual(
+      expect.arrayContaining([
+        ['save', 'signature'],
+        ['constructor', 'constructor'],
+        ['create', 'static'],
+        ['save', 'instance'],
+      ]),
+    )
+  })
+
+  it('owner-qualifies compact same-line class methods by construct range', () => {
+    const facts = baseAdapter.analyzeFile(
+      'workspace:src/compact.ts',
+      'class First { save() {} } class Second { save() {} }',
+      { session: new InMemoryIndexSession(), workspaceName: 'workspace' },
+    ).referenceFacts!
+    const saves = facts.declarations
+      .map((declaration) => parseLogicalSymbol(declaration.logicalId))
+      .filter((logical) => logical?.name === 'save')
+
+    expect(saves).toHaveLength(2)
+    expect(new Set(saves.map((logical) => logical?.ownerId)).size).toBe(2)
+  })
+
+  it('does not expose a member that shares an exported top-level name', () => {
+    const facts = baseAdapter.analyzeFile(
+      'workspace:src/exports.ts',
+      'export function save() {}\nexport class Service { save() {} }',
+      { session: new InMemoryIndexSession(), workspaceName: 'workspace' },
+    ).referenceFacts!
+
+    expect(facts.publicBindings.filter((binding) => binding.exportedName === 'save')).toHaveLength(
+      1,
+    )
+  })
+
+  it('emits an unresolved public binding for a named re-export alias', () => {
+    const session = new InMemoryIndexSession()
+    const facts = baseAdapter.analyzeFile(
+      'workspace:src/index.ts',
+      "export { Service as PublicService } from './service.js'",
+      { session, workspaceName: 'workspace' },
+    ).referenceFacts
+
+    expect(facts?.publicBindings).toEqual([
+      expect.objectContaining({
+        surface: 'workspace:src/index.ts',
+        exportedName: 'PublicService',
+        targetId: undefined,
+      }),
+    ])
+  })
+
+  it('retains export-star syntax for pass-2 expansion without inventing a wildcard binding', () => {
+    const session = new InMemoryIndexSession()
+    const draft = baseAdapter.analyzeFile(
+      'workspace:src/index.ts',
+      "export * from './service.js'",
+      { session, workspaceName: 'workspace' },
+    )
+
+    expect(draft.referenceFacts?.publicBindings).toEqual([])
+    expect(draft.parserState).toMatchObject({
+      reExports: [
+        {
+          specifier: './service.js',
+          importedName: '*',
+          exportedName: '*',
+        },
+      ],
+    })
+  })
+
+  it('resolves an import through a named re-export alias', () => {
+    const session = new InMemoryIndexSession()
+    const files = [
+      ['workspace:src/service.ts', 'export class Service {}'],
+      ['workspace:src/index.ts', "export { Service as PublicService } from './service.js'"],
+      [
+        'workspace:src/consumer.ts',
+        "import { PublicService } from './index.js'\nnew PublicService()",
+      ],
+    ] as const
+    for (const [filePath, content] of files) {
+      session.registerFile({
+        filePath,
+        configRelativePath: filePath,
+        language: 'typescript',
+        contentHash: 'abc',
+        workspace: 'workspace',
+      })
+      session.registerAnalysis({
+        filePath,
+        analysis: baseAdapter.analyzeFile(filePath, content, {
+          session,
+          workspaceName: 'workspace',
+        }),
+      })
+    }
+
+    const consumer = session.getAnalysis('workspace:src/consumer.ts')!
+    const resolved = baseAdapter.resolveImports(consumer, {
+      session,
+      qualifiedNames: new Map(),
+      packageToWorkspace: new Map(),
+    })
+    expect(resolved.importMap.get('PublicService')).toBe(
+      session.findSymbolsByFile('workspace:src/service.ts')[0]?.id,
+    )
+    expect(consumer.callFacts).toEqual([
+      expect.objectContaining({
+        targetName: 'PublicService',
+        form: CallForm.Constructor,
+      }),
+    ])
+  })
+
   describe('extractSymbols', () => {
     it('extracts function declarations', () => {
       const code = `function greet(name: string): string { return name }`
@@ -176,6 +359,28 @@ describe('TypeScriptLanguageAdapter', () => {
       expect(symbols).toHaveLength(1)
       expect(symbols[0]!.name).toBe('fetchData')
       expect(symbols[0]!.kind).toBe(SymbolKind.Function)
+    })
+
+    it('extracts parser-authoritative construct and declared-name ranges', () => {
+      const code = `class UserService {
+  execute(): void {
+    return
+  }
+}`
+      const symbol = adapter
+        .extractSymbols('main.ts', code)
+        .find((candidate) => candidate.name === 'UserService')!
+
+      expect(
+        sliceRange(code, {
+          startLine: symbol.line,
+          startColumn: symbol.column,
+          endLine: symbol.endLine,
+          endColumn: symbol.endColumn,
+        }),
+      ).toBe(code)
+      expect(sliceRange(code, symbol.selectionRange)).toBe('UserService')
+      expect(symbol.id).toBe('main.ts:class:UserService:1:0')
     })
 
     it('extracts arrow functions assigned to const', () => {
@@ -400,7 +605,7 @@ Article.formatTitle = (title) => { };`
       expect(relations.some((r: Relation) => r.type === RelationType.Implements)).toBe(true)
 
       const overrides = relations.filter((r: Relation) => r.type === RelationType.Overrides)
-      expect(overrides).toHaveLength(1)
+      expect(overrides).toHaveLength(2)
     })
 
     it('creates EXTENDS for imported base classes', () => {

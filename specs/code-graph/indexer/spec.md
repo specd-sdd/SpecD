@@ -239,6 +239,38 @@ Spec indexing runs as an additional phase after source file indexing.
 
 When indexing specs into the code graph, the indexer SHALL prefer `optimizedDescription` (if it exists and is not empty) over the standard `description` for BM25 full-text indexing and display metadata.
 
+### Requirement: Reference fact indexing
+
+The two-pass indexing session SHALL group declaration occurrences into logical symbols, normalize member forms and symbol spaces, preserve public/local bindings and every proven route, and persist hierarchy and binding provenance atomically.
+
+The indexer SHALL persist a coverage outcome for every discovered or considered source target, including indexed content hash, excluded, unsupported capability, parse-failed, and partial states. Index errors required for later absence decisions MUST NOT exist only in the transient `IndexResult`.
+
+`COVERS_SYMBOL` relations SHALL resolve to logical-symbol identity rather than an arbitrary declaration occurrence. Ambiguous, runtime-only, or conditional-without-context references MUST NOT create guessed relations.
+
+Every persisted source file SHALL retain the indexed textual content used for analysis. Every emitted symbol SHALL carry its parser-derived complete construct range and declared-name selection range through chunking, semantic reconstruction, backend persistence, and structured query results without recomputing ranges from neighboring symbols.
+
+Relation construction SHALL build reusable declaration, logical-symbol, import, and public-binding lookup indexes once per indexing session. Resolving an individual call, dependency, import, or re-export MUST NOT scan the complete logical declaration or symbol collection. Persistence SHALL retain bounded chunk/batch writes so the work of building relations grows with the processed relation facts rather than multiplying them by the full graph size.
+
+### Requirement: Incompatible derivation rebuild
+
+When package derivation fingerprint or backend schema is incompatible, project indexing SHALL perform a visible destructive full rebuild through provider-owned recreation, rotate storage generation, and report the rebuild reason. Ordinary read paths MUST NOT perform this repair or serve a silently empty graph.
+
+### Requirement: Indexed-input observation capture
+
+A successful index SHALL atomically replace indexed-input observations for every produced file, document, and spec resource, including every physical or repository input of aggregate specs. It SHALL record current hash and observation evidence with `stale: false`, replace workspace VCS-scope base-ref/diff evidence, and clear workspace and aggregate stale latches only when the complete indexing session commits.
+
+Failed or partial indexing MUST NOT clear stale evidence. Removed resources and obsolete inputs SHALL be pruned in the same committed generation.
+
+### Requirement: Bounded incremental relation construction
+
+Incremental indexing SHALL use persisted filesystem mtime/size observations as a read-avoidance fast path and content hashes as the authoritative comparison whenever a stamp differs or no observation exists. Equal stamps SHALL reuse the indexed content hash; changed stamps with equal content SHALL remain unchanged. The result SHALL identify changed, removed, and unchanged inputs and report those counts accurately. A normal semantic refresh SHALL re-extract only new and changed targets plus the transitive importer, relation-dependent, hierarchy-dependent, or public-route closure whose derived facts may change. Because native stores cannot retain relations to absent endpoints, a run containing newly added code files SHALL conservatively re-extract existing code files that may contain previously unresolved imports; this addition-only fallback MUST NOT classify unchanged files as content-indexed. Unaffected files and documents MUST retain their persisted nodes, symbols, relations, and reference facts without adapter extraction outside that addition-only fallback. The run SHALL hydrate the compact persisted facts needed to resolve affected files against unchanged declarations and bindings. Full-corpus destructive replacement is reserved for an explicit force operation, an incompatible derivation/schema rebuild, or an initial empty graph.
+
+Re-export and public-binding propagation SHALL use indexed affected-route work queues rather than repeated full-file passes. Enclosing-symbol, ownership, hierarchy, and relation-endpoint resolution SHALL use run-scoped indexes and batch Store operations instead of repeated sorting, whole-collection scans, or N+1 queries.
+
+The indexer SHALL append bounded chunks to one Store bulk session, commit once, and request at most one final rebuild covering semantic, document, spec, and source-content indexes when searchable content changed. A fully unchanged generation SHALL preserve the existing semantic reference-fact snapshot while updating metadata and freshness state, without re-extracting files, replacing reference facts, constructing relations, or rebuilding search indexes. Persisted coverage hashes SHALL participate in diffing targets such as non-text content that intentionally has no File or Document node. Full and incremental indexing of equivalent source state MUST produce equivalent nodes, ranges, semantic facts, relations, and source-search behavior. Progress SHALL report separate counts and timings for import resolution, dependency facts, adapter relations, re-exports, hierarchy/overrides, persistence, and search-index rebuilding. Persistence timing SHALL include cleanup, staged writes, observation/reference-fact writes, relation writes, and non-search commit work; search-index timing SHALL be zero when no search rebuild is requested and SHALL cover only the backend search-index step when requested.
+
+`IndexResult` SHALL expose `fullRebuild: boolean` directly in addition to `fullRebuildReason`, so every Code Graph, SDK, and CLI caller receives the same rebuild truth without reconstructing it at a higher layer.
+
 ## Constraints
 
 - The `GraphStore` must be opened before calling the use case — the indexer does not manage store lifecycle

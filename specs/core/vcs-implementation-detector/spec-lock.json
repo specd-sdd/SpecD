@@ -6,8 +6,46 @@
   "dependsOn": ["core:implementation-detector-port", "core:vcs-adapter-port"],
   "implementation": [
     {
-      "file": "core:src/infrastructure/vcs/vcs-implementation-detector.ts",
-      "symbols": ["VcsImplementationDetector", "VcsImplementationDetector.detectModifiedFiles"]
+      "file": "core:src/infrastructure/vcs/vcs-implementation-detector.ts"
+    },
+    {
+      "file": "core:test/infrastructure/vcs/vcs-implementation-detector.spec.ts"
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Detect raw project-relative implementation candidates from VCS changes since first implementing transition.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:eb016482ebf156e48dfdbcf132adae3c1ddedd030d164a341f674c9836d408c9",
+          "lastModified": "2026-08-16T08:12:48.858Z"
+        },
+        "verify.md": {
+          "hash": "sha256:2e24aab5db50fce5b3b1e8bf09eb0fa42b8c2aa2b91c2a51fd51090a116d7c4c",
+          "lastModified": "2026-08-16T08:12:48.863Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# VCS Implementation Detector\n\n## Rules\n\n- VCS-backed detector implements `core:implementation-detector-port` and remains replaceable.\n- Obtain modified-file data through `core:vcs-adapter-port`; delegate VCS enumeration, never embed VCS commands directly.\n- Baseline is first timestamp change entered `implementing`; resolve historical revision via `VcsAdapter.refAt(...)` and pass to `modifiedFiles(...)`. Fall back to `VcsAdapter.ref()` if missing/unresolvable.\n- Rebase repository-root-relative VCS paths to configured project root; normalize separators to forward slashes; deduplicate and sort. Omit paths outside project root. Keep deleted/missing paths and rename sides inside project root.\n- MAY apply generic caller-provided `excludePaths` from `ImplementationDetector` port. MUST NOT load graph config, apply Code Graph effective visibility (`allowedPaths`, graph defaults/exclusions), or derive graph fingerprints.\n- Remain workspace-agnostic; return raw project-relative paths, never canonical `workspace:path`.\n\n## Constraints\n\n- Preserve raw project-relative semantics.\n- Workspace validation and graph visibility filtering occur outside detector.\n- Detector remains swappable through detector port.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:eb016482ebf156e48dfdbcf132adae3c1ddedd030d164a341f674c9836d408c9",
+          "lastModified": "2026-08-16T08:12:48.858Z"
+        },
+        "verify.md": {
+          "hash": "sha256:2e24aab5db50fce5b3b1e8bf09eb0fa42b8c2aa2b91c2a51fd51090a116d7c4c",
+          "lastModified": "2026-08-16T08:12:48.863Z"
+        }
+      }
+    }
+  }
 }

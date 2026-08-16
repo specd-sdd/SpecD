@@ -4,8 +4,9 @@ import { svn, svnSync } from './exec.js'
 /**
  * Subversion CLI implementation of the {@link VcsAdapter} port.
  *
- * Shells out to the `svn` binary for all queries. All methods operate relative
- * to `cwd`, which defaults to `process.cwd()` when not specified.
+ * Shells out to the `svn` binary for all queries. Working-copy-wide operations
+ * execute from the resolved root; detection still starts from `cwd`, which
+ * defaults to `process.cwd()` when not specified.
  */
 export class SvnVcsAdapter extends VcsAdapter {
   private readonly _rootDir: string | null
@@ -63,7 +64,7 @@ export class SvnVcsAdapter extends VcsAdapter {
   /** @inheritdoc */
   async ref(): Promise<string | null> {
     try {
-      return await svn(this.cwd, 'info', '--show-item', 'revision')
+      return await svn(this.rootDir(), 'info', '--show-item', 'revision')
     } catch {
       return null
     }
@@ -72,7 +73,7 @@ export class SvnVcsAdapter extends VcsAdapter {
   /** @inheritdoc */
   async refAt(at: string): Promise<string | null> {
     try {
-      const revision = await svn(this.cwd, 'info', '--show-item', 'revision', '-r', `{${at}}`)
+      const revision = await svn(this.rootDir(), 'info', '--show-item', 'revision', '-r', `{${at}}`)
       return revision.length > 0 ? revision : null
     } catch {
       return null
@@ -81,8 +82,9 @@ export class SvnVcsAdapter extends VcsAdapter {
 
   /** @inheritdoc */
   async modifiedFiles(baseRef: string): Promise<readonly string[]> {
-    const diffOutput = await svn(this.cwd, 'diff', '--summarize', '-r', `${baseRef}:WORKING`)
-    const statusOutput = await svn(this.cwd, 'status')
+    const rootDir = this.rootDir()
+    const diffOutput = await svn(rootDir, 'diff', '--summarize', '-r', `${baseRef}:WORKING`)
+    const statusOutput = await svn(rootDir, 'status')
     return normalizeSvnPaths(diffOutput, statusOutput)
   }
 
@@ -113,22 +115,40 @@ function normalizeSvnPaths(diffOutput: string, statusOutput: string): readonly s
   const files = new Set<string>()
 
   for (const line of diffOutput.split('\n')) {
-    const normalized = line.trim()
-    if (normalized.length === 0) continue
-    const parts = normalized.split(/\s+/)
-    const file = parts[parts.length - 1]
-    if (file !== undefined && file.length > 0) {
-      files.add(file)
-    }
+    addSvnStatusPath(files, line)
   }
 
   for (const line of statusOutput.split('\n')) {
-    if (!line.startsWith('?')) continue
-    const file = line.slice(1).trim()
-    if (file.length > 0) {
-      files.add(file)
+    const status = line[0]
+    if (
+      status === 'M' ||
+      status === 'A' ||
+      status === 'D' ||
+      status === 'R' ||
+      status === '!' ||
+      status === '?' ||
+      status === '~'
+    ) {
+      addSvnStatusPath(files, line)
     }
   }
 
   return [...files]
+}
+
+/**
+ * Adds the path column from one SVN status-shaped output line.
+ *
+ * Both `svn status` and `svn diff --summarize` reserve seven status columns
+ * followed by a separator before the path.
+ *
+ * @param files - Accumulated unique paths
+ * @param line - Native SVN output line
+ */
+function addSvnStatusPath(files: Set<string>, line: string): void {
+  if (line.length <= 8) return
+  const filePath = line.slice(8).trimEnd().replaceAll('\\', '/')
+  if (filePath.length > 0) {
+    files.add(filePath)
+  }
 }
