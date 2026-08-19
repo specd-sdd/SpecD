@@ -95,6 +95,20 @@ export class SQLiteGraphStore extends GraphStore {
   }
 
   /**
+   * Whether the underlying SQLite worker is open and ready.
+   */
+  get isOpen(): boolean {
+    return this.client.isOpen
+  }
+
+  /**
+   * Whether the underlying SQLite worker is in a faulted state.
+   */
+  get faulted(): boolean {
+    return this.client.faulted
+  }
+
+  /**
    * Opens the graph store by spawning the worker thread and initializing SQLite.
    *
    * @returns Promise resolving when the store is open.
@@ -202,7 +216,7 @@ export class SQLiteGraphStore extends GraphStore {
    * @returns Promise resolving to the file node, or undefined if not found.
    */
   async getFile(path: string): Promise<FileNode | undefined> {
-    return this.client.sendRequest<FileNode | undefined>('getFile', { filePath: path })
+    return this.client.sendRequest('getFile', { filePath: path })
   }
 
   /**
@@ -212,7 +226,7 @@ export class SQLiteGraphStore extends GraphStore {
    * @returns Promise resolving to the document node, or undefined if not found.
    */
   async getDocument(path: string): Promise<DocumentNode | undefined> {
-    return this.client.sendRequest<DocumentNode | undefined>('getDocument', { documentId: path })
+    return this.client.sendRequest('getDocument', { documentId: path })
   }
 
   /**
@@ -222,7 +236,7 @@ export class SQLiteGraphStore extends GraphStore {
    * @returns Promise resolving to matching file nodes.
    */
   async findFilesByConfigRelativePath(configRelativePath: string): Promise<FileNode[]> {
-    return this.client.sendRequest<FileNode[]>('findFilesByConfigRelativePath', {
+    return this.client.sendRequest('findFilesByConfigRelativePath', {
       configRelativePath,
     })
   }
@@ -234,7 +248,7 @@ export class SQLiteGraphStore extends GraphStore {
    * @returns Promise resolving to matching document nodes.
    */
   async findDocumentsByConfigRelativePath(configRelativePath: string): Promise<DocumentNode[]> {
-    return this.client.sendRequest<DocumentNode[]>('findDocumentsByConfigRelativePath', {
+    return this.client.sendRequest('findDocumentsByConfigRelativePath', {
       configRelativePath,
     })
   }
@@ -246,7 +260,7 @@ export class SQLiteGraphStore extends GraphStore {
    * @returns Promise resolving to the symbol node, or undefined if not found.
    */
   async getSymbol(id: string): Promise<SymbolNode | undefined> {
-    return this.client.sendRequest<SymbolNode | undefined>('getSymbol', { symbolId: id })
+    return this.client.sendRequest('getSymbol', { symbolId: id })
   }
 
   /**
@@ -256,7 +270,7 @@ export class SQLiteGraphStore extends GraphStore {
    * @returns Promise resolving to the spec node, or undefined if not found.
    */
   async getSpec(specId: string): Promise<SpecNode | undefined> {
-    return this.client.sendRequest<SpecNode | undefined>('getSpec', { specId })
+    return this.client.sendRequest('getSpec', { specId })
   }
 
   /**
@@ -266,7 +280,7 @@ export class SQLiteGraphStore extends GraphStore {
    * @returns Promise resolving to calling relations.
    */
   async getCallers(symbolId: string): Promise<Relation[]> {
-    return this.client.sendRequest<Relation[]>('getCallers', { symbolId })
+    return this.client.sendRequest('getCallers', { symbolId })
   }
 
   /**
@@ -276,7 +290,7 @@ export class SQLiteGraphStore extends GraphStore {
    * @returns Promise resolving to callee relations.
    */
   async getCallees(symbolId: string): Promise<Relation[]> {
-    return this.client.sendRequest<Relation[]>('getCallees', { symbolId })
+    return this.client.sendRequest('getCallees', { symbolId })
   }
 
   /**
@@ -286,7 +300,7 @@ export class SQLiteGraphStore extends GraphStore {
    * @returns Promise resolving to importing relations.
    */
   async getImporters(filePath: string): Promise<Relation[]> {
-    return this.client.sendRequest<Relation[]>('getImporters', { filePath })
+    return this.client.sendRequest('getImporters', { filePath })
   }
 
   /**
@@ -296,7 +310,7 @@ export class SQLiteGraphStore extends GraphStore {
    * @returns Promise resolving to imported relations.
    */
   async getImportees(filePath: string): Promise<Relation[]> {
-    return this.client.sendRequest<Relation[]>('getImportees', { filePath })
+    return this.client.sendRequest('getImportees', { filePath })
   }
 
   /**
@@ -306,7 +320,7 @@ export class SQLiteGraphStore extends GraphStore {
    * @returns Promise resolving to affected file paths.
    */
   override async findDirectlyAffectedFiles(filePaths: readonly string[]): Promise<string[]> {
-    return this.client.sendRequest<string[]>('findDirectlyAffectedFiles', { filePaths })
+    return this.client.sendRequest('findDirectlyAffectedFiles', { filePaths })
   }
 
   /**
@@ -316,7 +330,7 @@ export class SQLiteGraphStore extends GraphStore {
    * @returns Promise resolving to extender relations.
    */
   async getExtenders(symbolId: string): Promise<Relation[]> {
-    return this.client.sendRequest<Relation[]>('getExtenders', { symbolId })
+    return this.client.sendRequest('getExtenders', { symbolId })
   }
 
   /**
@@ -326,7 +340,7 @@ export class SQLiteGraphStore extends GraphStore {
    * @returns Promise resolving to extended target relations.
    */
   async getExtendedTargets(symbolId: string): Promise<Relation[]> {
-    return this.client.sendRequest<Relation[]>('getExtendedTargets', { symbolId })
+    return this.client.sendRequest('getExtendedTargets', { symbolId })
   }
 
   /**
@@ -336,7 +350,7 @@ export class SQLiteGraphStore extends GraphStore {
    * @returns Promise resolving to implementor relations.
    */
   async getImplementors(symbolId: string): Promise<Relation[]> {
-    return this.client.sendRequest<Relation[]>('getImplementors', { symbolId })
+    return this.client.sendRequest('getImplementors', { symbolId })
   }
 
   /**
@@ -346,7 +360,7 @@ export class SQLiteGraphStore extends GraphStore {
    * @returns Promise resolving to implemented target relations.
    */
   async getImplementedTargets(symbolId: string): Promise<Relation[]> {
-    return this.client.sendRequest<Relation[]>('getImplementedTargets', { symbolId })
+    return this.client.sendRequest('getImplementedTargets', { symbolId })
   }
 
   /**
@@ -356,7 +370,7 @@ export class SQLiteGraphStore extends GraphStore {
    * @returns Promise resolving to overrider relations.
    */
   async getOverriders(symbolId: string): Promise<Relation[]> {
-    return this.client.sendRequest<Relation[]>('getOverriders', { symbolId })
+    return this.client.sendRequest('getOverriders', { symbolId })
   }
 
   /**
@@ -366,7 +380,7 @@ export class SQLiteGraphStore extends GraphStore {
    * @returns Promise resolving to overridden target relations.
    */
   async getOverriddenTargets(symbolId: string): Promise<Relation[]> {
-    return this.client.sendRequest<Relation[]>('getOverriddenTargets', { symbolId })
+    return this.client.sendRequest('getOverriddenTargets', { symbolId })
   }
 
   /**
@@ -376,7 +390,7 @@ export class SQLiteGraphStore extends GraphStore {
    * @returns Promise resolving to dependency relations.
    */
   async getSpecDependencies(specId: string): Promise<Relation[]> {
-    return this.client.sendRequest<Relation[]>('getSpecDependencies', { specId })
+    return this.client.sendRequest('getSpecDependencies', { specId })
   }
 
   /**
@@ -386,7 +400,7 @@ export class SQLiteGraphStore extends GraphStore {
    * @returns Promise resolving to dependent relations.
    */
   async getSpecDependents(specId: string): Promise<Relation[]> {
-    return this.client.sendRequest<Relation[]>('getSpecDependents', { specId })
+    return this.client.sendRequest('getSpecDependents', { specId })
   }
 
   /**
@@ -396,7 +410,7 @@ export class SQLiteGraphStore extends GraphStore {
    * @returns Promise resolving to covered file relations.
    */
   async getCoveredFiles(specId: string): Promise<Relation[]> {
-    return this.client.sendRequest<Relation[]>('getCoveredFiles', { specId })
+    return this.client.sendRequest('getCoveredFiles', { specId })
   }
 
   /**
@@ -406,7 +420,7 @@ export class SQLiteGraphStore extends GraphStore {
    * @returns Promise resolving to covering spec relations.
    */
   async getCoveringSpecsForFile(filePath: string): Promise<Relation[]> {
-    return this.client.sendRequest<Relation[]>('getCoveringSpecsForFile', { filePath })
+    return this.client.sendRequest('getCoveringSpecsForFile', { filePath })
   }
 
   /**
@@ -416,7 +430,7 @@ export class SQLiteGraphStore extends GraphStore {
    * @returns Promise resolving to covering spec relations.
    */
   async getCoveringSpecsForFiles(filePaths: readonly string[]): Promise<Relation[]> {
-    return this.client.sendRequest<Relation[]>('getCoveringSpecsForFiles', { filePaths })
+    return this.client.sendRequest('getCoveringSpecsForFiles', { filePaths })
   }
 
   /**
@@ -426,7 +440,7 @@ export class SQLiteGraphStore extends GraphStore {
    * @returns Promise resolving to covered symbol relations.
    */
   async getCoveredSymbols(specId: string): Promise<Relation[]> {
-    return this.client.sendRequest<Relation[]>('getCoveredSymbols', { specId })
+    return this.client.sendRequest('getCoveredSymbols', { specId })
   }
 
   /**
@@ -436,7 +450,7 @@ export class SQLiteGraphStore extends GraphStore {
    * @returns Promise resolving to covering spec relations.
    */
   async getCoveringSpecsForSymbol(symbolId: string): Promise<Relation[]> {
-    return this.client.sendRequest<Relation[]>('getCoveringSpecsForSymbol', { symbolId })
+    return this.client.sendRequest('getCoveringSpecsForSymbol', { symbolId })
   }
 
   /**
@@ -446,7 +460,7 @@ export class SQLiteGraphStore extends GraphStore {
    * @returns Promise resolving to covering spec relations.
    */
   async getCoveringSpecsForSymbols(symbolIds: readonly string[]): Promise<Relation[]> {
-    return this.client.sendRequest<Relation[]>('getCoveringSpecsForSymbols', { symbolIds })
+    return this.client.sendRequest('getCoveringSpecsForSymbols', { symbolIds })
   }
 
   /**
@@ -456,7 +470,7 @@ export class SQLiteGraphStore extends GraphStore {
    * @returns Promise resolving to exported symbol nodes.
    */
   async getExportedSymbols(filePath: string): Promise<SymbolNode[]> {
-    return this.client.sendRequest<SymbolNode[]>('getExportedSymbols', { filePath })
+    return this.client.sendRequest('getExportedSymbols', { filePath })
   }
 
   /**
@@ -466,7 +480,7 @@ export class SQLiteGraphStore extends GraphStore {
    * @returns Promise resolving to matching symbol nodes.
    */
   async findSymbols(query: SymbolQuery): Promise<SymbolNode[]> {
-    return this.client.sendRequest<SymbolNode[]>('findSymbols', { query })
+    return this.client.sendRequest('findSymbols', { query })
   }
 
   /**
@@ -475,7 +489,7 @@ export class SQLiteGraphStore extends GraphStore {
    * @returns Promise resolving to graph statistics.
    */
   async getStatistics(): Promise<GraphStatistics> {
-    return this.client.sendRequest<GraphStatistics>('getStatistics', {})
+    return this.client.sendRequest('getStatistics', {})
   }
 
   /**
@@ -484,7 +498,7 @@ export class SQLiteGraphStore extends GraphStore {
    * @returns Promise resolving to all file nodes.
    */
   async getAllFiles(): Promise<FileNode[]> {
-    return this.client.sendRequest<FileNode[]>('getAllFiles', {})
+    return this.client.sendRequest('getAllFiles', {})
   }
 
   /**
@@ -493,7 +507,7 @@ export class SQLiteGraphStore extends GraphStore {
    * @returns Promise resolving to all document nodes.
    */
   async getAllDocuments(): Promise<DocumentNode[]> {
-    return this.client.sendRequest<DocumentNode[]>('getAllDocuments', {})
+    return this.client.sendRequest('getAllDocuments', {})
   }
 
   /**
@@ -502,7 +516,7 @@ export class SQLiteGraphStore extends GraphStore {
    * @returns Promise resolving to all spec nodes.
    */
   async getAllSpecs(): Promise<SpecNode[]> {
-    return this.client.sendRequest<SpecNode[]>('getAllSpecs', {})
+    return this.client.sendRequest('getAllSpecs', {})
   }
 
   /**
@@ -573,7 +587,7 @@ export class SQLiteGraphStore extends GraphStore {
   async searchSourceContentCandidates(
     query: SourceContentCandidateQuery,
   ): Promise<SourceContentCandidatePage> {
-    return this.client.sendRequest<SourceContentCandidatePage>('searchSourceCandidates', { query })
+    return this.client.sendRequest('searchSourceCandidates', { query })
   }
 
   /**
@@ -591,7 +605,7 @@ export class SQLiteGraphStore extends GraphStore {
    * @returns Promise resolving to a map from file path to count.
    */
   async getFileImporterCounts(): Promise<Map<string, number>> {
-    return this.client.sendRequest<Map<string, number>>('getFileImporterCounts', {})
+    return this.client.sendRequest('getFileImporterCounts', {})
   }
 
   /**
@@ -613,7 +627,6 @@ export class SQLiteGraphStore extends GraphStore {
       const graphDir = join(this.storagePath, 'graph')
       rmSync(graphDir, { recursive: true, force: true })
       rotateStorageGeneration(this.storagePath)
-      await this.open()
       return
     }
     await this.client.sendRequest('recreate', {})
@@ -625,7 +638,7 @@ export class SQLiteGraphStore extends GraphStore {
    * @returns Promise resolving to the generation snapshot.
    */
   async getStorageGeneration(): Promise<StorageGenerationSnapshot> {
-    return this.client.sendRequest<StorageGenerationSnapshot>('readStorageGenerationSnapshot', {})
+    return this.client.sendRequest('readStorageGenerationSnapshot', {})
   }
 
   /**
@@ -637,10 +650,7 @@ export class SQLiteGraphStore extends GraphStore {
   override async getIndexedInputObservations(
     resources: readonly IndexedResourceKey[],
   ): Promise<readonly IndexedInputObservation[]> {
-    return this.client.sendRequest<readonly IndexedInputObservation[]>(
-      'getIndexedInputObservations',
-      { resources },
-    )
+    return this.client.sendRequest('getIndexedInputObservations', { resources })
   }
 
   /**
@@ -674,7 +684,7 @@ export class SQLiteGraphStore extends GraphStore {
    * @returns Promise resolving to freshness latches.
    */
   override async getFreshnessLatches(workspaces: readonly string[]): Promise<FreshnessLatches> {
-    return this.client.sendRequest<FreshnessLatches>('readFreshnessLatches', { workspaces })
+    return this.client.sendRequest('readFreshnessLatches', { workspaces })
   }
 
   /**
@@ -708,7 +718,7 @@ export class SQLiteGraphStore extends GraphStore {
   override async findLogicalSymbols(
     lookups: readonly LogicalSymbolLookup[],
   ): Promise<LogicalSymbol[]> {
-    return this.client.sendRequest<LogicalSymbol[]>('findLogicalSymbols', { lookups })
+    return this.client.sendRequest('findLogicalSymbols', { lookups })
   }
 
   /**
@@ -717,7 +727,7 @@ export class SQLiteGraphStore extends GraphStore {
    * @returns Promise resolving to all reference facts.
    */
   override async getAllReferenceFacts(): Promise<ReferenceFactsWrite> {
-    return this.client.sendRequest<ReferenceFactsWrite>('getAllReferenceFacts', {})
+    return this.client.sendRequest('getAllReferenceFacts', {})
   }
 
   /**
@@ -727,7 +737,7 @@ export class SQLiteGraphStore extends GraphStore {
    * @returns Promise resolving to found logical symbols.
    */
   override async findLogicalSymbolsByIds(ids: readonly string[]): Promise<LogicalSymbol[]> {
-    return this.client.sendRequest<LogicalSymbol[]>('findLogicalSymbolsByIds', { ids })
+    return this.client.sendRequest('findLogicalSymbolsByIds', { ids })
   }
 
   /**
@@ -739,7 +749,7 @@ export class SQLiteGraphStore extends GraphStore {
   override async findDeclarations(
     logicalSymbolIds: readonly string[],
   ): Promise<LogicalDeclaration[]> {
-    return this.client.sendRequest<LogicalDeclaration[]>('findDeclarations', { logicalSymbolIds })
+    return this.client.sendRequest('findDeclarations', { logicalSymbolIds })
   }
 
   /**
@@ -751,7 +761,7 @@ export class SQLiteGraphStore extends GraphStore {
   override async findPublicBindings(
     lookups: readonly PublicBindingLookup[],
   ): Promise<PublicBinding[]> {
-    return this.client.sendRequest<PublicBinding[]>('findPublicBindings', { lookups })
+    return this.client.sendRequest('findPublicBindings', { lookups })
   }
 
   /**
@@ -763,7 +773,7 @@ export class SQLiteGraphStore extends GraphStore {
   override async findPublicBindingsByExportedNames(
     exportedNames: readonly string[],
   ): Promise<PublicBinding[]> {
-    return this.client.sendRequest<PublicBinding[]>('findPublicBindingsByExportedNames', {
+    return this.client.sendRequest('findPublicBindingsByExportedNames', {
       exportedNames,
     })
   }
@@ -777,7 +787,7 @@ export class SQLiteGraphStore extends GraphStore {
   override async findLocalBindings(
     lookups: readonly LocalBindingLookup[],
   ): Promise<LocalBinding[]> {
-    return this.client.sendRequest<LocalBinding[]>('findLocalBindings', { lookups })
+    return this.client.sendRequest('findLocalBindings', { lookups })
   }
 
   /**
@@ -787,7 +797,7 @@ export class SQLiteGraphStore extends GraphStore {
    * @returns Promise resolving to resolution steps.
    */
   override async findResolutionSteps(fromIds: readonly string[]): Promise<ResolutionStep[]> {
-    return this.client.sendRequest<ResolutionStep[]>('findResolutionSteps', { fromIds })
+    return this.client.sendRequest('findResolutionSteps', { fromIds })
   }
 
   /**
@@ -797,7 +807,7 @@ export class SQLiteGraphStore extends GraphStore {
    * @returns Promise resolving to index coverage records.
    */
   override async findIndexCoverage(filePaths: readonly string[]): Promise<IndexCoverage[]> {
-    return this.client.sendRequest<IndexCoverage[]>('findIndexCoverage', { filePaths })
+    return this.client.sendRequest('findIndexCoverage', { filePaths })
   }
 
   /**
@@ -806,7 +816,7 @@ export class SQLiteGraphStore extends GraphStore {
    * @returns Promise resolving to all index coverage records.
    */
   override async getAllIndexCoverage(): Promise<IndexCoverage[]> {
-    return this.client.sendRequest<IndexCoverage[]>('findIndexCoverage', {})
+    return this.client.sendRequest('getAllIndexCoverage', {})
   }
 
   /**
@@ -815,7 +825,7 @@ export class SQLiteGraphStore extends GraphStore {
    * @returns Promise resolving when FTS indexes are rebuilt.
    */
   override async rebuildFtsIndexes(): Promise<void> {
-    await this.client.sendRequest<void>('rebuildFtsIndexes', {})
+    await this.client.sendRequest('rebuildFtsIndexes', {})
   }
 
   /**

@@ -8,11 +8,16 @@ import { SpecNotFoundError } from '../../domain/errors/spec-not-found-error.js'
 import { resolveSqliteWorkerPath } from './resolve-worker-path.js'
 import {
   type SerializedErrorPayload,
-  type SQLiteWorkerOperation,
+  type SQLiteWorkerOperationMap,
   type SQLiteWorkerRequest,
   type SQLiteWorkerResponse,
 } from './sqlite-worker-protocol.js'
 import { type SQLiteGraphStoreOptions } from './sqlite-runtime-descriptor.js'
+
+/**
+ * Formal lifecycle states of the SQLite worker client.
+ */
+export type WorkerState = 'closed' | 'opening' | 'open' | 'closing' | 'faulted'
 
 /**
  * Internal descriptor tracking an in-flight asynchronous request to the SQLite worker.
@@ -99,9 +104,9 @@ export function deserializeWorkerError(payload: SerializedErrorPayload): Error {
  */
 export class SQLiteWorkerClient {
   private worker: Worker | undefined
-  private isFaulted = false
-  private isClosing = false
-  private isOpenState = false
+  private state: WorkerState = 'closed'
+  private openPromise: Promise<void> | undefined
+  private closePromise: Promise<void> | undefined
   private nextRequestId = 1
   private maxPendingOperations = 256
   private readonly pendingRequests = new Map<number, PendingRequest>()
@@ -110,14 +115,21 @@ export class SQLiteWorkerClient {
    * Whether the worker thread is active and ready to accept database requests.
    */
   get isOpen(): boolean {
-    return this.isOpenState && !this.isFaulted && !this.isClosing
+    return this.state === 'open'
   }
 
   /**
    * Whether the worker thread encountered an unrecoverable fault.
    */
   get faulted(): boolean {
-    return this.isFaulted
+    return this.state === 'faulted'
+  }
+
+  /**
+   * Current lifecycle state of the worker client.
+   */
+  get currentState(): WorkerState {
+    return this.state
   }
 
   /**
@@ -129,121 +141,219 @@ export class SQLiteWorkerClient {
 
   /**
    * Spawns the worker thread, establishes communication, and opens the SQLite database.
+   * Concurrent invocations share the same in-flight initialization promise.
    *
    * @param storagePath - Root path owning the `graph/` directory.
    * @param options - Optional runtime configuration and max pending operations settings.
    * @returns Promise resolving when the worker has successfully opened and initialized the database.
    * @throws {StoreWorkerError} If the worker is already faulted.
+   * @throws {StoreNotOpenError} If called while closing.
+   * @throws {Error} If `maxPendingOperations` is invalid.
    */
   async open(storagePath: string, options?: SQLiteGraphStoreOptions): Promise<void> {
-    if (this.isOpen) return
-    if (this.isFaulted) {
-      throw new StoreWorkerError('SQLite worker is faulted and cannot be reopened')
+    if (this.state === 'open') {
+      return
+    }
+    if (this.state === 'opening' && this.openPromise) {
+      return this.openPromise
+    }
+    if (this.state === 'closing') {
+      throw new StoreNotOpenError()
+    }
+    if (this.state === 'faulted') {
+      throw new StoreWorkerError('SQLite worker is faulted; close store before reopening')
     }
 
-    this.maxPendingOperations = options?.maxPendingOperations ?? 256
-    const workerScriptPath = resolveSqliteWorkerPath(options?.workerPath)
-
-    const isTs = workerScriptPath.endsWith('.ts')
-    const worker = new Worker(workerScriptPath, {
-      execArgv: isTs ? ['--import', 'tsx'] : undefined,
-    })
-
-    worker.on('message', (response: SQLiteWorkerResponse) => {
-      this.handleWorkerMessage(response)
-    })
-
-    worker.on('error', (err: Error) => {
-      this.handleWorkerError(err)
-    })
-
-    worker.on('exit', (code: number) => {
-      this.handleWorkerExit(code)
-    })
-
-    this.worker = worker
-    this.isOpenState = true
-
-    try {
-      await this.sendRequest('open', {
-        storagePath,
-        runtime: options?.runtime,
-      })
-    } catch (error) {
-      await this.close()
-      throw error
+    if (options?.maxPendingOperations !== undefined) {
+      const limit = options.maxPendingOperations
+      if (typeof limit !== 'number' || !Number.isInteger(limit) || limit < 1) {
+        throw new Error(
+          `Invalid maxPendingOperations: expected integer >= 1, received ${String(limit)}`,
+        )
+      }
+      this.maxPendingOperations = limit
     }
+
+    this.state = 'opening'
+
+    this.openPromise = (async () => {
+      try {
+        const workerScriptPath = resolveSqliteWorkerPath(options?.workerPath)
+        const isTs = workerScriptPath.endsWith('.ts')
+        const worker = new Worker(workerScriptPath, {
+          execArgv: isTs ? ['--import', 'tsx'] : undefined,
+        })
+
+        worker.on('message', (response: SQLiteWorkerResponse) => {
+          this.handleWorkerMessage(response)
+        })
+
+        worker.on('error', (err: Error) => {
+          this.handleWorkerError(err)
+        })
+
+        worker.on('exit', (code: number) => {
+          this.handleWorkerExit(code)
+        })
+
+        this.worker = worker
+
+        await this.sendRequestInternal(
+          'open',
+          {
+            storagePath,
+            runtime: options?.runtime,
+          },
+          true,
+        )
+
+        this.state = 'open'
+      } catch (error) {
+        this.state = 'closed'
+        if (this.worker) {
+          try {
+            await this.worker.terminate()
+          } catch {
+            // Ignore termination errors on failed open
+          }
+          this.worker = undefined
+        }
+        throw error
+      } finally {
+        this.openPromise = undefined
+      }
+    })()
+
+    return this.openPromise
   }
 
   /**
-   * Closes the database connection in the worker and terminates the worker thread.
+   * Drains in-flight requests, closes the database connection in the worker,
+   * and terminates the worker thread. Concurrent invocations share the same shutdown promise.
    *
+   * @param drainTimeoutMs - Maximum time in milliseconds to wait for accepted operations to drain.
    * @returns Promise resolving when the worker has shut down cleanly.
    */
-  async close(): Promise<void> {
-    if (!this.isOpenState || this.isClosing || !this.worker) {
+  async close(drainTimeoutMs = 5000): Promise<void> {
+    if (this.state === 'closed') {
       return
     }
-
-    this.isClosing = true
-    try {
-      await this.sendRequest('close', {})
-    } catch {
-      // Ignore errors when sending close to worker
-    } finally {
+    if (this.state === 'closing' && this.closePromise) {
+      return this.closePromise
+    }
+    if (this.state === 'faulted') {
+      // Manual recovery: clean up worker reference and reset state to closed
       if (this.worker) {
         try {
           await this.worker.terminate()
         } catch {
-          // Ignore termination errors
+          // Ignore termination errors during recovery
         }
         this.worker = undefined
       }
-      this.isOpenState = false
-      this.isClosing = false
-
-      // Reject any lingering requests
-      for (const [, pending] of this.pendingRequests) {
-        pending.reject(new StoreNotOpenError())
-      }
-      this.pendingRequests.clear()
+      this.state = 'closed'
+      return
     }
+
+    this.state = 'closing'
+
+    this.closePromise = (async () => {
+      try {
+        // 1. Drain accepted in-flight requests
+        if (this.pendingRequests.size > 0) {
+          await this.drainPendingRequests(drainTimeoutMs)
+        }
+
+        // 2. Send close command to worker SQLite database
+        if (this.worker) {
+          try {
+            await this.sendRequestInternal('close', {}, true)
+          } catch {
+            // Ignore error sending close to database during shutdown
+          }
+        }
+      } finally {
+        // 3. Terminate worker thread
+        if (this.worker) {
+          try {
+            await this.worker.terminate()
+          } catch {
+            // Ignore termination errors
+          }
+          this.worker = undefined
+        }
+
+        this.state = 'closed'
+        this.closePromise = undefined
+
+        // 4. Reject any remaining timed-out requests
+        for (const [, pending] of this.pendingRequests) {
+          pending.reject(new StoreWorkerError('Operation aborted: store closed before completion'))
+        }
+        this.pendingRequests.clear()
+      }
+    })()
+
+    return this.closePromise
   }
 
   /**
-   * Sends an asynchronous RPC request to the SQLite worker thread.
+   * Sends a strongly-typed asynchronous RPC request to the SQLite worker thread.
    *
+   * @template K - Specific SQLiteWorkerOperation key.
    * @param op - Worker operation identifier.
-   * @param payload - Serializable request payload.
+   * @param payload - Strongly-typed serializable request payload matching operation.
    * @param onProgress - Optional callback for stage progress events during execution.
-   * @returns Promise resolving with the typed result returned by the worker.
+   * @returns Promise resolving with the strongly-typed result returned by the worker.
    * @throws {StoreWorkerError} If the worker has faulted.
    * @throws {StoreNotOpenError} If the store is not open or is currently closing.
    * @throws {StoreOverloadError} If the pending operations limit has been exceeded.
    */
-  async sendRequest<TResult = unknown, TPayload = unknown>(
-    op: SQLiteWorkerOperation,
-    payload: TPayload,
+  async sendRequest<K extends keyof SQLiteWorkerOperationMap>(
+    op: K,
+    payload: SQLiteWorkerOperationMap[K]['payload'],
     onProgress?: (stage: string) => void,
-  ): Promise<TResult> {
-    if (this.isFaulted) {
+  ): Promise<SQLiteWorkerOperationMap[K]['result']> {
+    return this.sendRequestInternal(op, payload, false, onProgress)
+  }
+
+  /**
+   * Internal request sender with lifecycle allowance switch.
+   *
+   * @template K - Specific SQLiteWorkerOperation key.
+   * @param op - Worker operation identifier.
+   * @param payload - Strongly-typed serializable request payload.
+   * @param allowLifecycle - Whether to allow request during opening or closing states.
+   * @param onProgress - Optional progress callback.
+   * @returns Promise resolving with the typed result.
+   */
+  private async sendRequestInternal<K extends keyof SQLiteWorkerOperationMap>(
+    op: K,
+    payload: SQLiteWorkerOperationMap[K]['payload'],
+    allowLifecycle = false,
+    onProgress?: (stage: string) => void,
+  ): Promise<SQLiteWorkerOperationMap[K]['result']> {
+    if (this.state === 'faulted') {
       throw new StoreWorkerError('SQLite worker has terminated unexpectedly')
     }
-    if (!this.isOpenState || this.isClosing || !this.worker) {
+    if (!allowLifecycle && this.state !== 'open') {
       throw new StoreNotOpenError()
     }
-    if (this.pendingRequests.size >= this.maxPendingOperations) {
+    if (!this.worker) {
+      throw new StoreNotOpenError()
+    }
+    if (!allowLifecycle && this.pendingRequests.size >= this.maxPendingOperations) {
       throw new StoreOverloadError(
         `SQLite operation queue overloaded (pending: ${this.pendingRequests.size} >= max: ${this.maxPendingOperations})`,
       )
     }
 
     const id = this.nextRequestId++
-    const request: SQLiteWorkerRequest<TPayload> = { id, op, payload }
+    const request: SQLiteWorkerRequest<K> = { id, op, payload }
 
-    return new Promise<TResult>((resolve, reject) => {
+    return new Promise<SQLiteWorkerOperationMap[K]['result']>((resolve, reject) => {
       this.pendingRequests.set(id, {
-        resolve: (val: unknown) => resolve(val as TResult),
+        resolve: (val: unknown) => resolve(val as SQLiteWorkerOperationMap[K]['result']),
         reject,
         onProgress,
       })
@@ -253,6 +363,26 @@ export class SQLiteWorkerClient {
         this.pendingRequests.delete(id)
         reject(err instanceof Error ? err : new Error(String(err)))
       }
+    })
+  }
+
+  /**
+   * Waits for accepted in-flight requests to drain, up to the specified timeout.
+   *
+   * @param timeoutMs - Maximum time in milliseconds to wait for pending requests to reach 0.
+   * @returns Promise resolving when drained or when timeout expires.
+   */
+  private async drainPendingRequests(timeoutMs: number): Promise<void> {
+    if (this.pendingRequests.size === 0) return
+
+    return new Promise<void>((resolve) => {
+      const startTime = Date.now()
+      const checkInterval = setInterval(() => {
+        if (this.pendingRequests.size === 0 || Date.now() - startTime >= timeoutMs) {
+          clearInterval(checkInterval)
+          resolve()
+        }
+      }, 10)
     })
   }
 
@@ -294,7 +424,7 @@ export class SQLiteWorkerClient {
    * @param code - Exit code returned by worker thread.
    */
   private handleWorkerExit(code: number): void {
-    if (this.isClosing) return
+    if (this.state === 'closing' || this.state === 'closed') return
     this.faultWorker(new Error(`Worker thread exited unexpectedly with code ${code}`))
   }
 
@@ -304,8 +434,7 @@ export class SQLiteWorkerClient {
    * @param error - Root cause error triggering the fault.
    */
   private faultWorker(error: Error): void {
-    this.isFaulted = true
-    this.isOpenState = false
+    this.state = 'faulted'
     const workerError = new StoreWorkerError(
       `SQLite worker terminated unexpectedly: ${error.message}`,
     )

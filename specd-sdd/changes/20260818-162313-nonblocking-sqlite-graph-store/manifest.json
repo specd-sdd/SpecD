@@ -1,7 +1,7 @@
 {
   "name": "nonblocking-sqlite-graph-store",
   "createdAt": "2026-08-18T16:23:13.275Z",
-  "updatedAt": "2026-08-19T06:58:28.324Z",
+  "updatedAt": "2026-08-19T08:10:18.557Z",
   "description": "Execute SQLite operations inside a persistent worker thread without blocking host event loop",
   "schema": {
     "name": "schema-std",
@@ -124,10 +124,18 @@
     },
     {
       "file": "package.json",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/code-graph/test/infrastructure/ladybug/ladybug-graph-store-multi-kind.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/sqlite/sqlite-worker-lifecycle.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/sqlite/sqlite-graph-store.spec.ts",
       "state": "open"
     }
   ],
@@ -253,6 +261,11 @@
       "specId": "code-graph:sqlite-graph-store",
       "file": "docs/code-graph/index.md",
       "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:sqlite-graph-store",
+      "file": "packages/code-graph/test/infrastructure/sqlite/sqlite-worker-lifecycle.spec.ts",
+      "fileLinkExplicit": true
     }
   ],
   "artifacts": [
@@ -266,7 +279,7 @@
           "key": "proposal",
           "filename": "proposal.md",
           "state": "complete",
-          "validatedHash": "sha256:66d39ae1d253360cdaf515078844e052e57bfc09c61266c83927550085f332d0"
+          "validatedHash": "sha256:c2abdb2f5d31e27fc565c1a474a30ed84b07fd2d3721c63b344aa0cad8b52caa"
         }
       ]
     },
@@ -280,7 +293,7 @@
           "key": "code-graph:sqlite-graph-store",
           "filename": "deltas/code-graph/sqlite-graph-store/spec.md.delta.yaml",
           "state": "complete",
-          "validatedHash": "sha256:1c3c640e576e908a2f0e9d9190fd2f95717aef2b9e5eb3783076cbd81436809d"
+          "validatedHash": "sha256:17aa6cf06851ba1a82286b8c60145c878ab1f51cf0b1651479d5032107aac287"
         },
         {
           "key": "code-graph:composition",
@@ -300,7 +313,7 @@
           "key": "code-graph:sqlite-graph-store",
           "filename": "deltas/code-graph/sqlite-graph-store/verify.md.delta.yaml",
           "state": "complete",
-          "validatedHash": "sha256:098703f9d0b2c9352f0f02299d081ba821b6d68dcafa63ad5907de652c859c27"
+          "validatedHash": "sha256:e624e7ff8ecc4451793f1dedb4b39fb8b044d2cb0be2423eab6c90720bea1f22"
         },
         {
           "key": "code-graph:composition",
@@ -320,7 +333,7 @@
           "key": "design",
           "filename": "design.md",
           "state": "complete",
-          "validatedHash": "sha256:a2bd1b1f9b400c50e60e479a472e690f69b2709bfd816b7045cdc043160dfd4d"
+          "validatedHash": "sha256:378d4a25fac7c4c1ea04e643ecc221884352cf1c7563f760df5eb7242547c087"
         }
       ]
     },
@@ -334,7 +347,7 @@
           "key": "tasks",
           "filename": "tasks.md",
           "state": "complete",
-          "validatedHash": "sha256:e5f1ea5ab26291220f10da895fe6fa0a6a071df273443d9f6177e9c4fc4e2632"
+          "validatedHash": "sha256:b77a3b0ac1579b0c44018f496cecf2bbb60a46271122cfc8791fef711a54f439"
         }
       ]
     }
@@ -542,6 +555,94 @@
       },
       "from": "done",
       "to": "archivable"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-19T07:25:27.774Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]; design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "specs",
+          "files": ["code-graph:sqlite-graph-store", "code-graph:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:sqlite-graph-store", "code-graph:composition"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-19T07:25:27.774Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "archivable",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-19T07:25:28.217Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-19T07:27:43.839Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-19T07:27:49.596Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-19T08:10:12.743Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
     }
   ]
 }

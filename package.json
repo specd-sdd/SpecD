@@ -13,7 +13,7 @@
     "specd": "node packages/cli/dist/index.js",
     "test": "turbo test --filter=@specd/core --filter=@specd/cli --filter=@specd/code-graph",
     "typecheck": "turbo typecheck --filter=!@specd/public-web",
-    "lint": "eslint . --cache",
+    "lint": "eslint . ",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

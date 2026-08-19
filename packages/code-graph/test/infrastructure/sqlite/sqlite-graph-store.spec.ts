@@ -976,4 +976,67 @@ describe('SQLiteGraphStore', () => {
       await store.close()
     })
   })
+
+  describe('IndexCoverage queries', () => {
+    it('differentiates findIndexCoverage and getAllIndexCoverage correctly', async () => {
+      tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-coverage-test-'))
+      const store = new SQLiteGraphStore(tempDir)
+      await store.open()
+
+      const session = store.beginBulkIndexSession()
+      await session.writeFiles([
+        createFileNode({
+          path: 'core:src/a.ts',
+          configRelativePath: 'src/a.ts',
+          language: 'typescript',
+          contentHash: 'sha256:a',
+          workspace: 'core',
+        }),
+        createFileNode({
+          path: 'core:src/b.ts',
+          configRelativePath: 'src/b.ts',
+          language: 'typescript',
+          contentHash: 'sha256:b',
+          workspace: 'core',
+        }),
+      ])
+      await session.writeReferenceFacts({
+        logicalSymbols: [],
+        declarations: [],
+        publicBindings: [],
+        localBindings: [],
+        steps: [],
+        coverage: [
+          {
+            filePath: 'core:src/a.ts',
+            contentHash: 'sha256:a',
+            status: 'indexed',
+            reason: undefined,
+            capabilities: ['typescript'],
+          },
+          {
+            filePath: 'core:src/b.ts',
+            contentHash: 'sha256:b',
+            status: 'indexed',
+            reason: undefined,
+            capabilities: ['typescript'],
+          },
+        ],
+      })
+      await session.commit()
+
+      const allCoverage = await store.getAllIndexCoverage()
+      expect(allCoverage).toHaveLength(2)
+      expect(allCoverage.map((c) => c.filePath)).toEqual(['core:src/a.ts', 'core:src/b.ts'])
+
+      const singleCoverage = await store.findIndexCoverage(['core:src/a.ts'])
+      expect(singleCoverage).toHaveLength(1)
+      expect(singleCoverage[0]?.filePath).toBe('core:src/a.ts')
+
+      const emptyCoverage = await store.findIndexCoverage([])
+      expect(emptyCoverage).toEqual([])
+
+      await store.close()
+    })
+  })
 })

@@ -4,7 +4,7 @@
 
 - [x] 1.1 Add `StoreOverloadError` and `StoreWorkerError` domain errors
       `packages/code-graph/src/domain/errors/index.ts`: `StoreOverloadError`, `StoreWorkerError` — define infrastructure errors for worker failure and queue overflow
-      Approach: Extend `SpecdCodeGraphError` with error codes `'STORE_OVERLOAD'` and `'STORE_WORKER_ERROR'`, exporting them from the domain error index.
+      Approach: Extend `SpecdCodeGraphError` with error codes 'STORE_OVERLOAD' and 'STORE_WORKER_ERROR', exporting them from the domain error index.
       (Req: Worker-backed non-blocking execution)
 
 - [x] 1.2 Create worker communication protocol interfaces and DTOs
@@ -115,4 +115,57 @@
 - [x] 9.1 Update Code Graph architecture and services documentation
       `docs/code-graph/index.md`, `docs/code-graph/services.md`: document non-blocking worker architecture and `SqliteRuntimeDescriptor`
       Approach: Add architectural diagrams and descriptions explaining the worker thread boundary and serializable configuration.
+      (Req: Worker-backed non-blocking execution)
+
+## 10. Concurrency, Lifecycle & Protocol Hardening
+
+- [x] 10.1 Add dedicated `getAllIndexCoverage` RPC operation and database implementation
+      `packages/code-graph/src/infrastructure/sqlite/sqlite-graph-database.ts`: `SQLiteGraphDatabase.getAllIndexCoverage()` — query all rows from `index_coverage`
+      `packages/code-graph/src/infrastructure/sqlite/sqlite-graph-store.ts`: `SQLiteGraphStore.getAllIndexCoverage()` — send dedicated `getAllIndexCoverage` RPC
+      Approach: Add `getAllIndexCoverage` to database and protocol map without parameters, executing `SELECT * FROM index_coverage ORDER BY file_path`.
+      (Req: Worker-backed non-blocking execution)
+
+- [x] 10.2 Implement strongly-typed `SQLiteWorkerOperationMap` in protocol
+      `packages/code-graph/src/infrastructure/sqlite/sqlite-worker-protocol.ts`: `SQLiteWorkerOperationMap` — define typed mapping for operations, payloads, and results
+      `packages/code-graph/src/infrastructure/sqlite/sqlite-worker-client.ts`: `SQLiteWorkerClient.sendRequest<K>()` — enforce operation-specific typed payloads and results
+      Approach: Use generic parameter `K extends keyof SQLiteWorkerOperationMap` across client and worker to guarantee type safety at compile time.
+      (Req: Worker-backed non-blocking execution)
+
+- [x] 10.3 Implement formal `WorkerState` state machine in `SQLiteWorkerClient`
+      `packages/code-graph/src/infrastructure/sqlite/sqlite-worker-client.ts`: `WorkerState` — define `closed | opening | open | closing | faulted`
+      Approach: Replace loose booleans with explicit state tracking, ensuring state transitions happen only on verified lifecycle events.
+      (Req: Worker-backed non-blocking execution)
+
+- [x] 10.4 Implement concurrent `open()` and `close()` promise sharing
+      `packages/code-graph/src/infrastructure/sqlite/sqlite-worker-client.ts`: `openPromise`, `closePromise` — deduplicate simultaneous lifecycle invocations
+      Approach: Return existing in-flight promise if `open()` or `close()` is called concurrently, marking `state === open` only after worker ACK.
+      (Req: Worker-backed non-blocking execution)
+
+- [x] 10.5 Implement graceful `close()` drain of in-flight requests with timeout
+      `packages/code-graph/src/infrastructure/sqlite/sqlite-worker-client.ts`: `SQLiteWorkerClient.close()` — reject new requests, drain pending, send close, and terminate
+      Approach: Transition to `closing`, reject new requests with `StoreNotOpenError`, wait for pending requests to drain (bounded by safety timeout), send `close` to worker, await ACK, and terminate worker thread.
+      (Req: Worker-backed non-blocking execution)
+
+- [x] 10.6 Implement single-consumer serial FIFO execution queue in `sqlite-worker.ts`
+      `packages/code-graph/src/infrastructure/sqlite/sqlite-worker.ts`: `dispatchQueue` — guarantee strict FIFO execution across async and sync operations
+      Approach: Chain incoming messages onto a serial Promise chain so asynchronous operations (such as `open` and `recreate`) complete fully before the next operation begins.
+      (Req: Worker-backed non-blocking execution)
+
+- [x] 10.7 Implement strict validation for `maxPendingOperations >= 1`
+      `packages/code-graph/src/infrastructure/sqlite/sqlite-worker-client.ts`: `validateMaxPendingOperations()` — ensure valid positive integer
+      Approach: Reject invalid values (non-integers, <= 0, NaN, Infinity) with an explicit error during `open()`.
+      (Req: Worker-backed non-blocking execution)
+
+- [x] 10.8 Implement manual recovery semantics for faulted store
+      `packages/code-graph/src/infrastructure/sqlite/sqlite-worker-client.ts`: support `close()` from `faulted` to `closed`, allowing fresh `open()`
+      Approach: When in `faulted` state, allow `close()` to clean up references and transition to `closed`, enabling callers to re-open a healthy worker explicitly.
+      (Req: Worker-backed non-blocking execution)
+
+- [x] 10.9 Revert `package.json` lint script modification
+      `package.json`: restore `"lint": "eslint . "`
+      Approach: Remove the `--cache` flag from `package.json` to avoid unrelated change scope drift.
+      (Req: Package exports)
+
+- [x] 10.10 Add exhaustive contract, lifecycle, and concurrency tests
+      `packages/code-graph/test/infrastructure/sqlite/sqlite-worker-lifecycle.spec.ts`: add comprehensive tests covering `getAllIndexCoverage`, concurrent `open()`, concurrent `close()`, drain semantics, `recreate()` serialization, backpressure bounds, and fault recovery.
       (Req: Worker-backed non-blocking execution)

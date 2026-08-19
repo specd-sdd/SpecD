@@ -61,7 +61,7 @@ export function serializeError(error: unknown): SerializedErrorPayload {
  */
 export async function handleMessage(
   database: SQLiteGraphDatabase,
-  message: SQLiteWorkerRequest<unknown>,
+  message: SQLiteWorkerRequest,
   postMessage: (response: SQLiteWorkerResponse) => void,
 ): Promise<void> {
   const { id, op, payload } = message
@@ -397,6 +397,10 @@ export async function handleMessage(
         result = database.findIndexCoverage(p.filePaths)
         break
       }
+      case 'getAllIndexCoverage': {
+        result = database.getAllIndexCoverage()
+        break
+      }
       case 'rebuildFtsIndexes': {
         database.rebuildFtsIndexes()
         break
@@ -435,9 +439,21 @@ export async function handleMessage(
 // If executing inside a real Worker thread
 if (parentPort !== null) {
   const database = new SQLiteGraphDatabase()
+  let dispatchQueue: Promise<void> = Promise.resolve()
+
   parentPort.on('message', (message: SQLiteWorkerRequest) => {
-    void handleMessage(database, message, (response) => {
-      parentPort?.postMessage(response)
-    })
+    dispatchQueue = dispatchQueue
+      .then(() =>
+        handleMessage(database, message, (response) => {
+          parentPort?.postMessage(response)
+        }),
+      )
+      .catch((error) => {
+        parentPort?.postMessage({
+          id: message.id,
+          type: 'error',
+          error: serializeError(error),
+        })
+      })
   })
 }

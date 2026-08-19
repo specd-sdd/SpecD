@@ -937,7 +937,7 @@ export class SQLiteGraphDatabase {
       publicBindings,
       localBindings,
       steps,
-      coverage: this.findIndexCoverage(),
+      coverage: this.getAllIndexCoverage(),
     }
   }
 
@@ -2074,24 +2074,12 @@ export class SQLiteGraphDatabase {
   }
 
   /**
-   * Finds index coverage.
+   * Finds index coverage for specific file paths.
    *
-   * @param filePaths - File paths parameter.
-   * @returns The result of find index coverage.
+   * @param filePaths - Array of file paths to query coverage for.
+   * @returns The index coverage records for the matching files.
    */
-  findIndexCoverage(filePaths?: readonly string[]): IndexCoverage[] {
-    if (filePaths === undefined) {
-      const rows = this.statement(
-        'SELECT file_path, content_hash, status, reason, capabilities_json FROM index_coverage ORDER BY file_path',
-      ).all() as IndexCoverageRow[]
-      return rows.map((row) => ({
-        filePath: row.file_path,
-        contentHash: row.content_hash ?? undefined,
-        status: row.status as IndexCoverage['status'],
-        reason: row.reason ?? undefined,
-        capabilities: JSON.parse(row.capabilities_json) as string[],
-      }))
-    }
+  findIndexCoverage(filePaths: readonly string[]): IndexCoverage[] {
     if (filePaths.length === 0) return []
     const paths = [...new Set(filePaths)]
     const rows = this.statement(
@@ -2107,6 +2095,24 @@ export class SQLiteGraphDatabase {
         capabilities: JSON.parse(row.capabilities_json) as string[],
       }))
       .sort((left, right) => left.filePath.localeCompare(right.filePath))
+  }
+
+  /**
+   * Retrieves all index coverage records across all files.
+   *
+   * @returns Array of all index coverage records ordered by file path.
+   */
+  getAllIndexCoverage(): IndexCoverage[] {
+    const rows = this.statement(
+      'SELECT file_path, content_hash, status, reason, capabilities_json FROM index_coverage ORDER BY file_path',
+    ).all() as IndexCoverageRow[]
+    return rows.map((row) => ({
+      filePath: row.file_path,
+      contentHash: row.content_hash ?? undefined,
+      status: row.status as IndexCoverage['status'],
+      reason: row.reason ?? undefined,
+      capabilities: JSON.parse(row.capabilities_json) as string[],
+    }))
   }
 
   /**

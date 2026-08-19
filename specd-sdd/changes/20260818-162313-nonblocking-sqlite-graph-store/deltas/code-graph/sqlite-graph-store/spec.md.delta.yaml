@@ -30,30 +30,37 @@
     1. **Persistent Worker Lifecycle**: Each open store instance owns exactly one
        persistent worker thread. Workers SHALL NOT be spawned per operation or
        pooled. `open()` starts and initializes the worker, and `close()` terminates
-       it cleanly and idempotently.
+       it cleanly and idempotently. Concurrent calls to `open()` or `close()` MUST
+       share the same in-flight initialization or shutdown Promise.
     2. **Worker Ownership**: The worker thread owns the `better-sqlite3` database
        connection, prepared statements cache, active transactions, and backend-owned
        filesystem operations (such as database file creation and cleanup). Database
        handles and prepared statements MUST NOT cross the worker boundary.
-    3. **Serializable Communication Protocol**: Host and worker communicate via
-       structured-cloneable messages with unique correlation IDs. The protocol MUST
-       use plain serializable DTOs for requests, results, errors, and progress events.
-       Native objects, functions, and class instances with prototypes MUST NOT be
-       transferred across the boundary.
-    4. **Execution Ordering & Backpressure**: The worker executes operations serially
-       in FIFO order. The host-side worker client MUST maintain a bounded pending
-       operation queue (default: 256 pending operations). When the limit is exceeded,
-       new operations MUST reject immediately with an explicit infrastructure
-       overload error without corrupting or delaying existing queued requests.
-    5. **Serializable Runtime Descriptor**: The worker receives SQLite runtime
+    3. **Strongly-Typed Protocol**: Host and worker communicate via structured-cloneable
+       messages with monotonic correlation IDs. The protocol MUST use strongly-typed
+       DTOs mapping operation to payload and result. Native objects, functions, and
+       class instances with prototypes MUST NOT be transferred across the boundary.
+    4. **Worker FIFO Serialization**: The worker MUST process incoming messages through
+       an explicit serial execution queue, ensuring that asynchronous operations (such
+       as `open()` and `recreate()`) and subsequent queries execute in strict FIFO order
+       without interleaving.
+    5. **Bounded Outstanding Requests**: The host client MUST enforce a strictly
+       validated limit on outstanding pending requests (`maxPendingOperations >= 1`,
+       default: 256). When the limit is exceeded, new requests MUST reject immediately
+       with `StoreOverloadError` without disturbing existing queued requests.
+    6. **Graceful Shutdown & Drain**: Calling `close()` transitions the client to
+       `closing` and immediately rejects new operations with `StoreNotOpenError`.
+       Accepted in-flight operations MUST be drained to completion (bounded by a
+       configurable fallback timeout) before the worker closes the SQLite database and
+       terminates the thread.
+    7. **Serializable Runtime Descriptor**: The worker receives SQLite runtime
        configuration via a serializable descriptor (e.g. `SqliteRuntimeDescriptor` with
        optional `modulePath`), enabling dynamic loading of custom or vendored SQLite
        native bindings inside the worker context without transferring function loaders.
-    6. **Deterministic Failure Semantics**: If the worker thread crashes or exits
-       unexpectedly, the store transitions to a faulted/closed state. All pending
-       and in-flight operations MUST be rejected immediately, and subsequent calls
-       MUST fail deterministically. The store SHALL NOT attempt silent automatic
-       restarts.
+    8. **Fault Isolation & Manual Recovery**: If the worker thread crashes or exits
+       unexpectedly, the store transitions to a `faulted` state, rejecting outstanding
+       operations with `StoreWorkerError`. The store SHALL NOT attempt silent auto-restarts;
+       manual recovery is supported by calling `close()` followed by `open()`.
 
 - op: modified
   selector:

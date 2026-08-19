@@ -3,89 +3,44 @@ import { type FileNode } from '../../domain/value-objects/file-node.js'
 import { type Relation } from '../../domain/value-objects/relation.js'
 import { type SpecNode } from '../../domain/value-objects/spec-node.js'
 import { type SymbolNode } from '../../domain/value-objects/symbol-node.js'
-import { type IndexedInputObservation } from '../../domain/value-objects/indexed-input-freshness.js'
-import { type ReferenceFactsWrite } from '../../domain/ports/graph-store.js'
+import { type SymbolQuery } from '../../domain/value-objects/symbol-query.js'
+import { type SearchOptions } from '../../domain/value-objects/search-options.js'
+import { type GraphStatistics } from '../../domain/value-objects/graph-statistics.js'
+import {
+  type SourceContentCandidatePage,
+  type SourceContentCandidateQuery,
+} from '../../domain/value-objects/source-search.js'
+import {
+  type FreshnessLatches,
+  type IndexedInputObservation,
+  type IndexedResourceKey,
+  type MarkIndexedInputStaleInput,
+  type UpdateIndexedInputObservationInput,
+} from '../../domain/value-objects/indexed-input-freshness.js'
+import {
+  type LocalBinding,
+  type LogicalSymbol,
+  type PublicBinding,
+  type ResolutionStep,
+} from '../../domain/value-objects/symbol-reference.js'
+import { type IndexCoverage } from '../../domain/value-objects/index-session.js'
+import {
+  type LocalBindingLookup,
+  type LogicalDeclaration,
+  type LogicalSymbolLookup,
+  type PublicBindingLookup,
+  type ReferenceFactsWrite,
+  type StorageGenerationSnapshot,
+} from '../../domain/ports/graph-store.js'
 import { type SqliteRuntimeDescriptor } from './sqlite-runtime-descriptor.js'
-
-/**
- * Discriminator operations supported by the SQLite worker thread.
- */
-export type SQLiteWorkerOperation =
-  | 'open'
-  | 'close'
-  | 'recreate'
-  | 'clear'
-  | 'getFile'
-  | 'findFilesByConfigRelativePath'
-  | 'getDocument'
-  | 'findDocumentsByConfigRelativePath'
-  | 'getSymbol'
-  | 'findSymbols'
-  | 'getSpec'
-  | 'getSpecDependencies'
-  | 'getSpecDependents'
-  | 'getCoveredFiles'
-  | 'getCoveringSpecsForFile'
-  | 'getCoveringSpecsForFiles'
-  | 'getCoveredSymbols'
-  | 'getCoveringSpecsForSymbol'
-  | 'getCoveringSpecsForSymbols'
-  | 'getCallers'
-  | 'getCallees'
-  | 'getImporters'
-  | 'getImportees'
-  | 'findDirectlyAffectedFiles'
-  | 'getExtenders'
-  | 'getExtendedTargets'
-  | 'getImplementors'
-  | 'getImplementedTargets'
-  | 'getOverriders'
-  | 'getOverriddenTargets'
-  | 'getExportedSymbols'
-  | 'getSymbolCallers'
-  | 'getFileImporterCounts'
-  | 'getAllFiles'
-  | 'getAllDocuments'
-  | 'getAllSpecs'
-  | 'getAllReferenceFacts'
-  | 'findLogicalSymbolsByIds'
-  | 'findDeclarations'
-  | 'findPublicBindingsByExportedNames'
-  | 'getStatistics'
-  | 'searchSymbols'
-  | 'searchSpecs'
-  | 'searchDocuments'
-  | 'searchSourceCandidates'
-  | 'upsertFile'
-  | 'removeFile'
-  | 'upsertDocument'
-  | 'removeDocument'
-  | 'upsertSpec'
-  | 'removeSpec'
-  | 'removeSpecs'
-  | 'addRelations'
-  | 'readStorageGenerationSnapshot'
-  | 'rotateStorageGeneration'
-  | 'getIndexedInputObservations'
-  | 'markIndexedInputsStale'
-  | 'updateIndexedInputObservation'
-  | 'readFreshnessLatches'
-  | 'markWorkspacesAndGraphStaleSinceLastIndex'
-  | 'replaceReferenceFacts'
-  | 'findLogicalSymbols'
-  | 'findLogicalDeclarations'
-  | 'findPublicBindings'
-  | 'findLocalBindings'
-  | 'findResolutionSteps'
-  | 'findIndexCoverage'
-  | 'rebuildFtsIndexes'
-  | 'commitBulkIndex'
 
 /**
  * Payload sent for opening SQLite worker and database.
  */
 export interface OpenWorkerPayload {
+  /** Root path where database is located. */
   readonly storagePath: string
+  /** Optional SQLite runtime descriptor. */
   readonly runtime?: SqliteRuntimeDescriptor | undefined
 }
 
@@ -93,39 +48,289 @@ export interface OpenWorkerPayload {
  * Payload sent for atomic bulk index commit.
  */
 export interface BulkIndexPayload {
+  /** File nodes to persist. */
   readonly files: readonly FileNode[]
+  /** Optional document nodes to persist. */
   readonly documents?: readonly DocumentNode[] | undefined
+  /** Symbol nodes to persist. */
   readonly symbols: readonly SymbolNode[]
+  /** Spec nodes to persist. */
   readonly specs: readonly SpecNode[]
+  /** Relations to persist. */
   readonly relations: readonly Relation[]
+  /** Optional file paths to remove. */
   readonly removedFilePaths?: readonly string[] | undefined
+  /** Optional document paths to remove. */
   readonly removedDocumentPaths?: readonly string[] | undefined
+  /** Optional spec IDs to remove. */
   readonly removedSpecIds?: readonly string[] | undefined
+  /** Optional reference facts write payload. */
   readonly referenceFacts?: ReferenceFactsWrite | undefined
+  /** Optional observations to persist. */
   readonly observations?: readonly IndexedInputObservation[] | undefined
+  /** Optional VCS ref identifier. */
   readonly vcsRef?: string | undefined
+  /** Optional graph content fingerprint. */
   readonly graphFingerprint?: string | undefined
+  /** Optional indexed workspace names. */
   readonly indexedWorkspaces?: readonly string[] | undefined
+  /** Whether to clear graph stale latch. */
   readonly clearGraphStaleLatch?: boolean | undefined
+  /** Whether to replace code graph state. */
   readonly replaceCodeGraph?: boolean | undefined
+  /** Whether to rebuild search indexes. */
   readonly rebuildSearchIndexes?: boolean | undefined
 }
 
 /**
- * Generic request structure sent from host client to SQLite worker.
+ * Comprehensive mapping of operation names to their payload and return types.
  */
-export interface SQLiteWorkerRequest<TPayload = unknown> {
+export interface SQLiteWorkerOperationMap {
+  /** Opens SQLite worker database. */
+  open: { payload: OpenWorkerPayload; result: void }
+  /** Closes SQLite worker database. */
+  close: { payload: Record<string, never>; result: void }
+  /** Recreates database schema destructively. */
+  recreate: { payload: Record<string, never>; result: void }
+  /** Clears all data while retaining tables. */
+  clear: { payload: Record<string, never>; result: void }
+  /** Retrieves a file node. */
+  getFile: { payload: { filePath: string }; result: FileNode | undefined }
+  /** Finds files by config relative path. */
+  findFilesByConfigRelativePath: { payload: { configRelativePath: string }; result: FileNode[] }
+  /** Retrieves a document node. */
+  getDocument: { payload: { documentId: string }; result: DocumentNode | undefined }
+  /** Finds documents by config relative path. */
+  findDocumentsByConfigRelativePath: {
+    payload: { configRelativePath: string }
+    result: DocumentNode[]
+  }
+  /** Retrieves a symbol node. */
+  getSymbol: { payload: { symbolId: string }; result: SymbolNode | undefined }
+  /** Finds symbols matching query. */
+  findSymbols: { payload: { query: SymbolQuery }; result: SymbolNode[] }
+  /** Retrieves a spec node. */
+  getSpec: { payload: { specId: string }; result: SpecNode | undefined }
+  /** Retrieves spec dependencies. */
+  getSpecDependencies: { payload: { specId: string }; result: Relation[] }
+  /** Retrieves spec dependents. */
+  getSpecDependents: { payload: { specId: string }; result: Relation[] }
+  /** Retrieves files covered by spec. */
+  getCoveredFiles: { payload: { specId: string }; result: Relation[] }
+  /** Retrieves specs covering file. */
+  getCoveringSpecsForFile: { payload: { filePath: string }; result: Relation[] }
+  /** Retrieves specs covering any file in list. */
+  getCoveringSpecsForFiles: { payload: { filePaths: readonly string[] }; result: Relation[] }
+  /** Retrieves symbols covered by spec. */
+  getCoveredSymbols: { payload: { specId: string }; result: Relation[] }
+  /** Retrieves specs covering symbol. */
+  getCoveringSpecsForSymbol: { payload: { symbolId: string }; result: Relation[] }
+  /** Retrieves specs covering any symbol in list. */
+  getCoveringSpecsForSymbols: { payload: { symbolIds: readonly string[] }; result: Relation[] }
+  /** Retrieves callers of symbol. */
+  getCallers: { payload: { symbolId: string }; result: Relation[] }
+  /** Retrieves callees of symbol. */
+  getCallees: { payload: { symbolId: string }; result: Relation[] }
+  /** Retrieves importers of file. */
+  getImporters: { payload: { filePath: string }; result: Relation[] }
+  /** Retrieves importees of file. */
+  getImportees: { payload: { filePath: string }; result: Relation[] }
+  /** Finds files directly affected by changes. */
+  findDirectlyAffectedFiles: { payload: { filePaths: readonly string[] }; result: string[] }
+  /** Retrieves extenders of symbol. */
+  getExtenders: { payload: { symbolId: string }; result: Relation[] }
+  /** Retrieves extended targets of symbol. */
+  getExtendedTargets: { payload: { symbolId: string }; result: Relation[] }
+  /** Retrieves implementors of symbol. */
+  getImplementors: { payload: { symbolId: string }; result: Relation[] }
+  /** Retrieves implemented targets of symbol. */
+  getImplementedTargets: { payload: { symbolId: string }; result: Relation[] }
+  /** Retrieves overriders of symbol. */
+  getOverriders: { payload: { symbolId: string }; result: Relation[] }
+  /** Retrieves overridden targets of symbol. */
+  getOverriddenTargets: { payload: { symbolId: string }; result: Relation[] }
+  /** Retrieves exported symbols from file. */
+  getExportedSymbols: { payload: { filePath: string }; result: SymbolNode[] }
+  /** Retrieves all symbol callers. */
+  getSymbolCallers: {
+    payload: Record<string, never>
+    result: Array<{ symbol: SymbolNode; callerFilePath: string }>
+  }
+  /** Retrieves importer counts per file. */
+  getFileImporterCounts: { payload: Record<string, never>; result: Map<string, number> }
+  /** Retrieves all file nodes. */
+  getAllFiles: { payload: Record<string, never>; result: FileNode[] }
+  /** Retrieves all document nodes. */
+  getAllDocuments: { payload: Record<string, never>; result: DocumentNode[] }
+  /** Retrieves all spec nodes. */
+  getAllSpecs: { payload: Record<string, never>; result: SpecNode[] }
+  /** Retrieves all reference facts. */
+  getAllReferenceFacts: { payload: Record<string, never>; result: ReferenceFactsWrite }
+  /** Finds logical symbols by ids. */
+  findLogicalSymbolsByIds: { payload: { ids: readonly string[] }; result: LogicalSymbol[] }
+  /** Finds declarations for logical symbols. */
+  findDeclarations: {
+    payload: { logicalSymbolIds: readonly string[] }
+    result: LogicalDeclaration[]
+  }
+  /** Finds public bindings by exported names. */
+  findPublicBindingsByExportedNames: {
+    payload: { exportedNames: readonly string[] }
+    result: PublicBinding[]
+  }
+  /** Retrieves graph statistics. */
+  getStatistics: { payload: Record<string, never>; result: GraphStatistics }
+  /** Searches symbols using FTS. */
+  searchSymbols: {
+    payload: { query: string; options: SearchOptions }
+    result: Array<{
+      symbol: SymbolNode
+      score: number
+      snippet: string
+      startLine: number
+      endLine: number
+    }>
+  }
+  /** Searches specs using FTS. */
+  searchSpecs: {
+    payload: { query: string; options: SearchOptions }
+    result: Array<{
+      spec: SpecNode
+      score: number
+      snippet: string
+      startLine: number
+      endLine: number
+    }>
+  }
+  /** Searches documents using FTS. */
+  searchDocuments: {
+    payload: { query: string; options: SearchOptions }
+    result: Array<{
+      document: DocumentNode
+      score: number
+      snippet: string
+      startLine: number
+      endLine: number
+    }>
+  }
+  /** Searches source code candidates. */
+  searchSourceCandidates: {
+    payload: { query: SourceContentCandidateQuery }
+    result: SourceContentCandidatePage
+  }
+  /** Upserts a file node. */
+  upsertFile: {
+    payload: {
+      file: FileNode
+      symbols: SymbolNode[]
+      relations: Relation[]
+      referenceFacts?: ReferenceFactsWrite | undefined
+    }
+    result: void
+  }
+  /** Removes a file. */
+  removeFile: { payload: { filePath: string }; result: void }
+  /** Upserts a document node. */
+  upsertDocument: { payload: { document: DocumentNode }; result: void }
+  /** Removes a document. */
+  removeDocument: { payload: { documentPath: string }; result: void }
+  /** Upserts a spec node. */
+  upsertSpec: { payload: { spec: SpecNode; relations: Relation[] }; result: void }
+  /** Removes a spec node. */
+  removeSpec: { payload: { specId: string }; result: void }
+  /** Removes multiple spec nodes. */
+  removeSpecs: { payload: { specIds: readonly string[] }; result: void }
+  /** Adds relations to graph. */
+  addRelations: { payload: { relations: Relation[] }; result: void }
+  /** Reads storage generation snapshot. */
+  readStorageGenerationSnapshot: {
+    payload: Record<string, never>
+    result: StorageGenerationSnapshot
+  }
+  /** Rotates storage generation snapshot. */
+  rotateStorageGeneration: {
+    payload: { expectedGeneration: string }
+    result: StorageGenerationSnapshot
+  }
+  /** Retrieves indexed input observations. */
+  getIndexedInputObservations: {
+    payload: { resources: readonly IndexedResourceKey[] }
+    result: readonly IndexedInputObservation[]
+  }
+  /** Marks indexed inputs stale. */
+  markIndexedInputsStale: {
+    payload: { updates: readonly MarkIndexedInputStaleInput[] }
+    result: void
+  }
+  /** Updates indexed input observation. */
+  updateIndexedInputObservation: {
+    payload: { updates: readonly UpdateIndexedInputObservationInput[] }
+    result: void
+  }
+  /** Reads freshness latches. */
+  readFreshnessLatches: { payload: { workspaces: readonly string[] }; result: FreshnessLatches }
+  /** Marks workspaces and graph stale since last index. */
+  markWorkspacesAndGraphStaleSinceLastIndex: {
+    payload: { workspaces: readonly string[] }
+    result: void
+  }
+  /** Replaces semantic reference facts. */
+  replaceReferenceFacts: { payload: { facts: ReferenceFactsWrite }; result: void }
+  /** Finds logical symbols matching lookups. */
+  findLogicalSymbols: {
+    payload: { lookups: readonly LogicalSymbolLookup[] }
+    result: LogicalSymbol[]
+  }
+  /** Finds logical declarations. */
+  findLogicalDeclarations: {
+    payload: { logicalSymbolIds: readonly string[] }
+    result: LogicalDeclaration[]
+  }
+  /** Finds public bindings matching lookups. */
+  findPublicBindings: {
+    payload: { lookups: readonly PublicBindingLookup[] }
+    result: PublicBinding[]
+  }
+  /** Finds local bindings matching lookups. */
+  findLocalBindings: { payload: { lookups: readonly LocalBindingLookup[] }; result: LocalBinding[] }
+  /** Finds resolution steps. */
+  findResolutionSteps: { payload: { fromIds: readonly string[] }; result: ResolutionStep[] }
+  /** Finds index coverage for specific file paths. */
+  findIndexCoverage: { payload: { filePaths: readonly string[] }; result: IndexCoverage[] }
+  /** Retrieves all index coverage records across all files. */
+  getAllIndexCoverage: { payload: Record<string, never>; result: IndexCoverage[] }
+  /** Rebuilds FTS indexes. */
+  rebuildFtsIndexes: { payload: Record<string, never>; result: void }
+  /** Commits bulk index session payload. */
+  commitBulkIndex: { payload: BulkIndexPayload; result: void }
+}
+
+/**
+ * Discriminator operations supported by the SQLite worker thread.
+ */
+export type SQLiteWorkerOperation = keyof SQLiteWorkerOperationMap
+
+/**
+ * Strongly-typed request structure sent from host client to SQLite worker.
+ */
+export interface SQLiteWorkerRequest<K extends SQLiteWorkerOperation = SQLiteWorkerOperation> {
+  /** Monotonic request identifier. */
   readonly id: number
-  readonly op: SQLiteWorkerOperation
-  readonly payload: TPayload
+  /** Operation discriminator key. */
+  readonly op: K
+  /** Strongly-typed payload matching operation. */
+  readonly payload: SQLiteWorkerOperationMap[K]['payload']
 }
 
 /**
  * Successful response message from SQLite worker to host client.
  */
 export interface SQLiteWorkerSuccessResponse<TResult = unknown> {
+  /** Correlation identifier matching request. */
   readonly id: number
+  /** Result discriminator. */
   readonly type: 'result'
+  /** Typed result value. */
   readonly result: TResult
 }
 
@@ -133,10 +338,15 @@ export interface SQLiteWorkerSuccessResponse<TResult = unknown> {
  * Serialized error payload transferred across worker boundary.
  */
 export interface SerializedErrorPayload {
+  /** Machine-readable error code if present. */
   readonly code?: string | undefined
+  /** Name of error class. */
   readonly name: string
+  /** Error message. */
   readonly message: string
+  /** Optional stack trace. */
   readonly stack?: string | undefined
+  /** SQLite-specific error code if present. */
   readonly sqliteCode?: string | undefined
 }
 
@@ -144,8 +354,11 @@ export interface SerializedErrorPayload {
  * Error response message from SQLite worker to host client.
  */
 export interface SQLiteWorkerErrorResponse {
+  /** Correlation identifier matching request. */
   readonly id: number
+  /** Error discriminator. */
   readonly type: 'error'
+  /** Serialized error payload. */
   readonly error: SerializedErrorPayload
 }
 
@@ -153,8 +366,11 @@ export interface SQLiteWorkerErrorResponse {
  * Progress event message emitted by SQLite worker during long-running atomic operations.
  */
 export interface SQLiteWorkerProgressEvent {
+  /** Correlation identifier matching request. */
   readonly id: number
+  /** Progress discriminator. */
   readonly type: 'progress'
+  /** Current execution stage label. */
   readonly stage: string
 }
 

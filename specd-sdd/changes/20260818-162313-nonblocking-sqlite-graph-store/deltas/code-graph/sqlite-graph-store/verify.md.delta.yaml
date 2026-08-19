@@ -35,18 +35,37 @@
     - **AND** subsequent store operations reuse the running worker thread without spawning new workers
     - **AND** `SQLiteGraphStore.close()` cleanly terminates the worker thread and connection
 
+    #### Scenario: Concurrent open and close calls share in-flight promises
+
+    - **GIVEN** multiple callers invoke `open()` or `close()` concurrently
+    - **WHEN** initialization or shutdown is in progress
+    - **THEN** all callers share and resolve the same in-flight Promise without duplicate worker spawns or race conditions
+
     #### Scenario: Concurrent caller request correlation and FIFO execution
 
     - **GIVEN** multiple asynchronous callers dispatch queries concurrently to an open `SQLiteGraphStore`
-    - **WHEN** the requests are queued and processed serially by the worker in FIFO order
-    - **THEN** each caller receives its exact matching result correlated by request ID
+    - **WHEN** the requests are processed serially by the worker execution queue in FIFO order
+    - **THEN** each caller receives its exact matching result correlated by monotonic request ID
 
     #### Scenario: Bounded operation backpressure rejects on queue overflow
 
-    - **GIVEN** an open `SQLiteGraphStore` with a bounded pending queue capacity (default 256)
-    - **WHEN** the number of pending queued requests exceeds the capacity
-    - **THEN** the overflowing operation rejects immediately with an infrastructure overload error
-    - **AND** existing in-flight and queued operations continue processing normally
+    - **GIVEN** an open `SQLiteGraphStore` with a strictly validated positive capacity limit (`maxPendingOperations >= 1`)
+    - **WHEN** the number of outstanding pending requests reaches the capacity limit
+    - **THEN** new incoming requests reject immediately with `StoreOverloadError`
+    - **AND** existing in-flight requests continue processing normally
+
+    #### Scenario: Graceful close drains in-flight operations before terminating worker
+
+    - **GIVEN** an open `SQLiteGraphStore` with accepted pending operations
+    - **WHEN** `close()` is invoked
+    - **THEN** new incoming operations reject with `StoreNotOpenError`
+    - **AND** all previously accepted pending operations are drained to completion before the worker closes the SQLite database and terminates
+
+    #### Scenario: Recreate serializes exclusively against concurrent reads and writes
+
+    - **GIVEN** concurrent queries and a `recreate()` operation dispatched to the store
+    - **WHEN** the worker serial execution queue processes them in order
+    - **THEN** earlier queries complete before recreation, recreation finishes cleanly, and subsequent queries execute against the freshly recreated store without race conditions
 
     #### Scenario: Serializable runtime descriptor loads custom module in worker
 
@@ -54,12 +73,13 @@
     - **WHEN** `SQLiteGraphStore.open()` starts the worker
     - **THEN** the worker dynamically loads the specified SQLite module inside its execution context without requiring function-valued loaders across IPC
 
-    #### Scenario: Deterministic error propagation on unexpected worker termination
+    #### Scenario: Deterministic error propagation on unexpected worker termination and manual recovery
 
     - **GIVEN** an open `SQLiteGraphStore` with in-flight and pending operations
     - **WHEN** the worker thread crashes or is terminated unexpectedly
-    - **THEN** all outstanding Promises reject immediately
-    - **AND** subsequent store operations reject deterministically without silent auto-restart
+    - **THEN** all outstanding Promises reject immediately with `StoreWorkerError`
+    - **AND** the store transitions to `faulted` state
+    - **AND** manual recovery is achieved by calling `close()` followed by `open()`
 
 - op: modified
   selector:
