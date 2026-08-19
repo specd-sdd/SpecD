@@ -595,4 +595,59 @@ parentPort.on('message', (msg) => {
     expect((await store.getFile(file.path))?.path).toBe(file.path)
     await store.close()
   })
+
+  it('invalidates the active bulk session when the store is cleared', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-worker-clear-session-'))
+    const store = new SQLiteGraphStore(tempDir)
+    await store.open()
+
+    const file = createFileNode({
+      path: 'core:src/cleared.ts',
+      configRelativePath: 'src/cleared.ts',
+      language: 'typescript',
+      contentHash: 'sha256:cleared',
+      workspace: 'core',
+    })
+    const session1 = store.beginBulkIndexSession()
+    await session1.writeFiles([file])
+    await store.clear()
+
+    // The old session is invalidated host-side and worker-side
+    await expect(session1.commit()).rejects.toBeInstanceOf(StoreNotOpenError)
+
+    // A new session can be created and committed after clear
+    const session2 = store.beginBulkIndexSession()
+    await session2.writeFiles([file])
+    await session2.commit()
+
+    expect((await store.getFile(file.path))?.path).toBe(file.path)
+    await store.close()
+  })
+
+  it('rejects stale session staging that races a store clear', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-worker-clear-race-'))
+    const store = new SQLiteGraphStore(tempDir)
+    await store.open()
+
+    const file = createFileNode({
+      path: 'core:src/race.ts',
+      configRelativePath: 'src/race.ts',
+      language: 'typescript',
+      contentHash: 'sha256:race',
+      workspace: 'core',
+    })
+    const session = store.beginBulkIndexSession()
+    await session.writeFiles([file])
+
+    // clear() invalidates the host token before its RPC enters the FIFO queue
+    const clearing = store.clear()
+    await expect(session.writeFiles([file])).rejects.toThrow()
+    await clearing
+
+    // The store can immediately create a fresh session afterwards
+    const nextSession = store.beginBulkIndexSession()
+    await nextSession.rollback()
+
+    await store.close()
+  })
 })

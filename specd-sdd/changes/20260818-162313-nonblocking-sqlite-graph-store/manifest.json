@@ -1,7 +1,7 @@
 {
   "name": "nonblocking-sqlite-graph-store",
   "createdAt": "2026-08-18T16:23:13.275Z",
-  "updatedAt": "2026-08-19T19:23:34.009Z",
+  "updatedAt": "2026-08-19T19:30:36.548Z",
   "description": "Execute SQLite operations inside a persistent worker thread without blocking host event loop",
   "schema": {
     "name": "schema-std",
@@ -269,7 +269,7 @@
       "specId": "code-graph:sqlite-graph-store",
       "file": "packages/code-graph/src/infrastructure/sqlite/sqlite-graph-store.ts",
       "fileLinkExplicit": false,
-      "symbols": ["SQLiteGraphStore"]
+      "symbols": ["SQLiteGraphStore", "clear", "invalidateBulkSession"]
     },
     {
       "specId": "code-graph:composition",
@@ -457,7 +457,7 @@
           "key": "design",
           "filename": "design.md",
           "state": "complete",
-          "validatedHash": "sha256:eaec2ec7f989da1221b770a81080f83edb67ff59f1302420e03de0c1b63dd27c"
+          "validatedHash": "sha256:37e77e648f3ee93c044f13ae5107b1e0db2311714c3811a1565e2eb865ee68c4"
         }
       ]
     },
@@ -471,7 +471,7 @@
           "key": "tasks",
           "filename": "tasks.md",
           "state": "complete",
-          "validatedHash": "sha256:fd5fe92adcc002cd03e6d8879ed7f47fba855949bff3f5dede231be9d1bb64c6"
+          "validatedHash": "sha256:e430f612123c9b42298d7491fc2aa159246526ddf8f18c47b9e239f948cdd16d"
         }
       ]
     }
@@ -1030,6 +1030,38 @@
       },
       "from": "ready",
       "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-19T19:30:30.748Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-19T19:30:30.748Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "implementing",
+      "to": "designing"
     }
   ]
 }

@@ -105,6 +105,15 @@ export class SQLiteGraphStore extends GraphStore {
   private activeBulkSessionId: string | undefined = undefined
 
   /**
+   * Invalidates the active bulk session token. Called by every destructive or
+   * lifecycle operation (`close`, `clear`, `recreate`) so the host and the
+   * worker-side session map stay in sync.
+   */
+  private invalidateBulkSession(): void {
+    this.activeBulkSessionId = undefined
+  }
+
+  /**
    * Creates a new SQLite-backed graph store under the provided storage root.
    *
    * @param storagePath - Root path owning `graph/` and `tmp/` directories.
@@ -144,7 +153,7 @@ export class SQLiteGraphStore extends GraphStore {
    * @returns Promise resolving when the store is closed.
    */
   async close(): Promise<void> {
-    this.activeBulkSessionId = undefined
+    this.invalidateBulkSession()
     await this.client.close()
   }
 
@@ -636,6 +645,10 @@ export class SQLiteGraphStore extends GraphStore {
    * @returns Promise resolving when data is cleared.
    */
   async clear(): Promise<void> {
+    // The worker clears its bulk session map before executing database.clear(),
+    // so the host token must be invalidated before the RPC. Even if the SQLite
+    // clear fails, the staging session is already gone worker-side.
+    this.invalidateBulkSession()
     await this.client.sendRequest('clear', {})
   }
 
@@ -645,7 +658,7 @@ export class SQLiteGraphStore extends GraphStore {
    * @returns Promise resolving when recreation completes.
    */
   override async recreate(): Promise<void> {
-    this.activeBulkSessionId = undefined
+    this.invalidateBulkSession()
     if (!this.client.isOpen) {
       const graphDir = join(this.storagePath, 'graph')
       await rm(graphDir, { recursive: true, force: true })

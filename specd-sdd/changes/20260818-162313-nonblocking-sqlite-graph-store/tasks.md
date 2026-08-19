@@ -330,3 +330,17 @@
 - [x] 15.10 Add bulk-session scenarios to the verify delta
       `deltas/code-graph/sqlite-graph-store/verify.md.delta.yaml`: scenarios for staging-state rejection, no session resurrection, reference-facts merge, `maxPendingOperations = 1`, and chunked `bulkLoad()`
       Approach: map each P1/P2 fix to an observable verify scenario.
+
+## 16. Bulk Session Hardening round 2 (clear() ↔ session desync — P1)
+
+- [x] 16.1 `clear()` invalidates the host bulk session token before its RPC
+      `packages/code-graph/src/infrastructure/sqlite/sqlite-graph-store.ts`: `clear()` calls `invalidateBulkSession()` before `client.sendRequest('clear', {})`
+      Approach: the worker clears `bulkSessions` before executing `database.clear()`, so the host must clear `activeBulkSessionId` before the RPC — even a failing SQLite clear leaves the staging session gone worker-side. Prevents the store from being locked out of creating new bulk sessions until close/reopen.
+
+- [x] 16.2 Centralize session invalidation for destructive/lifecycle operations
+      `packages/code-graph/src/infrastructure/sqlite/sqlite-graph-store.ts`: add `private invalidateBulkSession()` and use it in `close()`, `clear()`, and `recreate()`
+      Approach: removes the ad-hoc `this.activeBulkSessionId = undefined` repetitions so a future destructive op cannot forget the host/worker sync.
+
+- [x] 16.3 Tests for clear() invalidating active and racing sessions
+      `packages/code-graph/test/infrastructure/sqlite/sqlite-worker-lifecycle.spec.ts`: sequential test (`session1.commit()` rejects `StoreNotOpenError` after `clear()`, then `session2` commits) and race test (concurrent `clear()` makes stale `writeFiles()` reject; a fresh session can be created and rolled back afterwards)
+      Approach: mirrors the invalidation semantics already covered for close/recreate.
