@@ -1,25 +1,23 @@
 import { type GraphStoreFactory } from './graph-store-factory.js'
 import { SQLiteGraphStore } from '../infrastructure/sqlite/sqlite-graph-store.js'
-
-/**
- * Runtime-loadable SQLite module shape.
- */
-export interface SqliteDatabaseModule {
-  readonly default: new (path: string, options?: { readonly?: boolean | undefined }) => unknown
-}
+import { type SqliteRuntimeDescriptor } from '../infrastructure/sqlite/sqlite-runtime-descriptor.js'
 
 /**
  * Options for reusable SQLite graph-store construction.
  */
 export interface SqliteGraphStoreFactoryOptions {
-  /** Optional runtime-specific loader for the SQLite database module. */
-  readonly loadDatabaseModule?: (() => Promise<SqliteDatabaseModule>) | undefined
+  /** Optional serializable SQLite runtime descriptor. */
+  readonly runtime?: SqliteRuntimeDescriptor | undefined
+  /** Maximum number of concurrent in-flight/queued requests before rejecting with StoreOverloadError. */
+  readonly maxPendingOperations?: number | undefined
+  /** Optional worker script path override. */
+  readonly workerPath?: string | undefined
 }
 
 /**
  * Creates a reusable SQLite-backed graph-store factory.
  *
- * @param factoryOptions - Optional runtime-specific SQLite loader overrides.
+ * @param factoryOptions - Optional runtime-specific SQLite configuration overrides.
  * @returns A graph-store factory that constructs {@link SQLiteGraphStore}.
  */
 export function createSqliteGraphStoreFactory(
@@ -28,7 +26,9 @@ export function createSqliteGraphStoreFactory(
   return {
     create(graphStoreOptions) {
       return new SQLiteGraphStore(graphStoreOptions.storagePath, {
-        loadDatabaseModule: factoryOptions?.loadDatabaseModule,
+        runtime: factoryOptions?.runtime,
+        maxPendingOperations: factoryOptions?.maxPendingOperations,
+        workerPath: factoryOptions?.workerPath,
       })
     },
   }

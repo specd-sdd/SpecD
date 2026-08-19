@@ -1,0 +1,105 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: SQLite-backed implementation'
+  content: |
+    `SQLiteGraphStore` SHALL implement the abstract `GraphStore` contract using
+    `better-sqlite3` as its underlying storage engine, executing all synchronous
+    SQLite operations within a dedicated, persistent Node.js Worker Thread
+    (`node:worker_threads`) owned by the store instance.
+
+    Synchronous SQLite queries, mutations, transactions, schema initialization,
+    and FTS operations MUST NOT execute on the host event-loop thread. The caller
+    interacts with the store exclusively through the asynchronous `GraphStore`
+    interface, receiving genuine non-blocking event-loop behavior.
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: SQLite-backed implementation'
+  content: |
+    ### Requirement: Worker-backed non-blocking execution
+
+    `SQLiteGraphStore` SHALL manage worker thread isolation and communication
+    according to the following operational invariants:
+
+    1. **Persistent Worker Lifecycle**: Each open store instance owns exactly one
+       persistent worker thread. Workers SHALL NOT be spawned per operation or
+       pooled. `open()` starts and initializes the worker, and `close()` terminates
+       it cleanly and idempotently.
+    2. **Worker Ownership**: The worker thread owns the `better-sqlite3` database
+       connection, prepared statements cache, active transactions, and backend-owned
+       filesystem operations (such as database file creation and cleanup). Database
+       handles and prepared statements MUST NOT cross the worker boundary.
+    3. **Serializable Communication Protocol**: Host and worker communicate via
+       structured-cloneable messages with unique correlation IDs. The protocol MUST
+       use plain serializable DTOs for requests, results, errors, and progress events.
+       Native objects, functions, and class instances with prototypes MUST NOT be
+       transferred across the boundary.
+    4. **Execution Ordering & Backpressure**: The worker executes operations serially
+       in FIFO order. The host-side worker client MUST maintain a bounded pending
+       operation queue (default: 256 pending operations). When the limit is exceeded,
+       new operations MUST reject immediately with an explicit infrastructure
+       overload error without corrupting or delaying existing queued requests.
+    5. **Serializable Runtime Descriptor**: The worker receives SQLite runtime
+       configuration via a serializable descriptor (e.g. `SqliteRuntimeDescriptor` with
+       optional `modulePath`), enabling dynamic loading of custom or vendored SQLite
+       native bindings inside the worker context without transferring function loaders.
+    6. **Deterministic Failure Semantics**: If the worker thread crashes or exits
+       unexpectedly, the store transitions to a faulted/closed state. All pending
+       and in-flight operations MUST be rejected immediately, and subsequent calls
+       MUST fail deterministically. The store SHALL NOT attempt silent automatic
+       restarts.
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Transactional mutation model'
+  content: |
+    `SQLiteGraphStore` SHALL use SQLite transactions executing entirely within the
+    worker thread to preserve the atomic mutation semantics required by the
+    abstract `GraphStore` contract.
+
+    Transactions MUST NOT span multiple host/worker IPC round-trips. Each atomic
+    mutation (including `upsertFile()`, `removeFile()`, `upsertSpec()`,
+    `removeSpec()`, and bulk index commit) MUST be dispatched and executed as a
+    single, self-contained worker operation.
+
+    At minimum:
+
+    - `upsertFile()` MUST replace file-local graph state atomically
+    - `removeFile()` MUST remove file-local graph state atomically
+    - `upsertSpec()` MUST replace spec-local graph state atomically
+    - `removeSpec()` MUST remove spec-local graph state atomically
+    - bulk indexing operations MUST commit all-or-nothing backend state for the batch they
+      claim to have persisted
+
+    If a transaction fails, the backend MUST leave previously committed graph state intact.
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Bulk indexing support'
+  content: |
+    `SQLiteGraphStore` SHALL support efficient bulk indexing for large repositories.
+
+    The complete staged bulk index payload MUST be transferred to the worker as a
+    single atomic commit operation, executing within a single worker-side SQLite
+    transaction.
+
+    During bulk commit, the worker MUST emit serializable progress events (covering
+    `cleanup`, `files`, `documents`, `symbols`, `specs`, `reference-facts`,
+    `observations`, `relations`, and `search-indexes`) across the worker boundary,
+    which the host forwards to any registered `onProgress` callback.
+
+    The adapter MAY use batching, prepared statements, temporary tables, or other
+    SQLite-appropriate techniques to keep large indexing runs stable, provided the
+    observable `GraphStore` contract and bulk atomicity are preserved.
+
+    If the implementation materializes backend-owned scratch artifacts outside the
+    primary database file, those artifacts MUST be scoped to `{configPath}/tmp` and
+    cleaned up after successful completion.

@@ -1,0 +1,87 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: SQLite-backed implementation'
+  content: |
+    #### Scenario: Backend initialization stays inside the adapter
+
+    - **WHEN** `SQLiteGraphStore.open()` is called through the abstract `GraphStore`
+      lifecycle
+    - **THEN** the adapter initializes its persistent worker, SQLite-specific connection, and schema state
+      before serving queries
+    - **AND** storage-agnostic callers do not need to know any SQLite DDL or query details
+
+    #### Scenario: Host event loop remains responsive during long-running SQLite operation
+
+    - **GIVEN** a SQLite operation is executing within the worker thread
+    - **WHEN** an unrelated timer or microtask is scheduled on the host event loop
+    - **THEN** the host timer/microtask executes and completes without waiting for the SQLite operation to finish
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: SQLite-backed implementation'
+  content: |
+    ### Requirement: Worker-backed non-blocking execution
+
+    #### Scenario: Single persistent worker per open store lifecycle
+
+    - **WHEN** `SQLiteGraphStore.open()` is invoked
+    - **THEN** exactly one persistent worker thread is spawned and initialized
+    - **AND** subsequent store operations reuse the running worker thread without spawning new workers
+    - **AND** `SQLiteGraphStore.close()` cleanly terminates the worker thread and connection
+
+    #### Scenario: Concurrent caller request correlation and FIFO execution
+
+    - **GIVEN** multiple asynchronous callers dispatch queries concurrently to an open `SQLiteGraphStore`
+    - **WHEN** the requests are queued and processed serially by the worker in FIFO order
+    - **THEN** each caller receives its exact matching result correlated by request ID
+
+    #### Scenario: Bounded operation backpressure rejects on queue overflow
+
+    - **GIVEN** an open `SQLiteGraphStore` with a bounded pending queue capacity (default 256)
+    - **WHEN** the number of pending queued requests exceeds the capacity
+    - **THEN** the overflowing operation rejects immediately with an infrastructure overload error
+    - **AND** existing in-flight and queued operations continue processing normally
+
+    #### Scenario: Serializable runtime descriptor loads custom module in worker
+
+    - **GIVEN** a `SqliteRuntimeDescriptor` specifying a custom `modulePath`
+    - **WHEN** `SQLiteGraphStore.open()` starts the worker
+    - **THEN** the worker dynamically loads the specified SQLite module inside its execution context without requiring function-valued loaders across IPC
+
+    #### Scenario: Deterministic error propagation on unexpected worker termination
+
+    - **GIVEN** an open `SQLiteGraphStore` with in-flight and pending operations
+    - **WHEN** the worker thread crashes or is terminated unexpectedly
+    - **THEN** all outstanding Promises reject immediately
+    - **AND** subsequent store operations reject deterministically without silent auto-restart
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Transactional mutation model'
+  content: |
+    #### Scenario: File upsert is all-or-nothing
+
+    - **WHEN** `upsertFile()` is invoked
+    - **THEN** the complete file-level graph replacement executes within a single worker-side transaction
+    - **AND** if an error occurs during replacement, previous graph state remains intact
+
+    #### Scenario: Bulk indexing batch is all-or-nothing
+
+    - **WHEN** a bulk index commit payload is transferred to the worker
+    - **THEN** the batch commits atomically within a single worker transaction without intermediate host RPC round-trips
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Scenario: Large indexing runs use backend-specific batching safely'
+  content: |
+    - **WHEN** a repository is indexed in bulk through `SQLiteGraphStore`
+    - **THEN** the staged payload is committed atomically in the worker
+    - **AND** serializable progress events are received and forwarded to the caller's progress callback

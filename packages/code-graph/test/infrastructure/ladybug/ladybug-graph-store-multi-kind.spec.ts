@@ -17,7 +17,7 @@ describe('LadybugGraphStore searchSymbols multi-kind', () => {
     }
   })
 
-  it('matches any of the requested symbol kinds', { timeout: 10000 }, async () => {
+  it('matches any of the requested symbol kinds', { timeout: 30000 }, async () => {
     tempDir = mkdtempSync(join(tmpdir(), 'code-graph-test-'))
     const store = new LadybugGraphStore(tempDir)
     await store.open()

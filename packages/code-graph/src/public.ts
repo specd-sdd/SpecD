@@ -1,6 +1,13 @@
 // Composition
 export { createCodeGraphProvider } from './composition/create-code-graph-provider.js'
-export { createSqliteGraphStoreFactory } from './composition/create-sqlite-graph-store-factory.js'
+export {
+  createSqliteGraphStoreFactory,
+  type SqliteGraphStoreFactoryOptions,
+} from './composition/create-sqlite-graph-store-factory.js'
+export {
+  type SqliteRuntimeDescriptor,
+  type SQLiteGraphStoreOptions,
+} from './infrastructure/sqlite/sqlite-runtime-descriptor.js'
 export {
   type CodeGraphCompositionOptions,
   type CodeGraphOptions,
@@ -194,6 +201,8 @@ export { GraphBusyError } from './domain/errors/graph-busy-error.js'
 export { GraphProviderStaleError } from './domain/errors/graph-provider-stale-error.js'
 export { StoreNotOpenError } from './domain/errors/store-not-open-error.js'
 export { SpecNotFoundError } from './domain/errors/spec-not-found-error.js'
+export { StoreOverloadError } from './domain/errors/store-overload-error.js'
+export { StoreWorkerError } from './domain/errors/store-worker-error.js'
 
 import { readInstalledCodeGraphVersion } from './application/use-cases/_shared/installed-code-graph-version.js'
 
