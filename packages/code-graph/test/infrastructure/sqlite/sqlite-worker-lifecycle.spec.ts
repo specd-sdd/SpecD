@@ -7,6 +7,10 @@ import { SQLiteWorkerClient } from '../../../src/infrastructure/sqlite/sqlite-wo
 import { createFileNode } from '../../../src/domain/value-objects/file-node.js'
 import { createDocumentNode } from '../../../src/domain/value-objects/document-node.js'
 import { createSpecNode } from '../../../src/domain/value-objects/spec-node.js'
+import {
+  createLogicalSymbol,
+  SymbolSpace,
+} from '../../../src/domain/value-objects/symbol-reference.js'
 import { StoreNotOpenError } from '../../../src/domain/errors/store-not-open-error.js'
 import { StoreWorkerError } from '../../../src/domain/errors/store-worker-error.js'
 
@@ -473,6 +477,122 @@ parentPort.on('message', (msg) => {
     expect(await store.getDocument(doc.path)).toBeUndefined()
     expect(await store.getSpec(spec.specId)).toBeUndefined()
 
+    await store.close()
+  })
+
+  it('merges reference-facts chunks staged through the same bulk session', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-worker-facts-merge-'))
+    const store = new SQLiteGraphStore(tempDir)
+    await store.open()
+
+    const chunk1 = createLogicalSymbol({
+      workspace: 'core',
+      surface: 'core:src/a.ts',
+      name: 'alpha',
+      space: SymbolSpace.Value,
+      ownerId: undefined,
+      memberForm: undefined,
+    })
+    const chunk2 = createLogicalSymbol({
+      workspace: 'core',
+      surface: 'core:src/b.ts',
+      name: 'beta',
+      space: SymbolSpace.Value,
+      ownerId: undefined,
+      memberForm: undefined,
+    })
+
+    const session = store.beginBulkIndexSession()
+    await session.writeReferenceFacts({
+      logicalSymbols: [chunk1],
+      declarations: [],
+      publicBindings: [],
+      localBindings: [],
+      steps: [],
+      coverage: [],
+    })
+    await session.writeReferenceFacts({
+      logicalSymbols: [chunk2],
+      declarations: [],
+      publicBindings: [],
+      localBindings: [],
+      steps: [],
+      coverage: [],
+    })
+    await session.commit()
+
+    const facts = await store.getAllReferenceFacts()
+    expect(facts.logicalSymbols.map((symbol) => symbol.name)).toEqual(['alpha', 'beta'])
+
+    await store.close()
+  })
+
+  it('rejects writes, second commits, and rollbacks while a commit is in flight', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-worker-commit-state-'))
+    const store = new SQLiteGraphStore(tempDir)
+    await store.open()
+
+    const file = createFileNode({
+      path: 'core:src/state.ts',
+      configRelativePath: 'src/state.ts',
+      language: 'typescript',
+      contentHash: 'sha256:state',
+      workspace: 'core',
+    })
+    const session = store.beginBulkIndexSession()
+    await session.writeFiles([file])
+
+    const committing = session.commit()
+    await expect(session.writeFiles([file])).rejects.toThrow(/committing/)
+    await expect(session.commit()).rejects.toThrow(/committing/)
+    await expect(session.rollback()).rejects.toThrow(/committing/)
+    await committing
+
+    expect((await store.getFile(file.path))?.path).toBe(file.path)
+    await store.close()
+  })
+
+  it('rejects writes and commits while a rollback is in flight', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-worker-rollback-state-'))
+    const store = new SQLiteGraphStore(tempDir)
+    await store.open()
+
+    const file = createFileNode({
+      path: 'core:src/rollback-state.ts',
+      configRelativePath: 'src/rollback-state.ts',
+      language: 'typescript',
+      contentHash: 'sha256:rollback',
+      workspace: 'core',
+    })
+    const session = store.beginBulkIndexSession()
+    await session.writeFiles([file])
+
+    const rolling = session.rollback()
+    await expect(session.writeFiles([file])).rejects.toThrow(/rolling-back/)
+    await expect(session.commit()).rejects.toThrow(/rolling-back/)
+    await rolling
+
+    expect(await store.getFile(file.path)).toBeUndefined()
+    await store.close()
+  })
+
+  it('stages a full bulk session under maxPendingOperations=1 without overload', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-worker-max-pending-1-'))
+    const store = new SQLiteGraphStore(tempDir, { maxPendingOperations: 1 })
+    await store.open()
+
+    const file = createFileNode({
+      path: 'core:src/limited.ts',
+      configRelativePath: 'src/limited.ts',
+      language: 'typescript',
+      contentHash: 'sha256:limited',
+      workspace: 'core',
+    })
+    const session = store.beginBulkIndexSession()
+    await session.writeFiles([file])
+    await session.commit()
+
+    expect((await store.getFile(file.path))?.path).toBe(file.path)
     await store.close()
   })
 })

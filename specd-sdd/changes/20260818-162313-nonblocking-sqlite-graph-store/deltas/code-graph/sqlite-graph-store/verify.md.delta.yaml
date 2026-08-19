@@ -96,8 +96,8 @@
     - **WHEN** `close()` is called and the drain timeout expires
     - **THEN** the `close` RPC is NOT sent to the worker
     - **AND** all remaining pending requests reject with `StoreWorkerError`
-    - **AND** `worker.terminate()` is called unconditionally
-    - **AND** the store reaches `'closed'` state within the drain timeout window
+    - **AND** forced worker termination (`worker.terminate()`) is initiated
+    - **AND** the store reaches `'closed'` state after the forced termination concludes
 
     #### Scenario: Worker crash during opening leaves deterministic faulted state
 
@@ -116,13 +116,46 @@
       stale in-flight promise)
     - **AND** a subsequent `open()` + `close()` cycle succeeds without error
 
-    #### Scenario: close() total duration is bounded when worker ignores the close RPC
+    #### Scenario: close() gives up graceful shutdown and force-terminates when worker ignores the close RPC
 
     - **GIVEN** an open store whose worker responds to `open` but deliberately ignores `close`
     - **WHEN** `close(N)` is called (N milliseconds)
-    - **THEN** `close()` resolves within approximately N milliseconds
-    - **AND** `worker.terminate()` is called to force-kill the unresponsive worker
+    - **THEN** graceful shutdown gives up at approximately N milliseconds
+    - **AND** forced worker termination is initiated and awaited to conclusion
     - **AND** the store reaches `'closed'` state
+
+    #### Scenario: Bulk session staging rejects writes while a commit or rollback is in flight
+
+    - **GIVEN** an active `IndexWriteSession` with a `commit()` or `rollback()` already invoked
+    - **WHEN** another write, removal, commit, or rollback is attempted concurrently
+    - **THEN** the concurrent operation rejects with a session-state error
+    - **AND** the original commit or rollback completes unaffected
+
+    #### Scenario: Staging cannot resurrect a committed or rolled-back session
+
+    - **GIVEN** a bulk index session that has been committed, rolled back, closed, or recreated
+    - **WHEN** a subsequent staging RPC targets the same session id
+    - **THEN** the staging operation rejects and does not create a new worker-side session
+
+    #### Scenario: Reference-facts chunks staged in one session are merged, not replaced
+
+    - **GIVEN** two `writeReferenceFacts()` calls against the same `IndexWriteSession`
+    - **WHEN** the session is committed
+    - **THEN** reference facts from both chunks are persisted together
+
+    #### Scenario: Bulk session staging works under maxPendingOperations = 1
+
+    - **GIVEN** an open `SQLiteGraphStore` configured with `maxPendingOperations: 1`
+    - **WHEN** a full bulk session performs begin, staging, and commit
+    - **THEN** no `StoreOverloadError` is raised because the begin RPC is shared and awaited
+      rather than dispatched fire-and-forget
+
+    #### Scenario: bulkLoad() stages chunked data instead of one giant payload
+
+    - **GIVEN** a large set of files, symbols, specs, and relations passed to `bulkLoad()`
+    - **WHEN** the bulk load commits
+    - **THEN** entities are staged in bounded chunks and committed atomically in one
+      worker transaction without a single complete-graph structured-clone message
 
     #### Scenario: Progress callback exceptions are isolated silently
 

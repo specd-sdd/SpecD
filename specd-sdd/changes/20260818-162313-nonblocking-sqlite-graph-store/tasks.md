@@ -288,3 +288,45 @@
 - [x] 14.6 Re-run full compliance audit and replace the partial report
       Re-run the compliance audit (full mode) after the fixes; supersede `reports/20260819-193743/_partial-code-graph.md` with the final full report and confirm 0 non-compliant findings.
       Approach: Re-verify against the reconciled specs and update the report path in the change metadata.
+
+## 15. Bulk Session Hardening (review of chunked staging — P1/P2 findings)
+
+- [x] 15.1 Merge (not replace) reference-facts chunks worker-side
+      `packages/code-graph/src/infrastructure/sqlite/sqlite-worker.ts`: `stageBulkReferenceFacts` accumulates via `mergeReferenceFactChunks()` (logicalSymbols, declarations, publicBindings, localBindings, steps, coverage)
+      Approach: `session.facts = session.facts === undefined ? p.facts : mergeReferenceFactChunks(session.facts, p.facts)`; add lifecycle test committing two `writeReferenceFacts()` chunks and asserting both are persisted.
+
+- [x] 15.2 Only `beginBulkIndexSession` may create a worker session
+      `packages/code-graph/src/infrastructure/sqlite/sqlite-worker.ts`: replace `getOrCreateBulkSession` with `createBulkSession` (throws if exists) and `requireBulkSession` (throws if missing)
+      Approach: `beginBulkIndexSession` calls `createBulkSession`; all `stage*`, `commitBulkIndex`, and `rollbackBulkIndexSession` call `requireBulkSession`. A finalized session can never be resurrected by staging.
+
+- [x] 15.3 Host bulk session state machine (active/committing/rolling-back/finished)
+      `packages/code-graph/src/infrastructure/sqlite/sqlite-graph-store.ts`: `beginBulkIndexSession` tracks `BulkSessionState`; `commit()` sets `committing` and `rollback()` sets `rolling-back` before their RPCs
+      Approach: writes/removals/second commit/rollback accept only `state === 'active'`; commit/rollback finish with success or error (worker deletes session in finally). Add lifecycle tests for commit+write, commit+commit, commit+rollback, rollback+write, rollback+commit.
+
+- [x] 15.4 Await the begin RPC (`ensureReady`) instead of fire-and-forget
+      `packages/code-graph/src/infrastructure/sqlite/sqlite-graph-store.ts`: store the `beginBulkIndexSession` RPC promise as `readyPromise` and await it at the start of every async session method
+      Approach: On `readyPromise` rejection, mark the session finished, release `activeBulkSessionId`, and propagate the original error (no `.catch(() => {})`). Add test asserting a full session works under `maxPendingOperations: 1`.
+
+- [x] 15.5 Serializable RPC metadata (no functions in payload types)
+      `packages/code-graph/src/infrastructure/sqlite/sqlite-worker-protocol.ts`: define `SerializableIndexWriteSessionMetadata = Omit<IndexWriteSessionMetadata, 'onProgress'>` and use it in `commitBulkIndex`
+      Approach: worker casts to the concrete serializable type instead of `Record<string, unknown>`.
+
+- [x] 15.6 `bulkLoad()` uses the chunked session flow; remove legacy direct payload
+      `packages/code-graph/src/infrastructure/sqlite/sqlite-graph-store.ts`: `bulkLoad()` stages files/documents/symbols/specs/relations/observations in `BULK_RPC_CHUNK_SIZE` (1000) chunks via `IndexWriteSession` and commits atomically
+      Approach: drop the `| BulkIndexPayload` legacy variant from `commitBulkIndex` so a complete-graph structured clone is impossible.
+
+- [x] 15.7 Hardened responsiveness test with heartbeat ticks and many staging RPCs
+      `packages/code-graph/test/infrastructure/sqlite/sqlite-worker-responsiveness.spec.ts`: 10 000 files/symbols staged in 250-element chunks; assert `ticks > 0` and `maxLag < 200`
+      Approach: keep a generous CI threshold; the goal is detecting large stalls, not microbenchmarking.
+
+- [x] 15.8 `drainPendingRequests(0)` resolves false immediately
+      `packages/code-graph/src/infrastructure/sqlite/sqlite-worker-client.ts`: short-circuit `if (this.pendingRequests.size === 0) return true; if (timeoutMs <= 0) return false` before scheduling the interval
+      Approach: prevents a 10 ms interval tick when the close deadline has already expired.
+
+- [x] 15.9 Spec/design/verify wording: graceful-shutdown deadline + forced termination (no hard bound)
+      `deltas/code-graph/sqlite-graph-store/{spec,verify}.md.delta.yaml`, `design.md`: `drainTimeoutMs` is a graceful-shutdown deadline; after expiry forced `worker.terminate()` is initiated and awaited — no hard wall-clock promise including native-code termination
+      Approach: wording-only reconciliation; the implementation already awaits termination.
+
+- [x] 15.10 Add bulk-session scenarios to the verify delta
+      `deltas/code-graph/sqlite-graph-store/verify.md.delta.yaml`: scenarios for staging-state rejection, no session resurrection, reference-facts merge, `maxPendingOperations = 1`, and chunked `bulkLoad()`
+      Approach: map each P1/P2 fix to an observable verify scenario.

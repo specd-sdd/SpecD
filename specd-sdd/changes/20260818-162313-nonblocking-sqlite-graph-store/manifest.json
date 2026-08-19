@@ -1,7 +1,7 @@
 {
   "name": "nonblocking-sqlite-graph-store",
   "createdAt": "2026-08-18T16:23:13.275Z",
-  "updatedAt": "2026-08-19T18:44:57.026Z",
+  "updatedAt": "2026-08-19T19:23:34.009Z",
   "description": "Execute SQLite operations inside a persistent worker thread without blocking host event loop",
   "schema": {
     "name": "schema-std",
@@ -231,7 +231,8 @@
         "SQLiteWorkerResponse",
         "SerializedErrorPayload",
         "SQLiteWorkerProgressEvent",
-        "SQLiteWorkerOperationMap"
+        "SQLiteWorkerOperationMap",
+        "SerializableIndexWriteSessionMetadata"
       ]
     },
     {
@@ -250,13 +251,19 @@
       "specId": "code-graph:sqlite-graph-store",
       "file": "packages/code-graph/src/infrastructure/sqlite/sqlite-worker.ts",
       "fileLinkExplicit": false,
-      "symbols": ["handleMessage", "serializeError"]
+      "symbols": [
+        "handleMessage",
+        "serializeError",
+        "createBulkSession",
+        "requireBulkSession",
+        "mergeReferenceFactChunks"
+      ]
     },
     {
       "specId": "code-graph:sqlite-graph-store",
       "file": "packages/code-graph/src/infrastructure/sqlite/sqlite-worker-client.ts",
       "fileLinkExplicit": false,
-      "symbols": ["SQLiteWorkerClient"]
+      "symbols": ["SQLiteWorkerClient", "drainPendingRequests"]
     },
     {
       "specId": "code-graph:sqlite-graph-store",
@@ -341,7 +348,7 @@
       "specId": "code-graph:composition",
       "file": "packages/code-graph/src/infrastructure/sqlite/sqlite-graph-store.ts",
       "fileLinkExplicit": false,
-      "symbols": ["SQLiteGraphStore"]
+      "symbols": ["SQLiteGraphStore", "beginBulkIndexSession", "bulkLoad"]
     },
     {
       "specId": "code-graph:composition",
@@ -410,7 +417,7 @@
           "key": "code-graph:sqlite-graph-store",
           "filename": "deltas/code-graph/sqlite-graph-store/spec.md.delta.yaml",
           "state": "complete",
-          "validatedHash": "sha256:d0b11d3dfe2fdc4b2dfe3673a19c5d63977b0c97397024b5a5608b71c34e857d"
+          "validatedHash": "sha256:9361738e8e86cf94eb0e65f230d2e22946c4fb632aea495bb95cdc7b3852b86c"
         },
         {
           "key": "code-graph:composition",
@@ -430,7 +437,7 @@
           "key": "code-graph:sqlite-graph-store",
           "filename": "deltas/code-graph/sqlite-graph-store/verify.md.delta.yaml",
           "state": "complete",
-          "validatedHash": "sha256:8246e9b3d38b84904419e83c61627d7c7e79ecb198cd05153081ae1fbd4b05b8"
+          "validatedHash": "sha256:0a1786bf2124ebe9ae4ca6b73035aa6366daed2faa62fc796818b4cce58df600"
         },
         {
           "key": "code-graph:composition",
@@ -450,7 +457,7 @@
           "key": "design",
           "filename": "design.md",
           "state": "complete",
-          "validatedHash": "sha256:b01510c14f9e2e086e53ed50bef506a4fd5c1b421158e78ce53ec6baeac21f09"
+          "validatedHash": "sha256:eaec2ec7f989da1221b770a81080f83edb67ff59f1302420e03de0c1b63dd27c"
         }
       ]
     },
@@ -464,7 +471,7 @@
           "key": "tasks",
           "filename": "tasks.md",
           "state": "complete",
-          "validatedHash": "sha256:0a9096c5bac179ef29a2bbfa2a790957a1f09933526d6029a6360374fbe22f6f"
+          "validatedHash": "sha256:fd5fe92adcc002cd03e6d8879ed7f47fba855949bff3f5dede231be9d1bb64c6"
         }
       ]
     }
@@ -954,6 +961,68 @@
     {
       "type": "transitioned",
       "at": "2026-08-19T18:14:39.518Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-19T19:21:28.725Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [code-graph:sqlite-graph-store]; verify [code-graph:sqlite-graph-store]; design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:sqlite-graph-store"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:sqlite-graph-store"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-19T19:21:28.725Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-19T19:23:17.962Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-19T19:23:18.642Z",
       "by": {
         "name": "M***a",
         "email": "1***i@u***.com",

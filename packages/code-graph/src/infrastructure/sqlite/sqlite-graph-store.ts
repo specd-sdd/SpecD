@@ -40,9 +40,29 @@ import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { SQLiteWorkerClient } from './sqlite-worker-client.js'
 import { type InternalSQLiteGraphStoreOptions } from './sqlite-runtime-descriptor.js'
-import { type BulkIndexPayload } from './sqlite-worker-protocol.js'
 import { rotateStorageGenerationAsync } from '../storage-generation.js'
 import { StoreNotOpenError } from '../../domain/errors/store-not-open-error.js'
+
+/** Default maximum number of entities staged per bulk staging RPC. */
+const BULK_RPC_CHUNK_SIZE = 1000
+
+/** Lifecycle states of a host-side bulk index write session. */
+type BulkSessionState = 'active' | 'committing' | 'rolling-back' | 'finished'
+
+/**
+ * Splits a read-only array into bounded chunks for progressive worker staging.
+ *
+ * @param items - The entities to split.
+ * @param size - Maximum number of entities per chunk.
+ * @returns Array of chunks, each with at most `size` entities.
+ */
+function chunkArray<T>(items: readonly T[], size: number): T[][] {
+  const chunks: T[][] = []
+  for (let i = 0; i < items.length; i += size) {
+    chunks.push(items.slice(i, i + size))
+  }
+  return chunks
+}
 
 /**
  * Options for direct bulk load operation in SQLite graph store.
@@ -851,12 +871,17 @@ export class SQLiteGraphStore extends GraphStore {
     const sessionGeneration = this.client.lifecycleGeneration
     this.activeBulkSessionId = sessionId
 
-    // Notify worker to initialize worker-side staging session
-    void this.client.sendRequest('beginBulkIndexSession', { sessionId }).catch(() => {})
-
+    let state: BulkSessionState = 'active'
     let finished = false
+    let readyPromise: Promise<void> | undefined
 
-    const assertActive = (): void => {
+    const releaseSessionId = (): void => {
+      if (this.activeBulkSessionId === sessionId) {
+        this.activeBulkSessionId = undefined
+      }
+    }
+
+    const assertNotFinished = (): void => {
       if (finished) throw new Error('Bulk index session is already finished')
       if (
         this.activeBulkSessionId !== sessionId ||
@@ -864,63 +889,111 @@ export class SQLiteGraphStore extends GraphStore {
         !this.client.isOpen
       ) {
         finished = true
+        state = 'finished'
         throw new StoreNotOpenError()
+      }
+    }
+
+    const assertWritable = (): void => {
+      assertNotFinished()
+      if (state !== 'active') {
+        throw new Error(
+          `Bulk index session is "${state}"; writes, removals, and commit are only allowed while active`,
+        )
+      }
+    }
+
+    // Shares the single begin RPC across all session methods so a strict
+    // maxPendingOperations (e.g. 1) is never overloaded by session staging.
+    const ensureReady = async (): Promise<void> => {
+      if (readyPromise === undefined) {
+        readyPromise = this.client.sendRequest('beginBulkIndexSession', { sessionId })
+      }
+      try {
+        await readyPromise
+      } catch (error) {
+        finished = true
+        state = 'finished'
+        releaseSessionId()
+        throw error
       }
     }
 
     const finish = (): void => {
       finished = true
-      if (this.activeBulkSessionId === sessionId) {
-        this.activeBulkSessionId = undefined
-      }
+      state = 'finished'
+      releaseSessionId()
     }
 
     return {
       writeFiles: async (chunk) => {
-        assertActive()
+        assertWritable()
+        await ensureReady()
+        assertNotFinished()
         await this.client.sendRequest('stageBulkFiles', { sessionId, files: [...chunk] })
       },
       writeDocuments: async (chunk) => {
-        assertActive()
+        assertWritable()
+        await ensureReady()
+        assertNotFinished()
         await this.client.sendRequest('stageBulkDocuments', { sessionId, documents: [...chunk] })
       },
       writeSymbols: async (chunk) => {
-        assertActive()
+        assertWritable()
+        await ensureReady()
+        assertNotFinished()
         await this.client.sendRequest('stageBulkSymbols', { sessionId, symbols: [...chunk] })
       },
       writeSpecs: async (chunk) => {
-        assertActive()
+        assertWritable()
+        await ensureReady()
+        assertNotFinished()
         await this.client.sendRequest('stageBulkSpecs', { sessionId, specs: [...chunk] })
       },
       writeReferenceFacts: async (chunk) => {
-        assertActive()
+        assertWritable()
+        await ensureReady()
+        assertNotFinished()
         await this.client.sendRequest('stageBulkReferenceFacts', { sessionId, facts: chunk })
       },
       writeObservations: async (chunk) => {
-        assertActive()
+        assertWritable()
+        await ensureReady()
+        assertNotFinished()
         await this.client.sendRequest('stageBulkObservations', {
           sessionId,
           observations: [...chunk],
         })
       },
       writeRelations: async (chunk) => {
-        assertActive()
+        assertWritable()
+        await ensureReady()
+        assertNotFinished()
         await this.client.sendRequest('stageBulkRelations', { sessionId, relations: [...chunk] })
       },
       removeFiles: async (paths) => {
-        assertActive()
+        assertWritable()
+        await ensureReady()
+        assertNotFinished()
         await this.client.sendRequest('stageBulkRemovals', { sessionId, filePaths: [...paths] })
       },
       removeDocuments: async (paths) => {
-        assertActive()
+        assertWritable()
+        await ensureReady()
+        assertNotFinished()
         await this.client.sendRequest('stageBulkRemovals', { sessionId, documentPaths: [...paths] })
       },
       removeSpecs: async (ids) => {
-        assertActive()
+        assertWritable()
+        await ensureReady()
+        assertNotFinished()
         await this.client.sendRequest('stageBulkRemovals', { sessionId, specIds: [...ids] })
       },
       commit: async () => {
-        assertActive()
+        assertWritable()
+        state = 'committing'
+        await ensureReady()
+        assertNotFinished()
         try {
           const { onProgress, ...serializableMetadata } = metadata
           await this.client.sendRequest(
@@ -935,7 +1008,10 @@ export class SQLiteGraphStore extends GraphStore {
         }
       },
       rollback: async () => {
-        assertActive()
+        assertWritable()
+        state = 'rolling-back'
+        await ensureReady()
+        assertNotFinished()
         try {
           await this.client.sendRequest('rollbackBulkIndexSession', { sessionId })
         } catch {
@@ -948,25 +1024,56 @@ export class SQLiteGraphStore extends GraphStore {
   }
 
   /**
-   * Bulk loads graph entities directly into the SQLite worker.
+   * Bulk loads graph entities into the SQLite worker through progressive
+   * chunked staging and a single atomic commit.
    *
    * @param options - Bulk data payload and options.
    * @returns Promise resolving when the bulk load commits.
    */
   async bulkLoad(options: SqliteBulkLoadOptions): Promise<void> {
-    const payload: BulkIndexPayload = {
-      files: options.files,
-      documents: options.documents,
-      symbols: options.symbols,
-      specs: options.specs,
-      relations: options.relations,
-      vcsRef: options.vcsRef,
-      graphFingerprint: options.graphFingerprint,
-      observations: options.observations,
-      indexedWorkspaces: options.indexedWorkspaces,
-      clearGraphStaleLatch: options.clearGraphStaleLatch,
-      rebuildSearchIndexes: options.rebuildSearchIndexes,
+    const session = this.beginBulkIndexSession({
+      ...(options.vcsRef === undefined ? {} : { vcsRef: options.vcsRef }),
+      ...(options.graphFingerprint === undefined
+        ? {}
+        : { graphFingerprint: options.graphFingerprint }),
+      ...(options.indexedWorkspaces === undefined
+        ? {}
+        : { indexedWorkspaces: options.indexedWorkspaces }),
+      ...(options.clearGraphStaleLatch === undefined
+        ? {}
+        : { clearGraphStaleLatch: options.clearGraphStaleLatch }),
+      ...(options.rebuildSearchIndexes === undefined
+        ? {}
+        : { rebuildSearchIndexes: options.rebuildSearchIndexes }),
+      ...(options.onProgress === undefined ? {} : { onProgress: options.onProgress }),
+    })
+    try {
+      for (const chunk of chunkArray(options.files, BULK_RPC_CHUNK_SIZE)) {
+        await session.writeFiles(chunk)
+      }
+      if (options.documents !== undefined) {
+        for (const chunk of chunkArray(options.documents, BULK_RPC_CHUNK_SIZE)) {
+          await session.writeDocuments(chunk)
+        }
+      }
+      for (const chunk of chunkArray(options.symbols, BULK_RPC_CHUNK_SIZE)) {
+        await session.writeSymbols(chunk)
+      }
+      for (const chunk of chunkArray(options.specs, BULK_RPC_CHUNK_SIZE)) {
+        await session.writeSpecs(chunk)
+      }
+      for (const chunk of chunkArray(options.relations, BULK_RPC_CHUNK_SIZE)) {
+        await session.writeRelations(chunk)
+      }
+      if (options.observations !== undefined) {
+        for (const chunk of chunkArray(options.observations, BULK_RPC_CHUNK_SIZE)) {
+          await session.writeObservations(chunk)
+        }
+      }
+      await session.commit()
+    } catch (error) {
+      await session.rollback().catch(() => {})
+      throw error
     }
-    await this.client.sendRequest('commitBulkIndex', payload, options.onProgress)
   }
 }

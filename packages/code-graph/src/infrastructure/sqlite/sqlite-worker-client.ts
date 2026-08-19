@@ -476,6 +476,7 @@ export class SQLiteWorkerClient {
    */
   private async drainPendingRequests(timeoutMs: number): Promise<boolean> {
     if (this.pendingRequests.size === 0) return true
+    if (timeoutMs <= 0) return false
 
     return new Promise<boolean>((resolve) => {
       const startTime = Date.now()

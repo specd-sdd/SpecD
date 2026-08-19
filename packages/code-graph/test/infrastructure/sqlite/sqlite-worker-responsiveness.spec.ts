@@ -18,15 +18,16 @@ describe('SQLiteWorker responsiveness', () => {
   })
 
   it(
-    'keeps the host event loop responsive during large bulk index persistence',
-    { timeout: 30000 },
+    'keeps the host event loop responsive across many chunked staging RPCs',
+    { timeout: 60000 },
     async () => {
       tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-responsiveness-'))
       const store = new SQLiteGraphStore(tempDir)
       await store.open()
 
-      // Build a batch of files and symbols
-      const files = Array.from({ length: 500 }, (_, i) =>
+      // Build a large batch of files and symbols to force many staging RPCs
+      const fileCount = 10000
+      const files = Array.from({ length: fileCount }, (_, i) =>
         createFileNode({
           path: `core:src/module-${i}.ts`,
           configRelativePath: `src/module-${i}.ts`,
@@ -36,7 +37,7 @@ describe('SQLiteWorker responsiveness', () => {
           content: `export function fn${i}() { return ${i} }`,
         }),
       )
-      const symbols = Array.from({ length: 500 }, (_, i) =>
+      const symbols = Array.from({ length: fileCount }, (_, i) =>
         createSymbolNode({
           name: `fn${i}`,
           kind: SymbolKind.Function,
@@ -55,6 +56,7 @@ describe('SQLiteWorker responsiveness', () => {
         }),
       )
 
+      let ticks = 0
       let maxLag = 0
       const intervalMs = 10
       let expected = performance.now() + intervalMs
@@ -63,23 +65,29 @@ describe('SQLiteWorker responsiveness', () => {
         const now = performance.now()
         maxLag = Math.max(maxLag, now - expected)
         expected = now + intervalMs
+        ticks++
       }, intervalMs)
 
       const session = store.beginBulkIndexSession({
         rebuildSearchIndexes: true,
       })
-      await session.writeFiles(files)
-      await session.writeSymbols(symbols)
+      const chunkSize = 250
+      for (let i = 0; i < fileCount; i += chunkSize) {
+        await session.writeFiles(files.slice(i, i + chunkSize))
+        await session.writeSymbols(symbols.slice(i, i + chunkSize))
+      }
       await session.commit()
 
       clearInterval(timer)
 
-      // Maximum event-loop lag should remain bounded below generous CI threshold (200ms)
+      // The heartbeat must have fired at least once during persistence, and
+      // maximum event-loop lag should remain bounded below a generous CI threshold
+      expect(ticks).toBeGreaterThan(0)
       expect(maxLag).toBeLessThan(200)
 
       const stats = await store.getStatistics()
-      expect(stats.fileCount).toBe(500)
-      expect(stats.symbolCount).toBe(500)
+      expect(stats.fileCount).toBe(fileCount)
+      expect(stats.symbolCount).toBe(fileCount)
 
       await store.close()
     },

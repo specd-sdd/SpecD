@@ -50,12 +50,15 @@
        with `StoreOverloadError` without disturbing existing queued requests.
     6. **Graceful Shutdown & Drain**: Calling `close()` MUST transition the client to
        `closing` and immediately reject new operations with `StoreNotOpenError`.
-       `drainTimeoutMs` (default: 5 000 ms) is a hard upper bound on the total
-       `close()` wall-clock time, covering `await openPromise`, the drain phase, and the
-       `close` RPC ACK via a unref'd `withDeadline` helper. If any phase exhausts the
-       deadline, remaining pending requests MUST be rejected with `StoreWorkerError`, and
-       `worker.terminate()` MUST be called unconditionally. The `closePromise` sentinel
-       MUST be cleared in an outer `finally` block wrapping the entire shutdown body.
+       `drainTimeoutMs` (default: 5 000 ms) is a deadline for graceful shutdown,
+       covering `await openPromise`, the drain phase, and the `close` RPC ACK via a
+       unref'd `withDeadline` helper. If any phase exhausts the deadline, remaining
+       pending requests MUST be rejected with `StoreWorkerError`, and forced worker
+       termination (`worker.terminate()`) MUST be initiated. A worker executing native
+       code provides no mathematical guarantee of terminating within a fixed wall-clock
+       bound, so `close()` SHALL NOT advertise a hard upper bound on its total duration;
+       instead it MUST wait for the forced termination to conclude. The `closePromise`
+       sentinel MUST be cleared in an outer `finally` block wrapping the entire shutdown body.
     7. **Serializable Runtime Descriptor**: The worker receives SQLite runtime
        configuration via a serializable descriptor (`SqliteRuntimeDescriptor`),
        enabling dynamic loading of custom SQLite native bindings. `workerPath` is strictly
@@ -70,10 +73,16 @@
        `open()` MUST NOT transition state to `'open'` once `close()` has set state to `'closing'`.
     10. **Chunked Worker-Side Bulk Staging & Lifecycle Session Token**: Bulk index operations
         MUST stage entity chunks progressively to the worker thread via RPCs (`stageBulkFiles`,
-        `stageBulkSymbols`, etc.) under a worker-side session (`sessionId`). The final visible
-        mutation MUST commit atomically within a single SQLite worker transaction. Sessions MUST
-        be bound to a host-side `lifecycleGeneration` token and invalidated deterministically on
-        store close, worker crash, or recreation.
+        `stageBulkSymbols`, etc.) under a worker-side session (`sessionId`). Only
+        `beginBulkIndexSession` MAY create a session; staging, commit, and rollback against a
+        missing or already finalized session MUST reject rather than resurrect it. The host
+        session SHALL enforce an `active`/`committing`/`rolling-back`/`finished` state machine so
+        writes, removals, and duplicate commits or rollbacks are rejected while a commit or
+        rollback is in flight. Reference-facts chunks staged in the same session MUST be merged
+        (not replaced) so earlier chunks survive later writes. The final visible mutation MUST
+        commit atomically within a single SQLite worker transaction. Sessions MUST be bound to a
+        host-side `lifecycleGeneration` token and invalidated deterministically on store close,
+        worker crash, or recreation.
     11. **Isolated Observational Progress Callbacks**: Progress callback notifications (`onProgress`)
         MUST be strictly observational. Any exception thrown by a progress callback handler MUST be
         caught and isolated silently without failing the active operation or aborting transactions.
@@ -113,9 +122,11 @@
   content: |
     `SQLiteGraphStore` SHALL support efficient bulk indexing for large repositories.
 
-    The complete staged bulk index payload MUST be transferred to the worker as a
-    single atomic commit operation, executing within a single worker-side SQLite
-    transaction.
+    Bulk index data MUST be staged to the worker in bounded chunks (not as one giant
+    structured-clone payload) and committed atomically as a single worker-side SQLite
+    transaction. The `bulkLoad()` convenience path SHALL internally use the chunked
+    `IndexWriteSession` staging flow and MUST NOT transfer a complete repository graph
+    across the worker boundary in a single IPC message.
 
     During bulk commit, the worker MUST emit serializable progress events (covering
     `cleanup`, `files`, `documents`, `symbols`, `specs`, `reference-facts`,

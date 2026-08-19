@@ -334,16 +334,21 @@ export interface SQLiteWorkerOperationMap {
     }
     result: void
   }
-  /** Commits a bulk index session by session ID or direct payload. */
+  /** Commits a worker-side bulk index session by session ID. */
   commitBulkIndex: {
-    payload:
-      | { sessionId: string; metadata?: IndexWriteSessionMetadata | undefined }
-      | BulkIndexPayload
+    payload: { sessionId: string; metadata?: SerializableIndexWriteSessionMetadata | undefined }
     result: void
   }
   /** Rollbacks and releases a worker-side bulk index staging session. */
   rollbackBulkIndexSession: { payload: { sessionId: string }; result: void }
 }
+
+/**
+ * Metadata that can be transferred across the worker boundary. Functions such
+ * as `onProgress` are not structured-clone serializable and SHALL NOT appear in
+ * RPC payload types.
+ */
+export type SerializableIndexWriteSessionMetadata = Omit<IndexWriteSessionMetadata, 'onProgress'>
 
 /**
  * Discriminator operations supported by the SQLite worker thread.

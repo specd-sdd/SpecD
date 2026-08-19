@@ -88,19 +88,24 @@ During `close()`:
    even when `open()` fails concurrently. Without this, a subsequent `close()` would find the stale
    resolved promise and silently skip recovery.
 2. `deadline = Date.now() + drainTimeoutMs` is computed once at the entry of `close()`. This shared
-   deadline bounds `await openPromise`, the drain phase, and the `close` RPC ACK using a unref'd `withDeadline` helper.
+   deadline bounds the graceful-shutdown phases — `await openPromise`, the drain phase, and the
+   `close` RPC ACK — using a unref'd `withDeadline` helper. It is NOT a hard upper bound on the
+   total `close()` wall-clock time: once the deadline expires, forced `worker.terminate()` is
+   initiated and `close()` awaits the termination to conclude (a worker executing native code offers
+   no mathematical guarantee of terminating within a fixed bound).
 3. If `state === 'opening'`, `close()` sets `state = 'closing'` and awaits `openPromise` with `withDeadline`.
    `open()` sees `state !== 'opening'` and skips the `→ 'open'` transition. If `openPromise` rejects or times out,
    `close()` returns early from the inner catch — the outer `finally` still clears `closePromise` and terminates the worker.
    `handleWorkerExit` in `'closing'` state also rejects any stale pending requests (such as an unacknowledged `open` RPC).
 4. `state` is set to `closing`. Any new incoming `sendRequest()` call immediately rejects with `StoreNotOpenError`.
-5. `drainPendingRequests(Math.max(0, deadline - now))` waits for pending requests to settle.
+5. `drainPendingRequests(Math.max(0, deadline - now))` waits for pending requests to settle. When the
+   remaining time is `0`, `drainPendingRequests(0)` resolves `false` immediately without scheduling an interval tick.
 6. **If `drained === true`** (all requests settled before deadline):
    - `withDeadline(sendRequestInternal('close'), deadline)` races the clean DB close RPC against the shared deadline.
 7. **If `drained === false`** OR the `close` RPC times out:
    - Any remaining pending requests are rejected **before** `worker.terminate()` is called, so
      the drain-timeout `StoreWorkerError` is the rejection callers observe (not the exit-event error).
-   - `worker.terminate()` is called unconditionally to force-kill the thread.
+   - `worker.terminate()` is called unconditionally to force-kill the thread; `close()` awaits it.
 8. `state` transitions to `closed` and `closePromise` is cleared in the `finally` block.
 
 ### 3. Worker-Side Serial FIFO Execution Queue
@@ -278,7 +283,27 @@ export interface SQLiteWorkerOperationMap {
   findIndexCoverage: { payload: { filePaths: readonly string[] }; result: IndexCoverage[] }
   getAllIndexCoverage: { payload: Record<string, never>; result: IndexCoverage[] }
   rebuildFtsIndexes: { payload: Record<string, never>; result: void }
-  commitBulkIndex: { payload: BulkIndexPayload; result: void }
+  beginBulkIndexSession: { payload: { sessionId: string }; result: void }
+  stageBulkFiles: { payload: { sessionId: string; files: FileNode[] }; result: void }
+  stageBulkSymbols: { payload: { sessionId: string; symbols: SymbolNode[] }; result: void }
+  stageBulkReferenceFacts: {
+    payload: { sessionId: string; facts: ReferenceFactsWrite }
+    result: void
+  }
+  stageBulkRemovals: {
+    payload: {
+      sessionId: string
+      filePaths?: string[]
+      documentPaths?: string[]
+      specIds?: string[]
+    }
+    result: void
+  }
+  commitBulkIndex: {
+    payload: { sessionId: string; metadata?: SerializableIndexWriteSessionMetadata }
+    result: void
+  }
+  rollbackBulkIndexSession: { payload: { sessionId: string }; result: void }
 }
 ```
 
@@ -314,10 +339,27 @@ getAllIndexCoverage(): IndexCoverage[] {
      `StoreWorkerError`.
    - **Worker crash during `opening`**: unhandled worker exit before the `open` ACK leaves state as
      `faulted` (not `closed`), giving callers deterministic signal that startup failed.
-   - **`closePromise` cleared when `open()` fails during concurrent `close()`**: a subsequent
-     `close()` executes the recovery path rather than returning the stale promise; a full
-     `open()` → `close()` cycle succeeds afterwards.
-   - **`close()` total time bounded when worker ignores the `close` RPC**: a mock worker that
-     responds to `open` but never acknowledges `close` causes `close(N)` to resolve within ≈N ms
-     via the shared deadline timeout.
+
+- **`closePromise` cleared when `open()` fails during concurrent `close()`**: a subsequent
+  `close()` executes the recovery path rather than returning the stale promise; a full
+  `open()` → `close()` cycle succeeds afterwards.
+  - **`close()` force-terminates when worker ignores the `close` RPC**: a mock worker that
+    responds to `open` but never acknowledges `close` causes `close(N)` to give up graceful
+    shutdown at ≈N ms and await forced termination; the store reaches `'closed'`.
+  - **Bulk session state machine**: writes/removals, duplicate commits, and rollbacks are
+    rejected while a commit (`committing`) or rollback (`rolling-back`) is in flight; the
+    original operation completes unaffected.
+  - **No session resurrection**: staging RPCs against a committed, rolled-back, closed, or
+    recreated session reject instead of creating a new worker-side session (`createBulkSession`
+    is only reachable from `beginBulkIndexSession`).
+  - **Reference-facts chunk merge**: two `writeReferenceFacts()` calls in one session persist
+    data from both chunks after commit.
+  - **`maxPendingOperations: 1` session**: a full begin → stage → commit session succeeds
+    because the begin RPC is shared and awaited (`ensureReady`) instead of fire-and-forget.
+  - **`bulkLoad()` chunked staging**: large `bulkLoad()` inputs are staged in bounded chunks
+    through the session flow; no single complete-graph structured-clone is sent.
+  - **Responsiveness with many staging RPCs**: 10 000 files/symbols staged in 250-element
+    chunks while the host heartbeat (10 ms interval) keeps ticking (`ticks > 0`) with bounded
+    `maxLag`.
+
 3. **End-to-End Indexing & Traversal**: Run indexer, health checks, symbol queries, and FTS search.

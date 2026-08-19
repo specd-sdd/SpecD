@@ -3,6 +3,7 @@ import { SQLiteGraphDatabase } from './sqlite-graph-database.js'
 import {
   type BulkIndexPayload,
   type OpenWorkerPayload,
+  type SerializableIndexWriteSessionMetadata,
   type SerializedErrorPayload,
   type SQLiteWorkerProgressEvent,
   type SQLiteWorkerRequest,
@@ -77,28 +78,66 @@ interface WorkerBulkSession {
 const bulkSessions = new Map<string, WorkerBulkSession>()
 
 /**
- * Gets the staged bulk index session for a given session id, creating an empty one if missing.
+ * Creates a new worker-side bulk staging session. Only `beginBulkIndexSession`
+ * is allowed to create a session; staging operations must target an existing one.
+ *
+ * @param sessionId - Unique identifier of the bulk index session.
+ * @returns The freshly created empty bulk session accumulator.
+ * @throws {Error} When a session with the same id already exists.
+ */
+function createBulkSession(sessionId: string): WorkerBulkSession {
+  const session: WorkerBulkSession = {
+    files: [],
+    documents: [],
+    symbols: [],
+    specs: [],
+    relations: [],
+    observations: [],
+    removals: [],
+    removedDocumentPaths: [],
+    removedSpecIds: [],
+  }
+  bulkSessions.set(sessionId, session)
+  return session
+}
+
+/**
+ * Requires an existing worker-side bulk staging session. A session removed by
+ * commit, rollback, close, clear, or recreate can never be resurrected by a
+ * staging operation.
  *
  * @param sessionId - Unique identifier of the bulk index session.
  * @returns The staged bulk session accumulator for the given id.
+ * @throws {Error} When no session with the given id exists.
  */
-function getOrCreateBulkSession(sessionId: string): WorkerBulkSession {
-  let session = bulkSessions.get(sessionId)
+function requireBulkSession(sessionId: string): WorkerBulkSession {
+  const session = bulkSessions.get(sessionId)
   if (!session) {
-    session = {
-      files: [],
-      documents: [],
-      symbols: [],
-      specs: [],
-      relations: [],
-      observations: [],
-      removals: [],
-      removedDocumentPaths: [],
-      removedSpecIds: [],
-    }
-    bulkSessions.set(sessionId, session)
+    throw new Error(`Bulk index session "${sessionId}" not found or expired`)
   }
   return session
+}
+
+/**
+ * Merges two reference-facts chunks into a single accumulator, concatenating
+ * each of the six fact arrays so multi-chunk writes are not lost.
+ *
+ * @param accumulated - Facts already staged in the session.
+ * @param incoming - New chunk to accumulate.
+ * @returns A merged facts write containing both chunks' data.
+ */
+function mergeReferenceFactChunks(
+  accumulated: ReferenceFactsWrite,
+  incoming: ReferenceFactsWrite,
+): ReferenceFactsWrite {
+  return {
+    logicalSymbols: [...accumulated.logicalSymbols, ...incoming.logicalSymbols],
+    declarations: [...accumulated.declarations, ...incoming.declarations],
+    publicBindings: [...accumulated.publicBindings, ...incoming.publicBindings],
+    localBindings: [...accumulated.localBindings, ...incoming.localBindings],
+    steps: [...accumulated.steps, ...incoming.steps],
+    coverage: [...accumulated.coverage, ...incoming.coverage],
+  }
 }
 
 /**
@@ -460,43 +499,47 @@ export async function handleMessage(
       }
       case 'beginBulkIndexSession': {
         const p = payload as { sessionId: string }
-        getOrCreateBulkSession(p.sessionId)
+        if (bulkSessions.has(p.sessionId)) {
+          throw new Error(`Bulk index session "${p.sessionId}" already exists`)
+        }
+        createBulkSession(p.sessionId)
         break
       }
       case 'stageBulkFiles': {
         const p = payload as { sessionId: string; files: FileNode[] }
-        getOrCreateBulkSession(p.sessionId).files.push(...p.files)
+        requireBulkSession(p.sessionId).files.push(...p.files)
         break
       }
       case 'stageBulkDocuments': {
         const p = payload as { sessionId: string; documents: DocumentNode[] }
-        getOrCreateBulkSession(p.sessionId).documents.push(...p.documents)
+        requireBulkSession(p.sessionId).documents.push(...p.documents)
         break
       }
       case 'stageBulkSymbols': {
         const p = payload as { sessionId: string; symbols: SymbolNode[] }
-        getOrCreateBulkSession(p.sessionId).symbols.push(...p.symbols)
+        requireBulkSession(p.sessionId).symbols.push(...p.symbols)
         break
       }
       case 'stageBulkSpecs': {
         const p = payload as { sessionId: string; specs: SpecNode[] }
-        getOrCreateBulkSession(p.sessionId).specs.push(...p.specs)
+        requireBulkSession(p.sessionId).specs.push(...p.specs)
         break
       }
       case 'stageBulkRelations': {
         const p = payload as { sessionId: string; relations: Relation[] }
-        getOrCreateBulkSession(p.sessionId).relations.push(...p.relations)
+        requireBulkSession(p.sessionId).relations.push(...p.relations)
         break
       }
       case 'stageBulkReferenceFacts': {
         const p = payload as { sessionId: string; facts: ReferenceFactsWrite }
-        const sess = getOrCreateBulkSession(p.sessionId)
-        sess.facts = p.facts
+        const session = requireBulkSession(p.sessionId)
+        session.facts =
+          session.facts === undefined ? p.facts : mergeReferenceFactChunks(session.facts, p.facts)
         break
       }
       case 'stageBulkObservations': {
         const p = payload as { sessionId: string; observations: IndexedInputObservation[] }
-        getOrCreateBulkSession(p.sessionId).observations.push(...p.observations)
+        requireBulkSession(p.sessionId).observations.push(...p.observations)
         break
       }
       case 'stageBulkRemovals': {
@@ -506,50 +549,32 @@ export async function handleMessage(
           documentPaths?: string[]
           specIds?: string[]
         }
-        const session = getOrCreateBulkSession(p.sessionId)
+        const session = requireBulkSession(p.sessionId)
         if (p.filePaths?.length) session.removals.push(...p.filePaths)
         if (p.documentPaths?.length) session.removedDocumentPaths.push(...p.documentPaths)
         if (p.specIds?.length) session.removedSpecIds.push(...p.specIds)
         break
       }
       case 'commitBulkIndex': {
-        let bulkPayload: BulkIndexPayload
-        const p = payload as
-          | { sessionId: string; metadata?: Record<string, unknown> }
-          | BulkIndexPayload
-
-        if ('sessionId' in p && typeof p.sessionId === 'string') {
-          const session = bulkSessions.get(p.sessionId)
-          if (!session) {
-            throw new Error(`Bulk index session "${p.sessionId}" not found or expired`)
-          }
-          bulkPayload = {
-            files: session.files,
-            documents: session.documents,
-            symbols: session.symbols,
-            specs: session.specs,
-            relations: session.relations,
-            referenceFacts: session.facts,
-            observations: session.observations,
-            removedFilePaths: session.removals,
-            removedDocumentPaths: session.removedDocumentPaths,
-            removedSpecIds: session.removedSpecIds,
-            ...(p.metadata || {}),
-          }
-          try {
-            database.commitBulkIndex(bulkPayload, (stage: string) => {
-              const progressEvent: SQLiteWorkerProgressEvent = {
-                id,
-                type: 'progress',
-                stage,
-              }
-              postMessage(progressEvent)
-            })
-          } finally {
-            bulkSessions.delete(p.sessionId)
-          }
-        } else {
-          bulkPayload = p as BulkIndexPayload
+        const p = payload as {
+          sessionId: string
+          metadata?: SerializableIndexWriteSessionMetadata
+        }
+        const session = requireBulkSession(p.sessionId)
+        const bulkPayload: BulkIndexPayload = {
+          files: session.files,
+          documents: session.documents,
+          symbols: session.symbols,
+          specs: session.specs,
+          relations: session.relations,
+          referenceFacts: session.facts,
+          observations: session.observations,
+          removedFilePaths: session.removals,
+          removedDocumentPaths: session.removedDocumentPaths,
+          removedSpecIds: session.removedSpecIds,
+          ...(p.metadata || {}),
+        }
+        try {
           database.commitBulkIndex(bulkPayload, (stage: string) => {
             const progressEvent: SQLiteWorkerProgressEvent = {
               id,
@@ -558,11 +583,14 @@ export async function handleMessage(
             }
             postMessage(progressEvent)
           })
+        } finally {
+          bulkSessions.delete(p.sessionId)
         }
         break
       }
       case 'rollbackBulkIndexSession': {
         const p = payload as { sessionId: string }
+        requireBulkSession(p.sessionId)
         bulkSessions.delete(p.sessionId)
         break
       }
