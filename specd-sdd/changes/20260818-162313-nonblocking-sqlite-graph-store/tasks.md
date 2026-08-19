@@ -195,3 +195,34 @@
 - [x] 11.5 Add lifecycle hardening tests
       `packages/code-graph/test/infrastructure/sqlite/sqlite-worker-lifecycle.spec.ts`: 3 new tests - `handles close() called while open() is still in-flight without exposing open state` - `forces worker termination and rejects stuck requests when drain timeout expires` - `leaves deterministic faulted state if worker crashes unexpectedly during opening`
       (Req: Worker-backed non-blocking execution)
+
+## 12. Lifecycle Hardening Round 2 (post-review fixes)
+
+- [x] 12.1 Fix `closePromise` leak when `open()` fails during concurrent `close()`
+      `packages/code-graph/src/infrastructure/sqlite/sqlite-worker-client.ts`: `SQLiteWorkerClient.close()` — wrap entire IIFE body in outer `try/finally`
+      Approach: Move `this.closePromise = undefined` into an outer `finally` that wraps the complete closure including `await this.openPromise`. Previously, `return` inside the inner catch (when `openPromise` rejected) escaped before cleanup, leaving `closePromise` permanently set. A subsequent `close()` would find the stale promise and silently skip recovery or any state reset.
+      (Req: Worker-backed non-blocking execution)
+
+- [x] 12.2 Apply shared deadline to drain + close RPC (true hard bound on `close()` total time)
+      `packages/code-graph/src/infrastructure/sqlite/sqlite-worker-client.ts`: `SQLiteWorkerClient.close()` — compute `deadline = Date.now() + drainTimeoutMs` once at entry
+      Approach: Drain pending requests with `drainPendingRequests(deadline - Date.now())`, then if drained, race `sendRequestInternal('close', {}, true)` against `timeout(deadline - Date.now())`. This makes `drainTimeoutMs` a genuine hard upper bound on total `close()` wall-clock time including the close RPC ACK, not just the drain phase.
+      (Req: Worker-backed non-blocking execution)
+
+- [x] 12.3 Reject pending in-flight requests before `worker.terminate()` in finally block
+      `packages/code-graph/src/infrastructure/sqlite/sqlite-worker-client.ts`: `SQLiteWorkerClient.close()` finally — reorder steps
+      Approach: Reject remaining pending requests with `StoreWorkerError` BEFORE calling `worker.terminate()`. This ensures callers observe the drain-timeout error message rather than the subsequent exit-event error ("Worker exited unexpectedly during shutdown") triggered by `terminate()`.
+      (Req: Worker-backed non-blocking execution)
+
+- [x] 12.4 Fix `handleWorkerExit` to reject pending requests when in `'closing'` state
+      `packages/code-graph/src/infrastructure/sqlite/sqlite-worker-client.ts`: `SQLiteWorkerClient.handleWorkerExit()` — handle 'closing' state
+      Approach: Previously `handleWorkerExit` bailed out for both `'closing'` and `'closed'`. If the worker crashed during `'closing'` (e.g. while `close()` awaited `openPromise`), any in-flight pending requests (the unacknowledged `open` RPC) were never rejected, causing `openPromise` to hang forever. Fix: only skip for `'closed'`; for `'closing'` with pending requests, reject them and return (do not call `faultWorker` since `close()` owns the state transition).
+      (Req: Worker-backed non-blocking execution)
+
+- [x] 12.5 Guard `open()` catch against resetting state during `close()` ownership
+      `packages/code-graph/src/infrastructure/sqlite/sqlite-worker-client.ts`: `SQLiteWorkerClient.open()` error catch — check `state !== 'closing'` before state reset
+      Approach: In the `open()` catch block, only reset `this.state = 'closed'` and terminate the worker if `this.state !== 'closing'`. When `close()` is coordinating the lifecycle, `open()` must not overwrite `'closing'` or attempt to terminate the worker (close's `finally` handles both).
+      (Req: Worker-backed non-blocking execution)
+
+- [x] 12.6 Add 2 new lifecycle tests for round-2 fixes
+      `packages/code-graph/test/infrastructure/sqlite/sqlite-worker-lifecycle.spec.ts`: 2 new tests - `clears closePromise when concurrent close() waits on a failing open()`: verifies closePromise is cleared and a full recovery cycle (close → open → close) works after a concurrent open+close where open crashes - `bounds close() total time when worker ignores the close RPC`: verifies close() with a mock worker that responds to 'open' but never acknowledges 'close' resolves within the deadline
+      (Req: Worker-backed non-blocking execution)

@@ -107,6 +107,23 @@
     - **AND** the `open()` promise rejects with a `StoreWorkerError`
     - **AND** callers can recover by calling `close()` followed by `open()`
 
+    #### Scenario: closePromise is always cleared after open() fails during concurrent close()
+
+    - **GIVEN** `open()` is in-flight and `close()` is called concurrently
+    - **WHEN** the `open()` operation fails (e.g. worker crashes during startup)
+    - **THEN** `close()` settles without hanging
+    - **AND** a subsequent `close()` call executes the correct recovery path (not the
+      stale in-flight promise)
+    - **AND** a subsequent `open()` + `close()` cycle succeeds without error
+
+    #### Scenario: close() total duration is bounded when worker ignores the close RPC
+
+    - **GIVEN** an open store whose worker responds to `open` but deliberately ignores `close`
+    - **WHEN** `close(N)` is called (N milliseconds)
+    - **THEN** `close()` resolves within approximately N milliseconds
+    - **AND** `worker.terminate()` is called to force-kill the unresponsive worker
+    - **AND** the store reaches `'closed'` state
+
 - op: modified
   selector:
     type: section

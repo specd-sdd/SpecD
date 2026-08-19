@@ -209,8 +209,11 @@ parentPort.on('message', (msg) => {
     const client = new SQLiteWorkerClient()
     await client.open(tempDir, { workerPath: slowWorkerPath })
 
-    // Send a request that will never receive a response from this mock worker
+    // Send a request that will never receive a response from this mock worker.
+    // Attach a no-op catch immediately so the rejection is never unhandled — the
+    // actual assertion happens after close() resolves.
     const stuckPromise = client.sendRequest('getStatistics', {})
+    stuckPromise.catch(() => {})
 
     // Close with a short 30ms drain timeout
     const closeStart = Date.now()
@@ -222,7 +225,7 @@ parentPort.on('message', (msg) => {
     expect(client.currentState).toBe('closed')
     expect(client.isOpen).toBe(false)
 
-    // The in-flight stuck request must have been rejected
+    // The in-flight stuck request must have been rejected with the drain-timeout error
     await expect(stuckPromise).rejects.toThrow(
       /Worker shutdown timed out while draining pending requests/,
     )
@@ -247,6 +250,71 @@ process.exit(1)`,
     // Recovery clears faulted state to closed
     await client.close()
     expect(client.faulted).toBe(false)
+    expect(client.currentState).toBe('closed')
+  })
+
+  it('clears closePromise when concurrent close() waits on a failing open()', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-worker-close-open-fail-'))
+    const crashingWorkerPath = join(tempDir, 'crashing-worker2.mjs')
+    const { writeFileSync } = await import('node:fs')
+    writeFileSync(
+      crashingWorkerPath,
+      `import process from 'node:process'
+process.exit(1)`,
+    )
+
+    const client = new SQLiteWorkerClient()
+
+    // Start open (will fail) and close concurrently
+    const opening = client.open(tempDir, { workerPath: crashingWorkerPath })
+    const closing = client.close()
+
+    await expect(opening).rejects.toThrow()
+    await closing
+
+    // When close() coordinated the cleanup after a crashing open(), it owns
+    // the final state transition — state is 'closed' (not 'faulted')
+    expect(client.currentState).toBe('closed')
+
+    // closePromise must have been cleared — a second close() must be idempotent
+    // (returns immediately, not hang on the stale in-flight promise)
+    await client.close()
+    expect(client.currentState).toBe('closed')
+
+    // Full recovery: can open a fresh worker after
+    await client.open(tempDir)
+    expect(client.currentState).toBe('open')
+    await client.close()
+    expect(client.currentState).toBe('closed')
+  })
+
+  it('bounds close() total time when worker ignores the close RPC', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-worker-close-rpc-timeout-'))
+    const slowCloseWorkerPath = join(tempDir, 'slow-close-worker.mjs')
+    const { writeFileSync } = await import('node:fs')
+    writeFileSync(
+      slowCloseWorkerPath,
+      `import { parentPort } from 'node:worker_threads'
+parentPort.on('message', (msg) => {
+  if (msg.op === 'open') {
+    parentPort.postMessage({ id: msg.id, type: 'result', result: undefined })
+  }
+  // Deliberately ignore the 'close' RPC to simulate a hanging worker shutdown
+})`,
+    )
+
+    const client = new SQLiteWorkerClient()
+    await client.open(tempDir, { workerPath: slowCloseWorkerPath })
+
+    // No pending requests — drain is instant (drained === true)
+    // But the close RPC will never be acknowledged by the mock worker
+
+    const closeStart = Date.now()
+    await client.close(50) // 50ms hard deadline
+    const closeDuration = Date.now() - closeStart
+
+    // close() must resolve well within the timeout ceiling, not hang indefinitely
+    expect(closeDuration).toBeLessThan(1000)
     expect(client.currentState).toBe('closed')
   })
 })

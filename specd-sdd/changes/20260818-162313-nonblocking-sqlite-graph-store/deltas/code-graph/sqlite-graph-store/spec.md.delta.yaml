@@ -50,13 +50,17 @@
        with `StoreOverloadError` without disturbing existing queued requests.
     6. **Graceful Shutdown & Drain**: Calling `close()` MUST transition the client to
        `closing` and immediately reject new operations with `StoreNotOpenError`.
-       Accepted in-flight operations MUST be drained up to a configurable timeout
-       (`drainTimeoutMs`, default: 5 000 ms). If the timeout expires before all
-       pending requests settle, the `close` RPC MUST NOT be sent to the worker (it
-       would block behind stuck operations); instead, any remaining pending requests
-       MUST be rejected with `StoreWorkerError`, and `worker.terminate()` MUST be
-       called unconditionally. `drainTimeoutMs` is a hard upper bound on total
-       `close()` wall-clock time, not a soft hint.
+       `drainTimeoutMs` (default: 5 000 ms) is a hard upper bound on the total
+       `close()` wall-clock time, covering both the drain phase and the `close` RPC ACK.
+       The implementation MUST use a shared deadline: compute `deadline = now + drainTimeoutMs`
+       at the start of `close()`, drain pending requests up to `deadline - now`, and if
+       all requests settled in time, race the `close` RPC against the remaining
+       `deadline - now` ms. If either the drain or the close RPC exhausts the deadline,
+       any remaining pending requests MUST be rejected with `StoreWorkerError`,
+       and `worker.terminate()` MUST be called unconditionally.
+       The `closePromise` sentinel MUST be cleared in a `finally` block that wraps the
+       entire `close()` body (including `await openPromise`), so that a subsequent
+       `close()` call after any failure is never short-circuited by a stale promise.
     7. **Serializable Runtime Descriptor**: The worker receives SQLite runtime
        configuration via a serializable descriptor (e.g. `SqliteRuntimeDescriptor` with
        optional `modulePath`), enabling dynamic loading of custom or vendored SQLite

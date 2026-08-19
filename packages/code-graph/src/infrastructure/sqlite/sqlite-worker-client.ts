@@ -212,16 +212,19 @@ export class SQLiteWorkerClient {
           this.state = 'open'
         }
       } catch (error) {
-        if (!this.faulted) {
-          this.state = 'closed'
-        }
-        if (this.worker) {
-          try {
-            await this.worker.terminate()
-          } catch {
-            // Ignore termination errors on failed open
+        // Don't reset state or clean up worker if close() is already managing the lifecycle
+        if (this.state !== 'closing') {
+          if (!this.faulted) {
+            this.state = 'closed'
           }
-          this.worker = undefined
+          if (this.worker) {
+            try {
+              await this.worker.terminate()
+            } catch {
+              // Ignore termination errors on failed open
+            }
+            this.worker = undefined
+          }
         }
         throw error
       } finally {
@@ -261,34 +264,62 @@ export class SQLiteWorkerClient {
     }
 
     this.closePromise = (async () => {
-      // 1. If currently opening, wait for open attempt to settle first
-      if (this.openPromise) {
-        this.state = 'closing'
-        try {
-          await this.openPromise
-        } catch {
-          // If open failed, state is already closed or faulted and worker cleaned up
-          return
-        }
-      }
-
-      this.state = 'closing'
-
       try {
-        // 2. Drain accepted in-flight requests within drainTimeoutMs
+        // 1. If currently opening, wait for open attempt to settle first
+        if (this.openPromise) {
+          this.state = 'closing'
+          try {
+            await this.openPromise
+          } catch {
+            // If open failed, state is already closed or faulted and worker cleaned up.
+            // Return here — the outer finally will still clear closePromise.
+            return
+          }
+        }
+
+        this.state = 'closing'
+
+        // Shared deadline for drain + close RPC combined
+        const deadline = Date.now() + drainTimeoutMs
+
+        // 2. Drain accepted in-flight requests within deadline
         const drained =
-          this.pendingRequests.size > 0 ? await this.drainPendingRequests(drainTimeoutMs) : true
+          this.pendingRequests.size > 0
+            ? await this.drainPendingRequests(deadline - Date.now())
+            : true
 
         // 3. If drained successfully and worker is still healthy, send clean DB close RPC
+        //    with remaining time from the shared deadline so the total close() is bounded.
         if (drained && !this.faulted && this.worker) {
+          const remainingMs = deadline - Date.now()
           try {
-            await this.sendRequestInternal('close', {}, true)
+            await Promise.race([
+              this.sendRequestInternal('close', {}, true),
+              new Promise<void>((_, reject) =>
+                setTimeout(
+                  () => reject(new StoreWorkerError('Worker close RPC timed out')),
+                  Math.max(0, remainingMs),
+                ),
+              ),
+            ])
           } catch {
-            // Ignore error sending close to database during shutdown
+            // Ignore error sending close to worker during shutdown (timeout or worker gone)
           }
         }
       } finally {
-        // 4. Force terminate worker thread
+        // 4. Reject any remaining timed-out requests BEFORE terminating the worker so
+        //    that the drain-timeout error is the one callers see (not the exit event error).
+        if (this.pendingRequests.size > 0) {
+          const timeoutErr = new StoreWorkerError(
+            'Worker shutdown timed out while draining pending requests',
+          )
+          for (const [, pending] of this.pendingRequests) {
+            pending.reject(timeoutErr)
+          }
+          this.pendingRequests.clear()
+        }
+
+        // 5. Force terminate worker thread unconditionally
         if (this.worker) {
           try {
             await this.worker.terminate()
@@ -301,18 +332,9 @@ export class SQLiteWorkerClient {
         if (!this.faulted) {
           this.state = 'closed'
         }
-        this.closePromise = undefined
 
-        // 5. Reject any remaining timed-out requests that did not finish draining
-        if (this.pendingRequests.size > 0) {
-          const timeoutErr = new StoreWorkerError(
-            'Worker shutdown timed out while draining pending requests',
-          )
-          for (const [, pending] of this.pendingRequests) {
-            pending.reject(timeoutErr)
-          }
-          this.pendingRequests.clear()
-        }
+        // Always clear closePromise — even if openPromise threw above
+        this.closePromise = undefined
       }
     })()
 
@@ -449,7 +471,25 @@ export class SQLiteWorkerClient {
    * @param code - Exit code returned by worker thread.
    */
   private handleWorkerExit(code: number): void {
-    if (this.state === 'closing' || this.state === 'closed') return
+    // If we are already closed, ignore — this is the expected exit after terminate()
+    if (this.state === 'closed') return
+
+    // If we are closing but the worker exits before all pending requests settled
+    // (e.g. crash while waiting for the open ACK during a concurrent open+close),
+    // reject any remaining in-flight requests so that awaited promises can settle.
+    if (this.state === 'closing') {
+      if (this.pendingRequests.size > 0) {
+        const err = new StoreWorkerError(
+          `SQLite worker exited unexpectedly during shutdown (code ${code})`,
+        )
+        for (const [, pending] of this.pendingRequests) {
+          pending.reject(err)
+        }
+        this.pendingRequests.clear()
+      }
+      return
+    }
+
     this.faultWorker(new Error(`Worker thread exited unexpectedly with code ${code}`))
   }
 

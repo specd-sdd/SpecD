@@ -1,7 +1,7 @@
 {
   "name": "nonblocking-sqlite-graph-store",
   "createdAt": "2026-08-18T16:23:13.275Z",
-  "updatedAt": "2026-08-19T08:10:18.557Z",
+  "updatedAt": "2026-08-19T09:42:59.715Z",
   "description": "Execute SQLite operations inside a persistent worker thread without blocking host event loop",
   "schema": {
     "name": "schema-std",
@@ -293,7 +293,7 @@
           "key": "code-graph:sqlite-graph-store",
           "filename": "deltas/code-graph/sqlite-graph-store/spec.md.delta.yaml",
           "state": "complete",
-          "validatedHash": "sha256:17aa6cf06851ba1a82286b8c60145c878ab1f51cf0b1651479d5032107aac287"
+          "validatedHash": "sha256:57d5e9acdf00f6a9738226a2d764d8a7c6ba5d3f833eea9ee70bec62b2006c4c"
         },
         {
           "key": "code-graph:composition",
@@ -313,7 +313,7 @@
           "key": "code-graph:sqlite-graph-store",
           "filename": "deltas/code-graph/sqlite-graph-store/verify.md.delta.yaml",
           "state": "complete",
-          "validatedHash": "sha256:e624e7ff8ecc4451793f1dedb4b39fb8b044d2cb0be2423eab6c90720bea1f22"
+          "validatedHash": "sha256:7f3dbf2c06dbfa2782e1af3eae2394658f126b18d4fe537b258bb75768532acd"
         },
         {
           "key": "code-graph:composition",
@@ -333,7 +333,7 @@
           "key": "design",
           "filename": "design.md",
           "state": "complete",
-          "validatedHash": "sha256:378d4a25fac7c4c1ea04e643ecc221884352cf1c7563f760df5eb7242547c087"
+          "validatedHash": "sha256:1e0310eacc02d17f14479d8cbee9d3221cbe2f725639a71c3c23306f5f84cb89"
         }
       ]
     },
@@ -347,7 +347,7 @@
           "key": "tasks",
           "filename": "tasks.md",
           "state": "complete",
-          "validatedHash": "sha256:b77a3b0ac1579b0c44018f496cecf2bbb60a46271122cfc8791fef711a54f439"
+          "validatedHash": "sha256:ebbadaa258aaf90f7d5acb1e398cc6468924b80202b10883d40fd79f983e9f95"
         }
       ]
     }
@@ -643,6 +643,68 @@
       },
       "from": "implementing",
       "to": "verifying"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-19T09:40:57.521Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [code-graph:sqlite-graph-store]; verify [code-graph:sqlite-graph-store]; design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:sqlite-graph-store"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:sqlite-graph-store"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-19T09:40:57.521Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-19T09:42:55.503Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-19T09:42:59.711Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
     }
   ]
 }

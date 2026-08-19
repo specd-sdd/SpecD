@@ -83,21 +83,32 @@ within the timeout, or `false` if the timeout expired before they did.
 
 During `close()`:
 
-1. If `state === 'opening'`, `close()` waits for the in-flight `openPromise` before proceeding. Once
-   `open()` resolves (but sees `state !== 'opening'` and skips the `→ 'open'` transition), `close()` continues.
-2. `state` is set to `closing`. Any new incoming `sendRequest()` call immediately rejects with `StoreNotOpenError`.
-3. The client calls `drainPendingRequests(drainTimeoutMs)` (default: 5 000 ms).
-4. **If `drained === true`** (all requests settled in time):
-   - `sendRequestInternal('close', {}, true)` sends the shutdown command to the worker.
-   - The worker invokes `database.close()`, closing the SQLite connection, clearing statements, and acknowledging.
-5. **If `drained === false`** (timeout expired while requests were still pending):
-   - The `close` RPC is **not** sent — stuck operations would block it indefinitely.
-   - Any remaining pending requests are rejected immediately with `StoreWorkerError('Worker shutdown timed out while draining pending requests')`.
+1. `closePromise` is set at the very start of the outer IIFE. A single `try/finally` wrapping the
+   **entire** body (including `await openPromise`) guarantees `closePromise` is always cleared —
+   even when `open()` fails concurrently. Without this, a subsequent `close()` would find the stale
+   resolved promise and silently skip recovery.
+2. If `state === 'opening'`, `close()` sets `state = 'closing'` and waits for the in-flight
+   `openPromise`. `open()` sees `state !== 'opening'` and skips the `→ 'open'` transition.
+   If `openPromise` rejects (e.g. worker crashed during startup), `close()` returns early from
+   the inner catch — the outer `finally` still clears `closePromise` and terminates the worker.
+   `handleWorkerExit` in `'closing'` state also rejects any stale pending requests (such as the
+   unacknowledged `open` RPC) so that `openPromise` can settle rather than hanging forever.
+3. `state` is set to `closing`. Any new incoming `sendRequest()` call immediately rejects with
+   `StoreNotOpenError`.
+4. A **shared deadline** is computed: `deadline = Date.now() + drainTimeoutMs`. This deadline
+   applies to both the drain phase and the `close` RPC, making `drainTimeoutMs` a true hard
+   upper bound on the total `close()` wall-clock time.
+5. `drainPendingRequests(deadline - now)` waits for pending requests to settle.
+6. **If `drained === true`** (all requests settled before deadline):
+   - `Promise.race([sendRequestInternal('close'), timeout(deadline - now)])` races the clean DB
+     close RPC against the remaining deadline. The worker invokes `database.close()`, closing the
+     SQLite connection and clearing statements.
+7. **If `drained === false`** OR the `close` RPC times out:
+   - Any remaining pending requests are rejected **before** `worker.terminate()` is called, so
+     the drain-timeout `StoreWorkerError` is the rejection callers observe (not the subsequent
+     exit-event error).
    - `worker.terminate()` is called unconditionally to force-kill the thread.
-6. `state` transitions to `closed` and `closePromise` is cleared.
-
-This guarantees that `drainTimeoutMs` is a hard upper bound on total `close()` duration, not a soft
-hint that can be bypassed by queuing a `close` RPC behind stuck operations.
+8. `state` transitions to `closed` and `closePromise` is cleared in the `finally` block.
 
 ### 3. Worker-Side Serial FIFO Execution Queue
 
@@ -310,4 +321,10 @@ getAllIndexCoverage(): IndexCoverage[] {
      `StoreWorkerError`.
    - **Worker crash during `opening`**: unhandled worker exit before the `open` ACK leaves state as
      `faulted` (not `closed`), giving callers deterministic signal that startup failed.
+   - **`closePromise` cleared when `open()` fails during concurrent `close()`**: a subsequent
+     `close()` executes the recovery path rather than returning the stale promise; a full
+     `open()` → `close()` cycle succeeds afterwards.
+   - **`close()` total time bounded when worker ignores the `close` RPC**: a mock worker that
+     responds to `open` but never acknowledges `close` causes `close(N)` to resolve within ≈N ms
+     via the shared deadline timeout.
 3. **End-to-End Indexing & Traversal**: Run indexer, health checks, symbol queries, and FTS search.
