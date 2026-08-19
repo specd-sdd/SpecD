@@ -78,14 +78,26 @@ export class SQLiteWorkerClient {
 
 ### 2. Shutdown & Drain Semantics
 
+`drainPendingRequests(timeoutMs): Promise<boolean>` returns `true` if all in-flight requests settled
+within the timeout, or `false` if the timeout expired before they did.
+
 During `close()`:
 
-1. `state` is set to `closing`. Any new incoming `sendRequest()` call immediately rejects with `StoreNotOpenError`.
-2. The client waits for `this.pendingRequests.size === 0` with a safety timeout (default: 5000ms).
-3. Once drained (or timed out), `sendRequestInternal('close', {}, true)` sends the shutdown command to the worker.
-4. The worker invokes `database.close()`, closing the SQLite connection, clearing statements, and acknowledging.
-5. `worker.terminate()` is called for final process cleanup.
-6. Any remaining timed-out pending requests are rejected with `StoreWorkerError`.
+1. If `state === 'opening'`, `close()` waits for the in-flight `openPromise` before proceeding. Once
+   `open()` resolves (but sees `state !== 'opening'` and skips the `→ 'open'` transition), `close()` continues.
+2. `state` is set to `closing`. Any new incoming `sendRequest()` call immediately rejects with `StoreNotOpenError`.
+3. The client calls `drainPendingRequests(drainTimeoutMs)` (default: 5 000 ms).
+4. **If `drained === true`** (all requests settled in time):
+   - `sendRequestInternal('close', {}, true)` sends the shutdown command to the worker.
+   - The worker invokes `database.close()`, closing the SQLite connection, clearing statements, and acknowledging.
+5. **If `drained === false`** (timeout expired while requests were still pending):
+   - The `close` RPC is **not** sent — stuck operations would block it indefinitely.
+   - Any remaining pending requests are rejected immediately with `StoreWorkerError('Worker shutdown timed out while draining pending requests')`.
+   - `worker.terminate()` is called unconditionally to force-kill the thread.
+6. `state` transitions to `closed` and `closePromise` is cleared.
+
+This guarantees that `drainTimeoutMs` is a hard upper bound on total `close()` duration, not a soft
+hint that can be bypassed by queuing a `close` RPC behind stuck operations.
 
 ### 3. Worker-Side Serial FIFO Execution Queue
 
@@ -291,4 +303,11 @@ getAllIndexCoverage(): IndexCoverage[] {
    - Concurrent queries and `recreate()` preserve strict FIFO ordering.
    - `faulted` state prevents operations and recovers after `close()` + `open()`.
    - Strict validation of `maxPendingOperations` (< 1, non-integer, negative rejects).
+   - **`close()` called while `open()` is still in-flight**: `close()` waits for `openPromise`, then
+     proceeds to shut down; `open()` does **not** expose `'open'` state after resolving.
+   - **Drain timeout forces worker termination**: when `drainPendingRequests()` returns `false`, the
+     `close` RPC is skipped and `worker.terminate()` is called; pending requests are rejected with
+     `StoreWorkerError`.
+   - **Worker crash during `opening`**: unhandled worker exit before the `open` ACK leaves state as
+     `faulted` (not `closed`), giving callers deterministic signal that startup failed.
 3. **End-to-End Indexing & Traversal**: Run indexer, health checks, symbol queries, and FTS search.

@@ -48,11 +48,15 @@
        validated limit on outstanding pending requests (`maxPendingOperations >= 1`,
        default: 256). When the limit is exceeded, new requests MUST reject immediately
        with `StoreOverloadError` without disturbing existing queued requests.
-    6. **Graceful Shutdown & Drain**: Calling `close()` transitions the client to
-       `closing` and immediately rejects new operations with `StoreNotOpenError`.
-       Accepted in-flight operations MUST be drained to completion (bounded by a
-       configurable fallback timeout) before the worker closes the SQLite database and
-       terminates the thread.
+    6. **Graceful Shutdown & Drain**: Calling `close()` MUST transition the client to
+       `closing` and immediately reject new operations with `StoreNotOpenError`.
+       Accepted in-flight operations MUST be drained up to a configurable timeout
+       (`drainTimeoutMs`, default: 5 000 ms). If the timeout expires before all
+       pending requests settle, the `close` RPC MUST NOT be sent to the worker (it
+       would block behind stuck operations); instead, any remaining pending requests
+       MUST be rejected with `StoreWorkerError`, and `worker.terminate()` MUST be
+       called unconditionally. `drainTimeoutMs` is a hard upper bound on total
+       `close()` wall-clock time, not a soft hint.
     7. **Serializable Runtime Descriptor**: The worker receives SQLite runtime
        configuration via a serializable descriptor (e.g. `SqliteRuntimeDescriptor` with
        optional `modulePath`), enabling dynamic loading of custom or vendored SQLite
@@ -61,6 +65,14 @@
        unexpectedly, the store transitions to a `faulted` state, rejecting outstanding
        operations with `StoreWorkerError`. The store SHALL NOT attempt silent auto-restarts;
        manual recovery is supported by calling `close()` followed by `open()`.
+       If the crash occurs during `opening` (before the `open` ACK is received),
+       the store MUST transition to `faulted`, not `closed`, to give callers a
+       deterministic signal that startup failed.
+    9. **Concurrent open()/close() Race**: If `close()` is called while `open()` is
+       still in-flight, `close()` MUST wait for the `open()` promise to resolve before
+       proceeding with shutdown. `open()` MUST NOT transition state to `'open'` once
+       `close()` has already set state to `'closing'`. The store MUST NOT be observable
+       in the `'open'` state after a concurrent `close()` has begun.
 
 - op: modified
   selector:

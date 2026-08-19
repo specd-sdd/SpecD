@@ -207,9 +207,14 @@ export class SQLiteWorkerClient {
           true,
         )
 
-        this.state = 'open'
+        // Only transition to 'open' if close() was not called concurrently during startup
+        if (this.state === 'opening') {
+          this.state = 'open'
+        }
       } catch (error) {
-        this.state = 'closed'
+        if (!this.faulted) {
+          this.state = 'closed'
+        }
         if (this.worker) {
           try {
             await this.worker.terminate()
@@ -238,7 +243,7 @@ export class SQLiteWorkerClient {
     if (this.state === 'closed') {
       return
     }
-    if (this.state === 'closing' && this.closePromise) {
+    if (this.closePromise) {
       return this.closePromise
     }
     if (this.state === 'faulted') {
@@ -255,17 +260,27 @@ export class SQLiteWorkerClient {
       return
     }
 
-    this.state = 'closing'
-
     this.closePromise = (async () => {
-      try {
-        // 1. Drain accepted in-flight requests
-        if (this.pendingRequests.size > 0) {
-          await this.drainPendingRequests(drainTimeoutMs)
+      // 1. If currently opening, wait for open attempt to settle first
+      if (this.openPromise) {
+        this.state = 'closing'
+        try {
+          await this.openPromise
+        } catch {
+          // If open failed, state is already closed or faulted and worker cleaned up
+          return
         }
+      }
 
-        // 2. Send close command to worker SQLite database
-        if (this.worker) {
+      this.state = 'closing'
+
+      try {
+        // 2. Drain accepted in-flight requests within drainTimeoutMs
+        const drained =
+          this.pendingRequests.size > 0 ? await this.drainPendingRequests(drainTimeoutMs) : true
+
+        // 3. If drained successfully and worker is still healthy, send clean DB close RPC
+        if (drained && !this.faulted && this.worker) {
           try {
             await this.sendRequestInternal('close', {}, true)
           } catch {
@@ -273,7 +288,7 @@ export class SQLiteWorkerClient {
           }
         }
       } finally {
-        // 3. Terminate worker thread
+        // 4. Force terminate worker thread
         if (this.worker) {
           try {
             await this.worker.terminate()
@@ -283,14 +298,21 @@ export class SQLiteWorkerClient {
           this.worker = undefined
         }
 
-        this.state = 'closed'
+        if (!this.faulted) {
+          this.state = 'closed'
+        }
         this.closePromise = undefined
 
-        // 4. Reject any remaining timed-out requests
-        for (const [, pending] of this.pendingRequests) {
-          pending.reject(new StoreWorkerError('Operation aborted: store closed before completion'))
+        // 5. Reject any remaining timed-out requests that did not finish draining
+        if (this.pendingRequests.size > 0) {
+          const timeoutErr = new StoreWorkerError(
+            'Worker shutdown timed out while draining pending requests',
+          )
+          for (const [, pending] of this.pendingRequests) {
+            pending.reject(timeoutErr)
+          }
+          this.pendingRequests.clear()
         }
-        this.pendingRequests.clear()
       }
     })()
 
@@ -370,17 +392,20 @@ export class SQLiteWorkerClient {
    * Waits for accepted in-flight requests to drain, up to the specified timeout.
    *
    * @param timeoutMs - Maximum time in milliseconds to wait for pending requests to reach 0.
-   * @returns Promise resolving when drained or when timeout expires.
+   * @returns Promise resolving to true if fully drained, or false if the timeout expired.
    */
-  private async drainPendingRequests(timeoutMs: number): Promise<void> {
-    if (this.pendingRequests.size === 0) return
+  private async drainPendingRequests(timeoutMs: number): Promise<boolean> {
+    if (this.pendingRequests.size === 0) return true
 
-    return new Promise<void>((resolve) => {
+    return new Promise<boolean>((resolve) => {
       const startTime = Date.now()
       const checkInterval = setInterval(() => {
-        if (this.pendingRequests.size === 0 || Date.now() - startTime >= timeoutMs) {
+        if (this.pendingRequests.size === 0) {
           clearInterval(checkInterval)
-          resolve()
+          resolve(true)
+        } else if (Date.now() - startTime >= timeoutMs) {
+          clearInterval(checkInterval)
+          resolve(false)
         }
       }, 10)
     })

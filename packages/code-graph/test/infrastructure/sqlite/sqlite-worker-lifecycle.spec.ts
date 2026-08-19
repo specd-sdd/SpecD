@@ -175,4 +175,78 @@ describe('SQLiteWorkerClient & Store Lifecycle', () => {
 
     await client.close()
   })
+
+  it('handles close() called while open() is still in-flight without exposing open state', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-worker-open-close-race-'))
+    const client = new SQLiteWorkerClient()
+
+    const opening = client.open(tempDir)
+    const closing = client.close()
+
+    await Promise.all([opening, closing])
+
+    expect(client.currentState).toBe('closed')
+    expect(client.isOpen).toBe(false)
+
+    await expect(client.sendRequest('getStatistics', {})).rejects.toBeInstanceOf(StoreNotOpenError)
+  })
+
+  it('forces worker termination and rejects stuck requests when drain timeout expires', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-worker-drain-timeout-'))
+    const slowWorkerPath = join(tempDir, 'slow-worker.mjs')
+    const { writeFileSync } = await import('node:fs')
+    writeFileSync(
+      slowWorkerPath,
+      `import { parentPort } from 'node:worker_threads'
+parentPort.on('message', (msg) => {
+  if (msg.op === 'open') {
+    parentPort.postMessage({ id: msg.id, type: 'result', result: undefined })
+  }
+  // Deliberately ignore all other requests to simulate a stuck/hanging operation
+})`,
+    )
+
+    const client = new SQLiteWorkerClient()
+    await client.open(tempDir, { workerPath: slowWorkerPath })
+
+    // Send a request that will never receive a response from this mock worker
+    const stuckPromise = client.sendRequest('getStatistics', {})
+
+    // Close with a short 30ms drain timeout
+    const closeStart = Date.now()
+    await client.close(30)
+    const closeDuration = Date.now() - closeStart
+
+    // Verify close terminated within bounded time rather than waiting indefinitely
+    expect(closeDuration).toBeLessThan(1000)
+    expect(client.currentState).toBe('closed')
+    expect(client.isOpen).toBe(false)
+
+    // The in-flight stuck request must have been rejected
+    await expect(stuckPromise).rejects.toThrow(
+      /Worker shutdown timed out while draining pending requests/,
+    )
+  })
+
+  it('leaves deterministic faulted state if worker crashes unexpectedly during opening', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-worker-crash-startup-'))
+    const crashingWorkerPath = join(tempDir, 'crashing-worker.mjs')
+    const { writeFileSync } = await import('node:fs')
+    writeFileSync(
+      crashingWorkerPath,
+      `import process from 'node:process'
+process.exit(1)`,
+    )
+
+    const client = new SQLiteWorkerClient()
+    await expect(client.open(tempDir, { workerPath: crashingWorkerPath })).rejects.toThrow()
+
+    expect(client.faulted).toBe(true)
+    expect(client.currentState).toBe('faulted')
+
+    // Recovery clears faulted state to closed
+    await client.close()
+    expect(client.faulted).toBe(false)
+    expect(client.currentState).toBe('closed')
+  })
 })

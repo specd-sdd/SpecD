@@ -81,6 +81,32 @@
     - **AND** the store transitions to `faulted` state
     - **AND** manual recovery is achieved by calling `close()` followed by `open()`
 
+    #### Scenario: close() called while open() is in-flight does not expose open state
+
+    - **GIVEN** `open()` has been called but has not yet received the worker ACK
+    - **WHEN** `close()` is called concurrently
+    - **THEN** `close()` waits for the in-flight `open()` promise before proceeding
+    - **AND** `open()` does NOT transition the store to `'open'` state
+    - **AND** the store completes shutdown and reaches `'closed'` state without ever
+      being observable in the `'open'` state
+
+    #### Scenario: Drain timeout forces worker termination and rejects stuck requests
+
+    - **GIVEN** an open `SQLiteGraphStore` with a pending request that will not complete
+    - **WHEN** `close()` is called and the drain timeout expires
+    - **THEN** the `close` RPC is NOT sent to the worker
+    - **AND** all remaining pending requests reject with `StoreWorkerError`
+    - **AND** `worker.terminate()` is called unconditionally
+    - **AND** the store reaches `'closed'` state within the drain timeout window
+
+    #### Scenario: Worker crash during opening leaves deterministic faulted state
+
+    - **GIVEN** `open()` has been called but the worker exits before sending the `open` ACK
+    - **WHEN** the unexpected worker exit is detected
+    - **THEN** the store transitions to `'faulted'` state (not `'closed'`)
+    - **AND** the `open()` promise rejects with a `StoreWorkerError`
+    - **AND** callers can recover by calling `close()` followed by `open()`
+
 - op: modified
   selector:
     type: section

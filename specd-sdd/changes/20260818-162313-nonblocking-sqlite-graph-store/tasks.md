@@ -169,3 +169,29 @@
 - [x] 10.10 Add exhaustive contract, lifecycle, and concurrency tests
       `packages/code-graph/test/infrastructure/sqlite/sqlite-worker-lifecycle.spec.ts`: add comprehensive tests covering `getAllIndexCoverage`, concurrent `open()`, concurrent `close()`, drain semantics, `recreate()` serialization, backpressure bounds, and fault recovery.
       (Req: Worker-backed non-blocking execution)
+
+## 11. Lifecycle Hardening (post-review fixes)
+
+- [x] 11.1 Make `drainPendingRequests()` return `Promise<boolean>`
+      `packages/code-graph/src/infrastructure/sqlite/sqlite-worker-client.ts`: `drainPendingRequests(timeoutMs)` — return `true` if fully drained, `false` on timeout
+      Approach: Resolve the inner race promise with a boolean before the timeout fires; the `Promise.race` winner determines whether all pending requests settled in time.
+      (Req: Worker-backed non-blocking execution)
+
+- [x] 11.2 Harden `close()` drain-timeout path to force-terminate worker
+      `packages/code-graph/src/infrastructure/sqlite/sqlite-worker-client.ts`: `SQLiteWorkerClient.close()` — skip `close` RPC and force-terminate on drain timeout
+      Approach: If `drained === false`, immediately reject all remaining pending requests with `StoreWorkerError`, skip `sendRequestInternal('close', ...)`, and call `worker.terminate()` unconditionally. This makes `drainTimeoutMs` a hard upper bound.
+      (Req: Worker-backed non-blocking execution)
+
+- [x] 11.3 Fix `open()`/`close()` concurrent-call race
+      `packages/code-graph/src/infrastructure/sqlite/sqlite-worker-client.ts`: `SQLiteWorkerClient.open()` — guard state transition with narrowed check
+      Approach: Replace unconditional `this.state = 'open'` with `if (this.state === 'opening') this.state = 'open'` so that a concurrent `close()` call (which sets state to `'closing'`) is not overwritten by the delayed `open()` resolution.
+      (Req: Worker-backed non-blocking execution)
+
+- [x] 11.4 Preserve `faulted` state on worker crash during `opening`
+      `packages/code-graph/src/infrastructure/sqlite/sqlite-worker-client.ts`: `SQLiteWorkerClient.open()` error catch — preserve `faulted` state set by crash handler
+      Approach: In the `catch` block, only reset `this.state = 'closed'` if `!this.faulted`, so that an unexpected worker exit during startup leaves the store in the deterministic `faulted` state rather than silently transitioning to `closed`.
+      (Req: Worker-backed non-blocking execution)
+
+- [x] 11.5 Add lifecycle hardening tests
+      `packages/code-graph/test/infrastructure/sqlite/sqlite-worker-lifecycle.spec.ts`: 3 new tests - `handles close() called while open() is still in-flight without exposing open state` - `forces worker termination and rejects stuck requests when drain timeout expires` - `leaves deterministic faulted state if worker crashes unexpectedly during opening`
+      (Req: Worker-backed non-blocking execution)
