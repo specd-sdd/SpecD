@@ -10,8 +10,6 @@ export interface SqliteGraphStoreFactoryOptions {
   readonly runtime?: SqliteRuntimeDescriptor | undefined
   /** Maximum number of concurrent in-flight/queued requests before rejecting with StoreOverloadError. */
   readonly maxPendingOperations?: number | undefined
-  /** Optional worker script path override. */
-  readonly workerPath?: string | undefined
 }
 
 /**
@@ -28,7 +26,6 @@ export function createSqliteGraphStoreFactory(
       return new SQLiteGraphStore(graphStoreOptions.storagePath, {
         runtime: factoryOptions?.runtime,
         maxPendingOperations: factoryOptions?.maxPendingOperations,
-        workerPath: factoryOptions?.workerPath,
       })
     },
   }

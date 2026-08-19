@@ -46,7 +46,6 @@ export {
   type GetChangeSpecCoverageResult,
 } from './application/use-cases/get-change-spec-coverage.js'
 export { createGetChangeSpecCoverage } from './composition/use-cases/get-change-spec-coverage.js'
-export { ResolveSymbolReference } from './application/use-cases/resolve-symbol-reference.js'
 export {
   FreshnessMode,
   FreshnessState,

@@ -5,6 +5,8 @@ import { tmpdir } from 'node:os'
 import { SQLiteGraphStore } from '../../../src/infrastructure/sqlite/sqlite-graph-store.js'
 import { SQLiteWorkerClient } from '../../../src/infrastructure/sqlite/sqlite-worker-client.js'
 import { createFileNode } from '../../../src/domain/value-objects/file-node.js'
+import { createDocumentNode } from '../../../src/domain/value-objects/document-node.js'
+import { createSpecNode } from '../../../src/domain/value-objects/spec-node.js'
 import { StoreNotOpenError } from '../../../src/domain/errors/store-not-open-error.js'
 import { StoreWorkerError } from '../../../src/domain/errors/store-worker-error.js'
 
@@ -316,5 +318,161 @@ parentPort.on('message', (msg) => {
     // close() must resolve well within the timeout ceiling, not hang indefinitely
     expect(closeDuration).toBeLessThan(1000)
     expect(client.currentState).toBe('closed')
+  })
+
+  it('isolates onProgress callback exceptions without failing the request', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-worker-progress-error-'))
+    const store = new SQLiteGraphStore(tempDir)
+    await store.open()
+
+    const file = createFileNode({
+      path: 'core:src/progress.ts',
+      configRelativePath: 'src/progress.ts',
+      language: 'typescript',
+      contentHash: 'sha256:progress',
+      workspace: 'core',
+    })
+
+    const session = store.beginBulkIndexSession({
+      onProgress: () => {
+        throw new Error('progress consumer failed')
+      },
+    })
+    await session.writeFiles([file])
+
+    // Should complete cleanly despite onProgress throwing
+    await expect(session.commit()).resolves.toBeUndefined()
+
+    const fetched = await store.getFile(file.path)
+    expect(fetched?.path).toBe(file.path)
+
+    await store.close()
+  })
+
+  it('preserves exact specId when serializing and deserializing SpecNotFoundError', async () => {
+    const { SpecNotFoundError } = await import('../../../src/domain/errors/spec-not-found-error.js')
+    const { serializeWorkerError, deserializeWorkerError } =
+      await import('../../../src/infrastructure/sqlite/sqlite-worker-client.js')
+
+    const original = new SpecNotFoundError('core:specs/auth.spec.md')
+    const serialized = serializeWorkerError(original)
+
+    expect(serialized.code).toBe('SPEC_NOT_FOUND')
+    expect(serialized.details?.specId).toBe('core:specs/auth.spec.md')
+
+    const deserialized = deserializeWorkerError(serialized)
+    expect(deserialized).toBeInstanceOf(SpecNotFoundError)
+    expect((deserialized as Error & { specId?: string }).specId).toBe('core:specs/auth.spec.md')
+    expect(deserialized.message).toBe('No spec found matching "core:specs/auth.spec.md".')
+  })
+
+  it('executes recreate() asynchronously on closed store without lingering WAL/SHM files', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-worker-recreate-closed-'))
+    const store = new SQLiteGraphStore(tempDir)
+    await store.open()
+
+    const file = createFileNode({
+      path: 'core:src/closed-recreate.ts',
+      configRelativePath: 'src/closed-recreate.ts',
+      language: 'typescript',
+      contentHash: 'sha256:cr',
+      workspace: 'core',
+    })
+    await store.upsertFile(file, [], [])
+
+    await store.close()
+    expect(store.isOpen).toBe(false)
+
+    // Recreate while closed
+    await store.recreate()
+
+    // Reopen and check that store was reset
+    await store.open()
+    const fetched = await store.getFile(file.path)
+    expect(fetched).toBeUndefined()
+
+    await store.close()
+  })
+
+  it('invalidates chunked bulk sessions on store close, worker crash, or recreate', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-worker-session-invalidation-'))
+    const store = new SQLiteGraphStore(tempDir)
+    await store.open()
+
+    const session1 = store.beginBulkIndexSession()
+    await store.close()
+
+    // Calling write or commit on closed session must throw StoreNotOpenError
+    await expect(
+      session1.writeFiles([
+        createFileNode({
+          path: 'core:src/s1.ts',
+          configRelativePath: 'src/s1.ts',
+          language: 'typescript',
+          contentHash: 'sha256:s1',
+          workspace: 'core',
+        }),
+      ]),
+    ).rejects.toBeInstanceOf(StoreNotOpenError)
+
+    // Reopen and create session2
+    await store.open()
+    const session2 = store.beginBulkIndexSession()
+
+    // Recreate invalidates active session
+    await store.recreate()
+
+    await expect(
+      session2.writeFiles([
+        createFileNode({
+          path: 'core:src/s2.ts',
+          configRelativePath: 'src/s2.ts',
+          language: 'typescript',
+          contentHash: 'sha256:s2',
+          workspace: 'core',
+        }),
+      ]),
+    ).rejects.toBeInstanceOf(StoreNotOpenError)
+
+    await store.close()
+  })
+
+  it('removes documents and specs committed through a bulk index session', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-worker-session-removals-'))
+    const store = new SQLiteGraphStore(tempDir)
+    await store.open()
+
+    const doc = createDocumentNode({
+      path: 'core:docs/auth.md',
+      configRelativePath: 'docs/auth.md',
+      contentHash: 'sha256:doc',
+      content: 'auth docs',
+      workspace: 'core',
+    })
+    const spec = createSpecNode({
+      specId: 'core:specs/auth.spec.md',
+      path: 'specs/core/auth.spec.md',
+      title: 'Auth',
+      contentHash: 'sha256:spec',
+      workspace: 'core',
+    })
+
+    const session = store.beginBulkIndexSession()
+    await session.writeDocuments([doc])
+    await session.writeSpecs([spec])
+    await session.commit()
+
+    expect((await store.getDocument(doc.path))?.path).toBe(doc.path)
+    expect((await store.getSpec(spec.specId))?.specId).toBe(spec.specId)
+
+    const removeSession = store.beginBulkIndexSession()
+    await removeSession.removeDocuments([doc.path])
+    await removeSession.removeSpecs([spec.specId])
+    await removeSession.commit()
+
+    expect(await store.getDocument(doc.path)).toBeUndefined()
+    expect(await store.getSpec(spec.specId)).toBeUndefined()
+
+    await store.close()
   })
 })

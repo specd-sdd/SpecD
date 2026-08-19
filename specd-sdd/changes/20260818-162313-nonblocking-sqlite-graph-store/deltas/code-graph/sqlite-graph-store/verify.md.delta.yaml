@@ -124,6 +124,34 @@
     - **AND** `worker.terminate()` is called to force-kill the unresponsive worker
     - **AND** the store reaches `'closed'` state
 
+    #### Scenario: Progress callback exceptions are isolated silently
+
+    - **GIVEN** a bulk index operation registered with an `onProgress` handler that throws an Error
+    - **WHEN** progress stage events are emitted by the worker
+    - **THEN** the progress handler exception is isolated silently
+    - **AND** the bulk index operation completes successfully without unhandled rejections
+
+    #### Scenario: SpecNotFoundError preserves specId across worker error serialization roundtrip
+
+    - **GIVEN** a `SpecNotFoundError` for spec `"core:specs/auth.spec.md"` thrown in worker
+    - **WHEN** the error payload is serialized and deserialized on the host
+    - **THEN** the reconstructed error is an instance of `SpecNotFoundError`
+    - **AND** `error.specId` matches `"core:specs/auth.spec.md"`
+
+    #### Scenario: Closed store recreate executes non-blocking async filesystem cleanup
+
+    - **GIVEN** a closed `SQLiteGraphStore`
+    - **WHEN** `recreate()` is invoked
+    - **THEN** `rm` and `rotateStorageGenerationAsync` execute asynchronously on host
+    - **AND** no worker thread is spawned
+    - **AND** subsequent store `open()` starts with a fresh schema without residual WAL/SHM files
+
+    #### Scenario: Chunked bulk sessions are invalidated on store close, worker crash, or recreate
+
+    - **GIVEN** an active `IndexWriteSession` created via `beginBulkIndexSession()`
+    - **WHEN** the store is closed, the worker crashes, or `recreate()` is called
+    - **THEN** subsequent calls to `session.writeFiles()`, `session.commit()`, or `session.rollback()` reject with `StoreNotOpenError`
+
 - op: modified
   selector:
     type: section
@@ -148,3 +176,13 @@
     - **WHEN** a repository is indexed in bulk through `SQLiteGraphStore`
     - **THEN** the staged payload is committed atomically in the worker
     - **AND** serializable progress events are received and forwarded to the caller's progress callback
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Scenario: SQLite old schema rebuilds safely'
+  content: |
+    - **GIVEN** schema version 8 and the reference schema expects 9
+    - **WHEN** normal read and then graph index are attempted
+    - **THEN** read rejects without empty recreation
+    - **AND** index rotates generation, rebuilds fields/FTS, and opens the new version

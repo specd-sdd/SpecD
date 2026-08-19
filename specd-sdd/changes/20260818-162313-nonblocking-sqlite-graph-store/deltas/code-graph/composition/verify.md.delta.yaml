@@ -65,6 +65,13 @@
     - **THEN** `SpecNotFoundError` is available as an import
     - **AND** thrown instances expose machine-readable code `SPEC_NOT_FOUND` and the requested spec id
 
+    #### Scenario: Concrete store adapters are available only from the internal entry
+
+    - **GIVEN** a consumer importing from `@specd/code-graph/internal`
+    - **WHEN** the internal entry is queried for concrete store adapter symbols
+    - **THEN** `SQLiteGraphStore`, `LadybugGraphStore`, `AdapterRegistry`, and the built-in language adapters are importable
+    - **AND** none of those symbols are importable from `@specd/code-graph` (`"."`)
+
 - op: modified
   selector:
     type: section
@@ -88,3 +95,34 @@
     - **WHEN** `close()` is called twice
     - **THEN** the second call completes without error
     - **AND** underlying worker threads and connections are terminated cleanly
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Symbol-reference provider surface'
+  content: |
+    #### Scenario: Public facade delegates resolver lifecycle
+
+    - **WHEN** a host invokes batch resolution and export impact
+    - **THEN** the provider delegates under its availability checks
+    - **AND** only public reference/result types are exported from `"."`
+
+    #### Scenario: Provider returns bounded selector ambiguity
+
+    - **GIVEN** an unqualified selector has several case-exact candidates
+    - **WHEN** a host resolves it for impact
+    - **THEN** the provider returns a bounded deterministic ambiguity without traversal
+    - **AND** it does not widen the selector to prefix or textual matches
+
+    #### Scenario: Exact public binding lookup bypasses search pagination
+
+    - **GIVEN** more than one search page of bindings shares an exported name
+    - **WHEN** a host requests one binding by surface, exported name, space, and target identity
+    - **THEN** the provider returns that exact binding and its declarations
+    - **AND** no ranked or paginated symbol search is used
+
+    #### Scenario: Concrete resolver implementation stays internal
+
+    - **WHEN** a consumer imports from `@specd/code-graph`
+    - **THEN** the concrete `ResolveSymbolReference` implementation is not available as an import from `"."`
+    - **AND** resolver input/result/status/reason/provenance types and factories remain available from `"."`

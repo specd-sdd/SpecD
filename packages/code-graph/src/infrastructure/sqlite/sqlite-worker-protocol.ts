@@ -25,6 +25,7 @@ import {
 } from '../../domain/value-objects/symbol-reference.js'
 import { type IndexCoverage } from '../../domain/value-objects/index-session.js'
 import {
+  type IndexWriteSessionMetadata,
   type LocalBindingLookup,
   type LogicalDeclaration,
   type LogicalSymbolLookup,
@@ -301,8 +302,47 @@ export interface SQLiteWorkerOperationMap {
   getAllIndexCoverage: { payload: Record<string, never>; result: IndexCoverage[] }
   /** Rebuilds FTS indexes. */
   rebuildFtsIndexes: { payload: Record<string, never>; result: void }
-  /** Commits bulk index session payload. */
-  commitBulkIndex: { payload: BulkIndexPayload; result: void }
+  /** Begins a new worker-side bulk index staging session. */
+  beginBulkIndexSession: { payload: { sessionId: string }; result: void }
+  /** Stages bulk file nodes into active session. */
+  stageBulkFiles: { payload: { sessionId: string; files: FileNode[] }; result: void }
+  /** Stages bulk document nodes into active session. */
+  stageBulkDocuments: { payload: { sessionId: string; documents: DocumentNode[] }; result: void }
+  /** Stages bulk symbol nodes into active session. */
+  stageBulkSymbols: { payload: { sessionId: string; symbols: SymbolNode[] }; result: void }
+  /** Stages bulk spec nodes into active session. */
+  stageBulkSpecs: { payload: { sessionId: string; specs: SpecNode[] }; result: void }
+  /** Stages bulk relations into active session. */
+  stageBulkRelations: { payload: { sessionId: string; relations: Relation[] }; result: void }
+  /** Stages bulk reference facts into active session. */
+  stageBulkReferenceFacts: {
+    payload: { sessionId: string; facts: ReferenceFactsWrite }
+    result: void
+  }
+  /** Stages bulk observations into active session. */
+  stageBulkObservations: {
+    payload: { sessionId: string; observations: IndexedInputObservation[] }
+    result: void
+  }
+  /** Stages bulk file removals into active session. */
+  stageBulkRemovals: {
+    payload: {
+      sessionId: string
+      filePaths?: string[]
+      documentPaths?: string[]
+      specIds?: string[]
+    }
+    result: void
+  }
+  /** Commits a bulk index session by session ID or direct payload. */
+  commitBulkIndex: {
+    payload:
+      | { sessionId: string; metadata?: IndexWriteSessionMetadata | undefined }
+      | BulkIndexPayload
+    result: void
+  }
+  /** Rollbacks and releases a worker-side bulk index staging session. */
+  rollbackBulkIndexSession: { payload: { sessionId: string }; result: void }
 }
 
 /**
@@ -348,6 +388,8 @@ export interface SerializedErrorPayload {
   readonly stack?: string | undefined
   /** SQLite-specific error code if present. */
   readonly sqliteCode?: string | undefined
+  /** Domain error specific structured details payload. */
+  readonly details?: Record<string, unknown> | undefined
 }
 
 /**

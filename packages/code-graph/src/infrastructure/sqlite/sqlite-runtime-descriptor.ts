@@ -10,13 +10,19 @@ export interface SqliteRuntimeDescriptor {
 }
 
 /**
- * Options for configuring {@link SQLiteGraphStore} and {@link SQLiteWorkerClient}.
+ *
  */
 export interface SQLiteGraphStoreOptions {
   /** Optional serializable SQLite runtime descriptor. */
   readonly runtime?: SqliteRuntimeDescriptor | undefined
   /** Maximum number of concurrent in-flight/queued requests before rejecting with StoreOverloadError. Default is 256. */
   readonly maxPendingOperations?: number | undefined
+}
+
+/**
+ * Internal options including worker path override for testing.
+ */
+export interface InternalSQLiteGraphStoreOptions extends SQLiteGraphStoreOptions {
   /** Optional worker script path override for testing. */
   readonly workerPath?: string | undefined
 }

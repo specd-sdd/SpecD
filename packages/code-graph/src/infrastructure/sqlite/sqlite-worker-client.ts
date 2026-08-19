@@ -12,7 +12,7 @@ import {
   type SQLiteWorkerRequest,
   type SQLiteWorkerResponse,
 } from './sqlite-worker-protocol.js'
-import { type SQLiteGraphStoreOptions } from './sqlite-runtime-descriptor.js'
+import { type InternalSQLiteGraphStoreOptions } from './sqlite-runtime-descriptor.js'
 
 /**
  * Formal lifecycle states of the SQLite worker client.
@@ -26,6 +26,42 @@ interface PendingRequest {
   readonly resolve: (result: unknown) => void
   readonly reject: (error: Error) => void
   readonly onProgress?: ((stage: string) => void) | undefined
+}
+
+/**
+ * Wraps a promise with a hard deadline. If the deadline expires (or is already past),
+ * rejects immediately with the error returned by `createTimeoutError()`.
+ * Automatically cleans up the internal timer and unrefs it.
+ * @param promise - The promise to race against the deadline.
+ * @param deadline - Absolute timestamp (ms since epoch) by which the promise must settle.
+ * @param createTimeoutError - Factory producing the error to reject with on timeout.
+ * @returns Promise resolving with the wrapped promise result when it settles before the deadline.
+ */
+export async function withDeadline<T>(
+  promise: Promise<T>,
+  deadline: number,
+  createTimeoutError: () => Error,
+): Promise<T> {
+  const remainingMs = deadline - Date.now()
+  if (remainingMs <= 0) {
+    throw createTimeoutError()
+  }
+
+  let timer: NodeJS.Timeout | undefined
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      reject(createTimeoutError())
+    }, remainingMs)
+    timer.unref?.()
+  })
+
+  try {
+    return await Promise.race([promise, timeoutPromise])
+  } finally {
+    if (timer !== undefined) {
+      clearTimeout(timer)
+    }
+  }
 }
 
 /**
@@ -44,12 +80,21 @@ export function serializeWorkerError(error: unknown): SerializedErrorPayload {
         : customCode?.startsWith('SQLITE_')
           ? customCode
           : undefined
+
+    const details: Record<string, unknown> = {}
+    if (error instanceof SpecNotFoundError && typeof error.specId === 'string') {
+      details.specId = error.specId
+    } else if (typeof errorRecord.specId === 'string') {
+      details.specId = errorRecord.specId
+    }
+
     return {
       name: error.name,
       message: error.message,
       stack: error.stack,
       code: customCode,
       sqliteCode,
+      ...(Object.keys(details).length > 0 ? { details } : {}),
     }
   }
   return {
@@ -81,7 +126,13 @@ export function deserializeWorkerError(payload: SerializedErrorPayload): Error {
     return new GraphProviderStaleError(payload.message)
   }
   if (payload.code === 'SPEC_NOT_FOUND') {
-    return new SpecNotFoundError(payload.message)
+    if (typeof payload.details?.specId === 'string') {
+      return new SpecNotFoundError(payload.details.specId)
+    }
+    const err = new Error(payload.message)
+    err.name = 'SpecNotFoundError'
+    Object.assign(err, { code: 'SPEC_NOT_FOUND' })
+    return err
   }
 
   const err = new Error(payload.message)
@@ -110,6 +161,15 @@ export class SQLiteWorkerClient {
   private nextRequestId = 1
   private maxPendingOperations = 256
   private readonly pendingRequests = new Map<number, PendingRequest>()
+
+  private generation = 0
+
+  /**
+   * Monotonically increasing lifecycle generation token, incremented whenever a new worker thread is initialized.
+   */
+  get lifecycleGeneration(): number {
+    return this.generation
+  }
 
   /**
    * Whether the worker thread is active and ready to accept database requests.
@@ -144,13 +204,13 @@ export class SQLiteWorkerClient {
    * Concurrent invocations share the same in-flight initialization promise.
    *
    * @param storagePath - Root path owning the `graph/` directory.
-   * @param options - Optional runtime configuration and max pending operations settings.
+   * @param options - Optional runtime configuration, max pending operations, and worker path override settings.
    * @returns Promise resolving when the worker has successfully opened and initialized the database.
    * @throws {StoreWorkerError} If the worker is already faulted.
    * @throws {StoreNotOpenError} If called while closing.
    * @throws {Error} If `maxPendingOperations` is invalid.
    */
-  async open(storagePath: string, options?: SQLiteGraphStoreOptions): Promise<void> {
+  async open(storagePath: string, options?: InternalSQLiteGraphStoreOptions): Promise<void> {
     if (this.state === 'open') {
       return
     }
@@ -210,6 +270,7 @@ export class SQLiteWorkerClient {
         // Only transition to 'open' if close() was not called concurrently during startup
         if (this.state === 'opening') {
           this.state = 'open'
+          this.generation++
         }
       } catch (error) {
         // Don't reset state or clean up worker if close() is already managing the lifecycle
@@ -264,44 +325,41 @@ export class SQLiteWorkerClient {
     }
 
     this.closePromise = (async () => {
+      const deadline = Date.now() + drainTimeoutMs
+
       try {
-        // 1. If currently opening, wait for open attempt to settle first
+        // 1. If currently opening, wait for open attempt to settle within the deadline
         if (this.openPromise) {
           this.state = 'closing'
           try {
-            await this.openPromise
+            await withDeadline(
+              this.openPromise,
+              deadline,
+              () => new StoreWorkerError('Worker shutdown timed out while awaiting startup'),
+            )
           } catch {
-            // If open failed, state is already closed or faulted and worker cleaned up.
-            // Return here — the outer finally will still clear closePromise.
+            // If open failed or timed out waiting for open, return early — outer finally clears closePromise
             return
           }
         }
 
         this.state = 'closing'
 
-        // Shared deadline for drain + close RPC combined
-        const deadline = Date.now() + drainTimeoutMs
-
         // 2. Drain accepted in-flight requests within deadline
         const drained =
           this.pendingRequests.size > 0
-            ? await this.drainPendingRequests(deadline - Date.now())
+            ? await this.drainPendingRequests(Math.max(0, deadline - Date.now()))
             : true
 
         // 3. If drained successfully and worker is still healthy, send clean DB close RPC
-        //    with remaining time from the shared deadline so the total close() is bounded.
+        //    with remaining time from the shared deadline using withDeadline.
         if (drained && !this.faulted && this.worker) {
-          const remainingMs = deadline - Date.now()
           try {
-            await Promise.race([
+            await withDeadline(
               this.sendRequestInternal('close', {}, true),
-              new Promise<void>((_, reject) =>
-                setTimeout(
-                  () => reject(new StoreWorkerError('Worker close RPC timed out')),
-                  Math.max(0, remainingMs),
-                ),
-              ),
-            ])
+              deadline,
+              () => new StoreWorkerError('Worker close RPC timed out'),
+            )
           } catch {
             // Ignore error sending close to worker during shutdown (timeout or worker gone)
           }
@@ -444,7 +502,11 @@ export class SQLiteWorkerClient {
     if (!pending) return
 
     if (type === 'progress') {
-      pending.onProgress?.(response.stage)
+      try {
+        pending.onProgress?.(response.stage)
+      } catch {
+        // Observer failures must not affect worker request lifecycle.
+      }
       return
     }
 

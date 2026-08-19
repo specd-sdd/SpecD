@@ -16,7 +16,9 @@ import { type Relation } from '../../domain/value-objects/relation.js'
 import { type SymbolQuery } from '../../domain/value-objects/symbol-query.js'
 import { type SearchOptions } from '../../domain/value-objects/search-options.js'
 import { type SourceContentCandidateQuery } from '../../domain/value-objects/source-search.js'
+import { SpecNotFoundError } from '../../domain/errors/spec-not-found-error.js'
 import {
+  type IndexedInputObservation,
   type IndexedResourceKey,
   type MarkIndexedInputStaleInput,
   type UpdateIndexedInputObservationInput,
@@ -37,18 +39,66 @@ import {
 export function serializeError(error: unknown): SerializedErrorPayload {
   if (error instanceof Error) {
     const err = error as Error & { code?: string; sqliteCode?: string }
+    const details: Record<string, unknown> = {}
+    if (error instanceof SpecNotFoundError && typeof error.specId === 'string') {
+      details.specId = error.specId
+    }
     return {
       name: err.name || 'Error',
       message: err.message,
       stack: err.stack,
       code: typeof err.code === 'string' ? err.code : undefined,
       sqliteCode: typeof err.sqliteCode === 'string' ? err.sqliteCode : undefined,
+      ...(Object.keys(details).length > 0 ? { details } : {}),
     }
   }
   return {
     name: 'Error',
     message: String(error),
   }
+}
+
+/**
+ *
+ */
+interface WorkerBulkSession {
+  files: FileNode[]
+  documents: DocumentNode[]
+  symbols: SymbolNode[]
+  specs: SpecNode[]
+  relations: Relation[]
+  facts?: ReferenceFactsWrite | undefined
+  observations: IndexedInputObservation[]
+  removals: string[]
+  removedDocumentPaths: string[]
+  removedSpecIds: string[]
+}
+
+const bulkSessions = new Map<string, WorkerBulkSession>()
+
+/**
+ * Gets the staged bulk index session for a given session id, creating an empty one if missing.
+ *
+ * @param sessionId - Unique identifier of the bulk index session.
+ * @returns The staged bulk session accumulator for the given id.
+ */
+function getOrCreateBulkSession(sessionId: string): WorkerBulkSession {
+  let session = bulkSessions.get(sessionId)
+  if (!session) {
+    session = {
+      files: [],
+      documents: [],
+      symbols: [],
+      specs: [],
+      relations: [],
+      observations: [],
+      removals: [],
+      removedDocumentPaths: [],
+      removedSpecIds: [],
+    }
+    bulkSessions.set(sessionId, session)
+  }
+  return session
 }
 
 /**
@@ -74,14 +124,17 @@ export async function handleMessage(
         break
       }
       case 'close': {
+        bulkSessions.clear()
         database.close()
         break
       }
       case 'recreate': {
+        bulkSessions.clear()
         await database.recreate()
         break
       }
       case 'clear': {
+        bulkSessions.clear()
         database.clear()
         break
       }
@@ -405,16 +458,112 @@ export async function handleMessage(
         database.rebuildFtsIndexes()
         break
       }
+      case 'beginBulkIndexSession': {
+        const p = payload as { sessionId: string }
+        getOrCreateBulkSession(p.sessionId)
+        break
+      }
+      case 'stageBulkFiles': {
+        const p = payload as { sessionId: string; files: FileNode[] }
+        getOrCreateBulkSession(p.sessionId).files.push(...p.files)
+        break
+      }
+      case 'stageBulkDocuments': {
+        const p = payload as { sessionId: string; documents: DocumentNode[] }
+        getOrCreateBulkSession(p.sessionId).documents.push(...p.documents)
+        break
+      }
+      case 'stageBulkSymbols': {
+        const p = payload as { sessionId: string; symbols: SymbolNode[] }
+        getOrCreateBulkSession(p.sessionId).symbols.push(...p.symbols)
+        break
+      }
+      case 'stageBulkSpecs': {
+        const p = payload as { sessionId: string; specs: SpecNode[] }
+        getOrCreateBulkSession(p.sessionId).specs.push(...p.specs)
+        break
+      }
+      case 'stageBulkRelations': {
+        const p = payload as { sessionId: string; relations: Relation[] }
+        getOrCreateBulkSession(p.sessionId).relations.push(...p.relations)
+        break
+      }
+      case 'stageBulkReferenceFacts': {
+        const p = payload as { sessionId: string; facts: ReferenceFactsWrite }
+        const sess = getOrCreateBulkSession(p.sessionId)
+        sess.facts = p.facts
+        break
+      }
+      case 'stageBulkObservations': {
+        const p = payload as { sessionId: string; observations: IndexedInputObservation[] }
+        getOrCreateBulkSession(p.sessionId).observations.push(...p.observations)
+        break
+      }
+      case 'stageBulkRemovals': {
+        const p = payload as {
+          sessionId: string
+          filePaths?: string[]
+          documentPaths?: string[]
+          specIds?: string[]
+        }
+        const session = getOrCreateBulkSession(p.sessionId)
+        if (p.filePaths?.length) session.removals.push(...p.filePaths)
+        if (p.documentPaths?.length) session.removedDocumentPaths.push(...p.documentPaths)
+        if (p.specIds?.length) session.removedSpecIds.push(...p.specIds)
+        break
+      }
       case 'commitBulkIndex': {
-        const bulkPayload = payload as BulkIndexPayload
-        database.commitBulkIndex(bulkPayload, (stage: string) => {
-          const progressEvent: SQLiteWorkerProgressEvent = {
-            id,
-            type: 'progress',
-            stage,
+        let bulkPayload: BulkIndexPayload
+        const p = payload as
+          | { sessionId: string; metadata?: Record<string, unknown> }
+          | BulkIndexPayload
+
+        if ('sessionId' in p && typeof p.sessionId === 'string') {
+          const session = bulkSessions.get(p.sessionId)
+          if (!session) {
+            throw new Error(`Bulk index session "${p.sessionId}" not found or expired`)
           }
-          postMessage(progressEvent)
-        })
+          bulkPayload = {
+            files: session.files,
+            documents: session.documents,
+            symbols: session.symbols,
+            specs: session.specs,
+            relations: session.relations,
+            referenceFacts: session.facts,
+            observations: session.observations,
+            removedFilePaths: session.removals,
+            removedDocumentPaths: session.removedDocumentPaths,
+            removedSpecIds: session.removedSpecIds,
+            ...(p.metadata || {}),
+          }
+          try {
+            database.commitBulkIndex(bulkPayload, (stage: string) => {
+              const progressEvent: SQLiteWorkerProgressEvent = {
+                id,
+                type: 'progress',
+                stage,
+              }
+              postMessage(progressEvent)
+            })
+          } finally {
+            bulkSessions.delete(p.sessionId)
+          }
+        } else {
+          bulkPayload = p as BulkIndexPayload
+          database.commitBulkIndex(bulkPayload, (stage: string) => {
+            const progressEvent: SQLiteWorkerProgressEvent = {
+              id,
+              type: 'progress',
+              stage,
+            }
+            postMessage(progressEvent)
+          })
+        }
+        break
+      }
+      case 'rollbackBulkIndexSession': {
+        const p = payload as { sessionId: string }
+        bulkSessions.delete(p.sessionId)
         break
       }
       default: {

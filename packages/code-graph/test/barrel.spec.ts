@@ -28,6 +28,34 @@ describe('@specd/code-graph barrel', () => {
     expect(InMemoryIndexSession).toBeDefined()
   })
 
+  it('keeps concrete store adapters on the internal barrel only', async () => {
+    const publicModule = await import('../src/public.js')
+    const internalModule = await import('../src/index.js')
+
+    const adapters = [
+      'SQLiteGraphStore',
+      'LadybugGraphStore',
+      'AdapterRegistry',
+      'TypeScriptLanguageAdapter',
+      'PythonLanguageAdapter',
+      'PhpLanguageAdapter',
+      'GoLanguageAdapter',
+    ]
+
+    for (const name of adapters) {
+      expect(name in publicModule).toBe(false)
+      expect(name in internalModule).toBe(true)
+    }
+  })
+
+  it('keeps ResolveSymbolReference on the internal barrel only', async () => {
+    const publicModule = await import('../src/public.js')
+    const internalModule = await import('../src/index.js')
+
+    expect('ResolveSymbolReference' in publicModule).toBe(false)
+    expect('ResolveSymbolReference' in internalModule).toBe(true)
+  })
+
   it('exposes CodeGraphProvider as a type-only factory result', async () => {
     const publicModule = await import('../src/public.js')
     const provider: CodeGraphProvider | undefined = undefined

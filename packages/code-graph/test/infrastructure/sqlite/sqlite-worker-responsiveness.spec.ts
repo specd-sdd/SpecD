@@ -55,10 +55,15 @@ describe('SQLiteWorker responsiveness', () => {
         }),
       )
 
-      let timerTicks = 0
-      const interval = setInterval(() => {
-        timerTicks++
-      }, 10)
+      let maxLag = 0
+      const intervalMs = 10
+      let expected = performance.now() + intervalMs
+
+      const timer = setInterval(() => {
+        const now = performance.now()
+        maxLag = Math.max(maxLag, now - expected)
+        expected = now + intervalMs
+      }, intervalMs)
 
       const session = store.beginBulkIndexSession({
         rebuildSearchIndexes: true,
@@ -67,9 +72,10 @@ describe('SQLiteWorker responsiveness', () => {
       await session.writeSymbols(symbols)
       await session.commit()
 
-      clearInterval(interval)
-      // The host timer should have fired multiple times during bulk commit
-      expect(timerTicks).toBeGreaterThanOrEqual(1)
+      clearInterval(timer)
+
+      // Maximum event-loop lag should remain bounded below generous CI threshold (200ms)
+      expect(maxLag).toBeLessThan(200)
 
       const stats = await store.getStatistics()
       expect(stats.fileCount).toBe(500)

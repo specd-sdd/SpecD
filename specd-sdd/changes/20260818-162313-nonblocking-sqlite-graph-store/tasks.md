@@ -226,3 +226,65 @@
 - [x] 12.6 Add 2 new lifecycle tests for round-2 fixes
       `packages/code-graph/test/infrastructure/sqlite/sqlite-worker-lifecycle.spec.ts`: 2 new tests - `clears closePromise when concurrent close() waits on a failing open()`: verifies closePromise is cleared and a full recovery cycle (close → open → close) works after a concurrent open+close where open crashes - `bounds close() total time when worker ignores the close RPC`: verifies close() with a mock worker that responds to 'open' but never acknowledges 'close' resolves within the deadline
       (Req: Worker-backed non-blocking execution)
+
+## 13. Deep Architecture & Robustness Hardening (15 Points Review)
+
+- [x] 13.1 `withDeadline` helper with unref'd timer cleanup
+      `packages/code-graph/src/infrastructure/sqlite/sqlite-worker-client.ts`: Implement `withDeadline<T>` helper to handle timeout race, `clearTimeout` in `finally`, and `timer.unref?.()`.
+
+- [x] 13.2 Unified `close()` deadline
+      `packages/code-graph/src/infrastructure/sqlite/sqlite-worker-client.ts`: Calculate `deadline = now + drainTimeoutMs` at entry of `close()` and apply `withDeadline` across `openPromise`, `drainPendingRequests`, and the `close` RPC.
+
+- [x] 13.3 Non-blocking closed store `recreate()`
+      `packages/code-graph/src/infrastructure/sqlite/sqlite-graph-store.ts` & `storage-generation.ts`: Replace synchronous `rmSync` and `rotateStorageGeneration` in closed `recreate()` with `rm` from `node:fs/promises` and `rotateStorageGenerationAsync`.
+
+- [x] 13.4 Chunked worker-side bulk index staging protocol
+      `packages/code-graph/src/infrastructure/sqlite/sqlite-worker-protocol.ts` & `sqlite-worker.ts`: Add `beginBulkIndexSession`, `stageBulkFiles`, `stageBulkSymbols`, etc., and `WorkerBulkSession` map in worker thread. Execute commit within a single worker `db.transaction()`.
+
+- [x] 13.5 Isolation of `onProgress` callback exceptions
+      `packages/code-graph/src/infrastructure/sqlite/sqlite-worker-client.ts`: Wrap `pending.onProgress?.(...)` invocation in a silent `try/catch` block.
+
+- [x] 13.6 Private `workerPath` option
+      `packages/code-graph/src/infrastructure/sqlite/sqlite-runtime-descriptor.ts`: Remove `workerPath` from public `SQLiteGraphStoreOptions` and `SqliteGraphStoreFactoryOptions`; define internal options interface.
+
+- [x] 13.7 Error serialization payload details & `SpecNotFoundError` codec
+      `packages/code-graph/src/infrastructure/sqlite/sqlite-worker-protocol.ts` & `sqlite-worker-client.ts`: Add `details` field to `SerializedErrorPayload` and update `serializeWorkerError`/`deserializeWorkerError` to preserve `SpecNotFoundError.specId`.
+
+- [x] 13.8 Bulk session lifecycle generation & token validation
+      `packages/code-graph/src/infrastructure/sqlite/sqlite-worker-client.ts` & `sqlite-graph-store.ts`: Add `lifecycleGeneration` to worker client and `activeBulkSessionId` to store; invalidate `IndexWriteSession` on close, worker crash, or recreation.
+
+- [x] 13.9 Hardened responsiveness test
+      `packages/code-graph/test/infrastructure/sqlite/sqlite-worker-responsiveness.spec.ts`: Measure `maxLag` with `performance.now()` and `setInterval` to verify event-loop lag remains bounded under heavy load.
+
+- [x] 13.10 Suite of 5 new lifecycle & session tests
+      `packages/code-graph/test/infrastructure/sqlite/sqlite-worker-lifecycle.spec.ts`: Add test cases for `onProgress` exception isolation, `SpecNotFoundError` roundtrip, closed `recreate()` async cleanup, and chunked session invalidation.
+
+## 14. Compliance Reconciliation (audit D1–D5)
+
+- [x] 14.1 Export concrete store adapter symbols from internal entry
+      `packages/code-graph/src/index.ts`: export `SQLiteGraphStore`, `LadybugGraphStore`, `AdapterRegistry`, and the built-in language adapters from the `./internal` barrel only
+      Approach: Add imports/re-exports for the concrete adapter infrastructure modules in `src/index.ts`; do NOT add them to `src/public.ts` (`"."`).
+      (Req: Public and internal entry points)
+
+- [x] 14.2 Remove `ResolveSymbolReference` concrete class from public surface
+      `packages/code-graph/src/public.ts`: drop the concrete `ResolveSymbolReference` re-export from `"."`
+      Approach: Remove `ResolveSymbolReference` from `public.ts`; keep resolver input/result/status/reason/provenance types and factories exported from `"."` and verify no host-side consumer imports the concrete class.
+      (Req: Symbol-reference provider surface)
+
+- [x] 14.3 Align worker-side error serialization with host codec (specId preservation)
+      `packages/code-graph/src/infrastructure/sqlite/sqlite-worker.ts` / `sqlite-worker-protocol.ts`: make worker-side `serializeError` include `details` (e.g. `specId` for `SpecNotFoundError`) matching the host-side codec
+      Approach: Reuse the shared `serializeWorkerError` so host and worker serialize identically; extend the roundtrip test to assert `SpecNotFoundError.specId` survives worker→host transport.
+      (Req: Symbol-reference provider surface)
+
+- [x] 14.4 Correct test-count metadata in change artifacts
+      `specd-sdd/changes/20260818-162313-nonblocking-sqlite-graph-store/verify` artifacts/reports: update the claimed `sqlite-graph-store.spec.ts` test count to the actual figure (~67 explicit `it(` + generated shared contract cases; vitest reports 113 passing)
+      Approach: Reconcile the reported count in the change's verify notes so the audit D3 finding is resolved; no code change required.
+
+- [x] 14.5 Add export-scope verification tests for internal-only symbols
+      `packages/code-graph/test/`: add tests asserting concrete adapters (`SQLiteGraphStore`, `LadybugGraphStore`, `AdapterRegistry`, built-in language adapters) are importable from `@specd/code-graph/internal` and NOT from `@specd/code-graph` (`"."`), and that `ResolveSymbolReference` is not importable from `"."`
+      Approach: Import/module-scope assertions mirroring the reconciled composition verify scenarios.
+      (Req: Public and internal entry points, Symbol-reference provider surface)
+
+- [x] 14.6 Re-run full compliance audit and replace the partial report
+      Re-run the compliance audit (full mode) after the fixes; supersede `reports/20260819-193743/_partial-code-graph.md` with the final full report and confirm 0 non-compliant findings.
+      Approach: Re-verify against the reconciled specs and update the report path in the change metadata.

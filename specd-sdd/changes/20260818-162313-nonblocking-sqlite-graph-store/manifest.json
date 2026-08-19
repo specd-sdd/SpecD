@@ -1,7 +1,7 @@
 {
   "name": "nonblocking-sqlite-graph-store",
   "createdAt": "2026-08-18T16:23:13.275Z",
-  "updatedAt": "2026-08-19T09:42:59.715Z",
+  "updatedAt": "2026-08-19T18:44:57.026Z",
   "description": "Execute SQLite operations inside a persistent worker thread without blocking host event loop",
   "schema": {
     "name": "schema-std",
@@ -136,6 +136,58 @@
     },
     {
       "file": "packages/code-graph/test/infrastructure/sqlite/sqlite-graph-store.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/errors/spec-not-found-error.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/storage-generation.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/code-graph/graph-store/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/indexer/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/symbol-model/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/traversal/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/ladybug/ladybug-graph-store.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/adapter-registry.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/typescript-language-adapter.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/python-language-adapter.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/php-language-adapter.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/go-language-adapter.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/code-graph/test/barrel.spec.ts",
       "state": "open"
     }
   ],
@@ -178,7 +230,8 @@
         "SQLiteWorkerRequest",
         "SQLiteWorkerResponse",
         "SerializedErrorPayload",
-        "SQLiteWorkerProgressEvent"
+        "SQLiteWorkerProgressEvent",
+        "SQLiteWorkerOperationMap"
       ]
     },
     {
@@ -197,7 +250,7 @@
       "specId": "code-graph:sqlite-graph-store",
       "file": "packages/code-graph/src/infrastructure/sqlite/sqlite-worker.ts",
       "fileLinkExplicit": false,
-      "symbols": ["handleMessage"]
+      "symbols": ["handleMessage", "serializeError"]
     },
     {
       "specId": "code-graph:sqlite-graph-store",
@@ -266,6 +319,70 @@
       "specId": "code-graph:sqlite-graph-store",
       "file": "packages/code-graph/test/infrastructure/sqlite/sqlite-worker-lifecycle.spec.ts",
       "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:sqlite-graph-store",
+      "file": "packages/code-graph/src/domain/errors/spec-not-found-error.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["SpecNotFoundError"]
+    },
+    {
+      "specId": "code-graph:sqlite-graph-store",
+      "file": "packages/code-graph/src/infrastructure/storage-generation.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["rotateStorageGenerationAsync", "ensureStorageGenerationAsync"]
+    },
+    {
+      "specId": "code-graph:sqlite-graph-store",
+      "file": "packages/code-graph/test/infrastructure/sqlite/sqlite-graph-store.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:composition",
+      "file": "packages/code-graph/src/infrastructure/sqlite/sqlite-graph-store.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["SQLiteGraphStore"]
+    },
+    {
+      "specId": "code-graph:composition",
+      "file": "packages/code-graph/src/infrastructure/ladybug/ladybug-graph-store.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["LadybugGraphStore"]
+    },
+    {
+      "specId": "code-graph:composition",
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/adapter-registry.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["AdapterRegistry"]
+    },
+    {
+      "specId": "code-graph:composition",
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/typescript-language-adapter.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["TypeScriptLanguageAdapter"]
+    },
+    {
+      "specId": "code-graph:composition",
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/python-language-adapter.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["PythonLanguageAdapter"]
+    },
+    {
+      "specId": "code-graph:composition",
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/php-language-adapter.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["PhpLanguageAdapter"]
+    },
+    {
+      "specId": "code-graph:composition",
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/go-language-adapter.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["GoLanguageAdapter"]
+    },
+    {
+      "specId": "code-graph:composition",
+      "file": "packages/code-graph/test/barrel.spec.ts",
+      "fileLinkExplicit": true
     }
   ],
   "artifacts": [
@@ -293,7 +410,7 @@
           "key": "code-graph:sqlite-graph-store",
           "filename": "deltas/code-graph/sqlite-graph-store/spec.md.delta.yaml",
           "state": "complete",
-          "validatedHash": "sha256:57d5e9acdf00f6a9738226a2d764d8a7c6ba5d3f833eea9ee70bec62b2006c4c"
+          "validatedHash": "sha256:d0b11d3dfe2fdc4b2dfe3673a19c5d63977b0c97397024b5a5608b71c34e857d"
         },
         {
           "key": "code-graph:composition",
@@ -313,13 +430,13 @@
           "key": "code-graph:sqlite-graph-store",
           "filename": "deltas/code-graph/sqlite-graph-store/verify.md.delta.yaml",
           "state": "complete",
-          "validatedHash": "sha256:7f3dbf2c06dbfa2782e1af3eae2394658f126b18d4fe537b258bb75768532acd"
+          "validatedHash": "sha256:8246e9b3d38b84904419e83c61627d7c7e79ecb198cd05153081ae1fbd4b05b8"
         },
         {
           "key": "code-graph:composition",
           "filename": "deltas/code-graph/composition/verify.md.delta.yaml",
           "state": "complete",
-          "validatedHash": "sha256:b24b76164c361680135230e2198cdc3588eec5549fc0a42b15af9f6672e4c890"
+          "validatedHash": "sha256:4965da0422cda3da7aba9000fc9c54b1ef4a0c8658167107a3b66fbd1c8445e7"
         }
       ]
     },
@@ -333,7 +450,7 @@
           "key": "design",
           "filename": "design.md",
           "state": "complete",
-          "validatedHash": "sha256:1e0310eacc02d17f14479d8cbee9d3221cbe2f725639a71c3c23306f5f84cb89"
+          "validatedHash": "sha256:b01510c14f9e2e086e53ed50bef506a4fd5c1b421158e78ce53ec6baeac21f09"
         }
       ]
     },
@@ -347,7 +464,7 @@
           "key": "tasks",
           "filename": "tasks.md",
           "state": "complete",
-          "validatedHash": "sha256:ebbadaa258aaf90f7d5acb1e398cc6468924b80202b10883d40fd79f983e9f95"
+          "validatedHash": "sha256:0a9096c5bac179ef29a2bbfa2a790957a1f09933526d6029a6360374fbe22f6f"
         }
       ]
     }
@@ -698,6 +815,145 @@
     {
       "type": "transitioned",
       "at": "2026-08-19T09:42:59.711Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-19T12:40:24.716Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [code-graph:sqlite-graph-store]; verify [code-graph:sqlite-graph-store]; design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:sqlite-graph-store"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:sqlite-graph-store"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-19T12:40:24.716Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-19T12:40:47.124Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-19T12:40:50.012Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-19T17:33:37.798Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-19T17:58:37.331Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["code-graph:sqlite-graph-store", "code-graph:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:sqlite-graph-store", "code-graph:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-19T17:58:37.331Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-19T18:13:38.742Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-19T18:14:39.518Z",
       "by": {
         "name": "M***a",
         "email": "1***i@u***.com",

@@ -87,26 +87,19 @@ During `close()`:
    **entire** body (including `await openPromise`) guarantees `closePromise` is always cleared —
    even when `open()` fails concurrently. Without this, a subsequent `close()` would find the stale
    resolved promise and silently skip recovery.
-2. If `state === 'opening'`, `close()` sets `state = 'closing'` and waits for the in-flight
-   `openPromise`. `open()` sees `state !== 'opening'` and skips the `→ 'open'` transition.
-   If `openPromise` rejects (e.g. worker crashed during startup), `close()` returns early from
-   the inner catch — the outer `finally` still clears `closePromise` and terminates the worker.
-   `handleWorkerExit` in `'closing'` state also rejects any stale pending requests (such as the
-   unacknowledged `open` RPC) so that `openPromise` can settle rather than hanging forever.
-3. `state` is set to `closing`. Any new incoming `sendRequest()` call immediately rejects with
-   `StoreNotOpenError`.
-4. A **shared deadline** is computed: `deadline = Date.now() + drainTimeoutMs`. This deadline
-   applies to both the drain phase and the `close` RPC, making `drainTimeoutMs` a true hard
-   upper bound on the total `close()` wall-clock time.
-5. `drainPendingRequests(deadline - now)` waits for pending requests to settle.
+2. `deadline = Date.now() + drainTimeoutMs` is computed once at the entry of `close()`. This shared
+   deadline bounds `await openPromise`, the drain phase, and the `close` RPC ACK using a unref'd `withDeadline` helper.
+3. If `state === 'opening'`, `close()` sets `state = 'closing'` and awaits `openPromise` with `withDeadline`.
+   `open()` sees `state !== 'opening'` and skips the `→ 'open'` transition. If `openPromise` rejects or times out,
+   `close()` returns early from the inner catch — the outer `finally` still clears `closePromise` and terminates the worker.
+   `handleWorkerExit` in `'closing'` state also rejects any stale pending requests (such as an unacknowledged `open` RPC).
+4. `state` is set to `closing`. Any new incoming `sendRequest()` call immediately rejects with `StoreNotOpenError`.
+5. `drainPendingRequests(Math.max(0, deadline - now))` waits for pending requests to settle.
 6. **If `drained === true`** (all requests settled before deadline):
-   - `Promise.race([sendRequestInternal('close'), timeout(deadline - now)])` races the clean DB
-     close RPC against the remaining deadline. The worker invokes `database.close()`, closing the
-     SQLite connection and clearing statements.
+   - `withDeadline(sendRequestInternal('close'), deadline)` races the clean DB close RPC against the shared deadline.
 7. **If `drained === false`** OR the `close` RPC times out:
    - Any remaining pending requests are rejected **before** `worker.terminate()` is called, so
-     the drain-timeout `StoreWorkerError` is the rejection callers observe (not the subsequent
-     exit-event error).
+     the drain-timeout `StoreWorkerError` is the rejection callers observe (not the exit-event error).
    - `worker.terminate()` is called unconditionally to force-kill the thread.
 8. `state` transitions to `closed` and `closePromise` is cleared in the `finally` block.
 

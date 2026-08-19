@@ -51,32 +51,35 @@
     6. **Graceful Shutdown & Drain**: Calling `close()` MUST transition the client to
        `closing` and immediately reject new operations with `StoreNotOpenError`.
        `drainTimeoutMs` (default: 5 000 ms) is a hard upper bound on the total
-       `close()` wall-clock time, covering both the drain phase and the `close` RPC ACK.
-       The implementation MUST use a shared deadline: compute `deadline = now + drainTimeoutMs`
-       at the start of `close()`, drain pending requests up to `deadline - now`, and if
-       all requests settled in time, race the `close` RPC against the remaining
-       `deadline - now` ms. If either the drain or the close RPC exhausts the deadline,
-       any remaining pending requests MUST be rejected with `StoreWorkerError`,
-       and `worker.terminate()` MUST be called unconditionally.
-       The `closePromise` sentinel MUST be cleared in a `finally` block that wraps the
-       entire `close()` body (including `await openPromise`), so that a subsequent
-       `close()` call after any failure is never short-circuited by a stale promise.
+       `close()` wall-clock time, covering `await openPromise`, the drain phase, and the
+       `close` RPC ACK via a unref'd `withDeadline` helper. If any phase exhausts the
+       deadline, remaining pending requests MUST be rejected with `StoreWorkerError`, and
+       `worker.terminate()` MUST be called unconditionally. The `closePromise` sentinel
+       MUST be cleared in an outer `finally` block wrapping the entire shutdown body.
     7. **Serializable Runtime Descriptor**: The worker receives SQLite runtime
-       configuration via a serializable descriptor (e.g. `SqliteRuntimeDescriptor` with
-       optional `modulePath`), enabling dynamic loading of custom or vendored SQLite
-       native bindings inside the worker context without transferring function loaders.
+       configuration via a serializable descriptor (`SqliteRuntimeDescriptor`),
+       enabling dynamic loading of custom SQLite native bindings. `workerPath` is strictly
+       an internal testing option and SHALL NOT be exposed on public options interfaces.
     8. **Fault Isolation & Manual Recovery**: If the worker thread crashes or exits
        unexpectedly, the store transitions to a `faulted` state, rejecting outstanding
-       operations with `StoreWorkerError`. The store SHALL NOT attempt silent auto-restarts;
-       manual recovery is supported by calling `close()` followed by `open()`.
-       If the crash occurs during `opening` (before the `open` ACK is received),
-       the store MUST transition to `faulted`, not `closed`, to give callers a
-       deterministic signal that startup failed.
+       operations with `StoreWorkerError`. Manual recovery is achieved by calling `close()`
+       followed by `open()`. An unexpected exit during `opening` transitions to `faulted`
+       unless `close()` already owns the lifecycle (in which case final state is `closed`).
     9. **Concurrent open()/close() Race**: If `close()` is called while `open()` is
-       still in-flight, `close()` MUST wait for the `open()` promise to resolve before
-       proceeding with shutdown. `open()` MUST NOT transition state to `'open'` once
-       `close()` has already set state to `'closing'`. The store MUST NOT be observable
-       in the `'open'` state after a concurrent `close()` has begun.
+       still in-flight, `close()` MUST wait for `openPromise` within the shared deadline.
+       `open()` MUST NOT transition state to `'open'` once `close()` has set state to `'closing'`.
+    10. **Chunked Worker-Side Bulk Staging & Lifecycle Session Token**: Bulk index operations
+        MUST stage entity chunks progressively to the worker thread via RPCs (`stageBulkFiles`,
+        `stageBulkSymbols`, etc.) under a worker-side session (`sessionId`). The final visible
+        mutation MUST commit atomically within a single SQLite worker transaction. Sessions MUST
+        be bound to a host-side `lifecycleGeneration` token and invalidated deterministically on
+        store close, worker crash, or recreation.
+    11. **Isolated Observational Progress Callbacks**: Progress callback notifications (`onProgress`)
+        MUST be strictly observational. Any exception thrown by a progress callback handler MUST be
+        caught and isolated silently without failing the active operation or aborting transactions.
+    12. **Non-Blocking Closed Store Maintenance**: When `recreate()` is called on a closed store,
+        directory cleanup (`rm`) and generation sidecar rotation (`rotateStorageGenerationAsync`)
+        MUST execute asynchronously using non-blocking host I/O (`node:fs/promises`).
 
 - op: modified
   selector:
@@ -126,3 +129,18 @@
     If the implementation materializes backend-owned scratch artifacts outside the
     primary database file, those artifacts MUST be scoped to `{configPath}/tmp` and
     cleaned up after successful completion.
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Reference schema upgrade'
+  content: |
+    SQLite SHALL persist the enriched logical-symbol, declaration, member, symbol-space, binding, provenance, coverage, complete construct range, and declared-name selection range fields required by `GraphStore`. Structured workspace, surface, name, symbol-space, owner, member-form, and exported-name columns SHALL have indexes supporting semantic search and selector resolution without parsing or substring-ranking serialized canonical ids. Canonical ids remain unique external identities. Backend-local integer row keys MAY be used for physical joins when they do not change provider-visible ids.
+
+    SQLite SHALL maintain a dedicated source-file content FTS index using substring-capable trigram tokenization. Candidate queries SHALL use the shared complete/raw/expanded query plan, honor filters before candidate limits, and return indexed content or precise evidence for Code Graph verification. Queries shorter than three characters SHALL use a bounded indexed/SQL fallback defined by the shared Store contract rather than returning every file for application-layer scanning.
+
+    Batched reverse coverage lookup SHALL use set-based predicates over deduplicated file paths and symbol ids and deterministic ordering.
+
+    The backend SHALL track a reference schema version; the current reference schema version is `9`. A schema-affecting change SHALL increment the schema version exactly once relative to the version current when that change's implementation begins. An incompatible database MUST reject ordinary reads. `graph index` SHALL rebuild it destructively, rotate `storage.epoch`, and complete FTS rebuild before marking it ready.
+
+    SQLite SHALL persist indexed-input observations, workspace/global latches, VCS-scope evidence, and compact unchanged-file facts required by incremental hydration. One indexing run SHALL use one database transaction, set-based relation endpoint validation, bounded prepared/bulk inserts, one commit, and one rebuild of all semantic and content FTS indexes. Chunk appends MUST NOT rebuild FTS independently.

@@ -35,12 +35,13 @@ import {
   type MarkIndexedInputStaleInput,
   type UpdateIndexedInputObservationInput,
 } from '../../domain/value-objects/indexed-input-freshness.js'
-import { rmSync } from 'node:fs'
+import { randomUUID } from 'node:crypto'
+import { rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { SQLiteWorkerClient } from './sqlite-worker-client.js'
-import { type SQLiteGraphStoreOptions } from './sqlite-runtime-descriptor.js'
+import { type InternalSQLiteGraphStoreOptions } from './sqlite-runtime-descriptor.js'
 import { type BulkIndexPayload } from './sqlite-worker-protocol.js'
-import { rotateStorageGeneration } from '../storage-generation.js'
+import { rotateStorageGenerationAsync } from '../storage-generation.js'
 import { StoreNotOpenError } from '../../domain/errors/store-not-open-error.js'
 
 /**
@@ -80,16 +81,16 @@ export interface SqliteBulkLoadOptions {
  */
 export class SQLiteGraphStore extends GraphStore {
   private readonly client = new SQLiteWorkerClient()
-  private readonly options: SQLiteGraphStoreOptions | undefined
-  private bulkSessionActive = false
+  private readonly options: InternalSQLiteGraphStoreOptions | undefined
+  private activeBulkSessionId: string | undefined = undefined
 
   /**
    * Creates a new SQLite-backed graph store under the provided storage root.
    *
    * @param storagePath - Root path owning `graph/` and `tmp/` directories.
-   * @param options - Optional runtime configuration and max pending operation options.
+   * @param options - Optional runtime configuration, max pending operations, and worker path override settings.
    */
-  constructor(storagePath: string, options?: SQLiteGraphStoreOptions) {
+  constructor(storagePath: string, options?: InternalSQLiteGraphStoreOptions) {
     super(storagePath)
     this.options = options
   }
@@ -123,6 +124,7 @@ export class SQLiteGraphStore extends GraphStore {
    * @returns Promise resolving when the store is closed.
    */
   async close(): Promise<void> {
+    this.activeBulkSessionId = undefined
     await this.client.close()
   }
 
@@ -623,10 +625,11 @@ export class SQLiteGraphStore extends GraphStore {
    * @returns Promise resolving when recreation completes.
    */
   override async recreate(): Promise<void> {
+    this.activeBulkSessionId = undefined
     if (!this.client.isOpen) {
       const graphDir = join(this.storagePath, 'graph')
-      rmSync(graphDir, { recursive: true, force: true })
-      rotateStorageGeneration(this.storagePath)
+      await rm(graphDir, { recursive: true, force: true })
+      await rotateStorageGenerationAsync(this.storagePath)
       return
     }
     await this.client.sendRequest('recreate', {})
@@ -840,117 +843,106 @@ export class SQLiteGraphStore extends GraphStore {
     if (!this.client.isOpen) {
       throw new StoreNotOpenError()
     }
-    if (this.bulkSessionActive) {
+    if (this.activeBulkSessionId !== undefined) {
       throw new Error('A bulk index session is already active')
     }
-    this.bulkSessionActive = true
 
-    const files: FileNode[] = []
-    const documents: DocumentNode[] = []
-    const symbols: SymbolNode[] = []
-    const specs: SpecNode[] = []
-    const observations: IndexedInputObservation[] = []
-    const relations = new Map<string, Relation>()
-    const removedFiles = new Set<string>()
-    const removedDocuments = new Set<string>()
-    const removedSpecs = new Set<string>()
-    let referenceFacts: ReferenceFactsWrite | undefined
+    const sessionId = randomUUID()
+    const sessionGeneration = this.client.lifecycleGeneration
+    this.activeBulkSessionId = sessionId
+
+    // Notify worker to initialize worker-side staging session
+    void this.client.sendRequest('beginBulkIndexSession', { sessionId }).catch(() => {})
+
     let finished = false
 
     const assertActive = (): void => {
       if (finished) throw new Error('Bulk index session is already finished')
+      if (
+        this.activeBulkSessionId !== sessionId ||
+        this.client.lifecycleGeneration !== sessionGeneration ||
+        !this.client.isOpen
+      ) {
+        finished = true
+        throw new StoreNotOpenError()
+      }
     }
+
     const finish = (): void => {
       finished = true
-      this.bulkSessionActive = false
+      if (this.activeBulkSessionId === sessionId) {
+        this.activeBulkSessionId = undefined
+      }
     }
 
     return {
-      writeFiles: (chunk) => {
+      writeFiles: async (chunk) => {
         assertActive()
-        files.push(...chunk)
-        return Promise.resolve()
+        await this.client.sendRequest('stageBulkFiles', { sessionId, files: [...chunk] })
       },
-      writeDocuments: (chunk) => {
+      writeDocuments: async (chunk) => {
         assertActive()
-        documents.push(...chunk)
-        return Promise.resolve()
+        await this.client.sendRequest('stageBulkDocuments', { sessionId, documents: [...chunk] })
       },
-      writeSymbols: (chunk) => {
+      writeSymbols: async (chunk) => {
         assertActive()
-        symbols.push(...chunk)
-        return Promise.resolve()
+        await this.client.sendRequest('stageBulkSymbols', { sessionId, symbols: [...chunk] })
       },
-      writeSpecs: (chunk) => {
+      writeSpecs: async (chunk) => {
         assertActive()
-        specs.push(...chunk)
-        return Promise.resolve()
+        await this.client.sendRequest('stageBulkSpecs', { sessionId, specs: [...chunk] })
       },
-      writeReferenceFacts: (chunk) => {
+      writeReferenceFacts: async (chunk) => {
         assertActive()
-        referenceFacts = mergeReferenceFactChunks(referenceFacts, chunk)
-        return Promise.resolve()
+        await this.client.sendRequest('stageBulkReferenceFacts', { sessionId, facts: chunk })
       },
-      writeObservations: (chunk) => {
+      writeObservations: async (chunk) => {
         assertActive()
-        observations.push(...chunk)
-        return Promise.resolve()
+        await this.client.sendRequest('stageBulkObservations', {
+          sessionId,
+          observations: [...chunk],
+        })
       },
-      writeRelations: (chunk) => {
+      writeRelations: async (chunk) => {
         assertActive()
-        for (const relation of chunk) {
-          relations.set(sqliteRelationKey(relation), relation)
-        }
-        return Promise.resolve()
+        await this.client.sendRequest('stageBulkRelations', { sessionId, relations: [...chunk] })
       },
-      removeFiles: (paths) => {
+      removeFiles: async (paths) => {
         assertActive()
-        for (const path of paths) removedFiles.add(path)
-        return Promise.resolve()
+        await this.client.sendRequest('stageBulkRemovals', { sessionId, filePaths: [...paths] })
       },
-      removeDocuments: (paths) => {
+      removeDocuments: async (paths) => {
         assertActive()
-        for (const path of paths) removedDocuments.add(path)
-        return Promise.resolve()
+        await this.client.sendRequest('stageBulkRemovals', { sessionId, documentPaths: [...paths] })
       },
-      removeSpecs: (ids) => {
+      removeSpecs: async (ids) => {
         assertActive()
-        for (const id of ids) removedSpecs.add(id)
-        return Promise.resolve()
+        await this.client.sendRequest('stageBulkRemovals', { sessionId, specIds: [...ids] })
       },
       commit: async () => {
         assertActive()
-        const payload: BulkIndexPayload = {
-          files,
-          documents,
-          symbols,
-          specs,
-          relations: [...relations.values()],
-          removedFilePaths: [...removedFiles],
-          removedDocumentPaths: [...removedDocuments],
-          removedSpecIds: [...removedSpecs],
-          referenceFacts,
-          observations,
-          vcsRef: metadata.vcsRef,
-          graphFingerprint: metadata.graphFingerprint,
-          indexedWorkspaces: metadata.indexedWorkspaces,
-          clearGraphStaleLatch: metadata.clearGraphStaleLatch,
-          replaceCodeGraph: metadata.replaceCodeGraph,
-          rebuildSearchIndexes: metadata.rebuildSearchIndexes,
-        }
-
         try {
-          await this.client.sendRequest('commitBulkIndex', payload, metadata.onProgress)
+          const { onProgress, ...serializableMetadata } = metadata
+          await this.client.sendRequest(
+            'commitBulkIndex',
+            { sessionId, metadata: serializableMetadata },
+            onProgress,
+          )
           finish()
         } catch (error) {
           finish()
           throw error
         }
       },
-      rollback: () => {
+      rollback: async () => {
         assertActive()
-        finish()
-        return Promise.resolve()
+        try {
+          await this.client.sendRequest('rollbackBulkIndexSession', { sessionId })
+        } catch {
+          // Ignore rollback errors on closed worker
+        } finally {
+          finish()
+        }
       },
     }
   }
@@ -977,36 +969,4 @@ export class SQLiteGraphStore extends GraphStore {
     }
     await this.client.sendRequest('commitBulkIndex', payload, options.onProgress)
   }
-}
-
-/**
- * Merges reference fact write chunks into a single aggregated payload.
- *
- * @param current - Existing reference facts accumulator.
- * @param next - Next chunk to append.
- * @returns Combined reference facts write payload.
- */
-function mergeReferenceFactChunks(
-  current: ReferenceFactsWrite | undefined,
-  next: ReferenceFactsWrite,
-): ReferenceFactsWrite {
-  if (current === undefined) return next
-  return {
-    logicalSymbols: [...current.logicalSymbols, ...next.logicalSymbols],
-    declarations: [...current.declarations, ...next.declarations],
-    publicBindings: [...current.publicBindings, ...next.publicBindings],
-    localBindings: [...current.localBindings, ...next.localBindings],
-    steps: [...current.steps, ...next.steps],
-    coverage: [...current.coverage, ...next.coverage],
-  }
-}
-
-/**
- * Generates a stable key for relation deduplication in SQLite persistence.
- *
- * @param relation - Relation to generate a key for.
- * @returns JSON string representing the relation uniqueness tuple.
- */
-function sqliteRelationKey(relation: Relation): string {
-  return JSON.stringify([relation.source, relation.target, relation.type])
 }
