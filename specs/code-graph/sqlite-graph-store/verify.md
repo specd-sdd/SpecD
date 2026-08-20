@@ -24,19 +24,24 @@
 
 ### Requirement: Default backend role
 
-#### Scenario: SQLite is the built-in default backend id
+#### Scenario: SQLite is the sole built-in default backend
 
-- **GIVEN** the built-in graph-store registry contains both `sqlite` and `ladybug`
-- **WHEN** no explicit `graphStoreId` is supplied during provider or kernel
-  construction
-- **THEN** the backend id `sqlite` is selected
+- **GIVEN** no external graph-store factories are supplied
+- **WHEN** provider composition is created without an explicit `graphStoreId`
+- **THEN** `sqlite` is selected
+- **AND** no other backend id is registered
 
-#### Scenario: Default backend preserves Ladybug-era capabilities
+#### Scenario: SQLite satisfies current Code Graph consumers directly
 
-- **WHEN** graph indexing, search, stats, traversal, impact, and hotspot flows run
-  through the built-in default backend
-- **THEN** they succeed through `SQLiteGraphStore` without requiring a fallback to
-  `LadybugGraphStore`
+- **WHEN** indexing, references, coverage, search, stats, traversal, impact, and hotspot flows run through the default backend
+- **THEN** they satisfy their current graph contracts through `SQLiteGraphStore`
+- **AND** their assertions rely only on the current SQLite-backed contract
+
+#### Scenario: Re-index is the recovery boundary
+
+- **GIVEN** persisted graph data is absent or incompatible after changing backend ownership
+- **WHEN** the user performs a full graph re-index
+- **THEN** SQLite rebuilds the graph from source and specs without a compatibility-migration path
 
 ### Requirement: Destructive recreation
 

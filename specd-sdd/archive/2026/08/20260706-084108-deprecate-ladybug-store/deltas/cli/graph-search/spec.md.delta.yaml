@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'Search behavior remains defined by Code Graph and SQLite; no Ladybug compatibility requirement is retained'

@@ -14,13 +14,7 @@
   "implementation": [
     {
       "file": "cli:src/commands/graph/impact.ts",
-      "symbols": ["handlePublicExportImpact"]
-    },
-    {
-      "file": "cli:test/commands/graph-impact.spec.ts"
-    },
-    {
-      "file": "cli:src/commands/graph/resolve-impact-file-selectors.ts"
+      "symbols": ["registerGraphImpact"]
     }
   ],
   "optimizations": {

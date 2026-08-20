@@ -45,7 +45,7 @@
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "Abstract GraphStore port defining atomic graph persistence, queries, search, staleness tracking, generation semantics, and lifecycle rules.",
+      "value": "GraphStore: persistencia gráfica atómica con búsquedas por identidad, referencias y frescura incremental.",
       "schema": {
         "name": "schema-std",
         "version": 1
@@ -56,13 +56,13 @@
           "lastModified": "2026-08-16T08:12:47.708Z"
         },
         "verify.md": {
-          "hash": "sha256:7fc883f917f83765fb29108cda9f83c8e5bec24020de464fa1e05930b780d4d9",
-          "lastModified": "2026-08-16T08:12:47.710Z"
+          "hash": "sha256:cb72e67639cd0c0edc6701e2f35d56ed8ca10ca68a15156b6bf4a2163e86ceb9",
+          "lastModified": "2026-08-16T10:48:01.520Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# Graph Store\n\n## Rules\n\n- `GraphStore`: abstract class port in `domain/ports/`; constructor `storagePath`; adapters in `infrastructure/`; implementations own backend schema/layout.\n- Persist: `FileNode` (canonical path, `configRelativePath`, content, `contentHash`), `SymbolNode`, `SpecNode`, `DocumentNode`.\n- Relations: `IMPORTS`, `DEFINES`, `CALLS`, `CONSTRUCTS`, `USES_TYPE`, `EXPORTS`, `DEPENDS_ON`, `COVERS_FILE`, `COVERS_SYMBOL`, `EXTENDS`, `IMPLEMENTS`, `OVERRIDES`. `COVERS_SYMBOL` MAY carry `metadata.stale`.\n- Lifecycle: `open()` prepares backend/indexes; `close()` idempotent; throw `StoreNotOpenError` when unopened/closed.\n- `recreate()` destructively resets persisted storage, rotates generation marker (e.g. `graph/storage.epoch`); provider owns reset, caller MUST NOT delete backend directly.\n- Mutations: `upsertFile`, `addRelations`, `removeFile`, `upsertSpec`, `removeSpec` are atomic per file/spec.\n- Queries: `getFile`, `findFilesByConfigRelativePath`, `getSymbol`, `getCallers`, `getCallees`, `getImporters`, `getImportees`, `getExtenders`, `getExtendedTargets`, `getImplementors`, `getImplementedTargets`, `getOverriders`, `getOverriddenTargets`, `getSpec`, `getSpecDependencies`, `getSpecDependents`, `getCoveredFiles`, `getCoveredSymbols`, `getCoveringSpecsForFile`, `getCoveringSpecsForSymbol`, `findSymbols(query: SymbolQuery)`, `getStatistics(): Promise<GraphStatistics>`.\n- Search: `searchSymbols`, `searchSpecs`, `searchDocuments` rank descending; `rebuildFtsIndexes()`. Snippets include 1-based `startLine`/`endLine`.\n- Lexical expansion: split whitespace, `:`, `/`, `_`, `.`, `-`, CamelCase/PascalCase.\n- Ranking: exact identity > exact token > prefix > suffix > component > substring > BM25 text. Filters (`kind`, `filePattern`, `workspace`, `excludePaths`, `excludeWorkspaces`) applied before `limit`.\n- Freshness: persist `IndexedInputObservation` records and `knownStaleSinceLastIndex` latches per workspace/aggregate; cleared only on successful index.\n- Bulk session: single-session bulk indexing commits once, deduplicates relations, rebuilds search indexes once post-commit.\n\n## Constraints\n\n- Abstract class port, not interface; no prescribed physical schema/layout.\n- Atomic mutations; operations throw `StoreNotOpenError` when closed.\n- `recreate()` owned by provider/indexer, not caller file deletion.\n- No `@specd/core` dependency; errors extend `CodeGraphError`.",
+      "value": "# Graph Store\n\n## Rules\n\n- GraphStore abstract class in domain/ports/; storagePath constructor; adapters own physical schema.\n- Persist FileNode content, SymbolNode, SpecNode, DocumentNode, required relation families and graph metadata.\n- open() prepares; close() idempotent; unopened/closed ops throw StoreNotOpenError. Provider-owned recreate() resets backend and rotates generation; incompatible schemas reject ordinary reads.\n- upsertFile, removeFile, upsertSpec, removeSpec atomic; addRelations additive; incremental updates compare contentHash. Bulk commits once, dedupes, rebuilds FTS once.\n- Query files/symbols/import-call-type-hierarchy/spec-coverage, SymbolQuery, statistics, reference/binding/coverage snapshots and batched affected/coverage lookup.\n- searchSymbols, searchSpecs, searchDocuments: 1-based snippets; lexical expansion whitespace, :, /, _, ., -, Camel/Pascal; rank identity > exact > prefix > suffix > component > substring > BM25; filter before limit. Content candidate query indexed/bounded, never full-file scan.\n- Persist IndexedInputObservation plus stale latches; clear only successful index. COVERS_SYMBOL may carry metadata.stale.\n\n## Constraints\n\n- Backend-agnostic port; consumers no backend mechanics/direct deletion.\n- Deterministic batch order; no @specd/core; errors extend CodeGraphError.",
       "schema": {
         "name": "schema-std",
         "version": 1
@@ -73,8 +73,8 @@
           "lastModified": "2026-08-16T08:12:47.708Z"
         },
         "verify.md": {
-          "hash": "sha256:7fc883f917f83765fb29108cda9f83c8e5bec24020de464fa1e05930b780d4d9",
-          "lastModified": "2026-08-16T08:12:47.710Z"
+          "hash": "sha256:cb72e67639cd0c0edc6701e2f35d56ed8ca10ca68a15156b6bf4a2163e86ceb9",
+          "lastModified": "2026-08-16T10:48:01.520Z"
         }
       }
     }

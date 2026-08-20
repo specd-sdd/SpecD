@@ -14,7 +14,6 @@
     "@ast-grep/lang-php": "^0.0.6",
     "@ast-grep/lang-python": "^0.0.5",
     "@ast-grep/napi": "^0.41.1",
-    "@ladybugdb/core": "0.19.1",
     "@specd/core": "workspace:*",
     "better-sqlite3": "^12.8.0",
     "ignore": "^7.0.0"

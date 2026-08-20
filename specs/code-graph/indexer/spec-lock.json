@@ -38,36 +38,36 @@
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "IndexCodeGraph orchestrates two-pass extraction, incremental hashing, cross-workspace binding resolution, spec metadata indexing, and bulk persistence.",
+      "value": "IndexCodeGraph extrae en dos pases, detecta incompatibilidades y persiste código, documentos y specs en bulk.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:71f310444400f0b2163396e00c8a58342348ec8c5514b3375fd653aba1948d22",
-          "lastModified": "2026-08-16T08:12:47.841Z"
+          "hash": "sha256:c33d4c342751510911da9e93208700b42adec1e156ea771716bba85d69a322d3",
+          "lastModified": "2026-08-16T10:48:01.560Z"
         },
         "verify.md": {
-          "hash": "sha256:35bc4f9695b3c4979464cc6af93e7bab6b03bdfccc63a5dac308d43a927f7d7a",
-          "lastModified": "2026-08-16T08:12:47.843Z"
+          "hash": "sha256:c56966849ab60e45ae5022dc06588c68828227776a57a199a355d439c6cb2ece",
+          "lastModified": "2026-08-16T10:48:01.592Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# Indexer\n\n## Rules\n\n- `IndexCodeGraph`: main write path for code graph indexing.\n- Pipeline: discover workspaces and global resources; diff content hashes and derivation fingerprints; extract code/documents (Pass 1); resolve scoped bindings/relations (Pass 2); index specs via `SpecRepository` and `GetSpecMetadata`; bulk commit to `GraphStore`; persist `lastIndexedRef` and `IndexedInputObservation` records.\n- Fingerprint diffing: matches running `@specd/code-graph` version plus canonical hash of resolved workspaces. Fingerprint or backend schema mismatch triggers destructive full rebuild via `recreate()` with reported reason (`fullRebuildReason`, `fullRebuild: boolean`).\n- Workspace discovery: combines global `includePaths`/`excludePaths`, repository spec-root exclusions, workspace `allowedPaths`/`excludePaths`/`respectGitignore`. `specsPath` synthetically excluded from document discovery.\n- File decoding: handles UTF-8, UTF-16LE, UTF-16BE, Windows-1252 (without NUL); filters binary extensions (`.gif`, `.png`, `.jpg`, `.pdf`, `.zip`, etc.).\n- `IndexSession` & 2-Pass extraction:\n  1. Pass 1 (all workspaces/chunks): read files, generate adapter `FileAnalysis`, store `DEFINES`/`EXPORTS`.\n  2. Pass 2 (after Pass 1 for all workspaces): resolve `IMPORTS`, `CALLS`, `CONSTRUCTS`, `USES_TYPE`, `EXTENDS`, `IMPLEMENTS`, `OVERRIDES` deterministically from in-memory session facts. Self-relations and unresolved facts dropped. No store queries in Pass 2.\n  3. Specs phase: list spec IDs via `repo.list()`; call `GetSpecMetadata.execute({ specId })`; compare `metadataFingerprint`; load title/description (prefer `optimizedDescription`), `COVERS_FILE`/`COVERS_SYMBOL`, `DEPENDS_ON`.\n  4. Single-session bulk commit: `GraphStore.bulkLoad()`; then `GraphStore.rebuildFtsIndexes()`.\n- Cross-workspace package resolution: maps `packageName → workspaceName` via `LanguageAdapter.getPackageIdentity`.\n- Progress & Error handling: `onProgress` callback reports phase percentages (0–100%); per-file extraction errors captured in `IndexResult.errors`; only infrastructure failures (disk full, store lost) abort run.\n- `IndexResult`: contains `filesDiscovered`, `filesIndexed`, `filesRemoved`, `filesSkipped`, `specsDiscovered`, `specsIndexed`, `errors`, `duration`, per-workspace breakdowns, `vcsRef`, `graphFingerprint`, `fullRebuild`, `fullRebuildReason`.\n\n## Constraints\n\n- `GraphStore` must be open before running; indexer does not manage store lifecycle.\n- Forward-slash relative paths; `excludePaths` replaces defaults when supplied; `.gitignore` absolute priority when `respectGitignore: true`.\n- Pass 1 must finish for ALL workspaces before Pass 2 starts.\n- Pass 2 binding environment uses in-memory pass facts only; no store queries, no language-specific rules in `IndexCodeGraph`, no self-relations.\n- Specs indexed exclusively via `SpecRepository`.",
+      "value": "# Indexer\n\n## Rules\n\n- IndexCodeGraph discovers workspaces/resources, diffs hashes/fingerprints, extracts Pass 1, resolves Pass 2, indexes specs with SpecRepository/GetSpecMetadata, bulk persists and records ref/observations.\n- Fingerprint: code-graph version + canonical workspace hash. Fingerprint/backend mismatch causes provider recreate() full rebuild with reason.\n- Discovery merges include/exclude/allowed paths/gitignore and excludes spec root from docs. Decode UTF-8/UTF-16LE/UTF-16BE/Windows-1252 sans NUL; filter binaries.\n- Pass 1 all workspaces: FileAnalysis, DEFINES/EXPORTS. Then Pass 2 from in-memory facts only: IMPORTS, CALLS, CONSTRUCTS, USES_TYPE, EXTENDS, IMPLEMENTS, OVERRIDES; deterministic, no self/unresolved/store queries.\n- Specs: repo.list(), metadata fingerprint, optimizedDescription-preferred title/description, coverage/DEPENDS_ON. One bulkLoad(), then rebuildFtsIndexes().\n- Package resolution via LanguageAdapter.getPackageIdentity. onProgress 0–100; per-file errors collected, infrastructure faults abort. IndexResult returns counts/errors/duration/workspaces/ref/fingerprint/rebuild fields.\n\n## Constraints\n\n- Store pre-opened; indexer no lifecycle/backend ownership.\n- Forward-slash paths; supplied excludePaths replaces defaults; gitignore priority.\n- No language rules here; specs exclusively SpecRepository.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:71f310444400f0b2163396e00c8a58342348ec8c5514b3375fd653aba1948d22",
-          "lastModified": "2026-08-16T08:12:47.841Z"
+          "hash": "sha256:c33d4c342751510911da9e93208700b42adec1e156ea771716bba85d69a322d3",
+          "lastModified": "2026-08-16T10:48:01.560Z"
         },
         "verify.md": {
-          "hash": "sha256:35bc4f9695b3c4979464cc6af93e7bab6b03bdfccc63a5dac308d43a927f7d7a",
-          "lastModified": "2026-08-16T08:12:47.843Z"
+          "hash": "sha256:c56966849ab60e45ae5022dc06588c68828227776a57a199a355d439c6cb2ece",
+          "lastModified": "2026-08-16T10:48:01.592Z"
         }
       }
     }

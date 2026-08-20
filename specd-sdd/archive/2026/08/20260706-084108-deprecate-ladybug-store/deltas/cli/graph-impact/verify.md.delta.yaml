@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'Existing impact scenarios are backend-neutral and remain valid with SQLite as the sole built-in store'

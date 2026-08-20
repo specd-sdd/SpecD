@@ -1,0 +1,9 @@
+releases:
+  code-graph:ladybug-graph-store: major
+  code-graph:composition: major
+  code-graph:sqlite-graph-store: major
+  cli:graph-cli-context: major
+  cli:graph-stats: major
+  cli:graph-impact: major
+  cli:graph-hotspots: major
+  cli:graph-search: major

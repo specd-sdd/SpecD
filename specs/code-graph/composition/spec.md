@@ -34,35 +34,33 @@ Primary (workspace-aware):
 `createCodeGraphProvider(config: SpecdConfig, options?: CodeGraphCompositionOptions): CodeGraphProvider`
 
 1. Derives the graph storage root from `config.configPath`
-2. Resolves the active graph-store backend id using `options.graphStoreId` when provided, otherwise the built-in default backend id
-3. Builds a merged graph-store registry from the built-in backends plus any additive `options.graphStoreFactories`
-4. Creates the selected concrete `GraphStore` from that registry using the derived storage root
-5. Creates `AdapterRegistry` and registers the built-in adapters (TypeScript, Python, Go, PHP)
-6. Registers any additive language adapters from `options.adapters`
-7. Creates `IndexCodeGraph` with the selected store and adapter registry
-8. Returns a `CodeGraphProvider` wired to all components
+2. Resolves the active graph-store backend id using `options.graphStoreId` when provided, otherwise `sqlite`
+3. Builds a graph-store registry containing the built-in SQLite factory plus any additive `options.graphStoreFactories`
+4. Validates registrations and rejects an external collision with the built-in backend id instead of silently overriding its factory
+5. Creates the selected concrete `GraphStore` from that registry using the derived storage root
+6. Creates `AdapterRegistry` and registers the built-in language adapters (TypeScript, Python, Go, PHP)
+7. Registers any additive language adapters from `options.adapters`
+8. Creates `IndexCodeGraph` with the selected store and language-adapter registry
+9. Returns a `CodeGraphProvider` wired to all components
 
 Legacy (standalone):
 
 `createCodeGraphProvider(options: CodeGraphOptions): CodeGraphProvider` accepts:
 
 - `storagePath` (string, required) — filesystem root allocated to the selected concrete graph-store backend
-- `graphStoreId` (string, optional) — selected backend id; when omitted, uses the built-in default backend id
-- `graphStoreFactories` (optional additive registrations) — external graph-store factories merged with the built-in graph-store registry before backend selection
-- `adapters` (`LanguageAdapter[]`, optional) — additional language adapters to register beyond the 4 built-in adapters
+- `graphStoreId` (string, optional) — selected backend id; when omitted, uses `sqlite`
+- `graphStoreFactories` (optional additive registrations) — external graph-store factories merged with the built-in SQLite registration before backend selection
+- `adapters` (`LanguageAdapter[]`, optional) — additional language adapters to register beyond the built-in language adapters
 
 The provider is stateless regarding project configuration; it uses `SpecdConfig` only to derive composition inputs such as storage path and project root.
 
-`CodeGraphCompositionOptions` SHALL support the same additive graph-store selection model and adapter-extension model as `CodeGraphOptions`.
+`CodeGraphCompositionOptions` SHALL support the same additive graph-store selection model and language-adapter extension model as `CodeGraphOptions`.
 
 The factory detects which overload is being used by checking for the project-root-bearing `SpecdConfig` shape.
 
-The built-in graph-store registry SHALL include at least:
+The built-in graph-store registry SHALL contain exactly the `sqlite` backend. The built-in default graph-store id SHALL be `sqlite`. Selecting any other id MUST succeed only when the caller supplied a factory for that id; otherwise composition MUST throw the graph-store registry's unknown-backend error.
 
-- `ladybug` — the Ladybug-backed implementation
-- `sqlite` — the SQLite-backed implementation
-
-The built-in default graph-store id SHALL be `sqlite`. `ladybug` remains available only when explicitly selected.
+`graphStoreFactories` SHALL remain a supported additive registration seam for future graph-store plugins. External factories MUST obey the same lifecycle and storage-root contract as the built-in factory. A registration whose id collides with the built-in `sqlite` id MUST fail deterministically and MUST NOT replace the built-in factory. The `Readonly<Record<string, GraphStoreFactory>>` input structurally provides at most one external factory per id.
 
 Factory creation MUST remain synchronous. Any backend-native module loading or runtime-specific binding resolution required by a built-in or external store MUST happen during `open()`, not during `createCodeGraphProvider(...)`.
 

@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'Impact behavior is backend-neutral; implementation coverage changes only because the built-in Ladybug adapter is extracted'

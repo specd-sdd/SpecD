@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'Existing search scenarios define backend-neutral observable behavior and require no Ladybug compatibility coverage'

@@ -4,5 +4,41 @@
     "version": 1
   },
   "dependsOn": ["core:artifact-ast"],
-  "implementation": []
+  "implementation": [],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Format-agnostic AST selectors target nodes for deltas, validations, and metadata extraction.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:fd399e6049f16e21379b6bdc6d8636ef7081d3ef6dd26debfe5bd1ae8e0e6454",
+          "lastModified": "2026-05-25T06:02:58.480Z"
+        },
+        "verify.md": {
+          "hash": "sha256:d0dad66cc0f04dd5414429cb4fe87121a1ef452ee24b4b93d200f28d3a606f52",
+          "lastModified": "2026-05-04T16:57:12.558Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Selector model\n## Rules\n- Selector YAML fields: type required; matches, contains, parent, index, where, level optional.\n- type must exist in target ArtifactParser.nodeTypes(). matches regex case-insensitive on node.label; contains regex case-insensitive on node.value.\n- parent recursively constrains nearest ancestor; supports nested parent selectors.\n- index zero-based for array-item/sequence-item; where object fields regex case-insensitive for object items; index XOR where.\n- level matches Markdown section heading level only; nodes without level fail level selector.\n- Addressable types: Markdown document/section/paragraph/list/list-item/code-block/thematic-break; JSON document/object/property/array/array-item; YAML document/mapping/pair/sequence/sequence-item; text document/paragraph/line.\n- Delta modified/removed selector requires exactly one match, else DeltaApplicationError. Validation and metadata extraction process every match.\n- Zero validation matches pass vacuously. Added position.after/before zero match warns then inserts end parent scope.\n## Constraints\n- Unknown type parse validation error.\n- label feeds matches; scalar value feeds contains.\n- parent is full recursive selector.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:fd399e6049f16e21379b6bdc6d8636ef7081d3ef6dd26debfe5bd1ae8e0e6454",
+          "lastModified": "2026-05-25T06:02:58.480Z"
+        },
+        "verify.md": {
+          "hash": "sha256:d0dad66cc0f04dd5414429cb4fe87121a1ef452ee24b4b93d200f28d3a606f52",
+          "lastModified": "2026-05-04T16:57:12.558Z"
+        }
+      }
+    }
+  }
 }

@@ -16,5 +16,41 @@
     "core:schema-format",
     "core:composition-resolver"
   ],
-  "implementation": []
+  "implementation": [],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Single validation chokepoint enforces schema, dependencies, deltas, metadata, drift, hashes, and artifact completion.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:e81e0d09662f752635b86fdc617e1f6bed41ab1e2866c739991ddabeb0504be6",
+          "lastModified": "2026-07-15T16:04:34.183Z"
+        },
+        "verify.md": {
+          "hash": "sha256:872ddd33b3601324a39c9cdb119fc223087d2df36f9cc61c90869935046a0309",
+          "lastModified": "2026-07-15T16:04:34.184Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# ValidateArtifacts\n## Rules\n- Constructor injects `ChangeRepository`, workspace-keyed `SpecRepository` map, `SchemaProvider`, `ArtifactParserRegistry`, `ExtractorTransformRegistry`, `ActorResolver`, `ContentHasher`, `LifecycleEngine`, `SpecWorkspaceRoute[]`; config factory uses `resolveValidateArtifactsDeps(resolver)` then canonical `createValidateArtifacts(deps)`.\n- Load resolved schema lazily; before validation require `schema.name() === change.schemaName`, else throw `SchemaMismatchError`.\n- `ValidateArtifactsInput.specPath`: required for `scope: spec`; optional/ignored for `scope: change`. Change-scoped routing uses `artifactId`, never `change.specIds` membership.\n- Full validation checks every non-optional artifact present. `missing` required artifacts return failures; optional `skipped` artifacts resolve completeness. Suppress full-set check when `artifactId` supplied.\n- Multi-artifact invocation traverses `schema.artifactDag().topologicalOrder()`; outer batch artifact-type order remains topological, spec files follow `change.specIds`.\n- Before artifact validation, interpret every `requires` status through `LifecycleEngine`; only `complete` or `skipped` unblock. Recompute effective lifecycle after each persisted completion. Failure names dependency ID and effective status; `pending-parent-artifact-review` also names upstream blocker when available. Preserve explicit wording for `missing`, `in-progress`, `pending-review`, `drifted-pending-review`.\n- Canonical `complete`/`skipped` files bypass read, validation, preview, and `markComplete`; selected nonterminal/review/drift files validate normally. Drift checks apply only to files actually validated.\n- Establish expected path and presence before reading `validatedHash`. Required absence sets canonical `missing`, fails with expected filename, never marks complete; absence may set `hasDrift=true` but never `complete-with-drift`.\n- Expected spec-scoped path: existing concrete base artifact plus `delta: true` → `deltas/<workspace>/<capability-path>/<artifact-filename>.delta.yaml`; new spec/concrete base absent → `specs/<workspace>/<capability-path>/<artifact-filename>`. Never accept alternate direct/delta fallback. Change-scoped path is output basename at change root.\n- Delta eligibility is per concrete base artifact file, not spec existence. Reject delta without matching base, including mixed new-spec direct/delta representation.\n- Non-no-op delta flow: parse normalized YAML AST; run `deltaValidations[]`; load concrete base; parse base; `parser.apply(baseAST, deltaEntries)`; map `DeltaApplicationError` to failure; serialize merged AST; run `validations[]`. Never mutate `SpecRepository`.\n- Delta containing only `no-op` entries skips `deltaValidations`, base loading/application preview, and `validations`; hash raw delta and complete.\n- Shared validation algorithm: select nodes via `core:selector-model` fields or JSONPath `path`; zero matches yield failure when `required: true`, warning otherwise; evaluate `count` total/unique constraints; per node run `contentMatches` against `parser.renderSubtree(node)`, then recurse through `children`. Collect all failures/warnings.\n- After local success, evaluate applicable `crossArtifactValidations`: matching scope, same target spec/scope, and when filtered, rule references `artifactId`. Participant ready iff expected file exists, local validation passed, parsed materialized output exists; rehydrate required prior-`complete` participants to identical parsed/materialized shape. Defer unavailable-participant rules with non-failing warning.\n- Cross-artifact keys: resolve participant `selector`; resolve optional `keySelector` relative to each match; extract via `key.from`; apply `capture`/`strip`; evaluate `relation.kind`, `relation.between`, options. `all-equal` compares all aliases; `subset [A,B]` means A ⊆ B; `superset [A,B]` means B ⊆ A. `ordering: ignore` unordered; `ordering: strict` ordered, with relative-order preservation for subset/superset. Mismatch fails participant set.\n- Metadata validation: call `extractMetadata(schema.metadataExtraction(), astsByArtifact, renderers, transforms, transformContext, artifactType.id)`; validate through `strictSpecMetadataSchema`. Unknown/failing transform or invalid metadata fails artifact.\n- Successful spec-scoped metadata `dependsOn` updates `change.specDependsOn`; transform failure blocks update. Difference from canonical `spec-lock.json` does not fail validation; `ArchiveChange` owns hard consistency.\n- Approval/signoff drift compares cleaned current hashes against active `artifactHashes` keys `type:key`. Scan all candidate mismatches first, group concrete files, preserve absent files as canonical `missing`, mark drifted present files `drifted-pending-review`, recompute parents, then invoke `Change.invalidate('artifact-drift', actor, focusedPayload)` exactly once. Invalidation returns state to `designing`, preserves focused drift states, downgrades remaining files to `pending-review`.\n- Any baseline mismatch is drift evidence. Effective invalidation policy materializes `hasDrift=true`; policy `none` still reports mismatch without reopening beyond canonical rules.\n- Per successful file: apply `preHashCleanup` substitutions in order to raw file content, SHA-256 cleaned content, call `change.getArtifact(type).markComplete(key, cleanedHash)`. Any failure preserves non-complete state.\n- Return, never throw for validation failures: `passed`; `failures: ValidationFailure[]`; `warnings: ValidationWarning[]`; `files: ValidationFileResult[]` with `artifactId`, `key`, expected `filename`, outcome. Failures include artifact/rule/error context; missing file includes expected path.\n- Persist all invalidation, completion, hash, and `setSpecDependsOn` effects through `ChangeRepository.mutate(name, fn)` on fresh entity. Persist partial successful progress despite other failures.\n## Constraints\n- Only `ValidateArtifacts` may call `Artifact.markComplete(hash)`.\n- Validation never writes merged specs to `SpecRepository`; only `ArchiveChange` does.\n- At most one focused `artifact-drift` invalidation per `execute`.\n- `deltaValidations` target normalized delta YAML AST; `validations` target merged/direct artifact AST; identical rule algorithm.\n- `preHashCleanup` affects hash only, never disk content.\n- Missing `deltaValidations[]` or `validations[]` means skip, not error.\n- Existing delta-capable concrete base requires expected delta; direct `specs/...` file is valid only for new concrete artifact or non-delta artifact.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:e81e0d09662f752635b86fdc617e1f6bed41ab1e2866c739991ddabeb0504be6",
+          "lastModified": "2026-07-15T16:04:34.183Z"
+        },
+        "verify.md": {
+          "hash": "sha256:872ddd33b3601324a39c9cdb119fc223087d2df36f9cc61c90869935046a0309",
+          "lastModified": "2026-07-15T16:04:34.184Z"
+        }
+      }
+    }
+  }
 }

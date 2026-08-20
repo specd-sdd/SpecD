@@ -1,0 +1,43 @@
+- op: removed
+  selector: { type: section, matches: 'Requirement: Ladybug-backed implementation' }
+- op: removed
+  selector: { type: section, matches: 'Requirement: Config-derived persistence layout' }
+- op: removed
+  selector: { type: section, matches: 'Requirement: Destructive recreation' }
+- op: removed
+  selector: { type: section, matches: 'Requirement: Storage generation sidecar' }
+- op: removed
+  selector: { type: section, matches: 'Requirement: Ladybug schema ownership' }
+- op: removed
+  selector: { type: section, matches: 'Requirement: Node tables' }
+- op: removed
+  selector: { type: section, matches: 'Requirement: Relationship tables' }
+- op: removed
+  selector: { type: section, matches: 'Requirement: Full-text search implementation' }
+- op: removed
+  selector: { type: section, matches: 'Requirement: Schema versioning' }
+- op: removed
+  selector: { type: section, matches: 'Requirement: Bulk loading and scratch files' }
+- op: removed
+  selector: { type: section, matches: 'Requirement: Concrete database files' }
+- op: removed
+  selector: { type: section, matches: 'Requirement: Persisted metadata keys' }
+- op: removed
+  selector: { type: section, matches: 'Requirement: Prepared statement usage' }
+- op: removed
+  selector: { type: section, matches: 'Requirement: Reference schema upgrade' }
+
+- op: added
+  description: Verify that Ladybug ownership has left the built-in package
+  position:
+    parent: { type: section, matches: Requirements }
+  content: |
+    ### Requirement: Ladybug ownership transferred
+
+    #### Scenario: Core package contains no Ladybug backend
+
+    - **GIVEN** the Ladybug requirements and verification suite have been recreated as `ladybug:graph-store` in `specd-plugin-graphstore-ladybug`
+    - **AND** its dependencies on `default`, `code-graph`, and `core` resolve through external `readOnly` workspaces
+    - **WHEN** the `@specd/code-graph` source, exports, dependencies, tests, and built-in registry are inspected
+    - **THEN** no Ladybug implementation, native dependency, schema, fixture, or built-in registration remains
+    - **AND** this repository retains only the retirement record

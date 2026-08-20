@@ -1,5 +1,4 @@
 import { type SpecdConfig } from '@specd/core'
-import { LadybugGraphStore } from '../infrastructure/ladybug/ladybug-graph-store.js'
 import { AdapterRegistry } from '../infrastructure/tree-sitter/adapter-registry.js'
 import { TypeScriptLanguageAdapter } from '../infrastructure/tree-sitter/typescript-language-adapter.js'
 import { PythonLanguageAdapter } from '../infrastructure/tree-sitter/python-language-adapter.js'
@@ -11,7 +10,6 @@ import {
   type CodeGraphCompositionOptions,
   type CodeGraphOptions,
   type GraphStoreFactory,
-  type GraphStoreFactoryOptions,
 } from './graph-store-factory.js'
 import { GraphStoreRegistryError } from '../domain/errors/graph-store-registry-error.js'
 import { createSqliteGraphStoreFactory } from './create-sqlite-graph-store-factory.js'
@@ -21,16 +19,9 @@ import { type WorkspaceIndexTarget } from '../domain/value-objects/index-options
 
 const DEFAULT_GRAPH_STORE_ID = 'sqlite'
 
-const LADYBUG_GRAPH_STORE_FACTORY: GraphStoreFactory = {
-  create(options: GraphStoreFactoryOptions) {
-    return new LadybugGraphStore(options.storagePath)
-  },
-}
-
 const SQLITE_GRAPH_STORE_FACTORY: GraphStoreFactory = createSqliteGraphStoreFactory()
 
 const BUILTIN_GRAPH_STORE_FACTORIES: Readonly<Record<string, GraphStoreFactory>> = {
-  ladybug: LADYBUG_GRAPH_STORE_FACTORY,
   sqlite: SQLITE_GRAPH_STORE_FACTORY,
 }
 

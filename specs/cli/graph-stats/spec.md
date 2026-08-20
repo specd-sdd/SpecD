@@ -12,19 +12,21 @@ Without a quick overview of the code graph's contents, users and agents cannot t
 specd graph stats [--config <path> | --path <path>] [--format text|json|toon]
 ```
 
-- `--config <path>` — optional; explicit path to `specd.yaml`, matching the standard CLI meaning
-- `--path <path>` — optional; repo-root bootstrap mode
+- `--config <path>` — optional explicit path to `specd.yaml`, matching the standard CLI forced-file meaning
+- `--path <path>` — optional repository-root bootstrap mode
 - `--format text|json|toon` — optional; output format, defaults to `text`
 
 `--config` and `--path` are mutually exclusive.
 
-`--path` and no-config fallback are bootstrap mechanisms for setup and repository exploration, not the intended steady-state mode for configured projects.
+A valid `--config` MUST run graph stats even when its configured project root is outside a VCS repository. In that case, unavailable VCS-derived health is provider data and MUST NOT be converted into a bootstrap validation failure.
+
+`--path` and no-config fallback are bootstrap mechanisms for setup and repository exploration, not the intended steady-state mode for configured projects. They MUST continue to require a VCS repository.
 
 ### Requirement: Statistics retrieval
 
-The command SHALL open the project host and graph provider through the standard composition lifecycle and call the provider's canonical `getGraphHealth` operation exactly once for the requested project.
+The command SHALL resolve configured and bootstrap execution context through `resolveGraphCliContext`, open the graph provider through `withProvider`, and call the provider's canonical `getGraphHealth` operation exactly once for the requested project.
 
-Provider composition SHALL use the same resolved configuration and kernel workspace definitions as the host. The CLI MUST NOT independently repeat workspace discovery, recompute freshness, or merge a second health interpretation. Project bootstrap and configuration errors remain standard command errors.
+The shared lifecycle SHALL use the resolved configuration and kernel context without independently repeating workspace discovery, recomputing freshness, or merging a second health interpretation. Project bootstrap and configuration errors remain standard command errors.
 
 ### Requirement: Concurrent indexing guard
 
@@ -54,10 +56,10 @@ Text output SHALL explain why the graph cannot prove symbol absence. JSON and TO
 
 ## Constraints
 
-- Health orchestration runs inside `withOpenGraphProvider` from `@specd/sdk`; the CLI does not manage provider lifecycle inline
-- `process.exit(0)` is called explicitly after the SDK wrapper closes the provider
+- Health orchestration runs inside the shared `withProvider` lifecycle, which delegates open and close to `withOpenGraphProvider` from `@specd/sdk`
+- Successful completion returns normally after provider cleanup; the command MUST NOT call `process.exit(0)`
 - Zero-value relation counts are omitted from text output for readability
-- Bootstrap mode (`--path`) resolves host context through `openSpecdHost` with the appropriate config path input
+- Bootstrap mode (`--path`) resolves the same synthetic workspace context used by other read-only graph commands
 - Graph-busy and provider-stale availability semantics are owned by the provider, not by a CLI-managed pre-open lock probe
 
 ## Examples
@@ -90,9 +92,9 @@ Last indexed: 2026-03-13T09:00:00.000Z
 ## Spec Dependencies
 
 - [`cli:entrypoint`](../entrypoint/spec.md)
+- [`cli:graph-cli-context`](../graph-cli-context/spec.md) — shared configured and bootstrap context resolution
 - [`core:config`](../../core/config/spec.md)
 - [`code-graph:staleness-detection`](../../code-graph/staleness-detection/spec.md)
 - [`core:list-workspaces`](../../core/list-workspaces/spec.md)
-- [`code-graph:get-graph-health`](../../code-graph/get-graph-health/spec.md) — consolidated health orchestration (invoked via SDK host session)
+- [`code-graph:get-graph-health`](../../code-graph/get-graph-health/spec.md) — consolidated health orchestration (invoked through the shared provider lifecycle)
 - [`sdk:with-open-graph-provider`](../../sdk/with-open-graph-provider/spec.md) — provider lifecycle wrapper
-- [`sdk:host-context`](../../sdk/host-context/spec.md) — host bootstrap via `openSpecdHost`

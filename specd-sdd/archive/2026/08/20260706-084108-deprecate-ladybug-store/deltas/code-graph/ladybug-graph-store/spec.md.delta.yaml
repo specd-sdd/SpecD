@@ -1,0 +1,53 @@
+- op: modified
+  description: Record the extraction of Ladybug ownership
+  selector:
+    type: section
+    matches: Purpose
+  content: |
+    **Retired from this repository.** Ladybug graph-store implementation, native integration, tests, and normative requirements move to `ladybug:graph-store` in the independent `specd-plugin-graphstore-ladybug` repository/package. That repository reads its `default`, `code-graph`, and `core` dependencies through external `readOnly` workspaces. This tombstone records the ownership transfer; it does not define a built-in backend or compatibility contract for `@specd/code-graph`.
+
+- op: removed
+  selector: { type: section, matches: 'Requirement: Ladybug-backed implementation' }
+- op: removed
+  selector: { type: section, matches: 'Requirement: Config-derived persistence layout' }
+- op: removed
+  selector: { type: section, matches: 'Requirement: Destructive recreation' }
+- op: removed
+  selector: { type: section, matches: 'Requirement: Storage generation sidecar' }
+- op: removed
+  selector: { type: section, matches: 'Requirement: Ladybug schema ownership' }
+- op: removed
+  selector: { type: section, matches: 'Requirement: Node tables' }
+- op: removed
+  selector: { type: section, matches: 'Requirement: Relationship tables' }
+- op: removed
+  selector: { type: section, matches: 'Requirement: Full-text search implementation' }
+- op: removed
+  selector: { type: section, matches: 'Requirement: Schema versioning' }
+- op: removed
+  selector: { type: section, matches: 'Requirement: Bulk loading and scratch files' }
+- op: removed
+  selector: { type: section, matches: 'Requirement: Concrete database files' }
+- op: removed
+  selector: { type: section, matches: 'Requirement: Persisted metadata keys' }
+- op: removed
+  selector: { type: section, matches: 'Requirement: Prepared statement usage' }
+- op: removed
+  selector: { type: section, matches: 'Requirement: Reference schema upgrade' }
+
+- op: added
+  description: Preserve a normative ownership boundary after retirement
+  position:
+    parent: { type: section, matches: Requirements }
+  content: |
+    ### Requirement: Ladybug ownership transferred
+
+    `@specd/code-graph` MUST NOT ship, register, initialize, or test a built-in Ladybug graph-store backend. Ladybug-specific requirements MUST be owned and verified as `ladybug:graph-store` by `specd-plugin-graphstore-ladybug` before their counterparts are removed from this repository. The successor spec MAY and SHOULD retain dependencies on read-only specs in this repository.
+
+- op: removed
+  selector: { type: section, matches: Constraints }
+
+- op: modified
+  selector: { type: section, matches: 'Spec Dependencies' }
+  content: |
+    _none_

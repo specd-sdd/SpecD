@@ -7,6 +7,7 @@ import { createCodeGraphProvider } from '../../src/composition/create-code-graph
 import { createBootstrapGraphConfig } from '../../src/application/services/bootstrap-graph-config.js'
 import { StoreNotOpenError } from '../../src/domain/errors/store-not-open-error.js'
 import { GraphProviderStaleError } from '../../src/domain/errors/graph-provider-stale-error.js'
+import { GraphStoreRegistryError } from '../../src/domain/errors/graph-store-registry-error.js'
 import { InMemoryGraphStore } from '../helpers/in-memory-graph-store.js'
 import { makeMockSpecRepository } from '../helpers/make-mock-spec-repository.js'
 import { createFileNode } from '../../src/domain/value-objects/file-node.js'
@@ -43,18 +44,6 @@ describe('CodeGraphProvider', () => {
     const provider = await createCodeGraphProvider({
       storagePath: tempDir,
       projectRoot: tempDir,
-    })
-
-    expect(provider).toBeDefined()
-    await provider.close()
-  })
-
-  it('can be instantiated with a Ladybug backend', async () => {
-    tempDir = mkdtempSync(join(tmpdir(), 'specd-graph-provider-ladybug-'))
-    const provider = await createCodeGraphProvider({
-      storagePath: tempDir,
-      projectRoot: tempDir,
-      graphStoreId: 'ladybug',
     })
 
     expect(provider).toBeDefined()
@@ -114,6 +103,49 @@ describe('CodeGraphProvider', () => {
 
     expect(provider).toBeDefined()
     await provider.close()
+  })
+
+  it('selects an additive external factory and forwards its storage root', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'specd-graph-provider-external-'))
+    const externalStore = new InMemoryGraphStore()
+    const create = vi.fn(() => externalStore)
+
+    const provider = createCodeGraphProvider({
+      storagePath: tempDir,
+      projectRoot: tempDir,
+      graphStoreFactories: { 'external-test': { create } },
+      graphStoreId: 'external-test',
+    })
+
+    expect(create).toHaveBeenCalledOnce()
+    expect(create).toHaveBeenCalledWith({ storagePath: tempDir })
+    await provider.close()
+  })
+
+  it('rejects an external collision with the sqlite built-in before store construction', () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'specd-graph-provider-collision-'))
+    const create = vi.fn(() => new InMemoryGraphStore())
+
+    expect(() =>
+      createCodeGraphProvider({
+        storagePath: tempDir,
+        projectRoot: tempDir,
+        graphStoreFactories: { sqlite: { create } },
+      }),
+    ).toThrow(GraphStoreRegistryError)
+    expect(create).not.toHaveBeenCalled()
+  })
+
+  it('rejects an unknown backend without falling back to sqlite', () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'specd-graph-provider-unknown-'))
+
+    expect(() =>
+      createCodeGraphProvider({
+        storagePath: tempDir,
+        projectRoot: tempDir,
+        graphStoreId: 'unknown',
+      }),
+    ).toThrow(GraphStoreRegistryError)
   })
 
   it('delegates indexing to the IndexCodeGraph use case', async () => {

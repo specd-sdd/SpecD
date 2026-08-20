@@ -1,0 +1,35 @@
+- op: modified
+  description: Use the shared graph CLI lifecycle without forced process exit
+  selector:
+    type: section
+    matches: Constraints
+  content: |
+    - Health orchestration runs inside the shared `withProvider` lifecycle, which delegates open and close to `withOpenGraphProvider` from `@specd/sdk`
+    - Successful completion returns normally after provider cleanup; the command MUST NOT call `process.exit(0)`
+    - Zero-value relation counts are omitted from text output for readability
+    - Bootstrap mode (`--path`) resolves the same synthetic workspace context used by other read-only graph commands
+    - Graph-busy and provider-stale availability semantics are owned by the provider, not by a CLI-managed pre-open lock probe
+
+- op: modified
+  description: Route stats through the shared graph context rather than its own host bootstrap
+  selector:
+    type: section
+    matches: 'Requirement: Statistics retrieval'
+  content: |
+    The command SHALL resolve configured and bootstrap execution context through `resolveGraphCliContext`, open the graph provider through `withProvider`, and call the provider's canonical `getGraphHealth` operation exactly once for the requested project.
+
+    The shared lifecycle SHALL use the resolved configuration and kernel context without independently repeating workspace discovery, recomputing freshness, or merging a second health interpretation. Project bootstrap and configuration errors remain standard command errors.
+
+- op: modified
+  description: Record the shared graph-context dependency and remove direct host bootstrap coupling
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`cli:entrypoint`](../entrypoint/spec.md)
+    - [`cli:graph-cli-context`](../graph-cli-context/spec.md) — shared configured and bootstrap context resolution
+    - [`core:config`](../../core/config/spec.md)
+    - [`code-graph:staleness-detection`](../../code-graph/staleness-detection/spec.md)
+    - [`core:list-workspaces`](../../core/list-workspaces/spec.md)
+    - [`code-graph:get-graph-health`](../../code-graph/get-graph-health/spec.md) — consolidated health orchestration (invoked through the shared provider lifecycle)
+    - [`sdk:with-open-graph-provider`](../../sdk/with-open-graph-provider/spec.md) — provider lifecycle wrapper

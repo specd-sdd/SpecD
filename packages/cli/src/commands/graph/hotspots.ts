@@ -142,89 +142,94 @@ Exclude examples:
             1,
           ),
         )
-        await withProvider(config, opts.format, async (provider) => {
-          await warnGraphStale(provider, config, kernel)
-          const options: HotspotOptions = {
-            ...(opts.workspace ? { workspace: opts.workspace } : undefined),
-            kinds: kinds ?? [...CLI_DEFAULT_HOTSPOT_KINDS],
-            ...(opts.file ? { filePath: opts.file } : undefined),
-            ...(opts.excludePath.length > 0 ? { excludePaths: opts.excludePath } : undefined),
-            ...(opts.excludeWorkspace.length > 0
-              ? { excludeWorkspaces: opts.excludeWorkspace }
-              : undefined),
-            ...(opts.limit !== undefined ? { limit: parseInt(opts.limit, 10) } : undefined),
-            ...(opts.minScore !== undefined
-              ? { minScore: parseInt(opts.minScore, 10) }
-              : undefined),
-            ...(opts.minRisk !== undefined ? { minRisk: opts.minRisk as RiskLevel } : undefined),
-            ...(opts.includeImporterOnly === true ? { includeImporterOnly: true } : undefined),
-          }
-
-          const result = await provider.getHotspots(options)
-
-          if (fmt === 'text') {
-            if (result.entries.length === 0) {
-              output('No hotspots found.', 'text')
-              return
+        await withProvider(
+          config,
+          opts.format,
+          async (provider) => {
+            await warnGraphStale(provider, config, kernel)
+            const options: HotspotOptions = {
+              ...(opts.workspace ? { workspace: opts.workspace } : undefined),
+              kinds: kinds ?? [...CLI_DEFAULT_HOTSPOT_KINDS],
+              ...(opts.file ? { filePath: opts.file } : undefined),
+              ...(opts.excludePath.length > 0 ? { excludePaths: opts.excludePath } : undefined),
+              ...(opts.excludeWorkspace.length > 0
+                ? { excludeWorkspaces: opts.excludeWorkspace }
+                : undefined),
+              ...(opts.limit !== undefined ? { limit: parseInt(opts.limit, 10) } : undefined),
+              ...(opts.minScore !== undefined
+                ? { minScore: parseInt(opts.minScore, 10) }
+                : undefined),
+              ...(opts.minRisk !== undefined ? { minRisk: opts.minRisk as RiskLevel } : undefined),
+              ...(opts.includeImporterOnly === true ? { includeImporterOnly: true } : undefined),
             }
 
-            const toDisplayPath = async (canonicalPath: string): Promise<string> => {
-              const file = await provider.getFile(canonicalPath)
-              if (file) return file.configRelativePath
-              const document = await provider.getDocument(canonicalPath)
-              if (document) return document.configRelativePath
-              const idx = canonicalPath.indexOf(':')
-              return idx === -1 ? canonicalPath : canonicalPath.substring(idx + 1)
-            }
+            const result = await provider.getHotspots(options)
 
-            const lines: string[] = []
-            lines.push(
-              `Hotspots (${String(result.entries.length)} of ${String(result.totalSymbols)} symbols):`,
-            )
-            lines.push('')
+            if (fmt === 'text') {
+              if (result.entries.length === 0) {
+                output('No hotspots found.', 'text')
+                return
+              }
 
-            // Header
-            lines.push(
-              `${'Score'.padStart(6)}  ${'Risk'.padEnd(8)}  ${'XWS'.padStart(3)}  ${'Kind'.padEnd(9)}  ${'Name'.padEnd(30)}  File`,
-            )
-            lines.push('─'.repeat(90))
+              const toDisplayPath = async (canonicalPath: string): Promise<string> => {
+                const file = await provider.getFile(canonicalPath)
+                if (file) return file.configRelativePath
+                const document = await provider.getDocument(canonicalPath)
+                if (document) return document.configRelativePath
+                const idx = canonicalPath.indexOf(':')
+                return idx === -1 ? canonicalPath : canonicalPath.substring(idx + 1)
+              }
 
-            for (const entry of result.entries) {
-              const sepIndex = entry.symbol.filePath.indexOf(':')
-              const ws = sepIndex !== -1 ? entry.symbol.filePath.substring(0, sepIndex) : ''
-              const displayPath = await toDisplayPath(entry.symbol.filePath)
+              const lines: string[] = []
               lines.push(
-                `${String(entry.score).padStart(6)}  ${entry.riskLevel.padEnd(8)}  ${String(entry.crossWorkspaceCallers).padStart(3)}  ${entry.symbol.kind.padEnd(9)}  ${entry.symbol.name.padEnd(30)}  [${ws}] ${displayPath}:${String(entry.symbol.line)}`,
+                `Hotspots (${String(result.entries.length)} of ${String(result.totalSymbols)} symbols):`,
+              )
+              lines.push('')
+
+              // Header
+              lines.push(
+                `${'Score'.padStart(6)}  ${'Risk'.padEnd(8)}  ${'XWS'.padStart(3)}  ${'Kind'.padEnd(9)}  ${'Name'.padEnd(30)}  File`,
+              )
+              lines.push('─'.repeat(90))
+
+              for (const entry of result.entries) {
+                const sepIndex = entry.symbol.filePath.indexOf(':')
+                const ws = sepIndex !== -1 ? entry.symbol.filePath.substring(0, sepIndex) : ''
+                const displayPath = await toDisplayPath(entry.symbol.filePath)
+                lines.push(
+                  `${String(entry.score).padStart(6)}  ${entry.riskLevel.padEnd(8)}  ${String(entry.crossWorkspaceCallers).padStart(3)}  ${entry.symbol.kind.padEnd(9)}  ${entry.symbol.name.padEnd(30)}  [${ws}] ${displayPath}:${String(entry.symbol.line)}`,
+                )
+              }
+
+              output(lines.join('\n'), 'text')
+            } else {
+              output(
+                {
+                  totalSymbols: result.totalSymbols,
+                  entries: await Promise.all(
+                    result.entries.map(async (e) => {
+                      const file = await provider.getFile(e.symbol.filePath)
+                      return {
+                        symbol: e.symbol,
+                        score: e.score,
+                        directCallers: e.directCallers,
+                        crossWorkspaceCallers: e.crossWorkspaceCallers,
+                        fileImporters: e.fileImporters,
+                        riskLevel: e.riskLevel,
+                        workspace: e.symbol.filePath.includes(':')
+                          ? e.symbol.filePath.substring(0, e.symbol.filePath.indexOf(':'))
+                          : '',
+                        displayPath: file?.configRelativePath ?? e.symbol.filePath,
+                      }
+                    }),
+                  ),
+                },
+                fmt,
               )
             }
-
-            output(lines.join('\n'), 'text')
-          } else {
-            output(
-              {
-                totalSymbols: result.totalSymbols,
-                entries: await Promise.all(
-                  result.entries.map(async (e) => {
-                    const file = await provider.getFile(e.symbol.filePath)
-                    return {
-                      symbol: e.symbol,
-                      score: e.score,
-                      directCallers: e.directCallers,
-                      crossWorkspaceCallers: e.crossWorkspaceCallers,
-                      fileImporters: e.fileImporters,
-                      riskLevel: e.riskLevel,
-                      workspace: e.symbol.filePath.includes(':')
-                        ? e.symbol.filePath.substring(0, e.symbol.filePath.indexOf(':'))
-                        : '',
-                      displayPath: file?.configRelativePath ?? e.symbol.filePath,
-                    }
-                  }),
-                ),
-              },
-              fmt,
-            )
-          }
-        })
+          },
+          { kernel },
+        )
       },
     )
 }
