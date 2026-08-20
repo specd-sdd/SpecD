@@ -11,7 +11,8 @@
   "type": "module",
   "dependencies": {
     "@specd/code-graph": "workspace:*",
-    "@specd/core": "workspace:*"
+    "@specd/core": "workspace:*",
+    "zod": "^3.25.76"
   },
   "exports": {
     ".": {

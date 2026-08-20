@@ -1,0 +1,2201 @@
+{
+  "name": "suggest-implementation-and-spec-deps",
+  "createdAt": "2026-08-16T11:21:12.000Z",
+  "updatedAt": "2026-08-18T16:46:58.572Z",
+  "description": "Add SDK use cases and CLI commands to suggest implementation links and spec dependencies with post-apply validation",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "cli:spec-implementation",
+    "cli:spec-deps",
+    "sdk:suggest-implementation-links",
+    "sdk:suggest-spec-dependencies",
+    "code-graph:language-adapter",
+    "code-graph:graph-store"
+  ],
+  "specDependsOn": {
+    "cli:spec-implementation": [
+      "core:update-persisted-spec-implementation",
+      "cli:entrypoint",
+      "core:get-persisted-spec-implementation",
+      "sdk:suggest-implementation-links"
+    ],
+    "cli:spec-deps": [
+      "core:get-persisted-spec-deps",
+      "core:update-persisted-spec-deps",
+      "cli:entrypoint",
+      "sdk:suggest-spec-dependencies"
+    ],
+    "sdk:suggest-implementation-links": [
+      "code-graph:symbol-model",
+      "code-graph:traversal",
+      "code-graph:language-adapter",
+      "core:get-persisted-spec-implementation",
+      "core:update-persisted-spec-implementation"
+    ],
+    "sdk:suggest-spec-dependencies": [
+      "sdk:suggest-implementation-links",
+      "code-graph:traversal",
+      "core:get-persisted-spec-deps",
+      "core:update-persisted-spec-deps"
+    ],
+    "code-graph:graph-store": [
+      "code-graph:symbol-model",
+      "default:_global/architecture",
+      "code-graph:staleness-detection",
+      "code-graph:document-model"
+    ]
+  },
+  "invalidationPolicy": "downstream",
+  "trackedImplementationFiles": [
+    {
+      "file": "dev/scripts/.spec-implementation-cache.json",
+      "state": "ignored"
+    },
+    {
+      "file": "dev/scripts/spec-implementation-cache.json",
+      "state": "ignored"
+    },
+    {
+      "file": "dev/scripts/suggest-spec-implementation.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "dev/scripts/test-internal-agent.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "log/specd.log",
+      "state": "ignored"
+    },
+    {
+      "file": "tmp_output.txt",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/sdk/src/orchestration/cache/implementation-suggestion-cache.ts",
+      "state": "removed"
+    },
+    {
+      "file": "packages/sdk/src/orchestration/suggest-implementation-links.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/orchestration/suggest-spec-dependencies.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/spec/implementation.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/spec/deps.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/cli/cli-reference.md",
+      "state": "open"
+    },
+    {
+      "file": "docs/cli/spec-deps.md",
+      "state": "open"
+    },
+    {
+      "file": "docs/cli/spec-implementation.md",
+      "state": "open"
+    },
+    {
+      "file": "packages/cli/test/commands/spec-deps.spec.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/cli/test/commands/spec-implementation.spec.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/sdk/src/index.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/sdk/src/orchestration/index.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/sdk/test/orchestration/suggest-implementation-links.spec.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/sdk/test/orchestration/suggest-spec-dependencies.spec.ts",
+      "state": "open"
+    },
+    {
+      "file": "Users/monki/Documents/Proyectos/specd/.specd/config/cache/implementation-suggestions.json",
+      "state": "removed"
+    },
+    {
+      "file": "packages/code-graph/src/composition/create-code-graph-provider.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/code-graph/src/domain/ports/adapter-registry-port.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/code-graph/src/index.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/adapter-registry.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/code-graph/src/public.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/sdk/src/orchestration/cache/fs-implementation-suggestion-cache.ts",
+      "state": "removed"
+    },
+    {
+      "file": "packages/sdk/src/orchestration/cache/implementation-suggestion-cache-port.ts",
+      "state": "removed"
+    },
+    {
+      "file": "packages/code-graph/src/composition/use-cases/create-builtin-adapter-registry.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/code-graph/test/composition/create-builtin-adapter-registry.spec.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/code-graph/src/domain/value-objects/language-adapter.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/go-language-adapter.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/php-language-adapter.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/python-language-adapter.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/tree-sitter/typescript-language-adapter.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/sqlite/sqlite-graph-store.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/code-graph/src/domain/value-objects/symbol-query.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/ladybug/ladybug-graph-store.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/sdk/src/orchestration/cache/fs-spec-deps-suggestion-cache.ts",
+      "state": "removed"
+    },
+    {
+      "file": "packages/sdk/src/orchestration/cache/spec-deps-suggestion-cache-port.ts",
+      "state": "removed"
+    },
+    {
+      "file": "packages/sdk/src/orchestration/cache/spec-deps-suggestion-cache.ts",
+      "state": "removed"
+    },
+    {
+      "file": "packages/code-graph/test/domain/ports/graph-store.contract.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/code-graph/test/helpers/in-memory-graph-store.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/code-graph/src/composition/code-graph-provider.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/code-graph/src/domain/services/analyze-file-impact.ts",
+      "state": "open"
+    },
+    {
+      "file": "AGENTS.md",
+      "state": "open"
+    },
+    {
+      "file": "CLAUDE.md",
+      "state": "open"
+    },
+    {
+      "file": "packages/sdk/package.json",
+      "state": "open"
+    },
+    {
+      "file": "packages/sdk/src/application/ports/implementation-suggestion-cache-port.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/sdk/src/application/ports/spec-deps-suggestion-cache-port.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/sdk/src/domain/value-objects/implementation-suggestion-cache.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/sdk/src/domain/value-objects/spec-deps-suggestion-cache.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/sdk/src/infrastructure/fs/fs-implementation-suggestion-cache.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/sdk/src/infrastructure/fs/fs-spec-deps-suggestion-cache.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/sdk/src/ports.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/sdk/test/infrastructure/fs/fs-suggestion-cache.spec.ts",
+      "state": "open"
+    },
+    {
+      "file": "pnpm-lock.yaml",
+      "state": "open"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "sdk:suggest-implementation-links",
+      "file": "packages/sdk/src/orchestration/suggest-implementation-links.ts",
+      "fileLinkExplicit": false,
+      "symbols": [
+        "SuggestImplementationLinks",
+        "createSuggestImplementationLinks",
+        "resolveSuggestImplementationLinksDeps",
+        "SuggestImplementationLinksInput",
+        "SuggestImplementationLinksResult",
+        "SpecImplementationSuggestion"
+      ]
+    },
+    {
+      "specId": "sdk:suggest-spec-dependencies",
+      "file": "packages/sdk/src/orchestration/suggest-spec-dependencies.ts",
+      "fileLinkExplicit": false,
+      "symbols": [
+        "SuggestSpecDependencies",
+        "createSuggestSpecDependencies",
+        "resolveSuggestSpecDependenciesDeps",
+        "SuggestSpecDependenciesInput",
+        "SuggestSpecDependenciesResult",
+        "SpecDependencySuggestion",
+        "SuggestedSpecDependency",
+        "PostApplyValidationDiagnostic",
+        "CreatedAlignmentChangeInfo"
+      ]
+    },
+    {
+      "specId": "cli:spec-implementation",
+      "file": "packages/cli/src/commands/spec/implementation.ts",
+      "fileLinkExplicit": false,
+      "symbols": [
+        "registerSpecImplementation"
+      ]
+    },
+    {
+      "specId": "cli:spec-deps",
+      "file": "packages/cli/src/commands/spec/deps.ts",
+      "fileLinkExplicit": false,
+      "symbols": [
+        "registerSpecDeps"
+      ]
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:d5e604db960391d4ac5b07b9d22795cfd157669a29020d98619bd171f88ba3eb"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": [
+        "proposal"
+      ],
+      "state": "complete",
+      "files": [
+        {
+          "key": "cli:spec-implementation",
+          "filename": "deltas/cli/spec-implementation/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:a24db0a4a1e9aba97e078faafed0395c69f749398304eb8d018a6921c63bfa10"
+        },
+        {
+          "key": "cli:spec-deps",
+          "filename": "deltas/cli/spec-deps/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:463060a42bfb1f7b8e28177ea57a20f906157f26958f0414b738c6b6048f1681"
+        },
+        {
+          "key": "sdk:suggest-implementation-links",
+          "filename": "specs/sdk/suggest-implementation-links/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:56270354affcf4e83d7b48887e2a48e00dbb2ae2dbd698e1f0934f60c162419f"
+        },
+        {
+          "key": "sdk:suggest-spec-dependencies",
+          "filename": "specs/sdk/suggest-spec-dependencies/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:dca22bc79cd1678d7acaa865aa468a6be49b949c68e50112907125153098fb7d"
+        },
+        {
+          "key": "code-graph:language-adapter",
+          "filename": "deltas/code-graph/language-adapter/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b34b7efe703947d4139f60e25f1b2dfeb69b357ba5ed89f21d6945ce55157288"
+        },
+        {
+          "key": "code-graph:graph-store",
+          "filename": "deltas/code-graph/graph-store/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:04d47e5762c89ec6a5cb216fbef62a7d508dd4fd35c0ab71458b1edd7f8244ed"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": [
+        "specs"
+      ],
+      "state": "complete",
+      "files": [
+        {
+          "key": "cli:spec-implementation",
+          "filename": "deltas/cli/spec-implementation/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:ea55143ac739a62a2a1247729d52dbabcb01317b0e08eb2f862b9f5c0367b0a8"
+        },
+        {
+          "key": "cli:spec-deps",
+          "filename": "deltas/cli/spec-deps/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:0f63e828196f45f5f4440dae5b8570e1531c5ac54d33c648f0fa281757223067"
+        },
+        {
+          "key": "sdk:suggest-implementation-links",
+          "filename": "specs/sdk/suggest-implementation-links/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:815c67bbcd437950e647ae6c74d6cc792abb64e467dbdd44659584e6641b2b7c"
+        },
+        {
+          "key": "sdk:suggest-spec-dependencies",
+          "filename": "specs/sdk/suggest-spec-dependencies/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:f8baa51951fb883a4f8af61140a37458324cecae0a789346e8850ca9633538a2"
+        },
+        {
+          "key": "code-graph:language-adapter",
+          "filename": "deltas/code-graph/language-adapter/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:ee2c2f860bcde699dc72ba1f5d90f5de14dce37bed0ef726f760e20677d0a035"
+        },
+        {
+          "key": "code-graph:graph-store",
+          "filename": "deltas/code-graph/graph-store/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:78304bb5f557c40c5df8e90ea58193c9b4993b033c1c6b01852d9a3f0d988dc2"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": [
+        "proposal",
+        "specs",
+        "verify"
+      ],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:a3a91eec049304107bb4de2c3df09910226bba587ec14bdd88cee40d6a57a26c"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": [
+        "specs",
+        "design"
+      ],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:df4ce55e856f98b87767c139d047bfa19d904fd2e9d8e2a308b25defcc3e0506"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-08-16T11:21:12.000Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "specIds": [
+        "cli:spec-implementation",
+        "cli:spec-deps",
+        "sdk:suggest-implementation-links",
+        "sdk:suggest-spec-dependencies"
+      ],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-16T14:17:42.650Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [sdk:suggest-implementation-links, sdk:suggest-spec-dependencies]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": [
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies"
+          ]
+        },
+        {
+          "type": "design",
+          "files": [
+            "design"
+          ]
+        },
+        {
+          "type": "tasks",
+          "files": [
+            "tasks"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-16T14:17:42.650Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-16T14:26:26.000Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:spec-deps, cli:spec-implementation]; verify [cli:spec-deps, cli:spec-implementation]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "cli:spec-deps",
+            "cli:spec-implementation"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:spec-deps",
+            "cli:spec-implementation"
+          ]
+        },
+        {
+          "type": "design",
+          "files": [
+            "design"
+          ]
+        },
+        {
+          "type": "tasks",
+          "files": [
+            "tasks"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-16T14:30:23.823Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:spec-deps, cli:spec-implementation]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "cli:spec-deps",
+            "cli:spec-implementation"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:spec-implementation",
+            "cli:spec-deps",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies"
+          ]
+        },
+        {
+          "type": "design",
+          "files": [
+            "design"
+          ]
+        },
+        {
+          "type": "tasks",
+          "files": [
+            "tasks"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-16T14:31:19.631Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": [
+            "design"
+          ]
+        },
+        {
+          "type": "tasks",
+          "files": [
+            "tasks"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-16T14:32:18.214Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": [
+            "design"
+          ]
+        },
+        {
+          "type": "tasks",
+          "files": [
+            "tasks"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-16T14:33:22.159Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": [
+            "design"
+          ]
+        },
+        {
+          "type": "tasks",
+          "files": [
+            "tasks"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-16T14:35:21.738Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": [
+            "design"
+          ]
+        },
+        {
+          "type": "tasks",
+          "files": [
+            "tasks"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-16T14:36:20.095Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": [
+            "design"
+          ]
+        },
+        {
+          "type": "tasks",
+          "files": [
+            "tasks"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-16T14:37:47.751Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [sdk:suggest-implementation-links, sdk:suggest-spec-dependencies]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:spec-implementation",
+            "cli:spec-deps",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies"
+          ]
+        },
+        {
+          "type": "design",
+          "files": [
+            "design"
+          ]
+        },
+        {
+          "type": "tasks",
+          "files": [
+            "tasks"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-16T14:46:18.890Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-16T14:47:16.665Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-16T15:20:32.853Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": [
+            "proposal"
+          ]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:spec-implementation",
+            "cli:spec-deps",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:spec-implementation",
+            "cli:spec-deps",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies"
+          ]
+        },
+        {
+          "type": "design",
+          "files": [
+            "design"
+          ]
+        },
+        {
+          "type": "tasks",
+          "files": [
+            "tasks"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-16T15:20:32.853Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-16T15:23:51.189Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [sdk:suggest-implementation-links, sdk:suggest-spec-dependencies]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": [
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies"
+          ]
+        },
+        {
+          "type": "design",
+          "files": [
+            "design"
+          ]
+        },
+        {
+          "type": "tasks",
+          "files": [
+            "tasks"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-16T15:23:58.358Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-16T15:23:59.025Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-16T15:30:25.976Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": [
+            "design"
+          ]
+        },
+        {
+          "type": "tasks",
+          "files": [
+            "tasks"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-16T15:30:25.976Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-16T15:30:57.902Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [sdk:suggest-implementation-links]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "sdk:suggest-implementation-links"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:spec-implementation",
+            "cli:spec-deps",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies"
+          ]
+        },
+        {
+          "type": "design",
+          "files": [
+            "design"
+          ]
+        },
+        {
+          "type": "tasks",
+          "files": [
+            "tasks"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-16T15:34:45.506Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [sdk:suggest-implementation-links, sdk:suggest-spec-dependencies]; design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies"
+          ]
+        },
+        {
+          "type": "design",
+          "files": [
+            "design"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:spec-implementation",
+            "cli:spec-deps",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies"
+          ]
+        },
+        {
+          "type": "tasks",
+          "files": [
+            "tasks"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-16T17:38:22.836Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": [
+            "design"
+          ]
+        },
+        {
+          "type": "tasks",
+          "files": [
+            "tasks"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-16T17:57:58.706Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [sdk:suggest-implementation-links]; verify [sdk:suggest-implementation-links]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "sdk:suggest-implementation-links"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "sdk:suggest-implementation-links"
+          ]
+        },
+        {
+          "type": "design",
+          "files": [
+            "design"
+          ]
+        },
+        {
+          "type": "tasks",
+          "files": [
+            "tasks"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-16T17:59:15.194Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [sdk:suggest-implementation-links, sdk:suggest-spec-dependencies]; verify [sdk:suggest-implementation-links]; design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "sdk:suggest-implementation-links"
+          ]
+        },
+        {
+          "type": "design",
+          "files": [
+            "design"
+          ]
+        },
+        {
+          "type": "tasks",
+          "files": [
+            "tasks"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-08-16T18:08:00.648Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "code-graph:language-adapter"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:language-adapter"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-16T18:21:26.940Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [code-graph:language-adapter, sdk:suggest-implementation-links]; verify [code-graph:language-adapter]; design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:language-adapter",
+            "sdk:suggest-implementation-links"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:language-adapter"
+          ]
+        },
+        {
+          "type": "design",
+          "files": [
+            "design"
+          ]
+        },
+        {
+          "type": "tasks",
+          "files": [
+            "tasks"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-16T18:26:29.957Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [sdk:suggest-implementation-links]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "sdk:suggest-implementation-links"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:spec-implementation",
+            "cli:spec-deps",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies",
+            "code-graph:language-adapter"
+          ]
+        },
+        {
+          "type": "design",
+          "files": [
+            "design"
+          ]
+        },
+        {
+          "type": "tasks",
+          "files": [
+            "tasks"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-16T18:31:24.836Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [sdk:suggest-implementation-links]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "sdk:suggest-implementation-links"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:spec-implementation",
+            "cli:spec-deps",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies",
+            "code-graph:language-adapter"
+          ]
+        },
+        {
+          "type": "design",
+          "files": [
+            "design"
+          ]
+        },
+        {
+          "type": "tasks",
+          "files": [
+            "tasks"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-08-16T18:35:06.525Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "code-graph:graph-store"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:graph-store"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-08-16T18:36:18.759Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [],
+      "filesRemoved": [
+        {
+          "type": "specs",
+          "key": "code-graph:graph-store"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:graph-store"
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-16T18:36:19.016Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": [
+            "proposal"
+          ]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:spec-implementation",
+            "cli:spec-deps",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies",
+            "code-graph:language-adapter"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:spec-implementation",
+            "cli:spec-deps",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies",
+            "code-graph:language-adapter"
+          ]
+        },
+        {
+          "type": "design",
+          "files": [
+            "design"
+          ]
+        },
+        {
+          "type": "tasks",
+          "files": [
+            "tasks"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-08-16T18:36:19.018Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "code-graph:graph-store"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:graph-store"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-16T18:41:10.916Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [sdk:suggest-implementation-links]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "sdk:suggest-implementation-links"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:spec-implementation",
+            "cli:spec-deps",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies",
+            "code-graph:language-adapter",
+            "code-graph:graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": [
+            "design"
+          ]
+        },
+        {
+          "type": "tasks",
+          "files": [
+            "tasks"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-16T18:44:26.059Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [sdk:suggest-implementation-links]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "sdk:suggest-implementation-links"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:spec-implementation",
+            "cli:spec-deps",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies",
+            "code-graph:language-adapter",
+            "code-graph:graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": [
+            "design"
+          ]
+        },
+        {
+          "type": "tasks",
+          "files": [
+            "tasks"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-16T18:45:56.704Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [sdk:suggest-implementation-links]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "sdk:suggest-implementation-links"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:spec-implementation",
+            "cli:spec-deps",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies",
+            "code-graph:language-adapter",
+            "code-graph:graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": [
+            "design"
+          ]
+        },
+        {
+          "type": "tasks",
+          "files": [
+            "tasks"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-16T18:49:47.394Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [sdk:suggest-implementation-links]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "sdk:suggest-implementation-links"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:spec-implementation",
+            "cli:spec-deps",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies",
+            "code-graph:language-adapter",
+            "code-graph:graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": [
+            "design"
+          ]
+        },
+        {
+          "type": "tasks",
+          "files": [
+            "tasks"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-16T18:51:28.046Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [sdk:suggest-implementation-links]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "sdk:suggest-implementation-links"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:spec-implementation",
+            "cli:spec-deps",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies",
+            "code-graph:language-adapter",
+            "code-graph:graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": [
+            "design"
+          ]
+        },
+        {
+          "type": "tasks",
+          "files": [
+            "tasks"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-16T18:57:12.685Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [sdk:suggest-implementation-links]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "sdk:suggest-implementation-links"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:spec-implementation",
+            "cli:spec-deps",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies",
+            "code-graph:language-adapter",
+            "code-graph:graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": [
+            "design"
+          ]
+        },
+        {
+          "type": "tasks",
+          "files": [
+            "tasks"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-16T18:57:48.098Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [sdk:suggest-implementation-links]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "sdk:suggest-implementation-links"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:spec-implementation",
+            "cli:spec-deps",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies",
+            "code-graph:language-adapter",
+            "code-graph:graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": [
+            "design"
+          ]
+        },
+        {
+          "type": "tasks",
+          "files": [
+            "tasks"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-16T19:05:53.355Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [sdk:suggest-implementation-links]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "sdk:suggest-implementation-links"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:spec-implementation",
+            "cli:spec-deps",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies",
+            "code-graph:language-adapter",
+            "code-graph:graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": [
+            "design"
+          ]
+        },
+        {
+          "type": "tasks",
+          "files": [
+            "tasks"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-16T20:01:50.076Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [sdk:suggest-implementation-links]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "sdk:suggest-implementation-links"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:spec-implementation",
+            "cli:spec-deps",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies",
+            "code-graph:language-adapter",
+            "code-graph:graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": [
+            "design"
+          ]
+        },
+        {
+          "type": "tasks",
+          "files": [
+            "tasks"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-17T06:28:23.622Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [sdk:suggest-implementation-links]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "sdk:suggest-implementation-links"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:spec-implementation",
+            "cli:spec-deps",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies",
+            "code-graph:language-adapter",
+            "code-graph:graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": [
+            "design"
+          ]
+        },
+        {
+          "type": "tasks",
+          "files": [
+            "tasks"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-17T06:34:11.786Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [sdk:suggest-implementation-links]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "sdk:suggest-implementation-links"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:spec-implementation",
+            "cli:spec-deps",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies",
+            "code-graph:language-adapter",
+            "code-graph:graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": [
+            "design"
+          ]
+        },
+        {
+          "type": "tasks",
+          "files": [
+            "tasks"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-17T07:05:23.439Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [sdk:suggest-implementation-links, sdk:suggest-spec-dependencies]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:spec-implementation",
+            "cli:spec-deps",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies",
+            "code-graph:language-adapter",
+            "code-graph:graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": [
+            "design"
+          ]
+        },
+        {
+          "type": "tasks",
+          "files": [
+            "tasks"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-17T07:22:48.895Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [sdk:suggest-spec-dependencies]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "sdk:suggest-spec-dependencies"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:spec-implementation",
+            "cli:spec-deps",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies",
+            "code-graph:language-adapter",
+            "code-graph:graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": [
+            "design"
+          ]
+        },
+        {
+          "type": "tasks",
+          "files": [
+            "tasks"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-17T08:08:19.443Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [sdk:suggest-spec-dependencies]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "sdk:suggest-spec-dependencies"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:spec-implementation",
+            "cli:spec-deps",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies",
+            "code-graph:language-adapter",
+            "code-graph:graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": [
+            "design"
+          ]
+        },
+        {
+          "type": "tasks",
+          "files": [
+            "tasks"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-17T08:29:36.971Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:spec-deps, cli:spec-implementation, sdk:suggest-implementation-links, sdk:suggest-spec-dependencies]; verify [cli:spec-implementation, sdk:suggest-implementation-links]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "cli:spec-deps",
+            "cli:spec-implementation",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:spec-implementation",
+            "sdk:suggest-implementation-links"
+          ]
+        },
+        {
+          "type": "design",
+          "files": [
+            "design"
+          ]
+        },
+        {
+          "type": "tasks",
+          "files": [
+            "tasks"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-17T08:35:58.756Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": [
+            "design"
+          ]
+        },
+        {
+          "type": "tasks",
+          "files": [
+            "tasks"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-17T15:06:15.186Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [sdk:suggest-implementation-links, sdk:suggest-spec-dependencies]; verify [sdk:suggest-implementation-links, sdk:suggest-spec-dependencies]; design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies"
+          ]
+        },
+        {
+          "type": "design",
+          "files": [
+            "design"
+          ]
+        },
+        {
+          "type": "tasks",
+          "files": [
+            "tasks"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-18T08:15:15.083Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [sdk:suggest-implementation-links, sdk:suggest-spec-dependencies]; verify [sdk:suggest-implementation-links, sdk:suggest-spec-dependencies]; design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies"
+          ]
+        },
+        {
+          "type": "design",
+          "files": [
+            "design"
+          ]
+        },
+        {
+          "type": "tasks",
+          "files": [
+            "tasks"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-18T14:06:24.707Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [sdk:suggest-implementation-links]; verify [sdk:suggest-implementation-links]; design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "sdk:suggest-implementation-links"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "sdk:suggest-implementation-links"
+          ]
+        },
+        {
+          "type": "design",
+          "files": [
+            "design"
+          ]
+        },
+        {
+          "type": "tasks",
+          "files": [
+            "tasks"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-18T14:25:41.101Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [sdk:suggest-implementation-links, sdk:suggest-spec-dependencies]; verify [sdk:suggest-implementation-links, sdk:suggest-spec-dependencies]; design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies"
+          ]
+        },
+        {
+          "type": "design",
+          "files": [
+            "design"
+          ]
+        },
+        {
+          "type": "tasks",
+          "files": [
+            "tasks"
+          ]
+        }
+      ]
+    }
+  ]
+}

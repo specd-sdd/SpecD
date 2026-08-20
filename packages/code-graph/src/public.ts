@@ -1,5 +1,6 @@
 // Composition
-export { createCodeGraphProvider } from './composition/create-code-graph-provider.js'
+export { createCodeGraphProvider, createBuiltinAdapterRegistry } from './composition/create-code-graph-provider.js'
+export { type AdapterRegistryPort } from './domain/ports/adapter-registry-port.js'
 export { createSqliteGraphStoreFactory } from './composition/create-sqlite-graph-store-factory.js'
 export {
   type CodeGraphCompositionOptions,

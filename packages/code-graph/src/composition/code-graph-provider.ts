@@ -43,7 +43,7 @@ import {
   type PublicBindingImpactResult,
   type ResolvedPublicBindingImpactInput,
 } from '../domain/services/analyze-impact.js'
-import { analyzeFileImpact } from '../domain/services/analyze-file-impact.js'
+import { analyzeFileImpact, analyzeFileImportImpact } from '../domain/services/analyze-file-impact.js'
 import { analyzeSpecImpact } from '../domain/services/analyze-spec-impact.js'
 import { detectChanges } from '../domain/services/detect-changes.js'
 import { computeHotspots } from '../domain/services/compute-hotspots.js'
@@ -152,6 +152,11 @@ export interface CodeGraphProvider {
     direction: 'upstream' | 'downstream' | 'both',
     maxDepth?: number,
   ): Promise<FileImpactResult>
+  analyzeFileImportImpact(
+    filePath: string,
+    direction: 'upstream' | 'downstream' | 'both',
+    maxDepth?: number,
+  ): Promise<ImpactResult>
   analyzeFilesImpact(
     filePaths: string[],
     direction: 'upstream' | 'downstream' | 'both',
@@ -747,6 +752,23 @@ export class CodeGraphProviderImpl implements CodeGraphProvider {
   ): Promise<FileImpactResult> {
     await this.assertAvailable()
     return analyzeFileImpact(this.store, filePath, direction, maxDepth)
+  }
+
+  /**
+   * Analyzes file import impact using only direct import relations.
+   *
+   * @param filePath - Target file path
+   * @param direction - Traversal direction
+   * @param maxDepth - Maximum traversal depth
+   * @returns Impact result
+   */
+  async analyzeFileImportImpact(
+    filePath: string,
+    direction: 'upstream' | 'downstream' | 'both',
+    maxDepth?: number,
+  ): Promise<ImpactResult> {
+    await this.assertAvailable()
+    return analyzeFileImportImpact(this.store, filePath, direction, maxDepth ?? 1)
   }
 
   /**

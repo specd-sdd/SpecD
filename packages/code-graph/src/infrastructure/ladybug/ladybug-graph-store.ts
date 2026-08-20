@@ -2410,6 +2410,10 @@ export class LadybugGraphStore extends GraphStore {
       conditions.push(`s.kind = $kind`)
       params.kind = query.kind
     }
+    if (query.workspace !== undefined) {
+      conditions.push(`s.filePath STARTS WITH $workspacePrefix`)
+      params.workspacePrefix = `${query.workspace}:`
+    }
     if (query.filePath !== undefined) {
       if (query.filePath.includes('*')) {
         const regex = query.filePath.replaceAll('.', '\\.').replaceAll('*', '.*')

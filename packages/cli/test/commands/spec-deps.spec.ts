@@ -12,6 +12,34 @@ vi.mock('../../src/helpers/cli-context.js', () => ({
   buildCliKernelOptions: vi.fn(() => ({})),
 }))
 
+const mockExecuteSuggestSpecDependencies = vi.fn().mockResolvedValue({
+  result: 'ok',
+  specs: [
+    {
+      specId: 'default:auth/login',
+      title: 'Login',
+      existingDependsOn: [],
+      suggestedDependsOn: [
+        {
+          specId: 'default:auth/shared',
+          title: 'Shared Auth',
+          reason: 'Code import relationship',
+        },
+      ],
+    },
+  ],
+})
+
+vi.mock('@specd/sdk', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@specd/sdk')>()
+  return {
+    ...actual,
+    createSuggestSpecDependencies: vi.fn(() => ({
+      execute: mockExecuteSuggestSpecDependencies,
+    })),
+  }
+})
+
 import { resolveCliContext } from '../../src/helpers/cli-context.js'
 import { registerSpecDeps } from '../../src/commands/spec/deps.js'
 
@@ -73,5 +101,29 @@ describe('spec deps', () => {
       specId: 'default:auth/login',
       set: ['default:auth/shared'],
     })
+  })
+
+  it('suggest delegates to SuggestSpecDependencies orchestration use case', async () => {
+    setup()
+    const program = makeProgram()
+    registerSpecDeps(program.command('spec'))
+
+    await program.parseAsync([
+      'node',
+      'specd',
+      'spec',
+      'deps',
+      'suggest',
+      'auth/login',
+      '--format',
+      'json',
+    ])
+
+    expect(resolveCliContext).toHaveBeenCalled()
+    expect(mockExecuteSuggestSpecDependencies).toHaveBeenCalledWith(
+      expect.objectContaining({
+        specId: 'default:auth/login',
+      }),
+    )
   })
 })

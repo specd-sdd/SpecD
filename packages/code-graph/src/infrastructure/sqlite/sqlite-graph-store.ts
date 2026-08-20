@@ -1289,6 +1289,11 @@ export class SQLiteGraphStore extends GraphStore {
       params.push(query.kind)
     }
 
+    if (query.workspace !== undefined) {
+      conditions.push('file_path LIKE ?')
+      params.push(`${query.workspace}:%`)
+    }
+
     if (query.filePath !== undefined && !needsFilePathPatternFilter) {
       conditions.push('file_path = ?')
       params.push(query.filePath)

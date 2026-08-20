@@ -749,6 +749,45 @@ export function graphStoreContractTests(
       expect(functions[0]!.name).toBe('doSomething')
     })
 
+    it('scopes results to workspace when workspace is specified', async () => {
+      const fileCore = createFileNode({
+        path: 'core:src/main.ts',
+        configRelativePath: '',
+        language: 'typescript',
+        contentHash: 'sha256:abc',
+        workspace: 'core',
+      })
+      const fileOther = createFileNode({
+        path: 'other:src/main.ts',
+        configRelativePath: '',
+        language: 'typescript',
+        contentHash: 'sha256:def',
+        workspace: 'other',
+      })
+      const symCore = createSymbolNode({
+        name: 'createCore',
+        kind: SymbolKind.Function,
+        filePath: 'core:src/main.ts',
+        line: 1,
+        column: 0,
+      })
+      const symOther = createSymbolNode({
+        name: 'createOther',
+        kind: SymbolKind.Function,
+        filePath: 'other:src/main.ts',
+        line: 1,
+        column: 0,
+      })
+      await store.upsertFile(fileCore, [symCore], [])
+      await store.upsertFile(fileOther, [symOther], [])
+
+      const results = await store.findSymbols({ name: 'create*', workspace: 'core' })
+      expect(results).toHaveLength(1)
+      for (const sym of results) {
+        expect(sym.filePath.startsWith('core:')).toBe(true)
+      }
+    })
+
     it('distinguishes case-exact symbol lookup from explicit case-insensitive fallback', async () => {
       const file = createFileNode({
         path: 'core:src/change.ts',

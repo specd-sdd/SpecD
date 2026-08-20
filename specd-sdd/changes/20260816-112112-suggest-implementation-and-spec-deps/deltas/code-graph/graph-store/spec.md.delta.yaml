@@ -1,0 +1,11 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    ### Requirement: Symbol Query Workspace Scope
+
+    `SymbolQuery` SHALL include an optional `workspace?: string` property.
+
+    When `workspace` is specified in `SymbolQuery`, `GraphStore.findSymbols(query)` MUST scope returned `SymbolNode` results directly to symbols belonging to that workspace (`file_path LIKE '<workspace>:%'` or `s.filePath STARTS WITH '<workspace>:'`).

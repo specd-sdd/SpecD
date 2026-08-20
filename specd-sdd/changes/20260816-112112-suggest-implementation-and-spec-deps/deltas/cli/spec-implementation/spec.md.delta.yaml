@@ -1,0 +1,23 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    ### Requirement: Suggest subcommand
+
+    `specd specs implementation suggest [<spec-id>] [--spec <id>...] [--all] [--workspace <name>] [--apply] [--confidence <HIGH|MED>] [--rebuild-cache]` MUST invoke `SuggestImplementationLinks` in `@specd/sdk`.
+
+    When `--apply` is passed, the command MUST delegate additive mutation to the SDK use case, which merges new discovered files and symbols into `spec-lock.json` via `UpdatePersistedSpecImplementation`.
+
+    Each suggestion in the text output MUST display its inclusion status: `[already included]` for files already present in `spec-lock.json`, `[new]` for newly discovered candidates.
+
+    The subcommand MUST support `--format text|json|toon`.
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: '^Spec Dependencies$'
+  content: |
+    - [`sdk:suggest-implementation-links`](../../sdk/suggest-implementation-links/spec.md) — orchestration use case for inferring spec implementation links

@@ -12,4 +12,10 @@ export interface AdapterRegistryPort {
 
   /** Returns all unique registered adapters. */
   getAdapters(): LanguageAdapter[]
+
+  /** Returns all file extensions registered across adapters. */
+  getSupportedExtensions(): string[]
+
+  /** Returns all reserved keywords and built-in type names aggregated across registered adapters. */
+  getReservedKeywords(): Set<string>
 }

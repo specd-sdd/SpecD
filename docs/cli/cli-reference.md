@@ -939,6 +939,7 @@ See [spec schema](spec-schema.md).
 ```
 specd specs deps list <specPath>
 specd specs deps add|remove|set|clear <specPath> [options]
+specd specs deps suggest [<specPath>] [options]
 ```
 
 Manage persisted `dependsOn` links in `spec-lock.json`.
@@ -950,6 +951,7 @@ See [spec deps](spec-deps.md).
 ```
 specd specs implementation list <specPath>
 specd specs implementation add|remove <specPath> [options]
+specd specs implementation suggest [<specPath>] [options]
 ```
 
 Manage persisted implementation tracking links.

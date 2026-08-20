@@ -1,0 +1,15 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    ### Requirement: Built-in Adapter Registry Composition Factory & Keyword Discovery
+
+    #### Scenario: Built-in adapter registry factory creation and extension/keyword lookup
+
+    - **GIVEN** built-in language adapters registered in `@specd/code-graph`
+    - **WHEN** `createBuiltinAdapterRegistry()` is called
+    - **THEN** it returns an `AdapterRegistry` containing all built-in language adapters
+    - **AND** `registry.getSupportedExtensions()` returns extensions including `.ts`, `.py`, `.go`, and `.php`
+    - **AND** `registry.getReservedKeywords()` returns aggregated reserved keywords from all registered adapters (including `class`, `def`, `func`, `interface`, `async`)

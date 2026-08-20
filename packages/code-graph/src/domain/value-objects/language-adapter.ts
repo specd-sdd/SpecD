@@ -64,6 +64,12 @@ export interface LanguageAdapter {
   extensions(): Record<string, string>
 
   /**
+   * Returns language-specific reserved keywords and built-in type names for this adapter.
+   * @returns Array of reserved keyword strings.
+   */
+  keywords?(): readonly string[]
+
+  /**
    * Analyzes a single file and extracts its symbols, imports, binding/call facts,
    * namespace, and any optional parser-specific state.
    */

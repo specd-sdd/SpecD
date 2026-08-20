@@ -12,6 +12,36 @@ vi.mock('../../src/helpers/cli-context.js', () => ({
   buildCliKernelOptions: vi.fn(() => ({})),
 }))
 
+const mockExecuteSuggestImplementationLinks = vi.fn().mockResolvedValue({
+  result: 'ok',
+  specs: [
+    {
+      specId: 'default:auth/login',
+      title: 'Login',
+      existing: { files: [], symbols: [], dependsOn: [] },
+      suggestions: [
+        {
+          file: 'default:src/auth.ts',
+          symbols: ['login'],
+          confidence: 'HIGH',
+          reasons: ['exact-ast-symbol-match'],
+          score: 160,
+        },
+      ],
+    },
+  ],
+})
+
+vi.mock('@specd/sdk', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@specd/sdk')>()
+  return {
+    ...actual,
+    createSuggestImplementationLinks: vi.fn(() => ({
+      execute: mockExecuteSuggestImplementationLinks,
+    })),
+  }
+})
+
 import { resolveCliContext } from '../../src/helpers/cli-context.js'
 import { registerSpecImplementation } from '../../src/commands/spec/implementation.js'
 
@@ -77,5 +107,29 @@ describe('spec implementation', () => {
       file: 'src/auth.ts',
       symbols: ['login'],
     })
+  })
+
+  it('suggest delegates to SuggestImplementationLinks orchestration use case', async () => {
+    setup()
+    const program = makeProgram()
+    registerSpecImplementation(program.command('spec'))
+
+    await program.parseAsync([
+      'node',
+      'specd',
+      'spec',
+      'implementation',
+      'suggest',
+      'auth/login',
+      '--format',
+      'json',
+    ])
+
+    expect(resolveCliContext).toHaveBeenCalled()
+    expect(mockExecuteSuggestImplementationLinks).toHaveBeenCalledWith(
+      expect.objectContaining({
+        specId: 'default:auth/login',
+      }),
+    )
   })
 })

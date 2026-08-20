@@ -1080,6 +1080,22 @@ export class PhpLanguageAdapter implements LanguageAdapter {
   }
 
   /**
+   * Returns language-specific reserved keywords and built-in type names for PHP.
+   * @returns Array of reserved keyword strings.
+   */
+  keywords(): string[] {
+    return [
+      'function', 'class', 'interface', 'trait', 'enum', 'namespace', 'use',
+      'extends', 'implements', 'public', 'protected', 'private', 'static',
+      'readonly', 'const', 'return', 'yield', 'if', 'else', 'elseif', 'switch',
+      'case', 'default', 'match', 'for', 'foreach', 'while', 'do', 'try',
+      'catch', 'finally', 'throw', 'new', 'clone', 'self', 'parent', 'echo',
+      'print', 'fn', 'array', 'string', 'int', 'float', 'bool', 'void',
+      'null', 'true', 'false', 'mixed', 'never', 'object', 'callable',
+    ]
+  }
+
+  /**
    * Analyzes a single file and extracts its symbols, imports, binding/call facts,
    * namespace, and any optional parser-specific state.
    * @param filePath - The path of the file to analyze.
