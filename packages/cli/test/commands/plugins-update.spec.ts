@@ -13,40 +13,50 @@ vi.mock('../../src/helpers/cli-context.js', () => ({
 
 vi.mock('@specd/plugin-manager', () => ({
   createPluginLoader: vi.fn().mockReturnValue({}),
-  InstallPlugin: vi.fn().mockImplementation(() => ({
-    execute: vi.fn().mockResolvedValue({ success: true, message: 'ok' }),
-  })),
-  LoadPlugin: vi.fn().mockImplementation(() => ({
-    execute: vi.fn().mockResolvedValue({
-      plugin: {
-        name: '@specd/plugin-agent-claude',
-        type: 'agent',
-        version: '0.0.1',
-        configSchema: {},
-        init: vi.fn(),
-        destroy: vi.fn(),
-        install: vi.fn(),
-        uninstall: vi.fn(),
-      },
-    }),
-  })),
-  ListPlugins: vi.fn().mockImplementation(() => ({
-    execute: vi.fn().mockResolvedValue({
-      plugins: [
-        {
+  InstallPlugin: vi.fn(function InstallPluginMock() {
+    return {
+      execute: vi.fn().mockResolvedValue({ success: true, message: 'ok' }),
+    }
+  }),
+  LoadPlugin: vi.fn(function LoadPluginMock() {
+    return {
+      execute: vi.fn().mockResolvedValue({
+        plugin: {
           name: '@specd/plugin-agent-claude',
-          status: 'loaded',
-          plugin: { version: '0.0.1' },
+          type: 'agent',
+          version: '0.0.1',
+          configSchema: {},
+          init: vi.fn(),
+          destroy: vi.fn(),
+          install: vi.fn(),
+          uninstall: vi.fn(),
         },
-      ],
-    }),
-  })),
-  UninstallPlugin: vi.fn().mockImplementation(() => ({
-    execute: vi.fn().mockResolvedValue(undefined),
-  })),
-  UpdatePlugin: vi.fn().mockImplementation(() => ({
-    execute: vi.fn().mockResolvedValue({ success: true, message: 'ok' }),
-  })),
+      }),
+    }
+  }),
+  ListPlugins: vi.fn(function ListPluginsMock() {
+    return {
+      execute: vi.fn().mockResolvedValue({
+        plugins: [
+          {
+            name: '@specd/plugin-agent-claude',
+            status: 'loaded',
+            plugin: { version: '0.0.1' },
+          },
+        ],
+      }),
+    }
+  }),
+  UninstallPlugin: vi.fn(function UninstallPluginMock() {
+    return {
+      execute: vi.fn().mockResolvedValue(undefined),
+    }
+  }),
+  UpdatePlugin: vi.fn(function UpdatePluginMock() {
+    return {
+      execute: vi.fn().mockResolvedValue({ success: true, message: 'ok' }),
+    }
+  }),
 }))
 
 import { resolveCliContext } from '../../src/helpers/cli-context.js'
@@ -69,7 +79,11 @@ function setup(configOverrides: Parameters<typeof makeMockConfig>[0] = {}) {
   return { stdout }
 }
 
-afterEach(() => vi.clearAllMocks())
+afterEach(() => {
+  vi.clearAllMocks()
+  const exit = process.exit as typeof process.exit & { mockRestore?: () => void }
+  exit.mockRestore?.()
+})
 
 describe('plugins update', () => {
   it('updates all declared plugins when no args are provided', async () => {

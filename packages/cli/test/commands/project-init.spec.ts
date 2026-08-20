@@ -62,7 +62,10 @@ function setup() {
   return { stdout }
 }
 
-afterEach(() => vi.restoreAllMocks())
+afterEach(() => {
+  vi.clearAllMocks()
+  vi.restoreAllMocks()
+})
 
 describe('project init', () => {
   it('supports --plugin and installs selected plugins after init', async () => {

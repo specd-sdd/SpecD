@@ -9,4 +9,4 @@ onlyBuiltDependencies:
   - core-js
   - core-js-pure
   - esbuild
-  - lbug
+  - '@ladybugdb/core'

@@ -478,7 +478,9 @@ export function makeMockStats(overrides: Partial<Stats> = {}): Stats {
  * @returns A mock object with an `execute` property
  */
 export function makeMockUseCase<
-  T extends { execute: (...args: never[]) => unknown } = { execute: ReturnType<typeof vi.fn> },
+  T extends { execute: (...args: never[]) => unknown } = {
+    execute: (...args: never[]) => unknown
+  },
 >(execute: ReturnType<typeof vi.fn> = vi.fn()): T {
   // Single-point cast: the mock structurally satisfies any use-case with an execute method
   return { execute } as unknown as T

@@ -1,4 +1,4 @@
-import type { Database, Connection, QueryResult, LbugValue } from 'lbug'
+import type { Database, Connection, QueryResult, LbugValue } from '@ladybugdb/core'
 import {
   GraphStore,
   type IndexWriteSession,
@@ -324,7 +324,7 @@ function toLadybugObservation(row: Record<string, LbugValue>): IndexedInputObser
 }
 
 /**
- * Graph store implementation backed by a Ladybug (lbug) embedded graph database.
+ * Graph store implementation backed by the Ladybug embedded graph database.
  * Persists files, symbols, specs, and their relations as a labeled property graph.
  */
 export class LadybugGraphStore extends GraphStore {
@@ -335,7 +335,7 @@ export class LadybugGraphStore extends GraphStore {
   private _lastIndexedRef: string | null = null
   private _graphFingerprint: string | null = null
   private bulkSessionActive = false
-  private readonly loadLbugModule: () => Promise<LbugModule> = async () => import('lbug')
+  private readonly loadLbugModule: () => Promise<LbugModule> = async () => import('@ladybugdb/core')
 
   /**
    * Asserts the store is open and the connection is available.
@@ -968,7 +968,7 @@ export class LadybugGraphStore extends GraphStore {
    * @param data.removeFilePaths - File identities removed before inserting the generation.
    * @param data.removeDocumentPaths - Document identities removed before insertion.
    * @param data.removeSpecIds - Spec identities removed before insertion.
-   * @param data.createRelationsInTransaction - Whether relations use transactional creates.
+   * @param data.createRelationsInTransaction - Whether relations use transactional creates. Defaults to true because current Ladybug bindings do not reliably persist relationship COPY imports across reopen cycles.
    */
   async bulkLoad(data: {
     files: FileNode[]
@@ -1095,11 +1095,11 @@ export class LadybugGraphStore extends GraphStore {
       // Write relations CSVs — one per type
       // IGNORE_ERRORS skips rows referencing non-existent nodes (dangling imports to external files)
       const relsByType = new Map<string, Relation[]>()
-      if (data.createRelationsInTransaction === true) {
+      if (data.createRelationsInTransaction !== false) {
         for (const relation of data.relations) await this.createRelation(conn, relation)
       }
       for (const rel of data.relations) {
-        if (data.createRelationsInTransaction === true) continue
+        if (data.createRelationsInTransaction !== false) continue
         const existing = relsByType.get(rel.type) ?? []
         existing.push(rel)
         relsByType.set(rel.type, existing)

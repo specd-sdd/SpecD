@@ -32,7 +32,7 @@ afterEach(() => vi.restoreAllMocks())
 describe('change run-hooks', () => {
   it('renders observable text progress while a hook is active and writes a summary to stdout', async () => {
     const { kernel, stderr, stdout } = setup()
-    kernel.changes.runStepHooks.execute.mockImplementation(async (_input, onProgress) => {
+    kernel.changes.runStepHooks.execute.mockImplementation((_input, onProgress) => {
       onProgress?.({ type: 'hook-start', hookId: 'lint', command: 'pnpm lint' })
       onProgress?.({
         type: 'hook-output',
@@ -94,7 +94,7 @@ describe('change run-hooks', () => {
 
   it('writes failed hook summary with full output to stdout', async () => {
     const { kernel, stdout, stderr } = setup()
-    kernel.changes.runStepHooks.execute.mockImplementation(async (_input, onProgress) => {
+    kernel.changes.runStepHooks.execute.mockImplementation((_input, onProgress) => {
       onProgress?.({ type: 'hook-start', hookId: 'lint', command: 'pnpm lint' })
       onProgress?.({
         type: 'hook-output',
@@ -161,7 +161,7 @@ describe('change run-hooks', () => {
 
   it('emits structured progress and completion records on stdout in json mode', async () => {
     const { kernel, stdout, stderr } = setup()
-    kernel.changes.runStepHooks.execute.mockImplementation(async (_input, onProgress) => {
+    kernel.changes.runStepHooks.execute.mockImplementation((_input, onProgress) => {
       onProgress?.({ type: 'hook-start', hookId: 'lint', command: 'pnpm lint' })
       onProgress?.({ type: 'hook-heartbeat', hookId: 'lint', elapsedMs: 5000 })
       onProgress?.({ type: 'hook-done', hookId: 'lint', success: true, exitCode: 0 })

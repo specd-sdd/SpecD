@@ -34,6 +34,7 @@ graphStoreContractTests(
       tempDir = undefined
     }
   },
+  { supportsReferenceFacts: true },
 )
 
 describe('LadybugGraphStore hierarchy persistence', () => {

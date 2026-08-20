@@ -59,7 +59,10 @@ function setup() {
   return { kernel, stdout, stderr }
 }
 
-afterEach(() => vi.restoreAllMocks())
+afterEach(() => {
+  vi.clearAllMocks()
+  vi.restoreAllMocks()
+})
 
 describe('spec optimizations', () => {
   it('get delegates to kernel.specs.getPersistedOptimizations', async () => {

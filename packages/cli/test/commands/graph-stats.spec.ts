@@ -76,6 +76,10 @@ function setup(
     createGraphProvider: vi.fn(),
   })
 
+  vi.mocked(createVcsAdapter).mockResolvedValue({
+    ref: vi.fn().mockResolvedValue('abc1234def'),
+  } as never)
+
   if (options.vcsError === true) {
     vi.mocked(createVcsAdapter).mockRejectedValue(new Error('no VCS'))
   } else if (options.vcsRef !== undefined) {
@@ -202,7 +206,10 @@ function makeStatsProgram() {
   return program
 }
 
-afterEach(() => vi.restoreAllMocks())
+afterEach(() => {
+  vi.clearAllMocks()
+  vi.restoreAllMocks()
+})
 
 describe('graph stats', () => {
   it('delegates graph access through the SDK lifecycle helper', async () => {

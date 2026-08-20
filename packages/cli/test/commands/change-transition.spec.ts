@@ -174,7 +174,7 @@ describe('Pre- and post-hooks', () => {
       change: makeMockChange({ name: 'my-change', state: 'drafting' }),
       artifactStatuses: [],
     })
-    kernel.changes.transition.execute.mockImplementation(async (_input, onProgress) => {
+    kernel.changes.transition.execute.mockImplementation((_input, onProgress) => {
       onProgress?.({ type: 'hook-start', phase: 'pre', hookId: 'lint', command: 'pnpm lint' })
       onProgress?.({
         type: 'hook-output',
@@ -238,7 +238,7 @@ describe('Output on success', () => {
       change: makeMockChange({ name: 'my-change', state: 'drafting' }),
       artifactStatuses: [],
     })
-    kernel.changes.transition.execute.mockImplementation(async (_input, onProgress) => {
+    kernel.changes.transition.execute.mockImplementation((_input, onProgress) => {
       onProgress?.({ type: 'hook-start', phase: 'pre', hookId: 'lint', command: 'pnpm lint' })
       onProgress?.({ type: 'hook-done', phase: 'pre', hookId: 'lint', success: true, exitCode: 0 })
       onProgress?.({ type: 'transitioned', from: 'drafting', to: 'designing' })
@@ -292,7 +292,7 @@ describe('Output on success', () => {
       change: makeMockChange({ name: 'my-change', state: 'drafting' }),
       artifactStatuses: [],
     })
-    kernel.changes.transition.execute.mockImplementation(async (_input, onProgress) => {
+    kernel.changes.transition.execute.mockImplementation((_input, onProgress) => {
       onProgress?.({ type: 'hook-start', phase: 'pre', hookId: 'lint', command: 'pnpm lint' })
       onProgress?.({
         type: 'hook-output',
