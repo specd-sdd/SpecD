@@ -190,6 +190,12 @@ export {
   buildProjectGraphConfig,
   type GraphConfigOverrides,
 } from './application/services/build-project-graph-config.js'
+export { normalizeFileSelectorPath } from './application/services/resolve-graph-selector.js'
+export type {
+  ResolvedFileSelector,
+  ResolvedSymbolSelector,
+  ResolvedSymbolSelectorResult,
+} from './application/services/resolve-graph-selector.js'
 
 // Errors
 export { SpecdCodeGraphError } from './domain/errors/specd-code-graph-error.js'
@@ -202,6 +208,9 @@ export { StoreNotOpenError } from './domain/errors/store-not-open-error.js'
 export { SpecNotFoundError } from './domain/errors/spec-not-found-error.js'
 export { StoreOverloadError } from './domain/errors/store-overload-error.js'
 export { StoreWorkerError } from './domain/errors/store-worker-error.js'
+export { BulkSessionStateError } from './domain/errors/bulk-session-state-error.js'
+export { InvalidGraphStoreConfigurationError } from './domain/errors/invalid-graph-store-configuration-error.js'
+export { GraphSchemaIncompatibleError } from './domain/errors/graph-schema-incompatible-error.js'
 
 import { readInstalledCodeGraphVersion } from './application/use-cases/_shared/installed-code-graph-version.js'
 

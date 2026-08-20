@@ -4,14 +4,17 @@
     matches: 'Requirement: SQLite-backed implementation'
   content: |
     `SQLiteGraphStore` SHALL implement the abstract `GraphStore` contract using
-    `better-sqlite3` as its underlying storage engine, executing all synchronous
-    SQLite operations within a dedicated, persistent Node.js Worker Thread
-    (`node:worker_threads`) owned by the store instance.
+    `better-sqlite3` as its SQLite engine while preserving the storage-neutral
+    semantics defined by `code-graph:graph-store`.
 
-    Synchronous SQLite queries, mutations, transactions, schema initialization,
-    and FTS operations MUST NOT execute on the host event-loop thread. The caller
-    interacts with the store exclusively through the asynchronous `GraphStore`
-    interface, receiving genuine non-blocking event-loop behavior.
+    All synchronous SQLite queries, mutations, transactions, schema initialization,
+    full-text search, and backend-owned maintenance MUST execute inside a dedicated,
+    persistent Node.js Worker Thread (`node:worker_threads`) owned by the open store
+    instance. Synchronous SQLite work MUST NOT execute on the host event-loop thread.
+
+    The stable backend id SHALL remain `sqlite`. Runtime-specific native binding
+    resolution MUST be deferred until `open()`, and `close()` MUST remain
+    idempotent.
 
 - op: added
   position:
@@ -24,96 +27,105 @@
   content: |
     ### Requirement: Worker-backed non-blocking execution
 
-    `SQLiteGraphStore` SHALL manage worker thread isolation and communication
-    according to the following operational invariants:
+    `SQLiteGraphStore` SHALL manage worker isolation and communication according
+    to these invariants:
 
-    1. **Persistent Worker Lifecycle**: Each open store instance owns exactly one
-       persistent worker thread. Workers SHALL NOT be spawned per operation or
-       pooled. `open()` starts and initializes the worker, and `close()` terminates
-       it cleanly and idempotently. Concurrent calls to `open()` or `close()` MUST
-       share the same in-flight initialization or shutdown Promise.
-    2. **Worker Ownership**: The worker thread owns the `better-sqlite3` database
-       connection, prepared statements cache, active transactions, and backend-owned
-       filesystem operations (such as database file creation and cleanup). Database
-       handles and prepared statements MUST NOT cross the worker boundary.
-    3. **Strongly-Typed Protocol**: Host and worker communicate via structured-cloneable
-       messages with monotonic correlation IDs. The protocol MUST use strongly-typed
-       DTOs mapping operation to payload and result. Native objects, functions, and
-       class instances with prototypes MUST NOT be transferred across the boundary.
-    4. **Worker FIFO Serialization**: The worker MUST process incoming messages through
-       an explicit serial execution queue, ensuring that asynchronous operations (such
-       as `open()` and `recreate()`) and subsequent queries execute in strict FIFO order
-       without interleaving.
-    5. **Bounded Outstanding Requests**: The host client MUST enforce a strictly
-       validated limit on outstanding pending requests (`maxPendingOperations >= 1`,
-       default: 256). When the limit is exceeded, new requests MUST reject immediately
-       with `StoreOverloadError` without disturbing existing queued requests.
-    6. **Graceful Shutdown & Drain**: Calling `close()` MUST transition the client to
-       `closing` and immediately reject new operations with `StoreNotOpenError`.
-       `drainTimeoutMs` (default: 5 000 ms) is a deadline for graceful shutdown,
-       covering `await openPromise`, the drain phase, and the `close` RPC ACK via a
-       unref'd `withDeadline` helper. If any phase exhausts the deadline, remaining
-       pending requests MUST be rejected with `StoreWorkerError`, and forced worker
-       termination (`worker.terminate()`) MUST be initiated. A worker executing native
-       code provides no mathematical guarantee of terminating within a fixed wall-clock
-       bound, so `close()` SHALL NOT advertise a hard upper bound on its total duration;
-       instead it MUST wait for the forced termination to conclude. The `closePromise`
-       sentinel MUST be cleared in an outer `finally` block wrapping the entire shutdown body.
-    7. **Serializable Runtime Descriptor**: The worker receives SQLite runtime
-       configuration via a serializable descriptor (`SqliteRuntimeDescriptor`),
-       enabling dynamic loading of custom SQLite native bindings. `workerPath` is strictly
-       an internal testing option and SHALL NOT be exposed on public options interfaces.
-    8. **Fault Isolation & Manual Recovery**: If the worker thread crashes or exits
-       unexpectedly, the store transitions to a `faulted` state, rejecting outstanding
-       operations with `StoreWorkerError`. Manual recovery is achieved by calling `close()`
-       followed by `open()`. An unexpected exit during `opening` transitions to `faulted`
-       unless `close()` already owns the lifecycle (in which case final state is `closed`).
-    9. **Concurrent open()/close() Race**: If `close()` is called while `open()` is
-       still in-flight, `close()` MUST wait for `openPromise` within the shared deadline.
-       `open()` MUST NOT transition state to `'open'` once `close()` has set state to `'closing'`.
-    10. **Chunked Worker-Side Bulk Staging & Lifecycle Session Token**: Bulk index operations
-        MUST stage entity chunks progressively to the worker thread via RPCs (`stageBulkFiles`,
-        `stageBulkSymbols`, etc.) under a worker-side session (`sessionId`). Only
-        `beginBulkIndexSession` MAY create a session; staging, commit, and rollback against a
-        missing or already finalized session MUST reject rather than resurrect it. The host
-        session SHALL enforce an `active`/`committing`/`rolling-back`/`finished` state machine so
-        writes, removals, and duplicate commits or rollbacks are rejected while a commit or
-        rollback is in flight. Reference-facts chunks staged in the same session MUST be merged
-        (not replaced) so earlier chunks survive later writes. The final visible mutation MUST
-        commit atomically within a single SQLite worker transaction. Sessions MUST be bound to a
-        host-side `lifecycleGeneration` token and invalidated deterministically on store close,
-        worker crash, or recreation.
-    11. **Isolated Observational Progress Callbacks**: Progress callback notifications (`onProgress`)
-        MUST be strictly observational. Any exception thrown by a progress callback handler MUST be
-        caught and isolated silently without failing the active operation or aborting transactions.
-    12. **Non-Blocking Closed Store Maintenance**: When `recreate()` is called on a closed store,
-        directory cleanup (`rm`) and generation sidecar rotation (`rotateStorageGenerationAsync`)
-        MUST execute asynchronously using non-blocking host I/O (`node:fs/promises`).
+    1. Each open store owns exactly one persistent worker and one SQLite connection.
+       Workers MUST NOT be created per operation or pooled. Concurrent `open()` or
+       `close()` calls MUST share their respective in-flight lifecycle Promise.
+    2. The worker owns the `better-sqlite3` connection, prepared statements,
+       transactions, schema work, FTS maintenance, and backend-owned filesystem work.
+       Native handles and prepared statements MUST NOT cross the worker boundary.
+    3. Host and worker communicate through strongly typed, structured-cloneable
+       request, result, error, and progress DTOs with monotonic correlation ids.
+       Functions, native objects, and class instances MUST NOT cross the boundary.
+    4. The worker MUST process operations through an explicit FIFO serial queue so
+       lifecycle, maintenance, reads, and mutations do not interleave.
+    5. The host client MUST validate `maxPendingOperations >= 1` and enforce a
+       default limit of 256 outstanding operations. A request beyond the limit MUST
+       reject immediately with `StoreOverloadError` without disturbing accepted work.
+    6. `close()` MUST reject new work, drain accepted operations within
+       `drainTimeoutMs` (default 5 000 ms), request worker-side database closure,
+       and force termination after the graceful deadline. Unsettled requests MUST
+       reject with `StoreWorkerError`. The store MUST await forced termination but
+       MUST NOT claim a hard wall-clock bound while native code is executing.
+    7. SQLite runtime configuration crossing the boundary MUST use a serializable
+       `SqliteRuntimeDescriptor`. A custom `modulePath` MAY select a compatible
+       runtime binding. Internal worker-path test overrides MUST NOT be public options.
+    8. Unexpected worker error or exit MUST fault the store and reject outstanding
+       operations with `StoreWorkerError`. Recovery is explicit `close()` then
+       `open()`; the store MUST NOT silently restart.
+    9. If `close()` begins while `open()` is pending, shutdown MUST own the final
+       lifecycle state and `open()` MUST NOT subsequently publish `open`.
+    10. Bulk indexing MUST use a worker-side session identified by `sessionId`.
+        Only session start creates state; staging, commit, and rollback against a
+        missing or finalized session MUST reject. Host sessions MUST enforce explicit
+        active, committing, rolling-back, and finished states and bind to the current
+        store lifecycle generation.
+    11. Progress callbacks are observational. Callback failures MUST be isolated and
+        MUST NOT abort the worker operation or transaction.
+    12. Closed-store recreation MUST use non-blocking host filesystem APIs for cleanup
+        and storage-generation rotation.
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Worker-backed non-blocking execution'
+  content: |
+    ### Requirement: Worker-efficient batch reads
+
+    SQLite SHALL implement the batch symbol and relation queries defined by
+    `GraphStore` as set-based worker operations. One batch call MUST cross the
+    worker boundary as one RPC rather than one RPC per symbol or relation type.
+
+    Batch symbol lookup SHALL use set-based predicates. Incoming and outgoing
+    relation lookup SHALL query all requested symbol ids and relation types together.
+    Large input sets MUST be divided into deterministic bounded SQL parameter chunks
+    inside the worker so SQLite parameter limits cannot make a valid graph traversal
+    fail. Results MUST preserve the deterministic ordering and empty-input semantics
+    of the abstract contract.
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Persisted relation storage'
+  content: |
+    The SQLite schema SHALL persist every relation family required by the abstract
+    graph model:
+
+    - `IMPORTS`
+    - `DEFINES`
+    - `CALLS`
+    - `CONSTRUCTS`
+    - `USES_TYPE`
+    - `EXPORTS`
+    - `DEPENDS_ON`
+    - `COVERS_FILE`
+    - `COVERS_SYMBOL`
+    - `EXTENDS`
+    - `IMPLEMENTS`
+    - `OVERRIDES`
+
+    The adapter MAY choose a SQLite-appropriate physical layout, provided all
+    observable `GraphStore` semantics remain preserved. `COVERS_SYMBOL` entries
+    MUST preserve relation metadata so stale symbol-level links survive reload.
 
 - op: modified
   selector:
     type: section
     matches: 'Requirement: Transactional mutation model'
   content: |
-    `SQLiteGraphStore` SHALL use SQLite transactions executing entirely within the
-    worker thread to preserve the atomic mutation semantics required by the
-    abstract `GraphStore` contract.
+    `SQLiteGraphStore` SHALL execute SQLite transactions entirely inside the worker
+    to preserve the atomic mutation semantics required by `GraphStore`.
 
-    Transactions MUST NOT span multiple host/worker IPC round-trips. Each atomic
-    mutation (including `upsertFile()`, `removeFile()`, `upsertSpec()`,
-    `removeSpec()`, and bulk index commit) MUST be dispatched and executed as a
-    single, self-contained worker operation.
-
-    At minimum:
-
-    - `upsertFile()` MUST replace file-local graph state atomically
-    - `removeFile()` MUST remove file-local graph state atomically
-    - `upsertSpec()` MUST replace spec-local graph state atomically
-    - `removeSpec()` MUST remove spec-local graph state atomically
-    - bulk indexing operations MUST commit all-or-nothing backend state for the batch they
-      claim to have persisted
-
-    If a transaction fails, the backend MUST leave previously committed graph state intact.
+    A transaction MUST NOT span multiple host/worker round trips. Each atomic
+    mutation, including `upsertFile()`, `removeFile()`, `upsertSpec()`,
+    `removeSpec()`, and bulk commit, MUST execute as one self-contained worker
+    operation. Failure MUST preserve the previously committed graph state.
 
 - op: modified
   selector:
@@ -122,36 +134,53 @@
   content: |
     `SQLiteGraphStore` SHALL support efficient bulk indexing for large repositories.
 
-    Bulk index data MUST be staged to the worker in bounded chunks (not as one giant
-    structured-clone payload) and committed atomically as a single worker-side SQLite
-    transaction. The `bulkLoad()` convenience path SHALL internally use the chunked
-    `IndexWriteSession` staging flow and MUST NOT transfer a complete repository graph
-    across the worker boundary in a single IPC message.
+    Bulk data MUST be staged to a worker-side session in bounded chunks rather than
+    transferred as one repository-sized structured-clone payload. Commit MUST make
+    the complete session visible atomically in one SQLite transaction. Reference-fact
+    chunks MUST merge with earlier chunks from the same session.
 
-    During bulk commit, the worker MUST emit serializable progress events (covering
-    `cleanup`, `files`, `documents`, `symbols`, `specs`, `reference-facts`,
-    `observations`, `relations`, and `search-indexes`) across the worker boundary,
-    which the host forwards to any registered `onProgress` callback.
+    The worker MUST emit serializable progress stages for cleanup, files, documents,
+    symbols, specs, reference facts, observations, relations, and search indexes.
+    The host SHALL forward them to the optional observational callback.
 
-    The adapter MAY use batching, prepared statements, temporary tables, or other
-    SQLite-appropriate techniques to keep large indexing runs stable, provided the
-    observable `GraphStore` contract and bulk atomicity are preserved.
-
-    If the implementation materializes backend-owned scratch artifacts outside the
-    primary database file, those artifacts MUST be scoped to `{configPath}/tmp` and
-    cleaned up after successful completion.
+    Prepared statements, temporary tables, and bounded SQL chunks MAY be used to keep
+    the run stable. Any scratch artifacts MUST remain under `{configPath}/tmp`.
 
 - op: modified
   selector:
     type: section
     matches: 'Requirement: Reference schema upgrade'
   content: |
-    SQLite SHALL persist the enriched logical-symbol, declaration, member, symbol-space, binding, provenance, coverage, complete construct range, and declared-name selection range fields required by `GraphStore`. Structured workspace, surface, name, symbol-space, owner, member-form, and exported-name columns SHALL have indexes supporting semantic search and selector resolution without parsing or substring-ranking serialized canonical ids. Canonical ids remain unique external identities. Backend-local integer row keys MAY be used for physical joins when they do not change provider-visible ids.
+    SQLite SHALL persist the logical-symbol, declaration, member, symbol-space,
+    binding, provenance, coverage, construct-range, and selection-range fields
+    required by `GraphStore`. Structured lookup columns SHALL be indexed; serialized
+    canonical ids MUST NOT be parsed or substring-ranked to implement semantic lookup.
+    Canonical ids remain unique external identities; backend-local integer row keys
+    MAY be used for physical joins when provider-visible ids do not change.
 
-    SQLite SHALL maintain a dedicated source-file content FTS index using substring-capable trigram tokenization. Candidate queries SHALL use the shared complete/raw/expanded query plan, honor filters before candidate limits, and return indexed content or precise evidence for Code Graph verification. Queries shorter than three characters SHALL use a bounded indexed/SQL fallback defined by the shared Store contract rather than returning every file for application-layer scanning.
+    SQLite SHALL maintain the substring-capable source-content index and bounded
+    short-query fallback required by the abstract store. Reverse coverage and new
+    traversal batch reads SHALL use set-based predicates and deterministic ordering.
 
-    Batched reverse coverage lookup SHALL use set-based predicates over deduplicated file paths and symbol ids and deterministic ordering.
+    The backend SHALL track reference schema version `9`. A later schema-affecting
+    change SHALL increment the version exactly once. Incompatible data MUST reject
+    ordinary reads; `graph index` SHALL rebuild destructively, rotate
+    `storage.epoch`, and rebuild search indexes before readiness.
 
-    The backend SHALL track a reference schema version; the current reference schema version is `9`. A schema-affecting change SHALL increment the schema version exactly once relative to the version current when that change's implementation begins. An incompatible database MUST reject ordinary reads. `graph index` SHALL rebuild it destructively, rotate `storage.epoch`, and complete FTS rebuild before marking it ready.
+    Indexed-input observations, freshness latches, VCS evidence, and compact
+    unchanged-file facts SHALL remain persisted. One indexing run SHALL use one
+    transaction, set-based endpoint validation, bounded writes, one commit, and one
+    semantic/content index rebuild.
 
-    SQLite SHALL persist indexed-input observations, workspace/global latches, VCS-scope evidence, and compact unchanged-file facts required by incremental hydration. One indexing run SHALL use one database transaction, set-based relation endpoint validation, bounded prepared/bulk inserts, one commit, and one rebuild of all semantic and content FTS indexes. Chunk appends MUST NOT rebuild FTS independently.
+- op: added
+  position:
+    parent:
+      type: section
+      matches: '^SQLite Graph Store$'
+    after:
+      type: section
+      matches: '^Spec Dependencies$'
+  content: |
+    ## ADRs
+
+    - [ADR-0025: Non-Blocking Worker-Thread SQLite Graph Store](../../../docs/adr/0025-nonblocking-worker-sqlite-graph-store.md) — the built-in SQLite backend executes on a persistent worker thread

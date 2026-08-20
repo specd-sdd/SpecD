@@ -1,0 +1,32 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Query methods'
+  content: |
+    ### Requirement: Batched symbol traversal reads
+
+    `GraphStore` SHALL expose storage-neutral batch queries for traversal:
+
+    - `getSymbolsByIds(symbolIds: readonly string[]): Promise<SymbolNode[]>`
+      retrieves every existing requested symbol.
+    - `getIncomingSymbolRelations(symbolIds: readonly string[], relationTypes: readonly RelationType[]): Promise<Relation[]>`
+      retrieves relations whose target is one of the requested symbols and whose type
+      is requested.
+    - `getOutgoingSymbolRelations(symbolIds: readonly string[], relationTypes: readonly RelationType[]): Promise<Relation[]>`
+      retrieves relations whose source is one of the requested symbols and whose type
+      is requested.
+
+    These operations MUST support `CALLS`, `CONSTRUCTS`, `USES_TYPE`,
+    `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES`. Inputs SHALL be deduplicated
+    without changing observable meaning. Unknown symbol ids SHALL be omitted.
+    Results MUST be deterministic across backends: symbols ordered by requested id
+    order and relations ordered by source, type, then target. Empty symbol-id or
+    relation-type input MUST return an empty array without backend work.
+
+    A backend MUST execute each logical batch without requiring one storage call per
+    symbol or per relation type. Physical parameter chunking is permitted when it is
+    transparent to the result.

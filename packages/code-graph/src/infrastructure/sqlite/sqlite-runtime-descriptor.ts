@@ -10,7 +10,7 @@ export interface SqliteRuntimeDescriptor {
 }
 
 /**
- *
+ * Options accepted when constructing a SQLite-backed graph store.
  */
 export interface SQLiteGraphStoreOptions {
   /** Optional serializable SQLite runtime descriptor. */

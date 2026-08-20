@@ -7,8 +7,31 @@ import { StoreWorkerError } from '../../../src/domain/errors/store-worker-error.
 import { StoreOverloadError } from '../../../src/domain/errors/store-overload-error.js'
 import { StoreNotOpenError } from '../../../src/domain/errors/store-not-open-error.js'
 import { SpecdCodeGraphError } from '../../../src/domain/errors/specd-code-graph-error.js'
+import { BulkSessionStateError } from '../../../src/domain/errors/bulk-session-state-error.js'
+import { InvalidGraphStoreConfigurationError } from '../../../src/domain/errors/invalid-graph-store-configuration-error.js'
+import { GraphSchemaIncompatibleError } from '../../../src/domain/errors/graph-schema-incompatible-error.js'
+import { RelationType } from '../../../src/domain/value-objects/relation-type.js'
+import { type SQLiteWorkerRequest } from '../../../src/infrastructure/sqlite/sqlite-worker-protocol.js'
 
 describe('SQLiteWorkerProtocol serialization', () => {
+  it('round-trips typed traversal batch requests through structured clone', () => {
+    const requests: SQLiteWorkerRequest[] = [
+      { id: 1, op: 'getSymbolsByIds', payload: { symbolIds: ['a', 'b'] } },
+      {
+        id: 2,
+        op: 'getIncomingSymbolRelations',
+        payload: { symbolIds: ['a'], relationTypes: [RelationType.Calls] },
+      },
+      {
+        id: 3,
+        op: 'getOutgoingSymbolRelations',
+        payload: { symbolIds: ['b'], relationTypes: [RelationType.Extends] },
+      },
+    ]
+
+    expect(structuredClone(requests)).toEqual(requests)
+  })
+
   it('serializes and deserializes standard Error instances', () => {
     const error = new Error('Database disk image is malformed')
     const serialized = serializeWorkerError(error)
@@ -41,6 +64,31 @@ describe('SQLiteWorkerProtocol serialization', () => {
     expect(serializedWorkerErr.code).toBe('STORE_WORKER_ERROR')
     const deserializedWorkerErr = deserializeWorkerError(serializedWorkerErr)
     expect(deserializedWorkerErr).toBeInstanceOf(StoreWorkerError)
+  })
+
+  it('round-trips the bulk-session, configuration, and schema error codes', () => {
+    const bulk = new BulkSessionStateError('Bulk index session is already active')
+    const serializedBulk = serializeWorkerError(bulk)
+    expect(serializedBulk.code).toBe('BULK_SESSION_STATE')
+    const deserializedBulk = deserializeWorkerError(serializedBulk)
+    expect(deserializedBulk).toBeInstanceOf(BulkSessionStateError)
+    expect(deserializedBulk.message).toBe('Bulk index session is already active')
+
+    const config = new InvalidGraphStoreConfigurationError(
+      'maxPendingOperations must be an integer >= 1',
+    )
+    const serializedConfig = serializeWorkerError(config)
+    expect(serializedConfig.code).toBe('INVALID_GRAPH_STORE_CONFIGURATION')
+    const deserializedConfig = deserializeWorkerError(serializedConfig)
+    expect(deserializedConfig).toBeInstanceOf(InvalidGraphStoreConfigurationError)
+    expect(deserializedConfig.message).toBe('maxPendingOperations must be an integer >= 1')
+
+    const schema = new GraphSchemaIncompatibleError('schema 8 is incompatible with expected 9')
+    const serializedSchema = serializeWorkerError(schema)
+    expect(serializedSchema.code).toBe('GRAPH_SCHEMA_INCOMPATIBLE')
+    const deserializedSchema = deserializeWorkerError(serializedSchema)
+    expect(deserializedSchema).toBeInstanceOf(GraphSchemaIncompatibleError)
+    expect(deserializedSchema.message).toBe('schema 8 is incompatible with expected 9')
   })
 
   it('attaches sqliteCode if available', () => {

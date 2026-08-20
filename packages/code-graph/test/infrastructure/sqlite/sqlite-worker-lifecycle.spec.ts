@@ -13,6 +13,7 @@ import {
 } from '../../../src/domain/value-objects/symbol-reference.js'
 import { StoreNotOpenError } from '../../../src/domain/errors/store-not-open-error.js'
 import { StoreWorkerError } from '../../../src/domain/errors/store-worker-error.js'
+import { BulkSessionStateError } from '../../../src/domain/errors/bulk-session-state-error.js'
 
 let tempDir: string | undefined
 
@@ -573,6 +574,27 @@ parentPort.on('message', (msg) => {
     await rolling
 
     expect(await store.getFile(file.path)).toBeUndefined()
+    await store.close()
+  })
+
+  it('rejects a second bulk session while one is already active', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-worker-already-active-'))
+    const store = new SQLiteGraphStore(tempDir)
+    await store.open()
+
+    const file = createFileNode({
+      path: 'core:src/already-active.ts',
+      configRelativePath: 'src/already-active.ts',
+      language: 'typescript',
+      contentHash: 'sha256:already-active',
+      workspace: 'core',
+    })
+    const first = store.beginBulkIndexSession()
+    await first.writeFiles([file])
+
+    expect(() => store.beginBulkIndexSession()).toThrow(BulkSessionStateError)
+
+    await first.commit()
     await store.close()
   })
 

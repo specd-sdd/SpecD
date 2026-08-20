@@ -265,6 +265,52 @@ describe('CodeGraphProvider', () => {
     await expect(provider.getStatistics()).rejects.toThrow(StoreNotOpenError)
   })
 
+  it('throws StoreNotOpenError for analyzeImpact after close', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'specd-graph-provider-analyze-closed-'))
+    const provider = await createCodeGraphProvider({
+      storagePath: tempDir,
+      projectRoot: tempDir,
+    })
+    await provider.open()
+    await provider.close()
+
+    await expect(provider.analyzeImpact('core:src/state.ts:render', 'downstream')).rejects.toThrow(
+      StoreNotOpenError,
+    )
+  })
+
+  it('resolves a config-relative file selector to the canonical workspace path', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'specd-graph-provider-file-resolve-'))
+    const store = new InMemoryGraphStore()
+    const provider = createCodeGraphProvider({
+      storagePath: tempDir,
+      projectRoot: tempDir,
+      graphStoreFactories: { custom: { create: () => store } },
+      graphStoreId: 'custom',
+    })
+    await provider.open()
+    await store.upsertFile(
+      createFileNode({
+        path: 'root:src/messages.ts',
+        configRelativePath: 'packages/root/src/messages.ts',
+        language: 'typescript',
+        contentHash: 'hash',
+        workspace: 'root',
+      }),
+      [],
+      [],
+    )
+
+    const resolved = await provider.resolveFileSelector('packages/root/src/messages.ts')
+    expect(resolved).toHaveLength(1)
+    expect(resolved[0]).toMatchObject({
+      canonicalPath: 'root:src/messages.ts',
+      configRelativePath: 'packages/root/src/messages.ts',
+      workspace: 'root',
+    })
+    await provider.close()
+  })
+
   it('exposes batch resolution under the open provider lifecycle', async () => {
     tempDir = mkdtempSync(join(tmpdir(), 'specd-graph-provider-resolver-'))
     const provider = createCodeGraphProvider({

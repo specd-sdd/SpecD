@@ -1,6 +1,7 @@
 import { type DocumentNode } from '../../domain/value-objects/document-node.js'
 import { type FileNode } from '../../domain/value-objects/file-node.js'
 import { type Relation } from '../../domain/value-objects/relation.js'
+import { type RelationType } from '../../domain/value-objects/relation-type.js'
 import { type SpecNode } from '../../domain/value-objects/spec-node.js'
 import { type SymbolNode } from '../../domain/value-objects/symbol-node.js'
 import { type SymbolQuery } from '../../domain/value-objects/symbol-query.js'
@@ -108,6 +109,18 @@ export interface SQLiteWorkerOperationMap {
   }
   /** Retrieves a symbol node. */
   getSymbol: { payload: { symbolId: string }; result: SymbolNode | undefined }
+  /** Retrieves a logical batch of symbol nodes. */
+  getSymbolsByIds: { payload: { symbolIds: readonly string[] }; result: SymbolNode[] }
+  /** Retrieves traversal relations targeting a logical symbol batch. */
+  getIncomingSymbolRelations: {
+    payload: { symbolIds: readonly string[]; relationTypes: readonly RelationType[] }
+    result: Relation[]
+  }
+  /** Retrieves traversal relations originating from a logical symbol batch. */
+  getOutgoingSymbolRelations: {
+    payload: { symbolIds: readonly string[]; relationTypes: readonly RelationType[] }
+    result: Relation[]
+  }
   /** Finds symbols matching query. */
   findSymbols: { payload: { query: SymbolQuery }; result: SymbolNode[] }
   /** Retrieves a spec node. */

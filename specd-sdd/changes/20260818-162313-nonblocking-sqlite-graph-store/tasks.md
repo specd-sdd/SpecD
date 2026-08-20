@@ -344,3 +344,187 @@
 - [x] 16.3 Tests for clear() invalidating active and racing sessions
       `packages/code-graph/test/infrastructure/sqlite/sqlite-worker-lifecycle.spec.ts`: sequential test (`session1.commit()` rejects `StoreNotOpenError` after `clear()`, then `session2` commits) and race test (concurrent `clear()` makes stale `writeFiles()` reject; a fresh session can be created and rolled back afterwards)
       Approach: mirrors the invalidation semantics already covered for close/recreate.
+
+## 17. Compliance Reconciliation (post-audit round)
+
+- [x] 17.1 Add `BulkSessionStateError` typed domain error
+      `packages/code-graph/src/domain/errors/`: `BulkSessionStateError` (code `BULK_SESSION_STATE`) — replace the three generic `Error` throws in the host bulk-session state machine (`sqlite-graph-store.ts`: session already active, already finished, invalid state)
+      Approach: Extend `SpecdCodeGraphError`; export from the domain error index.
+      (Req: Worker-backed non-blocking execution, Transactional mutation model)
+
+- [x] 17.2 Add `InvalidGraphStoreConfigurationError` typed domain error
+      `packages/code-graph/src/domain/errors/`: `InvalidGraphStoreConfigurationError` (code `INVALID_GRAPH_STORE_CONFIGURATION`) — replace the generic `Error` for invalid `maxPendingOperations` in `open()` (`sqlite-worker-client.ts`)
+      Approach: Extend `SpecdCodeGraphError`; export from the domain error index.
+      (Req: Worker-backed non-blocking execution)
+
+- [x] 17.3 Add `GraphSchemaIncompatibleError` typed domain error
+      `packages/code-graph/src/domain/errors/`: `GraphSchemaIncompatibleError` (code `GRAPH_SCHEMA_INCOMPATIBLE`) — replace the generic `Error` for incompatible persisted schema on `open()` (`sqlite-graph-database.ts`)
+      Approach: Extend `SpecdCodeGraphError`; export from the domain error index.
+      (Req: Schema versioning)
+
+- [x] 17.4 Use `BulkSessionStateError` for worker-side session lookup failures
+      `packages/code-graph/src/infrastructure/sqlite/sqlite-worker.ts`: replace generic `Error` for missing/duplicate `sessionId` (create/require bulk session) with `BulkSessionStateError`
+      Approach: Keep distinct messages; unknown-operation path remains an internal protocol `Error`.
+      (Req: Worker-backed non-blocking execution)
+
+- [x] 17.5 Extend `deserializeWorkerError` with the three new codes
+      `packages/code-graph/src/infrastructure/sqlite/sqlite-worker-client.ts`: handle `BULK_SESSION_STATE`, `INVALID_GRAPH_STORE_CONFIGURATION`, `GRAPH_SCHEMA_INCOMPATIBLE` so worker-thrown typed errors reconstruct as the same types on the host
+      Approach: Add branches mirroring the existing codec; extend the round-trip test.
+      (Req: Worker-backed non-blocking execution)
+
+- [x] 17.6 Complete empty JSDoc blocks
+      `packages/code-graph/src/infrastructure/sqlite/sqlite-runtime-descriptor.ts` (`SQLiteGraphStoreOptions`) and `packages/code-graph/src/infrastructure/sqlite/sqlite-worker.ts` (`WorkerBulkSession`): replace empty JSDoc with real descriptions
+      Approach: Follow the local JSDoc conventions (description, `@param`, `@returns` as applicable).
+      (Req: Package exports)
+
+- [x] 17.7 Create ADR-0025
+      `docs/adr/0025-nonblocking-worker-sqlite-graph-store.md`: MADR-format ADR for the non-blocking worker-thread SQLite backend decision, with `### Confirmation` and `### Spec` sections linking `code-graph:sqlite-graph-store` and `code-graph:composition`
+      Approach: Document the decision and rejected alternatives (async driver, worker pool, worker per operation, main-thread SQLite).
+      (Req: SQLite-backed implementation, Worker-backed non-blocking execution)
+
+- [x] 17.8 Add `SqliteRuntimeDescriptor.modulePath` end-to-end test
+      `packages/code-graph/test/`: descriptor supplied via `createSqliteGraphStoreFactory` / composition options reaches the worker during `open()` and drives the worker-side dynamic module load
+      Approach: Exercise the factory plumbing path; assert the custom module is loaded inside the worker.
+      (Req: Factory function, Worker-backed non-blocking execution)
+
+- [x] 17.9 Add `createSqliteGraphStoreFactory` behavior tests
+      `packages/code-graph/test/`: options plumb-through of `runtime` / `maxPendingOperations` and rejection of an invalid `maxPendingOperations`
+      Approach: Unit-test the factory in isolation; invalid config rejects with `InvalidGraphStoreConfigurationError`.
+      (Req: Factory function)
+
+- [x] 17.10 Add public-barrel export-presence smoke tests
+      `packages/code-graph/test/barrel.spec.ts`: assert spec-mandated `"."` exports are importable (`GraphStoreFactory`, `GraphStoreFactoryOptions`, `CodeGraphOptions`, `CodeGraphCompositionOptions`, `SqliteRuntimeDescriptor`, `SQLiteGraphStoreOptions`, `createSqliteGraphStoreFactory`, `LanguageAdapter`, model vocabulary, `SpecNotFoundError` code/specId) and that host use-case factories (`createGetGraphHealth`, `createIndexProjectGraph`, `createGetSpecCoverage`, `createGetChangeSpecCoverage`) are named exports from the public barrel
+      Approach: Import from `src/public.js` and assert presence.
+      (Req: Package exports, Host use cases)
+
+- [x] 17.11 Replace `as unknown as` partial port mocks introduced/needed by this change
+      `packages/code-graph/test/composition/host-use-case-factories.spec.ts`, `packages/code-graph/test/application/use-cases/get-change-spec-coverage.spec.ts`: full typed port implementations, no `as unknown as`
+      Approach: Scope-limited — only mocks this change created or needed; pre-existing helper mocks stay untouched.
+      (Req: default:\_global/testing)
+
+- [x] 17.12 Run full compliance audit and confirm 24/24 + no change-attributable global findings
+      Re-run the full-mode compliance audit after the fixes; update the report and confirm the change can archive cleanly
+      Approach: Re-run `/specd-verify` full mode after implementation; supersede the 20260819-214909 report.
+      (Req: default:\_global/\*)
+
+- [x] 17.13 Add protocol round-trip tests for the three new typed error codes
+      `packages/code-graph/test/infrastructure/sqlite/sqlite-worker-protocol.spec.ts`: round-trip `BULK_SESSION_STATE`, `INVALID_GRAPH_STORE_CONFIGURATION`, `GRAPH_SCHEMA_INCOMPATIBLE` through `serializeWorkerError` / `deserializeWorkerError`
+      Approach: Extend the existing round-trip test; the three new codes are currently exercised only indirectly.
+      (Req: Worker-backed non-blocking execution)
+
+- [x] 17.14 Add typed assertion for the host "already active" bulk-session branch
+      `packages/code-graph/test/infrastructure/sqlite/sqlite-worker-lifecycle.spec.ts`: assert `beginBulkIndexSession` already-active throw rejects with `BulkSessionStateError` by type
+      Approach: Add a test mirroring the in-flight commit/rollback assertions but asserting the error type directly. Placed in the lifecycle spec alongside the other bulk-session state tests.
+      (Req: Worker-backed non-blocking execution)
+
+- [x] 17.15 Add literal post-close `analyzeImpact` test
+      `packages/code-graph/test/composition/code-graph-provider.spec.ts`: assert `analyzeImpact` throws `StoreNotOpenError` after `close()`
+      Approach: Exercise the shared `assertAvailable` gate via a literal impact call after close.
+      (Req: Lifecycle management)
+
+- [x] 17.16 Add provider-level `resolveFileSelector` test
+      `packages/code-graph/test/composition/code-graph-provider.spec.ts`: direct facade test normalizing a project-relative path to the canonical graph identity
+      Approach: Call `provider.resolveFileSelector` on an opened provider and assert canonical resolution.
+      (Req: CodeGraphProvider facade)
+
+- [x] 17.17 Assert `SpecNotFoundError.specId` in barrel smoke test
+      `packages/code-graph/test/barrel.spec.ts`: assert the `specId` getter alongside the `SPEC_NOT_FOUND` code
+      Approach: Extend the existing error surface test to check both `.code` and `.specId`.
+      (Req: Package exports)
+
+- [x] 17.18 Export public resolver selector result types
+      `packages/code-graph/src/public.ts`, `packages/code-graph/src/index.ts`: export `ResolvedFileSelector`, `ResolvedSymbolSelector`, `ResolvedSymbolSelectorResult` from `resolve-graph-selector.ts`
+      Approach: The public facade `resolveFileSelector`/`resolveSymbolSelector` return these types; Requirement 8 requires resolver result types to be publicly nameable. Add a barrel smoke assertion for them.
+      (Req: Package exports, Symbol-reference provider surface)
+
+## 18. Main reconciliation and efficient wide traversal follow-up
+
+- [x] 18.1 Add storage-neutral batch traversal reads to `GraphStore`
+      `packages/code-graph/src/domain/ports/graph-store.ts`: `GraphStore` — add `getSymbolsByIds`, `getIncomingSymbolRelations`, and `getOutgoingSymbolRelations` with readonly inputs and documented deterministic results
+      Approach: use the exact signatures from design; keep SQL and worker concepts out of the domain port.
+      (Req: Batched symbol traversal reads)
+
+- [x] 18.2 Implement deterministic batch reads in the in-memory test store
+      `packages/code-graph/test/helpers/in-memory-graph-store.ts`: `InMemoryGraphStore` — implement the three new abstract methods
+      Approach: deduplicate ids, omit unknown symbols, preserve first requested-id order, filter direction/types, and sort relations by source/type/target.
+      (Req: Batched symbol traversal reads)
+
+- [x] 18.3 Add typed worker protocol operations for traversal batches
+      `packages/code-graph/src/infrastructure/sqlite/sqlite-worker-protocol.ts`: `SQLiteWorkerOperationMap` — add batch symbol, incoming-relation, and outgoing-relation payload/result entries
+      Approach: carry readonly id/type arrays in structured-clone-safe payloads; derive discriminators from the exhaustive operation map.
+      (Req: Worker-efficient batch reads)
+
+- [x] 18.4 Implement worker-side set-based symbol batches
+      `packages/code-graph/src/infrastructure/sqlite/sqlite-graph-database.ts`: `getSymbolsByIds` — fetch symbols with bound `IN` predicates
+      Approach: deduplicate ids, query sequential chunks of at most 900 parameters, map rows by id, and emit first requested-id order without unknowns.
+      (Req: Batched symbol traversal reads, Worker-efficient batch reads)
+
+- [x] 18.5 Implement worker-side set-based relation batches
+      `packages/code-graph/src/infrastructure/sqlite/sqlite-graph-database.ts`: `getIncomingSymbolRelations` and `getOutgoingSymbolRelations` — query ids and relation types together
+      Approach: validate the six traversal types, chunk ids by `900 - relationTypes.length`, use bound placeholders, deduplicate source/type/target, and globally sort merged results.
+      (Req: Batched symbol traversal reads, Worker-efficient batch reads)
+
+- [x] 18.6 Dispatch batch operations through the worker FIFO
+      `packages/code-graph/src/infrastructure/sqlite/sqlite-worker.ts`: message dispatcher — route the three new operations to `SQLiteGraphDatabase`
+      Approach: execute each complete logical batch as one item on the existing serial promise chain and return one correlated response.
+      (Req: Worker-backed non-blocking execution, Worker-efficient batch reads)
+
+- [x] 18.7 Expose one-RPC batch methods from `SQLiteGraphStore`
+      `packages/code-graph/src/infrastructure/sqlite/sqlite-graph-store.ts`: GraphStore batch overrides — add host empty-input guards and client requests
+      Approach: return `[]` before IPC for empty inputs; otherwise issue exactly one `sendRequest` per logical method call and leave physical chunks inside the worker.
+      (Req: Worker-efficient batch reads)
+
+- [x] 18.8 Extend memoized reads for batch operations
+      `packages/code-graph/src/domain/services/analyze-file-impact.ts`: `createMemoizedReadStore` — implement the three batch methods and reuse/populate per-id caches
+      Approach: share resolved and in-flight reads across the full top-level impact call while reprojecting results into deterministic contract order.
+      (Req: Batched symbol traversal reads, Bounded batched traversal execution)
+
+- [x] 18.9 Add the ordered concurrency utility
+      `packages/code-graph/src/domain/services/map-with-concurrency.ts`: `mapWithConcurrency` — implement a pure ordered scheduler
+      Approach: validate a positive integer limit, run at most that many mappers, preserve input order, and stop scheduling after first rejection.
+      (Req: Bounded batched traversal execution)
+
+- [x] 18.10 Batch upstream BFS frontiers
+      `packages/code-graph/src/domain/services/get-upstream.ts`: `getUpstream` and incoming relation helper — remove per-symbol/per-relation `Promise.all`
+      Approach: one incoming relation batch and one symbol batch per frontier/lookahead; group by target and preserve visited, import, depth, cycle, and truncation semantics.
+      (Req: Bounded batched traversal execution)
+
+- [x] 18.11 Batch downstream BFS frontiers
+      `packages/code-graph/src/domain/services/get-downstream.ts`: `getDownstream` and outgoing relation helper — remove per-symbol/per-relation `Promise.all`
+      Approach: one outgoing relation batch and one symbol batch per frontier/lookahead; group by source and preserve visited, import, depth, cycle, and truncation semantics.
+      (Req: Bounded batched traversal execution)
+
+- [x] 18.12 Share one concurrency budget across file impact
+      `packages/code-graph/src/domain/services/analyze-file-impact.ts` and `analyze-files-impact.ts`: `ImpactExecutionContext`, `analyzeFileImpactDetails`, `analyzeFilesImpact` — replace unbounded file/symbol fan-out
+      Approach: create one memoized store and one budget of 4 per top-level call; avoid nested permit acquisition by using a shared re-entrant scheduler or flattened jobs; preserve ordering, coverage, counts, and risk.
+      (Req: Bounded batched traversal execution, File impact)
+
+- [x] 18.13 Add GraphStore and traversal batch unit tests
+      `packages/code-graph/test/domain/`: GraphStore contract, upstream/downstream, and file-impact suites — cover order, unknown/duplicate/empty inputs, all relation types, wide frontiers, and shared maximum concurrency
+      Approach: instrument store call counts and active operations; assert one logical batch per frontier and maximum active work 4 with unchanged semantic results.
+      (Req: Batched symbol traversal reads, Bounded batched traversal execution)
+
+- [x] 18.14 Add SQLite batch RPC and SQL chunk tests
+      `packages/code-graph/test/infrastructure/sqlite/`: protocol, database, and store suites — verify one RPC, empty no-op, >900 parameter chunks, deterministic merge, and no loss/duplication
+      Approach: spy at host/worker and database boundaries so RPC batching and physical chunking are independently proven.
+      (Req: Worker-efficient batch reads)
+
+- [x] 18.15 Add low-capacity wide-graph integration regression
+      `packages/code-graph/test/integration/sqlite-wide-traversal.spec.ts`: reproduce wide overlapping multi-file upstream/downstream impact with `maxPendingOperations: 32`
+      Approach: compare SQLite with the in-memory store and assert completion without `StoreOverloadError`, identical ordered results, depths, counts, coverage, and risk.
+      (Req: Bounded batched traversal execution)
+
+- [x] 18.16 Reconcile SQLite-only internal exports after the main merge
+      `packages/code-graph/src/index.ts` and `packages/code-graph/test/barrel.spec.ts`: remove the historical Ladybug internal export/assertion introduced by tasks 14.1 and 14.5
+      Approach: keep `SQLiteGraphStore`, `AdapterRegistry`, and language adapters internal; assert `LadybugGraphStore` is absent from both public and internal entries.
+      (Req: Package exports, Factory function)
+
+- [x] 18.17 Update ADR-0025 for batching and all affected specs
+      `docs/adr/0025-nonblocking-worker-sqlite-graph-store.md`: add set-based batch reads, shared traversal budget, rejected queue-limit-only fix, and links to graph-store/traversal specs
+      Approach: retain MADR, Confirmation, and Spec sections; document why batching plus bounded scheduling is required.
+      (Req: Worker-efficient batch reads, Bounded batched traversal execution)
+
+- [x] 18.18 Run build, lint, unit, integration, and manual regression commands
+      repository and CLI: validate the complete reconciled implementation and original failure case
+      Approach: build/lint code-graph and CLI, run all code-graph tests, index via `node packages/cli/dist/index.js graph index --format toon`, run the original six-file impact command twice, compare deterministic output, and confirm host heartbeat plus clean worker shutdown.
+      (Req: all four affected specs and verification scenarios)

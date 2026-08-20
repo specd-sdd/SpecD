@@ -1,4 +1,4 @@
-import { describe, afterEach, expect, it } from 'vitest'
+import { describe, afterEach, expect, it, vi } from 'vitest'
 import { existsSync, mkdtempSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
@@ -17,6 +17,7 @@ import {
   SymbolSpace,
 } from '../../../src/domain/value-objects/symbol-reference.js'
 import { SQLiteGraphStore } from '../../../src/infrastructure/sqlite/sqlite-graph-store.js'
+import { SQLiteWorkerClient } from '../../../src/infrastructure/sqlite/sqlite-worker-client.js'
 import {
   SQLITE_SCHEMA_DDL,
   SQLITE_SCHEMA_VERSION,
@@ -42,10 +43,98 @@ graphStoreContractTests(
 
 describe('SQLiteGraphStore', () => {
   afterEach(() => {
+    vi.restoreAllMocks()
     if (tempDir) {
       rmSync(tempDir, { recursive: true, force: true })
       tempDir = undefined
     }
+  })
+
+  it('uses one RPC per non-empty traversal batch and no RPC for empty inputs', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-rpc-batch-'))
+    const store = new SQLiteGraphStore(tempDir)
+    const sendRequest = vi.spyOn(SQLiteWorkerClient.prototype, 'sendRequest')
+    sendRequest.mockResolvedValue([])
+
+    await expect(store.getSymbolsByIds([])).resolves.toEqual([])
+    await expect(store.getIncomingSymbolRelations([], [RelationType.Calls])).resolves.toEqual([])
+    await expect(store.getOutgoingSymbolRelations(['symbol'], [])).resolves.toEqual([])
+    expect(sendRequest).not.toHaveBeenCalled()
+
+    await store.getSymbolsByIds(['symbol'])
+    await store.getIncomingSymbolRelations(['symbol'], [RelationType.Calls])
+    await store.getOutgoingSymbolRelations(['symbol'], [RelationType.Calls])
+
+    expect(sendRequest.mock.calls).toEqual([
+      ['getSymbolsByIds', { symbolIds: ['symbol'] }],
+      [
+        'getIncomingSymbolRelations',
+        { symbolIds: ['symbol'], relationTypes: [RelationType.Calls] },
+      ],
+      [
+        'getOutgoingSymbolRelations',
+        { symbolIds: ['symbol'], relationTypes: [RelationType.Calls] },
+      ],
+    ])
+  })
+
+  it('chunks more than 900 traversal ids inside one worker request without loss', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-large-read-batch-'))
+    const store = new SQLiteGraphStore(tempDir)
+    await store.open()
+    const file = createFileNode({
+      path: 'core:src/wide.ts',
+      configRelativePath: 'src/wide.ts',
+      language: 'typescript',
+      contentHash: 'sha256:wide',
+      workspace: 'core',
+    })
+    const target = createSymbolNode({
+      name: 'target',
+      kind: SymbolKind.Function,
+      filePath: file.path,
+      line: 1,
+      column: 0,
+    })
+    const sources = Array.from({ length: 905 }, (_, index) =>
+      createSymbolNode({
+        name: `source${String(index)}`,
+        kind: SymbolKind.Function,
+        filePath: file.path,
+        line: index + 2,
+        column: 0,
+      }),
+    )
+    const relations = sources.map((source, index) =>
+      createRelation({
+        source: source.id,
+        target: target.id,
+        type: index % 2 === 0 ? RelationType.Calls : RelationType.UsesType,
+      }),
+    )
+    await store.bulkLoad({ files: [file], symbols: [target, ...sources], specs: [], relations })
+
+    const requestedIds = [...sources.map((symbol) => symbol.id).reverse(), sources[0]!.id]
+    const symbols = await store.getSymbolsByIds(requestedIds)
+    const outgoing = await store.getOutgoingSymbolRelations(requestedIds, [
+      RelationType.UsesType,
+      RelationType.Calls,
+    ])
+
+    expect(symbols.map((symbol) => symbol.id)).toEqual(sources.map((symbol) => symbol.id).reverse())
+    expect(outgoing).toHaveLength(relations.length)
+    expect(new Set(outgoing.map((relation) => `${relation.source}:${relation.type}`)).size).toBe(
+      relations.length,
+    )
+    expect(outgoing).toEqual(
+      [...outgoing].sort(
+        (left, right) =>
+          left.source.localeCompare(right.source) ||
+          left.type.localeCompare(right.type) ||
+          left.target.localeCompare(right.target),
+      ),
+    )
+    await store.close()
   })
 
   it('batches large freshness observation lookups below SQLite expression limits', async () => {

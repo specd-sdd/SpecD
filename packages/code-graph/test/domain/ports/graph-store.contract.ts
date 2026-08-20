@@ -247,6 +247,80 @@ export function graphStoreContractTests(
       expect(await store.getSymbol(symbol.id)).toEqual(symbol)
     })
 
+    it('batches symbols and traversal relations deterministically', async () => {
+      const file = createFileNode({
+        path: 'core:src/batch.ts',
+        configRelativePath: 'src/batch.ts',
+        language: 'typescript',
+        contentHash: 'sha256:batch',
+        workspace: 'core',
+      })
+      const symbols = Array.from({ length: 7 }, (_, index) =>
+        createSymbolNode({
+          name: `symbol${String(index)}`,
+          kind: SymbolKind.Function,
+          filePath: file.path,
+          line: index + 1,
+          column: 0,
+        }),
+      )
+      const relationTypes = [
+        RelationType.Calls,
+        RelationType.Constructs,
+        RelationType.UsesType,
+        RelationType.Extends,
+        RelationType.Implements,
+        RelationType.Overrides,
+      ] as const
+      const relations = relationTypes.map((type, index) =>
+        createRelation({ source: symbols[index + 1]!.id, target: symbols[0]!.id, type }),
+      )
+
+      await store.bulkLoad({ files: [file], symbols, specs: [], relations })
+
+      expect(
+        await store.getSymbolsByIds([
+          symbols[2]!.id,
+          'unknown-symbol',
+          symbols[0]!.id,
+          symbols[2]!.id,
+        ]),
+      ).toEqual([symbols[2], symbols[0]])
+      expect(await store.getSymbolsByIds([])).toEqual([])
+
+      const incoming = await store.getIncomingSymbolRelations(
+        [symbols[0]!.id, symbols[0]!.id, 'unknown-symbol'],
+        relationTypes,
+      )
+      expect(incoming).toEqual(
+        [...relations].sort(
+          (left, right) =>
+            left.source.localeCompare(right.source) ||
+            left.type.localeCompare(right.type) ||
+            left.target.localeCompare(right.target),
+        ),
+      )
+
+      const outgoing = await store.getOutgoingSymbolRelations(
+        [symbols[3]!.id, symbols[1]!.id, symbols[3]!.id],
+        relationTypes,
+      )
+      expect(outgoing).toEqual(
+        relations
+          .filter(
+            (relation) => relation.source === symbols[1]!.id || relation.source === symbols[3]!.id,
+          )
+          .sort(
+            (left, right) =>
+              left.source.localeCompare(right.source) ||
+              left.type.localeCompare(right.type) ||
+              left.target.localeCompare(right.target),
+          ),
+      )
+      expect(await store.getIncomingSymbolRelations([], relationTypes)).toEqual([])
+      expect(await store.getOutgoingSymbolRelations([symbols[0]!.id], [])).toEqual([])
+    })
+
     it('stages bounded bulk-session chunks until one commit and deduplicates relations', async () => {
       const file = createFileNode({
         path: 'core:src/bulk.ts',

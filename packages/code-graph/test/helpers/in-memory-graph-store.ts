@@ -501,6 +501,42 @@ export class InMemoryGraphStore extends GraphStore {
     return this.symbols.get(id)
   }
 
+  async getSymbolsByIds(symbolIds: readonly string[]): Promise<SymbolNode[]> {
+    this.ensureOpen()
+    const results: SymbolNode[] = []
+    for (const symbolId of new Set(symbolIds)) {
+      const symbol = this.symbols.get(symbolId)
+      if (symbol !== undefined) results.push(symbol)
+    }
+    return results
+  }
+
+  async getIncomingSymbolRelations(
+    symbolIds: readonly string[],
+    relationTypes: readonly RelationType[],
+  ): Promise<Relation[]> {
+    this.ensureOpen()
+    if (symbolIds.length === 0 || relationTypes.length === 0) return []
+    const targets = new Set(symbolIds)
+    const types = new Set(relationTypes)
+    return this.relations
+      .filter((relation) => targets.has(relation.target) && types.has(relation.type))
+      .sort(compareRelations)
+  }
+
+  async getOutgoingSymbolRelations(
+    symbolIds: readonly string[],
+    relationTypes: readonly RelationType[],
+  ): Promise<Relation[]> {
+    this.ensureOpen()
+    if (symbolIds.length === 0 || relationTypes.length === 0) return []
+    const sources = new Set(symbolIds)
+    const types = new Set(relationTypes)
+    return this.relations
+      .filter((relation) => sources.has(relation.source) && types.has(relation.type))
+      .sort(compareRelations)
+  }
+
   async getSpec(specId: string): Promise<SpecNode | undefined> {
     this.ensureOpen()
     return this.specs.get(specId)

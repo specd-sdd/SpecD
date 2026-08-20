@@ -1,0 +1,38 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Query methods'
+  content: |
+    ### Requirement: Batched symbol traversal reads
+
+    #### Scenario: Batch symbol lookup deduplicates and preserves requested order
+
+    - **GIVEN** a requested id list contains duplicates, existing symbols, and an unknown id
+    - **WHEN** `getSymbolsByIds()` is called
+    - **THEN** each existing symbol is returned once in requested-id order
+    - **AND** the unknown id is omitted
+
+    #### Scenario: Relation batches filter and order the requested relation set
+
+    - **GIVEN** the graph contains incoming and outgoing traversal relations of requested and unrequested types
+    - **WHEN** incoming and outgoing batch queries request several symbol ids and relation types
+    - **THEN** only relations matching the requested direction, ids, and types are returned
+    - **AND** results are ordered by source, type, then target
+    - **AND** `CALLS`, `CONSTRUCTS`, `USES_TYPE`, `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES` are supported
+
+    #### Scenario: Empty batch performs no backend work
+
+    - **WHEN** a symbol batch has no ids or a relation batch has no ids or relation types
+    - **THEN** the result is an empty array
+    - **AND** the backend query primitive is not invoked
+
+    #### Scenario: Logical batch does not fan out by symbol or relation type
+
+    - **GIVEN** a logical batch contains many distinct symbols and several relation types
+    - **WHEN** a conforming backend executes it
+    - **THEN** backend instrumentation observes a bounded batch operation rather than one storage call per symbol or relation type
+    - **AND** transparent physical parameter chunking does not change the result

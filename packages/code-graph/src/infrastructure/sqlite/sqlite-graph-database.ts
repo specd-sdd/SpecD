@@ -1,6 +1,7 @@
 import { mkdirSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { StoreNotOpenError } from '../../domain/errors/store-not-open-error.js'
+import { GraphSchemaIncompatibleError } from '../../domain/errors/graph-schema-incompatible-error.js'
 import { expandSearchQuery } from '../../domain/services/expand-search-query.js'
 import { expandSymbolName } from '../../domain/services/expand-symbol-name.js'
 import { matchesExclude } from '../../domain/services/matches-exclude.js'
@@ -89,6 +90,28 @@ const SYMBOL_DEPENDENCY_RELATION_TYPES = [
   RelationType.Constructs,
   RelationType.UsesType,
 ] as const
+
+const SQLITE_BATCH_PARAMETER_LIMIT = 900
+const SYMBOL_ROW_COLUMNS =
+  'id, name, kind, file_path, parent_id, line, column_number, end_line, end_column, selection_start_line, selection_start_column, selection_end_line, selection_end_column, comment'
+
+/** Raw SQLite row projected into a domain symbol. */
+interface SymbolRow {
+  readonly id: string
+  readonly name: string
+  readonly kind: string
+  readonly file_path: string
+  readonly parent_id: string | null
+  readonly line: number
+  readonly column_number: number
+  readonly end_line: number
+  readonly end_column: number
+  readonly selection_start_line: number
+  readonly selection_start_column: number
+  readonly selection_end_line: number
+  readonly selection_end_column: number
+  readonly comment: string | null
+}
 
 /**
  * Represents relation row.
@@ -462,6 +485,56 @@ export class SQLiteGraphDatabase {
         }
       | undefined
     return row === undefined ? undefined : this.mapSymbolRow(row)
+  }
+
+  /**
+   * Retrieves a deterministic logical batch of symbols.
+   * @param symbolIds - Symbol identifiers to retrieve.
+   * @returns Existing symbols in first requested-id order.
+   */
+  getSymbolsByIds(symbolIds: readonly string[]): SymbolNode[] {
+    const uniqueIds = [...new Set(symbolIds)]
+    if (uniqueIds.length === 0) return []
+
+    const symbolsById = new Map<string, SymbolNode>()
+    for (const ids of chunksOf(uniqueIds, SQLITE_BATCH_PARAMETER_LIMIT)) {
+      const placeholders = ids.map(() => '?').join(', ')
+      const rows = this.statement(
+        `SELECT ${SYMBOL_ROW_COLUMNS} FROM symbols WHERE id IN (${placeholders})`,
+      ).all(...ids) as SymbolRow[]
+      for (const row of rows) symbolsById.set(row.id, this.mapSymbolRow(row))
+    }
+
+    return uniqueIds.flatMap((id) => {
+      const symbol = symbolsById.get(id)
+      return symbol === undefined ? [] : [symbol]
+    })
+  }
+
+  /**
+   * Retrieves traversal relations targeting a logical symbol batch.
+   * @param symbolIds - Target symbol identifiers to match.
+   * @param relationTypes - Relation types to include.
+   * @returns Matching relations in deterministic order.
+   */
+  getIncomingSymbolRelations(
+    symbolIds: readonly string[],
+    relationTypes: readonly RelationTypeValue[],
+  ): Relation[] {
+    return this.getSymbolRelationsBatch('target', symbolIds, relationTypes)
+  }
+
+  /**
+   * Retrieves traversal relations originating from a logical symbol batch.
+   * @param symbolIds - Source symbol identifiers to match.
+   * @param relationTypes - Relation types to include.
+   * @returns Matching relations in deterministic order.
+   */
+  getOutgoingSymbolRelations(
+    symbolIds: readonly string[],
+    relationTypes: readonly RelationTypeValue[],
+  ): Relation[] {
+    return this.getSymbolRelationsBatch('source', symbolIds, relationTypes)
   }
 
   /**
@@ -2225,7 +2298,7 @@ export class SQLiteGraphDatabase {
    * Asserts that any existing schema version in the database is compatible with the expected version.
    *
    * @param db - The SQLite database instance to check.
-   * @throws {Error} When the schema version is incompatible.
+   * @throws {GraphSchemaIncompatibleError} When the schema version is incompatible.
    */
   private assertExistingSchemaCompatible(db: SqliteDatabase): void {
     const metaTable = db
@@ -2236,7 +2309,7 @@ export class SQLiteGraphDatabase {
       | { value: string }
       | undefined
     if (current !== undefined && Number(current.value) !== SQLITE_SCHEMA_VERSION) {
-      throw new Error(
+      throw new GraphSchemaIncompatibleError(
         `SQLite graph storage schema ${current.value} is incompatible with expected ${SQLITE_SCHEMA_VERSION}; reindex to recreate derived storage`,
       )
     }
@@ -2245,7 +2318,7 @@ export class SQLiteGraphDatabase {
   /**
    * Ensures the database schema version record exists and matches expected version.
    *
-   * @throws {Error} When the schema version is incompatible.
+   * @throws {GraphSchemaIncompatibleError} When the schema version is incompatible.
    */
   private ensureSchemaVersion(): void {
     const db = this.ensureOpen()
@@ -2260,7 +2333,7 @@ export class SQLiteGraphDatabase {
       db.close()
       this.db = undefined
       this.preparedStatements.clear()
-      throw new Error(
+      throw new GraphSchemaIncompatibleError(
         `SQLite graph storage schema ${current.value} is incompatible with expected ${SQLITE_SCHEMA_VERSION}; reindex to recreate derived storage`,
       )
     }
@@ -2779,6 +2852,43 @@ export class SQLiteGraphDatabase {
         `SELECT source, target, type, metadata_json FROM relations WHERE type IN (${placeholders}) AND target = ?`,
       ).all(...types, target) as RelationRow[],
     )
+  }
+
+  /**
+   * Executes a set-based traversal-relation lookup with bounded SQL parameters.
+   * @param direction - Relation endpoint matched against the symbol ids.
+   * @param symbolIds - Symbol identifiers to match.
+   * @param relationTypes - Relation types to include.
+   * @returns Deduplicated relations ordered by source, type, then target.
+   * @throws {RangeError} If relation types consume the complete SQLite parameter budget.
+   */
+  private getSymbolRelationsBatch(
+    direction: 'source' | 'target',
+    symbolIds: readonly string[],
+    relationTypes: readonly RelationTypeValue[],
+  ): Relation[] {
+    const uniqueIds = [...new Set(symbolIds)]
+    const uniqueTypes = [...new Set(relationTypes)].sort()
+    if (uniqueIds.length === 0 || uniqueTypes.length === 0) return []
+
+    const idChunkSize = SQLITE_BATCH_PARAMETER_LIMIT - uniqueTypes.length
+    if (idChunkSize < 1) {
+      throw new RangeError('relationTypes exceed the SQLite batch parameter limit')
+    }
+
+    const relationRows = new Map<string, RelationRow>()
+    const typePlaceholders = uniqueTypes.map(() => '?').join(', ')
+    for (const ids of chunksOf(uniqueIds, idChunkSize)) {
+      const idPlaceholders = ids.map(() => '?').join(', ')
+      const rows = this.statement(
+        `SELECT source, target, type, metadata_json FROM relations WHERE ${direction} IN (${idPlaceholders}) AND type IN (${typePlaceholders})`,
+      ).all(...ids, ...uniqueTypes) as RelationRow[]
+      for (const row of rows) {
+        relationRows.set(`${row.source}\u0000${row.type}\u0000${row.target}`, row)
+      }
+    }
+
+    return this.readRelations([...relationRows.values()]).sort(compareRelations)
   }
 
   /**
@@ -3812,6 +3922,34 @@ function toComponentNeedle(value: string): string {
  */
 function escapeLikePattern(value: string): string {
   return value.replaceAll('\\', '\\\\').replaceAll('%', '\\%').replaceAll('_', '\\_')
+}
+
+/**
+ * Splits a readonly list into non-empty bounded chunks.
+ * @param values - Values to split.
+ * @param size - Maximum values per chunk.
+ * @returns Ordered non-empty chunks.
+ */
+function chunksOf<T>(values: readonly T[], size: number): T[][] {
+  const chunks: T[][] = []
+  for (let offset = 0; offset < values.length; offset += size) {
+    chunks.push(values.slice(offset, offset + size))
+  }
+  return chunks
+}
+
+/**
+ * Orders relations by their stable storage-neutral identity.
+ * @param left - Left relation.
+ * @param right - Right relation.
+ * @returns Negative, zero, or positive comparison result.
+ */
+function compareRelations(left: Relation, right: Relation): number {
+  return (
+    left.source.localeCompare(right.source) ||
+    left.type.localeCompare(right.type) ||
+    left.target.localeCompare(right.target)
+  )
 }
 
 /**

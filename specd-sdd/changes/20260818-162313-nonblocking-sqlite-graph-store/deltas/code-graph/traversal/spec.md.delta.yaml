@@ -1,0 +1,27 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Downstream traversal'
+  content: |
+    ### Requirement: Bounded batched traversal execution
+
+    Upstream and downstream breadth-first traversal SHALL query each frontier through
+    the `GraphStore` batch symbol and relation operations. One frontier MUST NOT
+    issue one store request per symbol or per relation type. Newly reached symbol ids
+    SHALL be deduplicated before their nodes are fetched in one logical batch.
+
+    File impact, multi-file impact, change detection, and any per-symbol impact
+    aggregation MUST use a fixed bounded concurrency budget whose number of active
+    store operations does not grow with the number of input files, symbols, or
+    frontier width. Multi-file impact SHALL share one memoized read view and one
+    concurrency budget across all input files.
+
+    Batching and scheduling MUST preserve the existing traversal direction, depth,
+    cycle handling, deterministic ordering, affected-symbol/file sets, covering-spec
+    evidence, dependent counts, and risk calculation. Backpressure is an adapter
+    safety boundary; a valid traversal over a wide graph MUST NOT fail with
+    `StoreOverloadError` merely because its input contains many distinct symbols.

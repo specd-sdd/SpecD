@@ -190,6 +190,11 @@ export { expandSearchQuery, expandSearchToken } from './domain/services/expand-s
 export { isGraphStale } from './domain/services/is-graph-stale.js'
 export { analyzeFilesImpact } from './domain/services/analyze-files-impact.js'
 export { normalizeFileSelectorPath } from './application/services/resolve-graph-selector.js'
+export type {
+  ResolvedFileSelector,
+  ResolvedSymbolSelector,
+  ResolvedSymbolSelectorResult,
+} from './application/services/resolve-graph-selector.js'
 export {
   computeGraphFingerprint,
   computeRootFingerprint,
@@ -220,6 +225,9 @@ import { readInstalledCodeGraphVersion } from './application/use-cases/_shared/i
 export { SpecNotFoundError } from './domain/errors/spec-not-found-error.js'
 export { StoreOverloadError } from './domain/errors/store-overload-error.js'
 export { StoreWorkerError } from './domain/errors/store-worker-error.js'
+export { BulkSessionStateError } from './domain/errors/bulk-session-state-error.js'
+export { InvalidGraphStoreConfigurationError } from './domain/errors/invalid-graph-store-configuration-error.js'
+export { GraphSchemaIncompatibleError } from './domain/errors/graph-schema-incompatible-error.js'
 export { acquireGraphIndexLock, getGraphIndexLockPath } from './infrastructure/index-lock.js'
 
 /** Installed version of `@specd/code-graph`. */

@@ -3,6 +3,7 @@ import { type DocumentNode } from '../value-objects/document-node.js'
 import { type SymbolNode } from '../value-objects/symbol-node.js'
 import { type SpecNode } from '../value-objects/spec-node.js'
 import { type Relation } from '../value-objects/relation.js'
+import { type RelationType } from '../value-objects/relation-type.js'
 import { type SymbolQuery } from '../value-objects/symbol-query.js'
 import { type GraphStatistics } from '../value-objects/graph-statistics.js'
 import { type SearchOptions } from '../value-objects/search-options.js'
@@ -438,6 +439,37 @@ export abstract class GraphStore {
    * @returns The matching symbol node, or undefined if not found.
    */
   abstract getSymbol(id: string): Promise<SymbolNode | undefined>
+
+  /**
+   * Retrieves existing symbols for a logical batch of identifiers.
+   * Duplicate identifiers are ignored, unknown identifiers are omitted, and
+   * results follow the first requested-id order.
+   * @param symbolIds - Symbol identifiers to retrieve.
+   * @returns Existing symbols in deterministic requested-id order.
+   */
+  abstract getSymbolsByIds(symbolIds: readonly string[]): Promise<SymbolNode[]>
+
+  /**
+   * Retrieves traversal relations targeting any requested symbol.
+   * @param symbolIds - Target symbol identifiers to match.
+   * @param relationTypes - Relation types to include.
+   * @returns Matching relations ordered by source, type, then target.
+   */
+  abstract getIncomingSymbolRelations(
+    symbolIds: readonly string[],
+    relationTypes: readonly RelationType[],
+  ): Promise<Relation[]>
+
+  /**
+   * Retrieves traversal relations originating from any requested symbol.
+   * @param symbolIds - Source symbol identifiers to match.
+   * @param relationTypes - Relation types to include.
+   * @returns Matching relations ordered by source, type, then target.
+   */
+  abstract getOutgoingSymbolRelations(
+    symbolIds: readonly string[],
+    relationTypes: readonly RelationType[],
+  ): Promise<Relation[]>
 
   /**
    * Retrieves a spec node by its id.

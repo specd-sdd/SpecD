@@ -13,6 +13,7 @@ import { type DocumentNode } from '../../domain/value-objects/document-node.js'
 import { type FileNode } from '../../domain/value-objects/file-node.js'
 import { type GraphStatistics } from '../../domain/value-objects/graph-statistics.js'
 import { type Relation } from '../../domain/value-objects/relation.js'
+import { type RelationType } from '../../domain/value-objects/relation-type.js'
 import { type SearchOptions } from '../../domain/value-objects/search-options.js'
 import { type SpecNode } from '../../domain/value-objects/spec-node.js'
 import { type SymbolNode } from '../../domain/value-objects/symbol-node.js'
@@ -42,6 +43,7 @@ import { SQLiteWorkerClient } from './sqlite-worker-client.js'
 import { type InternalSQLiteGraphStoreOptions } from './sqlite-runtime-descriptor.js'
 import { rotateStorageGenerationAsync } from '../storage-generation.js'
 import { StoreNotOpenError } from '../../domain/errors/store-not-open-error.js'
+import { BulkSessionStateError } from '../../domain/errors/bulk-session-state-error.js'
 
 /** Default maximum number of entities staged per bulk staging RPC. */
 const BULK_RPC_CHUNK_SIZE = 1000
@@ -292,6 +294,44 @@ export class SQLiteGraphStore extends GraphStore {
    */
   async getSymbol(id: string): Promise<SymbolNode | undefined> {
     return this.client.sendRequest('getSymbol', { symbolId: id })
+  }
+
+  /**
+   * Retrieves a logical batch of symbols through one worker request.
+   * @param symbolIds - Symbol identifiers to retrieve.
+   * @returns Existing symbols in deterministic requested-id order.
+   */
+  async getSymbolsByIds(symbolIds: readonly string[]): Promise<SymbolNode[]> {
+    if (symbolIds.length === 0) return []
+    return this.client.sendRequest('getSymbolsByIds', { symbolIds })
+  }
+
+  /**
+   * Retrieves incoming traversal relations through one worker request.
+   * @param symbolIds - Target symbol identifiers to match.
+   * @param relationTypes - Relation types to include.
+   * @returns Matching relations in deterministic order.
+   */
+  async getIncomingSymbolRelations(
+    symbolIds: readonly string[],
+    relationTypes: readonly RelationType[],
+  ): Promise<Relation[]> {
+    if (symbolIds.length === 0 || relationTypes.length === 0) return []
+    return this.client.sendRequest('getIncomingSymbolRelations', { symbolIds, relationTypes })
+  }
+
+  /**
+   * Retrieves outgoing traversal relations through one worker request.
+   * @param symbolIds - Source symbol identifiers to match.
+   * @param relationTypes - Relation types to include.
+   * @returns Matching relations in deterministic order.
+   */
+  async getOutgoingSymbolRelations(
+    symbolIds: readonly string[],
+    relationTypes: readonly RelationType[],
+  ): Promise<Relation[]> {
+    if (symbolIds.length === 0 || relationTypes.length === 0) return []
+    return this.client.sendRequest('getOutgoingSymbolRelations', { symbolIds, relationTypes })
   }
 
   /**
@@ -870,14 +910,14 @@ export class SQLiteGraphStore extends GraphStore {
    * @param metadata - Metadata committed with the indexed generation.
    * @returns An atomic write session staging items on the host and committing in worker.
    * @throws {StoreNotOpenError} When the graph store is not open.
-   * @throws {Error} When another bulk index session is already active.
+   * @throws {BulkSessionStateError} When another bulk index session is already active.
    */
   override beginBulkIndexSession(metadata: IndexWriteSessionMetadata = {}): IndexWriteSession {
     if (!this.client.isOpen) {
       throw new StoreNotOpenError()
     }
     if (this.activeBulkSessionId !== undefined) {
-      throw new Error('A bulk index session is already active')
+      throw new BulkSessionStateError('A bulk index session is already active')
     }
 
     const sessionId = randomUUID()
@@ -895,7 +935,7 @@ export class SQLiteGraphStore extends GraphStore {
     }
 
     const assertNotFinished = (): void => {
-      if (finished) throw new Error('Bulk index session is already finished')
+      if (finished) throw new BulkSessionStateError('Bulk index session is already finished')
       if (
         this.activeBulkSessionId !== sessionId ||
         this.client.lifecycleGeneration !== sessionGeneration ||
@@ -910,7 +950,7 @@ export class SQLiteGraphStore extends GraphStore {
     const assertWritable = (): void => {
       assertNotFinished()
       if (state !== 'active') {
-        throw new Error(
+        throw new BulkSessionStateError(
           `Bulk index session is "${state}"; writes, removals, and commit are only allowed while active`,
         )
       }

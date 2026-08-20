@@ -5,6 +5,9 @@ import { StoreWorkerError } from '../../domain/errors/store-worker-error.js'
 import { GraphBusyError } from '../../domain/errors/graph-busy-error.js'
 import { GraphProviderStaleError } from '../../domain/errors/graph-provider-stale-error.js'
 import { SpecNotFoundError } from '../../domain/errors/spec-not-found-error.js'
+import { BulkSessionStateError } from '../../domain/errors/bulk-session-state-error.js'
+import { InvalidGraphStoreConfigurationError } from '../../domain/errors/invalid-graph-store-configuration-error.js'
+import { GraphSchemaIncompatibleError } from '../../domain/errors/graph-schema-incompatible-error.js'
 import { resolveSqliteWorkerPath } from './resolve-worker-path.js'
 import {
   type SerializedErrorPayload,
@@ -134,6 +137,15 @@ export function deserializeWorkerError(payload: SerializedErrorPayload): Error {
     Object.assign(err, { code: 'SPEC_NOT_FOUND' })
     return err
   }
+  if (payload.code === 'BULK_SESSION_STATE') {
+    return new BulkSessionStateError(payload.message)
+  }
+  if (payload.code === 'INVALID_GRAPH_STORE_CONFIGURATION') {
+    return new InvalidGraphStoreConfigurationError(payload.message)
+  }
+  if (payload.code === 'GRAPH_SCHEMA_INCOMPATIBLE') {
+    return new GraphSchemaIncompatibleError(payload.message)
+  }
 
   const err = new Error(payload.message)
   err.name = payload.name || 'Error'
@@ -227,7 +239,7 @@ export class SQLiteWorkerClient {
     if (options?.maxPendingOperations !== undefined) {
       const limit = options.maxPendingOperations
       if (typeof limit !== 'number' || !Number.isInteger(limit) || limit < 1) {
-        throw new Error(
+        throw new InvalidGraphStoreConfigurationError(
           `Invalid maxPendingOperations: expected integer >= 1, received ${String(limit)}`,
         )
       }

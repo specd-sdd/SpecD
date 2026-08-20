@@ -6,7 +6,20 @@ import {
   type ImpactResult,
 } from '../value-objects/impact-result.js'
 import { computeRiskLevel, maxRisk } from '../value-objects/risk-level.js'
+import { type Relation } from '../value-objects/relation.js'
+import { type RelationType } from '../value-objects/relation-type.js'
+import { type SymbolNode } from '../value-objects/symbol-node.js'
 import { analyzeImpact, type ImpactResolutionProvider } from './analyze-impact.js'
+import { mapWithConcurrency } from './map-with-concurrency.js'
+
+/** Maximum active impact analyses in one top-level file-impact operation. */
+export const IMPACT_CONCURRENCY = 4
+
+/** Shared read view and budget supplied by multi-file impact aggregation. */
+export interface ImpactExecutionContext {
+  readonly store: GraphStore
+  readonly concurrency: number
+}
 
 /**
  * Analyzes the combined impact of all symbols within a file.
@@ -46,6 +59,7 @@ export interface FileImpactDetails {
  * @param direction - Traversal direction.
  * @param maxDepth - Traversal limit.
  * @param resolve - Optional semantic target resolver.
+ * @param context - Optional shared memoized store and concurrency budget.
  * @returns Impact plus shallowest file/symbol depths.
  */
 export async function analyzeFileImpactDetails(
@@ -54,20 +68,20 @@ export async function analyzeFileImpactDetails(
   direction: 'upstream' | 'downstream' | 'both',
   maxDepth = 3,
   resolve?: ImpactResolutionProvider,
+  context?: ImpactExecutionContext,
 ): Promise<FileImpactDetails> {
-  const cachedStore = createMemoizedReadStore(store)
+  const cachedStore = context?.store ?? createMemoizedReadStore(store)
+  const symbolConcurrency = context === undefined ? IMPACT_CONCURRENCY : 1
 
   // Symbol-level impact via CALLS
   const symbols = await cachedStore.findSymbols({ filePath })
-  const symbolResults = await Promise.all(
-    symbols.map(async (symbol) =>
-      analyzeImpact(
-        cachedStore,
-        symbol.id,
-        direction,
-        maxDepth,
-        resolve === undefined ? undefined : await resolve(symbol.id),
-      ),
+  const symbolResults = await mapWithConcurrency(symbols, symbolConcurrency, async (symbol) =>
+    analyzeImpact(
+      cachedStore,
+      symbol.id,
+      direction,
+      maxDepth,
+      resolve === undefined ? undefined : await resolve(symbol.id),
     ),
   )
 
@@ -334,8 +348,9 @@ function deduplicateSymbols(symbols: readonly AffectedSymbol[]): AffectedSymbol[
  * @param store - The underlying graph store.
  * @returns A read-through memoized view over the same store.
  */
-function createMemoizedReadStore(store: GraphStore): GraphStore {
+export function createMemoizedReadStore(store: GraphStore): GraphStore {
   const cache = new Map<string, Promise<unknown>>()
+  const symbolCache = new Map<string, Promise<SymbolNode | undefined>>()
   const memoizedStore = Object.create(store) as GraphStore
 
   const memoize = <T>(methodName: string, call: (...args: readonly unknown[]) => Promise<T>) => {
@@ -353,7 +368,54 @@ function createMemoizedReadStore(store: GraphStore): GraphStore {
   }
 
   memoizedStore.getFile = memoize('getFile', (path) => store.getFile(path as string))
-  memoizedStore.getSymbol = memoize('getSymbol', (id) => store.getSymbol(id as string))
+  memoizedStore.getSymbol = async (id): Promise<SymbolNode | undefined> => {
+    const cached = symbolCache.get(id)
+    if (cached !== undefined) return cached
+    const pending = store.getSymbol(id)
+    symbolCache.set(id, pending)
+    return pending
+  }
+  memoizedStore.getSymbolsByIds = async (symbolIds): Promise<SymbolNode[]> => {
+    const uniqueIds = [...new Set(symbolIds)]
+    const missingIds = uniqueIds.filter((id) => !symbolCache.has(id))
+    if (missingIds.length > 0) {
+      const found = await store.getSymbolsByIds(missingIds)
+      const foundById = new Map(found.map((symbol) => [symbol.id, symbol]))
+      for (const id of missingIds) symbolCache.set(id, Promise.resolve(foundById.get(id)))
+    }
+    const symbols = await Promise.all(uniqueIds.map((id) => symbolCache.get(id)!))
+    return symbols.filter((symbol): symbol is SymbolNode => symbol !== undefined)
+  }
+  const memoizeRelationBatch = (
+    methodName: string,
+    call: (
+      symbolIds: readonly string[],
+      relationTypes: readonly RelationType[],
+    ) => Promise<Relation[]>,
+  ) => {
+    return async (
+      symbolIds: readonly string[],
+      relationTypes: readonly RelationType[],
+    ): Promise<Relation[]> => {
+      const ids = [...new Set(symbolIds)].sort()
+      const types = [...new Set(relationTypes)].sort()
+      if (ids.length === 0 || types.length === 0) return []
+      const key = `${methodName}:${JSON.stringify([ids, types])}`
+      const cached = cache.get(key)
+      if (cached !== undefined) return cached as Promise<Relation[]>
+      const pending = call(ids, types)
+      cache.set(key, pending)
+      return pending
+    }
+  }
+  memoizedStore.getIncomingSymbolRelations = memoizeRelationBatch(
+    'getIncomingSymbolRelations',
+    (ids, types) => store.getIncomingSymbolRelations(ids, types),
+  )
+  memoizedStore.getOutgoingSymbolRelations = memoizeRelationBatch(
+    'getOutgoingSymbolRelations',
+    (ids, types) => store.getOutgoingSymbolRelations(ids, types),
+  )
   memoizedStore.getSpec = memoize('getSpec', (specId) => store.getSpec(specId as string))
   memoizedStore.getCallers = memoize('getCallers', (id) => store.getCallers(id as string))
   memoizedStore.getCallees = memoize('getCallees', (id) => store.getCallees(id as string))

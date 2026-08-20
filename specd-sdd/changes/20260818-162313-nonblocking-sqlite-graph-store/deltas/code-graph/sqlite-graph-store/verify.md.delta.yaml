@@ -185,6 +185,37 @@
     - **WHEN** the store is closed, the worker crashes, or `recreate()` is called
     - **THEN** subsequent calls to `session.writeFiles()`, `session.commit()`, or `session.rollback()` reject with `StoreNotOpenError`
 
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Worker-backed non-blocking execution'
+  content: |
+    ### Requirement: Worker-efficient batch reads
+
+    #### Scenario: Logical batch crosses the worker boundary once
+
+    - **GIVEN** a batch contains several symbol ids and several supported relation types
+    - **WHEN** symbols, incoming relations, or outgoing relations are requested
+    - **THEN** each logical batch is sent as one worker RPC
+    - **AND** the worker executes set-based lookup rather than one RPC per symbol or relation type
+
+    #### Scenario: Large batches are chunked transparently inside the worker
+
+    - **GIVEN** a batch exceeds SQLite's safe parameter count
+    - **WHEN** the worker executes the batch query
+    - **THEN** it divides the query into deterministic bounded SQL parameter chunks
+    - **AND** the merged result preserves the abstract contract's deterministic order
+    - **AND** no valid requested symbol or relation is lost or duplicated
+
+    #### Scenario: Empty batch avoids worker and SQLite work
+
+    - **WHEN** a batch symbol query has no symbol ids or a relation query has no ids or relation types
+    - **THEN** it returns an empty array without dispatching a worker RPC or executing SQL
+
 - op: modified
   selector:
     type: section
@@ -209,6 +240,16 @@
     - **WHEN** a repository is indexed in bulk through `SQLiteGraphStore`
     - **THEN** the staged payload is committed atomically in the worker
     - **AND** serializable progress events are received and forwarded to the caller's progress callback
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Scenario: All required relation families are stored'
+  content: |
+    - **WHEN** the SQLite schema is initialized for a fresh graph database
+    - **THEN** persisted storage exists for `IMPORTS`, `DEFINES`, `CALLS`, `CONSTRUCTS`,
+      `USES_TYPE`, `EXPORTS`, `DEPENDS_ON`, `COVERS_FILE`, `COVERS_SYMBOL`, `EXTENDS`,
+      `IMPLEMENTS`, and `OVERRIDES`
 
 - op: modified
   selector:

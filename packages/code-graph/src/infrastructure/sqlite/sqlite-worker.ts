@@ -14,10 +14,12 @@ import { type DocumentNode } from '../../domain/value-objects/document-node.js'
 import { type SymbolNode } from '../../domain/value-objects/symbol-node.js'
 import { type SpecNode } from '../../domain/value-objects/spec-node.js'
 import { type Relation } from '../../domain/value-objects/relation.js'
+import { type RelationType } from '../../domain/value-objects/relation-type.js'
 import { type SymbolQuery } from '../../domain/value-objects/symbol-query.js'
 import { type SearchOptions } from '../../domain/value-objects/search-options.js'
 import { type SourceContentCandidateQuery } from '../../domain/value-objects/source-search.js'
 import { SpecNotFoundError } from '../../domain/errors/spec-not-found-error.js'
+import { BulkSessionStateError } from '../../domain/errors/bulk-session-state-error.js'
 import {
   type IndexedInputObservation,
   type IndexedResourceKey,
@@ -60,7 +62,8 @@ export function serializeError(error: unknown): SerializedErrorPayload {
 }
 
 /**
- *
+ * Worker-side accumulator for a bulk index session, staging entity chunks
+ * progressively until a single atomic commit transaction.
  */
 interface WorkerBulkSession {
   files: FileNode[]
@@ -83,7 +86,7 @@ const bulkSessions = new Map<string, WorkerBulkSession>()
  *
  * @param sessionId - Unique identifier of the bulk index session.
  * @returns The freshly created empty bulk session accumulator.
- * @throws {Error} When a session with the same id already exists.
+ * @throws {BulkSessionStateError} When a session with the same id already exists.
  */
 function createBulkSession(sessionId: string): WorkerBulkSession {
   const session: WorkerBulkSession = {
@@ -108,12 +111,12 @@ function createBulkSession(sessionId: string): WorkerBulkSession {
  *
  * @param sessionId - Unique identifier of the bulk index session.
  * @returns The staged bulk session accumulator for the given id.
- * @throws {Error} When no session with the given id exists.
+ * @throws {BulkSessionStateError} When no session with the given id exists.
  */
 function requireBulkSession(sessionId: string): WorkerBulkSession {
   const session = bulkSessions.get(sessionId)
   if (!session) {
-    throw new Error(`Bulk index session "${sessionId}" not found or expired`)
+    throw new BulkSessionStateError(`Bulk index session "${sessionId}" not found or expired`)
   }
   return session
 }
@@ -200,6 +203,27 @@ export async function handleMessage(
       case 'getSymbol': {
         const p = payload as { symbolId: string }
         result = database.getSymbol(p.symbolId)
+        break
+      }
+      case 'getSymbolsByIds': {
+        const p = payload as { symbolIds: readonly string[] }
+        result = database.getSymbolsByIds(p.symbolIds)
+        break
+      }
+      case 'getIncomingSymbolRelations': {
+        const p = payload as {
+          symbolIds: readonly string[]
+          relationTypes: readonly RelationType[]
+        }
+        result = database.getIncomingSymbolRelations(p.symbolIds, p.relationTypes)
+        break
+      }
+      case 'getOutgoingSymbolRelations': {
+        const p = payload as {
+          symbolIds: readonly string[]
+          relationTypes: readonly RelationType[]
+        }
+        result = database.getOutgoingSymbolRelations(p.symbolIds, p.relationTypes)
         break
       }
       case 'findSymbols': {
@@ -500,7 +524,7 @@ export async function handleMessage(
       case 'beginBulkIndexSession': {
         const p = payload as { sessionId: string }
         if (bulkSessions.has(p.sessionId)) {
-          throw new Error(`Bulk index session "${p.sessionId}" already exists`)
+          throw new BulkSessionStateError(`Bulk index session "${p.sessionId}" already exists`)
         }
         createBulkSession(p.sessionId)
         break
