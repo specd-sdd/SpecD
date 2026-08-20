@@ -156,7 +156,10 @@ function makeImpactProgram() {
   return program
 }
 
-afterEach(() => vi.restoreAllMocks())
+afterEach(() => {
+  vi.clearAllMocks()
+  vi.restoreAllMocks()
+})
 
 describe('graph impact', () => {
   describe('--direction option', () => {

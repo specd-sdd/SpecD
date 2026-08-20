@@ -200,7 +200,7 @@ re-extract sources, and rebuild search indexes. `IndexResult.fullRebuild` and
 `IndexResult.fullRebuildReason` explain that recovery directly. Long-lived providers opened against the old generation must
 close and reopen.
 
-SQLite and Ladybug persist and query semantic identity through structured workspace,
+SQLite persists and queries semantic identity through structured workspace,
 surface, name, space, owner, member-form, and exported-name fields rather than parsing
 serialized canonical ids. Both backends version these physical/index contracts;
 opening a previous version for normal reads is incompatible, while `graph index`

@@ -2,11 +2,7 @@
 
 ## Purpose
 
-`GraphStore` is the storage contract for the code graph, but SQLite has backend-specific
-behavior that should not leak into the abstract port spec. This spec defines the
-requirements that are specific to `SQLiteGraphStore`: its physical schema, persistence
-layout, full-text search behavior, transaction model, and operational role as the
-built-in default graph-store backend once it satisfies the full Ladybug feature set.
+`GraphStore` is the storage contract for the code graph, but SQLite has backend-specific behavior that should not leak into the abstract port spec. This spec defines the requirements specific to `SQLiteGraphStore`: its physical schema, persistence layout, full-text search behavior, transaction model, and role as the sole built-in graph-store backend.
 
 ## Requirements
 
@@ -42,17 +38,17 @@ MUST create the required directories on demand.
 
 ### Requirement: Default backend role
 
-The built-in code-graph composition SHALL treat `sqlite` as the default backend id
-when no explicit `graphStoreId` is selected.
+The built-in code-graph composition SHALL register `sqlite` as its sole built-in backend and SHALL select it when no explicit `graphStoreId` is provided.
 
-The SQLite backend therefore MUST preserve the full set of currently supported graph
-behaviors that Ladybug previously backed, including:
+SQLite MUST satisfy the current `GraphStore` contract and all code-graph consumer requirements directly, including:
 
-- durable persistence of file, symbol, spec, relation, and metadata state
+- durable persistence of file, document, symbol, spec, relation, and metadata state
 - atomic mutation semantics required by the abstract `GraphStore` contract
-- full-text search for symbols and specs
+- full-text and identity-aware search required by symbol, file, spec, and document discovery
 - bulk indexing and full re-index operations
-- query support for traversal-, impact-, hotspot-, search-, and stats-facing flows
+- structured query support for traversal, references, coverage, impact, hotspots, search, and statistics
+
+SQLite defines its own storage layout, query behavior, and output contract. If an existing graph cannot be read after a backend change, a full SQLite re-index is the supported recovery path.
 
 ### Requirement: Destructive recreation
 

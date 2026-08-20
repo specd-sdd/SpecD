@@ -1,0 +1,42 @@
+- op: modified
+  description: Verify shared lifecycle and normal return for stats
+  selector:
+    type: section
+    matches: 'Requirement: Statistics retrieval'
+  content: |
+    #### Scenario: Command delegates health through shared graph context
+
+    - **WHEN** `specd graph stats` is executed in configured mode
+    - **THEN** it resolves context through `resolveGraphCliContext`
+    - **AND** it opens the provider through `withProvider`
+    - **AND** it calls `GetGraphHealth.execute()` with the orchestrated workspace list
+
+    #### Scenario: Path and no-config stats use shared bootstrap fallback
+
+    - **GIVEN** a VCS repository without a discoverable `specd.yaml`
+    - **WHEN** `specd graph stats --path <repo>` or `specd graph stats` runs there
+    - **THEN** stats uses the same synthetic default workspace context as other read-only graph commands
+
+    #### Scenario: Successful stats returns after provider cleanup
+
+    - **WHEN** `specd graph stats` completes successfully
+    - **THEN** provider cleanup finishes through `withProvider`
+    - **AND** the handler returns normally without calling `process.exit(0)`
+
+    #### Scenario: Stats consumes one canonical provider health result
+
+    - **WHEN** graph stats executes
+    - **THEN** it calls `getGraphHealth` exactly once
+    - **AND** it does not independently repeat workspace discovery or recompute health
+
+    #### Scenario: Structured health remains canonical
+
+    - **GIVEN** `getGraphHealth` returns sparse or extended canonical diagnostics
+    - **WHEN** stats renders JSON or TOON
+    - **THEN** it preserves every returned field without presenter defaults or health reconstruction
+
+    #### Scenario: Text explains absence-proof limits
+
+    - **GIVEN** health reports dirty, excluded, unsupported, parse-failed, partial, or unknown coverage
+    - **WHEN** stats renders text
+    - **THEN** it states that symbol absence cannot be proven from that incomplete coverage

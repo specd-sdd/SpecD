@@ -137,6 +137,7 @@ function makeIndexProgram() {
 }
 
 afterEach(() => {
+  vi.clearAllMocks()
   vi.restoreAllMocks()
   vi.unstubAllEnvs()
 })

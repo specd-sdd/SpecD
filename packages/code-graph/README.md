@@ -14,7 +14,7 @@ a persistent graph database for impact analysis, traversal, and full-text search
 - **Hotspot detection** — ranks symbols by how many dependents they have
 - **Change detection** — given a list of changed files, returns all transitively affected symbols
 - **Full-text search** — BM25-ranked search across symbols and spec documents
-- **Persistent storage** — backed by a registry-selected `GraphStore`, with `sqlite` as the built-in default and `ladybug` still available by explicit backend id
+- **Persistent storage** — backed by a registry-selected `GraphStore`, with SQLite as the sole built-in backend
 - **Workspace-aware** — paths and IDs are prefixed with workspace name for cross-workspace uniqueness
 
 ## Domain model
@@ -44,7 +44,7 @@ createCodeGraphProvider(config)
        │    │    ├─ GoLanguageAdapter
        │    │    ├─ PythonLanguageAdapter
        │    │    └─ PhpLanguageAdapter
-       │    └─ GraphStore (port) ← implemented by SQLiteGraphStore or LadybugGraphStore
+       │    └─ GraphStore (port) ← implemented by SQLiteGraphStore
        └─ domain services        ← getUpstream, getDownstream, analyzeImpact, computeHotspots, …
 ```
 
@@ -137,11 +137,15 @@ await provider.close()
 `createGraphProvider()` is synchronous. Native backend loading happens lazily in
 `provider.open()`.
 
-To force the legacy backend explicitly:
+External factories remain an additive composition seam, but runtime plugin loading
+is not implemented and `GraphStore` is not yet a stable plugin API:
 
 ```ts
-const legacyGraph = createCodeGraphProvider(specdConfig, {
-  graphStoreId: 'ladybug',
+const graph = createCodeGraphProvider(specdConfig, {
+  graphStoreId: 'external-store',
+  graphStoreFactories: {
+    'external-store': externalFactory,
+  },
 })
 ```
 
@@ -155,9 +159,8 @@ For the default project layout this means:
 
 Backends are selected internally by id at composition time:
 
-- default built-in backend: `sqlite`
-- alternate built-in backend: `ladybug`
-- additive custom backends can be registered with `graphStoreFactories`
+- sole built-in backend: `sqlite`
+- additive external backends can be registered with `graphStoreFactories`
 
 ## Role in specd
 

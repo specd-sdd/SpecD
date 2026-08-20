@@ -17,37 +17,18 @@
   ],
   "implementation": [
     {
-      "file": "code-graph:src/composition/code-graph-provider.ts",
-      "symbols": [
-        "CodeGraphProvider",
-        "CodeGraphProviderImpl",
-        "IndexingOpenResult",
-        "resolveSymbolReferences",
-        "getExactPublicBinding"
-      ]
+      "file": "code-graph:src/composition/create-code-graph-provider.ts",
+      "symbols": ["createCodeGraphProvider", "createGraphStoreRegistry"]
     },
     {
-      "file": "code-graph:src/composition/create-code-graph-provider.ts",
-      "symbols": ["createCodeGraphProvider"]
+      "file": "code-graph:src/composition/graph-store-factory.ts",
+      "symbols": ["GraphStoreFactory", "CodeGraphCompositionOptions", "CodeGraphOptions"]
     },
     {
       "file": "code-graph:test/composition/code-graph-provider.spec.ts"
     },
     {
-      "file": "code-graph:src/public.ts"
-    },
-    {
-      "file": "code-graph:src/index.ts"
-    },
-    {
-      "file": "code-graph:src/application/index.ts"
-    },
-    {
-      "file": "code-graph:src/application/services/resolve-graph-selector.ts",
-      "symbols": ["resolveSymbolSelector"]
-    },
-    {
-      "file": "code-graph:test/application/services/resolve-graph-selector.spec.ts"
+      "file": "code-graph:README.md"
     }
   ],
   "optimizations": {

@@ -22,6 +22,14 @@ vi.mock('@specd/sdk', async () => {
   }
 })
 
+vi.mock('../../src/commands/graph/resolve-graph-cli-context.js', () => ({
+  resolveGraphCliContext: vi.fn(),
+}))
+
+vi.mock('../../src/commands/graph/with-provider.js', () => ({
+  withProvider: vi.fn(),
+}))
+
 import {
   createVcsAdapter,
   createGetGraphHealth,
@@ -32,6 +40,8 @@ import {
 import { parseFingerprintMap, detectFingerprintMismatch, buildProjectGraphConfig } from '@specd/sdk'
 import { codeGraphVersion } from '@specd/sdk'
 import { registerGraphStats } from '../../src/commands/graph/stats.js'
+import { resolveGraphCliContext } from '../../src/commands/graph/resolve-graph-cli-context.js'
+import { withProvider } from '../../src/commands/graph/with-provider.js'
 
 const DEFAULT_STATS = {
   fileCount: 1,
@@ -75,6 +85,18 @@ function setup(
     kernel: kernel ?? makeMockKernel(),
     createGraphProvider: vi.fn(),
   })
+  vi.mocked(resolveGraphCliContext).mockResolvedValue({
+    mode,
+    config,
+    configFilePath: mode === 'configured' ? '/project/specd.yaml' : null,
+    kernel,
+    projectRoot: config.projectRoot,
+    vcsRoot: config.projectRoot,
+  })
+
+  vi.mocked(createVcsAdapter).mockResolvedValue({
+    ref: vi.fn().mockResolvedValue('abc1234def'),
+  } as never)
 
   if (options.vcsError === true) {
     vi.mocked(createVcsAdapter).mockRejectedValue(new Error('no VCS'))
@@ -92,6 +114,9 @@ function setup(
     getGraphHealth: vi.fn(),
   }
   vi.mocked(withOpenGraphProvider).mockImplementation(async (_host, fn) => {
+    await fn(mockProvider as never)
+  })
+  vi.mocked(withProvider).mockImplementation(async (_config, _format, fn) => {
     await fn(mockProvider as never)
   })
   vi.mocked(createGetGraphHealth).mockImplementation(
@@ -202,7 +227,10 @@ function makeStatsProgram() {
   return program
 }
 
-afterEach(() => vi.restoreAllMocks())
+afterEach(() => {
+  vi.clearAllMocks()
+  vi.restoreAllMocks()
+})
 
 describe('graph stats', () => {
   it('delegates graph access through the SDK lifecycle helper', async () => {
@@ -211,16 +239,18 @@ describe('graph stats', () => {
     const program = makeStatsProgram()
     await runStats(program, 'graph', 'stats')
 
-    expect(withOpenGraphProvider).toHaveBeenCalledWith(
-      expect.objectContaining({ config }),
+    expect(withProvider).toHaveBeenCalledWith(
+      config,
+      'text',
       expect.any(Function),
+      expect.objectContaining({ kernel: expect.anything() }),
     )
   })
 
-  it('exits with code 0 only after the SDK lifecycle helper completes', async () => {
+  it('returns normally after the shared lifecycle helper completes', async () => {
     const order: string[] = []
     setup()
-    vi.mocked(withOpenGraphProvider).mockImplementation(async (_host, fn) => {
+    vi.mocked(withProvider).mockImplementation(async (_config, _format, fn) => {
       await fn({
         getGraphHealth: vi.fn().mockResolvedValue({
           ...DEFAULT_STATS,
@@ -236,15 +266,10 @@ describe('graph stats', () => {
       } as never)
       order.push('close')
     })
-    vi.mocked(process.exit).mockImplementation(((code?: number) => {
-      order.push(`exit:${String(code ?? 0)}`)
-      throw new ExitSentinel(code ?? 0)
-    }) as never)
-
     const program = makeStatsProgram()
     await runStats(program, 'graph', 'stats')
 
-    expect(order).toEqual(['close', 'exit:0'])
+    expect(order).toEqual(['close'])
   })
 
   it('passes explicit config path to SDK host bootstrap', async () => {
@@ -253,9 +278,34 @@ describe('graph stats', () => {
     const program = makeStatsProgram()
     await runStats(program, 'graph', 'stats', '--config', '/tmp/other/specd.yaml')
 
-    expect(openSpecdHost).toHaveBeenCalledWith({
+    expect(resolveGraphCliContext).toHaveBeenCalledWith({
       configPath: '/tmp/other/specd.yaml',
+      repoPath: undefined,
     })
+  })
+
+  it('runs configured non-VCS stats through the provider lifecycle', async () => {
+    const { config, mockProvider, getStderr } = setup()
+    vi.mocked(resolveGraphCliContext).mockResolvedValue({
+      mode: 'configured',
+      config,
+      configFilePath: '/tmp/non-vcs-project/specd.yaml',
+      kernel: makeMockKernel(),
+      projectRoot: '/tmp/non-vcs-project',
+      vcsRoot: null,
+    })
+
+    const program = makeStatsProgram()
+    await runStats(program, 'graph', 'stats', '--config', '/tmp/non-vcs-project/specd.yaml')
+
+    expect(withProvider).toHaveBeenCalledWith(
+      config,
+      'text',
+      expect.any(Function),
+      expect.objectContaining({ kernel: expect.anything() }),
+    )
+    expect(mockProvider.getGraphHealth).toHaveBeenCalledTimes(1)
+    expect(getStderr()).not.toContain('not inside a Git repository')
   })
 
   it('passes explicit bootstrap path to SDK host bootstrap', async () => {
@@ -264,9 +314,9 @@ describe('graph stats', () => {
     const program = makeStatsProgram()
     await runStats(program, 'graph', 'stats', '--path', '/tmp/repo')
 
-    expect(openSpecdHost).toHaveBeenCalledWith({
-      startDir: '/tmp/repo',
-      allowBootstrapFallback: true,
+    expect(resolveGraphCliContext).toHaveBeenCalledWith({
+      configPath: undefined,
+      repoPath: '/tmp/repo',
     })
   })
 
@@ -276,7 +326,10 @@ describe('graph stats', () => {
     const program = makeStatsProgram()
     await runStats(program, 'graph', 'stats')
 
-    expect(openSpecdHost).toHaveBeenCalledWith({ allowBootstrapFallback: true })
+    expect(resolveGraphCliContext).toHaveBeenCalledWith({
+      configPath: undefined,
+      repoPath: undefined,
+    })
   })
 
   it('rejects --config and --path together', async () => {

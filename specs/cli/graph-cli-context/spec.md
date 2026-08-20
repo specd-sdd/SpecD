@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Graph subcommands share config resolution, bootstrap mode, and `CodeGraphProvider` lifecycle. `resolveGraphCliContext` and `withProvider` centralize that wiring through `@specd/sdk`, while the CLI adapter retains bootstrap semantics, signal handling, and format-aware error reporting.
+Graph subcommands share config resolution, bootstrap mode, and `CodeGraphProvider` lifecycle. `resolveGraphCliContext` and `withProvider` centralize that wiring through `@specd/sdk`, while the CLI adapter retains bootstrap semantics and format-aware error reporting.
 
 ## Requirements
 
@@ -10,21 +10,19 @@ Graph subcommands share config resolution, bootstrap mode, and `CodeGraphProvide
 
 `resolveGraphCliContext` MUST resolve configured mode via `resolveCliContext` / `openSpecdHost` and MUST import platform types exclusively from `@specd/sdk` re-exports.
 
-In bootstrap mode (`--path` or no-config fallback), the command MUST use a synthetic single-workspace project rooted at the resolved VCS root.
+Configured mode, whether selected by `--config` or by successful configuration discovery, MUST use the resolved configuration's project root without requiring a VCS repository. Its VCS root value SHALL be absent when repository detection is unavailable, so provider health can represent unavailable VCS data without rejecting the configured command.
+
+In bootstrap mode (`--path` or no-config fallback), the command MUST require a resolved VCS root and use a synthetic single-workspace project rooted at that VCS root.
 
 ### Requirement: withProvider delegates to withOpenGraphProvider
 
 `withProvider` in `packages/cli/src/commands/graph/with-provider.ts` MUST open and close the graph provider through `withOpenGraphProvider` from `@specd/sdk`, building a `SdkHostContext` from the resolved config (and kernel when available).
 
-CLI-only concerns retained in `withProvider`:
-
-- `SIGINT` / `SIGTERM` signal handlers for configured commands
-- explicit `process.exit(0)` after close when required to release native graph-store threads
-- format-aware fatal error reporting before provider open
+`withProvider` MUST retain format-aware fatal error reporting before provider open. It MUST NOT install graph-store-specific signal handlers or force a successful `process.exit(0)` to release backend-native threads. Provider cleanup is completed by the SDK lifecycle helper; normal command completion returns control to the CLI runtime.
 
 ### Requirement: Graph command platform imports
 
-Graph command handlers (`search`, `hotspots`, `impact`) MUST obtain shared provider lifecycle through `withProvider` in this module. `graph stats` MUST bootstrap through `openSpecdHost` and manage its provider lifecycle through the SDK without `resolveGraphCliContext` or a pre-open lock probe.
+Graph command handlers (`search`, `hotspots`, `impact`, `stats`) MUST obtain shared provider lifecycle through `withProvider` in this module. They MUST resolve configured and bootstrap context through the shared graph CLI context instead of owning a backend-specific host bootstrap or shutdown path.
 
 `graph index` MUST delegate indexing orchestration to `runIndexProjectGraph` from `@specd/sdk`; it does not open a long-lived provider through `withProvider` because the worker subprocess performs indexing in isolation.
 

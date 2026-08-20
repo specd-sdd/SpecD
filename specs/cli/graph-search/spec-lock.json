@@ -14,13 +14,8 @@
   ],
   "implementation": [
     {
-      "file": "cli:src/commands/graph/search.ts"
-    },
-    {
-      "file": "cli:test/commands/graph-search.spec.ts"
-    },
-    {
-      "file": "cli:src/commands/graph/resolve-impact-file-selectors.ts"
+      "file": "cli:src/commands/graph/search.ts",
+      "symbols": ["registerGraphSearch"]
     }
   ],
   "optimizations": {

@@ -23,7 +23,6 @@ export type {
 
 // Internal-only concrete store adapters
 export { SQLiteGraphStore } from './infrastructure/sqlite/sqlite-graph-store.js'
-export { LadybugGraphStore } from './infrastructure/ladybug/ladybug-graph-store.js'
 export { AdapterRegistry } from './infrastructure/tree-sitter/adapter-registry.js'
 export { TypeScriptLanguageAdapter } from './infrastructure/tree-sitter/typescript-language-adapter.js'
 export { PythonLanguageAdapter } from './infrastructure/tree-sitter/python-language-adapter.js'

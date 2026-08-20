@@ -12,41 +12,49 @@
   ],
   "implementation": [
     {
-      "file": "cli:test/commands/graph-stats.spec.ts"
+      "file": "cli:src/commands/graph/with-provider.ts",
+      "symbols": ["withProvider"]
+    },
+    {
+      "file": "cli:test/commands/graph-cli-context.spec.ts"
+    },
+    {
+      "file": "cli:src/commands/graph/resolve-graph-cli-context.ts",
+      "symbols": ["resolveGraphCliContext"]
     }
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "Centralizes CLI graph bootstrap and SDK provider lifecycle while retaining signals, forced exit, and formatted errors.",
+      "value": "Centralize graph CLI config/bootstrap/provider wiring via `@specd/sdk`; retain CLI signals, exits, formatted failures.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:c4d80e8fb89f1e8c81a0d2efadd91cf33ee0b8b0d585407d0447ccd75f7dd16d",
-          "lastModified": "2026-07-20T16:47:44.605Z"
+          "hash": "sha256:46efb1851c9bbd09b84037c877ec07f1fb80cdca6765125edeb198f1fd27871f",
+          "lastModified": "2026-08-20T12:20:57.685Z"
         },
         "verify.md": {
-          "hash": "sha256:05f62e498461bfbc3d2c21f0c6958141c64ca7e87f1b7c78a29f53ab3e293a52",
-          "lastModified": "2026-07-20T16:47:44.605Z"
+          "hash": "sha256:46fde19d6c21ada1f476df338a68f3f223f9bbaec6ad84e1e9f7c3d2fe42abf0",
+          "lastModified": "2026-08-20T12:20:57.685Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# Graph CLI Context\n## Rules\n- `resolveGraphCliContext`: configured mode via `resolveCliContext` / `openSpecdHost`; platform types exclusively from `@specd/sdk` re-exports.\n- Bootstrap (`--path` or no-config fallback): synthetic single-workspace project rooted at resolved VCS root.\n- `withProvider` in `packages/cli/src/commands/graph/with-provider.ts`: build `SdkHostContext` from resolved config plus kernel when available; open/close through `withOpenGraphProvider` from `@specd/sdk`.\n- `withProvider` retains CLI-only `SIGINT` / `SIGTERM` handlers for configured commands, required post-close `process.exit(0)` for native graph-store threads, and format-aware fatal reporting before provider open.\n- `search`, `hotspots`, `impact`: use module `withProvider`. `graph stats`: bootstrap with `openSpecdHost`, use SDK provider lifecycle, never `resolveGraphCliContext` or pre-open lock probe.\n- `graph index`: delegate to `runIndexProjectGraph` from `@specd/sdk`; no long-lived provider via `withProvider`; worker subprocess performs isolated indexing.\n- Graph commands MUST NOT perform host-managed pre-open lock probes; opened SDK provider lifecycle surfaces availability errors, including indexing-busy.\n## Constraints\n- Host symbols come from `@specd/sdk` via this module or `cli:host-context`.\n- SDK owns provider lifecycle; CLI owns bootstrap semantics, signals, forced exit, error presentation.",
+      "value": "# Graph CLI Context\n## Rules\n- `resolveGraphCliContext`: configured mode via `resolveCliContext` / `openSpecdHost`; types only `@specd/sdk` re-exports.\n- Configured (`--config` or discovered): use config project root; no VCS required; absent VCS root when undetected.\n- Bootstrap (`--path` / no-config fallback): require VCS root; synthetic single-workspace project rooted there.\n- `packages/cli/src/commands/graph/with-provider.ts` `withProvider`: build `SdkHostContext` from resolved config + kernel when available; lifecycle via `withOpenGraphProvider` from `@specd/sdk`.\n- `withProvider` retains configured-command `SIGINT` / `SIGTERM`, post-close `process.exit(0)` for native graph-store threads, pre-open format-aware fatal reporting.\n- `search`, `hotspots`, `impact`: module `withProvider`. `graph stats`: `openSpecdHost` + SDK lifecycle; never `resolveGraphCliContext` / pre-open lock probe.\n- `graph index`: `runIndexProjectGraph` from `@specd/sdk`; no long-lived `withProvider`; worker indexes isolated.\n- No host-managed pre-open lock probes; opened SDK lifecycle surfaces availability incl. indexing-busy.\n## Constraints\n- Host symbols: `@specd/sdk` via module or `cli:host-context`.\n- SDK owns provider lifecycle; CLI owns bootstrap, signals, forced exit, error presentation.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:c4d80e8fb89f1e8c81a0d2efadd91cf33ee0b8b0d585407d0447ccd75f7dd16d",
-          "lastModified": "2026-07-20T16:47:44.605Z"
+          "hash": "sha256:46efb1851c9bbd09b84037c877ec07f1fb80cdca6765125edeb198f1fd27871f",
+          "lastModified": "2026-08-20T12:20:57.685Z"
         },
         "verify.md": {
-          "hash": "sha256:05f62e498461bfbc3d2c21f0c6958141c64ca7e87f1b7c78a29f53ab3e293a52",
-          "lastModified": "2026-07-20T16:47:44.605Z"
+          "hash": "sha256:46fde19d6c21ada1f476df338a68f3f223f9bbaec6ad84e1e9f7c3d2fe42abf0",
+          "lastModified": "2026-08-20T12:20:57.685Z"
         }
       }
     }

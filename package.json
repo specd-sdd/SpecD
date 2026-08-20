@@ -11,7 +11,7 @@
     "build:debug": "turbo build:debug --filter=!@specd/public-web",
     "dev": "turbo dev",
     "specd": "node packages/cli/dist/index.js",
-    "test": "turbo test --filter=@specd/core --filter=@specd/cli --filter=@specd/code-graph",
+    "test": "turbo test --concurrency=3 --filter=@specd/core --filter=@specd/cli --filter=@specd/code-graph",
     "typecheck": "turbo typecheck --filter=!@specd/public-web",
     "lint": "eslint . ",
     "lint:fix": "eslint . --fix",
@@ -26,7 +26,7 @@
     "preflight:check": "node dev/scripts/preflight-check.js",
     "preflight:typecheck": "turbo typecheck --filter=!@specd/public-web",
     "preflight:build": "turbo build --filter=!@specd/public-web",
-    "preflight:test": "turbo test --filter=@specd/core --filter=@specd/cli --filter=@specd/code-graph",
+    "preflight:test": "turbo test --concurrency=3 --filter=@specd/core --filter=@specd/cli --filter=@specd/code-graph",
     "preflight:changeset": "pnpm changeset status",
     "prepublish:check": "node dev/scripts/prepublish-check.js",
     "preflight:fast": "pnpm preflight:check && pnpm preflight:typecheck",
@@ -59,7 +59,7 @@
     "turbo": "^2.9.6",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.58.2",
-    "vitest": "^3.2.4"
+    "vitest": "^4.1.10"
   },
   "lint-staged": {
     "*.ts": [

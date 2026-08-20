@@ -1,8 +1,8 @@
 {
   "name": "deprecate-ladybug-store",
   "createdAt": "2026-07-06T08:41:08.887Z",
-  "updatedAt": "2026-08-16T08:12:43.908Z",
-  "description": "Deprecate Ladybug graph store, implement Symbol.asyncDispose in CodeGraphProvider, and refactor hosts to use await using",
+  "updatedAt": "2026-08-20T13:20:14.224Z",
+  "description": "Extracts the Ladybug graph-store implementation and its ownership to the independent specd-plugin-graphstore-ladybug project, leaving @specd/code-graph with SQLite as its sole built-in backend. The change preserves the additive graph-store factory seam for future plugins and aligns Code Graph CLI commands with the SDK-managed provider lifecycle.",
   "schema": {
     "name": "schema-std",
     "version": 1
@@ -10,26 +10,15 @@
   "specIds": [
     "code-graph:ladybug-graph-store",
     "code-graph:composition",
-    "sdk:with-open-graph-provider",
-    "sdk:composition",
     "cli:graph-cli-context",
-    "sdk:build-project-status-snapshot",
-    "sdk:run-index-project-graph",
     "cli:graph-stats",
     "cli:graph-impact",
     "cli:graph-hotspots",
     "cli:graph-search",
-    "code-graph:sqlite-graph-store",
-    "plugin-manager:specd-plugin-type",
-    "core:config"
+    "code-graph:sqlite-graph-store"
   ],
   "specDependsOn": {
-    "code-graph:ladybug-graph-store": [
-      "code-graph:graph-store",
-      "core:config",
-      "code-graph:symbol-model",
-      "code-graph:workspace-integration"
-    ],
+    "code-graph:ladybug-graph-store": [],
     "code-graph:composition": [
       "code-graph:symbol-model",
       "code-graph:graph-store",
@@ -39,14 +28,8 @@
       "code-graph:get-graph-health",
       "code-graph:index-project-graph",
       "code-graph:get-spec-coverage",
-      "code-graph:get-change-spec-coverage"
-    ],
-    "sdk:with-open-graph-provider": ["sdk:host-context", "code-graph:composition"],
-    "sdk:composition": [
-      "default:_global/architecture",
-      "core:composition",
-      "code-graph:composition",
-      "cli:host-context"
+      "code-graph:get-change-spec-coverage",
+      "code-graph:resolve-symbol-reference"
     ],
     "cli:graph-cli-context": [
       "cli:host-context",
@@ -55,16 +38,6 @@
       "sdk:with-open-graph-provider",
       "sdk:composition"
     ],
-    "sdk:build-project-status-snapshot": [
-      "sdk:host-context",
-      "core:get-project-summary",
-      "code-graph:get-graph-health"
-    ],
-    "sdk:run-index-project-graph": [
-      "sdk:with-open-graph-provider",
-      "code-graph:index-project-graph",
-      "core:list-workspaces"
-    ],
     "cli:graph-stats": [
       "cli:entrypoint",
       "core:config",
@@ -72,14 +45,15 @@
       "core:list-workspaces",
       "code-graph:get-graph-health",
       "sdk:with-open-graph-provider",
-      "sdk:host-context"
+      "cli:graph-cli-context"
     ],
     "cli:graph-impact": [
       "cli:entrypoint",
       "cli:graph-cli-context",
       "core:config",
       "code-graph:traversal",
-      "code-graph:workspace-integration"
+      "code-graph:workspace-integration",
+      "code-graph:resolve-symbol-reference"
     ],
     "cli:graph-hotspots": [
       "cli:entrypoint",
@@ -93,39 +67,331 @@
       "code-graph:composition",
       "code-graph:document-model",
       "code-graph:graph-store",
-      "cli:graph-cli-context"
+      "cli:graph-cli-context",
+      "code-graph:resolve-symbol-reference"
     ],
     "code-graph:sqlite-graph-store": [
       "code-graph:graph-store",
       "core:config",
       "code-graph:symbol-model",
       "code-graph:workspace-integration"
-    ],
-    "plugin-manager:specd-plugin-type": ["core:config", "default:_global/architecture"],
-    "core:config": [
-      "core:schema-format",
-      "core:schema-merge",
-      "default:_global/architecture",
-      "core:storage",
-      "core:spec-metadata",
-      "core:workspace",
-      "default:_global/logging"
     ]
   },
   "invalidationPolicy": "downstream",
+  "trackedImplementationFiles": [
+    {
+      "file": "specs/code-graph/graph-store/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/code-graph/indexer/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/code-graph/symbol-model/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/code-graph/traversal/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/content-extraction/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/delta-format/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/external-hook-runner-port/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/generate-metadata/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/get-project-summary/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/hook-execution-model/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/hook-runner-port/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/regenerate-spec-metadata/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/run-step-hooks/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/schema-merge/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/selector-model/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/spec-lock/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/template-variables/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/validate-artifacts/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/sdk/composition/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "../specd-plugin-graphstore-ladybug/PROVENANCE.md",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/composition/create-code-graph-provider.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/composition/graph-store-factory.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/composition/code-graph-provider.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/test/composition/host-context.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/package.json",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/vitest.config.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/with-provider.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/stats.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/ladybug/index.ts",
+      "state": "removed"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/ladybug/ladybug-graph-store.ts",
+      "state": "removed"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/ladybug/schema.ts",
+      "state": "removed"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/ladybug/ladybug-graph-store-multi-kind.spec.ts",
+      "state": "removed"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/ladybug/ladybug-graph-store.spec.ts",
+      "state": "removed"
+    },
+    {
+      "file": "pnpm-lock.yaml",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/cli/change-archive/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/graph-cli-context.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/graph-stats.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/adr/0024-logical-symbol-resolution.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/code-graph/index.md",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/README.md",
+      "state": "resolved"
+    },
+    {
+      "file": ".changeset/20260820-fix-graph-cli-context-explicit-config-specd.md",
+      "state": "resolved"
+    },
+    {
+      "file": ".changeset/20260820-fix-graph-cli-context-explicit-config.md",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/resolve-graph-cli-context.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/cli/graph-cli-context/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/cli/graph-cli-context/spec.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/cli/graph-cli-context/verify.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/cli/graph-stats/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/cli/graph-stats/spec.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/cli/graph-stats/verify.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/cli/graph-hotspots/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/code-graph/ladybug-graph-store/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/code-graph/sqlite-graph-store/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/hotspots.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/impact.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/search.ts",
+      "state": "resolved"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "code-graph:composition",
+      "file": "packages/code-graph/src/composition/create-code-graph-provider.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["createCodeGraphProvider", "createGraphStoreRegistry"]
+    },
+    {
+      "specId": "code-graph:composition",
+      "file": "packages/code-graph/src/composition/graph-store-factory.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["GraphStoreFactory", "CodeGraphCompositionOptions", "CodeGraphOptions"]
+    },
+    {
+      "specId": "code-graph:composition",
+      "file": "packages/code-graph/test/composition/code-graph-provider.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:ladybug-graph-store",
+      "file": "packages/code-graph/package.json",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:sqlite-graph-store",
+      "file": "packages/code-graph/vitest.config.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:graph-cli-context",
+      "file": "packages/cli/src/commands/graph/with-provider.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["withProvider"]
+    },
+    {
+      "specId": "cli:graph-stats",
+      "file": "packages/cli/src/commands/graph/stats.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["registerGraphStats"]
+    },
+    {
+      "specId": "cli:graph-cli-context",
+      "file": "packages/cli/test/commands/graph-cli-context.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:graph-stats",
+      "file": "packages/cli/test/commands/graph-stats.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:composition",
+      "file": "packages/code-graph/README.md",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:graph-cli-context",
+      "file": "packages/cli/src/commands/graph/resolve-graph-cli-context.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["resolveGraphCliContext"]
+    },
+    {
+      "specId": "cli:graph-impact",
+      "file": "packages/cli/src/commands/graph/impact.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["registerGraphImpact"]
+    },
+    {
+      "specId": "cli:graph-hotspots",
+      "file": "packages/cli/src/commands/graph/hotspots.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["registerGraphHotspots"]
+    },
+    {
+      "specId": "cli:graph-search",
+      "file": "packages/cli/src/commands/graph/search.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["registerGraphSearch"]
+    }
+  ],
   "artifacts": [
     {
       "type": "proposal",
       "optional": false,
       "requires": [],
-      "state": "drifted-pending-review",
+      "state": "complete",
       "files": [
         {
           "key": "proposal",
           "filename": "proposal.md",
-          "state": "drifted-pending-review",
-          "validatedHash": "sha256:d4fb5cae88e680a5d656ccc9fb985e25ab676681efef54a68d861acf209bf94d",
-          "hasDrift": true
+          "state": "complete",
+          "validatedHash": "sha256:e89ef6b71647269c2bf2e4c11967360aa807542f78e20b6060e926cb1875f621"
         }
       ]
     },
@@ -133,91 +399,55 @@
       "type": "specs",
       "optional": false,
       "requires": ["proposal"],
-      "state": "missing",
+      "state": "complete",
       "files": [
         {
           "key": "code-graph:ladybug-graph-store",
           "filename": "deltas/code-graph/ladybug-graph-store/spec.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
+          "state": "complete",
+          "validatedHash": "sha256:6407a886964223d06b6e249c6a9c62f14e7d52a629b9f051469ee877799e05fb"
         },
         {
           "key": "code-graph:composition",
           "filename": "deltas/code-graph/composition/spec.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
-        },
-        {
-          "key": "sdk:with-open-graph-provider",
-          "filename": "deltas/sdk/with-open-graph-provider/spec.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
-        },
-        {
-          "key": "sdk:composition",
-          "filename": "deltas/sdk/composition/spec.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
+          "state": "complete",
+          "validatedHash": "sha256:88e323383f3e341879b1a2204852b05b11107766f0c652b7da20c81a32af0695"
         },
         {
           "key": "cli:graph-cli-context",
           "filename": "deltas/cli/graph-cli-context/spec.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
-        },
-        {
-          "key": "sdk:build-project-status-snapshot",
-          "filename": "deltas/sdk/build-project-status-snapshot/spec.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
-        },
-        {
-          "key": "sdk:run-index-project-graph",
-          "filename": "deltas/sdk/run-index-project-graph/spec.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
+          "state": "complete",
+          "validatedHash": "sha256:5216d617f9deba301473d0816e2a4c335d348e7567b61967b06117592ec9a8fe"
         },
         {
           "key": "cli:graph-stats",
           "filename": "deltas/cli/graph-stats/spec.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
+          "state": "complete",
+          "validatedHash": "sha256:a56a041ad8d6cd9dd6ca3f6d1a49c0b663c0c4b2ae60a9ef63848d0a3ad0c190"
         },
         {
           "key": "cli:graph-impact",
           "filename": "deltas/cli/graph-impact/spec.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
+          "state": "complete",
+          "validatedHash": "sha256:fb9d39c35074456bd38d140faa9cb8e7472b26307be204b6f33d4454058db5e1"
         },
         {
           "key": "cli:graph-hotspots",
           "filename": "deltas/cli/graph-hotspots/spec.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
+          "state": "complete",
+          "validatedHash": "sha256:0438e2a8cefa409a6a5a1f8ec14848cfb32a7a3104a3b8089f7b7e172168e3d2"
         },
         {
           "key": "cli:graph-search",
           "filename": "deltas/cli/graph-search/spec.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
+          "state": "complete",
+          "validatedHash": "sha256:22655589ee387be25ca7e566047114db65b099982032a6e143ec45a7585ac63a"
         },
         {
           "key": "code-graph:sqlite-graph-store",
           "filename": "deltas/code-graph/sqlite-graph-store/spec.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
-        },
-        {
-          "key": "plugin-manager:specd-plugin-type",
-          "filename": "deltas/plugin-manager/specd-plugin-type/spec.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
-        },
-        {
-          "key": "core:config",
-          "filename": "deltas/core/config/spec.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
+          "state": "complete",
+          "validatedHash": "sha256:bf423b7019686749c12012dee88e6f3045302309f90b58158dce22bcb139ca9b"
         }
       ]
     },
@@ -225,91 +455,55 @@
       "type": "verify",
       "optional": false,
       "requires": ["specs"],
-      "state": "missing",
+      "state": "complete",
       "files": [
         {
           "key": "code-graph:ladybug-graph-store",
           "filename": "deltas/code-graph/ladybug-graph-store/verify.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
+          "state": "complete",
+          "validatedHash": "sha256:66b1880662961a579771f15f4debeeb9c9027136de126f4fa11b82ed637bdb8a"
         },
         {
           "key": "code-graph:composition",
           "filename": "deltas/code-graph/composition/verify.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
-        },
-        {
-          "key": "sdk:with-open-graph-provider",
-          "filename": "deltas/sdk/with-open-graph-provider/verify.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
-        },
-        {
-          "key": "sdk:composition",
-          "filename": "deltas/sdk/composition/verify.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
+          "state": "complete",
+          "validatedHash": "sha256:b070f6f958fa3d2f550d94b45b175ea4f622366c16be646e3a400e78827003a9"
         },
         {
           "key": "cli:graph-cli-context",
           "filename": "deltas/cli/graph-cli-context/verify.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
-        },
-        {
-          "key": "sdk:build-project-status-snapshot",
-          "filename": "deltas/sdk/build-project-status-snapshot/verify.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
-        },
-        {
-          "key": "sdk:run-index-project-graph",
-          "filename": "deltas/sdk/run-index-project-graph/verify.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
+          "state": "complete",
+          "validatedHash": "sha256:98f9d738f2c8b417d20e99e65ac5716d2685fead847e559b89f34b6933c34c22"
         },
         {
           "key": "cli:graph-stats",
           "filename": "deltas/cli/graph-stats/verify.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
+          "state": "complete",
+          "validatedHash": "sha256:d581f0fb17be03486c6cc5f8acbf1b0eedbd47611714a5989965657227569c2a"
         },
         {
           "key": "cli:graph-impact",
           "filename": "deltas/cli/graph-impact/verify.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
+          "state": "complete",
+          "validatedHash": "sha256:9764f681ed17bf0afec58e21f0553954481b8521afd2dd11cbb64ffed6263fa5"
         },
         {
           "key": "cli:graph-hotspots",
           "filename": "deltas/cli/graph-hotspots/verify.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
+          "state": "complete",
+          "validatedHash": "sha256:472af43c53def8e8184e3dc43625f6ba0eeefe3f64fdbb64329d9e0f60f7129a"
         },
         {
           "key": "cli:graph-search",
           "filename": "deltas/cli/graph-search/verify.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
+          "state": "complete",
+          "validatedHash": "sha256:aa8778221f7a2c9e577ce8ee5b611100e1afff3cde809c28b5c0c9458c1b14d8"
         },
         {
           "key": "code-graph:sqlite-graph-store",
           "filename": "deltas/code-graph/sqlite-graph-store/verify.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
-        },
-        {
-          "key": "plugin-manager:specd-plugin-type",
-          "filename": "deltas/plugin-manager/specd-plugin-type/verify.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
-        },
-        {
-          "key": "core:config",
-          "filename": "deltas/core/config/verify.md.delta.yaml",
-          "state": "missing",
-          "validatedHash": null
+          "state": "complete",
+          "validatedHash": "sha256:dd41d81cd6c17961204ffaad63c019b0d4cca22f667d400f0c095ea278d8869f"
         }
       ]
     },
@@ -317,13 +511,13 @@
       "type": "design",
       "optional": false,
       "requires": ["proposal", "specs", "verify"],
-      "state": "missing",
+      "state": "complete",
       "files": [
         {
           "key": "design",
           "filename": "design.md",
-          "state": "missing",
-          "validatedHash": null
+          "state": "complete",
+          "validatedHash": "sha256:19bfb756eeb11a5f4ca14b5696b2b6238caf8795b6b88ce600b5ec8ed4332189"
         }
       ]
     },
@@ -331,13 +525,13 @@
       "type": "tasks",
       "optional": false,
       "requires": ["specs", "design"],
-      "state": "missing",
+      "state": "complete",
       "files": [
         {
           "key": "tasks",
           "filename": "tasks.md",
-          "state": "missing",
-          "validatedHash": null
+          "state": "complete",
+          "validatedHash": "sha256:d6d8b742a98381a7f2de477055af1e44d66daab340681060391308bbd9c26f21"
         }
       ]
     }
@@ -3809,6 +4003,784 @@
           "files": ["tasks"]
         }
       ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-20T09:43:35.645Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:ladybug-graph-store",
+            "code-graph:composition",
+            "sdk:with-open-graph-provider",
+            "sdk:composition",
+            "cli:graph-cli-context",
+            "sdk:build-project-status-snapshot",
+            "sdk:run-index-project-graph",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "cli:graph-hotspots",
+            "cli:graph-search",
+            "code-graph:sqlite-graph-store",
+            "plugin-manager:specd-plugin-type",
+            "core:config"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:ladybug-graph-store",
+            "code-graph:composition",
+            "sdk:with-open-graph-provider",
+            "sdk:composition",
+            "cli:graph-cli-context",
+            "sdk:build-project-status-snapshot",
+            "sdk:run-index-project-graph",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "cli:graph-hotspots",
+            "cli:graph-search",
+            "code-graph:sqlite-graph-store",
+            "plugin-manager:specd-plugin-type",
+            "core:config"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-08-20T09:43:35.648Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [],
+      "filesRemoved": [
+        {
+          "type": "specs",
+          "key": "sdk:with-open-graph-provider"
+        },
+        {
+          "type": "specs",
+          "key": "sdk:composition"
+        },
+        {
+          "type": "specs",
+          "key": "sdk:build-project-status-snapshot"
+        },
+        {
+          "type": "specs",
+          "key": "sdk:run-index-project-graph"
+        },
+        {
+          "type": "specs",
+          "key": "plugin-manager:specd-plugin-type"
+        },
+        {
+          "type": "specs",
+          "key": "core:config"
+        },
+        {
+          "type": "verify",
+          "key": "sdk:with-open-graph-provider"
+        },
+        {
+          "type": "verify",
+          "key": "sdk:composition"
+        },
+        {
+          "type": "verify",
+          "key": "sdk:build-project-status-snapshot"
+        },
+        {
+          "type": "verify",
+          "key": "sdk:run-index-project-graph"
+        },
+        {
+          "type": "verify",
+          "key": "plugin-manager:specd-plugin-type"
+        },
+        {
+          "type": "verify",
+          "key": "core:config"
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-20T09:46:38.343Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:ladybug-graph-store",
+            "code-graph:composition",
+            "cli:graph-cli-context",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "cli:graph-hotspots",
+            "cli:graph-search",
+            "code-graph:sqlite-graph-store"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:ladybug-graph-store",
+            "code-graph:composition",
+            "cli:graph-cli-context",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "cli:graph-hotspots",
+            "cli:graph-search",
+            "code-graph:sqlite-graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "description-updated",
+      "at": "2026-08-20T09:46:38.393Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "description": "Extract Ladybug and its specs to specd-plugin-graphstore-ladybug, keep SQLite as the sole built-in store, and preserve the graph-store adapter registry for future plugins"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-20T10:05:45.217Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-20T10:09:57.896Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]; specs [code-graph:composition]; verify [code-graph:composition]; design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["code-graph:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-20T10:12:32.940Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]; specs [code-graph:ladybug-graph-store]; verify [code-graph:ladybug-graph-store]; design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["code-graph:ladybug-graph-store"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:ladybug-graph-store"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-20T10:16:06.975Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-20T10:18:06.685Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-20T10:43:45.672Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:ladybug-graph-store",
+            "code-graph:composition",
+            "cli:graph-cli-context",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "cli:graph-hotspots",
+            "cli:graph-search",
+            "code-graph:sqlite-graph-store"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:ladybug-graph-store",
+            "code-graph:composition",
+            "cli:graph-cli-context",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "cli:graph-hotspots",
+            "cli:graph-search",
+            "code-graph:sqlite-graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-20T10:43:45.672Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-20T10:44:34.060Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-20T10:54:42.576Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-20T10:54:59.831Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-20T12:20:36.475Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'fix-graph-cli-context-explicit-config' was archived with overlapping specs: cli:graph-cli-context, cli:graph-stats",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["cli:graph-cli-context", "cli:graph-stats"]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:graph-cli-context", "cli:graph-stats"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-20T12:20:36.475Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-20T12:20:57.545Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'fix-graph-cli-context-explicit-config' was archived with overlapping specs: cli:graph-cli-context, cli:graph-stats",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["cli:graph-cli-context", "cli:graph-stats"]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:graph-cli-context", "cli:graph-stats"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-20T12:23:55.689Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-20T12:29:39.985Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-20T12:31:03.233Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-20T12:32:12.752Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-20T12:35:27.202Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-20T12:35:27.202Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-20T12:36:42.925Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-20T12:44:11.415Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-20T12:45:38.509Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-20T12:55:33.294Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:ladybug-graph-store",
+            "code-graph:composition",
+            "cli:graph-cli-context",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "cli:graph-hotspots",
+            "cli:graph-search",
+            "code-graph:sqlite-graph-store"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:ladybug-graph-store",
+            "code-graph:composition",
+            "cli:graph-cli-context",
+            "cli:graph-stats",
+            "cli:graph-impact",
+            "cli:graph-hotspots",
+            "cli:graph-search",
+            "code-graph:sqlite-graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-20T12:55:33.294Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-20T13:05:23.331Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-20T13:06:48.872Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-20T13:08:22.192Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-20T13:15:54.497Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-20T13:16:08.998Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "description-updated",
+      "at": "2026-08-20T13:18:15.348Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "description": "Extracts the Ladybug graph-store implementation and its ownership to the independent specd-plugin-graphstore-ladybug project, leaving @specd/code-graph with SQLite as its sole built-in backend. The change preserves the additive graph-store factory seam for future plugins and aligns Code Graph CLI commands with the SDK-managed provider lifecycle."
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-08-20T13:19:11.382Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Implementation link \"code-graph:ladybug-graph-store\" points outside workspace \"code-graph\" codeRoot.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-08-20T13:19:29.154Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Implementation link \"code-graph:composition\" points outside workspace \"code-graph\" codeRoot.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-08-20T13:19:38.445Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'code-graph:composition': extracted dependencies [code-graph:symbol-model, code-graph:graph-store, code-graph:indexer, code-graph:traversal, default:_global/architecture, code-graph:get-graph-health, code-graph:index-project-graph, code-graph:get-spec-coverage, code-graph:get-change-spec-coverage, code-graph:resolve-symbol-reference] do not match persisted dependencies [code-graph:symbol-model, code-graph:graph-store, code-graph:indexer, code-graph:traversal, default:_global/architecture, code-graph:get-graph-health, code-graph:index-project-graph, code-graph:get-spec-coverage, code-graph:get-change-spec-coverage]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-08-20T13:19:51.348Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'cli:graph-stats': extracted dependencies [cli:entrypoint, cli:graph-cli-context, core:config, code-graph:staleness-detection, core:list-workspaces, code-graph:get-graph-health, sdk:with-open-graph-provider] do not match persisted dependencies [cli:entrypoint, core:config, code-graph:staleness-detection, core:list-workspaces, code-graph:get-graph-health, sdk:with-open-graph-provider, sdk:host-context, cli:graph-cli-context]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-08-20T13:20:01.940Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'cli:graph-impact': extracted dependencies [cli:entrypoint, cli:graph-cli-context, core:config, code-graph:traversal, code-graph:workspace-integration, code-graph:resolve-symbol-reference] do not match persisted dependencies [cli:entrypoint, cli:graph-cli-context, core:config, code-graph:traversal, code-graph:workspace-integration]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-08-20T13:20:07.397Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'cli:graph-search': extracted dependencies [cli:entrypoint, core:config, code-graph:composition, code-graph:document-model, code-graph:graph-store, cli:graph-cli-context, code-graph:resolve-symbol-reference] do not match persisted dependencies [cli:entrypoint, core:config, code-graph:composition, code-graph:document-model, code-graph:graph-store, cli:graph-cli-context]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-20T13:20:14.222Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
     }
-  ]
+  ],
+  "archivedAt": "2026-08-20T13:20:14.446Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
 }

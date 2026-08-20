@@ -1,0 +1,19 @@
+- op: modified
+  description: 'Make the forced --config contract explicit for non-VCS projects.'
+  selector:
+    type: section
+    matches: '^Requirement: Command signature$'
+  content: |
+    ```
+    specd graph stats [--config <path> | --path <path>] [--format text|json|toon]
+    ```
+
+    - `--config <path>` — optional explicit path to `specd.yaml`, matching the standard CLI forced-file meaning
+    - `--path <path>` — optional repository-root bootstrap mode
+    - `--format text|json|toon` — optional; output format, defaults to `text`
+
+    `--config` and `--path` are mutually exclusive.
+
+    A valid `--config` MUST run graph stats even when its configured project root is outside a VCS repository. In that case, unavailable VCS-derived health is provider data and MUST NOT be converted into a bootstrap validation failure.
+
+    `--path` and no-config fallback are bootstrap mechanisms for setup and repository exploration, not the intended steady-state mode for configured projects. They MUST continue to require a VCS repository.

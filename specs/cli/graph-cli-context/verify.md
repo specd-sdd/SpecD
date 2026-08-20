@@ -10,32 +10,51 @@
 - **THEN** `resolveGraphCliContext` obtains kernel via `resolveCliContext`
 - **AND** platform symbols are imported from `@specd/sdk`
 
+#### Scenario: Configured mode outside a repository
+
+- **GIVEN** a valid explicit or CWD-discovered `specd.yaml` has a project root outside VCS
+- **WHEN** a graph command resolves configured context
+- **THEN** it returns the configured project root without a VCS-root validation error
+- **AND** its VCS root is absent for provider health handling
+
 #### Scenario: Bootstrap mode uses synthetic default workspace
 
-- **WHEN** a graph command runs with `--path` or no-config bootstrap fallback
+- **WHEN** a graph command runs with `--path` or no-config bootstrap fallback inside a repository
 - **THEN** a synthetic `default` workspace is used with `codeRoot` at the resolved VCS root
+
+#### Scenario: Bootstrap mode outside a repository fails
+
+- **WHEN** a graph command enters `--path` or no-config bootstrap mode outside a repository
+- **THEN** context resolution fails with the bootstrap validation error
 
 ### Requirement: withProvider delegates to withOpenGraphProvider
 
 #### Scenario: Provider lifecycle via SDK
 
 - **WHEN** a graph command opens a provider through `withProvider`
-- **THEN** `withOpenGraphProvider` from `@specd/sdk` performs open/close
+- **THEN** `withOpenGraphProvider` from `@specd/sdk` performs open and close
 - **AND** the callback receives an opened `CodeGraphProvider`
+
+#### Scenario: Successful command returns after cleanup
+
+- **WHEN** a read-only graph command completes successfully
+- **THEN** provider close completes through the SDK helper
+- **AND** `withProvider` neither installs graph-store signal handlers nor calls `process.exit(0)`
+
+#### Scenario: Configured provider reuses resolved kernel
+
+- **GIVEN** configured context resolves a kernel
+- **WHEN** a read-only graph command calls `withProvider`
+- **THEN** the provider lifecycle receives that same resolved kernel
+- **AND** it does not create a second configured kernel or workspace projection
 
 ### Requirement: Graph command platform imports
 
-#### Scenario: Graph search uses shared context module
+#### Scenario: Read-only graph commands use shared context
 
-- **WHEN** `specd graph search` executes
+- **WHEN** graph `search`, `hotspots`, `impact`, or `stats` executes
 - **THEN** it resolves context via `resolveGraphCliContext` and opens via `withProvider`
 - **AND** platform symbols are sourced from `@specd/sdk`
-
-#### Scenario: Graph stats owns SDK host bootstrap
-
-- **WHEN** `specd graph stats` executes
-- **THEN** it uses `openSpecdHost` and SDK-managed provider lifecycle
-- **AND** it does not use `resolveGraphCliContext` or a host-managed lock probe
 
 #### Scenario: Graph index uses SDK orchestration without withProvider
 

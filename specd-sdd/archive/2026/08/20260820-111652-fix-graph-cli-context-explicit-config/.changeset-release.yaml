@@ -1,0 +1,3 @@
+releases:
+  cli:graph-cli-context: patch
+  cli:graph-stats: patch

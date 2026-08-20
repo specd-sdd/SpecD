@@ -33,14 +33,32 @@
 
 - **WHEN** `createCodeGraphProvider(config)` is called with a `SpecdConfig`
 - **THEN** the graph storage root is derived from `config.configPath`
-- **AND** the returned provider can be opened, used for indexing and queries, and closed without error
+- **AND** the returned SQLite-backed provider can be opened, used for indexing and queries, and closed without error
 
-#### Scenario: Factory resolves storage root from SpecdConfig.configPath
+#### Scenario: SQLite is the only built-in registration
 
-- **GIVEN** a valid `SpecdConfig` with `configPath` set
-- **WHEN** `createCodeGraphProvider(config)` is called
-- **THEN** the provider storage root is derived from `config.configPath`
-- **AND** the provider can be opened, used for indexing and queries, and closed without error
+- **WHEN** provider composition is created without `graphStoreId` or external factories
+- **THEN** the `sqlite` factory is selected
+- **AND** no `ladybug` factory is present in the built-in registry
+
+#### Scenario: External graph-store factory remains selectable
+
+- **GIVEN** `graphStoreFactories` contains a factory registered as `external-test`
+- **WHEN** `createCodeGraphProvider` is called with `graphStoreId: 'external-test'`
+- **THEN** that factory receives the derived storage root and creates the active store
+- **AND** the SQLite factory is not instantiated
+
+#### Scenario: Duplicate graph-store id is rejected
+
+- **GIVEN** an external factory uses the built-in id `sqlite`
+- **WHEN** provider composition builds the merged registry
+- **THEN** it throws the graph-store registry collision error
+- **AND** the built-in SQLite factory is not silently replaced
+
+#### Scenario: Unknown graph-store id is rejected
+
+- **WHEN** `graphStoreId` names neither `sqlite` nor an externally registered factory
+- **THEN** provider composition throws the graph-store registry unknown-backend error
 
 #### Scenario: Provider construction is factory-only
 

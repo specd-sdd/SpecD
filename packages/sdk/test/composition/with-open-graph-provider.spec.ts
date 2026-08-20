@@ -23,10 +23,10 @@ describe('withOpenGraphProvider', () => {
   it('opens before fn and closes after success', async () => {
     const provider = makeProvider()
     const order: string[] = []
-    provider.open.mockImplementation(async () => {
+    provider.open.mockImplementation(() => {
       order.push('open')
     })
-    provider.close.mockImplementation(async () => {
+    provider.close.mockImplementation(() => {
       order.push('close')
     })
 
@@ -45,10 +45,10 @@ describe('withOpenGraphProvider', () => {
     const afterClose = vi.fn(async () => {
       order.push('afterClose')
     })
-    provider.open.mockImplementation(async () => {
+    provider.open.mockImplementation(() => {
       order.push('open')
     })
-    provider.close.mockImplementation(async () => {
+    provider.close.mockImplementation(() => {
       order.push('close')
     })
 
@@ -108,7 +108,7 @@ describe('withOpenGraphProvider', () => {
     const beforeOpen = vi.fn(async () => {
       order.push('beforeOpen')
     })
-    provider.open.mockImplementation(async () => {
+    provider.open.mockImplementation(() => {
       order.push('open')
     })
 
@@ -149,11 +149,11 @@ describe('withOpenGraphProvider', () => {
     const afterClose = vi.fn(async () => {
       order.push('afterClose')
     })
-    provider.open.mockImplementation(async () => {
+    provider.open.mockImplementation(() => {
       order.push('open')
       throw openError
     })
-    provider.close.mockImplementation(async () => {
+    provider.close.mockImplementation(() => {
       order.push('close')
     })
 

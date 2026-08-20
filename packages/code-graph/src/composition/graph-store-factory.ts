@@ -10,7 +10,10 @@ export interface GraphStoreFactoryOptions {
 }
 
 /**
- * Factory contract for creating a concrete graph-store backend by id.
+ * Factory contract for an additive graph-store backend registration.
+ *
+ * SQLite remains the sole built-in and default backend. External factories may
+ * be selected explicitly, but this seam is not yet a stable plugin API.
  */
 export interface GraphStoreFactory {
   /**
@@ -26,9 +29,9 @@ export interface GraphStoreFactory {
  * Optional composition overrides for the primary `SpecdConfig` factory overload.
  */
 export interface CodeGraphCompositionOptions {
-  /** Selected backend id; when omitted, the built-in default is used. */
+  /** Selected backend id; when omitted, the built-in SQLite backend is used. */
   readonly graphStoreId?: string
-  /** Additional graph-store factories merged additively with the built-ins. */
+  /** Additional factories merged additively; they cannot override SQLite. */
   readonly graphStoreFactories?: Readonly<Record<string, GraphStoreFactory>>
   /** Additional language adapters to register beyond the built-ins. */
   readonly adapters?: readonly LanguageAdapter[]

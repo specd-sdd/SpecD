@@ -268,32 +268,37 @@ JSON/TOON output schema:
             1,
           ),
         )
-        await withProvider(config, opts.format, async (provider) => {
-          await warnGraphStale(provider, config, kernel)
-          if (opts.export !== undefined && opts.from !== undefined) {
-            await handlePublicExportImpact(
-              provider,
-              opts.export,
-              opts.from,
-              direction,
-              maxDepth,
-              fmt,
-            )
-          } else if (opts.symbol) {
-            await handleSymbolImpact(provider, opts.symbol, direction, maxDepth, fmt)
-          } else if (opts.spec) {
-            await handleSpecImpact(provider, opts.spec, direction, maxDepth, fmt)
-          } else if (opts.file) {
-            await handleFilesImpact(
-              provider,
-              opts.file,
-              direction,
-              maxDepth,
-              fmt,
-              config.projectRoot,
-            )
-          }
-        })
+        await withProvider(
+          config,
+          opts.format,
+          async (provider) => {
+            await warnGraphStale(provider, config, kernel)
+            if (opts.export !== undefined && opts.from !== undefined) {
+              await handlePublicExportImpact(
+                provider,
+                opts.export,
+                opts.from,
+                direction,
+                maxDepth,
+                fmt,
+              )
+            } else if (opts.symbol) {
+              await handleSymbolImpact(provider, opts.symbol, direction, maxDepth, fmt)
+            } else if (opts.spec) {
+              await handleSpecImpact(provider, opts.spec, direction, maxDepth, fmt)
+            } else if (opts.file) {
+              await handleFilesImpact(
+                provider,
+                opts.file,
+                direction,
+                maxDepth,
+                fmt,
+                config.projectRoot,
+              )
+            }
+          },
+          { kernel },
+        )
       },
     )
 }

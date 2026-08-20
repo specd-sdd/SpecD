@@ -10,6 +10,13 @@
 - **WHEN** `specd graph stats --config /tmp/other/specd.yaml` is run
 - **THEN** the command uses `/tmp/other/specd.yaml` directly
 
+#### Scenario: Explicit config works outside VCS
+
+- **GIVEN** `/tmp/project/specd.yaml` is valid and `/tmp/project` is outside a VCS repository
+- **WHEN** `specd graph stats --config /tmp/project/specd.yaml` is run
+- **THEN** the command opens the configured graph provider rather than failing bootstrap validation
+- **AND** unavailable VCS health is preserved as provider output
+
 #### Scenario: Explicit path enters bootstrap mode
 
 - **GIVEN** a `specd.yaml` exists under the current repository
@@ -24,42 +31,42 @@
 
 ### Requirement: Statistics retrieval
 
-#### Scenario: Command delegates health to GetGraphHealth via SDK
-
-- **WHEN** `specd graph stats` is executed in configured mode with kernel available
-- **THEN** it obtains host context via `openSpecdHost` from `@specd/sdk`
-- **AND** it opens the provider via `withOpenGraphProvider` from `@specd/sdk`
-- **AND** it calls `GetGraphHealth.execute()` with workspaces from `ListWorkspaces`
-- **AND** it does not call `resolveGraphCliContext`
-
-#### Scenario: Path and no-config stats use opt-in SDK bootstrap fallback
-
-- **GIVEN** a VCS repository without a discoverable specd.yaml
-- **WHEN** `specd graph stats --path <repo>` or `specd graph stats` runs there
-- **THEN** stats calls `openSpecdHost` with `allowBootstrapFallback: true`
-- **AND** it obtains graph health without `resolveGraphCliContext`
-
-#### Scenario: Successful stats exits after provider cleanup
-
-- **WHEN** `specd graph stats` completes successfully
-- **THEN** `process.exit(0)` is called only after `withOpenGraphProvider` completes its close path
-
-#### Scenario: Command obtains orchestrated project structure
+#### Scenario: Command delegates health through shared graph context
 
 - **WHEN** `specd graph stats` is executed in configured mode
-- **THEN** it calls `ListWorkspaces` to obtain the rich workspace list
-- **AND** it passes that list to `GetGraphHealth` for fingerprint comparison
+- **THEN** it resolves context through `resolveGraphCliContext`
+- **AND** it opens the provider through `withProvider`
+- **AND** it calls `GetGraphHealth.execute()` with the orchestrated workspace list
 
-#### Scenario: Host context from openSpecdHost
+#### Scenario: Path and no-config stats use shared bootstrap fallback
 
-- **WHEN** `specd graph stats` is executed
-- **THEN** it obtains host context via `openSpecdHost` from `@specd/sdk`
+- **GIVEN** a VCS repository without a discoverable `specd.yaml`
+- **WHEN** `specd graph stats --path <repo>` or `specd graph stats` runs there
+- **THEN** stats uses the same synthetic default workspace context as other read-only graph commands
+
+#### Scenario: Successful stats returns after provider cleanup
+
+- **WHEN** `specd graph stats` completes successfully
+- **THEN** provider cleanup finishes through `withProvider`
+- **AND** the handler returns normally without calling `process.exit(0)`
 
 #### Scenario: Stats consumes one canonical provider health result
 
 - **WHEN** graph stats executes
-- **THEN** it opens the standard provider lifecycle and calls `getGraphHealth` exactly once
+- **THEN** it calls `getGraphHealth` exactly once
 - **AND** it does not independently repeat workspace discovery or recompute health
+
+#### Scenario: Structured health remains canonical
+
+- **GIVEN** `getGraphHealth` returns sparse or extended canonical diagnostics
+- **WHEN** stats renders JSON or TOON
+- **THEN** it preserves every returned field without presenter defaults or health reconstruction
+
+#### Scenario: Text explains absence-proof limits
+
+- **GIVEN** health reports dirty, excluded, unsupported, parse-failed, partial, or unknown coverage
+- **WHEN** stats renders text
+- **THEN** it states that symbol absence cannot be proven from that incomplete coverage
 
 ### Requirement: Concurrent indexing guard
 

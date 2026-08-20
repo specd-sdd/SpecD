@@ -45,7 +45,7 @@
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "Abstract GraphStore port defining atomic persistence, queries, search ranking, freshness tracking, generation semantics, and lifecycle rules.",
+      "value": "GraphStore: persistencia gráfica atómica con búsquedas por identidad, referencias y frescura incremental.",
       "schema": {
         "name": "schema-std",
         "version": 1
@@ -53,16 +53,16 @@
       "artifactState": {
         "spec.md": {
           "hash": "sha256:bd53a787d42ca7e7ab2cedad9a75f95e9b448b5d899dbcc4c058862343d09d9e",
-          "lastModified": "2026-08-18T16:21:42.017Z"
+          "lastModified": "2026-08-16T08:12:47.708Z"
         },
         "verify.md": {
           "hash": "sha256:cb72e67639cd0c0edc6701e2f35d56ed8ca10ca68a15156b6bf4a2163e86ceb9",
-          "lastModified": "2026-08-18T16:21:42.017Z"
+          "lastModified": "2026-08-16T10:48:01.520Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# Graph Store\n\n## Rules\n\n- `GraphStore`: abstract class port; ctor `storagePath`; defined `domain/ports/`, adapters `infrastructure/`; implementations own physical schema/layout.\n- Min semantics: `FileNode` (canonical path, `configRelativePath`, full content), `SymbolNode`, `SpecNode`, `DocumentNode`; store metadata `lastIndexedAt`, `lastIndexedRef`, persisted graph fingerprint.\n- Relations: `IMPORTS`, `DEFINES`, `CALLS`, `CONSTRUCTS`, `USES_TYPE`, `EXPORTS`, `DEPENDS_ON`, `COVERS_FILE`, `COVERS_SYMBOL`, `EXTENDS`, `IMPLEMENTS`, `OVERRIDES`. `COVERS_SYMBOL` MAY carry `metadata.stale`.\n- Lifecycle: `open()` prepares backend; `close()` idempotent/repeat-safe; ops throw `StoreNotOpenError` when not open.\n- `recreate()`: destructive backend reset, rotates generation marker (e.g. `graph/storage.epoch`); provider/indexer owns reset — callers MUST NOT delete backend files. Incompatible schema → reject reads, no silent empty graph; repair = destructive rebuild + rotate generation + rebuild search indexes.\n- Mutations (atomic per file/spec): `upsertFile(file, symbols, relations)`, `addRelations(relations)` (additive, cross-file), `removeFile(filePath)`, `upsertSpec(spec, relations)`, `removeSpec(specId)`.\n- Queries: `getFile`, `findFilesByConfigRelativePath`, `getSymbol`, `getCallers`, `getCallees`, `getImporters`, `getImportees`, `getExtenders`, `getExtendedTargets`, `getImplementors`, `getImplementedTargets`, `getOverriders`, `getOverriddenTargets`, `getSpec`, `getSpecDependencies`, `getSpecDependents`, `getCoveredFiles`, `getCoveredSymbols`, `getCoveringSpecsForFile`, `getCoveringSpecsForSymbol`, `findSymbols(SymbolQuery)`, `getStatistics(): GraphStatistics`.\n- `SymbolQuery`: `name` (glob/regex), `kinds[]`, `filePath`, `comment` (substring), `caseSensitive` (default false).\n- `getStatistics()`: `fileCount`, `symbolCount`, `specCount`, `relationCounts: Record<RelationType, number>`, `languages`, `lastIndexedAt` (ISO 8601, read-only), `lastIndexedRef`, `graphFingerprint`.\n- Bulk: `clear()`, `getAllFiles()`, `getAllSpecs()`.\n- Search: `searchSymbols`, `searchSpecs`, `searchDocuments` — ranked relevance descending; `rebuildFtsIndexes()`; snippets + 1-based `startLine`/`endLine`.\n- Lexical expansion: preserve normalized token; split whitespace, `:`, `/`, `_`, `.`, `-`, CamelCase/PascalCase.\n- Ranking order: exact canonical identity > exact primary/alternate identity > identity prefix/suffix/substring token > structured component/path-component > generic text (BM25). Token strength: `x` > `x%` > `%x` > `%x%`; component match (`core` in `core:change`) > arbitrary substring (`core` in `score`); higher identity-token coverage ranks higher. Generic text always remains in retrieval.\n- `SearchOptions`: `query` (required), `limit` (default 20), `kind`, `filePattern` (glob, case-insensitive), `workspace`, `excludePaths`, `excludeWorkspaces`; filters applied before `limit`.\n- Reference/coverage: atomically persist logical-symbol identity, bindings/provenance, per-file/package coverage; never parse/case-fold serialized canonical ids for selectors/ranking; deterministic batch queries, no scan per reference; one complete reference-fact snapshot + one batched direct-affected-file query; reverse coverage batch query returns `COVERS_FILE`/`COVERS_SYMBOL` in deterministic source/type/target order; empty batch → empty result.\n- Source-content candidates: persist symbol construct/selection ranges; backend-neutral candidate query over `FileNode.content`; substring index for ≥3 chars, bounded fallback for shorter; never return all files for ordinary search; candidates only — merging/ranking/suppression belong to app layer.\n- Freshness: persist `IndexedInputObservation` (workspace, resource kind/id, input kind, locator, content hash, mtime/size/revision, monotonic stale flag); files/docs → 1 observation, aggregate specs → all inputs; batch compare-and-set marks stale/refreshes equal content, atomically updates workspace + aggregate latches; one monotonic `knownStaleSinceLastIndex` latch per workspace + one aggregate; cleared only by successful index; transient unknown assessments never persisted stale.\n- Bulk session: begins once, accepts bounded chunks, commits once, rebuilds search indexes once post-commit; batch relation validation/hierarchy lookups (no Store call per relation); dedupe equivalent relations; failed session never exposes partial generation.\n\n## Constraints\n\n- Abstract class, not interface.\n- All mutations atomic at file level; throw `StoreNotOpenError` when closed.\n- `recreate()` owned by provider/indexer, not caller file deletion.\n- No prescribed backend/schema/layout; storage-agnostic consumers rely on abstract semantics.\n- No `@specd/core` dependency; errors extend `CodeGraphError`.",
+      "value": "# Graph Store\n\n## Rules\n\n- GraphStore abstract class in domain/ports/; storagePath constructor; adapters own physical schema.\n- Persist FileNode content, SymbolNode, SpecNode, DocumentNode, required relation families and graph metadata.\n- open() prepares; close() idempotent; unopened/closed ops throw StoreNotOpenError. Provider-owned recreate() resets backend and rotates generation; incompatible schemas reject ordinary reads.\n- upsertFile, removeFile, upsertSpec, removeSpec atomic; addRelations additive; incremental updates compare contentHash. Bulk commits once, dedupes, rebuilds FTS once.\n- Query files/symbols/import-call-type-hierarchy/spec-coverage, SymbolQuery, statistics, reference/binding/coverage snapshots and batched affected/coverage lookup.\n- searchSymbols, searchSpecs, searchDocuments: 1-based snippets; lexical expansion whitespace, :, /, _, ., -, Camel/Pascal; rank identity > exact > prefix > suffix > component > substring > BM25; filter before limit. Content candidate query indexed/bounded, never full-file scan.\n- Persist IndexedInputObservation plus stale latches; clear only successful index. COVERS_SYMBOL may carry metadata.stale.\n\n## Constraints\n\n- Backend-agnostic port; consumers no backend mechanics/direct deletion.\n- Deterministic batch order; no @specd/core; errors extend CodeGraphError.",
       "schema": {
         "name": "schema-std",
         "version": 1
@@ -70,11 +70,11 @@
       "artifactState": {
         "spec.md": {
           "hash": "sha256:bd53a787d42ca7e7ab2cedad9a75f95e9b448b5d899dbcc4c058862343d09d9e",
-          "lastModified": "2026-08-18T16:21:42.017Z"
+          "lastModified": "2026-08-16T08:12:47.708Z"
         },
         "verify.md": {
           "hash": "sha256:cb72e67639cd0c0edc6701e2f35d56ed8ca10ca68a15156b6bf4a2163e86ceb9",
-          "lastModified": "2026-08-18T16:21:42.017Z"
+          "lastModified": "2026-08-16T10:48:01.520Z"
         }
       }
     }
