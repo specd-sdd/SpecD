@@ -1,0 +1,30 @@
+- op: modified
+  description: 'Verify forced stats configuration works without VCS and bootstrap remains VCS-bound.'
+  selector:
+    type: section
+    matches: '^Requirement: Command signature$'
+  content: |
+    #### Scenario: Explicit config path bypasses discovery
+
+    - **GIVEN** the current directory would autodiscover a different `specd.yaml`
+    - **WHEN** `specd graph stats --config /tmp/other/specd.yaml` is run
+    - **THEN** the command uses `/tmp/other/specd.yaml` directly
+
+    #### Scenario: Explicit config works outside VCS
+
+    - **GIVEN** `/tmp/project/specd.yaml` is valid and `/tmp/project` is outside a VCS repository
+    - **WHEN** `specd graph stats --config /tmp/project/specd.yaml` is run
+    - **THEN** the command opens the configured graph provider rather than failing bootstrap validation
+    - **AND** unavailable VCS health is preserved as provider output
+
+    #### Scenario: Explicit path enters bootstrap mode
+
+    - **GIVEN** a `specd.yaml` exists under the current repository
+    - **WHEN** `specd graph stats --path /tmp/repo` is run
+    - **THEN** config discovery is ignored
+    - **AND** the command opens the graph for a synthetic single workspace `default` rooted at `/tmp/repo`
+
+    #### Scenario: Mutually exclusive context flags fail fast
+
+    - **WHEN** `specd graph stats --config ./specd.yaml --path .` is run
+    - **THEN** the command exits with code 1 before any graph provider is opened
