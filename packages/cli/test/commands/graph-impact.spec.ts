@@ -121,6 +121,7 @@ function setup() {
       line: 10,
       column: 0,
     })),
+    getSymbolsByIds: vi.fn().mockResolvedValue([]),
     getFile: vi.fn().mockImplementation(async (path: string) => ({
       path,
       configRelativePath:
@@ -842,6 +843,7 @@ describe('graph impact', () => {
         })),
         totalCandidates: symbols.length,
       })
+      mockProvider.getSymbolsByIds.mockResolvedValue(symbols)
       mockProvider.analyzeImpact.mockResolvedValue({
         target: 'sym',
         directDependents: 0,
@@ -864,6 +866,9 @@ describe('graph impact', () => {
 
       const out = getStdout()
       expect(out).toContain('3 symbols exactly match "parse"')
+      expect(mockProvider.getSymbolsByIds).toHaveBeenCalledTimes(1)
+      expect(mockProvider.getSymbolsByIds).toHaveBeenCalledWith(symbols.map((s) => s.id))
+      expect(mockProvider.getSymbol).not.toHaveBeenCalled()
       expect(mockProvider.analyzeImpact).not.toHaveBeenCalled()
     })
 

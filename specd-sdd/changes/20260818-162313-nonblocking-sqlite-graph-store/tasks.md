@@ -647,3 +647,35 @@
       `packages/code-graph/src/domain/services/get-upstream.ts` and `packages/code-graph/src/domain/services/get-downstream.ts`: the truncation probe at line ~122 re-fetches `getSymbolsByIds(resolvedNextIds)` for symbols already resolved at line ~97
       Approach: reuse the already-fetched symbol batch (or probe existence via the same map) so each final level issues no extra logical batch; preserve truncated flag semantics, ordering, and all existing traversal.spec.ts assertions.
       (Req: Bounded batched traversal execution)
+
+## 21. Pre-compliance cleanup pass
+
+- [x] 21.1 Batch the ambiguous-symbol candidate enrichment in CLI impact
+      `packages/cli/src/commands/graph/impact.ts`: ambiguous path — replace the per-candidate `provider.getSymbol` `Promise.all` fan-out with one `provider.getSymbolsByIds(...)` lookup preserving candidate order and missing-symbol filtering; simplify the resolved-single path from a one-element `Promise.all(getSymbol)` to a direct single `getSymbol`
+      Approach: build the id list from `resolved.candidates`, one batch call, map results back by id; keep deterministic text/JSON output and totalCandidates accounting; update graph-impact.spec.ts to assert the batch API is used (getSymbol not called per candidate).
+      (Req: CodeGraphProvider facade)
+
+- [x] 21.2 Introduce typed selector validation error in resolve-graph-selector
+      `packages/code-graph/src/domain/errors/invalid-graph-selector-error.ts`: new `InvalidGraphSelectorError extends SpecdCodeGraphError` with code `INVALID_GRAPH_SELECTOR`; replace generic `throw new Error('empty file selector' | 'empty symbol selector')` in `resolve-graph-selector.ts`; export from package barrels
+      Approach: follow the existing `InvalidRelationTypeError` pattern (message-preserving, machine-readable code); these failures are reachable from host input through the public provider facade, so they are expected validation errors under default:\_global/error-handling-conventions; add error unit test + provider-level rejection test.
+      (Req: Symbol-reference provider surface)
+
+- [x] 21.3 Classify residual async loops in changed code
+      Fan-out re-audit over this change's diff: classify every `Promise.all(items.map(store/provider))` and sequential `for { await store... }` as fixed-cardinality, bounded, CPU-only, protected-bounded-concurrency, or scalable
+      Approach: record classifications in design.md §21; fix only occurrences whose cardinality scales with graph size or that violate the batching model; expected retained cases include includeFiles per-file importers loop (spec-permitted) and fixed two/three-element parallel probes.
+      (Req: Bounded batched traversal execution)
+
+- [x] 21.4 Confirm exact batch API symmetry end-to-end
+      Walk getSymbolsByIds/getFilesByPaths/getDocumentsByPaths/getSpecsByIds across port → provider → SQLite store → protocol → dispatcher → database → in-memory store → tests; confirm dedup, unknown-omission, first-requested order, empty-input no-op, chunking below the parameter budget, and one-RPC-per-logical-batch
+      Approach: verification-only checklist recorded in design.md §21; no contract changes unless a correctness defect appears.
+      (Req: Exact batch node retrieval, Worker-backed exact batch node lookups)
+
+- [x] 21.5 Add multi-parameter chunk regression for traversal relation batches
+      `packages/code-graph/test/infrastructure/sqlite/sqlite-graph-store.spec.ts`: prove `IN(ids) AND IN(types)` sizing accounts for both parameter groups
+      Approach: request all six traversal relation types with more than `SQLITE_BATCH_PARAMETER_LIMIT - types` ids; assert success with dedup/order preserved (chunk size = 900 − types); document the existing `idChunkSize = LIMIT − uniqueTypes.length` accounting and its RangeError guard.
+      (Req: Worker-efficient batch reads)
+
+- [x] 21.6 Run full cleanup-pass regression
+      typecheck + lint (code-graph, cli), full code-graph and cli suites, wide traversal/hotspot/single-file/multi-file suites with maxPendingOperations 16/32, plus manual `graph index`, `graph hotspots --min-risk HIGH`, six-file impact ×2 determinism, and large-file impact via dist CLI
+      Approach: no weakened assertions, no raised queue limits, no retries; all green before returning to verifying.
+      (Req: all affected specs)

@@ -118,3 +118,18 @@
     ## ADRs
 
     - [ADR-0025: Non-Blocking Worker-Thread SQLite Graph Store](../../../docs/adr/0025-nonblocking-worker-sqlite-graph-store.md) — provider composition starts and owns the worker-backed SQLite lifecycle
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Symbol-reference provider surface'
+  content: |
+    `CodeGraphProvider` SHALL expose single and batch symbol-reference resolution plus canonical-symbol and public-binding impact operations. These operations SHALL delegate to the shared resolver/traversal services under the provider's existing lifecycle and availability checks.
+
+    The provider SHALL expose an exact public-binding lookup keyed by public surface, exported name, symbol space, and canonical target identity. The lookup SHALL return the selected binding and its declarations without passing through ranked or paginated search, so common export names cannot hide an already-resolved binding behind a result limit.
+
+    Selector resolution SHALL distinguish unique, ambiguous, and missing outcomes. Unqualified impact selectors SHALL use case-exact names first, fall back only to case-insensitive exact names, never widen to prefixes/text, and bound ambiguity candidates before returning them to a host.
+
+    Selector validation failures that are reachable from host input (for example an empty selector) SHALL reject with a typed graph error carrying a stable machine-readable code (`INVALID_GRAPH_SELECTOR`) rather than a generic `Error`, preserving the descriptive message. When ambiguous-symbol presentation must enrich candidates with symbol details, it SHALL issue exactly one exact batch lookup rather than one call per candidate.
+
+    The curated package surface SHALL export resolver input/result/status/reason/provenance types and factories, logical-symbol/public-binding/member/coverage vocabulary, and the enriched health/index result types. Concrete resolver implementations and backend storage details SHALL remain internal.

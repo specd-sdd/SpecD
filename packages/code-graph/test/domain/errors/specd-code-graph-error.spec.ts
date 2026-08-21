@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { SpecdCodeGraphError } from '../../../src/domain/errors/specd-code-graph-error.js'
 import { InvalidSymbolKindError } from '../../../src/domain/errors/invalid-symbol-kind-error.js'
 import { InvalidRelationTypeError } from '../../../src/domain/errors/invalid-relation-type-error.js'
+import { InvalidGraphSelectorError } from '../../../src/domain/errors/invalid-graph-selector-error.js'
 import { DuplicateSymbolIdError } from '../../../src/domain/errors/duplicate-symbol-id-error.js'
 import { StoreNotOpenError } from '../../../src/domain/errors/store-not-open-error.js'
 import { SpecdError } from '@specd/core'
@@ -23,6 +24,16 @@ describe('SpecdCodeGraphError hierarchy', () => {
     expect(error).toBeInstanceOf(SpecdCodeGraphError)
     expect(error.code).toBe('INVALID_RELATION_TYPE')
     expect(error.message).toContain('NOPE')
+  })
+
+  it('InvalidGraphSelectorError extends SpecdCodeGraphError', () => {
+    const error = new InvalidGraphSelectorError('empty file selector')
+    expect(error).toBeInstanceOf(SpecdCodeGraphError)
+    expect(error).toBeInstanceOf(SpecdError)
+    expect(error.code).toBe('INVALID_GRAPH_SELECTOR')
+    expect(error.message).toBe('empty file selector')
+    expect(error.name).toBe('InvalidGraphSelectorError')
+    expect(error.specd).toBe(true)
   })
 
   it('DuplicateSymbolIdError extends SpecdCodeGraphError', () => {

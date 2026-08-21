@@ -1,7 +1,7 @@
 {
   "name": "nonblocking-sqlite-graph-store",
   "createdAt": "2026-08-18T16:23:13.275Z",
-  "updatedAt": "2026-08-21T21:50:22.256Z",
+  "updatedAt": "2026-08-21T22:40:10.293Z",
   "description": "Execute SQLite operations inside a persistent worker thread without blocking host event loop",
   "schema": {
     "name": "schema-std",
@@ -631,6 +631,14 @@
     {
       "file": "packages/code-graph/test/domain/services/compute-hotspots.spec.ts",
       "state": "open"
+    },
+    {
+      "file": "packages/code-graph/src/domain/errors/invalid-graph-selector-error.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/code-graph/test/domain/errors/specd-code-graph-error.spec.ts",
+      "state": "open"
     }
   ],
   "implementationLinks": [
@@ -1014,7 +1022,7 @@
           "key": "proposal",
           "filename": "proposal.md",
           "state": "complete",
-          "validatedHash": "sha256:935c9b3faa34b290cd286da3aa6bd0cbc3a28c978299ae0c3a2a13bbaf24028c"
+          "validatedHash": "sha256:eaf250f9c1ab52bbff4f9968eb839cd3af0cc347b27ede5918699be892a4eace"
         }
       ]
     },
@@ -1034,7 +1042,7 @@
           "key": "code-graph:composition",
           "filename": "deltas/code-graph/composition/spec.md.delta.yaml",
           "state": "complete",
-          "validatedHash": "sha256:a7ccff6f8dad55ad6ebe1c310deecb45253db5a71dc634233a3b170aa1d07da4"
+          "validatedHash": "sha256:d268ffdce7a53cc325df8f07e1313255b9f0ec7fd510f895eec79790de3b6a52"
         },
         {
           "key": "code-graph:graph-store",
@@ -1052,13 +1060,13 @@
           "key": "cli:graph-impact",
           "filename": "deltas/cli/graph-impact/spec.md.delta.yaml",
           "state": "complete",
-          "validatedHash": "sha256:6b1b3d82f8019700d548d09f7e45b2030a9fab384eae72463a6c55f7e9d3104c"
+          "validatedHash": "sha256:8d2e7e40a25f9c3c27e8eeefcc030440b6e56719527ead2f2f2bc2a95eb1df40"
         },
         {
           "key": "cli:graph-hotspots",
           "filename": "deltas/cli/graph-hotspots/spec.md.delta.yaml",
           "state": "complete",
-          "validatedHash": "sha256:d350db8a41c418e3e1fd2adf2cc9eda28053fed3a6ea9e4aef91cc03cd8e83b7"
+          "validatedHash": "sha256:6fbf2a93024c0195ef6fc14f3906f6094abb370c556d2d6592aaf554692ba1e9"
         }
       ]
     },
@@ -1078,7 +1086,7 @@
           "key": "code-graph:composition",
           "filename": "deltas/code-graph/composition/verify.md.delta.yaml",
           "state": "complete",
-          "validatedHash": "sha256:95ef786b041648f95f7398029ea619c1c6d47243d64021ff65e06e2f60784488"
+          "validatedHash": "sha256:8d71cc9dbee45160c4420e880f5e61c7b5e28b43f00d6f3d2f4febfaf7ad68c8"
         },
         {
           "key": "code-graph:graph-store",
@@ -1096,13 +1104,13 @@
           "key": "cli:graph-impact",
           "filename": "deltas/cli/graph-impact/verify.md.delta.yaml",
           "state": "complete",
-          "validatedHash": "sha256:704e0a19a1f8d30da28d0e6142f96acd6aa88a44a3db99a01e7ae2bf4594d380"
+          "validatedHash": "sha256:64e6b69478a72d39386c74187f61386aa5c8308a9e1fc8aa5a55cffe4ffeeab7"
         },
         {
           "key": "cli:graph-hotspots",
           "filename": "deltas/cli/graph-hotspots/verify.md.delta.yaml",
           "state": "complete",
-          "validatedHash": "sha256:88957c3b6407eab77923a02121020143f0ec2a1d16e9393afe9bf2f653eec90d"
+          "validatedHash": "sha256:2f99eb8a6ddc6782d93f7d15f64e47fb1b9b33a2014db13e27096e7155304cb7"
         }
       ]
     },
@@ -1116,7 +1124,7 @@
           "key": "design",
           "filename": "design.md",
           "state": "complete",
-          "validatedHash": "sha256:0934fdc0c7ab1ab05d2a3252bdec4f41e3341e5f721cb90dc0c1f3e2baa05ef0"
+          "validatedHash": "sha256:751cc303585ee4fe38128829ed36a057bc1a9b59da62db714b3a1f57ef1270f0"
         }
       ]
     },
@@ -1130,7 +1138,7 @@
           "key": "tasks",
           "filename": "tasks.md",
           "state": "complete",
-          "validatedHash": "sha256:541cb38fff02887828a68a87435830d4592b6666fa6e6d79432d6f08e1b5096f"
+          "validatedHash": "sha256:1c26da5db6dbe1b0b27cb9fbf76afe92a12bca38ecc8d149bd30d29919f095e5"
         }
       ]
     }
@@ -2669,6 +2677,198 @@
     {
       "type": "transitioned",
       "at": "2026-08-21T21:50:22.254Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-21T22:02:31.577Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]; specs [cli:graph-hotspots, cli:graph-impact]; verify [cli:graph-hotspots, cli:graph-impact]; design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["cli:graph-hotspots", "cli:graph-impact"]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:graph-hotspots", "cli:graph-impact"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-21T22:02:31.577Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "archivable",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-21T22:07:19.592Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [code-graph:composition]; verify [code-graph:composition]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:composition"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:composition"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-21T22:09:01.078Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-21T22:09:36.393Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-21T22:26:45.476Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-21T22:26:45.476Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-21T22:32:00.323Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-21T22:32:09.330Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-21T22:34:51.621Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-21T22:35:06.836Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-21T22:35:07.920Z",
       "by": {
         "name": "M***a",
         "email": "1***i@u***.com",

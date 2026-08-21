@@ -607,12 +607,15 @@ async function handleSymbolImpact(
   }
 
   if (resolved.status === 'ambiguous') {
-    const candidates = await Promise.all(
-      resolved.candidates.map(async (candidate) => {
-        const symbol = await provider.getSymbol(candidate.symbolId)
-        return symbol === undefined ? null : { symbol, displayPath: toDisplayPath(symbol.filePath) }
-      }),
+    const foundById = new Map(
+      (
+        await provider.getSymbolsByIds(resolved.candidates.map((candidate) => candidate.symbolId))
+      ).map((symbol) => [symbol.id, symbol]),
     )
+    const candidates = resolved.candidates.map((candidate) => {
+      const symbol = foundById.get(candidate.symbolId)
+      return symbol === undefined ? null : { symbol, displayPath: toDisplayPath(symbol.filePath) }
+    })
     const present = candidates.filter((candidate) => candidate !== null)
     if (fmt === 'text') {
       const lines = [
@@ -641,12 +644,9 @@ async function handleSymbolImpact(
     return
   }
 
-  const uniqueIds = [resolved.match.symbolId]
-  const symbols = (await Promise.all(uniqueIds.map((id) => provider.getSymbol(id)))).filter(
-    (symbol) => symbol !== undefined,
-  )
+  const sym = await provider.getSymbol(resolved.match.symbolId)
 
-  if (symbols.length === 0) {
+  if (sym === undefined) {
     if (fmt === 'text') {
       output(`No symbol found matching "${symbolSelector}".`, 'text')
     } else {
@@ -655,42 +655,38 @@ async function handleSymbolImpact(
     return
   }
 
-  if (symbols.length === 1) {
-    const sym = symbols[0]!
-    const result = await provider.analyzeImpact(sym.id, direction, maxDepth)
-    const displayPath = toDisplayPath(sym.filePath)
-    const displayResult = {
-      ...result,
-      affectedFiles: result.affectedFiles.map((path) => toDisplayPath(path)),
-      affectedSymbols: result.affectedSymbols.map((symbol) => ({
-        ...symbol,
-        filePath: toDisplayPath(symbol.filePath),
-      })),
-    }
+  const result = await provider.analyzeImpact(sym.id, direction, maxDepth)
+  const displayPath = toDisplayPath(sym.filePath)
+  const displayResult = {
+    ...result,
+    affectedFiles: result.affectedFiles.map((path) => toDisplayPath(path)),
+    affectedSymbols: result.affectedSymbols.map((symbol) => ({
+      ...symbol,
+      filePath: toDisplayPath(symbol.filePath),
+    })),
+  }
 
-    if (fmt === 'text') {
-      const lines = formatImpact(
-        `${sym.kind} ${sym.name} (${displayPath}:${String(sym.line)})`,
-        displayResult,
-        maxDepth,
-      )
-      output(lines.join('\n'), 'text')
-    } else {
-      output(
-        {
-          symbol: sym,
-          displayPath,
-          riskLevel: result.riskLevel,
-          directDepsCount: result.directDependents,
-          indirectDepsCount: result.indirectDependents,
-          transitiveDepsCount: result.transitiveDependents,
-          affectedFilesCount: result.affectedFiles.length,
-          impact: displayResult,
-        },
-        fmt,
-      )
-    }
-    return
+  if (fmt === 'text') {
+    const lines = formatImpact(
+      `${sym.kind} ${sym.name} (${displayPath}:${String(sym.line)})`,
+      displayResult,
+      maxDepth,
+    )
+    output(lines.join('\n'), 'text')
+  } else {
+    output(
+      {
+        symbol: sym,
+        displayPath,
+        riskLevel: result.riskLevel,
+        directDepsCount: result.directDependents,
+        indirectDepsCount: result.indirectDependents,
+        transitiveDepsCount: result.transitiveDependents,
+        affectedFilesCount: result.affectedFiles.length,
+        impact: displayResult,
+      },
+      fmt,
+    )
   }
 }
 

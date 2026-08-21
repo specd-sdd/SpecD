@@ -398,3 +398,93 @@ The change must not return to verification until:
 ## Open questions
 
 None. The audit may surface a generally useful batch abstraction for import traversal (`getImporters`/`getImportees`/`findSymbols` by file); if found, it is proposed in design rather than added speculatively. The read-session/snapshot abstraction remains a recorded potential future optimization unless the audit proves it necessary.
+
+## 21. Pre-compliance cleanup pass (post-audit)
+
+Decisions for the final cleanup requested before archiving:
+
+### Task 1 — CLI ambiguous-symbol enrichment
+
+The ambiguity branch in `impact.ts` currently enriches candidates with one
+`provider.getSymbol(candidate.symbolId)` under `Promise.all`. It will issue one
+`provider.getSymbolsByIds(...)` batch instead, mapping results back by id to
+preserve candidate order and missing-symbol filtering. The resolved-single path
+collapses its one-element `Promise.all(getSymbol)` into a single direct
+`getSymbol` call (single lookup; batching adds nothing).
+
+### Task 2 — Generic selector errors → typed error decision
+
+`resolveFileSelector('')` / `resolveSymbolSelector('')` throw generic
+`Error('empty file selector' | 'empty symbol selector')`. These ARE reachable
+from host input through the public provider facade (the CLI happens to guard
+empty input earlier, but MCP/sdk hosts are not required to). Under
+default:\_global/error-handling-conventions expected validation failures must be
+typed with machine-readable codes. Repository pattern research: every domain
+error extends `SpecdCodeGraphError` and exposes `get code()` (e.g.
+`InvalidRelationTypeError` → `INVALID_RELATION_TYPE`). Decision: introduce the
+smallest fitting class `InvalidGraphSelectorError extends SpecdCodeGraphError`
+with code `INVALID_GRAPH_SELECTOR`, message-preserving, exported from the
+package barrels; replace both generic throws. No new error hierarchy.
+
+### Task 3 — Residual fan-out classification (expected)
+
+- `impact.ts` ambiguity enrichment → FIXED by 21.1 (batch).
+- `get-upstream/get-downstream` includeFiles loop (`getImporters` per frontier
+  file) → RETAINED: spec letter permits per-file reads (prohibition is per
+  symbol/relation-type); cardinality is bounded by frontier width, not total
+  graph size, and impact paths run with includeFiles:false.
+- Fixed-cardinality probes in lifecycle/backpressure tests (2–3 parallel ops)
+  → RETAINED: intentional fixed bounds exercising backpressure semantics.
+- `analyze-files-impact` shared memoized view + concurrency budget 4 → already
+  compliant.
+- CLI hotspots/impact/search presentation → zero graph reads after section 19;
+  no change.
+
+### Task 4 — Batch API symmetry confirmation (verification-only)
+
+Contract walk recorded at implementation time: identical dedup /
+unknown-omission / first-requested-order / empty-input-`[]`-without-backend-work
+semantics implemented on port abstract methods, in-memory store, SQLite store
+(one RPC per logical batch), worker protocol + dispatcher, database set-based
+queries, provider facade (availability once), memoized read store; contract
+tests cover both backends via graph-store.contract.ts.
+
+### Task 5 — SQLite parameter-limit analysis
+
+`getSymbolRelationsBatch` computes `idChunkSize =
+SQLITE_BATCH_PARAMETER_LIMIT - uniqueTypes.length` and guards with `RangeError`
+when types exhaust the budget, so `IN(ids) AND IN(types)` never exceeds 900
+bound parameters. Exact node batches bind only ids and chunk at 900. Gap:
+no regression test exercises the multi-group accounting explicitly; 21.5 adds
+one (six relation types × >894 ids).
+
+### Task 6 — Regression scope
+
+Full code-graph + cli suites, low-limit integration tests (16/32), typecheck,
+lint, dist CLI manual regression (index, hotspots HIGH, six-file impact ×2,
+large-file impact).
+
+### Task 3/4/5 execution record (audit results)
+
+Fan-out classification of remaining async loops in changed code:
+
+- resolve-graph-selector.ts:77 (findFiles+findDocuments), :202 (getFile+getDocument)
+  → RETAINED: fixed-cardinality pairs, independent of graph size.
+- analyze-file-impact.ts:246 (covering-spec two-batch) → RETAINED: fixed pair of
+  logical batches per analysis.
+- analyze-file-impact.ts:389/431/445/457 → RETAINED: Promise.all over
+  already-resolved in-memory cache promises (CPU-only, no store calls).
+- compute-hotspots.ts:127 (3 fixed batch probes) → RETAINED: fixed cardinality.
+- get-upstream/get-downstream includeFiles per-file importers loop → RETAINED:
+  spec-permitted per-file reads, bounded by frontier width; impact paths use
+  includeFiles:false.
+- mapWithConcurrency sites (resolver 16, artifacts 16, impact budget 4) → RETAINED:
+  deliberate bounded concurrency where no batch representation exists.
+
+Batch symmetry walk (Task 4): confirmed identical semantics on all eight layers;
+contract tests cover both backends; one logical batch = one worker RPC asserted
+by sqlite-graph-store.spec.ts one-RPC tests for all four operations.
+
+Parameter-limit regression (Task 5): new test "accounts for all bind parameters
+when chunking ids together with relation types" (6 types × 905 ids) passes,
+proving idChunkSize = 900 − |types| accounting on both directions.

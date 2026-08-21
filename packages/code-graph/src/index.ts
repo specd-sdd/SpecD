@@ -216,6 +216,7 @@ export {
 export { SpecdCodeGraphError } from './domain/errors/specd-code-graph-error.js'
 export { InvalidSymbolKindError } from './domain/errors/invalid-symbol-kind-error.js'
 export { InvalidRelationTypeError } from './domain/errors/invalid-relation-type-error.js'
+export { InvalidGraphSelectorError } from './domain/errors/invalid-graph-selector-error.js'
 export { DuplicateSymbolIdError } from './domain/errors/duplicate-symbol-id-error.js'
 export { GraphBusyError } from './domain/errors/graph-busy-error.js'
 export { GraphProviderStaleError } from './domain/errors/graph-provider-stale-error.js'

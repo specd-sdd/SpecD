@@ -78,6 +78,67 @@ describe('SQLiteGraphStore', () => {
     ])
   })
 
+  it('accounts for all bind parameters when chunking ids together with relation types', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-rel-types-chunk-'))
+    const store = new SQLiteGraphStore(tempDir)
+    await store.open()
+    const file = createFileNode({
+      path: 'core:src/rel-chunk.ts',
+      configRelativePath: 'src/rel-chunk.ts',
+      language: 'typescript',
+      contentHash: 'sha256:rel-chunk',
+      workspace: 'core',
+    })
+    const target = createSymbolNode({
+      name: 'target',
+      kind: SymbolKind.Function,
+      filePath: file.path,
+      line: 1,
+      column: 0,
+    })
+    const sources = Array.from({ length: 905 }, (_, index) =>
+      createSymbolNode({
+        name: `source${String(index)}`,
+        kind: SymbolKind.Function,
+        filePath: file.path,
+        line: index + 2,
+        column: 0,
+      }),
+    )
+    const traversalTypes = [
+      RelationType.Calls,
+      RelationType.Constructs,
+      RelationType.UsesType,
+      RelationType.Extends,
+      RelationType.Implements,
+      RelationType.Overrides,
+    ] as const
+    const relations = sources.map((source, index) =>
+      createRelation({
+        source: source.id,
+        target: target.id,
+        type: traversalTypes[index % traversalTypes.length]!,
+      }),
+    )
+    await store.bulkLoad({ files: [file], symbols: [target, ...sources], specs: [], relations })
+
+    // 6 types + id chunks of (900 - 6) must stay within the parameter budget
+    // while still covering every requested id exactly once.
+    const outgoing = await store.getOutgoingSymbolRelations(
+      sources.map((s) => s.id),
+      [...traversalTypes],
+    )
+    expect(outgoing).toHaveLength(relations.length)
+    expect(new Set(outgoing.map((r) => `${r.source}\u0000${r.type}`)).size).toBe(relations.length)
+
+    const incoming = await store.getIncomingSymbolRelations(
+      [target.id, target.id],
+      [...traversalTypes],
+    )
+    expect(incoming).toHaveLength(relations.length)
+    await store.close()
+  })
+
   it('chunks more than 900 traversal ids inside one worker request without loss', async () => {
     tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-large-read-batch-'))
     const store = new SQLiteGraphStore(tempDir)

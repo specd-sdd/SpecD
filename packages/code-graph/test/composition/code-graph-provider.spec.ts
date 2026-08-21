@@ -7,6 +7,7 @@ import { createCodeGraphProvider } from '../../src/composition/create-code-graph
 import { createBootstrapGraphConfig } from '../../src/application/services/bootstrap-graph-config.js'
 import { StoreNotOpenError } from '../../src/domain/errors/store-not-open-error.js'
 import { GraphProviderStaleError } from '../../src/domain/errors/graph-provider-stale-error.js'
+import { InvalidGraphSelectorError } from '../../src/domain/errors/invalid-graph-selector-error.js'
 import { GraphStoreRegistryError } from '../../src/domain/errors/graph-store-registry-error.js'
 import { InMemoryGraphStore } from '../helpers/in-memory-graph-store.js'
 import { makeMockSpecRepository } from '../helpers/make-mock-spec-repository.js'
@@ -577,6 +578,30 @@ describe('CodeGraphProvider', () => {
       expect(snapshotCallCount()).toBe(1)
     } finally {
       sendRequest.mockRestore()
+      await provider.close()
+    }
+  })
+
+  it('rejects empty selectors with the typed graph selector error', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'specd-graph-provider-selector-error-'))
+    const provider = await createCodeGraphProvider({
+      storagePath: tempDir,
+      projectRoot: tempDir,
+      graphStoreId: 'sqlite',
+    })
+    await provider.open()
+
+    try {
+      const fileError = await provider.resolveFileSelector('').catch((error: unknown) => error)
+      expect(fileError).toBeInstanceOf(InvalidGraphSelectorError)
+      expect((fileError as InvalidGraphSelectorError).code).toBe('INVALID_GRAPH_SELECTOR')
+      expect((fileError as InvalidGraphSelectorError).message).toBe('empty file selector')
+
+      const symbolError = await provider.resolveSymbolSelector('').catch((error: unknown) => error)
+      expect(symbolError).toBeInstanceOf(InvalidGraphSelectorError)
+      expect((symbolError as InvalidGraphSelectorError).code).toBe('INVALID_GRAPH_SELECTOR')
+      expect((symbolError as InvalidGraphSelectorError).message).toBe('empty symbol selector')
+    } finally {
       await provider.close()
     }
   })

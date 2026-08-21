@@ -1,4 +1,5 @@
 import { isAbsolute, relative } from 'node:path'
+import { InvalidGraphSelectorError } from '../../domain/errors/invalid-graph-selector-error.js'
 import { type GraphStore } from '../../domain/ports/graph-store.js'
 import { mapWithConcurrency } from '../../domain/services/map-with-concurrency.js'
 import { type DocumentNode } from '../../domain/value-objects/document-node.js'
@@ -60,7 +61,7 @@ export async function resolveFileSelector(
 ): Promise<ResolvedFileSelector[]> {
   const trimmed = input.trim()
   if (trimmed.length === 0) {
-    throw new Error('empty file selector')
+    throw new InvalidGraphSelectorError('empty file selector')
   }
 
   const direct = await resolveDirectPath(trimmed, options.store)
@@ -97,7 +98,7 @@ export async function resolveSymbolSelector(
 ): Promise<ResolvedSymbolSelectorResult> {
   const trimmed = input.trim()
   if (trimmed.length === 0) {
-    throw new Error('empty symbol selector')
+    throw new InvalidGraphSelectorError('empty symbol selector')
   }
 
   const direct = await options.store.getSymbol(trimmed)
