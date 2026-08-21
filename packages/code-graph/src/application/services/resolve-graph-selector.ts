@@ -1,5 +1,6 @@
 import { isAbsolute, relative } from 'node:path'
 import { type GraphStore } from '../../domain/ports/graph-store.js'
+import { mapWithConcurrency } from '../../domain/services/map-with-concurrency.js'
 import { type DocumentNode } from '../../domain/value-objects/document-node.js'
 import { type FileNode } from '../../domain/value-objects/file-node.js'
 import { isSymbolKind, type SymbolKind } from '../../domain/value-objects/symbol-kind.js'
@@ -42,6 +43,9 @@ export type ResolvedSymbolSelectorResult =
   | { readonly status: 'missing'; readonly candidates: readonly [] }
 
 const MAX_AMBIGUITY_CANDIDATES = 10
+
+/** Ceiling for per-file resolution loops that lack a batch representation. */
+const RESOLVER_CONCURRENCY = 16
 
 /**
  * Resolves a raw file selector into canonical graph identities.
@@ -106,14 +110,12 @@ export async function resolveSymbolSelector(
   const fullId = parseFullIdSelector(trimmed)
   if (fullId !== null) {
     const fileMatches = await resolveFileSelector(fullId.fileSelector, options)
-    const symbolMatches = await Promise.all(
-      fileMatches.map((file) =>
-        options.store.findSymbols({
-          filePath: file.canonicalPath,
-          kind: fullId.kind,
-          name: fullId.name,
-        }),
-      ),
+    const symbolMatches = await mapWithConcurrency(fileMatches, RESOLVER_CONCURRENCY, (file) =>
+      options.store.findSymbols({
+        filePath: file.canonicalPath,
+        kind: fullId.kind,
+        name: fullId.name,
+      }),
     )
     return resolvedResult(
       symbolMatches
@@ -130,14 +132,12 @@ export async function resolveSymbolSelector(
   const qualified = parseQualifiedSelector(trimmed)
   if (qualified !== null) {
     const fileMatches = await resolveFileSelector(qualified.fileSelector, options)
-    const symbolMatches = await Promise.all(
-      fileMatches.map((file) =>
-        options.store.findSymbols({
-          filePath: file.canonicalPath,
-          ...(qualified.kind !== undefined ? { kind: qualified.kind } : {}),
-          name: qualified.name,
-        }),
-      ),
+    const symbolMatches = await mapWithConcurrency(fileMatches, RESOLVER_CONCURRENCY, (file) =>
+      options.store.findSymbols({
+        filePath: file.canonicalPath,
+        ...(qualified.kind !== undefined ? { kind: qualified.kind } : {}),
+        name: qualified.name,
+      }),
     )
     return resolvedResult(
       symbolMatches.flat().map((symbol) => ({

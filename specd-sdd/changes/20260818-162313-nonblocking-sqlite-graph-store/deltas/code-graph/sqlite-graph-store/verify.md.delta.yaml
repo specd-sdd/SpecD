@@ -216,6 +216,37 @@
     - **WHEN** a batch symbol query has no symbol ids or a relation query has no ids or relation types
     - **THEN** it returns an empty array without dispatching a worker RPC or executing SQL
 
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Worker-efficient batch reads'
+  content: |
+    ### Requirement: Worker-backed exact batch node lookups
+
+    #### Scenario: Exact batch node lookup crosses the worker boundary once
+
+    - **GIVEN** many file paths, document paths, spec ids, or symbol ids are requested together
+    - **WHEN** `getFilesByPaths`, `getDocumentsByPaths`, `getSpecsByIds`, or `getSymbolsByIds` is invoked
+    - **THEN** the whole logical batch is sent as one typed worker RPC
+    - **AND** the worker executes one set-based query rather than one RPC per node
+
+    #### Scenario: Large exact batch is chunked transparently inside the worker
+
+    - **GIVEN** an exact batch exceeds SQLite's safe parameter count
+    - **WHEN** the worker executes the batch query
+    - **THEN** it divides the query into deterministic bounded SQL parameter chunks
+    - **AND** the merged result deduplicates repeated identities, omits unknown identities,
+      and preserves first requested-identity order
+
+    #### Scenario: Empty exact batch avoids worker and SQLite work
+
+    - **WHEN** an exact batch node query has no paths, ids, or spec ids
+    - **THEN** it returns an empty array without dispatching a worker RPC or executing SQL
+
 - op: modified
   selector:
     type: section

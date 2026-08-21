@@ -321,6 +321,59 @@ export function graphStoreContractTests(
       expect(await store.getOutgoingSymbolRelations([symbols[0]!.id], [])).toEqual([])
     })
 
+    it('batches files, documents, and specs deterministically by requested identity', async () => {
+      const fileA = createFileNode({
+        path: 'core:src/node-a.ts',
+        configRelativePath: 'src/node-a.ts',
+        language: 'typescript',
+        contentHash: 'sha256:node-a',
+        workspace: 'core',
+      })
+      const fileB = createFileNode({
+        path: 'core:src/node-b.ts',
+        configRelativePath: 'src/node-b.ts',
+        language: 'typescript',
+        contentHash: 'sha256:node-b',
+        workspace: 'core',
+      })
+      const document = createDocumentNode({
+        path: 'root:docs/batch.md',
+        configRelativePath: 'docs/batch.md',
+        contentHash: 'sha256:batch-doc',
+        content: '# Batch',
+        workspace: 'root',
+      })
+      const spec = createSpecNode({
+        specId: 'core:core/batch',
+        path: 'specs/core/batch',
+        title: 'Batch',
+        contentHash: 'sha256:batch-spec',
+        workspace: 'test',
+      })
+
+      await store.bulkLoad({ files: [fileA, fileB], symbols: [], specs: [], relations: [] })
+      await store.upsertDocument(document)
+      await store.upsertSpec(spec, [])
+
+      expect(
+        await store.getFilesByPaths([
+          fileB.path,
+          'unknown-file',
+          fileA.path,
+          fileB.path,
+          fileB.path,
+        ]),
+      ).toEqual([fileB, fileA])
+      expect(
+        await store.getDocumentsByPaths(['unknown-doc', document.path, document.path]),
+      ).toEqual([document])
+      expect(await store.getSpecsByIds([spec.specId, 'unknown-spec'])).toEqual([spec])
+
+      expect(await store.getFilesByPaths([])).toEqual([])
+      expect(await store.getDocumentsByPaths([])).toEqual([])
+      expect(await store.getSpecsByIds([])).toEqual([])
+    })
+
     it('stages bounded bulk-session chunks until one commit and deduplicates relations', async () => {
       const file = createFileNode({
         path: 'core:src/bulk.ts',

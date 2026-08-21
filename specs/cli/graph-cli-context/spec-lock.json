@@ -25,36 +25,36 @@
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "Centralize graph CLI config/bootstrap/provider wiring via `@specd/sdk`; retain CLI signals, exits, formatted failures.",
+      "value": "Centralize graph CLI config/bootstrap/provider wiring via @specd/sdk; CLI retains signals, exits, formatted failures.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:46efb1851c9bbd09b84037c877ec07f1fb80cdca6765125edeb198f1fd27871f",
-          "lastModified": "2026-08-20T12:20:57.685Z"
+          "hash": "sha256:812228bec0095306b47f7da6420dd90ae36de8ec63aecbe52e655179b59200c0",
+          "lastModified": "2026-08-20T13:31:54.772Z"
         },
         "verify.md": {
-          "hash": "sha256:46fde19d6c21ada1f476df338a68f3f223f9bbaec6ad84e1e9f7c3d2fe42abf0",
-          "lastModified": "2026-08-20T12:20:57.685Z"
+          "hash": "sha256:c7e137b5bcd58a9c838b1511f70393c46e426e642228d1fdc647ae7e00f0275e",
+          "lastModified": "2026-08-20T13:31:54.772Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# Graph CLI Context\n## Rules\n- `resolveGraphCliContext`: configured mode via `resolveCliContext` / `openSpecdHost`; types only `@specd/sdk` re-exports.\n- Configured (`--config` or discovered): use config project root; no VCS required; absent VCS root when undetected.\n- Bootstrap (`--path` / no-config fallback): require VCS root; synthetic single-workspace project rooted there.\n- `packages/cli/src/commands/graph/with-provider.ts` `withProvider`: build `SdkHostContext` from resolved config + kernel when available; lifecycle via `withOpenGraphProvider` from `@specd/sdk`.\n- `withProvider` retains configured-command `SIGINT` / `SIGTERM`, post-close `process.exit(0)` for native graph-store threads, pre-open format-aware fatal reporting.\n- `search`, `hotspots`, `impact`: module `withProvider`. `graph stats`: `openSpecdHost` + SDK lifecycle; never `resolveGraphCliContext` / pre-open lock probe.\n- `graph index`: `runIndexProjectGraph` from `@specd/sdk`; no long-lived `withProvider`; worker indexes isolated.\n- No host-managed pre-open lock probes; opened SDK lifecycle surfaces availability incl. indexing-busy.\n## Constraints\n- Host symbols: `@specd/sdk` via module or `cli:host-context`.\n- SDK owns provider lifecycle; CLI owns bootstrap, signals, forced exit, error presentation.",
+      "value": "# Graph CLI Context\n## Rules\n- `resolveGraphCliContext`: configured mode via `resolveCliContext` / `openSpecdHost`; platform types ONLY from `@specd/sdk` re-exports.\n- Configured (`--config` or discovery): use resolved config project root; no VCS required; VCS root absent when undetected, provider health surfaces unavailable VCS without rejecting command.\n- Bootstrap (`--path` / no-config fallback): REQUIRE resolved VCS root; synthetic single-workspace project rooted at VCS root.\n- `withProvider` (`packages/cli/src/commands/graph/with-provider.ts`): build `SdkHostContext` from resolved config + kernel (when available); open/close provider via `withOpenGraphProvider` from `@specd/sdk`.\n- `withProvider` retains format-aware fatal error reporting pre-open; MUST NOT install graph-store-specific signal handlers or force `process.exit(0)` for backend-native threads; cleanup via SDK lifecycle; normal completion returns to CLI runtime.\n- `search`, `hotspots`, `impact`, `stats`: shared provider lifecycle via `withProvider`; context via shared graph CLI context, never backend-specific host bootstrap/shutdown.\n- `graph index`: delegate to `runIndexProjectGraph` (`@specd/sdk`); no long-lived `withProvider`; worker subprocess indexes in isolation.\n- Host symbols: `@specd/sdk` via this module or `cli:host-context`.\n- No host-managed pre-open lock probes; availability errors incl. indexing-busy surfaced by SDK-owned opened provider lifecycle.\n## Constraints\n- SDK owns provider lifecycle; CLI owns bootstrap, signals, exit, error presentation.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:46efb1851c9bbd09b84037c877ec07f1fb80cdca6765125edeb198f1fd27871f",
-          "lastModified": "2026-08-20T12:20:57.685Z"
+          "hash": "sha256:812228bec0095306b47f7da6420dd90ae36de8ec63aecbe52e655179b59200c0",
+          "lastModified": "2026-08-20T13:31:54.772Z"
         },
         "verify.md": {
-          "hash": "sha256:46fde19d6c21ada1f476df338a68f3f223f9bbaec6ad84e1e9f7c3d2fe42abf0",
-          "lastModified": "2026-08-20T12:20:57.685Z"
+          "hash": "sha256:c7e137b5bcd58a9c838b1511f70393c46e426e642228d1fdc647ae7e00f0275e",
+          "lastModified": "2026-08-20T13:31:54.772Z"
         }
       }
     }

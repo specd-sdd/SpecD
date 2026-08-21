@@ -10,6 +10,7 @@ import { GraphProviderStaleError } from '../../src/domain/errors/graph-provider-
 import { GraphStoreRegistryError } from '../../src/domain/errors/graph-store-registry-error.js'
 import { InMemoryGraphStore } from '../helpers/in-memory-graph-store.js'
 import { makeMockSpecRepository } from '../helpers/make-mock-spec-repository.js'
+import { SQLiteWorkerClient } from '../../src/infrastructure/sqlite/sqlite-worker-client.js'
 import { createFileNode } from '../../src/domain/value-objects/file-node.js'
 import { createSymbolNode } from '../../src/domain/value-objects/symbol-node.js'
 import {
@@ -521,5 +522,62 @@ describe('CodeGraphProvider', () => {
     })
     expect(store.recreateCount).toBe(1)
     await indexingProvider.close()
+  })
+
+  it('validates availability exactly once per provider batch operation', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'specd-graph-provider-batch-availability-'))
+    const provider = await createCodeGraphProvider({
+      storagePath: tempDir,
+      projectRoot: tempDir,
+      graphStoreId: 'sqlite',
+    })
+    await provider.open()
+    const sendRequest = vi.spyOn(SQLiteWorkerClient.prototype, 'sendRequest')
+    const snapshotCallCount = (): number =>
+      sendRequest.mock.calls.filter(([op]) => op === 'readStorageGenerationSnapshot').length
+
+    try {
+      expect(await provider.getSymbolsByIds(['core:missing-symbol'])).toEqual([])
+      expect(snapshotCallCount()).toBe(1)
+
+      expect(await provider.getFilesByPaths(['core:src/missing.ts'])).toEqual([])
+      expect(snapshotCallCount()).toBe(2)
+
+      expect(await provider.getDocumentsByPaths(['root:docs/missing.md'])).toEqual([])
+      expect(snapshotCallCount()).toBe(3)
+
+      expect(await provider.getSpecsByIds(['core:missing-spec'])).toEqual([])
+      expect(snapshotCallCount()).toBe(4)
+    } finally {
+      sendRequest.mockRestore()
+      await provider.close()
+    }
+  })
+
+  it('does not multiply availability validation across composite inner loops', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'specd-graph-provider-composite-availability-'))
+    const provider = await createCodeGraphProvider({
+      storagePath: tempDir,
+      projectRoot: tempDir,
+      graphStoreId: 'sqlite',
+    })
+    await provider.open()
+    const sendRequest = vi.spyOn(SQLiteWorkerClient.prototype, 'sendRequest')
+    const snapshotCallCount = (): number =>
+      sendRequest.mock.calls.filter(([op]) => op === 'readStorageGenerationSnapshot').length
+
+    try {
+      const result = await provider.analyzeFilesImpact(
+        ['core:src/a.ts', 'core:src/b.ts', 'core:src/c.ts'],
+        'upstream',
+        2,
+      )
+
+      expect(result.riskLevel).toBe('LOW')
+      expect(snapshotCallCount()).toBe(1)
+    } finally {
+      sendRequest.mockRestore()
+      await provider.close()
+    }
   })
 })

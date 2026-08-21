@@ -2,457 +2,303 @@
 
 ## Objectives
 
-Keep `better-sqlite3` while moving every synchronous database operation to one persistent Node.js worker per open store. Wide graph traversal SHALL use set-based batch reads and one shared, fixed concurrency budget so normal impact analysis cannot overflow the worker queue merely because the input or BFS frontier is wide. Existing traversal results, persistence identities, CLI behavior, and the SQLite-only built-in composition from `main` remain unchanged.
+Keep `better-sqlite3` while moving every synchronous database operation to one persistent Node.js worker per open store. Treat the worker boundary as an RPC boundary: first-party consumers MUST prefer pure derivation, then batch `GraphStore` operations, then memoization of already-loaded data, then bounded concurrency, and may use unrestricted `Promise.all` only for intrinsically small, bounded collections. This prevents data-dependent caller fan-out from overflowing the serial worker queue (`STORE_OVERLOAD`) on the real SpecD graph (≈37,161 symbols, 1,084 files, 206 MB SQLite DB). Existing traversal results, persistence identities, CLI behavior, and the SQLite-only built-in composition from `main` remain unchanged.
 
 ## Non-goals
 
-- Replacing `better-sqlite3`, adding a worker pool, or restoring the removed Ladybug backend.
-- Raising `maxPendingOperations` to conceal caller fan-out.
+- Replacing `better-sqlite3`, adding a worker pool, worker-per-request execution, or restoring the removed Ladybug backend.
+- Raising `maxPendingOperations` (default 256) to conceal caller fan-out, or replacing the hard limit with a silently unbounded host wait queue.
 - Changing traversal direction, default depth, cycle behavior, risk thresholds, result shapes, or CLI syntax.
 - Migrating a Ladybug store. Re-index remains the recovery boundary.
 - Automatic worker restart or retry after an unexpected exit.
+- Introducing a read-session/snapshot abstraction unless the audit in this change proves it necessary; it is recorded as a potential future optimization only.
+- Making `toGraphDisplayPath` database-backed. Display-path conversion is pure and must stay pure.
 
 ## Constraints
 
-- Domain traversal depends only on `GraphStore`; worker/SQLite types stay in infrastructure.
-- ESM, named exports, strict types, no `any`, and descriptive JSDoc apply.
-- Batch ids are deduplicated; unknown ids are omitted. Symbols follow first requested-id order. Relations sort by source, type, then target.
-- Empty ids, or empty relation types for relation queries, return `[]` without RPC or SQL.
-- Traversal relation types are `CALLS`, `CONSTRUCTS`, `USES_TYPE`, `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES`.
+- Domain traversal and hotspot computation depend only on `GraphStore`; worker/SQLite types stay in infrastructure.
+- ESM, named exports, strict types, no `any`, and descriptive JSDoc apply (default `_global` conventions).
+- Batch node operations accept arbitrary input ordering, deduplicate repeated requested identities, preserve first-requested identity order in the result, and omit identities that do not exist.
+- Empty input arrays, or empty relation-type arrays for relation queries, return `[]` without RPC or SQL.
 - One non-empty logical SQLite batch crosses IPC once. Physical SQL chunks remain worker-internal.
+- Traversal and hotspot relation types are `CALLS`, `CONSTRUCTS`, `USES_TYPE`, `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES`. Hotspot hierarchy signals use `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES`.
+- `maxPendingOperations` remains validated as a positive integer (`>= 1`) and defaults to 256. `STORE_OVERLOAD` remains the hard safety fuse.
+- The worker boundary is an RPC boundary: serial worker-side execution means batching is preferable to request-level concurrency; high-level callers are responsible for avoiding unbounded fan-out.
 
 ## Affected areas
 
-- `domain/ports/graph-store.ts` (`GraphStore`, HIGH risk): add three batch methods; SQLite and every test store must implement them.
-- `domain/services/get-upstream.ts` and `get-downstream.ts` (HIGH risk): replace nested per-symbol/per-type requests with frontier relation and symbol batches.
-- `domain/services/analyze-file-impact.ts` (`createMemoizedReadStore`/file analysis) and `analyze-files-impact.ts` (HIGH risk): share one memoized store and one concurrency budget across multi-file work; preserve result semantics.
-- `domain/services/map-with-concurrency.ts`: new pure ordered scheduler utility.
-- `infrastructure/sqlite/sqlite-worker-protocol.ts`, `sqlite-worker.ts`, `sqlite-worker-client.ts`, `sqlite-graph-store.ts`, and `sqlite-graph-database.ts` (HIGH risk): type, transport, dispatch, and execute batch reads; retain FIFO lifecycle/backpressure and worker-side transactions.
-- `infrastructure/sqlite/sqlite-runtime-descriptor.ts`, composition factory/provider code, `public.ts`, and `index.ts`: retain serializable runtime configuration, curated exports, and SQLite-only composition. `LadybugGraphStore` is exported by neither entrypoint.
-- `domain/errors/*`: preserve typed lifecycle, configuration, bulk-session, schema, overload, and worker errors across IPC.
-- `test/helpers/in-memory-graph-store.ts`, traversal/impact tests, SQLite protocol/lifecycle/database/store tests, composition tests, and barrel tests: implement and verify the complete contract.
-- `docs/adr/0025-nonblocking-worker-sqlite-graph-store.md`: document worker, FIFO, backpressure, batching, lifecycle, and rejected alternatives. No CLI guide changes are needed because commands/options do not change.
+### Domain port — `packages/code-graph/src/domain/ports/graph-store.ts`
+
+- Change: add three exact batch node methods (`getFilesByPaths`, `getDocumentsByPaths`, `getSpecsByIds`) beside the existing `getSymbolsByIds`, `getIncomingSymbolRelations`, and `getOutgoingSymbolRelations`.
+- Impact: every `GraphStore` implementation (SQLite store, in-memory test store, memoized store) and the shared contract tests must implement them. HIGH risk — the port is consumed by traversal, indexer, freshness, coverage, search, and composition.
+
+### Worker infrastructure — `packages/code-graph/src/infrastructure/sqlite/*`
+
+- `sqlite-worker-protocol.ts`: add typed operation-map entries for `getFilesByPaths`, `getDocumentsByPaths`, `getSpecsByIds`.
+- `sqlite-worker.ts`: dispatch the three new operations through the existing serial FIFO queue to `SQLiteGraphDatabase`.
+- `sqlite-graph-database.ts`: implement set-based queries (`WHERE ... IN (...)`) with internal parameter chunking for files, documents, and specs.
+- `sqlite-graph-store.ts`: add host empty-input guards and one-RPC batch methods.
+- `sqlite-worker-client.ts`: unchanged transport; remains bounded at 256 with `STORE_OVERLOAD`.
+- HIGH risk: protocol and database are the shared execution core; must retain FIFO lifecycle/backpressure and worker-side transactions.
+
+### Traversal & impact domain services — `packages/code-graph/src/domain/services/`
+
+- `get-upstream.ts`, `get-downstream.ts`: already batched per BFS frontier (preserve; do not regress).
+- `analyze-file-impact.ts`, `analyze-files-impact.ts`: already share one memoized store and one `IMPACT_CONCURRENCY = 4` budget (preserve; do not regress). Audit remaining import paths (`getImporters`, `getImportees`, `findSymbols({ filePath })`) for wide-level batching candidates.
+- `compute-hotspots.ts`: rewrite `collectHierarchySignals` to use batch relation retrieval (section "Hotspot hierarchy signals").
+- `map-with-concurrency.ts`: keep the ordered scheduler with a clear scope (section "mapWithConcurrency scope").
+- `analyze-impact.ts`, `analyze-file-impact.ts`: classify and fix remaining fan-outs per the audit table (section "Fan-out audit").
+
+### Application services — `packages/code-graph/src/application/services/`
+
+- `resolve-graph-selector.ts`: classify per-symbol/per-file resolution fan-outs (section "Fan-out audit"); use exact batch node APIs where they represent stable storage-neutral operations.
+
+### Composition — `packages/code-graph/src/composition/code-graph-provider.ts`
+
+- Add provider-level batch operations: `getFilesByPaths`, `getDocumentsByPaths`, `getSymbolsByIds`, `getSpecsByIds`.
+- A provider batch method validates availability/generation once and then issues one logical batch store operation (section "Provider availability validation").
+- `assertAvailable` remains for single-node public calls; composite facade operations validate once at the boundary.
+
+### CLI presentation — `packages/cli/src/commands/graph/impact.ts`, `packages/cli/src/commands/graph/hotspots.ts`, `packages/cli/src/commands/graph/resolve-impact-file-selectors.ts`
+
+- `toGraphDisplayPath` becomes a pure path projection; `impact.ts` formatting stops issuing `getFile`/`getDocument` RPCs per affected symbol (section "Pure display-path projection").
+- `hotspots.ts` presentation stops any per-entry fan-out that is not batch or bounded.
+- HIGH risk: `impact.ts` currently formats hundreds of symbols via unbounded `Promise.all(affectedSymbols.map(...))`; this is the confirmed CLI overload.
+
+### Indexing — `packages/code-graph/src/application/use-cases/index-code-graph.ts`
+
+- Audit line 1456 fan-out (section "Fan-out audit"); use batch reads or bounded concurrency as classified.
+
+### Docs — `docs/adr/0025-nonblocking-worker-sqlite-graph-store.md`
+
+- Extend with the RPC-boundary rule, serial-worker rationale, batch-over-concurrency preference, safety-fuse semantics, pure-derivation rule, exact batch APIs, and rejected worker-pool/unbounded-wait options.
+
+### Tests — `packages/code-graph/test/**`, `packages/cli/test/**`
+
+- GraphStore contract tests, in-memory test store, SQLite protocol/database/store tests, traversal/impact/hotspot suites, CLI impact/hotspots suites, and workload-level regression tests (section "Testing").
 
 ## New constructs
 
-`GraphStore` gains:
+### `GraphStore` exact batch node methods — `packages/code-graph/src/domain/ports/graph-store.ts`
 
 ```ts
-abstract getSymbolsByIds(symbolIds: readonly string[]): Promise<SymbolNode[]>
-abstract getIncomingSymbolRelations(
-  symbolIds: readonly string[],
-  relationTypes: readonly RelationType[],
-): Promise<Relation[]>
-abstract getOutgoingSymbolRelations(
-  symbolIds: readonly string[],
-  relationTypes: readonly RelationType[],
-): Promise<Relation[]>
+abstract getFilesByPaths(paths: readonly string[]): Promise<FileNode[]>
+abstract getDocumentsByPaths(paths: readonly string[]): Promise<DocumentNode[]>
+abstract getSpecsByIds(specIds: readonly string[]): Promise<SpecNode[]>
 ```
 
-`domain/services/map-with-concurrency.ts` exports:
+Contract (shared with the existing `getSymbolsByIds`):
+
+- Arbitrary input ordering accepted.
+- Repeated requested identities are deduplicated; results include each identity once.
+- Results preserve first-requested identity order; unknown identities are omitted.
+- Empty input returns `[]` without RPC or SQL.
+- Each logical call crosses the worker boundary once; physical `IN`-chunked SQL stays worker-internal.
+- Implementations must avoid N internal single `.get()` calls; use set-based queries.
+
+Existing single-item APIs (`getFile`, `getDocument`, `getSymbol`, `getSpec`) and complete-collection APIs (`getAllFiles`, `getAllDocuments`, `getAllSpecs`) are retained unchanged.
+
+### Worker protocol entries — `packages/code-graph/src/infrastructure/sqlite/sqlite-worker-protocol.ts`
 
 ```ts
-export async function mapWithConcurrency<T, R>(
-  values: readonly T[],
-  concurrency: number,
-  mapper: (value: T, index: number) => Promise<R>,
-): Promise<R[]>
+getFilesByPaths: { payload: { filePaths: readonly string[] }; result: FileNode[] }
+getDocumentsByPaths: { payload: { documentPaths: readonly string[] }; result: DocumentNode[] }
+getSpecsByIds: { payload: { specIds: readonly string[] }; result: SpecNode[] }
 ```
 
-It accepts only positive integer concurrency, preserves result order, starts at most the requested number of mappers, and stops scheduling new work after a rejection. It performs no I/O.
-
-`analyze-file-impact.ts` defines the internal shared context:
+### `SQLiteGraphDatabase` batch queries — `packages/code-graph/src/infrastructure/sqlite/sqlite-graph-database.ts`
 
 ```ts
-export interface ImpactExecutionContext {
-  readonly store: GraphStore
-  readonly concurrency: number
-}
+getFilesByPaths(paths: readonly string[]): FileNode[]
+getDocumentsByPaths(paths: readonly string[]): DocumentNode[]
+getSpecsByIds(specIds: readonly string[]): SpecNode[]
 ```
 
-`analyzeFileImpactDetails` accepts an optional final `context`; public signatures and result types do not otherwise change. `IMPACT_CONCURRENCY = 4` is an internal constant.
+Set-based queries: `files.path IN (...)`, `documents.path IN (...)`, `specs.id IN (...)`. Deduplicate input, chunk by `SQLITE_BATCH_PARAMETER_LIMIT = 900`, map rows by identity, and emit in first-requested identity order, omitting unknowns.
 
-## Overview
+### `SQLiteGraphStore` batch methods — `packages/code-graph/src/infrastructure/sqlite/sqlite-graph-store.ts`
 
-`SQLiteGraphStore` encapsulates `better-sqlite3` database operations, statement caches, schema initialization, and transactional batch commits off the host Node.js event loop by executing them inside a dedicated, persistent worker thread (`node:worker_threads`).
+Host empty-input guards returning `[]` before IPC; otherwise exactly one `sendRequest` per logical call.
 
-This design establishes:
-
-1. **Explicit Lifecycle State Machine**: `WorkerState = 'closed' | 'opening' | 'open' | 'closing' | 'faulted'` with concurrent promise sharing (`openPromise`, `closePromise`).
-2. **Graceful Shutdown & Drain**: `close()` stops accepting new requests, drains in-flight operations with fallback timeout, sends explicit `close` to the database, and terminates the worker cleanly.
-3. **Worker FIFO Serial Execution**: Explicit single-consumer serial queue inside `sqlite-worker.ts` preventing any race condition across async operations (`open`, `recreate`) and subsequent queries.
-4. **Strongly-Typed RPC Contract**: An exhaustive `SQLiteWorkerOperationMap` ensuring compile-time type safety for operation names, payloads, and returned results (including dedicated `getAllIndexCoverage`).
-5. **Strict Bounded Outstanding Requests**: Validated positive integer limit (`maxPendingOperations >= 1`) throwing `StoreOverloadError` on overflow.
-6. **Fault Isolation & Manual Recovery**: Worker crashes transition the store to `faulted` (throwing `StoreWorkerError`), allowing manual recovery via `close()` followed by `open()` without silent auto-restart.
-
----
-
-## Architectural breakdown
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│ Host Thread (CLI / SDK / Future HTTP API / MCP)             │
-│   SQLiteGraphStore (implements GraphStore)                  │
-│     └── SQLiteWorkerClient                                  │
-│           ├── State Machine (closed|opening|open|closing|   │
-│           │                  faulted)                       │
-│           ├── Concurrent openPromise / closePromise sharing │
-│           ├── Bounded Outstanding Requests Map (< 256)      │
-│           └── Graceful shutdown drain with safety timeout   │
-└──────────────────────────────┬──────────────────────────────┘
-                               │ Worker MessagePort IPC
-                               ▼
-┌─────────────────────────────────────────────────────────────┐
-│ Dedicated Worker Thread (sqlite-worker.ts)                  │
-│   Single-Consumer Serial Execution Queue (FIFO Promise Chain)│
-│     └── SQLiteGraphDatabase                                 │
-│           ├── better-sqlite3 engine (synchronous)           │
-│           ├── LRU / Map Prepared Statement Cache            │
-│           ├── Atomic Bulk Index Transactions                │
-│           ├── FTS5 Search Ranking Index                     │
-│           └── Dedicated getAllIndexCoverage() query         │
-└─────────────────────────────────────────────────────────────┘
-```
-
----
-
-## Technical Details
-
-### 1. State Machine and Concurrent Deduplication
-
-`SQLiteWorkerClient` maintains an explicit state variable:
+### Provider batch operations — `packages/code-graph/src/composition/code-graph-provider.ts`
 
 ```ts
-type WorkerState = 'closed' | 'opening' | 'open' | 'closing' | 'faulted'
-
-export class SQLiteWorkerClient {
-  private state: WorkerState = 'closed'
-  private openPromise?: Promise<void>
-  private closePromise?: Promise<void>
-  private readonly pendingRequests = new Map<number, PendingRequest>()
-
-  get isOpen(): boolean {
-    return this.state === 'open'
-  }
-}
+getFilesByPaths(paths: readonly string[]): Promise<FileNode[]>
+getDocumentsByPaths(paths: readonly string[]): Promise<DocumentNode[]>
+getSymbolsByIds(symbolIds: readonly string[]): Promise<SymbolNode[]>
+getSpecsByIds(specIds: readonly string[]): Promise<SpecNode[]>
 ```
 
-- **Concurrent `open()`**:
-  - If `state === 'open'`, resolves immediately.
-  - If `state === 'opening'`, returns the existing `this.openPromise`.
-  - If `state === 'closing'` or `state === 'faulted'`, throws an error requiring clean shutdown before reopening.
-  - Otherwise, initializes `this.openPromise`, validates `maxPendingOperations`, spawns the worker, awaits `open` RPC ACK, transitions to `open`, and clears `openPromise`.
+Each runs availability/generation validation once (section "Provider availability validation") and then issues one logical batch store operation.
 
-- **Concurrent `close()`**:
-  - If `state === 'closed'`, resolves immediately.
-  - If `state === 'closing'`, returns the existing `this.closePromise`.
-  - Otherwise, initializes `this.closePromise`, transitions to `closing`, drains in-flight requests, sends `close` RPC, terminates worker, transitions to `closed`, and clears `closePromise`.
-
-### 2. Shutdown & Drain Semantics
-
-`drainPendingRequests(timeoutMs): Promise<boolean>` returns `true` if all in-flight requests settled
-within the timeout, or `false` if the timeout expired before they did.
-
-During `close()`:
-
-1. `closePromise` is set at the very start of the outer IIFE. A single `try/finally` wrapping the
-   **entire** body (including `await openPromise`) guarantees `closePromise` is always cleared —
-   even when `open()` fails concurrently. Without this, a subsequent `close()` would find the stale
-   resolved promise and silently skip recovery.
-2. `deadline = Date.now() + drainTimeoutMs` is computed once at the entry of `close()`. This shared
-   deadline bounds the graceful-shutdown phases — `await openPromise`, the drain phase, and the
-   `close` RPC ACK — using a unref'd `withDeadline` helper. It is NOT a hard upper bound on the
-   total `close()` wall-clock time: once the deadline expires, forced `worker.terminate()` is
-   initiated and `close()` awaits the termination to conclude (a worker executing native code offers
-   no mathematical guarantee of terminating within a fixed bound).
-3. If `state === 'opening'`, `close()` sets `state = 'closing'` and awaits `openPromise` with `withDeadline`.
-   `open()` sees `state !== 'opening'` and skips the `→ 'open'` transition. If `openPromise` rejects or times out,
-   `close()` returns early from the inner catch — the outer `finally` still clears `closePromise` and terminates the worker.
-   `handleWorkerExit` in `'closing'` state also rejects any stale pending requests (such as an unacknowledged `open` RPC).
-4. `state` is set to `closing`. Any new incoming `sendRequest()` call immediately rejects with `StoreNotOpenError`.
-5. `drainPendingRequests(Math.max(0, deadline - now))` waits for pending requests to settle. When the
-   remaining time is `0`, `drainPendingRequests(0)` resolves `false` immediately without scheduling an interval tick.
-6. **If `drained === true`** (all requests settled before deadline):
-   - `withDeadline(sendRequestInternal('close'), deadline)` races the clean DB close RPC against the shared deadline.
-7. **If `drained === false`** OR the `close` RPC times out:
-   - Any remaining pending requests are rejected **before** `worker.terminate()` is called, so
-     the drain-timeout `StoreWorkerError` is the rejection callers observe (not the exit-event error).
-   - `worker.terminate()` is called unconditionally to force-kill the thread; `close()` awaits it.
-8. `state` transitions to `closed` and `closePromise` is cleared in the `finally` block.
-
-### 3. Worker-Side Serial FIFO Execution Queue
-
-To guarantee strict serial FIFO execution even across asynchronous worker operations (`open`, `recreate`), `sqlite-worker.ts` utilizes an explicit execution queue:
+### Pure display-path projection — `packages/cli/src/commands/graph/resolve-impact-file-selectors.ts`
 
 ```ts
-let dispatchQueue: Promise<void> = Promise.resolve()
-
-parentPort.on('message', (message: SQLiteWorkerRequest) => {
-  dispatchQueue = dispatchQueue
-    .then(() => handleMessage(database, message, (resp) => parentPort?.postMessage(resp)))
-    .catch((error) => {
-      // Unhandled error reported to host; queue remains unbroken
-      parentPort?.postMessage({
-        id: message.id,
-        type: 'error',
-        error: serializeError(error),
-      })
-    })
-})
+export function toGraphDisplayPath(config: CliGraphConfig, canonicalPath: string): string
 ```
 
-This ensures that queries dispatched after `recreate()` wait until `recreate()` finishes database teardown, schema creation, and initialization before executing.
+- Pure function; no `GraphStore`/`CodeGraphProvider` access.
+- For workspace resources: parse `workspace:path`, look up `workspace.codeRoot`, return `relative(projectRoot, join(codeRoot, path))` normalized with `/` separators and `./` stripped.
+- For root resources (`root:path`): return `path`.
+- Fallback: return the canonical path when the identity does not parse (documented edge case).
+- The previous async signature and its per-symbol `provider.getFile`/`getDocument` fallback are removed. `impact.ts` formatting becomes synchronous; a per-render `Map<canonicalPath, displayPath>` avoids recomputation for repeated identities.
 
-### 4. Strongly-Typed RPC Protocol Map
+### `ImpactExecutionContext` — `packages/code-graph/src/domain/services/analyze-file-impact.ts`
 
-The RPC protocol defines the complete contract mapping operation names to their payload and return types:
+Retained from the current design (shared memoized store + one concurrency budget). `IMPACT_CONCURRENCY = 4` stays an internal constant.
 
-```ts
-export interface SQLiteWorkerOperationMap {
-  open: { payload: OpenWorkerPayload; result: void }
-  close: { payload: Record<string, never>; result: void }
-  recreate: { payload: Record<string, never>; result: void }
-  clear: { payload: Record<string, never>; result: void }
-  getFile: { payload: { filePath: string }; result: FileNode | undefined }
-  findFilesByConfigRelativePath: { payload: { configRelativePath: string }; result: FileNode[] }
-  getDocument: { payload: { documentId: string }; result: DocumentNode | undefined }
-  findDocumentsByConfigRelativePath: {
-    payload: { configRelativePath: string }
-    result: DocumentNode[]
-  }
-  getSymbol: { payload: { symbolId: string }; result: SymbolNode | undefined }
-  getSymbolsByIds: { payload: { symbolIds: readonly string[] }; result: SymbolNode[] }
-  getIncomingSymbolRelations: {
-    payload: { symbolIds: readonly string[]; relationTypes: readonly RelationType[] }
-    result: Relation[]
-  }
-  getOutgoingSymbolRelations: {
-    payload: { symbolIds: readonly string[]; relationTypes: readonly RelationType[] }
-    result: Relation[]
-  }
-  findSymbols: { payload: { query: SymbolQuery }; result: SymbolNode[] }
-  getSpec: { payload: { specId: string }; result: SpecNode | undefined }
-  getSpecDependencies: { payload: { specId: string }; result: Relation[] }
-  getSpecDependents: { payload: { specId: string }; result: Relation[] }
-  getCoveredFiles: { payload: { specId: string }; result: Relation[] }
-  getCoveringSpecsForFile: { payload: { filePath: string }; result: Relation[] }
-  getCoveringSpecsForFiles: { payload: { filePaths: readonly string[] }; result: Relation[] }
-  getCoveredSymbols: { payload: { specId: string }; result: Relation[] }
-  getCoveringSpecsForSymbol: { payload: { symbolId: string }; result: Relation[] }
-  getCoveringSpecsForSymbols: { payload: { symbolIds: readonly string[] }; result: Relation[] }
-  getCallers: { payload: { symbolId: string }; result: Relation[] }
-  getCallees: { payload: { symbolId: string }; result: Relation[] }
-  getImporters: { payload: { filePath: string }; result: Relation[] }
-  getImportees: { payload: { filePath: string }; result: Relation[] }
-  findDirectlyAffectedFiles: { payload: { filePaths: readonly string[] }; result: string[] }
-  getExtenders: { payload: { symbolId: string }; result: Relation[] }
-  getExtendedTargets: { payload: { symbolId: string }; result: Relation[] }
-  getImplementors: { payload: { symbolId: string }; result: Relation[] }
-  getImplementedTargets: { payload: { symbolId: string }; result: Relation[] }
-  getOverriders: { payload: { symbolId: string }; result: Relation[] }
-  getOverriddenTargets: { payload: { symbolId: string }; result: Relation[] }
-  getExportedSymbols: { payload: { filePath: string }; result: SymbolNode[] }
-  getSymbolCallers: {
-    payload: Record<string, never>
-    result: Array<{ symbol: SymbolNode; callerFilePath: string }>
-  }
-  getFileImporterCounts: { payload: Record<string, never>; result: Map<string, number> }
-  getAllFiles: { payload: Record<string, never>; result: FileNode[] }
-  getAllDocuments: { payload: Record<string, never>; result: DocumentNode[] }
-  getAllSpecs: { payload: Record<string, never>; result: SpecNode[] }
-  getAllReferenceFacts: { payload: Record<string, never>; result: ReferenceFactsWrite }
-  findLogicalSymbolsByIds: { payload: { ids: readonly string[] }; result: LogicalSymbol[] }
-  findDeclarations: {
-    payload: { logicalSymbolIds: readonly string[] }
-    result: LogicalDeclaration[]
-  }
-  findPublicBindingsByExportedNames: {
-    payload: { exportedNames: readonly string[] }
-    result: PublicBinding[]
-  }
-  getStatistics: { payload: Record<string, never>; result: GraphStatistics }
-  searchSymbols: {
-    payload: { query: string; options: SearchOptions }
-    result: Array<{
-      symbol: SymbolNode
-      score: number
-      snippet: string
-      startLine: number
-      endLine: number
-    }>
-  }
-  searchSpecs: {
-    payload: { query: string; options: SearchOptions }
-    result: Array<{
-      spec: SpecNode
-      score: number
-      snippet: string
-      startLine: number
-      endLine: number
-    }>
-  }
-  searchDocuments: {
-    payload: { query: string; options: SearchOptions }
-    result: Array<{
-      document: DocumentNode
-      score: number
-      snippet: string
-      startLine: number
-      endLine: number
-    }>
-  }
-  searchSourceCandidates: {
-    payload: { query: SourceContentCandidateQuery }
-    result: SourceContentCandidatePage
-  }
-  upsertFile: {
-    payload: {
-      file: FileNode
-      symbols: SymbolNode[]
-      relations: Relation[]
-      referenceFacts?: ReferenceFactsWrite | undefined
-    }
-    result: void
-  }
-  removeFile: { payload: { filePath: string }; result: void }
-  upsertDocument: { payload: { document: DocumentNode }; result: void }
-  removeDocument: { payload: { documentPath: string }; result: void }
-  upsertSpec: { payload: { spec: SpecNode; relations: Relation[] }; result: void }
-  removeSpec: { payload: { specId: string }; result: void }
-  removeSpecs: { payload: { specIds: readonly string[] }; result: void }
-  addRelations: { payload: { relations: Relation[] }; result: void }
-  readStorageGenerationSnapshot: {
-    payload: Record<string, never>
-    result: StorageGenerationSnapshot
-  }
-  rotateStorageGeneration: {
-    payload: { expectedGeneration: string }
-    result: StorageGenerationSnapshot
-  }
-  getIndexedInputObservations: {
-    payload: { resources: readonly IndexedResourceKey[] }
-    result: readonly IndexedInputObservation[]
-  }
-  markIndexedInputsStale: {
-    payload: { updates: readonly MarkIndexedInputStaleInput[] }
-    result: void
-  }
-  updateIndexedInputObservation: {
-    payload: { updates: readonly UpdateIndexedInputObservationInput[] }
-    result: void
-  }
-  readFreshnessLatches: { payload: { workspaces: readonly string[] }; result: FreshnessLatches }
-  markWorkspacesAndGraphStaleSinceLastIndex: {
-    payload: { workspaces: readonly string[] }
-    result: void
-  }
-  replaceReferenceFacts: { payload: { facts: ReferenceFactsWrite }; result: void }
-  findLogicalSymbols: {
-    payload: { lookups: readonly LogicalSymbolLookup[] }
-    result: LogicalSymbol[]
-  }
-  findLogicalDeclarations: {
-    payload: { logicalSymbolIds: readonly string[] }
-    result: LogicalDeclaration[]
-  }
-  findPublicBindings: {
-    payload: { lookups: readonly PublicBindingLookup[] }
-    result: PublicBinding[]
-  }
-  findLocalBindings: { payload: { lookups: readonly LocalBindingLookup[] }; result: LocalBinding[] }
-  findResolutionSteps: { payload: { fromIds: readonly string[] }; result: ResolutionStep[] }
-  findIndexCoverage: { payload: { filePaths: readonly string[] }; result: IndexCoverage[] }
-  getAllIndexCoverage: { payload: Record<string, never>; result: IndexCoverage[] }
-  rebuildFtsIndexes: { payload: Record<string, never>; result: void }
-  beginBulkIndexSession: { payload: { sessionId: string }; result: void }
-  stageBulkFiles: { payload: { sessionId: string; files: FileNode[] }; result: void }
-  stageBulkSymbols: { payload: { sessionId: string; symbols: SymbolNode[] }; result: void }
-  stageBulkReferenceFacts: {
-    payload: { sessionId: string; facts: ReferenceFactsWrite }
-    result: void
-  }
-  stageBulkRemovals: {
-    payload: {
-      sessionId: string
-      filePaths?: string[]
-      documentPaths?: string[]
-      specIds?: string[]
-    }
-    result: void
-  }
-  commitBulkIndex: {
-    payload: { sessionId: string; metadata?: SerializableIndexWriteSessionMetadata }
-    result: void
-  }
-  rollbackBulkIndexSession: { payload: { sessionId: string }; result: void }
-}
-```
+### `mapWithConcurrency` — `packages/code-graph/src/domain/services/map-with-concurrency.ts`
 
-### 5. `getAllIndexCoverage()` Implementation
+Retained. Contract: positive integer concurrency only; preserves input order; starts at most `concurrency` mappers; stops scheduling new work after the first rejection (already-running tasks may settle); performs no I/O. Invalid concurrency is a programmer-contract error and keeps its documented behavior (either a typed error consistent with `default:_global/error-handling-conventions` or an explicit documented `RangeError`; the design does not change its current contract unless the global error-handling spec requires it).
 
-In `SQLiteGraphDatabase`:
+## Approach
 
-```ts
-getAllIndexCoverage(): IndexCoverage[] {
-  const db = this.ensureOpen()
-  const rows = db.prepare('SELECT * FROM index_coverage ORDER BY file_path').all() as IndexCoverageRow[]
-  return rows.map(toIndexCoverage)
-}
-```
+### 1. RPC-boundary rule
 
-### 6. Set-based worker batch reads
+Crossing the `GraphStore`/worker boundary is an RPC boundary. Consumers MUST resolve data-dependent collections in this priority order:
 
-`SQLiteGraphStore` performs the empty-input checks and otherwise sends exactly one typed RPC for each logical batch. `SQLiteGraphDatabase` deduplicates values and executes bound-placeholder queries:
+1. **Derive locally** without storage access when the data is already available (for example display-path projection from config).
+2. **Use a batch `GraphStore` operation** (`getSymbolsByIds`, `getFilesByPaths`, `getDocumentsByPaths`, `getSpecsByIds`, `getIncomingSymbolRelations`, `getOutgoingSymbolRelations`).
+3. **Reuse/cache already-loaded data** (the impact memoized store).
+4. **Use bounded concurrency** (`mapWithConcurrency`) when batching is not practical.
+5. **Use unrestricted `Promise.all`** only when the input cardinality is intrinsically small and bounded; document why.
+
+`STORE_OVERLOAD` at 256 is a hard safety fuse, not normal flow control. The normal expectation after this change is that first-party operations remain far below 256 outstanding requests.
+
+### 2. Pure display-path projection (CLI impact)
+
+`impact.ts` currently formats results with unbounded `Promise.all(result.affectedSymbols.map((s) => toDisplayPath(s.filePath)))`; each call issues `provider.getFile` (plus `assertAvailable` → `getStorageGeneration`) and a `getDocument` fallback — ≈3 RPCs per symbol. A 3,909-line file producing 598 affected symbols issues ≈1,800 concurrent RPCs and overflows the queue.
+
+The fix replaces this with the pure `toGraphDisplayPath(config, canonicalPath)` projection. The identity originates from an already-produced graph result; formatting must not perform existence checks. `impact.ts` builds one `Map<canonicalPath, displayPath>` per render and maps symbols/files synchronously, removing `Promise.all(...toDisplayPath...)` where it existed only because resolution was asynchronous. This applies to all impact presentation paths: single-file, multi-file, symbol, spec, and public-binding impact.
+
+### 3. Hotspot hierarchy signals (batch)
+
+`computeHotspots.collectHierarchySignals` currently runs, for every symbol, `getExtenders(id)`, `getImplementors(id)`, `getOverriders(id)` under nested unrestricted `Promise.all` — ≈111k RPCs for 37k symbols. Fix:
+
+1. Compute the candidate symbol id list once (all candidate symbols whose scores are being computed).
+2. Issue one logical batch: `store.getIncomingSymbolRelations(candidateIds, ['EXTENDS', 'IMPLEMENTS', 'OVERRIDES'])`.
+3. Fold the returned relations in memory by `relation.target + relation.type` into per-symbol extender/implementor/overrider counts.
+4. The SQLite implementation chunks the large `IN` set internally by its parameter budget (design preserved).
+
+Conceptual change: ≈111,000 host↔worker RPCs → one logical batch RPC → internally chunked SQLite queries inside the worker. `mapWithConcurrency` is NOT the primary fix for this path.
+
+### 4. Worker batch reads
+
+`SQLiteGraphStore` performs the empty-input checks and otherwise sends exactly one typed RPC per logical batch. `SQLiteGraphDatabase` deduplicates values and executes bound-placeholder queries:
 
 - symbols: `symbols.id IN (...)`;
+- files: `files.path IN (...)`;
+- documents: `documents.path IN (...)`;
+- specs: `specs.id IN (...)`;
 - incoming relations: `relations.target IN (...) AND relations.type IN (...)`;
 - outgoing relations: `relations.source IN (...) AND relations.type IN (...)`.
 
-Use `SQLITE_BATCH_PARAMETER_LIMIT = 900`. Symbol ids are chunked by 900. Relation ids are chunked by `900 - uniqueRelationTypes.length`. The six supported traversal types can never exhaust the budget; any unsupported type is rejected as invalid input. Chunks execute sequentially inside the single worker operation. Converted symbol rows are mapped by id and emitted in first requested-id order. Converted relations are deduplicated by source/type/target and globally sorted by source, type, then target.
+Use `SQLITE_BATCH_PARAMETER_LIMIT = 900`. Symbol ids are chunked by 900. Relation ids are chunked by `900 - uniqueRelationTypes.length`; the six supported traversal types can never exhaust the budget; any unsupported type is rejected as invalid input. Chunks execute sequentially inside the single worker operation. Converted rows are mapped by identity and emitted in first requested-identity order. Converted relations are deduplicated by source/type/target and globally sorted by source, type, then target.
 
-This does not change schema version 9 because no persisted field changes. Ordinary incompatible-store open continues to reject; graph index repair performs destructive recreation and generation rotation.
+This does not change schema version 9 because no persisted field changes.
 
-### 7. Bounded batched traversal
+### 5. Bounded batched traversal (preserved)
 
 At each upstream BFS level, deduplicate `currentIds`, invoke `getIncomingSymbolRelations(currentIds, TRAVERSAL_RELATION_TYPES)`, group by target, derive unvisited sources in frontier order, and invoke `getSymbolsByIds(nextIds)`. Downstream mirrors this with outgoing relations grouped by source and derives targets. Max-depth lookahead uses the same relation batch. Visited sets, first/shallowest depth, import expansion, truncation, and final deterministic sorting remain unchanged.
 
 `analyzeFilesImpact` creates one `createMemoizedReadStore(store)` and one concurrency budget of 4 for the entire call. It deduplicates file work while preserving first-input order. `analyzeFileImpactDetails` uses that context and schedules per-symbol impact plus unbatched import reads through the same limiter. Nested scheduling MUST NOT hold an outer permit while waiting to acquire an inner permit; use one re-entrant scheduler or flatten `(file, symbol)` jobs. The number of active store operations therefore never becomes `files × symbols × frontier width`.
 
-The memoized store implements the new batch methods and populates per-id caches from batch results. Repeated ids across files share resolved/in-flight reads. Cache scope is one top-level impact call; it never survives store close, recreate, or another command.
+The memoized store implements the new batch methods (including `getFilesByPaths`, `getDocumentsByPaths`, `getSpecsByIds`) and populates per-id caches from batch results. Repeated ids across files share resolved/in-flight reads. Cache scope is one top-level impact call; it never survives store close, recreate, or another command.
 
-### 8. Composition and exports
+### 6. Provider availability validation as an RPC multiplier
+
+`CodeGraphProvider` public methods call `assertAvailable()`, which calls `store.getStorageGeneration()` (`readStorageGenerationSnapshot` RPC). Composing large numbers of public provider calls therefore approximately doubles the RPC count. Stale-generation protection is NOT removed.
+
+Rule: composite Code Graph operations validate provider availability once at the public facade boundary and then execute internal work against `GraphStore`/application services. Internal loops must not repeatedly compose high-cardinality public provider calls. The new provider batch operations validate once and issue one logical batch store operation. Review current callers for violations during implementation; record a read-session/snapshot abstraction as a potential future optimization if the audit proves it necessary.
+
+### 7. Fan-out audit
+
+Audit the repository for `Promise.all(items.map((x) => store.someMethod(x)))` and `Promise.all(items.map((x) => provider.someMethod(x)))` and nested variants. Classify each occurrence as one of:
+
+- **A. Pure derivation possible** — remove the storage operation.
+- **B. Existing batch API available** — use the batch API.
+- **C. Missing but generally useful batch API** — add it to `GraphStore` if it is a stable backend-neutral operation (this change adds the exact node batches; do not add speculative APIs).
+- **D. True independent operations with no useful batch representation** — use `mapWithConcurrency`.
+- **E. Intrinsically small bounded collection** — unrestricted `Promise.all` may remain, documented as bounded.
+
+Known areas to inspect during implementation: `resolve-graph-selector.ts` (resolution loops), `analyze-impact.ts`, `analyze-file-impact.ts`, `analyze-files-impact.ts`, `get-upstream.ts`, `get-downstream.ts`, `compute-hotspots.ts`, `index-code-graph.ts`, CLI `impact.ts`, CLI `hotspots.ts`, and any other use case mapping data-dependent collections to provider/store operations. Pay particular attention to nested fan-out where a bounded top-level operation invokes an unbounded internal collection.
+
+Preliminary classification for the confirmed callers:
+
+| Location                                          | Classification      | Resolution                                          |
+| ------------------------------------------------- | ------------------- | --------------------------------------------------- |
+| CLI `impact.ts` display paths                     | A (pure derivation) | `toGraphDisplayPath` pure projection                |
+| CLI `impact.ts` affected-symbol/entity formatting | B                   | batch via provider node batches; bounded render map |
+| CLI `hotspots.ts` entry formatting                | B/D                 | batch node/relation reads or bounded concurrency    |
+| `compute-hotspots.ts` hierarchy signals           | B                   | `getIncomingSymbolRelations` batch                  |
+| `get-upstream`/`get-downstream` frontiers         | B                   | already batched (preserved)                         |
+| `analyze-file-impact`/`analyze-files-impact`      | D                   | already bounded (preserved)                         |
+| `resolve-graph-selector.ts` loops                 | C/D                 | exact batch node reads or `mapWithConcurrency`      |
+| `index-code-graph.ts` fan-outs                    | C/D                 | batch reads or bounded concurrency                  |
+
+Do not optimize by intuition alone: for every data-dependent fan-out, state the final classification and why.
+
+### 8. Preserve impact-domain improvements
+
+The domain improvements already made are correct and MUST NOT regress: `IMPACT_CONCURRENCY = 4`, shared memoized store for multi-file analysis, bounded multi-file analysis, `getSymbolsByIds`, `getIncomingSymbolRelations`, `getOutgoingSymbolRelations`, and batch traversal in `getUpstream`/`getDownstream`. The known impact overload occurs in CLI presentation after domain analysis. Still review the remaining import traversal paths (`getImporters(file)`, `getImportees(file)`, `findSymbols({ filePath })`) for wide graph levels; if batching those produces a generally useful abstraction, propose it in design rather than blindly adding concurrency.
+
+### 9. Keep `StoreOverloadError` as defense in depth
+
+Do not turn the pending-operation limit into an unlimited waiting queue. The design has exposed genuine pathological callers (hotspots ≈111k operations); silent waiting would hide those defects. Retain `maxPendingOperations = 256` default and `STORE_OVERLOAD` when exceeded. Tests use deliberately lower configured limits (16/32) to prove first-party operations respect backpressure.
+
+### 10. Composition and exports
 
 `createCodeGraphProvider` remains synchronous. Without an explicit external backend it selects the sole built-in `sqlite` factory. External factories remain selectable; duplicate ids and unknown ids retain their current typed failures. `createSqliteGraphStoreFactory` passes `SqliteRuntimeDescriptor` and `maxPendingOperations`; the worker dynamically imports `modulePath` during `open()`.
 
 The public entry exports storage-neutral factory/options types, runtime descriptor/options, documented errors, model and resolver-result types, and host use-case factories. The internal entry exposes `SQLiteGraphStore`, `AdapterRegistry`, and language adapters. Worker protocol/database/client types remain private. `LadybugGraphStore` is absent from both entries.
 
-### 9. Security, observability, and operations
+### 11. Security, observability, and operations
 
 SQL values use placeholders; no query value is interpolated. IPC contains structured-clone-safe data only, and source content or full SQL payloads are not logged. Existing logging records worker startup, shutdown, crash, forced termination, and index progress; individual batches do not produce noisy logs. No authorization, feature flag, or new metric is introduced. Operators distinguish `STORE_OVERLOAD`, `STORE_WORKER_ERROR`, `STORE_NOT_OPEN`, invalid configuration, bulk-session state, and schema incompatibility by typed code.
 
----
+### 12. Compliance reconciliation (carried forward)
 
-## Key decisions and trade-offs
+The prior compliance reconciliation remains binding: typed errors for expected failure modes (`BulkSessionStateError` `BULK_SESSION_STATE`, `InvalidGraphStoreConfigurationError` `INVALID_GRAPH_STORE_CONFIGURATION`, `GraphSchemaIncompatibleError` `GRAPH_SCHEMA_INCOMPATIBLE`) with round-trip serialization; complete empty JSDoc; ADR-0025 present and linked from all affected specs; `SQLiteGraphStoreOptions` naming canonicalized in specs without an unnecessary alias; relation enumeration covering all graph-store relation families including `CONSTRUCTS` and `USES_TYPE`; public export wording reflecting the actually required public surface; typed test doubles replacing `as unknown as Port` partial mocks; and runtime descriptor/factory/barrel test coverage retained. Do not reintroduce already-fixed issues while rebasing the design.
+
+## Key decisions
 
 - **One persistent worker instead of a pool**: SQLite writes/schema lifecycle need serialization, while one worker removes host blocking. Main-thread SQLite, worker-per-call startup, pool coordination, and an async-driver migration are rejected.
-- **Batch at the `GraphStore` boundary**: set-based reads remove both RPC and SQL fan-out. Raising queue capacity or only throttling per-symbol calls retains unnecessary work and is rejected.
+- **Treat the worker boundary as an RPC boundary**: serial worker-side execution makes batching strictly preferable to request-level concurrency. A pure-derivation-first rule eliminates entire RPC classes (display paths). Alternatives rejected: raising queue capacity, throttling per-symbol calls, silent unbounded waiting.
+- **Batch at the `GraphStore` boundary**: set-based reads remove both RPC and SQL fan-out. Exact node batches (`getFilesByPaths`, `getDocumentsByPaths`, `getSpecsByIds`) mirror the existing `getSymbolsByIds` contract.
+- **Hotspots use batch relation retrieval, not concurrency**: `mapWithConcurrency` would still issue 111k RPCs (just slower); one batch relation call is the correct shape. Rejected: bounded-concurrency-only fix.
 - **Bound concurrency as a second layer**: file/import work still contains non-batch reads. A single shared budget prevents nested pools from multiplying. The conservative fixed value 4 may underuse a future parallel backend but is safe for the serial SQLite worker.
 - **Chunk SQL inside one worker request**: this protects SQLite parameter limits without recreating host queue fan-out. Merging chunks costs bounded maps but guarantees deterministic results.
+- **Provider availability validated once per composite operation**: keeps stale-generation protection without doubling RPCs in high-cardinality loops. A read-session abstraction is deferred unless the audit proves it necessary.
+- **`STORE_OVERLOAD` remains a hard fuse at 256**: lowering or removing it hides pathological callers. Tests prove first-party operations stay far below it with low configured limits.
 - **Manual crash recovery**: automatic restart could replay non-idempotent work. `close()` then `open()` is explicit and testable.
 - **No schema bump**: batching adds query paths, not stored data. Schema 9 remains authoritative.
 
+## Trade-offs
+
+- [Synchronous pure display-path projection assumes canonical identity shapes (`workspace:path`, `root:path`)] → Verified against the indexer's canonicalization (`index-code-graph.ts`) and covered by CLI regression tests; unmatched identities fall back to the canonical path.
+- [Batch node methods increase GraphStore surface] → Additive, backend-neutral, mirrored by every test store; single-item APIs remain for low-cardinality callers.
+- [Validating availability once per composite operation slightly widens the stale-generation window] → Stale generation is still detected at the facade boundary; the window is a single composite call, not a loop.
+- [Conservative `IMPACT_CONCURRENCY = 4` may underuse future parallel backends] → Safe for the serial worker; documented as tunable when a parallel backend exists.
+- [Pure display projection removes the implicit existence check] → Graph identities originate from already-produced results; formatting must not perform existence checks.
+
 ## Spec impact
 
-- `code-graph:graph-store`: direct dependents include SQLite, composition, traversal, indexer, freshness, document/search flows, and test stores. The additive methods require implementations but do not alter existing contracts.
-- `code-graph:traversal`: provider, CLI impact, change detection, and hotspots consume its stable results. Scheduling changes internally; no delivery spec delta is required.
-- `code-graph:sqlite-graph-store`: config, symbol model, workspace integration, search, indexing, and coverage retain canonical identities and schema. The worker changes execution placement only.
-- `code-graph:composition`: indexer, traversal, health, coverage, resolver, and global architecture remain satisfied. Reconciliation adopts `main`'s SQLite-only built-in registry; no dependent spec requires a further delta.
+- `code-graph:graph-store`: direct dependents include SQLite, composition, traversal, indexer, freshness, document/search flows, and test stores. The additive batch node methods require implementations but do not alter existing contracts.
+- `code-graph:traversal`: provider, CLI impact, change detection, and hotspots consume its stable results. Scheduling and hotspot signal retrieval change internally; result semantics are unchanged.
+- `code-graph:sqlite-graph-store`: config, symbol model, workspace integration, search, indexing, and coverage retain canonical identities and schema. The worker changes execution placement only; batch node operations are worker-backed.
+- `code-graph:composition`: indexer, traversal, health, coverage, resolver, and global architecture remain satisfied. Reconciliation adopts `main`'s SQLite-only built-in registry; provider batch operations and single availability validation are additive.
+- `cli:graph-impact` / `cli:graph-hotspots`: newly in scope; require pure display-path projection (zero graph reads), bounded presentation fan-out, and completion on wide graphs without `STORE_OVERLOAD`. No CLI syntax or output shape changes.
 
 ## Dependency map
 
 ```mermaid
 graph LR
   CLI[CLI impact/hotspots] --> Provider[CodeGraphProvider]
+  Provider --> BatchOps[provider batch ops]
+  Provider --> Display[toGraphDisplayPath pure fn]
+  Display -. config only .-> Config[(project/workspace config)]
+  Provider --> Hotspots[computeHotspots]
+  Hotspots --> BatchRel[getIncomingSymbolRelations batch]
   Provider --> Multi[analyzeFilesImpact]
   Multi --> Traversal[getUpstream/getDownstream]
   Traversal --> Port[GraphStore batch port]
@@ -464,169 +310,91 @@ graph LR
 
 ```
 ┌────────────────┐    ┌──────────────────┐    ┌────────────────────┐
-│ CLI / provider │───▶│ multi-file impact│───▶│ traversal batches  │
-└────────────────┘    │ shared budget: 4 │    └─────────┬──────────┘
-                      └──────────────────┘              │
-                                                       ▼
-┌────────────────┐    ┌──────────────────┐    ┌────────────────────┐
-│ SQLite database│◀───│ FIFO worker      │◀───│ GraphStore / client│
-│ set-based SQL  │    │ one logical RPC  │    │ backpressure       │
-└────────────────┘    └──────────────────┘    └────────────────────┘
+│ CLI impact/    │───▶│ display projection│    │ pure config fn     │
+│ hotspots       │    │ + batch provider  │    │ (zero RPCs)        │
+└────────────────┘    └─────────┬────────┘    └────────────────────┘
+                                │
+                                ▼
+                       ┌──────────────────┐    ┌────────────────────┐
+                       │ provider batches │───▶│ hotspot signals    │
+                       │ + assertAvailable│    │ batch relations    │
+                       └─────────┬────────┘    └────────────────────┘
+                                 │
+                                 ▼
+                       ┌──────────────────┐    ┌────────────────────┐
+                       │ analyzeFilesImpact│───▶│ traversal batches  │
+                       │ shared budget: 4  │    └─────────┬──────────┘
+                       └──────────────────┘              │
+                                                         ▼
+                       ┌──────────────────┐    ┌────────────────────┐
+                       │ SQLite database  │◀───│ FIFO worker        │
+                       │ set-based SQL    │    │ one logical RPC    │
+                       └──────────────────┘    └────────────────────┘
 ```
 
-## Migration and rollback
+## Migration / Rollback
 
 No data migration is required. Schema version 9 remains current. Incompatible persisted state is never silently replaced by a read; a full graph index rotates generation and recreates it. Rollback requires closing the provider before deploying previous code and re-indexing if that version rejects schema 9. A live worker must never be abandoned across deployment/process shutdown.
 
-## Testing Strategy
+## Testing
+
+### Automated tests
 
 0. **Batch and traversal contract tests**:
-   - GraphStore contract/test store: duplicate and unknown ids, requested symbol order, relation direction/type filtering, all six types, source/type/target ordering, empty no-op, and bounded logical call count.
+   - GraphStore contract/test store: duplicate and unknown ids, requested order for symbols, files, documents, and specs; relation direction/type filtering; all six types; source/type/target ordering; empty no-op; bounded logical call count.
    - `get-upstream.spec.ts` / `get-downstream.spec.ts`: one relation and one symbol batch per wide frontier, lookahead batching, cycles/imports/hierarchy/static types, depth, truncation, and unchanged ordering.
-   - file/multi-file impact tests: maximum active work is 4, one shared memoized view, overlapping reads deduplicate, and affected sets/counts/risk/coverage remain unchanged.
-   - SQLite database/store/protocol tests: exactly one RPC per non-empty logical batch, no RPC for empty input, >900 parameters chunk inside the worker, deterministic merge, and typed payload/result round trip.
-   - integration test: wide overlapping multi-file graph with `maxPendingOperations: 32` completes upstream/downstream without `StoreOverloadError` and matches the in-memory result.
+   - File/multi-file impact tests: maximum active work is 4, one shared memoized view, overlapping reads deduplicate, and affected sets/counts/risk/coverage remain unchanged.
+   - SQLite database/store/protocol tests: exactly one RPC per non-empty logical batch, no RPC for empty input, >900 parameters chunk inside the worker, deterministic merge, and typed payload/result round trip for the three new node batch operations.
+   - Batch node method tests: contract-test ordering, deduplication, missing identities, SQLite parameter chunking, and one logical worker operation (spy at host/worker and database boundaries).
 
-1. **Coverage Contract Tests**: Verify `findIndexCoverage(filePaths)` vs `getAllIndexCoverage()` return exact matching records.
-2. **Concurrency & Lifecycle Tests**:
-   - Multiple concurrent `open()` calls share one initialization promise.
-   - Multiple concurrent `close()` calls share one shutdown promise.
-   - `close()` drains in-flight requests and rejects new ones.
-   - `close()` sends `close` to worker before termination.
-   - Concurrent queries and `recreate()` preserve strict FIFO ordering.
-   - `faulted` state prevents operations and recovers after `close()` + `open()`.
-   - Strict validation of `maxPendingOperations` (< 1, non-integer, negative rejects).
-   - **`close()` called while `open()` is still in-flight**: `close()` waits for `openPromise`, then
-     proceeds to shut down; `open()` does **not** expose `'open'` state after resolving.
-   - **Drain timeout forces worker termination**: when `drainPendingRequests()` returns `false`, the
-     `close` RPC is skipped and `worker.terminate()` is called; pending requests are rejected with
-     `StoreWorkerError`.
-   - **Worker crash during `opening`**: unhandled worker exit before the `open` ACK leaves state as
-     `faulted` (not `closed`), giving callers deterministic signal that startup failed.
+1. **Hotspot regression**:
+   - `compute-hotspots.spec.ts`: hierarchy signals issue one `getIncomingSymbolRelations` call per candidate set with `EXTENDS`, `IMPLEMENTS`, `OVERRIDES`; counts match per-symbol semantics; call-count instrumented.
+   - Wide-graph hotspot workload: a graph with enough symbols/hierarchy relations to make the old implementation exceed a low pending limit runs `computeHotspots` with `maxPendingOperations: 16` or `32` and completes without `STORE_OVERLOAD`.
 
-- **`closePromise` cleared when `open()` fails during concurrent `close()`**: a subsequent
-  `close()` executes the recovery path rather than returning the stale promise; a full
-  `open()` → `close()` cycle succeeds afterwards.
-  - **`close()` force-terminates when worker ignores the `close` RPC**: a mock worker that
-    responds to `open` but never acknowledges `close` causes `close(N)` to give up graceful
-    shutdown at ≈N ms and await forced termination; the store reaches `'closed'`.
-  - **Bulk session state machine**: writes/removals, duplicate commits, and rollbacks are
-    rejected while a commit (`committing`) or rollback (`rolling-back`) is in flight; the
-    original operation completes unaffected.
-  - **No session resurrection**: staging RPCs against a committed, rolled-back, closed, or
-    recreated session reject instead of creating a new worker-side session (`createBulkSession`
-    is only reachable from `beginBulkIndexSession`).
-  - **Reference-facts chunk merge**: two `writeReferenceFacts()` calls in one session persist
-    data from both chunks after commit.
-  - **`maxPendingOperations: 1` session**: a full begin → stage → commit session succeeds
-    because the begin RPC is shared and awaited (`ensureReady`) instead of fire-and-forget.
-  - **`bulkLoad()` chunked staging**: large `bulkLoad()` inputs are staged in bounded chunks
-    through the session flow; no single complete-graph structured-clone is sent.
-  - **Responsiveness with many staging RPCs**: 10 000 files/symbols staged in 250-element
-    chunks while the host heartbeat (10 ms interval) keeps ticking (`ticks > 0`) with bounded
-    `maxLag`.
+2. **CLI display-path regression**:
+   - `toGraphDisplayPath` pure-function tests: workspace (`core:src/index.ts` → `packages/core/src/index.ts`), root (`root:package.json` → `package.json`), `./`-stripping, backslash normalization, unparseable fallback.
+   - Impact formatting tests (single-file, multi-file, symbol, spec, public-binding): a realistic single-large-file scenario with hundreds of affected symbols completes, and the formatting path performs zero `getFile`/`getDocument` `GraphStore`/provider calls for display-path conversion (assert via instrumented provider/store double).
+   - `graph impact --file <large-file>` and multi-file impact run end-to-end with low `maxPendingOperations` without `STORE_OVERLOAD`.
 
-3. **End-to-End Indexing & Traversal**: Run indexer, health checks, symbol queries, and FTS search.
+3. **Coverage Contract Tests**: Verify `findIndexCoverage(filePaths)` vs `getAllIndexCoverage()` return exact matching records.
 
-4. **Manual verification**:
-   - Build code-graph and CLI, then run `node packages/cli/dist/index.js graph index --format toon`; expect `result: ok`.
-   - Run the original six-file `graph impact --format toon` command twice; both runs must exit 0 without `STORE_OVERLOAD` and return identical ordered files, symbols, covering specs, depths, counts, and risk.
-   - During a deliberately long worker operation, observe a 10 ms host heartbeat; ticks must continue.
-   - Confirm lifecycle/fault tests leave no orphan worker.
+4. **Concurrency & Lifecycle Tests** (retained from current design): concurrent `open()`/`close()` sharing, drain semantics, `close` during in-flight `open`, drain-timeout forced termination, `faulted` recovery, `closePromise` clearing, worker ignoring `close` RPC, bulk-session state machine, no session resurrection, reference-facts chunk merge, `maxPendingOperations: 1` session, chunked `bulkLoad()`, responsiveness heartbeat with 10k staged entities.
 
-All code-graph tests, TypeScript build, lint, and formatting checks must pass. Every verification scenario in all four deltas maps to the batch, traversal, lifecycle, transaction, composition, error, export, and E2E groups above.
+5. **Backpressure & fuse tests**:
+   - `StoreOverloadError` at the configured limit (default 256) retained.
+   - First-party operations (impact, hotspots) complete with deliberately low configured limits (`maxPendingOperations: 16` / `32`) — proves first-party operations respect backpressure.
 
----
+6. **Provider availability tests**: provider batch operations validate availability once (spy on `readStorageGenerationSnapshot` count); composite operations do not multiply generation checks per inner loop.
 
-## Compliance Reconciliation (post-audit round)
+7. **Barrel/export/ADR tests** (carried forward): public/internal export smoke tests, typed test doubles without `as unknown as Port`, protocol round-trip of the three typed error codes, ADR-0025 present and linked from all affected specs.
 
-The full-mode compliance audit (reports/20260819-214909) found no architecture or concurrency
-defects; remaining findings are error-contract, documentation, and test-coverage items. This round
-reconciles them so the change can archive clean.
+### Manual / E2E verification
 
-### Error contract — typed errors for expected failure modes
+- Build code-graph and CLI, then run `node packages/cli/dist/index.js graph index --format toon`; expect `result: ok`.
+- Against the real ~37k-symbol graph: `node packages/cli/dist/index.js graph hotspots --min-risk HIGH --format toon` completes without `STORE_OVERLOAD`.
+- `node packages/cli/dist/index.js graph impact --file "code-graph:src/infrastructure/sqlite/sqlite-graph-database.ts" --direction dependents --format toon` completes without `STORE_OVERLOAD`; a multi-file impact command completes identically.
+- Run the original six-file `graph impact --format toon` command twice; both runs must exit 0 without `STORE_OVERLOAD` and return identical ordered files, symbols, covering specs, depths, counts, and risk.
+- During a deliberately long worker operation, observe a 10 ms host heartbeat; ticks must continue.
+- Confirm lifecycle/fault tests leave no orphan worker.
 
-The following expected failure modes currently throw generic `Error`, violating
-`default:_global/error-handling-conventions` (domain MUST NOT use generic `Error` for expected
-failure modes or validation errors). They SHALL be replaced with `SpecdCodeGraphError` subclasses
-that serialize/reconstruct identically across the worker boundary via
-`serializeWorkerError` / `deserializeWorkerError`:
+All code-graph tests, TypeScript build, lint, and formatting checks must pass. Every verification scenario in all six deltas maps to the test groups above.
 
-- `BulkSessionStateError` (code `BULK_SESSION_STATE`) — bulk index session already active,
-  already finished, or invalid state; raised host-side in the session state machine
-  (`sqlite-graph-store.ts`).
-- `InvalidGraphStoreConfigurationError` (code `INVALID_GRAPH_STORE_CONFIGURATION`) — invalid
-  `maxPendingOperations` validation; raised during `open()` (`sqlite-worker-client.ts`).
-- `GraphSchemaIncompatibleError` (code `GRAPH_SCHEMA_INCOMPATIBLE`) — incompatible persisted
-  SQLite schema version rejected on ordinary reads; raised worker-side on `open()`
-  (`sqlite-graph-database.ts`) and MUST round-trip through `deserializeWorkerError` so the
-  provider can distinguish this state and trigger destructive `recreate()`.
+## Acceptance criteria
 
-Worker-side session lookup failures (missing/duplicate `sessionId`) SHALL also use
-`BulkSessionStateError` with a distinct message so hosts observe a typed, serializable error.
-The worker `unknown operation` path remains an internal protocol error (programming bug only,
-not an expected domain failure) and stays a generic `Error`.
+The change must not return to verification until:
 
-`deserializeWorkerError` SHALL be extended with the three new codes before the round-trip test
-suite passes.
+- `graph hotspots --min-risk HIGH` works against the real ~37k-symbol SpecD graph without `STORE_OVERLOAD`.
+- `graph impact --file <large-file>` works without `STORE_OVERLOAD`.
+- Multi-file impact works without `STORE_OVERLOAD`.
+- CLI impact display-path conversion performs zero graph DB reads.
+- Hotspot hierarchy signals use batch relation retrieval.
+- `getFilesByPaths`, `getDocumentsByPaths`, `getSpecsByIds`, and `getSymbolsByIds` have symmetric, tested contracts.
+- Remaining high-cardinality `GraphStore`/provider fan-outs are classified (A–E) and fixed appropriately.
+- First-party operations work with deliberately low `maxPendingOperations` in regression tests.
+- `maxPendingOperations = 256` remains the normal default safety fuse.
+- Full typecheck, lint, full Vitest suite, and build/dist worker tests pass without masked failures.
+- Change specs and verify artifacts validate; a fresh compliance report has no change-attributable failures.
 
-### Documentation — ADR-0025
+## Open questions
 
-Add `docs/adr/0025-nonblocking-worker-sqlite-graph-store.md` (MADR format, `### Confirmation`,
-`### Spec` links) recording the decision to keep `better-sqlite3` and execute it on one
-persistent worker thread with FIFO RPC, backpressure, drain/deadline lifecycle, fault recovery,
-and worker-side chunked bulk staging — and why alternatives (async driver, worker pool, worker
-per operation, main-thread SQLite) were rejected. All four change specs gain `## ADRs` sections
-linking it.
-
-### JSDoc completion
-
-Add real descriptions to the two empty JSDoc blocks: `SQLiteGraphStoreOptions`
-(`sqlite-runtime-descriptor.ts`) and `WorkerBulkSession` (`sqlite-worker.ts`).
-
-### Test coverage additions
-
-- `SqliteRuntimeDescriptor.modulePath` end-to-end: descriptor supplied through
-  `createSqliteGraphStoreFactory` / composition options reaches the worker during `open()` and
-  drives the worker-side dynamic module load.
-- `createSqliteGraphStoreFactory`: options plumb-through of `runtime` / `maxPendingOperations`,
-  plus rejection of an invalid `maxPendingOperations`.
-- Public barrel smoke tests asserting the spec-mandated `"."` exports are importable
-  (`GraphStoreFactory`, `GraphStoreFactoryOptions`, `CodeGraphOptions`,
-  `CodeGraphCompositionOptions`, `SqliteRuntimeDescriptor`, `SQLiteGraphStoreOptions`,
-  `createSqliteGraphStoreFactory`, `LanguageAdapter`, model vocabulary,
-  `SpecNotFoundError` `SPEC_NOT_FOUND` code + `specId`) and that host use-case factories
-  (`createGetGraphHealth`, `createIndexProjectGraph`, `createGetSpecCoverage`,
-  `createGetChangeSpecCoverage`) are named exports from the public barrel.
-- Scope-limited mock cleanup: replace `as unknown as Port` partial mocks only where this change
-  created or needed them (e.g. host-use-case factories and change-scoped coverage tests);
-  pre-existing helper mocks are left untouched.
-- Protocol round-trip coverage for the three new typed error codes: extend
-  `test/infrastructure/sqlite/sqlite-worker-protocol.spec.ts` to round-trip
-  `BULK_SESSION_STATE`, `INVALID_GRAPH_STORE_CONFIGURATION`, and `GRAPH_SCHEMA_INCOMPATIBLE`
-  through `serializeWorkerError` / `deserializeWorkerError` (currently only the pre-existing
-  `STORE_NOT_OPEN` / `STORE_OVERLOAD` / `STORE_WORKER_ERROR` codes are round-tripped directly).
-- Host-side "already active" bulk-session branch: add a test asserting the
-  `beginBulkIndexSession` already-active throw (`sqlite-graph-store.ts`) rejects with
-  `BulkSessionStateError` by type (the in-flight commit/rollback branches are covered by
-  message assertions).
-- Post-close `analyzeImpact`: add a literal test in `code-graph-provider.spec.ts` asserting
-  `analyzeImpact` throws `StoreNotOpenError` after `close()` (the shared `assertAvailable` gate
-  is covered via `getStatistics`, but not via a literal impact call).
-- Provider-level `resolveFileSelector`: add a direct facade test normalizing a project-relative
-  path to the canonical graph identity (currently covered only at service level and via unified
-  search exact-file filtering).
-- `SpecNotFoundError.specId`: assert the `specId` getter alongside the `SPEC_NOT_FOUND` code in
-  `barrel.spec.ts` (the getter is covered in `sqlite-worker-lifecycle.spec.ts` but not in the
-  barrel surface test).
-- Public resolver selector result types: export `ResolvedFileSelector`, `ResolvedSymbolSelector`,
-  and `ResolvedSymbolSelectorResult` from the `"."` and `"./internal"` barrels. The public facade
-  methods `resolveFileSelector` / `resolveSymbolSelector` return these types, so Requirement 8
-  ("curated package surface SHALL export resolver input/result/status/reason/provenance types")
-  requires them to be publicly nameable; they are currently defined in
-  `application/services/resolve-graph-selector.ts` but only `normalizeFileSelectorPath` is
-  exported.
-
-Progress-stage event labeling (the nine documented stages) is already exercised through bulk
-commit; no dedicated test is required because the labels are design detail, not an observable
-host contract in the specs.
+None. The audit may surface a generally useful batch abstraction for import traversal (`getImporters`/`getImportees`/`findSymbols` by file); if found, it is proposed in design rather than added speculatively. The read-session/snapshot abstraction remains a recorded potential future optimization unless the audit proves it necessary.

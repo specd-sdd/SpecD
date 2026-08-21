@@ -472,6 +472,33 @@ export abstract class GraphStore {
   ): Promise<Relation[]>
 
   /**
+   * Retrieves existing files for an exact batch of canonical paths.
+   * Duplicate paths are ignored, unknown paths are omitted, and results follow
+   * the first requested-path order.
+   * @param paths - Canonical file paths to retrieve.
+   * @returns Existing files in deterministic requested-path order.
+   */
+  abstract getFilesByPaths(paths: readonly string[]): Promise<FileNode[]>
+
+  /**
+   * Retrieves existing documents for an exact batch of canonical paths.
+   * Duplicate paths are ignored, unknown paths are omitted, and results follow
+   * the first requested-path order.
+   * @param paths - Canonical document paths to retrieve.
+   * @returns Existing documents in deterministic requested-path order.
+   */
+  abstract getDocumentsByPaths(paths: readonly string[]): Promise<DocumentNode[]>
+
+  /**
+   * Retrieves existing specs for an exact batch of identifiers.
+   * Duplicate identifiers are ignored, unknown identifiers are omitted, and
+   * results follow the first requested-id order.
+   * @param specIds - Spec identifiers to retrieve.
+   * @returns Existing specs in deterministic requested-id order.
+   */
+  abstract getSpecsByIds(specIds: readonly string[]): Promise<SpecNode[]>
+
+  /**
    * Retrieves a spec node by its id.
    * @param specId - The spec id to look up.
    * @returns The matching spec node, or undefined if not found.

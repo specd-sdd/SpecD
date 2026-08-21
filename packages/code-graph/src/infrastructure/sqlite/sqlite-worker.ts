@@ -226,6 +226,21 @@ export async function handleMessage(
         result = database.getOutgoingSymbolRelations(p.symbolIds, p.relationTypes)
         break
       }
+      case 'getFilesByPaths': {
+        const p = payload as { filePaths: readonly string[] }
+        result = database.getFilesByPaths(p.filePaths)
+        break
+      }
+      case 'getDocumentsByPaths': {
+        const p = payload as { documentPaths: readonly string[] }
+        result = database.getDocumentsByPaths(p.documentPaths)
+        break
+      }
+      case 'getSpecsByIds': {
+        const p = payload as { specIds: readonly string[] }
+        result = database.getSpecsByIds(p.specIds)
+        break
+      }
       case 'findSymbols': {
         const p = payload as { query: SymbolQuery }
         result = database.findSymbols(p.query)

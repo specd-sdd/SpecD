@@ -30,6 +30,12 @@ unbounded in-flight writes while the host stays responsive.
 - **Backpressure** — unbounded pending work must be rejected, not queued forever
 - **Efficient traversal** — wide graph frontiers must cross the worker boundary as
   set-based reads instead of per-symbol RPC fan-out
+- **Batch over concurrency** — one logical batch operation is preferable to
+  bounded concurrency whenever a stable batch representation exists; concurrency
+  ceilings are the fallback, never a substitute for batching
+- **Pure derivation** — values derivable from already-loaded data or static
+  configuration must be projected synchronously without crossing the store
+  boundary again
 - **Serialized state machine** — open/close/recreate and bulk-session mutations
   must remain race-free across async operations
 - **Typed failure semantics** — expected domain failures (invalid configuration,
@@ -46,6 +52,7 @@ unbounded in-flight writes while the host stays responsive.
 4. Spawn one worker per SQLite operation
 5. Run one dedicated worker thread for the entire SQLite store
 6. Keep per-symbol traversal reads and only raise `maxPendingOperations`
+7. Keep the fixed queue but let requests wait without bound instead of rejecting
 
 ## Decision Outcome
 
@@ -56,25 +63,54 @@ bounds pending work with a configured concurrency limit.
 
 ### The rule
 
-- All SQLite native operations execute inside a single dedicated worker thread.
-  The host `SQLiteWorkerClient` communicates over structured RPC
-  (`SQLiteWorkerRequest` / `SQLiteWorkerResponse`), never touching native
-  bindings directly.
+- **RPC-boundary rule.** All SQLite native operations execute inside a single
+  dedicated worker thread. The host `SQLiteWorkerClient` communicates over
+  structured RPC (`SQLiteWorkerRequest` / `SQLiteWorkerResponse`), never touching
+  native bindings directly. One logical store operation issues at most one RPC;
+  physical splitting (chunking) is a worker-internal implementation detail that
+  never leaks into host call counts.
 - The worker exposes a strict request/response protocol with one in-flight
   operation at a time and a bounded pending queue. `maxPendingOperations`
   (default 256) caps queued requests; exceeding it rejects immediately with
-  `StoreOverloadError` instead of queuing without bound.
+  `StoreOverloadError` instead of queuing without bound. This limit is a safety
+  fuse, not flow control: callers must keep request pressure independent of
+  input width through batching, not by sizing the queue to the workload. Waiting
+  without bound on a full queue is rejected as an option because it converts a
+  loud failure into an unbounded stall.
+- **Serial-worker rationale.** The single worker executes operations one at a
+  time, so simultaneous requests cannot increase SQLite throughput; they only
+  grow host-side memory and latency. This is why the fix for wide workloads is
+  fewer, larger operations rather than more parallel ones.
+- **Batch-over-concurrency preference.** Whenever a loop performs stable,
+  storage-neutral reads per identity (exact node lookups, relation batches), the
+  loop must be expressed as one batch API call. Bounded concurrency
+  (`mapWithConcurrency`) is reserved for loops with no batch representation
+  (per-file parsing, artifact reads). Both in-memory and SQLite stores implement
+  the same batch semantics so callers stay storage-neutral.
 - `GraphStore` exposes storage-neutral batch reads for symbols and incoming or
-  outgoing traversal relations. Each non-empty SQLite batch is one logical RPC;
-  the worker executes bound, set-based SQL and splits inputs into sequential
-  chunks below SQLite's parameter limit. Empty inputs return before IPC, symbol
-  results preserve requested-id order, and relation results use deterministic
-  source/type/target order.
+  outgoing traversal relations, plus exact node batch lookups
+  (`getSymbolsByIds`, `getFilesByPaths`, `getDocumentsByPaths`,
+  `getSpecsByIds`). Each non-empty SQLite batch is one logical RPC; the worker
+  executes bound, set-based SQL and splits inputs into sequential chunks below
+  SQLite's parameter limit. Empty inputs return before IPC, node results
+  preserve requested-identity order omitting unknown identities, and relation
+  results use deterministic source/type/target order.
 - Breadth-first traversal issues one relation batch and one symbol batch per
   frontier rather than nested per-symbol calls. Multi-file impact shares one
   memoized read view and one concurrency budget of four across file and symbol
   work, preserving result order and semantics while keeping request pressure
   independent of frontier width.
+- **Hotspot hierarchy batching.** Hotspot hierarchy signals are collected with
+  one logical `getIncomingSymbolRelations` call over the whole candidate set
+  (`EXTENDS`, `IMPLEMENTS`, `OVERRIDES`) folded in memory by target and type —
+  never three per-symbol relation queries under nested fan-out. Hotspot
+  presentation renders from the single returned result without per-entry graph
+  reads.
+- **Pure-derivation rule.** Presentation-only projections derive from data the
+  command already holds: CLI display paths project purely from static workspace
+  configuration (`toGraphDisplayPath(config, canonicalPath)`), performing zero
+  `getFile`/`getDocument` graph reads; provider availability is validated exactly
+  once per facade operation, never per inner-loop identity.
 - Lifecycle operations (`open`, `close`, `recreate`) form a serialized state
   machine. Concurrent `open()` calls share one in-flight initialization promise;
   `close()` and `recreate()` drain accepted requests before transitioning and
@@ -114,6 +150,12 @@ bounds pending work with a configured concurrency limit.
 - Good, because pending work is bounded and overload is reported explicitly
 - Good, because wide traversals perform set-based worker reads and cannot create
   hundreds of simultaneous RPCs from one frontier
+- Good, because exact node batch lookups keep host call counts independent of
+  lookup width across every store implementation
+- Good, because hotspot computation and presentation issue one bounded relation
+  read and zero per-entry graph reads regardless of ranked-entry count
+- Good, because pure display-path projection removes whole classes of redundant
+  reads and availability checks from CLI rendering
 - Good, because expected failures reconstruct as typed, codeable errors on the
   host
 - Good, because a worker crash is recoverable via close/open without corrupting
@@ -137,6 +179,18 @@ This decision is confirmed when:
   `StoreOverloadError`
 - traversal batches preserve ordering, deduplication, and all six symbol relation
   types across both in-memory and SQLite stores
+- exact node batch lookups (`getSymbolsByIds`, `getFilesByPaths`,
+  `getDocumentsByPaths`, `getSpecsByIds`) return requested-order results
+  omitting unknown identities, return `[]` for empty input without backend work,
+  issue exactly one RPC per non-empty logical batch, and chunk inputs above 900
+  parameters inside the worker
+- hotspot hierarchy signals are retrieved through one batched relation call and
+  wide hotspots complete with `maxPendingOperations: 16` without
+  `STORE_OVERLOAD`, matching in-memory results
+- CLI impact and search rendering performs zero `getFile`/`getDocument`
+  display-path reads, deriving paths purely from workspace configuration
+- provider batch operations validate availability exactly once per facade call,
+  including composite operations over multiple files
 - wide overlapping multi-file upstream and downstream impact completes with
   `maxPendingOperations: 32` and matches in-memory results
 - worker-side session and configuration failures reconstruct as the same typed
@@ -189,6 +243,16 @@ This decision is confirmed when:
 - Bad, because safe capacity would depend on graph width and the number of input
   files rather than a fixed execution budget
 
+### Keep the fixed queue but wait without bound instead of rejecting
+
+- Good, because callers would never observe `StoreOverloadError`
+- Bad, because a full queue stops being a signal: overload silently degrades
+  into an unbounded latency stall
+- Bad, because memory grows with pending promises exactly when the host is
+  already saturated
+- Bad, because it removes the pressure to batch, leaving request counts coupled
+  to graph width
+
 ## More Information
 
 ### Spec
@@ -197,3 +261,5 @@ This decision is confirmed when:
 - [`code-graph:composition`](../../specs/code-graph/composition/spec.md)
 - [`code-graph:graph-store`](../../specs/code-graph/graph-store/spec.md)
 - [`code-graph:traversal`](../../specs/code-graph/traversal/spec.md)
+- [`cli:graph-impact`](../../specs/cli/graph-impact/spec.md)
+- [`cli:graph-hotspots`](../../specs/cli/graph-hotspots/spec.md)

@@ -137,6 +137,85 @@ describe('SQLiteGraphStore', () => {
     await store.close()
   })
 
+  it('uses one RPC per non-empty exact node batch and no RPC for empty inputs', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-node-batch-rpc-'))
+    const store = new SQLiteGraphStore(tempDir)
+    const sendRequest = vi.spyOn(SQLiteWorkerClient.prototype, 'sendRequest')
+    sendRequest.mockResolvedValue([])
+
+    await expect(store.getFilesByPaths([])).resolves.toEqual([])
+    await expect(store.getDocumentsByPaths([])).resolves.toEqual([])
+    await expect(store.getSpecsByIds([])).resolves.toEqual([])
+    expect(sendRequest).not.toHaveBeenCalled()
+
+    await store.getFilesByPaths(['core:src/a.ts'])
+    await store.getDocumentsByPaths(['root:docs/a.md'])
+    await store.getSpecsByIds(['core:auth'])
+
+    expect(sendRequest.mock.calls).toEqual([
+      ['getFilesByPaths', { filePaths: ['core:src/a.ts'] }],
+      ['getDocumentsByPaths', { documentPaths: ['root:docs/a.md'] }],
+      ['getSpecsByIds', { specIds: ['core:auth'] }],
+    ])
+  })
+
+  it('chunks more than 900 exact node batch identities inside one worker request without loss', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-node-batch-chunk-'))
+    const store = new SQLiteGraphStore(tempDir)
+    await store.open()
+
+    const files = Array.from({ length: 905 }, (_, index) =>
+      createFileNode({
+        path: `core:src/bulk-${String(index)}.ts`,
+        configRelativePath: `src/bulk-${String(index)}.ts`,
+        language: 'typescript',
+        contentHash: `sha256:bulk-${String(index)}`,
+        workspace: 'core',
+      }),
+    )
+    const documents = Array.from({ length: 905 }, (_, index) =>
+      createDocumentNode({
+        path: `root:docs/bulk-${String(index)}.md`,
+        configRelativePath: `docs/bulk-${String(index)}.md`,
+        contentHash: `sha256:doc-${String(index)}`,
+        content: `# Doc ${String(index)}`,
+        workspace: 'root',
+      }),
+    )
+    const specs = Array.from({ length: 905 }, (_, index) =>
+      createSpecNode({
+        specId: `core:spec-${String(index)}`,
+        path: `specs/spec-${String(index)}`,
+        title: `Spec ${String(index)}`,
+        contentHash: `sha256:spec-${String(index)}`,
+        workspace: 'test',
+      }),
+    )
+    await store.bulkLoad({ files, symbols: [], specs, relations: [] })
+    for (const document of documents) {
+      await store.upsertDocument(document)
+    }
+
+    const requestedFilePaths = [...files.map((file) => file.path).reverse(), files[0]!.path]
+    const foundFiles = await store.getFilesByPaths(requestedFilePaths)
+    expect(foundFiles.map((file) => file.path)).toEqual(files.map((file) => file.path).reverse())
+
+    const requestedDocumentPaths = [
+      ...documents.map((document) => document.path).reverse(),
+      documents[0]!.path,
+    ]
+    const foundDocuments = await store.getDocumentsByPaths(requestedDocumentPaths)
+    expect(foundDocuments.map((document) => document.path)).toEqual(
+      documents.map((document) => document.path).reverse(),
+    )
+
+    const requestedSpecIds = [...specs.map((spec) => spec.specId), 'unknown-spec']
+    const foundSpecs = await store.getSpecsByIds(requestedSpecIds)
+    expect(foundSpecs.map((spec) => spec.specId)).toEqual(specs.map((spec) => spec.specId))
+
+    await store.close()
+  })
+
   it('batches large freshness observation lookups below SQLite expression limits', async () => {
     tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-observation-batch-'))
     const store = new SQLiteGraphStore(tempDir)

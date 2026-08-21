@@ -25,3 +25,38 @@
     evidence, dependent counts, and risk calculation. Backpressure is an adapter
     safety boundary; a valid traversal over a wide graph MUST NOT fail with
     `StoreOverloadError` merely because its input contains many distinct symbols.
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Bounded batched traversal execution'
+  content: |
+    ### Requirement: Bounded hotspot hierarchy retrieval
+
+    Hotspot computation SHALL retrieve hierarchy signals (extenders, implementors,
+    and overriders) through the `GraphStore` batch relation operations. One logical
+    `getIncomingSymbolRelations` call SHALL carry all candidate symbol ids with the
+    `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES` relation types, and the results SHALL be
+    folded in memory into per-symbol extender, implementor, and overrider counts.
+
+    Hotspot computation MUST NOT issue one hierarchy query per candidate symbol. A
+    valid hotspot ranking over a wide graph MUST NOT fail with `StoreOverloadError`
+    merely because the graph contains many symbols. Score composition, scoped
+    filters, ranking order, and risk classification MUST remain unchanged.
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: '^Traversal$'
+    after:
+      type: section
+      matches: '^Spec Dependencies$'
+  content: |
+    ## ADRs
+
+    - [ADR-0025: Non-Blocking Worker-Thread SQLite Graph Store](../../../docs/adr/0025-nonblocking-worker-sqlite-graph-store.md) — bounded batched traversal and hotspot hierarchy retrieval keep wide-graph analysis within worker backpressure limits

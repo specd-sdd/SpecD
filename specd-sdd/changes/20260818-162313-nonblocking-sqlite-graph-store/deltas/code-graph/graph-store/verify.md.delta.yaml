@@ -36,3 +36,61 @@
     - **WHEN** a conforming backend executes it
     - **THEN** backend instrumentation observes a bounded batch operation rather than one storage call per symbol or relation type
     - **AND** transparent physical parameter chunking does not change the result
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Batched symbol traversal reads'
+  content: |
+    ### Requirement: Exact batch node retrieval
+
+    #### Scenario: Exact file, document, and spec batches deduplicate and preserve requested order
+
+    - **GIVEN** each requested path/id list contains duplicates, existing nodes, and an unknown identity
+    - **WHEN** `getFilesByPaths()`, `getDocumentsByPaths()`, and `getSpecsByIds()` are called
+    - **THEN** each existing node is returned once in first-requested identity order
+    - **AND** unknown identities are omitted
+
+    #### Scenario: Exact batch accepts arbitrary input order and empty input
+
+    - **GIVEN** node identities supplied in arbitrary order, and separately an empty list
+    - **WHEN** exact batch node operations are invoked
+    - **THEN** results preserve first-requested identity order
+    - **AND** empty input returns an empty array without backend work
+
+    #### Scenario: Exact batch does not fan out by identity
+
+    - **GIVEN** a logical batch contains many distinct identities
+    - **WHEN** a conforming backend executes an exact batch node operation
+    - **THEN** backend instrumentation observes a bounded batch operation rather than one storage call per identity
+
+    #### Scenario: Display-path derivation never uses exact batch node retrieval
+
+    - **GIVEN** an impact presentation task that must render project-relative paths
+    - **WHEN** display paths are derived
+    - **THEN** derivation uses project and workspace configuration only
+    - **AND** `getFilesByPaths`, `getDocumentsByPaths`, `getSpecsByIds`, or `getSymbolsByIds` is not invoked for path derivation
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Scenario: Structured identity fields drive lookup'
+  content: |
+    - **GIVEN** canonical ids whose serialized text contains overlapping names and delimiters
+    - **WHEN** lookup, ranking, and selector resolution run by workspace, surface, name, space, owner, member form, or exported name
+    - **THEN** the SQLite backend uses indexed structured fields and returns deterministic results
+    - **AND** the serialized canonical ids are never parsed or substring-ranked
+
+- op: modified
+  selector:
+    type: section
+    matches: 'Scenario: Incremental hydration and affected lookup have backend parity'
+  content: |
+    - **GIVEN** persisted declarations, bindings, importers, callers, type users, and hierarchy dependents
+    - **WHEN** the complete reference snapshot and direct affected files are requested
+    - **THEN** the SQLite backend returns deterministically ordered facts and file paths
+    - **AND** affected lookup uses a bounded batch operation rather than one query per relation

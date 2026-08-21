@@ -32,6 +32,16 @@ describe('SQLiteWorkerProtocol serialization', () => {
     expect(structuredClone(requests)).toEqual(requests)
   })
 
+  it('round-trips typed exact node batch requests through structured clone', () => {
+    const requests: SQLiteWorkerRequest[] = [
+      { id: 1, op: 'getFilesByPaths', payload: { filePaths: ['core:src/a.ts'] } },
+      { id: 2, op: 'getDocumentsByPaths', payload: { documentPaths: ['root:docs/a.md'] } },
+      { id: 3, op: 'getSpecsByIds', payload: { specIds: ['core:auth'] } },
+    ]
+
+    expect(structuredClone(requests)).toEqual(requests)
+  })
+
   it('serializes and deserializes standard Error instances', () => {
     const error = new Error('Database disk image is malformed')
     const serialized = serializeWorkerError(error)

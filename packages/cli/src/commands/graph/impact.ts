@@ -4,6 +4,7 @@ import {
   createCodeGraphProvider,
   type FileImpactResult,
   GraphSpecNotFoundError as SpecNotFoundError,
+  type SpecdConfig,
 } from '@specd/sdk'
 import { cliError } from '../../handle-error.js'
 import { output, parseFormat } from '../../formatter.js'
@@ -283,18 +284,11 @@ JSON/TOON output schema:
                 fmt,
               )
             } else if (opts.symbol) {
-              await handleSymbolImpact(provider, opts.symbol, direction, maxDepth, fmt)
+              await handleSymbolImpact(provider, opts.symbol, direction, maxDepth, fmt, config)
             } else if (opts.spec) {
-              await handleSpecImpact(provider, opts.spec, direction, maxDepth, fmt)
+              await handleSpecImpact(provider, opts.spec, direction, maxDepth, fmt, config)
             } else if (opts.file) {
-              await handleFilesImpact(
-                provider,
-                opts.file,
-                direction,
-                maxDepth,
-                fmt,
-                config.projectRoot,
-              )
+              await handleFilesImpact(provider, opts.file, direction, maxDepth, fmt, config)
             }
           },
           { kernel },
@@ -424,7 +418,7 @@ async function handlePublicExportImpact(
  * @param direction - The traversal direction.
  * @param maxDepth - Maximum traversal depth.
  * @param fmt - The output format.
- * @param projectRoot - Project root used to normalize file selectors in error messages.
+ * @param config - Resolved project configuration used for pure display-path projection.
  */
 async function handleFilesImpact(
   provider: Awaited<ReturnType<typeof createCodeGraphProvider>>,
@@ -432,34 +426,28 @@ async function handleFilesImpact(
   direction: 'upstream' | 'downstream' | 'both',
   maxDepth: number,
   fmt: 'text' | 'json' | 'toon',
-  projectRoot: string,
+  config: SpecdConfig,
 ): Promise<void> {
-  void projectRoot
   const resolvedFiles = await resolveImpactFileSelectors(provider, rawSelectors)
-  const resolved = await Promise.all(
-    resolvedFiles.map(async (file) => ({
-      canonicalPath: file.path,
-      configRelativePath: await toGraphDisplayPath(provider, file.path),
-      workspace: file.workspace,
-      kind: 'file' as const,
-    })),
-  )
-  const toDisplayPath = (canonicalPath: string): Promise<string> =>
-    toGraphDisplayPath(provider, canonicalPath)
+  const resolved = resolvedFiles.map((file) => ({
+    canonicalPath: file.path,
+    configRelativePath: toGraphDisplayPath(config, file.path),
+    workspace: file.workspace,
+    kind: 'file' as const,
+  }))
+  const toDisplayPath = (canonicalPath: string): string => toGraphDisplayPath(config, canonicalPath)
 
   if (resolved.length === 1) {
     const file = resolved[0]!
     const result = await provider.analyzeFileImpact(file.canonicalPath, direction, maxDepth)
     const displayResult = {
       ...result,
-      affectedFiles: await Promise.all(result.affectedFiles.map((path) => toDisplayPath(path))),
+      affectedFiles: result.affectedFiles.map((path) => toDisplayPath(path)),
       affectedSymbols: result.affectedSymbols
-        ? await Promise.all(
-            result.affectedSymbols.map(async (symbol) => ({
-              ...symbol,
-              filePath: await toDisplayPath(symbol.filePath),
-            })),
-          )
+        ? result.affectedSymbols.map((symbol) => ({
+            ...symbol,
+            filePath: toDisplayPath(symbol.filePath),
+          }))
         : result.affectedSymbols,
     }
 
@@ -574,18 +562,16 @@ async function handleFilesImpact(
         directDependents: result.directDependents,
         indirectDependents: result.indirectDependents,
         transitiveDependents: result.transitiveDependents,
-        affectedFiles: await Promise.all(result.affectedFiles.map((path) => toDisplayPath(path))),
+        affectedFiles: result.affectedFiles.map((path) => toDisplayPath(path)),
         coveringSpecs: result.coveringSpecs,
-        perFile: await Promise.all(
-          perFile.map(async ({ file, result: r }) => ({
-            file: file.canonicalPath,
-            displayPath: file.configRelativePath,
-            result: {
-              ...r,
-              affectedFiles: await Promise.all(r.affectedFiles.map((path) => toDisplayPath(path))),
-            },
-          })),
-        ),
+        perFile: perFile.map(({ file, result: r }) => ({
+          file: file.canonicalPath,
+          displayPath: file.configRelativePath,
+          result: {
+            ...r,
+            affectedFiles: r.affectedFiles.map((path) => toDisplayPath(path)),
+          },
+        })),
       },
       fmt,
     )
@@ -599,6 +585,7 @@ async function handleFilesImpact(
  * @param direction - The traversal direction.
  * @param maxDepth - Maximum traversal depth.
  * @param fmt - The output format.
+ * @param config - Resolved project configuration used for pure display-path projection.
  */
 async function handleSymbolImpact(
   provider: Awaited<ReturnType<typeof createCodeGraphProvider>>,
@@ -606,9 +593,9 @@ async function handleSymbolImpact(
   direction: 'upstream' | 'downstream' | 'both',
   maxDepth: number,
   fmt: 'text' | 'json' | 'toon',
+  config: SpecdConfig,
 ): Promise<void> {
-  const toDisplayPath = (canonicalPath: string): Promise<string> =>
-    toGraphDisplayPath(provider, canonicalPath)
+  const toDisplayPath = (canonicalPath: string): string => toGraphDisplayPath(config, canonicalPath)
   const resolved = await provider.resolveSymbolSelector(symbolSelector)
   if (resolved.status === 'missing') {
     if (fmt === 'text') {
@@ -623,9 +610,7 @@ async function handleSymbolImpact(
     const candidates = await Promise.all(
       resolved.candidates.map(async (candidate) => {
         const symbol = await provider.getSymbol(candidate.symbolId)
-        return symbol === undefined
-          ? null
-          : { symbol, displayPath: await toDisplayPath(symbol.filePath) }
+        return symbol === undefined ? null : { symbol, displayPath: toDisplayPath(symbol.filePath) }
       }),
     )
     const present = candidates.filter((candidate) => candidate !== null)
@@ -673,16 +658,14 @@ async function handleSymbolImpact(
   if (symbols.length === 1) {
     const sym = symbols[0]!
     const result = await provider.analyzeImpact(sym.id, direction, maxDepth)
-    const displayPath = await toDisplayPath(sym.filePath)
+    const displayPath = toDisplayPath(sym.filePath)
     const displayResult = {
       ...result,
-      affectedFiles: await Promise.all(result.affectedFiles.map((path) => toDisplayPath(path))),
-      affectedSymbols: await Promise.all(
-        result.affectedSymbols.map(async (symbol) => ({
-          ...symbol,
-          filePath: await toDisplayPath(symbol.filePath),
-        })),
-      ),
+      affectedFiles: result.affectedFiles.map((path) => toDisplayPath(path)),
+      affectedSymbols: result.affectedSymbols.map((symbol) => ({
+        ...symbol,
+        filePath: toDisplayPath(symbol.filePath),
+      })),
     }
 
     if (fmt === 'text') {
@@ -718,6 +701,7 @@ async function handleSymbolImpact(
  * @param direction - The traversal direction.
  * @param maxDepth - Maximum traversal depth.
  * @param fmt - The output format.
+ * @param config - Resolved project configuration used for pure display-path projection.
  */
 async function handleSpecImpact(
   provider: Awaited<ReturnType<typeof createCodeGraphProvider>>,
@@ -725,6 +709,7 @@ async function handleSpecImpact(
   direction: 'upstream' | 'downstream' | 'both',
   maxDepth: number,
   fmt: 'text' | 'json' | 'toon',
+  config: SpecdConfig,
 ): Promise<void> {
   const spec = await provider.getSpec(specId)
   if (spec === undefined) {
@@ -732,17 +717,14 @@ async function handleSpecImpact(
   }
 
   const result = await provider.analyzeSpecImpact(specId, direction, maxDepth)
-  const toDisplayPath = (canonicalPath: string): Promise<string> =>
-    toGraphDisplayPath(provider, canonicalPath)
+  const toDisplayPath = (canonicalPath: string): string => toGraphDisplayPath(config, canonicalPath)
   const displayResult = {
     ...result,
-    affectedFiles: await Promise.all(result.affectedFiles.map((path) => toDisplayPath(path))),
-    affectedSymbols: await Promise.all(
-      result.affectedSymbols.map(async (sym) => ({
-        ...sym,
-        filePath: await toDisplayPath(sym.filePath),
-      })),
-    ),
+    affectedFiles: result.affectedFiles.map((path) => toDisplayPath(path)),
+    affectedSymbols: result.affectedSymbols.map((sym) => ({
+      ...sym,
+      filePath: toDisplayPath(sym.filePath),
+    })),
   }
   if (fmt === 'text') {
     output(formatSpecImpact(spec.specId, displayResult, maxDepth).join('\n'), 'text')

@@ -89,6 +89,28 @@
     fail. Results MUST preserve the deterministic ordering and empty-input semantics
     of the abstract contract.
 
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Worker-efficient batch reads'
+  content: |
+    ### Requirement: Worker-backed exact batch node lookups
+
+    SQLite SHALL implement the exact batch node lookups defined by `GraphStore`
+    (`getFilesByPaths`, `getDocumentsByPaths`, `getSpecsByIds`, and the existing
+    `getSymbolsByIds`) as set-based worker operations. Each logical batch MUST cross
+    the worker boundary once as one typed RPC and MUST NOT issue one RPC per node.
+
+    File, document, spec, and symbol lookups SHALL use set-based predicates
+    (`path IN (...)`, `id IN (...)`). Large input sets MUST be divided into
+    deterministic bounded SQL parameter chunks inside the worker. Results MUST
+    deduplicate repeated identities, omit unknown identities, preserve first
+    requested-identity order, and return an empty array for empty input without RPC.
+
 - op: modified
   selector:
     type: section

@@ -542,6 +542,36 @@ export class InMemoryGraphStore extends GraphStore {
     return this.specs.get(specId)
   }
 
+  async getFilesByPaths(paths: readonly string[]): Promise<FileNode[]> {
+    this.ensureOpen()
+    const results: FileNode[] = []
+    for (const path of new Set(paths)) {
+      const file = this.files.get(path)
+      if (file !== undefined) results.push(file)
+    }
+    return results
+  }
+
+  async getDocumentsByPaths(paths: readonly string[]): Promise<DocumentNode[]> {
+    this.ensureOpen()
+    const results: DocumentNode[] = []
+    for (const path of new Set(paths)) {
+      const document = this.documents.get(path)
+      if (document !== undefined) results.push(document)
+    }
+    return results
+  }
+
+  async getSpecsByIds(specIds: readonly string[]): Promise<SpecNode[]> {
+    this.ensureOpen()
+    const results: SpecNode[] = []
+    for (const specId of new Set(specIds)) {
+      const spec = this.specs.get(specId)
+      if (spec !== undefined) results.push(spec)
+    }
+    return results
+  }
+
   async getCallers(symbolId: string): Promise<Relation[]> {
     this.ensureOpen()
     return this.getSymbolDependencyRelationsByTarget(symbolId)

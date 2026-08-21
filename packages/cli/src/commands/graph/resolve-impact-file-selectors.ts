@@ -1,4 +1,5 @@
-import { type CodeGraphProvider } from '@specd/sdk'
+import { type CodeGraphProvider, type SpecdConfig } from '@specd/sdk'
+import { join, relative } from 'node:path'
 import { CliValidationError } from '../../errors/index.js'
 
 /** A file resolved from a selector with its canonical path and workspace. */
@@ -54,17 +55,43 @@ async function resolveOne(provider: CodeGraphProvider, raw: string): Promise<Res
 }
 
 /**
- * Resolves a canonical graph resource path to its config-relative display path.
- * @param provider - Open Code Graph provider.
- * @param canonicalPath - Canonical file or document path.
- * @returns Config-relative path when indexed, otherwise the canonical input.
+ * Projects a canonical graph resource path onto its config-relative display path.
+ *
+ * Pure synchronous projection with no graph store access:
+ * - `workspace:path` resources parse the identity, look up `workspace.codeRoot`,
+ *   and return `relative(projectRoot, join(codeRoot, path))` normalized to `/`.
+ * - `root:path` resources return the in-repository relative path.
+ * - The canonical path is returned when the identity does not parse.
+ *
+ * @param config - Resolved project configuration used for workspace code roots.
+ * @param canonicalPath - Canonical file or document path (e.g. `core:src/x.ts`).
+ * @returns Project-relative display path, or the canonical input on fallback.
  */
-export async function toGraphDisplayPath(
-  provider: CodeGraphProvider,
-  canonicalPath: string,
-): Promise<string> {
-  const file = await provider.getFile(canonicalPath)
-  if (file !== undefined) return file.configRelativePath
-  const document = await provider.getDocument(canonicalPath)
-  return document?.configRelativePath ?? canonicalPath
+export function toGraphDisplayPath(config: SpecdConfig, canonicalPath: string): string {
+  const firstColon = canonicalPath.indexOf(':')
+  if (firstColon <= 0) return canonicalPath
+
+  const identity = canonicalPath.slice(0, firstColon)
+  const rest = canonicalPath.slice(firstColon + 1)
+  if (rest.length === 0) return canonicalPath
+
+  if (identity === 'root') {
+    return toDisplaySeparators(rest)
+  }
+
+  const workspace = config.workspaces.find((ws) => ws.name === identity)
+  if (workspace === undefined) return canonicalPath
+
+  const display = relative(config.projectRoot, join(workspace.codeRoot, rest))
+  return toDisplaySeparators(display)
+}
+
+/**
+ * Normalizes a path to forward slashes and strips a leading `./`.
+ * @param value - A path to normalize.
+ * @returns The normalized display path.
+ */
+function toDisplaySeparators(value: string): string {
+  const normalized = value.replaceAll('\\', '/')
+  return normalized.startsWith('./') ? normalized.slice(2) : normalized
 }

@@ -4,6 +4,7 @@ import { output, parseFormat } from '../../formatter.js'
 import { cliError } from '../../handle-error.js'
 import { parseGraphKinds } from './parse-graph-kinds.js'
 import { resolveGraphCliContext } from './resolve-graph-cli-context.js'
+import { toGraphDisplayPath } from './resolve-impact-file-selectors.js'
 import { withProvider } from './with-provider.js'
 import { warnGraphStale } from './warn-graph-staleness.js'
 
@@ -171,14 +172,8 @@ Exclude examples:
                 return
               }
 
-              const toDisplayPath = async (canonicalPath: string): Promise<string> => {
-                const file = await provider.getFile(canonicalPath)
-                if (file) return file.configRelativePath
-                const document = await provider.getDocument(canonicalPath)
-                if (document) return document.configRelativePath
-                const idx = canonicalPath.indexOf(':')
-                return idx === -1 ? canonicalPath : canonicalPath.substring(idx + 1)
-              }
+              const toDisplayPath = (canonicalPath: string): string =>
+                toGraphDisplayPath(config, canonicalPath)
 
               const lines: string[] = []
               lines.push(
@@ -195,7 +190,7 @@ Exclude examples:
               for (const entry of result.entries) {
                 const sepIndex = entry.symbol.filePath.indexOf(':')
                 const ws = sepIndex !== -1 ? entry.symbol.filePath.substring(0, sepIndex) : ''
-                const displayPath = await toDisplayPath(entry.symbol.filePath)
+                const displayPath = toDisplayPath(entry.symbol.filePath)
                 lines.push(
                   `${String(entry.score).padStart(6)}  ${entry.riskLevel.padEnd(8)}  ${String(entry.crossWorkspaceCallers).padStart(3)}  ${entry.symbol.kind.padEnd(9)}  ${entry.symbol.name.padEnd(30)}  [${ws}] ${displayPath}:${String(entry.symbol.line)}`,
                 )
@@ -206,23 +201,18 @@ Exclude examples:
               output(
                 {
                   totalSymbols: result.totalSymbols,
-                  entries: await Promise.all(
-                    result.entries.map(async (e) => {
-                      const file = await provider.getFile(e.symbol.filePath)
-                      return {
-                        symbol: e.symbol,
-                        score: e.score,
-                        directCallers: e.directCallers,
-                        crossWorkspaceCallers: e.crossWorkspaceCallers,
-                        fileImporters: e.fileImporters,
-                        riskLevel: e.riskLevel,
-                        workspace: e.symbol.filePath.includes(':')
-                          ? e.symbol.filePath.substring(0, e.symbol.filePath.indexOf(':'))
-                          : '',
-                        displayPath: file?.configRelativePath ?? e.symbol.filePath,
-                      }
-                    }),
-                  ),
+                  entries: result.entries.map((e) => ({
+                    symbol: e.symbol,
+                    score: e.score,
+                    directCallers: e.directCallers,
+                    crossWorkspaceCallers: e.crossWorkspaceCallers,
+                    fileImporters: e.fileImporters,
+                    riskLevel: e.riskLevel,
+                    workspace: e.symbol.filePath.includes(':')
+                      ? e.symbol.filePath.substring(0, e.symbol.filePath.indexOf(':'))
+                      : '',
+                    displayPath: toGraphDisplayPath(config, e.symbol.filePath),
+                  })),
                 },
                 fmt,
               )

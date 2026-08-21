@@ -335,6 +335,36 @@ export class SQLiteGraphStore extends GraphStore {
   }
 
   /**
+   * Retrieves an exact batch of files through one worker request.
+   * @param paths - Canonical file paths to retrieve.
+   * @returns Existing files in deterministic requested-path order.
+   */
+  async getFilesByPaths(paths: readonly string[]): Promise<FileNode[]> {
+    if (paths.length === 0) return []
+    return this.client.sendRequest('getFilesByPaths', { filePaths: paths })
+  }
+
+  /**
+   * Retrieves an exact batch of documents through one worker request.
+   * @param paths - Canonical document paths to retrieve.
+   * @returns Existing documents in deterministic requested-path order.
+   */
+  async getDocumentsByPaths(paths: readonly string[]): Promise<DocumentNode[]> {
+    if (paths.length === 0) return []
+    return this.client.sendRequest('getDocumentsByPaths', { documentPaths: paths })
+  }
+
+  /**
+   * Retrieves an exact batch of specs through one worker request.
+   * @param specIds - Spec identifiers to retrieve.
+   * @returns Existing specs in deterministic requested-id order.
+   */
+  async getSpecsByIds(specIds: readonly string[]): Promise<SpecNode[]> {
+    if (specIds.length === 0) return []
+    return this.client.sendRequest('getSpecsByIds', { specIds })
+  }
+
+  /**
    * Retrieves a spec node by its unique identifier.
    *
    * @param specId - Unique spec ID.

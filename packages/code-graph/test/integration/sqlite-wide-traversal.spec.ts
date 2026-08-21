@@ -2,7 +2,9 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
+import { analyzeFileImpact } from '../../src/domain/services/analyze-file-impact.js'
 import { analyzeFilesImpact } from '../../src/domain/services/analyze-files-impact.js'
+import { computeHotspots } from '../../src/domain/services/compute-hotspots.js'
 import { createFileNode } from '../../src/domain/value-objects/file-node.js'
 import { createRelation } from '../../src/domain/value-objects/relation.js'
 import { RelationType } from '../../src/domain/value-objects/relation-type.js'
@@ -134,6 +136,158 @@ describe('SQLite wide traversal', () => {
       expect(sqliteDownstream.affectedSymbols).toHaveLength(dependencies.length)
       expect(sqliteUpstream.coveringSpecs[0]?.specId).toBe(coverageSpec.specId)
       expect(sqliteDownstream.coveringSpecs[0]?.specId).toBe(coverageSpec.specId)
+    } finally {
+      await Promise.all([sqlite.close(), memory.close()])
+    }
+  })
+
+  it('computes wide hotspots with a 16-request queue without overloading the store', async () => {
+    storagePath = mkdtempSync(join(tmpdir(), 'code-graph-wide-hotspots-'))
+    const sqlite = new SQLiteGraphStore(storagePath, { maxPendingOperations: 16 })
+    const memory = new InMemoryGraphStore()
+    await Promise.all([sqlite.open(), memory.open()])
+
+    const baseFile = createFileNode({
+      path: 'code-graph:src/base.ts',
+      configRelativePath: 'src/base.ts',
+      language: 'typescript',
+      contentHash: 'sha256:base',
+      workspace: 'code-graph',
+    })
+    const hierarchyFile = createFileNode({
+      path: 'code-graph:src/hierarchy.ts',
+      configRelativePath: 'src/hierarchy.ts',
+      language: 'typescript',
+      contentHash: 'sha256:hierarchy',
+      workspace: 'code-graph',
+    })
+    const baseClass = createSymbolNode({
+      name: 'Base',
+      kind: SymbolKind.Class,
+      filePath: baseFile.path,
+      line: 1,
+      column: 0,
+    })
+    const contract = createSymbolNode({
+      name: 'Contract',
+      kind: SymbolKind.Interface,
+      filePath: baseFile.path,
+      line: 4,
+      column: 0,
+    })
+    const descendants = Array.from({ length: 600 }, (_, index) =>
+      createSymbolNode({
+        name: `Descendant${String(index)}`,
+        kind: SymbolKind.Class,
+        filePath: hierarchyFile.path,
+        line: index + 1,
+        column: 0,
+      }),
+    )
+    const data = {
+      files: [baseFile, hierarchyFile],
+      symbols: [baseClass, contract, ...descendants],
+      specs: [],
+      relations: descendants.flatMap((descendant, index) => [
+        createRelation({
+          source: descendant.id,
+          target: baseClass.id,
+          type: RelationType.Extends,
+        }),
+        ...(index % 2 === 0
+          ? [
+              createRelation({
+                source: descendant.id,
+                target: contract.id,
+                type: RelationType.Implements,
+              }),
+            ]
+          : []),
+      ]),
+    }
+    await Promise.all([sqlite.bulkLoad(data), memory.bulkLoad(data)])
+
+    try {
+      const [sqliteHotspots, memoryHotspots] = await Promise.all([
+        computeHotspots(sqlite, {
+          minRisk: 'LOW',
+          kinds: [SymbolKind.Class, SymbolKind.Interface],
+        }),
+        computeHotspots(memory, {
+          minRisk: 'LOW',
+          kinds: [SymbolKind.Class, SymbolKind.Interface],
+        }),
+      ])
+
+      expect(sqliteHotspots).toEqual(memoryHotspots)
+      const baseEntry = sqliteHotspots.entries.find((entry) => entry.symbol.id === baseClass.id)
+      expect(baseEntry).toBeDefined()
+      expect(baseEntry!.score).toBeGreaterThan(0)
+    } finally {
+      await Promise.all([sqlite.close(), memory.close()])
+    }
+  })
+
+  it('matches in-memory single-file impact with a 16-request queue', async () => {
+    storagePath = mkdtempSync(join(tmpdir(), 'code-graph-wide-single-impact-'))
+    const sqlite = new SQLiteGraphStore(storagePath, { maxPendingOperations: 16 })
+    const memory = new InMemoryGraphStore()
+    await Promise.all([sqlite.open(), memory.open()])
+
+    const targetFile = createFileNode({
+      path: 'code-graph:src/target.ts',
+      configRelativePath: 'src/target.ts',
+      language: 'typescript',
+      contentHash: 'sha256:target',
+      workspace: 'code-graph',
+    })
+    const callerFile = createFileNode({
+      path: 'code-graph:src/callers.ts',
+      configRelativePath: 'src/callers.ts',
+      language: 'typescript',
+      contentHash: 'sha256:callers',
+      workspace: 'code-graph',
+    })
+    const targets = Array.from({ length: 40 }, (_, index) =>
+      createSymbolNode({
+        name: `target${String(index)}`,
+        kind: SymbolKind.Function,
+        filePath: targetFile.path,
+        line: index + 1,
+        column: 0,
+      }),
+    )
+    const callers = Array.from({ length: 120 }, (_, index) =>
+      createSymbolNode({
+        name: `caller${String(index)}`,
+        kind: SymbolKind.Function,
+        filePath: callerFile.path,
+        line: index + 1,
+        column: 0,
+      }),
+    )
+    const data = {
+      files: [targetFile, callerFile],
+      symbols: [...targets, ...callers],
+      specs: [],
+      relations: callers.map((caller, index) =>
+        createRelation({
+          source: caller.id,
+          target: targets[index % targets.length]!.id,
+          type: RelationType.Calls,
+        }),
+      ),
+    }
+    await Promise.all([sqlite.bulkLoad(data), memory.bulkLoad(data)])
+
+    try {
+      const [sqliteImpact, memoryImpact] = await Promise.all([
+        analyzeFileImpact(sqlite, targetFile.path, 'upstream', 3),
+        analyzeFileImpact(memory, targetFile.path, 'upstream', 3),
+      ])
+
+      expect(sqliteImpact).toEqual(memoryImpact)
+      expect(sqliteImpact.affectedSymbols).toHaveLength(callers.length)
     } finally {
       await Promise.all([sqlite.close(), memory.close()])
     }

@@ -538,6 +538,101 @@ export class SQLiteGraphDatabase {
   }
 
   /**
+   * Retrieves a deterministic exact batch of files by canonical paths.
+   * @param paths - Canonical file paths to retrieve.
+   * @returns Existing files in first requested-path order.
+   */
+  getFilesByPaths(paths: readonly string[]): FileNode[] {
+    const uniquePaths = [...new Set(paths)]
+    if (uniquePaths.length === 0) return []
+
+    const filesByPath = new Map<string, FileNode>()
+    for (const chunk of chunksOf(uniquePaths, SQLITE_BATCH_PARAMETER_LIMIT)) {
+      const placeholders = chunk.map(() => '?').join(', ')
+      const rows = this.statement(
+        `SELECT path, config_relative_path, language, content_hash, workspace, embedding, content FROM files WHERE path IN (${placeholders})`,
+      ).all(...chunk) as Array<{
+        path: string
+        config_relative_path: string
+        language: string
+        content_hash: string
+        workspace: string
+        embedding: Buffer | null
+        content: string | null
+      }>
+      for (const row of rows) filesByPath.set(row.path, this.mapFileRow(row))
+    }
+
+    return uniquePaths.flatMap((path) => {
+      const file = filesByPath.get(path)
+      return file === undefined ? [] : [file]
+    })
+  }
+
+  /**
+   * Retrieves a deterministic exact batch of documents by canonical paths.
+   * @param paths - Canonical document paths to retrieve.
+   * @returns Existing documents in first requested-path order.
+   */
+  getDocumentsByPaths(paths: readonly string[]): DocumentNode[] {
+    const uniquePaths = [...new Set(paths)]
+    if (uniquePaths.length === 0) return []
+
+    const documentsByPath = new Map<string, DocumentNode>()
+    for (const chunk of chunksOf(uniquePaths, SQLITE_BATCH_PARAMETER_LIMIT)) {
+      const placeholders = chunk.map(() => '?').join(', ')
+      const rows = this.statement(
+        `SELECT path, config_relative_path, content_hash, content, workspace FROM documents WHERE path IN (${placeholders})`,
+      ).all(...chunk) as Array<{
+        path: string
+        config_relative_path: string
+        content_hash: string
+        content: string
+        workspace: string
+      }>
+      for (const row of rows) documentsByPath.set(row.path, this.mapDocumentRow(row))
+    }
+
+    return uniquePaths.flatMap((path) => {
+      const document = documentsByPath.get(path)
+      return document === undefined ? [] : [document]
+    })
+  }
+
+  /**
+   * Retrieves a deterministic exact batch of specs by identifiers.
+   * @param specIds - Spec identifiers to retrieve.
+   * @returns Existing specs in first requested-id order.
+   */
+  getSpecsByIds(specIds: readonly string[]): SpecNode[] {
+    const uniqueIds = [...new Set(specIds)]
+    if (uniqueIds.length === 0) return []
+
+    const specsById = new Map<string, SpecNode>()
+    for (const chunk of chunksOf(uniqueIds, SQLITE_BATCH_PARAMETER_LIMIT)) {
+      const placeholders = chunk.map(() => '?').join(', ')
+      const rows = this.statement(
+        `SELECT spec_id, path, title, description, content_hash, content, depends_on_json, workspace FROM specs WHERE spec_id IN (${placeholders})`,
+      ).all(...chunk) as Array<{
+        spec_id: string
+        path: string
+        title: string
+        description: string
+        content_hash: string
+        content: string
+        depends_on_json: string
+        workspace: string
+      }>
+      for (const row of rows) specsById.set(row.spec_id, this.mapSpecRow(row))
+    }
+
+    return uniqueIds.flatMap((specId) => {
+      const spec = specsById.get(specId)
+      return spec === undefined ? [] : [spec]
+    })
+  }
+
+  /**
    * Retrieves spec.
    *
    * @param specId - Spec id parameter.

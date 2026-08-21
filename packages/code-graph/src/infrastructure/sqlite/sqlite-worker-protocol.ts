@@ -121,6 +121,12 @@ export interface SQLiteWorkerOperationMap {
     payload: { symbolIds: readonly string[]; relationTypes: readonly RelationType[] }
     result: Relation[]
   }
+  /** Retrieves an exact batch of file nodes. */
+  getFilesByPaths: { payload: { filePaths: readonly string[] }; result: FileNode[] }
+  /** Retrieves an exact batch of document nodes. */
+  getDocumentsByPaths: { payload: { documentPaths: readonly string[] }; result: DocumentNode[] }
+  /** Retrieves an exact batch of spec nodes. */
+  getSpecsByIds: { payload: { specIds: readonly string[] }; result: SpecNode[] }
   /** Finds symbols matching query. */
   findSymbols: { payload: { query: SymbolQuery }; result: SymbolNode[] }
   /** Retrieves a spec node. */

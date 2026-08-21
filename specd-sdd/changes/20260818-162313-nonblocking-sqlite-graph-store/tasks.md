@@ -528,3 +528,122 @@
       repository and CLI: validate the complete reconciled implementation and original failure case
       Approach: build/lint code-graph and CLI, run all code-graph tests, index via `node packages/cli/dist/index.js graph index --format toon`, run the original six-file impact command twice, compare deterministic output, and confirm host heartbeat plus clean worker shutdown.
       (Req: all four affected specs and verification scenarios)
+
+## 19. Follow-up: exact batch node lookups, display-path projection, and hotspot batching
+
+- [x] 19.1 Add exact batch node methods to `GraphStore` port
+      `packages/code-graph/src/domain/ports/graph-store.ts`: `GraphStore` — add `getFilesByPaths`, `getDocumentsByPaths`, and `getSpecsByIds` beside the existing `getSymbolsByIds`, `getIncomingSymbolRelations`, and `getOutgoingSymbolRelations`
+      Approach: use the signatures from design ("New constructs"); document the shared contract: arbitrary input ordering, deduplication, first-requested identity order, omitted unknowns, and empty-input `[]` without RPC or SQL.
+      (Req: Exact batch node retrieval)
+
+- [x] 19.2 Implement exact batch node methods in the in-memory test store
+      `packages/code-graph/test/helpers/in-memory-graph-store.ts`: `InMemoryGraphStore` — implement the three new abstract methods
+      Approach: deduplicate input identities, preserve first-requested identity order, omit unknown paths/ids, and return `[]` for empty input without backend work; mirror the existing `getSymbolsByIds` implementation pattern.
+      (Req: Exact batch node retrieval)
+
+- [x] 19.3 Add typed worker protocol entries for exact node batches
+      `packages/code-graph/src/infrastructure/sqlite/sqlite-worker-protocol.ts`: `SQLiteWorkerOperationMap` — add `getFilesByPaths`, `getDocumentsByPaths`, and `getSpecsByIds` payload/result entries
+      Approach: carry readonly path/id arrays in structured-clone-safe payloads: `{ filePaths }`, `{ documentPaths }`, `{ specIds }`; derive result types from the existing node models; derive discriminators from the exhaustive operation map.
+      (Req: Worker-backed exact batch node lookups)
+
+- [x] 19.4 Implement worker-side set-based file/document/spec batches
+      `packages/code-graph/src/infrastructure/sqlite/sqlite-graph-database.ts`: `getFilesByPaths`, `getDocumentsByPaths`, `getSpecsByIds` — execute bound `IN` predicates
+      Approach: deduplicate input, chunk by `SQLITE_BATCH_PARAMETER_LIMIT = 900`, query `files.path IN (...)`, `documents.path IN (...)`, `specs.id IN (...)`, map rows by identity, and emit in first-requested identity order omitting unknowns.
+      (Req: Worker-backed exact batch node lookups, Worker-efficient batch reads)
+
+- [x] 19.5 Dispatch exact node batch operations through the worker FIFO
+      `packages/code-graph/src/infrastructure/sqlite/sqlite-worker.ts`: message dispatcher — route `getFilesByPaths`, `getDocumentsByPaths`, and `getSpecsByIds` to `SQLiteGraphDatabase`
+      Approach: execute each complete logical batch as one item on the existing serial promise chain and return one correlated response, preserving FIFO and backpressure.
+      (Req: Worker-backed non-blocking execution, Worker-backed exact batch node lookups)
+
+- [x] 19.6 Expose one-RPC exact node batch methods from `SQLiteGraphStore`
+      `packages/code-graph/src/infrastructure/sqlite/sqlite-graph-store.ts`: GraphStore batch overrides — add host empty-input guards and client requests
+      Approach: return `[]` before IPC for empty inputs; otherwise issue exactly one `sendRequest` per logical method call and leave physical chunking inside the worker.
+      (Req: Worker-backed exact batch node lookups)
+
+- [x] 19.7 Add provider-level batch operations with single availability validation
+      `packages/code-graph/src/composition/code-graph-provider.ts`: `CodeGraphProvider` — add `getFilesByPaths`, `getDocumentsByPaths`, `getSymbolsByIds`, and `getSpecsByIds`
+      Approach: each method runs availability/generation validation exactly once at the facade boundary, then issues one logical batch store operation; never revalidate per identity (section "Provider availability validation").
+      (Req: CodeGraphProvider facade, Availability validated once per command)
+
+- [x] 19.8 Extend the memoized read store with the new batch methods
+      `packages/code-graph/src/domain/services/analyze-file-impact.ts`: `createMemoizedReadStore` — implement `getFilesByPaths`, `getDocumentsByPaths`, and `getSpecsByIds` in addition to the existing batch methods
+      Approach: share resolved and in-flight reads across the full top-level impact call while reprojecting results into deterministic contract order; populate per-id caches from batch results.
+      (Req: Exact batch node retrieval, Bounded batched traversal execution)
+
+- [x] 19.9 Rewrite hotspot hierarchy signals to one batch relation retrieval
+      `packages/code-graph/src/domain/services/compute-hotspots.ts`: `collectHierarchySignals` — replace per-symbol `getExtenders`/`getImplementors`/`getOverriders` under nested `Promise.all`
+      Approach: compute the candidate symbol id list once, issue one logical `store.getIncomingSymbolRelations(candidateIds, ['EXTENDS', 'IMPLEMENTS', 'OVERRIDES'])`, and fold results in memory by `relation.target + relation.type` into per-symbol extender/implementor/overrider counts; SQLite chunks the large `IN` set internally.
+      (Req: Bounded hotspot hierarchy retrieval)
+
+- [x] 19.10 Implement pure display-path projection
+      `packages/cli/src/commands/graph/resolve-impact-file-selectors.ts`: `toGraphDisplayPath(config, canonicalPath)` — pure synchronous projection with no `GraphStore`/`CodeGraphProvider` access
+      Approach: for `workspace:path` resources parse the identity, look up `workspace.codeRoot`, return `relative(projectRoot, join(codeRoot, path))` normalized with `/` separators and `./` stripped; for `root:path` return the path; fall back to the canonical path when the identity does not parse; remove the async signature and its `provider.getFile`/`getDocument` fallback.
+      (Req: Pure display-path projection)
+
+- [x] 19.11 Refactor CLI impact formatting to synchronous display-path mapping
+      `packages/cli/src/commands/graph/impact.ts`: formatting paths — replace `Promise.all(result.affectedSymbols.map((s) => toDisplayPath(s.filePath)))` with pure projection
+      Approach: build one `Map<canonicalPath, displayPath>` per render using `toGraphDisplayPath` and map symbols/files synchronously; apply to single-file, multi-file, symbol, spec, and public-binding impact presentation; remove the `Promise.all(...)` that existed only because resolution was asynchronous.
+      (Req: Pure display-path projection, Backpressure-safe hotspot presentation)
+
+- [x] 19.12 Remove per-entry fan-out from CLI hotspots presentation
+      `packages/cli/src/commands/graph/hotspots.ts`: presentation — stop any per-ranked-entry provider or store read
+      Approach: format text, JSON, and toon output from the single returned `HotspotResult` without additional graph reads or per-entry availability validation; keep column headers, totals, ranking order, risk labels, and scoped filters unchanged.
+      (Req: Backpressure-safe hotspot presentation)
+
+- [x] 19.13 Classify and fix remaining resolver fan-outs
+      `packages/code-graph/src/application/services/resolve-graph-selector.ts`: resolution loops — apply the A–E fan-out audit classification
+      Approach: use exact batch node APIs (`getSymbolsByIds`, `getFilesByPaths`, `getDocumentsByPaths`, `getSpecsByIds`) where the loops are stable storage-neutral operations, and `mapWithConcurrency` where no batch representation exists; record each classification with its rationale.
+      (Req: Exact batch node retrieval, Bounded batched traversal execution)
+
+- [x] 19.14 Audit and fix remaining indexing fan-outs
+      `packages/code-graph/src/application/use-cases/index-code-graph.ts`: line 1456 fan-out — classify and fix per the audit table
+      Approach: use batch reads or bounded concurrency as classified (C/D); state the final classification and why; do not regress the chunked bulk-session staging.
+      (Req: Bounded batched traversal execution)
+
+- [x] 19.15 Extend ADR-0025 with the RPC-boundary rule, pure-derivation rule, exact batch APIs, and hotspot batching
+      `docs/adr/0025-nonblocking-worker-sqlite-graph-store.md`: add the RPC-boundary rule, serial-worker rationale, batch-over-concurrency preference, safety-fuse semantics, pure-derivation rule, exact batch node APIs, hotspot hierarchy batch, and rejected worker-pool/unbounded-wait options
+      Approach: retain MADR, Confirmation, and Spec sections; document why batching plus bounded scheduling plus pure derivation is required; link all six affected specs.
+      (Req: all affected specs and verification scenarios)
+
+- [x] 19.16 Add exact batch node contract tests
+      `packages/code-graph/test/domain/ports/graph-store.contract.ts` and `packages/code-graph/test/helpers/in-memory-graph-store.ts`: cover the three new node batch methods
+      Approach: instrument store call counts; assert duplicate and unknown ids, requested order for files/documents/specs, empty-input `[]` without backend work, and one bounded batch operation rather than one storage call per identity.
+      (Req: Exact batch node retrieval)
+
+- [x] 19.17 Add SQLite exact batch node RPC and SQL chunk tests
+      `packages/code-graph/test/infrastructure/sqlite/`: protocol, database, and store suites — verify the three new node batch operations
+      Approach: spy at host/worker and database boundaries; assert exactly one RPC per non-empty logical batch, no RPC for empty input, >900 parameter chunks inside the worker, deterministic merge, and typed payload/result round trip.
+      (Req: Worker-backed exact batch node lookups, Worker-efficient batch reads)
+
+- [x] 19.18 Add hotspot hierarchy batch regression tests
+      `packages/code-graph/test/domain/services/compute-hotspots.spec.ts`: instrumented hierarchy-signal retrieval
+      Approach: assert hierarchy signals issue one `getIncomingSymbolRelations` call per candidate set with `EXTENDS`, `IMPLEMENTS`, `OVERRIDES`; counts match per-symbol semantics; wide-graph workload with `maxPendingOperations: 16` or `32` completes without `STORE_OVERLOAD`.
+      (Req: Bounded hotspot hierarchy retrieval)
+
+- [x] 19.19 Add CLI display-path projection tests
+      `packages/cli/test/commands/graph/impact.spec.ts` and `resolve-impact-file-selectors.spec.ts`: pure function and formatting regressions
+      Approach: test `toGraphDisplayPath` for workspace (`core:src/index.ts` → `packages/core/src/index.ts`), root (`root:package.json` → `package.json`), `./`-stripping, backslash normalization, and unparseable fallback; assert impact formatting performs zero `getFile`/`getDocument` calls for display-path conversion via an instrumented provider/store double.
+      (Req: Pure display-path projection, Availability validated once per command)
+
+- [x] 19.20 Add provider availability-once tests
+      `packages/code-graph/test/composition/`: provider batch operations and composite facade validation
+      Approach: spy on `readStorageGenerationSnapshot`; assert provider batch operations validate availability exactly once and composite operations do not multiply generation checks per inner loop.
+      (Req: CodeGraphProvider facade, Availability validated once per command)
+
+- [x] 19.21 Add wide-graph low-limit regression tests
+      `packages/code-graph/test/integration/`: wide hotspot, single-file impact, and multi-file impact with `maxPendingOperations: 16` or `32`
+      Approach: reproduce the real-graph workload shapes (≈37k symbols, 1,084 files); assert completion without `STORE_OVERLOAD` and identical ordered results, depths, counts, coverage, and risk versus the in-memory store.
+      (Req: Bounded hotspot hierarchy retrieval, Pure display-path projection, Backpressure-safe hotspot presentation)
+
+- [x] 19.22 Run build, lint, unit, integration, and manual regression commands
+      repository and CLI: validate the complete follow-up implementation
+      Approach: build/lint code-graph and CLI, run all code-graph and CLI tests, index via `node packages/cli/dist/index.js graph index --format toon`, run `graph hotspots --min-risk HIGH`, the original six-file impact command twice, and a single large-file impact; compare deterministic output and confirm zero display-path graph reads plus clean worker shutdown.
+      (Req: all six affected specs and verification scenarios)
+
+## 20. Compliance audit follow-ups
+
+- [x] 20.1 Remove the redundant duplicate symbol batch read from traversal truncation probes
+      `packages/code-graph/src/domain/services/get-upstream.ts` and `packages/code-graph/src/domain/services/get-downstream.ts`: the truncation probe at line ~122 re-fetches `getSymbolsByIds(resolvedNextIds)` for symbols already resolved at line ~97
+      Approach: reuse the already-fetched symbol batch (or probe existence via the same map) so each final level issues no extra logical batch; preserve truncated flag semantics, ordering, and all existing traversal.spec.ts assertions.
+      (Req: Bounded batched traversal execution)

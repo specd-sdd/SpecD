@@ -6,8 +6,11 @@ import {
   type ImpactResult,
 } from '../value-objects/impact-result.js'
 import { computeRiskLevel, maxRisk } from '../value-objects/risk-level.js'
+import { type DocumentNode } from '../value-objects/document-node.js'
+import { type FileNode } from '../value-objects/file-node.js'
 import { type Relation } from '../value-objects/relation.js'
 import { type RelationType } from '../value-objects/relation-type.js'
+import { type SpecNode } from '../value-objects/spec-node.js'
 import { type SymbolNode } from '../value-objects/symbol-node.js'
 import { analyzeImpact, type ImpactResolutionProvider } from './analyze-impact.js'
 import { mapWithConcurrency } from './map-with-concurrency.js'
@@ -416,6 +419,44 @@ export function createMemoizedReadStore(store: GraphStore): GraphStore {
     'getOutgoingSymbolRelations',
     (ids, types) => store.getOutgoingSymbolRelations(ids, types),
   )
+  const fileCache = new Map<string, Promise<FileNode | undefined>>()
+  memoizedStore.getFilesByPaths = async (paths): Promise<FileNode[]> => {
+    const uniquePaths = [...new Set(paths)]
+    const missingPaths = uniquePaths.filter((path) => !fileCache.has(path))
+    if (missingPaths.length > 0) {
+      const found = await store.getFilesByPaths(missingPaths)
+      const foundByPath = new Map(found.map((file) => [file.path, file]))
+      for (const path of missingPaths) fileCache.set(path, Promise.resolve(foundByPath.get(path)))
+    }
+    const files = await Promise.all(uniquePaths.map((path) => fileCache.get(path)!))
+    return files.filter((file): file is FileNode => file !== undefined)
+  }
+  const documentCache = new Map<string, Promise<DocumentNode | undefined>>()
+  memoizedStore.getDocumentsByPaths = async (paths): Promise<DocumentNode[]> => {
+    const uniquePaths = [...new Set(paths)]
+    const missingPaths = uniquePaths.filter((path) => !documentCache.has(path))
+    if (missingPaths.length > 0) {
+      const found = await store.getDocumentsByPaths(missingPaths)
+      const foundByPath = new Map(found.map((document) => [document.path, document]))
+      for (const path of missingPaths) {
+        documentCache.set(path, Promise.resolve(foundByPath.get(path)))
+      }
+    }
+    const documents = await Promise.all(uniquePaths.map((path) => documentCache.get(path)!))
+    return documents.filter((document): document is DocumentNode => document !== undefined)
+  }
+  const specCache = new Map<string, Promise<SpecNode | undefined>>()
+  memoizedStore.getSpecsByIds = async (specIds): Promise<SpecNode[]> => {
+    const uniqueIds = [...new Set(specIds)]
+    const missingIds = uniqueIds.filter((id) => !specCache.has(id))
+    if (missingIds.length > 0) {
+      const found = await store.getSpecsByIds(missingIds)
+      const foundById = new Map(found.map((spec) => [spec.specId, spec]))
+      for (const id of missingIds) specCache.set(id, Promise.resolve(foundById.get(id)))
+    }
+    const specs = await Promise.all(uniqueIds.map((id) => specCache.get(id)!))
+    return specs.filter((spec): spec is SpecNode => spec !== undefined)
+  }
   memoizedStore.getSpec = memoize('getSpec', (specId) => store.getSpec(specId as string))
   memoizedStore.getCallers = memoize('getCallers', (id) => store.getCallers(id as string))
   memoizedStore.getCallees = memoize('getCallees', (id) => store.getCallees(id as string))

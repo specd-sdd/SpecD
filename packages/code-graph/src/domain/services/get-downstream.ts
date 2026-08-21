@@ -119,9 +119,8 @@ export async function getDownstream(
       }
 
       if (!hasMore && includeFiles) {
-        const nextSymbols = await store.getSymbolsByIds(resolvedNextIds)
         const nextFilePaths = new Set(
-          nextSymbols.map((s) => s?.filePath).filter((p): p is string => p !== undefined),
+          levelSymbols.map((s) => s?.filePath).filter((p): p is string => p !== undefined),
         )
         for (const fp of nextFilePaths) {
           if (!visitedFiles.has(fp)) {
