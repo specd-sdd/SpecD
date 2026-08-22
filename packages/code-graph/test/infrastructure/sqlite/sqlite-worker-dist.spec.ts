@@ -27,9 +27,12 @@ describe('SQLiteWorker compiled dist integration', () => {
       workerPath: resolvedWorker,
     })
 
-    await store.open()
-    const stats = await store.getStatistics()
-    expect(stats.fileCount).toBe(0)
-    await store.close()
+    try {
+      await store.open()
+      const stats = await store.getStatistics()
+      expect(stats.fileCount).toBe(0)
+    } finally {
+      await store.close()
+    }
   })
 })
