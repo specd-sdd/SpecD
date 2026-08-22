@@ -335,4 +335,28 @@ describe('analyzeFilesImpact service', () => {
       },
     ])
   })
+
+  it('shares a maximum concurrency of four across multi-file impact work', async () => {
+    const filePaths = Array.from({ length: 12 }, (_, index) => `input-${String(index)}.ts`)
+    for (const filePath of filePaths) await store.upsertFile(file(filePath), [], [])
+
+    const originalFindSymbols = store.findSymbols.bind(store)
+    let active = 0
+    let maximumActive = 0
+    vi.spyOn(store, 'findSymbols').mockImplementation(async (query) => {
+      active += 1
+      maximumActive = Math.max(maximumActive, active)
+      await new Promise((resolve) => setTimeout(resolve, 5))
+      try {
+        return await originalFindSymbols(query)
+      } finally {
+        active -= 1
+      }
+    })
+
+    const result = await analyzeFilesImpact(store, filePaths, 'upstream')
+
+    expect(result.symbols).toHaveLength(filePaths.length)
+    expect(maximumActive).toBe(4)
+  })
 })

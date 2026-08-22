@@ -3,22 +3,16 @@ import { type TraversalOptions } from '../value-objects/traversal-options.js'
 import { type TraversalResult } from '../value-objects/traversal-result.js'
 import { type SymbolNode } from '../value-objects/symbol-node.js'
 import { type Relation } from '../value-objects/relation.js'
+import { RelationType } from '../value-objects/relation-type.js'
 
-/**
- * Collects incoming traversal relations for a symbol.
- * @param store - The graph store to query.
- * @param symbolId - The symbol identifier to inspect.
- * @returns Incoming call and hierarchy relations.
- */
-async function getIncomingRelations(store: GraphStore, symbolId: string): Promise<Relation[]> {
-  const [callers, extenders, implementors, overriders] = await Promise.all([
-    store.getCallers(symbolId),
-    store.getExtenders(symbolId),
-    store.getImplementors(symbolId),
-    store.getOverriders(symbolId),
-  ])
-  return [...callers, ...extenders, ...implementors, ...overriders]
-}
+const TRAVERSAL_RELATION_TYPES = [
+  RelationType.Calls,
+  RelationType.Constructs,
+  RelationType.UsesType,
+  RelationType.Extends,
+  RelationType.Implements,
+  RelationType.Overrides,
+] as const
 
 /**
  * Collects incoming traversal relations for a batch of symbols.
@@ -30,12 +24,14 @@ async function getIncomingRelationsBatch(
   store: GraphStore,
   symbolIds: readonly string[],
 ): Promise<Map<string, Relation[]>> {
-  const entries = await Promise.all(
-    symbolIds.map(
-      async (symbolId) => [symbolId, await getIncomingRelations(store, symbolId)] as const,
-    ),
-  )
-  return new Map(entries)
+  const relationMap = new Map<string, Relation[]>()
+  const relations = await store.getIncomingSymbolRelations(symbolIds, TRAVERSAL_RELATION_TYPES)
+  for (const relation of relations) {
+    const grouped = relationMap.get(relation.target)
+    if (grouped === undefined) relationMap.set(relation.target, [relation])
+    else grouped.push(relation)
+  }
+  return relationMap
 }
 
 /**
@@ -75,7 +71,7 @@ export async function getUpstream(
     }
 
     if (includeFiles) {
-      const symbols = await Promise.all(currentIds.map((id) => store.getSymbol(id)))
+      const symbols = await store.getSymbolsByIds(currentIds)
       const filePaths = new Set(
         symbols.map((s) => s?.filePath).filter((p): p is string => p !== undefined),
       )
@@ -98,18 +94,9 @@ export async function getUpstream(
       }
     }
 
-    const symbols = await Promise.all(nextIds.map((id) => store.getSymbol(id)))
-    const levelSymbols: SymbolNode[] = []
-    const resolvedNextIds: string[] = []
-
-    for (let index = 0; index < nextIds.length; index++) {
-      const nextId = nextIds[index]
-      const symbol = symbols[index]
-      if (nextId === undefined || symbol === undefined) continue
-      visited.add(nextId)
-      levelSymbols.push(symbol)
-      resolvedNextIds.push(nextId)
-    }
+    const levelSymbols: SymbolNode[] = await store.getSymbolsByIds(nextIds)
+    const resolvedNextIds = levelSymbols.map((symbol) => symbol.id)
+    for (const nextId of resolvedNextIds) visited.add(nextId)
 
     if (levelSymbols.length > 0) {
       levels.set(depth, levelSymbols)
@@ -132,9 +119,8 @@ export async function getUpstream(
       }
 
       if (!hasMore && includeFiles) {
-        const nextSymbols = await Promise.all(resolvedNextIds.map((id) => store.getSymbol(id)))
         const nextFilePaths = new Set(
-          nextSymbols.map((s) => s?.filePath).filter((p): p is string => p !== undefined),
+          levelSymbols.map((s) => s?.filePath).filter((p): p is string => p !== undefined),
         )
         for (const fp of nextFilePaths) {
           if (!visitedFiles.has(fp)) {

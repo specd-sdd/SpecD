@@ -3,6 +3,7 @@ import { type DocumentNode } from '../value-objects/document-node.js'
 import { type SymbolNode } from '../value-objects/symbol-node.js'
 import { type SpecNode } from '../value-objects/spec-node.js'
 import { type Relation } from '../value-objects/relation.js'
+import { type RelationType } from '../value-objects/relation-type.js'
 import { type SymbolQuery } from '../value-objects/symbol-query.js'
 import { type GraphStatistics } from '../value-objects/graph-statistics.js'
 import { type SearchOptions } from '../value-objects/search-options.js'
@@ -438,6 +439,70 @@ export abstract class GraphStore {
    * @returns The matching symbol node, or undefined if not found.
    */
   abstract getSymbol(id: string): Promise<SymbolNode | undefined>
+
+  /**
+   * Retrieves existing symbols for a logical batch of identifiers.
+   * Duplicate identifiers are ignored, unknown identifiers are omitted, and
+   * results follow the first requested-id order.
+   * Empty input must return without backend work.
+   * @param symbolIds - Symbol identifiers to retrieve.
+   * @returns Existing symbols in deterministic requested-id order.
+   */
+  abstract getSymbolsByIds(symbolIds: readonly string[]): Promise<SymbolNode[]>
+
+  /**
+   * Retrieves traversal relations targeting any requested symbol.
+   * Empty input must return without backend work.
+   * @param symbolIds - Target symbol identifiers to match.
+   * @param relationTypes - Relation types to include.
+   * @returns Matching relations ordered by source, type, then target.
+   */
+  abstract getIncomingSymbolRelations(
+    symbolIds: readonly string[],
+    relationTypes: readonly RelationType[],
+  ): Promise<Relation[]>
+
+  /**
+   * Retrieves traversal relations originating from any requested symbol.
+   * Empty input must return without backend work.
+   * @param symbolIds - Source symbol identifiers to match.
+   * @param relationTypes - Relation types to include.
+   * @returns Matching relations ordered by source, type, then target.
+   */
+  abstract getOutgoingSymbolRelations(
+    symbolIds: readonly string[],
+    relationTypes: readonly RelationType[],
+  ): Promise<Relation[]>
+
+  /**
+   * Retrieves existing files for an exact batch of canonical paths.
+   * Duplicate paths are ignored, unknown paths are omitted, and results follow
+   * the first requested-path order.
+   * Empty input must return without backend work.
+   * @param paths - Canonical file paths to retrieve.
+   * @returns Existing files in deterministic requested-path order.
+   */
+  abstract getFilesByPaths(paths: readonly string[]): Promise<FileNode[]>
+
+  /**
+   * Retrieves existing documents for an exact batch of canonical paths.
+   * Duplicate paths are ignored, unknown paths are omitted, and results follow
+   * the first requested-path order.
+   * Empty input must return without backend work.
+   * @param paths - Canonical document paths to retrieve.
+   * @returns Existing documents in deterministic requested-path order.
+   */
+  abstract getDocumentsByPaths(paths: readonly string[]): Promise<DocumentNode[]>
+
+  /**
+   * Retrieves existing specs for an exact batch of identifiers.
+   * Duplicate identifiers are ignored, unknown identifiers are omitted, and
+   * results follow the first requested-id order.
+   * Empty input must return without backend work.
+   * @param specIds - Spec identifiers to retrieve.
+   * @returns Existing specs in deterministic requested-id order.
+   */
+  abstract getSpecsByIds(specIds: readonly string[]): Promise<SpecNode[]>
 
   /**
    * Retrieves a spec node by its id.

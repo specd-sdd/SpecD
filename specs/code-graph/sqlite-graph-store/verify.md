@@ -8,9 +8,218 @@
 
 - **WHEN** `SQLiteGraphStore.open()` is called through the abstract `GraphStore`
   lifecycle
-- **THEN** the adapter initializes its SQLite-specific connection and schema state
+- **THEN** the adapter initializes its persistent worker, SQLite-specific connection, and schema state
   before serving queries
 - **AND** storage-agnostic callers do not need to know any SQLite DDL or query details
+
+#### Scenario: Host event loop remains responsive during long-running SQLite operation
+
+- **GIVEN** a SQLite operation is executing within the worker thread
+- **WHEN** an unrelated timer or microtask is scheduled on the host event loop
+- **THEN** the host timer/microtask executes and completes without waiting for the SQLite operation to finish
+
+### Requirement: Worker-backed non-blocking execution
+
+#### Scenario: Single persistent worker per open store lifecycle
+
+- **WHEN** `SQLiteGraphStore.open()` is invoked
+- **THEN** exactly one persistent worker thread is spawned and initialized
+- **AND** subsequent store operations reuse the running worker thread without spawning new workers
+- **AND** `SQLiteGraphStore.close()` cleanly terminates the worker thread and connection
+
+#### Scenario: Concurrent open and close calls share in-flight promises
+
+- **GIVEN** multiple callers invoke `open()` or `close()` concurrently
+- **WHEN** initialization or shutdown is in progress
+- **THEN** all callers share and resolve the same in-flight Promise without duplicate worker spawns or race conditions
+
+#### Scenario: Concurrent caller request correlation and FIFO execution
+
+- **GIVEN** multiple asynchronous callers dispatch queries concurrently to an open `SQLiteGraphStore`
+- **WHEN** the requests are processed serially by the worker execution queue in FIFO order
+- **THEN** each caller receives its exact matching result correlated by monotonic request ID
+
+#### Scenario: Bounded operation backpressure rejects on queue overflow
+
+- **GIVEN** an open `SQLiteGraphStore` with a strictly validated positive capacity limit (`maxPendingOperations >= 1`)
+- **WHEN** the number of outstanding pending requests reaches the capacity limit
+- **THEN** new incoming requests reject immediately with `StoreOverloadError`
+- **AND** existing in-flight requests continue processing normally
+
+#### Scenario: Graceful close drains in-flight operations before terminating worker
+
+- **GIVEN** an open `SQLiteGraphStore` with accepted pending operations
+- **WHEN** `close()` is invoked
+- **THEN** new incoming operations reject with `StoreNotOpenError`
+- **AND** all previously accepted pending operations are drained to completion before the worker closes the SQLite database and terminates
+
+#### Scenario: Recreate serializes exclusively against concurrent reads and writes
+
+- **GIVEN** concurrent queries and a `recreate()` operation dispatched to the store
+- **WHEN** the worker serial execution queue processes them in order
+- **THEN** earlier queries complete before recreation, recreation finishes cleanly, and subsequent queries execute against the freshly recreated store without race conditions
+
+#### Scenario: Serializable runtime descriptor loads custom module in worker
+
+- **GIVEN** a `SqliteRuntimeDescriptor` specifying a custom `modulePath`
+- **WHEN** `SQLiteGraphStore.open()` starts the worker
+- **THEN** the worker dynamically loads the specified SQLite module inside its execution context without requiring function-valued loaders across IPC
+
+#### Scenario: Deterministic error propagation on unexpected worker termination and manual recovery
+
+- **GIVEN** an open `SQLiteGraphStore` with in-flight and pending operations
+- **WHEN** the worker thread crashes or is terminated unexpectedly
+- **THEN** all outstanding Promises reject immediately with `StoreWorkerError`
+- **AND** the store transitions to `faulted` state
+- **AND** manual recovery is achieved by calling `close()` followed by `open()`
+
+#### Scenario: close() called while open() is in-flight does not expose open state
+
+- **GIVEN** `open()` has been called but has not yet received the worker ACK
+- **WHEN** `close()` is called concurrently
+- **THEN** `close()` waits for the in-flight `open()` promise before proceeding
+- **AND** `open()` does NOT transition the store to `'open'` state
+- **AND** the store completes shutdown and reaches `'closed'` state without ever
+  being observable in the `'open'` state
+
+#### Scenario: Drain timeout forces worker termination and rejects stuck requests
+
+- **GIVEN** an open `SQLiteGraphStore` with a pending request that will not complete
+- **WHEN** `close()` is called and the drain timeout expires
+- **THEN** the `close` RPC is NOT sent to the worker
+- **AND** all remaining pending requests reject with `StoreWorkerError`
+- **AND** forced worker termination (`worker.terminate()`) is initiated
+- **AND** the store reaches `'closed'` state after the forced termination concludes
+
+#### Scenario: Worker crash during opening leaves deterministic faulted state
+
+- **GIVEN** `open()` has been called but the worker exits before sending the `open` ACK
+- **WHEN** the unexpected worker exit is detected
+- **THEN** the store transitions to `'faulted'` state (not `'closed'`)
+- **AND** the `open()` promise rejects with a `StoreWorkerError`
+- **AND** callers can recover by calling `close()` followed by `open()`
+
+#### Scenario: closePromise is always cleared after open() fails during concurrent close()
+
+- **GIVEN** `open()` is in-flight and `close()` is called concurrently
+- **WHEN** the `open()` operation fails (e.g. worker crashes during startup)
+- **THEN** `close()` settles without hanging
+- **AND** a subsequent `close()` call executes the correct recovery path (not the
+  stale in-flight promise)
+- **AND** a subsequent `open()` + `close()` cycle succeeds without error
+
+#### Scenario: close() gives up graceful shutdown and force-terminates when worker ignores the close RPC
+
+- **GIVEN** an open store whose worker responds to `open` but deliberately ignores `close`
+- **WHEN** `close(N)` is called (N milliseconds)
+- **THEN** graceful shutdown gives up at approximately N milliseconds
+- **AND** forced worker termination is initiated and awaited to conclusion
+- **AND** the store reaches `'closed'` state
+
+#### Scenario: Bulk session staging rejects writes while a commit or rollback is in flight
+
+- **GIVEN** an active `IndexWriteSession` with a `commit()` or `rollback()` already invoked
+- **WHEN** another write, removal, commit, or rollback is attempted concurrently
+- **THEN** the concurrent operation rejects with a session-state error
+- **AND** the original commit or rollback completes unaffected
+
+#### Scenario: Staging cannot resurrect a committed or rolled-back session
+
+- **GIVEN** a bulk index session that has been committed, rolled back, closed, or recreated
+- **WHEN** a subsequent staging RPC targets the same session id
+- **THEN** the staging operation rejects and does not create a new worker-side session
+
+#### Scenario: Reference-facts chunks staged in one session are merged, not replaced
+
+- **GIVEN** two `writeReferenceFacts()` calls against the same `IndexWriteSession`
+- **WHEN** the session is committed
+- **THEN** reference facts from both chunks are persisted together
+
+#### Scenario: Bulk session staging works under maxPendingOperations = 1
+
+- **GIVEN** an open `SQLiteGraphStore` configured with `maxPendingOperations: 1`
+- **WHEN** a full bulk session performs begin, staging, and commit
+- **THEN** no `StoreOverloadError` is raised because the begin RPC is shared and awaited
+  rather than dispatched fire-and-forget
+
+#### Scenario: bulkLoad() stages chunked data instead of one giant payload
+
+- **GIVEN** a large set of files, symbols, specs, and relations passed to `bulkLoad()`
+- **WHEN** the bulk load commits
+- **THEN** entities are staged in bounded chunks and committed atomically in one
+  worker transaction without a single complete-graph structured-clone message
+
+#### Scenario: Progress callback exceptions are isolated silently
+
+- **GIVEN** a bulk index operation registered with an `onProgress` handler that throws an Error
+- **WHEN** progress stage events are emitted by the worker
+- **THEN** the progress handler exception is isolated silently
+- **AND** the bulk index operation completes successfully without unhandled rejections
+
+#### Scenario: SpecNotFoundError preserves specId across worker error serialization roundtrip
+
+- **GIVEN** a `SpecNotFoundError` for spec `"core:specs/auth.spec.md"` thrown in worker
+- **WHEN** the error payload is serialized and deserialized on the host
+- **THEN** the reconstructed error is an instance of `SpecNotFoundError`
+- **AND** `error.specId` matches `"core:specs/auth.spec.md"`
+
+#### Scenario: Closed store recreate executes non-blocking async filesystem cleanup
+
+- **GIVEN** a closed `SQLiteGraphStore`
+- **WHEN** `recreate()` is invoked
+- **THEN** `rm` and `rotateStorageGenerationAsync` execute asynchronously on host
+- **AND** no worker thread is spawned
+- **AND** subsequent store `open()` starts with a fresh schema without residual WAL/SHM files
+
+#### Scenario: Chunked bulk sessions are invalidated on store close, worker crash, or recreate
+
+- **GIVEN** an active `IndexWriteSession` created via `beginBulkIndexSession()`
+- **WHEN** the store is closed, the worker crashes, or `recreate()` is called
+- **THEN** subsequent calls to `session.writeFiles()`, `session.commit()`, or `session.rollback()` reject with `StoreNotOpenError`
+
+### Requirement: Worker-efficient batch reads
+
+#### Scenario: Logical batch crosses the worker boundary once
+
+- **GIVEN** a batch contains several symbol ids and several supported relation types
+- **WHEN** symbols, incoming relations, or outgoing relations are requested
+- **THEN** each logical batch is sent as one worker RPC
+- **AND** the worker executes set-based lookup rather than one RPC per symbol or relation type
+
+#### Scenario: Large batches are chunked transparently inside the worker
+
+- **GIVEN** a batch exceeds SQLite's safe parameter count
+- **WHEN** the worker executes the batch query
+- **THEN** it divides the query into deterministic bounded SQL parameter chunks
+- **AND** the merged result preserves the abstract contract's deterministic order
+- **AND** no valid requested symbol or relation is lost or duplicated
+
+#### Scenario: Empty batch avoids worker and SQLite work
+
+- **WHEN** a batch symbol query has no symbol ids or a relation query has no ids or relation types
+- **THEN** it returns an empty array without dispatching a worker RPC or executing SQL
+
+### Requirement: Worker-backed exact batch node lookups
+
+#### Scenario: Exact batch node lookup crosses the worker boundary once
+
+- **GIVEN** many file paths, document paths, spec ids, or symbol ids are requested together
+- **WHEN** `getFilesByPaths`, `getDocumentsByPaths`, `getSpecsByIds`, or `getSymbolsByIds` is invoked
+- **THEN** the whole logical batch is sent as one typed worker RPC
+- **AND** the worker executes one set-based query rather than one RPC per node
+
+#### Scenario: Large exact batch is chunked transparently inside the worker
+
+- **GIVEN** an exact batch exceeds SQLite's safe parameter count
+- **WHEN** the worker executes the batch query
+- **THEN** it divides the query into deterministic bounded SQL parameter chunks
+- **AND** the merged result deduplicates repeated identities, omits unknown identities,
+  and preserves first requested-identity order
+
+#### Scenario: Empty exact batch avoids worker and SQLite work
+
+- **WHEN** an exact batch node query has no paths, ids, or spec ids
+- **THEN** it returns an empty array without dispatching a worker RPC or executing SQL
 
 ### Requirement: Config-derived persistence layout
 
@@ -91,8 +300,9 @@
 #### Scenario: All required relation families are stored
 
 - **WHEN** the SQLite schema is initialized for a fresh graph database
-- **THEN** persisted storage exists for `IMPORTS`, `DEFINES`, `CALLS`, `EXPORTS`,
-  `DEPENDS_ON`, `COVERS_FILE`, `COVERS_SYMBOL`, `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES`
+- **THEN** persisted storage exists for `IMPORTS`, `DEFINES`, `CALLS`, `CONSTRUCTS`,
+  `USES_TYPE`, `EXPORTS`, `DEPENDS_ON`, `COVERS_FILE`, `COVERS_SYMBOL`, `EXTENDS`,
+  `IMPLEMENTS`, and `OVERRIDES`
 
 #### Scenario: COVERS_SYMBOL metadata survives SQLite persistence
 
@@ -237,24 +447,24 @@
 
 #### Scenario: File upsert is all-or-nothing
 
-- **GIVEN** a file already has persisted graph state in SQLite
-- **WHEN** `upsertFile()` fails during its transaction
-- **THEN** the previous committed state for that file remains intact
+- **WHEN** `upsertFile()` is invoked
+- **THEN** the complete file-level graph replacement executes within a single worker-side transaction
+- **AND** if an error occurs during replacement, previous graph state remains intact
 
 #### Scenario: Bulk indexing batch is all-or-nothing
 
-- **GIVEN** a bulk indexing operation is persisting a batch of graph data
-- **WHEN** the SQLite transaction for that batch fails
-- **THEN** the backend does not expose a partially committed batch
+- **GIVEN** bulk index data is staged to a worker-side session in bounded chunks
+- **WHEN** the batch commit is requested
+- **THEN** the complete session becomes visible atomically within a single worker transaction
+- **AND** a failure before or during commit leaves previously committed graph state intact
 
 ### Requirement: Bulk indexing support
 
 #### Scenario: Large indexing runs use backend-specific batching safely
 
-- **WHEN** a large repository is indexed through `SQLiteGraphStore`
-- **THEN** the backend may batch writes, use prepared statements, or use temporary
-  tables internally
-- **AND** the observable `GraphStore` contract remains unchanged
+- **WHEN** a repository is indexed in bulk through `SQLiteGraphStore`
+- **THEN** the staged payload is committed atomically in the worker
+- **AND** serializable progress events are received and forwarded to the caller's progress callback
 
 ### Requirement: Schema versioning
 
@@ -280,7 +490,7 @@
 
 #### Scenario: SQLite old schema rebuilds safely
 
-- **GIVEN** schema version 5 and the new reference schema expects 6
+- **GIVEN** schema version 8 and the reference schema expects 9
 - **WHEN** normal read and then graph index are attempted
 - **THEN** read rejects without empty recreation
 - **AND** index rotates generation, rebuilds fields/FTS, and opens the new version

@@ -162,6 +162,46 @@
 - **THEN** all file paths in the output (e.g., `packages/core/src/index.ts`) are relative to the project root
 - **AND** they do not include workspace-prefixed identities unless explicitly requested
 
+### Requirement: Pure display-path projection
+
+#### Scenario: File paths render without graph reads
+
+- **GIVEN** an impact result with many affected symbols and files
+- **WHEN** the command renders text and JSON output
+- **THEN** every rendered path is a project-relative display path derived from configuration alone
+- **AND** rendering performs no provider read and no availability validation per path
+
+#### Scenario: Wide multi-file impact formats without overload
+
+- **GIVEN** a multi-file impact result containing many input files and affected symbols
+- **AND** the SQLite store is configured with `maxPendingOperations: 32`
+- **WHEN** the command formats the result
+- **THEN** formatting completes without `StoreOverloadError`
+- **AND** each input file renders through its own workspace configuration while each affected file appears exactly once per contributing input file
+
+#### Scenario: Availability validated once per run
+
+- **GIVEN** one command run analyzing a wide graph
+- **WHEN** the command runs to completion
+- **THEN** exactly one availability/staleness validation occurs after provider open
+- **AND** no per-symbol or per-file validation is issued during aggregation or formatting
+
+### Requirement: Availability validated once per command
+
+#### Scenario: Single availability validation per command run
+
+- **GIVEN** a single impact command run
+- **WHEN** the provider is opened and analysis begins
+- **THEN** exactly one availability/staleness validation occurs
+- **AND** no further availability checks are issued per file, per symbol, or per affected file
+
+#### Scenario: Wide impact analysis does not trigger overload
+
+- **GIVEN** a wide graph whose impact result contains many distinct files and symbols
+- **AND** the SQLite store is configured with `maxPendingOperations: 32`
+- **WHEN** impact analysis and formatting run to completion
+- **THEN** the command completes without `StoreOverloadError`
+
 ### Requirement: Error cases
 
 #### Scenario: No selector provided

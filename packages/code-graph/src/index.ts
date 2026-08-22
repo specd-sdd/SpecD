@@ -1,6 +1,13 @@
 // Composition
 export { createCodeGraphProvider } from './composition/create-code-graph-provider.js'
-export { createSqliteGraphStoreFactory } from './composition/create-sqlite-graph-store-factory.js'
+export {
+  createSqliteGraphStoreFactory,
+  type SqliteGraphStoreFactoryOptions,
+} from './composition/create-sqlite-graph-store-factory.js'
+export {
+  type SqliteRuntimeDescriptor,
+  type SQLiteGraphStoreOptions,
+} from './infrastructure/sqlite/sqlite-runtime-descriptor.js'
 export {
   type CodeGraphCompositionOptions,
   type CodeGraphOptions,
@@ -13,6 +20,14 @@ export type {
   ExactPublicBindingSelector,
   IndexingOpenResult,
 } from './composition/code-graph-provider.js'
+
+// Internal-only concrete store adapters
+export { SQLiteGraphStore } from './infrastructure/sqlite/sqlite-graph-store.js'
+export { AdapterRegistry } from './infrastructure/tree-sitter/adapter-registry.js'
+export { TypeScriptLanguageAdapter } from './infrastructure/tree-sitter/typescript-language-adapter.js'
+export { PythonLanguageAdapter } from './infrastructure/tree-sitter/python-language-adapter.js'
+export { PhpLanguageAdapter } from './infrastructure/tree-sitter/php-language-adapter.js'
+export { GoLanguageAdapter } from './infrastructure/tree-sitter/go-language-adapter.js'
 
 // Host use cases
 export {
@@ -175,6 +190,11 @@ export { expandSearchQuery, expandSearchToken } from './domain/services/expand-s
 export { isGraphStale } from './domain/services/is-graph-stale.js'
 export { analyzeFilesImpact } from './domain/services/analyze-files-impact.js'
 export { normalizeFileSelectorPath } from './application/services/resolve-graph-selector.js'
+export type {
+  ResolvedFileSelector,
+  ResolvedSymbolSelector,
+  ResolvedSymbolSelectorResult,
+} from './application/services/resolve-graph-selector.js'
 export {
   computeGraphFingerprint,
   computeRootFingerprint,
@@ -196,6 +216,7 @@ export {
 export { SpecdCodeGraphError } from './domain/errors/specd-code-graph-error.js'
 export { InvalidSymbolKindError } from './domain/errors/invalid-symbol-kind-error.js'
 export { InvalidRelationTypeError } from './domain/errors/invalid-relation-type-error.js'
+export { InvalidGraphSelectorError } from './domain/errors/invalid-graph-selector-error.js'
 export { DuplicateSymbolIdError } from './domain/errors/duplicate-symbol-id-error.js'
 export { GraphBusyError } from './domain/errors/graph-busy-error.js'
 export { GraphProviderStaleError } from './domain/errors/graph-provider-stale-error.js'
@@ -203,6 +224,11 @@ export { StoreNotOpenError } from './domain/errors/store-not-open-error.js'
 import { readInstalledCodeGraphVersion } from './application/use-cases/_shared/installed-code-graph-version.js'
 
 export { SpecNotFoundError } from './domain/errors/spec-not-found-error.js'
+export { StoreOverloadError } from './domain/errors/store-overload-error.js'
+export { StoreWorkerError } from './domain/errors/store-worker-error.js'
+export { BulkSessionStateError } from './domain/errors/bulk-session-state-error.js'
+export { InvalidGraphStoreConfigurationError } from './domain/errors/invalid-graph-store-configuration-error.js'
+export { GraphSchemaIncompatibleError } from './domain/errors/graph-schema-incompatible-error.js'
 export { acquireGraphIndexLock, getGraphIndexLockPath } from './infrastructure/index-lock.js'
 
 /** Installed version of `@specd/code-graph`. */

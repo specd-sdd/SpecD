@@ -1,4 +1,5 @@
 import { type GraphStore } from '../ports/graph-store.js'
+import { RelationType } from '../value-objects/relation-type.js'
 import {
   DEFAULT_HOTSPOT_KINDS,
   type HotspotEntry,
@@ -61,7 +62,8 @@ interface HierarchySignal {
 }
 
 /**
- * Collects hierarchy-dependent counts for all candidate hotspot symbols.
+ * Collects hierarchy-dependent counts for all candidate hotspot symbols using
+ * one logical batch relation lookup.
  * @param store - The graph store to query.
  * @param symbols - Candidate symbols to score.
  * @returns Per-symbol hierarchy counts.
@@ -70,23 +72,41 @@ async function collectHierarchySignals(
   store: GraphStore,
   symbols: readonly SymbolNode[],
 ): Promise<Map<string, HierarchySignal>> {
-  const entries = await Promise.all(
-    symbols.map(async (symbol) => {
-      const [extenders, implementors, overriders] = await Promise.all([
-        store.getExtenders(symbol.id),
-        store.getImplementors(symbol.id),
-        store.getOverriders(symbol.id),
-      ])
-      return [
-        symbol.id,
-        {
-          extenders: extenders.length,
-          implementors: implementors.length,
-          overriders: overriders.length,
-        } satisfies HierarchySignal,
-      ] as const
-    }),
-  )
+  const candidateIds = symbols.map((symbol) => symbol.id)
+  if (candidateIds.length === 0) return new Map()
+
+  const relations = await store.getIncomingSymbolRelations(candidateIds, [
+    RelationType.Extends,
+    RelationType.Implements,
+    RelationType.Overrides,
+  ])
+
+  const hierarchyByTarget = new Map<
+    string,
+    { extenders: number; implementors: number; overriders: number }
+  >()
+  for (const relation of relations) {
+    let entry = hierarchyByTarget.get(relation.target)
+    if (entry === undefined) {
+      entry = { extenders: 0, implementors: 0, overriders: 0 }
+      hierarchyByTarget.set(relation.target, entry)
+    }
+    if (relation.type === RelationType.Extends) entry.extenders++
+    else if (relation.type === RelationType.Implements) entry.implementors++
+    else if (relation.type === RelationType.Overrides) entry.overriders++
+  }
+
+  const entries = symbols.map((symbol) => {
+    const counts = hierarchyByTarget.get(symbol.id)
+    return [
+      symbol.id,
+      {
+        extenders: counts?.extenders ?? 0,
+        implementors: counts?.implementors ?? 0,
+        overriders: counts?.overriders ?? 0,
+      } satisfies HierarchySignal,
+    ] as const
+  })
 
   return new Map(entries)
 }

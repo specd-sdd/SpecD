@@ -125,6 +125,23 @@
 - **THEN** stdout is a JSON object containing `totalSymbols` and `entries`
 - **AND** each entry includes `symbol`, `score`, `directCallers`, `crossWorkspaceCallers`, `fileImporters`, `riskLevel`, and `workspace`
 
+### Requirement: Backpressure-safe hotspot presentation
+
+#### Scenario: Ranking formats without per-entry reads
+
+- **GIVEN** a hotspot ranking with many ranked entries
+- **WHEN** the command renders text, JSON, and toon output
+- **THEN** formatting completes using only the returned `HotspotResult`
+- **AND** no provider read or availability validation is issued per ranked entry
+
+#### Scenario: Wide graph ranking completes
+
+- **GIVEN** a wide graph containing many symbols
+- **AND** the SQLite store is configured with `maxPendingOperations: 32`
+- **WHEN** the command retrieves and presents hotspots
+- **THEN** presentation completes without `StoreOverloadError`
+- **AND** column headers, totals, ranking order, risk labels, and scoped filters remain unchanged
+
 ### Requirement: Error cases
 
 #### Scenario: Mutually exclusive context flags fail fast

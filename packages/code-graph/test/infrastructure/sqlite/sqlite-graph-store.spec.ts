@@ -1,4 +1,4 @@
-import { describe, afterEach, expect, it } from 'vitest'
+import { describe, afterEach, expect, it, vi } from 'vitest'
 import { existsSync, mkdtempSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
@@ -17,6 +17,7 @@ import {
   SymbolSpace,
 } from '../../../src/domain/value-objects/symbol-reference.js'
 import { SQLiteGraphStore } from '../../../src/infrastructure/sqlite/sqlite-graph-store.js'
+import { SQLiteWorkerClient } from '../../../src/infrastructure/sqlite/sqlite-worker-client.js'
 import {
   SQLITE_SCHEMA_DDL,
   SQLITE_SCHEMA_VERSION,
@@ -42,10 +43,303 @@ graphStoreContractTests(
 
 describe('SQLiteGraphStore', () => {
   afterEach(() => {
+    vi.restoreAllMocks()
     if (tempDir) {
       rmSync(tempDir, { recursive: true, force: true })
       tempDir = undefined
     }
+  })
+
+  it('uses one RPC per non-empty traversal batch and no RPC for empty inputs', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-rpc-batch-'))
+    const store = new SQLiteGraphStore(tempDir)
+    const sendRequest = vi.spyOn(SQLiteWorkerClient.prototype, 'sendRequest')
+    sendRequest.mockResolvedValue([])
+
+    await expect(store.getSymbolsByIds([])).resolves.toEqual([])
+    await expect(store.getIncomingSymbolRelations([], [RelationType.Calls])).resolves.toEqual([])
+    await expect(store.getOutgoingSymbolRelations(['symbol'], [])).resolves.toEqual([])
+    expect(sendRequest).not.toHaveBeenCalled()
+
+    await store.getSymbolsByIds(['symbol'])
+    await store.getIncomingSymbolRelations(['symbol'], [RelationType.Calls])
+    await store.getOutgoingSymbolRelations(['symbol'], [RelationType.Calls])
+
+    expect(sendRequest.mock.calls).toEqual([
+      ['getSymbolsByIds', { symbolIds: ['symbol'] }],
+      [
+        'getIncomingSymbolRelations',
+        { symbolIds: ['symbol'], relationTypes: [RelationType.Calls] },
+      ],
+      [
+        'getOutgoingSymbolRelations',
+        { symbolIds: ['symbol'], relationTypes: [RelationType.Calls] },
+      ],
+    ])
+  })
+
+  it('accounts for all bind parameters when chunking ids together with relation types', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-rel-types-chunk-'))
+    const store = new SQLiteGraphStore(tempDir)
+    await store.open()
+    const file = createFileNode({
+      path: 'core:src/rel-chunk.ts',
+      configRelativePath: 'src/rel-chunk.ts',
+      language: 'typescript',
+      contentHash: 'sha256:rel-chunk',
+      workspace: 'core',
+    })
+    const target = createSymbolNode({
+      name: 'target',
+      kind: SymbolKind.Function,
+      filePath: file.path,
+      line: 1,
+      column: 0,
+    })
+    const sources = Array.from({ length: 905 }, (_, index) =>
+      createSymbolNode({
+        name: `source${String(index)}`,
+        kind: SymbolKind.Function,
+        filePath: file.path,
+        line: index + 2,
+        column: 0,
+      }),
+    )
+    const traversalTypes = [
+      RelationType.Calls,
+      RelationType.Constructs,
+      RelationType.UsesType,
+      RelationType.Extends,
+      RelationType.Implements,
+      RelationType.Overrides,
+    ] as const
+    const relations = sources.map((source, index) =>
+      createRelation({
+        source: source.id,
+        target: target.id,
+        type: traversalTypes[index % traversalTypes.length]!,
+      }),
+    )
+    await store.bulkLoad({ files: [file], symbols: [target, ...sources], specs: [], relations })
+
+    // 6 types + id chunks of (900 - 6) must stay within the parameter budget
+    // while still covering every requested id exactly once.
+    const outgoing = await store.getOutgoingSymbolRelations(
+      sources.map((s) => s.id),
+      [...traversalTypes],
+    )
+    expect(outgoing).toHaveLength(relations.length)
+    expect(new Set(outgoing.map((r) => `${r.source}\u0000${r.type}`)).size).toBe(relations.length)
+
+    const incoming = await store.getIncomingSymbolRelations(
+      [target.id, target.id],
+      [...traversalTypes],
+    )
+    expect(incoming).toHaveLength(relations.length)
+    await store.close()
+  })
+
+  it('respects the combined id and relation-type parameter budget on both directions', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-rel-boundary-'))
+    const store = new SQLiteGraphStore(tempDir)
+    await store.open()
+
+    const threeTypes = [RelationType.Calls, RelationType.Extends, RelationType.Implements] as const
+    // With SQLITE_BATCH_PARAMETER_LIMIT = 900 and 3 types, the safe per-query
+    // id budget is exactly 897. Exercise below/at/above that boundary so a
+    // statement would exceed 900 bound parameters if types were not subtracted.
+    for (const symbolCount of [896, 897, 898] as const) {
+      const ring = Array.from({ length: symbolCount }, (_, index) =>
+        createSymbolNode({
+          name: `ring-${String(symbolCount)}-${String(index)}`,
+          kind: SymbolKind.Function,
+          filePath: `core:src/ring-${String(symbolCount)}.ts`,
+          line: index + 1,
+          column: 0,
+        }),
+      )
+      const file = createFileNode({
+        path: `core:src/ring-${String(symbolCount)}.ts`,
+        configRelativePath: `src/ring-${String(symbolCount)}.ts`,
+        language: 'typescript',
+        contentHash: `sha256:ring-${String(symbolCount)}`,
+        workspace: 'core',
+      })
+      const relations = threeTypes.flatMap((type) =>
+        ring.map((symbol, index) =>
+          createRelation({
+            source: symbol.id,
+            target: ring[(index + 1) % ring.length]!.id,
+            type,
+          }),
+        ),
+      )
+      await store.bulkLoad({ files: [file], symbols: ring, specs: [], relations })
+
+      const outgoing = await store.getOutgoingSymbolRelations(
+        ring.map((symbol) => symbol.id),
+        [...threeTypes],
+      )
+      expect(outgoing).toHaveLength(symbolCount * threeTypes.length)
+      expect(new Set(outgoing.map((r) => `${r.source}\u0000${r.type}`)).size).toBe(
+        symbolCount * threeTypes.length,
+      )
+
+      const incoming = await store.getIncomingSymbolRelations(
+        ring.map((symbol) => symbol.id),
+        [...threeTypes],
+      )
+      expect(incoming).toHaveLength(symbolCount * threeTypes.length)
+      expect(new Set(incoming.map((r) => `${r.target}\u0000${r.type}`)).size).toBe(
+        symbolCount * threeTypes.length,
+      )
+
+      // Deterministic ordering across repeated calls with different input order.
+      const outgoingAgain = await store.getOutgoingSymbolRelations(
+        [...ring].reverse().map((symbol) => symbol.id),
+        [...threeTypes],
+      )
+      expect(outgoingAgain).toEqual(outgoing)
+    }
+    await store.close()
+  })
+
+  it('chunks more than 900 traversal ids inside one worker request without loss', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-large-read-batch-'))
+    const store = new SQLiteGraphStore(tempDir)
+    await store.open()
+    const file = createFileNode({
+      path: 'core:src/wide.ts',
+      configRelativePath: 'src/wide.ts',
+      language: 'typescript',
+      contentHash: 'sha256:wide',
+      workspace: 'core',
+    })
+    const target = createSymbolNode({
+      name: 'target',
+      kind: SymbolKind.Function,
+      filePath: file.path,
+      line: 1,
+      column: 0,
+    })
+    const sources = Array.from({ length: 905 }, (_, index) =>
+      createSymbolNode({
+        name: `source${String(index)}`,
+        kind: SymbolKind.Function,
+        filePath: file.path,
+        line: index + 2,
+        column: 0,
+      }),
+    )
+    const relations = sources.map((source, index) =>
+      createRelation({
+        source: source.id,
+        target: target.id,
+        type: index % 2 === 0 ? RelationType.Calls : RelationType.UsesType,
+      }),
+    )
+    await store.bulkLoad({ files: [file], symbols: [target, ...sources], specs: [], relations })
+
+    const requestedIds = [...sources.map((symbol) => symbol.id).reverse(), sources[0]!.id]
+    const symbols = await store.getSymbolsByIds(requestedIds)
+    const outgoing = await store.getOutgoingSymbolRelations(requestedIds, [
+      RelationType.UsesType,
+      RelationType.Calls,
+    ])
+
+    expect(symbols.map((symbol) => symbol.id)).toEqual(sources.map((symbol) => symbol.id).reverse())
+    expect(outgoing).toHaveLength(relations.length)
+    expect(new Set(outgoing.map((relation) => `${relation.source}:${relation.type}`)).size).toBe(
+      relations.length,
+    )
+    expect(outgoing).toEqual(
+      [...outgoing].sort(
+        (left, right) =>
+          left.source.localeCompare(right.source) ||
+          left.type.localeCompare(right.type) ||
+          left.target.localeCompare(right.target),
+      ),
+    )
+    await store.close()
+  })
+
+  it('uses one RPC per non-empty exact node batch and no RPC for empty inputs', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-node-batch-rpc-'))
+    const store = new SQLiteGraphStore(tempDir)
+    const sendRequest = vi.spyOn(SQLiteWorkerClient.prototype, 'sendRequest')
+    sendRequest.mockResolvedValue([])
+
+    await expect(store.getFilesByPaths([])).resolves.toEqual([])
+    await expect(store.getDocumentsByPaths([])).resolves.toEqual([])
+    await expect(store.getSpecsByIds([])).resolves.toEqual([])
+    expect(sendRequest).not.toHaveBeenCalled()
+
+    await store.getFilesByPaths(['core:src/a.ts'])
+    await store.getDocumentsByPaths(['root:docs/a.md'])
+    await store.getSpecsByIds(['core:auth'])
+
+    expect(sendRequest.mock.calls).toEqual([
+      ['getFilesByPaths', { filePaths: ['core:src/a.ts'] }],
+      ['getDocumentsByPaths', { documentPaths: ['root:docs/a.md'] }],
+      ['getSpecsByIds', { specIds: ['core:auth'] }],
+    ])
+  })
+
+  it('chunks more than 900 exact node batch identities inside one worker request without loss', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-node-batch-chunk-'))
+    const store = new SQLiteGraphStore(tempDir)
+    await store.open()
+
+    const files = Array.from({ length: 905 }, (_, index) =>
+      createFileNode({
+        path: `core:src/bulk-${String(index)}.ts`,
+        configRelativePath: `src/bulk-${String(index)}.ts`,
+        language: 'typescript',
+        contentHash: `sha256:bulk-${String(index)}`,
+        workspace: 'core',
+      }),
+    )
+    const documents = Array.from({ length: 905 }, (_, index) =>
+      createDocumentNode({
+        path: `root:docs/bulk-${String(index)}.md`,
+        configRelativePath: `docs/bulk-${String(index)}.md`,
+        contentHash: `sha256:doc-${String(index)}`,
+        content: `# Doc ${String(index)}`,
+        workspace: 'root',
+      }),
+    )
+    const specs = Array.from({ length: 905 }, (_, index) =>
+      createSpecNode({
+        specId: `core:spec-${String(index)}`,
+        path: `specs/spec-${String(index)}`,
+        title: `Spec ${String(index)}`,
+        contentHash: `sha256:spec-${String(index)}`,
+        workspace: 'test',
+      }),
+    )
+    await store.bulkLoad({ files, symbols: [], specs, relations: [] })
+    for (const document of documents) {
+      await store.upsertDocument(document)
+    }
+
+    const requestedFilePaths = [...files.map((file) => file.path).reverse(), files[0]!.path]
+    const foundFiles = await store.getFilesByPaths(requestedFilePaths)
+    expect(foundFiles.map((file) => file.path)).toEqual(files.map((file) => file.path).reverse())
+
+    const requestedDocumentPaths = [
+      ...documents.map((document) => document.path).reverse(),
+      documents[0]!.path,
+    ]
+    const foundDocuments = await store.getDocumentsByPaths(requestedDocumentPaths)
+    expect(foundDocuments.map((document) => document.path)).toEqual(
+      documents.map((document) => document.path).reverse(),
+    )
+
+    const requestedSpecIds = [...specs.map((spec) => spec.specId), 'unknown-spec']
+    const foundSpecs = await store.getSpecsByIds(requestedSpecIds)
+    expect(foundSpecs.map((spec) => spec.specId)).toEqual(specs.map((spec) => spec.specId))
+
+    await store.close()
   })
 
   it('batches large freshness observation lookups below SQLite expression limits', async () => {
@@ -973,6 +1267,69 @@ describe('SQLiteGraphStore', () => {
       await store.open()
       const results = await store.searchSymbols({ query: '' })
       expect(results).toEqual([])
+      await store.close()
+    })
+  })
+
+  describe('IndexCoverage queries', () => {
+    it('differentiates findIndexCoverage and getAllIndexCoverage correctly', async () => {
+      tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-coverage-test-'))
+      const store = new SQLiteGraphStore(tempDir)
+      await store.open()
+
+      const session = store.beginBulkIndexSession()
+      await session.writeFiles([
+        createFileNode({
+          path: 'core:src/a.ts',
+          configRelativePath: 'src/a.ts',
+          language: 'typescript',
+          contentHash: 'sha256:a',
+          workspace: 'core',
+        }),
+        createFileNode({
+          path: 'core:src/b.ts',
+          configRelativePath: 'src/b.ts',
+          language: 'typescript',
+          contentHash: 'sha256:b',
+          workspace: 'core',
+        }),
+      ])
+      await session.writeReferenceFacts({
+        logicalSymbols: [],
+        declarations: [],
+        publicBindings: [],
+        localBindings: [],
+        steps: [],
+        coverage: [
+          {
+            filePath: 'core:src/a.ts',
+            contentHash: 'sha256:a',
+            status: 'indexed',
+            reason: undefined,
+            capabilities: ['typescript'],
+          },
+          {
+            filePath: 'core:src/b.ts',
+            contentHash: 'sha256:b',
+            status: 'indexed',
+            reason: undefined,
+            capabilities: ['typescript'],
+          },
+        ],
+      })
+      await session.commit()
+
+      const allCoverage = await store.getAllIndexCoverage()
+      expect(allCoverage).toHaveLength(2)
+      expect(allCoverage.map((c) => c.filePath)).toEqual(['core:src/a.ts', 'core:src/b.ts'])
+
+      const singleCoverage = await store.findIndexCoverage(['core:src/a.ts'])
+      expect(singleCoverage).toHaveLength(1)
+      expect(singleCoverage[0]?.filePath).toBe('core:src/a.ts')
+
+      const emptyCoverage = await store.findIndexCoverage([])
+      expect(emptyCoverage).toEqual([])
+
       await store.close()
     })
   })

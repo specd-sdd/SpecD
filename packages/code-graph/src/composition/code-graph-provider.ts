@@ -111,6 +111,10 @@ export interface CodeGraphProvider {
   findSymbols(query: SymbolQuery): Promise<SymbolNode[]>
   getFile(path: string): Promise<FileNode | undefined>
   getDocument(path: string): Promise<DocumentNode | undefined>
+  getFilesByPaths(paths: readonly string[]): Promise<FileNode[]>
+  getDocumentsByPaths(paths: readonly string[]): Promise<DocumentNode[]>
+  getSymbolsByIds(symbolIds: readonly string[]): Promise<SymbolNode[]>
+  getSpecsByIds(specIds: readonly string[]): Promise<SpecNode[]>
   findFilesByConfigRelativePath(configRelativePath: string): Promise<FileNode[]>
   findDocumentsByConfigRelativePath(configRelativePath: string): Promise<DocumentNode[]>
   resolveFileSelector(input: string): Promise<ResolvedFileSelector[]>
@@ -347,6 +351,50 @@ export class CodeGraphProviderImpl implements CodeGraphProvider {
   }
 
   /**
+   * Retrieves an exact batch of files by canonical paths.
+   * Validates availability once, then issues one logical batch store operation.
+   * @param paths - Canonical file paths to retrieve.
+   * @returns Existing files in deterministic requested-path order.
+   */
+  async getFilesByPaths(paths: readonly string[]): Promise<FileNode[]> {
+    await this.assertAvailable()
+    return this.store.getFilesByPaths(paths)
+  }
+
+  /**
+   * Retrieves an exact batch of documents by canonical paths.
+   * Validates availability once, then issues one logical batch store operation.
+   * @param paths - Canonical document paths to retrieve.
+   * @returns Existing documents in deterministic requested-path order.
+   */
+  async getDocumentsByPaths(paths: readonly string[]): Promise<DocumentNode[]> {
+    await this.assertAvailable()
+    return this.store.getDocumentsByPaths(paths)
+  }
+
+  /**
+   * Retrieves an exact batch of symbols by identifiers.
+   * Validates availability once, then issues one logical batch store operation.
+   * @param symbolIds - Symbol identifiers to retrieve.
+   * @returns Existing symbols in deterministic requested-id order.
+   */
+  async getSymbolsByIds(symbolIds: readonly string[]): Promise<SymbolNode[]> {
+    await this.assertAvailable()
+    return this.store.getSymbolsByIds(symbolIds)
+  }
+
+  /**
+   * Retrieves an exact batch of specs by identifiers.
+   * Validates availability once, then issues one logical batch store operation.
+   * @param specIds - Spec identifiers to retrieve.
+   * @returns Existing specs in deterministic requested-id order.
+   */
+  async getSpecsByIds(specIds: readonly string[]): Promise<SpecNode[]> {
+    await this.assertAvailable()
+    return this.store.getSpecsByIds(specIds)
+  }
+
+  /**
    * Returns every indexed document for internal health snapshot comparison.
    * @returns All indexed document nodes.
    */
@@ -448,6 +496,7 @@ export class CodeGraphProviderImpl implements CodeGraphProvider {
    * Resolves a file-bearing selector into canonical graph identities.
    * @param input - The raw selector string.
    * @returns Matching canonical file or document entries.
+   * @throws {InvalidGraphSelectorError} When the selector is empty.
    */
   async resolveFileSelector(input: string): Promise<ResolvedFileSelector[]> {
     await this.assertAvailable()
@@ -461,6 +510,7 @@ export class CodeGraphProviderImpl implements CodeGraphProvider {
    * Resolves a symbol selector into canonical graph identities.
    * @param input - The raw selector string.
    * @returns Matching canonical symbol entries.
+   * @throws {InvalidGraphSelectorError} When the selector is empty.
    */
   async resolveSymbolSelector(input: string): Promise<ResolvedSymbolSelectorResult> {
     await this.assertAvailable()

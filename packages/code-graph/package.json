@@ -29,10 +29,10 @@
     }
   },
   "scripts": {
-    "build": "tsup src/public.ts src/index.ts --format esm --dts --clean",
-    "build:dev": "tsup src/public.ts src/index.ts --format esm --dts --sourcemap --clean",
-    "build:debug": "tsup src/public.ts src/index.ts --format esm --dts --sourcemap --clean",
-    "dev": "tsup src/public.ts src/index.ts --format esm --dts --sourcemap --watch",
+    "build": "tsup src/public.ts src/index.ts src/infrastructure/sqlite/sqlite-worker.ts --format esm --dts --clean",
+    "build:dev": "tsup src/public.ts src/index.ts src/infrastructure/sqlite/sqlite-worker.ts --format esm --dts --sourcemap --clean",
+    "build:debug": "tsup src/public.ts src/index.ts src/infrastructure/sqlite/sqlite-worker.ts --format esm --dts --sourcemap --clean",
+    "dev": "tsup src/public.ts src/index.ts src/infrastructure/sqlite/sqlite-worker.ts --format esm --dts --sourcemap --watch",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "release:publish": "pnpm publish --access public",

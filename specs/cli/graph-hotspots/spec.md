@@ -98,6 +98,18 @@ If no entries match, the command SHALL output `No hotspots found.`
 
 In `json` or `toon` mode, the command SHALL output an object containing `totalSymbols` and `entries`. Each entry SHALL include the symbol payload, `score`, `directCallers`, `crossWorkspaceCallers`, `fileImporters`, `riskLevel`, and the derived `workspace` field.
 
+### Requirement: Backpressure-safe hotspot presentation
+
+Hotspot presentation MUST rely on the provider's single hotspot computation and
+MUST NOT issue one provider or store read per ranked entry. After the provider
+returns `HotspotResult`, text, JSON, and toon formatting SHALL complete without
+additional graph reads or per-entry availability validation.
+
+A valid hotspot ranking over a wide graph MUST render successfully without
+`StoreOverloadError` merely because the graph contains many symbols. Column
+headers, totals, ranking order, risk labels, and scoped-filter semantics MUST
+remain unchanged.
+
 ### Requirement: Error cases
 
 If both `--config` and `--path` are passed, the command SHALL fail with a CLI error and exit code 1.
@@ -131,3 +143,7 @@ The CLI help text for `specd graph hotspots` and the existing reference document
 - [`cli:graph-cli-context`](../graph-cli-context/spec.md) — shared graph context and provider lifecycle
 - [`core:config`](../../core/config/spec.md) — config discovery contract and bootstrap-mode relationship to configured operation
 - [`code-graph:composition`](../../code-graph/composition/spec.md) — CodeGraphProvider facade used by the command
+
+## ADRs
+
+- [ADR-0025: Non-Blocking Worker-Thread SQLite Graph Store](../../../docs/adr/0025-nonblocking-worker-sqlite-graph-store.md) — hotspot presentation relies on the single provider computation and never fans out per ranked entry

@@ -240,8 +240,8 @@ Exclude examples:
               documents: documentResults,
             } = await provider.search(searchInput)
 
-            const toDisplayPath = (canonicalPath: string): Promise<string> =>
-              toGraphDisplayPath(provider, canonicalPath)
+            const toDisplayPath = (canonicalPath: string): string =>
+              toGraphDisplayPath(config, canonicalPath)
 
             if (fmt === 'text') {
               const lines: string[] = []
@@ -259,7 +259,7 @@ Exclude examples:
                       separator < 0 ? '' : firstHit.symbol.filePath.slice(0, separator)
                     lines.push(`  [${workspace}] ${firstHit.symbol.kind} ${firstHit.symbol.name}`)
                     lines.push(
-                      `    ${await toDisplayPath(firstHit.symbol.filePath)}:${String(firstHit.symbol.line)}:${String(firstHit.symbol.column)}`,
+                      `    ${toDisplayPath(firstHit.symbol.filePath)}:${String(firstHit.symbol.line)}:${String(firstHit.symbol.column)}`,
                     )
                   } else {
                     lines.push(
@@ -271,7 +271,7 @@ Exclude examples:
                   if (target !== null) {
                     for (const binding of group.matchedPublicBindings) {
                       lines.push(
-                        `    matched export: ${await toDisplayPath(binding.surface)}::${binding.exportedName}`,
+                        `    matched export: ${toDisplayPath(binding.surface)}::${binding.exportedName}`,
                       )
                     }
                   }
@@ -282,13 +282,13 @@ Exclude examples:
                     for (const declaration of group.declarations) {
                       const location = declaration.declaration.location
                       lines.push(
-                        `    declaration: ${await toDisplayPath(location.filePath)}:${String(location.line)}:${String(location.column)}`,
+                        `    declaration: ${toDisplayPath(location.filePath)}:${String(location.line)}:${String(location.column)}`,
                       )
                     }
                   } else {
                     for (const hit of group.hits) {
                       lines.push(
-                        `    declaration: ${await toDisplayPath(hit.symbol.filePath)}:${String(hit.symbol.line)}:${String(hit.symbol.column)}`,
+                        `    declaration: ${toDisplayPath(hit.symbol.filePath)}:${String(hit.symbol.line)}:${String(hit.symbol.column)}`,
                       )
                     }
                   }

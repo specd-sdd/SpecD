@@ -406,4 +406,74 @@ describe('computeHotspots', () => {
     expect(entry).toBeDefined()
     expect(entry!.score).toBeGreaterThan(0)
   })
+
+  it('collects all hierarchy signals through one batched relation lookup', async () => {
+    const baseClass = sym('Base', 'ws-a:base.ts', 1, SymbolKind.Class)
+    const contract = sym('Persistable', 'ws-a:contract.ts', 1, SymbolKind.Interface)
+    const parentMethod = sym('save', 'ws-a:parent.ts', 1, SymbolKind.Method)
+    const extenderA = sym('ExtenderA', 'ws-a:ext-a.ts', 1, SymbolKind.Class)
+    const extenderB = sym('ExtenderB', 'ws-a:ext-b.ts', 1, SymbolKind.Class)
+    const implementor = sym('Store', 'ws-a:store.ts', 1, SymbolKind.Class)
+    const overrider = sym('save', 'ws-a:child.ts', 1, SymbolKind.Method)
+
+    await store.upsertFile(file('ws-a:base.ts'), [baseClass], [])
+    await store.upsertFile(file('ws-a:contract.ts'), [contract], [])
+    await store.upsertFile(file('ws-a:parent.ts'), [parentMethod], [])
+    await store.upsertFile(
+      file('ws-a:hierarchy.ts'),
+      [extenderA, extenderB, implementor, overrider],
+      [
+        createRelation({ source: extenderA.id, target: baseClass.id, type: RelationType.Extends }),
+        createRelation({ source: extenderB.id, target: baseClass.id, type: RelationType.Extends }),
+        createRelation({
+          source: implementor.id,
+          target: contract.id,
+          type: RelationType.Implements,
+        }),
+        createRelation({
+          source: overrider.id,
+          target: parentMethod.id,
+          type: RelationType.Overrides,
+        }),
+      ],
+    )
+
+    const hierarchyCalls: Array<{
+      symbolIds: readonly string[]
+      relationTypes: readonly RelationType[]
+    }> = []
+    const originalGetIncoming = store.getIncomingSymbolRelations.bind(store)
+    store.getIncomingSymbolRelations = async (symbolIds, relationTypes) => {
+      hierarchyCalls.push({ symbolIds, relationTypes })
+      return originalGetIncoming(symbolIds, relationTypes)
+    }
+
+    const result = await computeHotspots(store, {
+      minRisk: 'LOW',
+      minScore: 0,
+      kinds: [SymbolKind.Class, SymbolKind.Interface, SymbolKind.Method],
+    })
+
+    expect(hierarchyCalls).toHaveLength(1)
+    expect(hierarchyCalls[0]!.relationTypes).toEqual([
+      RelationType.Extends,
+      RelationType.Implements,
+      RelationType.Overrides,
+    ])
+    for (const candidate of [baseClass, contract, parentMethod]) {
+      expect(hierarchyCalls[0]!.symbolIds).toContain(candidate.id)
+    }
+
+    const baseEntry = result.entries.find((candidate) => candidate.symbol.id === baseClass.id)
+    const contractEntry = result.entries.find((candidate) => candidate.symbol.id === contract.id)
+    const methodEntry = result.entries.find((candidate) => candidate.symbol.id === parentMethod.id)
+    expect(baseEntry).toBeDefined()
+    expect(contractEntry).toBeDefined()
+    expect(methodEntry).toBeDefined()
+
+    const rankOf = (id: string): number =>
+      result.entries.findIndex((candidate) => candidate.symbol.id === id)
+    expect(rankOf(baseClass.id)).toBeLessThan(rankOf(contract.id))
+    expect(rankOf(contract.id)).toBeLessThan(rankOf(parentMethod.id))
+  })
 })
