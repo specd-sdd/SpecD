@@ -350,10 +350,18 @@ export function graphStoreContractTests(
         contentHash: 'sha256:batch-spec',
         workspace: 'test',
       })
+      const otherSpec = createSpecNode({
+        specId: 'core:core/batch-other',
+        path: 'specs/core/batch-other',
+        title: 'Batch Other',
+        contentHash: 'sha256:batch-spec-other',
+        workspace: 'test',
+      })
 
       await store.bulkLoad({ files: [fileA, fileB], symbols: [], specs: [], relations: [] })
       await store.upsertDocument(document)
       await store.upsertSpec(spec, [])
+      await store.upsertSpec(otherSpec, [])
 
       expect(
         await store.getFilesByPaths([
@@ -367,7 +375,14 @@ export function graphStoreContractTests(
       expect(
         await store.getDocumentsByPaths(['unknown-doc', document.path, document.path]),
       ).toEqual([document])
-      expect(await store.getSpecsByIds([spec.specId, 'unknown-spec'])).toEqual([spec])
+      expect(
+        await store.getSpecsByIds([
+          otherSpec.specId,
+          'unknown-spec',
+          spec.specId,
+          otherSpec.specId,
+        ]),
+      ).toEqual([otherSpec, spec])
 
       expect(await store.getFilesByPaths([])).toEqual([])
       expect(await store.getDocumentsByPaths([])).toEqual([])
