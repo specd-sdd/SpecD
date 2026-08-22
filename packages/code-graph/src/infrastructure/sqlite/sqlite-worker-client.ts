@@ -314,8 +314,14 @@ export class SQLiteWorkerClient {
    *
    * @param drainTimeoutMs - Maximum time in milliseconds to wait for accepted operations to drain.
    * @returns Promise resolving when the worker has shut down cleanly.
+   * @throws {InvalidGraphStoreConfigurationError} If `drainTimeoutMs` is not a finite number.
    */
   async close(drainTimeoutMs = 5000): Promise<void> {
+    if (typeof drainTimeoutMs !== 'number' || !Number.isFinite(drainTimeoutMs)) {
+      throw new InvalidGraphStoreConfigurationError(
+        `Invalid drainTimeoutMs: expected finite number, received ${String(drainTimeoutMs)}`,
+      )
+    }
     if (this.state === 'closed') {
       return
     }
