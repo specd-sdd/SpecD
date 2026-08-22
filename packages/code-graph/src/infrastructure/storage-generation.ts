@@ -39,9 +39,11 @@ export async function ensureStorageGenerationAsync(
   storagePath: string,
 ): Promise<StorageGenerationSnapshot> {
   const path = getStorageGenerationPath(storagePath)
-  if (!existsSync(path)) {
-    await mkdir(dirname(path), { recursive: true })
-    await writeFile(path, `${randomUUID()}\n`, 'utf-8')
+  await mkdir(dirname(path), { recursive: true })
+  try {
+    await writeFile(path, `${randomUUID()}\n`, { encoding: 'utf-8', flag: 'wx' })
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error
   }
   return readStorageGenerationAsync(storagePath)
 }
