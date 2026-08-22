@@ -1,5 +1,7 @@
 import { existsSync } from 'node:fs'
+import { isAbsolute } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { InvalidGraphStoreConfigurationError } from '../../domain/errors/invalid-graph-store-configuration-error.js'
 
 /**
  * Resolves the filesystem path to the SQLite worker entrypoint script.
@@ -9,12 +11,19 @@ import { fileURLToPath } from 'node:url'
  * for native Worker execution.
  *
  * @param overridePath - Optional explicit worker script path (e.g., from options).
- * Non-empty values are trimmed before use.
+ * Non-empty values are trimmed before use and must be absolute filesystem paths;
+ * relative values are rejected with InvalidGraphStoreConfigurationError.
  * @returns Absolute filesystem path to the worker entrypoint script.
+ * @throws {InvalidGraphStoreConfigurationError} If `overridePath` is non-empty but not an absolute path.
  */
 export function resolveSqliteWorkerPath(overridePath?: string): string {
   const trimmedOverride = overridePath?.trim()
   if (trimmedOverride) {
+    if (!isAbsolute(trimmedOverride)) {
+      throw new InvalidGraphStoreConfigurationError(
+        `Invalid workerPath: expected an absolute filesystem path, received ${trimmedOverride}`,
+      )
+    }
     return trimmedOverride
   }
 

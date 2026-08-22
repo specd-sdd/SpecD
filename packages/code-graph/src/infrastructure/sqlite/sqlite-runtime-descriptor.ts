@@ -23,6 +23,6 @@ export interface SQLiteGraphStoreOptions {
  * Internal options including worker path override for testing.
  */
 export interface InternalSQLiteGraphStoreOptions extends SQLiteGraphStoreOptions {
-  /** Optional worker script path override for testing. */
+  /** Optional absolute worker script path override for testing. Relative paths are rejected with InvalidGraphStoreConfigurationError. */
   readonly workerPath?: string | undefined
 }
