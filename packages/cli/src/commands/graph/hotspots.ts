@@ -91,8 +91,13 @@ JSON/TOON output schema:
       fileImporters: number
       riskLevel: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL"
       workspace: string
+      displayPath: string
     }>
   }
+
+  displayPath is the config-relative project path projected from the
+  canonical symbol.filePath identity; filePath remains the canonical
+  workspace-prefixed graph identity used for selectors and further queries.
 
 Exclude examples:
   specd graph hotspots --exclude-path "*:test/*"
