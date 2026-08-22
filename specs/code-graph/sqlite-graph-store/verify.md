@@ -453,8 +453,10 @@
 
 #### Scenario: Bulk indexing batch is all-or-nothing
 
-- **WHEN** a bulk index commit payload is transferred to the worker
-- **THEN** the batch commits atomically within a single worker transaction without intermediate host RPC round-trips
+- **GIVEN** bulk index data is staged to a worker-side session in bounded chunks
+- **WHEN** the batch commit is requested
+- **THEN** the complete session becomes visible atomically within a single worker transaction
+- **AND** a failure before or during commit leaves previously committed graph state intact
 
 ### Requirement: Bulk indexing support
 
