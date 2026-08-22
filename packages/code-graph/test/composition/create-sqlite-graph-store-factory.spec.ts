@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { createRequire } from 'node:module'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
@@ -68,6 +68,8 @@ describe('createSqliteGraphStoreFactory', () => {
   })
 
   it('resolves the worker script used by factories to an existing path', () => {
-    expect(resolveSqliteWorkerPath()).toBeDefined()
+    const resolved = resolveSqliteWorkerPath()
+    expect(resolved).toBeDefined()
+    expect(existsSync(resolved)).toBe(true)
   })
 })
