@@ -26,101 +26,102 @@ describe('SQLite wide traversal', () => {
     storagePath = mkdtempSync(join(tmpdir(), 'code-graph-wide-traversal-'))
     const sqlite = new SQLiteGraphStore(storagePath, { maxPendingOperations: 32 })
     const memory = new InMemoryGraphStore()
-    await Promise.all([sqlite.open(), memory.open()])
-
-    const inputFiles = Array.from({ length: 6 }, (_, fileIndex) =>
-      createFileNode({
-        path: `code-graph:src/input-${String(fileIndex)}.ts`,
-        configRelativePath: `src/input-${String(fileIndex)}.ts`,
-        language: 'typescript',
-        contentHash: `sha256:input-${String(fileIndex)}`,
-        workspace: 'code-graph',
-      }),
-    )
-    const callerFile = createFileNode({
-      path: 'code-graph:src/callers.ts',
-      configRelativePath: 'src/callers.ts',
-      language: 'typescript',
-      contentHash: 'sha256:callers',
-      workspace: 'code-graph',
-    })
-    const dependencyFile = createFileNode({
-      path: 'code-graph:src/dependencies.ts',
-      configRelativePath: 'src/dependencies.ts',
-      language: 'typescript',
-      contentHash: 'sha256:dependencies',
-      workspace: 'code-graph',
-    })
-    const inputSymbols = inputFiles.flatMap((inputFile, fileIndex) =>
-      Array.from({ length: 12 }, (_, symbolIndex) =>
-        createSymbolNode({
-          name: `input${String(fileIndex)}Symbol${String(symbolIndex)}`,
-          kind: SymbolKind.Function,
-          filePath: inputFile.path,
-          line: symbolIndex + 1,
-          column: 0,
-        }),
-      ),
-    )
-    const callers = Array.from({ length: 48 }, (_, index) =>
-      createSymbolNode({
-        name: `caller${String(index)}`,
-        kind: SymbolKind.Function,
-        filePath: callerFile.path,
-        line: index + 1,
-        column: 0,
-      }),
-    )
-    const dependencies = Array.from({ length: 48 }, (_, index) =>
-      createSymbolNode({
-        name: `dependency${String(index)}`,
-        kind: SymbolKind.Function,
-        filePath: dependencyFile.path,
-        line: index + 1,
-        column: 0,
-      }),
-    )
-    const callRelations = inputSymbols.flatMap((inputSymbol, index) => [
-      createRelation({
-        source: callers[index % callers.length]!.id,
-        target: inputSymbol.id,
-        type: index % 3 === 0 ? RelationType.UsesType : RelationType.Calls,
-      }),
-      createRelation({
-        source: inputSymbol.id,
-        target: dependencies[index % dependencies.length]!.id,
-        type: index % 3 === 0 ? RelationType.Constructs : RelationType.Calls,
-      }),
-    ])
-    const coverageSpec = createSpecNode({
-      specId: 'code-graph:wide-traversal',
-      path: 'code-graph/wide-traversal',
-      title: 'Wide traversal',
-      contentHash: 'sha256:wide-traversal',
-      workspace: 'code-graph',
-    })
-    const data = {
-      files: [...inputFiles, callerFile, dependencyFile],
-      symbols: [...inputSymbols, ...callers, ...dependencies],
-      specs: [coverageSpec],
-      relations: [
-        ...callRelations,
-        createRelation({
-          source: coverageSpec.specId,
-          target: callerFile.path,
-          type: RelationType.CoversFile,
-        }),
-        createRelation({
-          source: coverageSpec.specId,
-          target: dependencies[0]!.id,
-          type: RelationType.CoversSymbol,
-        }),
-      ],
-    }
-    await Promise.all([sqlite.bulkLoad(data), memory.bulkLoad(data)])
-    const filePaths = inputFiles.map((inputFile) => inputFile.path)
 
     try {
+      await Promise.all([sqlite.open(), memory.open()])
+
+      const inputFiles = Array.from({ length: 6 }, (_, fileIndex) =>
+        createFileNode({
+          path: `code-graph:src/input-${String(fileIndex)}.ts`,
+          configRelativePath: `src/input-${String(fileIndex)}.ts`,
+          language: 'typescript',
+          contentHash: `sha256:input-${String(fileIndex)}`,
+          workspace: 'code-graph',
+        }),
+      )
+      const callerFile = createFileNode({
+        path: 'code-graph:src/callers.ts',
+        configRelativePath: 'src/callers.ts',
+        language: 'typescript',
+        contentHash: 'sha256:callers',
+        workspace: 'code-graph',
+      })
+      const dependencyFile = createFileNode({
+        path: 'code-graph:src/dependencies.ts',
+        configRelativePath: 'src/dependencies.ts',
+        language: 'typescript',
+        contentHash: 'sha256:dependencies',
+        workspace: 'code-graph',
+      })
+      const inputSymbols = inputFiles.flatMap((inputFile, fileIndex) =>
+        Array.from({ length: 12 }, (_, symbolIndex) =>
+          createSymbolNode({
+            name: `input${String(fileIndex)}Symbol${String(symbolIndex)}`,
+            kind: SymbolKind.Function,
+            filePath: inputFile.path,
+            line: symbolIndex + 1,
+            column: 0,
+          }),
+        ),
+      )
+      const callers = Array.from({ length: 48 }, (_, index) =>
+        createSymbolNode({
+          name: `caller${String(index)}`,
+          kind: SymbolKind.Function,
+          filePath: callerFile.path,
+          line: index + 1,
+          column: 0,
+        }),
+      )
+      const dependencies = Array.from({ length: 48 }, (_, index) =>
+        createSymbolNode({
+          name: `dependency${String(index)}`,
+          kind: SymbolKind.Function,
+          filePath: dependencyFile.path,
+          line: index + 1,
+          column: 0,
+        }),
+      )
+      const callRelations = inputSymbols.flatMap((inputSymbol, index) => [
+        createRelation({
+          source: callers[index % callers.length]!.id,
+          target: inputSymbol.id,
+          type: index % 3 === 0 ? RelationType.UsesType : RelationType.Calls,
+        }),
+        createRelation({
+          source: inputSymbol.id,
+          target: dependencies[index % dependencies.length]!.id,
+          type: index % 3 === 0 ? RelationType.Constructs : RelationType.Calls,
+        }),
+      ])
+      const coverageSpec = createSpecNode({
+        specId: 'code-graph:wide-traversal',
+        path: 'code-graph/wide-traversal',
+        title: 'Wide traversal',
+        contentHash: 'sha256:wide-traversal',
+        workspace: 'code-graph',
+      })
+      const data = {
+        files: [...inputFiles, callerFile, dependencyFile],
+        symbols: [...inputSymbols, ...callers, ...dependencies],
+        specs: [coverageSpec],
+        relations: [
+          ...callRelations,
+          createRelation({
+            source: coverageSpec.specId,
+            target: callerFile.path,
+            type: RelationType.CoversFile,
+          }),
+          createRelation({
+            source: coverageSpec.specId,
+            target: dependencies[0]!.id,
+            type: RelationType.CoversSymbol,
+          }),
+        ],
+      }
+      await Promise.all([sqlite.bulkLoad(data), memory.bulkLoad(data)])
+      const filePaths = inputFiles.map((inputFile) => inputFile.path)
+
       const [sqliteUpstream, memoryUpstream] = await Promise.all([
         analyzeFilesImpact(sqlite, filePaths, 'upstream', 2),
         analyzeFilesImpact(memory, filePaths, 'upstream', 2),
@@ -145,69 +146,70 @@ describe('SQLite wide traversal', () => {
     storagePath = mkdtempSync(join(tmpdir(), 'code-graph-wide-hotspots-'))
     const sqlite = new SQLiteGraphStore(storagePath, { maxPendingOperations: 16 })
     const memory = new InMemoryGraphStore()
-    await Promise.all([sqlite.open(), memory.open()])
-
-    const baseFile = createFileNode({
-      path: 'code-graph:src/base.ts',
-      configRelativePath: 'src/base.ts',
-      language: 'typescript',
-      contentHash: 'sha256:base',
-      workspace: 'code-graph',
-    })
-    const hierarchyFile = createFileNode({
-      path: 'code-graph:src/hierarchy.ts',
-      configRelativePath: 'src/hierarchy.ts',
-      language: 'typescript',
-      contentHash: 'sha256:hierarchy',
-      workspace: 'code-graph',
-    })
-    const baseClass = createSymbolNode({
-      name: 'Base',
-      kind: SymbolKind.Class,
-      filePath: baseFile.path,
-      line: 1,
-      column: 0,
-    })
-    const contract = createSymbolNode({
-      name: 'Contract',
-      kind: SymbolKind.Interface,
-      filePath: baseFile.path,
-      line: 4,
-      column: 0,
-    })
-    const descendants = Array.from({ length: 600 }, (_, index) =>
-      createSymbolNode({
-        name: `Descendant${String(index)}`,
-        kind: SymbolKind.Class,
-        filePath: hierarchyFile.path,
-        line: index + 1,
-        column: 0,
-      }),
-    )
-    const data = {
-      files: [baseFile, hierarchyFile],
-      symbols: [baseClass, contract, ...descendants],
-      specs: [],
-      relations: descendants.flatMap((descendant, index) => [
-        createRelation({
-          source: descendant.id,
-          target: baseClass.id,
-          type: RelationType.Extends,
-        }),
-        ...(index % 2 === 0
-          ? [
-              createRelation({
-                source: descendant.id,
-                target: contract.id,
-                type: RelationType.Implements,
-              }),
-            ]
-          : []),
-      ]),
-    }
-    await Promise.all([sqlite.bulkLoad(data), memory.bulkLoad(data)])
 
     try {
+      await Promise.all([sqlite.open(), memory.open()])
+
+      const baseFile = createFileNode({
+        path: 'code-graph:src/base.ts',
+        configRelativePath: 'src/base.ts',
+        language: 'typescript',
+        contentHash: 'sha256:base',
+        workspace: 'code-graph',
+      })
+      const hierarchyFile = createFileNode({
+        path: 'code-graph:src/hierarchy.ts',
+        configRelativePath: 'src/hierarchy.ts',
+        language: 'typescript',
+        contentHash: 'sha256:hierarchy',
+        workspace: 'code-graph',
+      })
+      const baseClass = createSymbolNode({
+        name: 'Base',
+        kind: SymbolKind.Class,
+        filePath: baseFile.path,
+        line: 1,
+        column: 0,
+      })
+      const contract = createSymbolNode({
+        name: 'Contract',
+        kind: SymbolKind.Interface,
+        filePath: baseFile.path,
+        line: 4,
+        column: 0,
+      })
+      const descendants = Array.from({ length: 600 }, (_, index) =>
+        createSymbolNode({
+          name: `Descendant${String(index)}`,
+          kind: SymbolKind.Class,
+          filePath: hierarchyFile.path,
+          line: index + 1,
+          column: 0,
+        }),
+      )
+      const data = {
+        files: [baseFile, hierarchyFile],
+        symbols: [baseClass, contract, ...descendants],
+        specs: [],
+        relations: descendants.flatMap((descendant, index) => [
+          createRelation({
+            source: descendant.id,
+            target: baseClass.id,
+            type: RelationType.Extends,
+          }),
+          ...(index % 2 === 0
+            ? [
+                createRelation({
+                  source: descendant.id,
+                  target: contract.id,
+                  type: RelationType.Implements,
+                }),
+              ]
+            : []),
+        ]),
+      }
+      await Promise.all([sqlite.bulkLoad(data), memory.bulkLoad(data)])
+
       const [sqliteHotspots, memoryHotspots] = await Promise.all([
         computeHotspots(sqlite, {
           minRisk: 'LOW',
@@ -232,55 +234,56 @@ describe('SQLite wide traversal', () => {
     storagePath = mkdtempSync(join(tmpdir(), 'code-graph-wide-single-impact-'))
     const sqlite = new SQLiteGraphStore(storagePath, { maxPendingOperations: 16 })
     const memory = new InMemoryGraphStore()
-    await Promise.all([sqlite.open(), memory.open()])
-
-    const targetFile = createFileNode({
-      path: 'code-graph:src/target.ts',
-      configRelativePath: 'src/target.ts',
-      language: 'typescript',
-      contentHash: 'sha256:target',
-      workspace: 'code-graph',
-    })
-    const callerFile = createFileNode({
-      path: 'code-graph:src/callers.ts',
-      configRelativePath: 'src/callers.ts',
-      language: 'typescript',
-      contentHash: 'sha256:callers',
-      workspace: 'code-graph',
-    })
-    const targets = Array.from({ length: 40 }, (_, index) =>
-      createSymbolNode({
-        name: `target${String(index)}`,
-        kind: SymbolKind.Function,
-        filePath: targetFile.path,
-        line: index + 1,
-        column: 0,
-      }),
-    )
-    const callers = Array.from({ length: 120 }, (_, index) =>
-      createSymbolNode({
-        name: `caller${String(index)}`,
-        kind: SymbolKind.Function,
-        filePath: callerFile.path,
-        line: index + 1,
-        column: 0,
-      }),
-    )
-    const data = {
-      files: [targetFile, callerFile],
-      symbols: [...targets, ...callers],
-      specs: [],
-      relations: callers.map((caller, index) =>
-        createRelation({
-          source: caller.id,
-          target: targets[index % targets.length]!.id,
-          type: RelationType.Calls,
-        }),
-      ),
-    }
-    await Promise.all([sqlite.bulkLoad(data), memory.bulkLoad(data)])
 
     try {
+      await Promise.all([sqlite.open(), memory.open()])
+
+      const targetFile = createFileNode({
+        path: 'code-graph:src/target.ts',
+        configRelativePath: 'src/target.ts',
+        language: 'typescript',
+        contentHash: 'sha256:target',
+        workspace: 'code-graph',
+      })
+      const callerFile = createFileNode({
+        path: 'code-graph:src/callers.ts',
+        configRelativePath: 'src/callers.ts',
+        language: 'typescript',
+        contentHash: 'sha256:callers',
+        workspace: 'code-graph',
+      })
+      const targets = Array.from({ length: 40 }, (_, index) =>
+        createSymbolNode({
+          name: `target${String(index)}`,
+          kind: SymbolKind.Function,
+          filePath: targetFile.path,
+          line: index + 1,
+          column: 0,
+        }),
+      )
+      const callers = Array.from({ length: 120 }, (_, index) =>
+        createSymbolNode({
+          name: `caller${String(index)}`,
+          kind: SymbolKind.Function,
+          filePath: callerFile.path,
+          line: index + 1,
+          column: 0,
+        }),
+      )
+      const data = {
+        files: [targetFile, callerFile],
+        symbols: [...targets, ...callers],
+        specs: [],
+        relations: callers.map((caller, index) =>
+          createRelation({
+            source: caller.id,
+            target: targets[index % targets.length]!.id,
+            type: RelationType.Calls,
+          }),
+        ),
+      }
+      await Promise.all([sqlite.bulkLoad(data), memory.bulkLoad(data)])
+
       const [sqliteImpact, memoryImpact] = await Promise.all([
         analyzeFileImpact(sqlite, targetFile.path, 'upstream', 3),
         analyzeFileImpact(memory, targetFile.path, 'upstream', 3),

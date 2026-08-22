@@ -68,28 +68,29 @@ describe('SQLiteWorker responsiveness', () => {
         ticks++
       }, intervalMs)
 
-      const session = store.beginBulkIndexSession({
-        rebuildSearchIndexes: true,
-      })
-      const chunkSize = 250
-      for (let i = 0; i < fileCount; i += chunkSize) {
-        await session.writeFiles(files.slice(i, i + chunkSize))
-        await session.writeSymbols(symbols.slice(i, i + chunkSize))
+      try {
+        const session = store.beginBulkIndexSession({
+          rebuildSearchIndexes: true,
+        })
+        const chunkSize = 250
+        for (let i = 0; i < fileCount; i += chunkSize) {
+          await session.writeFiles(files.slice(i, i + chunkSize))
+          await session.writeSymbols(symbols.slice(i, i + chunkSize))
+        }
+        await session.commit()
+
+        // The heartbeat must have fired at least once during persistence, and
+        // maximum event-loop lag should remain bounded below a generous CI threshold
+        expect(ticks).toBeGreaterThan(0)
+        expect(maxLag).toBeLessThan(200)
+
+        const stats = await store.getStatistics()
+        expect(stats.fileCount).toBe(fileCount)
+        expect(stats.symbolCount).toBe(fileCount)
+      } finally {
+        clearInterval(timer)
+        await store.close()
       }
-      await session.commit()
-
-      clearInterval(timer)
-
-      // The heartbeat must have fired at least once during persistence, and
-      // maximum event-loop lag should remain bounded below a generous CI threshold
-      expect(ticks).toBeGreaterThan(0)
-      expect(maxLag).toBeLessThan(200)
-
-      const stats = await store.getStatistics()
-      expect(stats.fileCount).toBe(fileCount)
-      expect(stats.symbolCount).toBe(fileCount)
-
-      await store.close()
     },
   )
 })
