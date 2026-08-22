@@ -1,8 +1,14 @@
 import { type GraphStore } from '../ports/graph-store.js'
 import { type AffectedSymbol, type FileImpactResult } from '../value-objects/impact-result.js'
 import { maxRisk, type RiskLevel } from '../value-objects/risk-level.js'
-import { analyzeFileImpactDetails, collectCoveringSpecs } from './analyze-file-impact.js'
+import {
+  analyzeFileImpactDetails,
+  collectCoveringSpecs,
+  createMemoizedReadStore,
+  IMPACT_CONCURRENCY,
+} from './analyze-file-impact.js'
 import { type ImpactResolutionProvider } from './analyze-impact.js'
+import { mapWithConcurrency } from './map-with-concurrency.js'
 
 /**
  * Analyzes the combined impact of multiple files.
@@ -25,8 +31,11 @@ export async function analyzeFilesImpact(
   maxDepth = 3,
   resolve?: ImpactResolutionProvider,
 ): Promise<FileImpactResult> {
-  const details = await Promise.all(
-    filePaths.map((fp) => analyzeFileImpactDetails(store, fp, direction, maxDepth, resolve)),
+  const sharedStore = createMemoizedReadStore(store)
+  const context = { store: sharedStore, concurrency: IMPACT_CONCURRENCY } as const
+  const uniqueFilePaths = [...new Set(filePaths)]
+  const details = await mapWithConcurrency(uniqueFilePaths, context.concurrency, (filePath) =>
+    analyzeFileImpactDetails(store, filePath, direction, maxDepth, resolve, context),
   )
   const results = details.map((detail) => detail.result)
 

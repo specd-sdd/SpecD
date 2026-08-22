@@ -33,20 +33,45 @@
 
 - **WHEN** `createCodeGraphProvider(config)` is called with a `SpecdConfig`
 - **THEN** the graph storage root is derived from `config.configPath`
-- **AND** the returned provider can be opened, used for indexing and queries, and closed without error
+- **AND** the returned SQLite-backed provider can be opened, used for indexing and queries, and closed without error
 
-#### Scenario: Factory resolves storage root from SpecdConfig.configPath
+#### Scenario: SQLite is the only built-in registration
 
-- **GIVEN** a valid `SpecdConfig` with `configPath` set
-- **WHEN** `createCodeGraphProvider(config)` is called
-- **THEN** the provider storage root is derived from `config.configPath`
-- **AND** the provider can be opened, used for indexing and queries, and closed without error
+- **WHEN** provider composition is created without `graphStoreId` or external factories
+- **THEN** the `sqlite` factory is selected
+- **AND** no `ladybug` factory is present in the built-in registry
+
+#### Scenario: External graph-store factory remains selectable
+
+- **GIVEN** `graphStoreFactories` contains a factory registered as `external-test`
+- **WHEN** `createCodeGraphProvider` is called with `graphStoreId: 'external-test'`
+- **THEN** that factory receives the derived storage root and creates the active store
+- **AND** the SQLite factory is not instantiated
+
+#### Scenario: Duplicate graph-store id is rejected
+
+- **GIVEN** an external factory uses the built-in id `sqlite`
+- **WHEN** provider composition builds the merged registry
+- **THEN** it throws the graph-store registry collision error
+- **AND** the built-in SQLite factory is not silently replaced
+
+#### Scenario: Unknown graph-store id is rejected
+
+- **WHEN** `graphStoreId` names neither `sqlite` nor an externally registered factory
+- **THEN** provider composition throws the graph-store registry unknown-backend error
 
 #### Scenario: Provider construction is factory-only
 
 - **WHEN** a consumer imports from `@specd/code-graph`
 - **THEN** `CodeGraphProvider` is available only as a type
 - **AND** constructing a provider directly is rejected at compile time
+
+#### Scenario: Custom SQLite runtime descriptor is accepted by factory
+
+- **GIVEN** a custom `SqliteRuntimeDescriptor` specifying `modulePath`
+- **WHEN** `createCodeGraphProvider` or `createSqliteGraphStoreFactory` is configured with that descriptor
+- **THEN** the factory creates the provider synchronously without error
+- **AND** the descriptor is passed to the underlying SQLite worker during `open()`
 
 ### Requirement: Package exports
 
@@ -63,7 +88,7 @@
 #### Scenario: Graph-store composition types are exported
 
 - **WHEN** a consumer wants to register or select a backend explicitly
-- **THEN** `GraphStoreFactory`, `CodeGraphOptions`, and `CodeGraphCompositionOptions` are available as imports
+- **THEN** `GraphStoreFactory`, `CodeGraphOptions`, `CodeGraphCompositionOptions`, `SqliteRuntimeDescriptor`, `SQLiteGraphStoreOptions`, and `createSqliteGraphStoreFactory` are available as imports
 
 #### Scenario: Model types are exported
 
@@ -80,6 +105,14 @@
 - **WHEN** a consumer imports from `@specd/code-graph`
 - **THEN** `SpecNotFoundError` is available as an import
 - **AND** thrown instances expose machine-readable code `SPEC_NOT_FOUND` and the requested spec id
+
+#### Scenario: Concrete store adapters are available only from the internal entry
+
+- **GIVEN** a consumer importing from `@specd/code-graph/internal`
+- **WHEN** the internal entry is queried for concrete store adapter symbols
+- **THEN** `SQLiteGraphStore`, `AdapterRegistry`, and the built-in language adapters are importable
+- **AND** none of those symbols are importable from `@specd/code-graph` (`"."`)
+- **AND** `LadybugGraphStore` is not importable from either entrypoint
 
 ### Requirement: Public and internal entry points
 
@@ -113,6 +146,7 @@
 - **GIVEN** an opened `CodeGraphProvider`
 - **WHEN** `close()` is called twice
 - **THEN** the second call completes without error
+- **AND** underlying worker threads and connections are terminated cleanly
 
 ### Requirement: Dependency on @specd/core
 
@@ -150,6 +184,26 @@
 - **WHEN** a host requests one binding by surface, exported name, space, and target identity
 - **THEN** the provider returns that exact binding and its declarations
 - **AND** no ranked or paginated symbol search is used
+
+#### Scenario: Concrete resolver implementation stays internal
+
+- **WHEN** a consumer imports from `@specd/code-graph`
+- **THEN** the concrete `ResolveSymbolReference` implementation is not available as an import from `"."`
+- **AND** resolver input/result/status/reason/provenance types and factories remain available from `"."`
+
+#### Scenario: Empty selector input rejects with a typed error
+
+- **GIVEN** an opened provider
+- **WHEN** a host resolves an empty file selector or an empty symbol selector
+- **THEN** the rejection is a typed graph error with code `INVALID_GRAPH_SELECTOR`
+- **AND** the descriptive message is preserved instead of a generic `Error`
+
+#### Scenario: Ambiguity presentation enriches candidates through one batch lookup
+
+- **GIVEN** a symbol selector resolves to several bounded ambiguity candidates
+- **WHEN** presentation loads symbol details for those candidates
+- **THEN** exactly one exact batch symbol lookup serves all candidates
+- **AND** candidate order, missing-symbol handling, and deterministic output are preserved
 
 ### Requirement: Code Graph-orchestrated search surface
 

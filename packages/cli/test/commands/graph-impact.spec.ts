@@ -34,7 +34,21 @@ import { type ImpactResult } from '@specd/sdk'
 import { registerGraphImpact } from '../../src/commands/graph/impact.js'
 
 function setup() {
-  const config = makeMockConfig()
+  const config = makeMockConfig({
+    workspaces: [
+      ...makeMockConfig().workspaces,
+      {
+        name: 'core',
+        specsPath: '/project/core/specs',
+        specsAdapter: { adapter: 'fs', config: { path: '/project/core/specs' } },
+        schemasPath: null,
+        schemasAdapter: null,
+        codeRoot: '/project/packages/core',
+        ownership: 'owned' as const,
+        isExternal: false,
+      },
+    ],
+  })
   vi.mocked(resolveGraphCliContext).mockResolvedValue({
     mode: 'configured',
     config,
@@ -107,6 +121,7 @@ function setup() {
       line: 10,
       column: 0,
     })),
+    getSymbolsByIds: vi.fn().mockResolvedValue([]),
     getFile: vi.fn().mockImplementation(async (path: string) => ({
       path,
       configRelativePath:
@@ -156,7 +171,10 @@ function makeImpactProgram() {
   return program
 }
 
-afterEach(() => vi.restoreAllMocks())
+afterEach(() => {
+  vi.clearAllMocks()
+  vi.restoreAllMocks()
+})
 
 describe('graph impact', () => {
   describe('--direction option', () => {
@@ -506,10 +524,35 @@ describe('graph impact', () => {
 
       const program = makeImpactProgram()
       await program.parseAsync(['node', 'specd', 'graph', 'impact', '--file', 'src/auth.ts'])
-
       const out = getStdout()
       expect(out).toContain('Impact analysis for packages/core/src/auth.ts')
       expect(out).not.toContain('depth=')
+    })
+
+    it('performs zero graph reads for display-path projection', async () => {
+      const { mockProvider, getStdout } = setup()
+      mockProvider.analyzeFileImpact.mockResolvedValue({
+        target: 'core:src/auth.ts',
+        directDependents: 1,
+        indirectDependents: 0,
+        transitiveDependents: 0,
+        riskLevel: 'LOW',
+        affectedFiles: ['core:src/login.ts'],
+        affectedSymbols: [
+          { id: 'sym1', name: 'handleLogin', filePath: 'core:src/login.ts', line: 12, depth: 1 },
+        ],
+        affectedProcesses: [],
+        symbols: [],
+      })
+
+      const program = makeImpactProgram()
+      await program.parseAsync(['node', 'specd', 'graph', 'impact', '--file', 'src/auth.ts'])
+
+      const out = getStdout()
+      expect(out).toContain('Impact analysis for packages/core/src/auth.ts')
+      expect(out).toContain('packages/core/src/login.ts')
+      expect(mockProvider.getFile).not.toHaveBeenCalled()
+      expect(mockProvider.getDocument).not.toHaveBeenCalled()
     })
   })
 
@@ -724,10 +767,10 @@ describe('graph impact', () => {
     it('outputs impact for a single matching symbol', async () => {
       const { mockProvider, getStdout } = setup()
       const sym = {
-        id: 'src/auth.ts:function:validate:10:0',
+        id: 'core:src/auth.ts:function:validate:10:0',
         name: 'validate',
         kind: 'function',
-        filePath: 'src/auth.ts',
+        filePath: 'core:src/auth.ts',
         line: 10,
         column: 0,
       }
@@ -745,7 +788,7 @@ describe('graph impact', () => {
         indirectDependents: 1,
         transitiveDependents: 0,
         riskLevel: 'MEDIUM',
-        affectedFiles: ['src/login.ts'],
+        affectedFiles: ['core:src/login.ts'],
         affectedSymbols: [],
         affectedProcesses: [],
       })
@@ -800,6 +843,7 @@ describe('graph impact', () => {
         })),
         totalCandidates: symbols.length,
       })
+      mockProvider.getSymbolsByIds.mockResolvedValue(symbols)
       mockProvider.analyzeImpact.mockResolvedValue({
         target: 'sym',
         directDependents: 0,
@@ -822,6 +866,9 @@ describe('graph impact', () => {
 
       const out = getStdout()
       expect(out).toContain('3 symbols exactly match "parse"')
+      expect(mockProvider.getSymbolsByIds).toHaveBeenCalledTimes(1)
+      expect(mockProvider.getSymbolsByIds).toHaveBeenCalledWith(symbols.map((s) => s.id))
+      expect(mockProvider.getSymbol).not.toHaveBeenCalled()
       expect(mockProvider.analyzeImpact).not.toHaveBeenCalled()
     })
 
@@ -1047,7 +1094,7 @@ describe('graph impact', () => {
             indirectDependents: 0,
             transitiveDependents: 0,
             riskLevel: 'LOW',
-            affectedFiles: ['src/x.ts'],
+            affectedFiles: ['core:src/x.ts'],
             affectedSymbols: [],
             affectedProcesses: [],
             symbols: [],

@@ -19,5 +19,41 @@
       "file": "core:src/application/use-cases/run-step-hooks.ts",
       "symbols": ["RunStepHooks"]
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Resolves and executes workflow step hooks with streaming progress, external dispatch, filtering, and phase-specific failure semantics.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:ceeb6daa92fdd385eea0f202eeb1a6e7e99c8a576dcc76c8aa88de52623e2418",
+          "lastModified": "2026-07-22T16:55:46.023Z"
+        },
+        "verify.md": {
+          "hash": "sha256:7d39615c83693b9b82391183d1d270eae98bf1075be1ed24ef25c556e23faf50",
+          "lastModified": "2026-07-22T16:55:46.023Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# RunStepHooks\n## Rules\n- Constructor injects `ChangeRepository`, `ArchiveRepository`, `HookRunner`, `ReadonlyMap<string, ExternalHookRunner>`, `SchemaProvider`; config factory uses `resolveRunStepHooksDeps(resolver)` then canonical `createRunStepHooks(deps)`.\n- `execute` input: required `name`, `step`, `phase: 'pre' | 'post'`; optional `only`. Optional second argument: `onProgress?: OnHookProgress`.\n- Lookup active change first. Only `step === 'archiving'` plus `phase === 'post'` may fall back to `ArchiveRepository.get(name)`; archived path uses `ArchiveRepository.archivePath()`. Otherwise missing change throws `ChangeNotFoundError`.\n- Before hook resolution require `schema.name() === change.schemaName`, else throw `SchemaMismatchError`.\n- Require `step` valid `ChangeState`, including `archiving`; invalid throws `StepNotValidError`. Missing `schema.workflowStep(step)` returns `{ hooks: [], success: true, failedHooks: [] }`.\n- Collect phase hooks in declaration order. Execute shell `run:` and explicit external entries; skip `instruction:`. Resolved schema already merges base, plugin, and override hooks.\n- External entry dispatches `external.type`/`external.config` to registered runner accepting type; absent runner fails clearly.\n- `only` selects matching executable hook ID. No ID throws `HookNotFoundError` reason `not-found`; matching `instruction:` throws reason `wrong-type`.\n- Build contextual `TemplateVariables` internally: `change.name`, absolute `change.path`, and archived fallback basename `change.archivedName`. Never define `change.workspace`. `TemplateExpander` owns built-ins such as `project.root`; `HookRunner` calls `expandForShell()`.\n- Shell hooks relay runner progress immediately and in hook order: `hook-start` with ID/command; `hook-output` with ID, `stdout`|`stderr`, line; `hook-heartbeat` with ID/elapsedMs; `hook-done` with ID/success/exitCode.\n- `pre`: sequential fail-fast; stop at first nonzero exit, and `failedHooks` contains aborting result only.\n- `post`: sequential fail-soft; execute all; `failedHooks` contains every failure in order.\n- Return complete final result despite progress streaming: `hooks` results with `id`, expanded `command`, `exitCode`, captured `stdout`, `stderr`, `success`; aggregate `success`; ordered `failedHooks`.\n- Supports independent invocation for any valid state, including pre-archive checks and post-archive retry.\n## Constraints\n- Never transition `Change`; execute hooks only.\n- Never execute `instruction:` hooks.\n- Schema-level hooks precede project-level hooks within phase.\n- `pre` fail-fast and `post` fail-soft are fixed.\n- Contextual variables come from resolved change, never caller.\n- Does not validate current step availability; caller owns timing.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:ceeb6daa92fdd385eea0f202eeb1a6e7e99c8a576dcc76c8aa88de52623e2418",
+          "lastModified": "2026-07-22T16:55:46.023Z"
+        },
+        "verify.md": {
+          "hash": "sha256:7d39615c83693b9b82391183d1d270eae98bf1075be1ed24ef25c556e23faf50",
+          "lastModified": "2026-07-22T16:55:46.023Z"
+        }
+      }
+    }
+  }
 }

@@ -10,14 +10,12 @@
     "core:list-workspaces",
     "code-graph:get-graph-health",
     "sdk:with-open-graph-provider",
-    "sdk:host-context"
+    "cli:graph-cli-context"
   ],
   "implementation": [
     {
-      "file": "cli:src/commands/graph/stats.ts"
-    },
-    {
-      "file": "cli:src/commands/graph/warn-graph-staleness.ts"
+      "file": "cli:src/commands/graph/stats.ts",
+      "symbols": ["registerGraphStats"]
     },
     {
       "file": "cli:test/commands/graph-stats.spec.ts"
@@ -25,36 +23,36 @@
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "Display SDK-computed graph counts, content freshness, derivation compatibility, and coverage diagnostics in text or structured form.",
+      "value": "Report SDK graph health and coverage diagnostics with config/bootstrap semantics, structured output, and provider-owned errors.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:4287ebd884ccb6dc87f2d6e92c371b4bff5a087583a627967973b5d57e97622d",
-          "lastModified": "2026-08-16T08:12:48.646Z"
+          "hash": "sha256:28af8f3853853ee75c10a88bd5e59b52296fe98c4fa43856119e000a7fe46587",
+          "lastModified": "2026-08-20T12:20:57.712Z"
         },
         "verify.md": {
-          "hash": "sha256:8902b180a1789a56033fb9dd34d4ab22b22a2a41e9fc13c10c3bd5360119a159",
-          "lastModified": "2026-08-16T08:12:48.649Z"
+          "hash": "sha256:9fa38fe99bda0d65392b5f6a3ed288ddcbbdbe8d51edeaba431ec481a3cba1cc",
+          "lastModified": "2026-08-20T12:20:57.712Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# Graph Stats\n\n## Rules\n\n- Signature: `specd graph stats [--config <path> | --path <path>] [--format text|json|toon]`; `--config` and `--path` mutually exclusive.\n- Obtain host via `openSpecdHost` from `@specd/sdk`; explicit config uses its path; `--path`/fallback use `allowBootstrapFallback: true`.\n- Open via `withOpenGraphProvider`; call provider `getGraphHealth` once. No CLI pre-open lock probe.\n- Output format: text shows labeled counts (`Files`, `Documents`, `Symbols`, `Specs`, `Languages`, `Relations`, `Last indexed`) and canonical health diagnostics (aggregate state, global stale latch, content freshness, coverage completeness, schema/generation compatibility, stable reason codes). Explains why graph cannot prove symbol absence.\n- Dirty, partial, unknown, or incompatible health MUST NOT be reduced to an unqualified fresh/current message.\n- JSON/TOON emit complete `getGraphHealth` result without presenter-side recomputation. Legacy fields (`stale`, `currentRef`, `fingerprintMismatch`) preserved for compatibility.\n- Infrastructure error (`GRAPH_BUSY`, `GRAPH_PROVIDER_STALE`, open failure) exits 3.\n\n## Constraints\n\n- CLI does not manage provider lifecycle or health computation inline.\n- Zero-value relation counts omitted only from text.\n- Call `process.exit(0)` after SDK closes provider.",
+      "value": "# Graph Stats\n## Rules\n- `specd graph stats [--config <path> | --path <path>] [--format text|json|toon]`; options exclusive; default format `text`.\n- `--config`: valid outside VCS; unavailable VCS health remains provider data. `--path` / no-config fallback: bootstrap only, require VCS.\n- Use `openSpecdHost` resolved config + kernel workspace definitions; `withOpenGraphProvider`; call `getGraphHealth` exactly once. Never independently discover workspaces/recompute/merge health, or pre-open lock probe.\n- Text: labeled counts + aggregate/global stale/content freshness/coverage/schema-generation/non-current-workspace/stable reason-code diagnostics; dirty/partial/unknown/incompatible never unqualified fresh/current; explain inability to prove symbol absence.\n- JSON/TOON: full unchanged `getGraphHealth`; legacy `stale`, `currentRef`, `fingerprintMismatch` may remain.\n- `GRAPH_BUSY`, `GRAPH_PROVIDER_STALE`, provider/open/retrieval infrastructure failures: exit 3.\n## Constraints\n- SDK owns provider lifecycle/health orchestration; explicit `process.exit(0)` after wrapper close.\n- Text omits zero relation counts; no CLI pre-open lock probe.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:4287ebd884ccb6dc87f2d6e92c371b4bff5a087583a627967973b5d57e97622d",
-          "lastModified": "2026-08-16T08:12:48.646Z"
+          "hash": "sha256:28af8f3853853ee75c10a88bd5e59b52296fe98c4fa43856119e000a7fe46587",
+          "lastModified": "2026-08-20T12:20:57.712Z"
         },
         "verify.md": {
-          "hash": "sha256:8902b180a1789a56033fb9dd34d4ab22b22a2a41e9fc13c10c3bd5360119a159",
-          "lastModified": "2026-08-16T08:12:48.649Z"
+          "hash": "sha256:9fa38fe99bda0d65392b5f6a3ed288ddcbbdbe8d51edeaba431ec481a3cba1cc",
+          "lastModified": "2026-08-20T12:20:57.712Z"
         }
       }
     }

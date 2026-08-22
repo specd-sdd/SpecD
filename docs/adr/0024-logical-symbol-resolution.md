@@ -115,7 +115,7 @@ the public or lexical route by which a target is reached.
   incompatible, indexing recreates the derived store, rotates its generation, and
   re-extracts source facts. User-authored manifests and implementation links are not
   rewritten.
-- SQLite and Ladybug query structured semantic columns/properties and rebuild their
+- SQLite queries structured semantic columns and rebuilds its
   versioned semantic indexes; canonical ids are external identities, not strings to
   parse for ranking.
 
@@ -203,6 +203,14 @@ This decision is confirmed when:
   unbounded query counts and repeated search-index maintenance during reindexing.
 
 ## More Information
+
+## Amendment — Ladybug ownership transfer (2026-08-20)
+
+Ladybug-specific graph-store implementation, native integration, tests, and
+normative requirements moved to the source-preservation repository
+`specd-plugin-graphstore-ladybug`. SQLite is the sole integrated backend in
+SpecD. The external repository is not a runtime plugin: stable plugin loading
+and a public `GraphStore` contract remain deferred to a dedicated change.
 
 ### Spec
 

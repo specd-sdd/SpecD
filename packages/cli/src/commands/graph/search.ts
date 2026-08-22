@@ -206,214 +206,221 @@ Exclude examples:
             1,
           ),
         )
-        await withProvider(config, opts.format, async (provider) => {
-          await warnGraphStale(provider, config, kernel)
-          const categories: SearchCategory[] = searchAll
-            ? ['symbols', 'files', 'specs', 'documents']
-            : [
-                ...(opts.symbols ? (['symbols'] as const) : []),
-                ...(opts.files ? (['files'] as const) : []),
-                ...(opts.specs ? (['specs'] as const) : []),
-                ...(opts.documents ? (['documents'] as const) : []),
-              ]
-          const searchInput: SearchCodeGraphInput = {
-            query,
-            categories,
-            limit,
-            includeSnippet: opts.snippet === true,
-            ...(kinds !== undefined ? { kinds } : undefined),
-            ...(opts.file ? { filePattern: opts.file } : undefined),
-            ...(opts.workspace ? { workspace: opts.workspace } : undefined),
-            ...(opts.excludePath.length > 0 ? { excludePaths: opts.excludePath } : undefined),
-            ...(opts.excludeWorkspace.length > 0
-              ? { excludeWorkspaces: opts.excludeWorkspace }
-              : undefined),
-          }
+        await withProvider(
+          config,
+          opts.format,
+          async (provider) => {
+            await warnGraphStale(provider, config, kernel)
+            const categories: SearchCategory[] = searchAll
+              ? ['symbols', 'files', 'specs', 'documents']
+              : [
+                  ...(opts.symbols ? (['symbols'] as const) : []),
+                  ...(opts.files ? (['files'] as const) : []),
+                  ...(opts.specs ? (['specs'] as const) : []),
+                  ...(opts.documents ? (['documents'] as const) : []),
+                ]
+            const searchInput: SearchCodeGraphInput = {
+              query,
+              categories,
+              limit,
+              includeSnippet: opts.snippet === true,
+              ...(kinds !== undefined ? { kinds } : undefined),
+              ...(opts.file ? { filePattern: opts.file } : undefined),
+              ...(opts.workspace ? { workspace: opts.workspace } : undefined),
+              ...(opts.excludePath.length > 0 ? { excludePaths: opts.excludePath } : undefined),
+              ...(opts.excludeWorkspace.length > 0
+                ? { excludeWorkspaces: opts.excludeWorkspace }
+                : undefined),
+            }
 
-          const {
-            symbols: symbolResults,
-            files: fileResults,
-            specs: specResults,
-            documents: documentResults,
-          } = await provider.search(searchInput)
+            const {
+              symbols: symbolResults,
+              files: fileResults,
+              specs: specResults,
+              documents: documentResults,
+            } = await provider.search(searchInput)
 
-          const toDisplayPath = (canonicalPath: string): Promise<string> =>
-            toGraphDisplayPath(provider, canonicalPath)
+            const toDisplayPath = (canonicalPath: string): string =>
+              toGraphDisplayPath(config, canonicalPath)
 
-          if (fmt === 'text') {
-            const lines: string[] = []
+            if (fmt === 'text') {
+              const lines: string[] = []
 
-            if (symbolResults.length > 0) {
-              lines.push(`Symbols (${String(symbolResults.length)} shown, limit ${String(limit)}):`)
-              for (const group of symbolResults) {
-                const target = group.logicalTarget
-                const firstHit = group.hits[0]
-                if (target === null && firstHit !== undefined) {
-                  const separator = firstHit.symbol.filePath.indexOf(':')
-                  const workspace =
-                    separator < 0 ? '' : firstHit.symbol.filePath.slice(0, separator)
-                  lines.push(`  [${workspace}] ${firstHit.symbol.kind} ${firstHit.symbol.name}`)
-                  lines.push(
-                    `    ${await toDisplayPath(firstHit.symbol.filePath)}:${String(firstHit.symbol.line)}:${String(firstHit.symbol.column)}`,
-                  )
-                } else {
-                  lines.push(
-                    target === null
-                      ? '  [legacy] (unknown)'
-                      : `  [${target.workspace}] ${target.space} ${target.name}`,
-                  )
-                }
-                if (target !== null) {
-                  for (const binding of group.matchedPublicBindings) {
-                    lines.push(
-                      `    matched export: ${await toDisplayPath(binding.surface)}::${binding.exportedName}`,
-                    )
-                  }
-                }
+              if (symbolResults.length > 0) {
                 lines.push(
-                  `    match: ${group.matchTier} (${group.matchReasons.join(', ') || 'none'})`,
+                  `Symbols (${String(symbolResults.length)} shown, limit ${String(limit)}):`,
                 )
-                if (group.declarations.length > 0) {
-                  for (const declaration of group.declarations) {
-                    const location = declaration.declaration.location
+                for (const group of symbolResults) {
+                  const target = group.logicalTarget
+                  const firstHit = group.hits[0]
+                  if (target === null && firstHit !== undefined) {
+                    const separator = firstHit.symbol.filePath.indexOf(':')
+                    const workspace =
+                      separator < 0 ? '' : firstHit.symbol.filePath.slice(0, separator)
+                    lines.push(`  [${workspace}] ${firstHit.symbol.kind} ${firstHit.symbol.name}`)
                     lines.push(
-                      `    declaration: ${await toDisplayPath(location.filePath)}:${String(location.line)}:${String(location.column)}`,
+                      `    ${toDisplayPath(firstHit.symbol.filePath)}:${String(firstHit.symbol.line)}:${String(firstHit.symbol.column)}`,
+                    )
+                  } else {
+                    lines.push(
+                      target === null
+                        ? '  [legacy] (unknown)'
+                        : `  [${target.workspace}] ${target.space} ${target.name}`,
                     )
                   }
-                } else {
-                  for (const hit of group.hits) {
-                    lines.push(
-                      `    declaration: ${await toDisplayPath(hit.symbol.filePath)}:${String(hit.symbol.line)}:${String(hit.symbol.column)}`,
-                    )
+                  if (target !== null) {
+                    for (const binding of group.matchedPublicBindings) {
+                      lines.push(
+                        `    matched export: ${toDisplayPath(binding.surface)}::${binding.exportedName}`,
+                      )
+                    }
                   }
-                }
-                if (opts.snippet) {
-                  for (const { snippet, startLine, endLine } of group.hits) {
-                    if (snippet) renderSnippetBlock(lines, snippet, startLine, endLine)
-                  }
-                }
-              }
-            }
-
-            if (fileResults.length > 0) {
-              if (lines.length > 0) lines.push('')
-              lines.push(`Files (${String(fileResults.length)} shown, limit ${String(limit)}):`)
-              for (const { file, matches, omittedMatches } of fileResults) {
-                lines.push(`  [${file.workspace}] ${file.configRelativePath}`)
-                for (const match of matches) {
                   lines.push(
-                    `    ${match.matchKind} ${renderSourceRange(match.range)} ${JSON.stringify(match.matchedText)} source=${match.sourceToken}`,
+                    `    match: ${group.matchTier} (${group.matchReasons.join(', ') || 'none'})`,
                   )
-                  if (opts.snippet && match.snippet !== undefined) {
-                    renderSnippetBlock(
-                      lines,
-                      match.snippet.content,
-                      match.snippet.range.startLine,
-                      match.snippet.range.endLine,
-                    )
+                  if (group.declarations.length > 0) {
+                    for (const declaration of group.declarations) {
+                      const location = declaration.declaration.location
+                      lines.push(
+                        `    declaration: ${toDisplayPath(location.filePath)}:${String(location.line)}:${String(location.column)}`,
+                      )
+                    }
+                  } else {
+                    for (const hit of group.hits) {
+                      lines.push(
+                        `    declaration: ${toDisplayPath(hit.symbol.filePath)}:${String(hit.symbol.line)}:${String(hit.symbol.column)}`,
+                      )
+                    }
+                  }
+                  if (opts.snippet) {
+                    for (const { snippet, startLine, endLine } of group.hits) {
+                      if (snippet) renderSnippetBlock(lines, snippet, startLine, endLine)
+                    }
                   }
                 }
-                if (omittedMatches > 0) {
-                  lines.push(`    ${String(omittedMatches)} more matches in this file`)
+              }
+
+              if (fileResults.length > 0) {
+                if (lines.length > 0) lines.push('')
+                lines.push(`Files (${String(fileResults.length)} shown, limit ${String(limit)}):`)
+                for (const { file, matches, omittedMatches } of fileResults) {
+                  lines.push(`  [${file.workspace}] ${file.configRelativePath}`)
+                  for (const match of matches) {
+                    lines.push(
+                      `    ${match.matchKind} ${renderSourceRange(match.range)} ${JSON.stringify(match.matchedText)} source=${match.sourceToken}`,
+                    )
+                    if (opts.snippet && match.snippet !== undefined) {
+                      renderSnippetBlock(
+                        lines,
+                        match.snippet.content,
+                        match.snippet.range.startLine,
+                        match.snippet.range.endLine,
+                      )
+                    }
+                  }
+                  if (omittedMatches > 0) {
+                    lines.push(`    ${String(omittedMatches)} more matches in this file`)
+                  }
                 }
               }
-            }
 
-            if (specResults.length > 0) {
-              if (lines.length > 0) lines.push('')
-              lines.push(`Specs (${String(specResults.length)} shown, limit ${String(limit)}):`)
-              for (const { spec, snippet, startLine, endLine } of specResults) {
-                lines.push(`  [${spec.workspace}] ${spec.specId}`)
-                lines.push(`    ${renderMatchLocation(startLine, endLine)}`)
-                if (opts.snippet && snippet) {
-                  renderSnippetBlock(lines, snippet, startLine, endLine)
+              if (specResults.length > 0) {
+                if (lines.length > 0) lines.push('')
+                lines.push(`Specs (${String(specResults.length)} shown, limit ${String(limit)}):`)
+                for (const { spec, snippet, startLine, endLine } of specResults) {
+                  lines.push(`  [${spec.workspace}] ${spec.specId}`)
+                  lines.push(`    ${renderMatchLocation(startLine, endLine)}`)
+                  if (opts.snippet && snippet) {
+                    renderSnippetBlock(lines, snippet, startLine, endLine)
+                  }
                 }
               }
-            }
 
-            if (documentResults.length > 0) {
-              if (lines.length > 0) lines.push('')
-              lines.push(
-                `Documents (${String(documentResults.length)} shown, limit ${String(limit)}):`,
-              )
-              for (const { document, snippet, startLine, endLine } of documentResults) {
-                lines.push(`  [${document.workspace}] ${document.configRelativePath}`)
-                lines.push(`    ${renderMatchLocation(startLine, endLine)}`)
-                if (opts.snippet && snippet) {
-                  renderSnippetBlock(lines, snippet, startLine, endLine)
+              if (documentResults.length > 0) {
+                if (lines.length > 0) lines.push('')
+                lines.push(
+                  `Documents (${String(documentResults.length)} shown, limit ${String(limit)}):`,
+                )
+                for (const { document, snippet, startLine, endLine } of documentResults) {
+                  lines.push(`  [${document.workspace}] ${document.configRelativePath}`)
+                  lines.push(`    ${renderMatchLocation(startLine, endLine)}`)
+                  if (opts.snippet && snippet) {
+                    renderSnippetBlock(lines, snippet, startLine, endLine)
+                  }
                 }
               }
-            }
 
-            if (lines.length === 0) {
-              lines.push('No results found.')
-            }
+              if (lines.length === 0) {
+                lines.push('No results found.')
+              }
 
-            output(lines.join('\n'), 'text')
-          } else {
-            output(
-              {
-                symbols: symbolResults.map((group) => ({
-                  logicalTarget: group.logicalTarget,
-                  declarations: group.declarations,
-                  publicBindings: group.publicBindings,
-                  matchedPublicBindings: group.matchedPublicBindings,
-                  score: group.score,
-                  matchTier: group.matchTier,
-                  matchReasons: group.matchReasons,
-                  hits: group.hits.map(({ symbol, score, snippet, startLine, endLine }) => ({
-                    symbol,
+              output(lines.join('\n'), 'text')
+            } else {
+              output(
+                {
+                  symbols: symbolResults.map((group) => ({
+                    logicalTarget: group.logicalTarget,
+                    declarations: group.declarations,
+                    publicBindings: group.publicBindings,
+                    matchedPublicBindings: group.matchedPublicBindings,
+                    score: group.score,
+                    matchTier: group.matchTier,
+                    matchReasons: group.matchReasons,
+                    hits: group.hits.map(({ symbol, score, snippet, startLine, endLine }) => ({
+                      symbol,
+                      score,
+                      startLine,
+                      endLine,
+                      ...(opts.snippet ? { snippet } : {}),
+                    })),
+                  })),
+                  files: fileResults.map(
+                    ({ file, score, matches, totalMatches, omittedMatches }) => ({
+                      workspace: file.workspace,
+                      path: file.path,
+                      configRelativePath: file.configRelativePath,
+                      score,
+                      totalMatches,
+                      omittedMatches,
+                      matches: matches.map((match) => ({
+                        range: match.range,
+                        matchedText: match.matchedText,
+                        matchKind: match.matchKind,
+                        sourceToken: match.sourceToken,
+                        ...(opts.snippet ? { snippet: match.snippet } : {}),
+                      })),
+                    }),
+                  ),
+                  specs: specResults.map(({ spec, score, snippet, startLine, endLine }) => ({
+                    workspace: spec.workspace,
+                    specId: spec.specId,
+                    path: spec.path,
+                    title: spec.title,
+                    description: spec.description,
+                    ...(opts.specContent ? { content: spec.content } : {}),
                     score,
                     startLine,
                     endLine,
                     ...(opts.snippet ? { snippet } : {}),
                   })),
-                })),
-                files: fileResults.map(
-                  ({ file, score, matches, totalMatches, omittedMatches }) => ({
-                    workspace: file.workspace,
-                    path: file.path,
-                    configRelativePath: file.configRelativePath,
-                    score,
-                    totalMatches,
-                    omittedMatches,
-                    matches: matches.map((match) => ({
-                      range: match.range,
-                      matchedText: match.matchedText,
-                      matchKind: match.matchKind,
-                      sourceToken: match.sourceToken,
-                      ...(opts.snippet ? { snippet: match.snippet } : {}),
-                    })),
-                  }),
-                ),
-                specs: specResults.map(({ spec, score, snippet, startLine, endLine }) => ({
-                  workspace: spec.workspace,
-                  specId: spec.specId,
-                  path: spec.path,
-                  title: spec.title,
-                  description: spec.description,
-                  ...(opts.specContent ? { content: spec.content } : {}),
-                  score,
-                  startLine,
-                  endLine,
-                  ...(opts.snippet ? { snippet } : {}),
-                })),
-                documents: documentResults.map(
-                  ({ document, score, snippet, startLine, endLine }) => ({
-                    workspace: document.workspace,
-                    path: document.path,
-                    configRelativePath: document.configRelativePath,
-                    score,
-                    startLine,
-                    endLine,
-                    ...(opts.snippet ? { snippet } : {}),
-                  }),
-                ),
-              },
-              fmt,
-            )
-          }
-        })
+                  documents: documentResults.map(
+                    ({ document, score, snippet, startLine, endLine }) => ({
+                      workspace: document.workspace,
+                      path: document.path,
+                      configRelativePath: document.configRelativePath,
+                      score,
+                      startLine,
+                      endLine,
+                      ...(opts.snippet ? { snippet } : {}),
+                    }),
+                  ),
+                },
+                fmt,
+              )
+            }
+          },
+          { kernel },
+        )
       },
     )
 }

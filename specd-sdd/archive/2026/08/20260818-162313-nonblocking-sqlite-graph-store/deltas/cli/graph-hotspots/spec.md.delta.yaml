@@ -1,0 +1,33 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Output format'
+  content: |
+    ### Requirement: Backpressure-safe hotspot presentation
+
+    Hotspot presentation MUST rely on the provider's single hotspot computation and
+    MUST NOT issue one provider or store read per ranked entry. After the provider
+    returns `HotspotResult`, text, JSON, and toon formatting SHALL complete without
+    additional graph reads or per-entry availability validation.
+
+    A valid hotspot ranking over a wide graph MUST render successfully without
+    `StoreOverloadError` merely because the graph contains many symbols. Column
+    headers, totals, ranking order, risk labels, and scoped-filter semantics MUST
+    remain unchanged.
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: '^Graph Hotspots$'
+    after:
+      type: section
+      matches: '^Spec Dependencies$'
+  content: |
+    ## ADRs
+
+    - [ADR-0025: Non-Blocking Worker-Thread SQLite Graph Store](../../../docs/adr/0025-nonblocking-worker-sqlite-graph-store.md) — hotspot presentation relies on the single provider computation and never fans out per ranked entry

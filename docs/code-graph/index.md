@@ -200,7 +200,7 @@ re-extract sources, and rebuild search indexes. `IndexResult.fullRebuild` and
 `IndexResult.fullRebuildReason` explain that recovery directly. Long-lived providers opened against the old generation must
 close and reopen.
 
-SQLite and Ladybug persist and query semantic identity through structured workspace,
+SQLite persists and queries semantic identity through structured workspace,
 surface, name, space, owner, member-form, and exported-name fields rather than parsing
 serialized canonical ids. Both backends version these physical/index contracts;
 opening a previous version for normal reads is incompatible, while `graph index`
@@ -209,6 +209,34 @@ owns generation rotation and a full rebuild.
 Code Graph does not read or mutate change implementation tracking. The
 [SDK](../sdk/index.md) combines raw Core tracking with these APIs; delivery hosts only
 render that projection.
+
+## Non-blocking SQLite storage architecture
+
+The SQLite backend executes on a dedicated worker thread via Node.js `node:worker_threads`.
+Synchronous SQLite transactions, DDL statements, and FTS5 ranking operations run completely
+off the host event loop, preventing UI or server freezes during heavy read/write operations.
+
+```text
+┌──────────────────────────────────────────────────────────────┐
+│ Host Thread (CLI / SDK / Public API)                         │
+│   SQLiteGraphStore ──> SQLiteWorkerClient                    │
+│                          ├── Request correlation ID map      │
+│                          └── Bounded FIFO backpressure queue │
+└──────────────────────────────┬───────────────────────────────┘
+                               │ Worker MessagePort IPC
+                               ▼
+┌─────────────────────────────────────────────────────────────┐
+│ Dedicated Worker Thread                                     │
+│   sqlite-worker.js ──> SQLiteGraphDatabase                  │
+│                          ├── better-sqlite3 (synchronous)   │
+│                          ├── Prepared statement cache       │
+│                          └── Atomic bulk transaction & FTS5 │
+└─────────────────────────────────────────────────────────────┘
+```
+
+- **Host-side Queue & Backpressure**: Requests are tracked with monotonic IDs in `SQLiteWorkerClient`. When pending requests exceed `maxPendingOperations` (default 256), requests immediately reject with `StoreOverloadError`.
+- **Fault & Crash Isolation**: If the worker thread crashes or exits unexpectedly, all in-flight pending operations are immediately rejected with `StoreWorkerError` and the store transitions to a faulted state.
+- **Serializable Runtime Descriptors**: Rather than passing un-cloneable loader closures across worker thread boundaries, `SqliteRuntimeDescriptor` provides structured configuration (`modulePath`, etc.).
 
 - [Use cases](./use-cases.md)
 - [Services](./services.md)

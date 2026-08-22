@@ -16,8 +16,7 @@
     "@ast-grep/napi": "^0.41.1",
     "@specd/core": "workspace:*",
     "better-sqlite3": "^12.8.0",
-    "ignore": "^7.0.0",
-    "lbug": "^0.14.0"
+    "ignore": "^7.0.0"
   },
   "exports": {
     ".": {
@@ -30,12 +29,12 @@
     }
   },
   "scripts": {
-    "build": "tsup src/public.ts src/index.ts --format esm --dts --clean",
-    "build:dev": "tsup src/public.ts src/index.ts --format esm --dts --sourcemap --clean",
-    "build:debug": "tsup src/public.ts src/index.ts --format esm --dts --sourcemap --clean",
-    "dev": "tsup src/public.ts src/index.ts --format esm --dts --sourcemap --watch",
+    "build": "tsup src/public.ts src/index.ts src/infrastructure/sqlite/sqlite-worker.ts --format esm --dts --clean",
+    "build:dev": "tsup src/public.ts src/index.ts src/infrastructure/sqlite/sqlite-worker.ts --format esm --dts --sourcemap --clean",
+    "build:debug": "tsup src/public.ts src/index.ts src/infrastructure/sqlite/sqlite-worker.ts --format esm --dts --sourcemap --clean",
+    "dev": "tsup src/public.ts src/index.ts src/infrastructure/sqlite/sqlite-worker.ts --format esm --dts --sourcemap --watch",
     "typecheck": "tsc --noEmit",
-    "test": "bash test/run-vitest.sh",
+    "test": "vitest run",
     "release:publish": "pnpm publish --access public",
     "lint": "eslint ."
   },

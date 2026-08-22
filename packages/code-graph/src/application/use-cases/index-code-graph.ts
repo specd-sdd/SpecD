@@ -19,6 +19,7 @@ import {
 } from '../../domain/value-objects/index-result.js'
 import { type AdapterRegistryPort } from '../../domain/ports/adapter-registry-port.js'
 import { type ResolvedImports } from '../../domain/value-objects/language-adapter.js'
+import { mapWithConcurrency } from '../../domain/services/map-with-concurrency.js'
 import {
   type IndexCoverage,
   IndexCoverageStatus,
@@ -54,6 +55,9 @@ import {
 } from '../../domain/value-objects/indexed-input-freshness.js'
 
 const DEFAULT_CHUNK_BYTES = 20 * 1024 * 1024
+
+/** Ceiling for concurrent spec-artifact file reads during indexing. */
+const ARTIFACT_READ_CONCURRENCY = 16
 
 /**
  * Mutable version of WorkspaceIndexBreakdown for tracking progress.
@@ -1453,8 +1457,10 @@ export class IndexCodeGraph {
               })
 
             const artifactStart = performance.now()
-            const artifacts = await Promise.all(
-              contentFilenames.map((f) => ws.specRepo.artifact(repoSpec, f)),
+            const artifacts = await mapWithConcurrency(
+              contentFilenames,
+              ARTIFACT_READ_CONCURRENCY,
+              (f) => ws.specRepo.artifact(repoSpec, f),
             )
             specArtifactReadDuration += performance.now() - artifactStart
 

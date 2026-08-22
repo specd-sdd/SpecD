@@ -1,0 +1,42 @@
+- op: modified
+  description: Verify normal cleanup without native-backend process controls
+  selector:
+    type: section
+    matches: 'Requirement: withProvider delegates to withOpenGraphProvider'
+  content: |
+    #### Scenario: Provider lifecycle via SDK
+
+    - **WHEN** a graph command opens a provider through `withProvider`
+    - **THEN** `withOpenGraphProvider` from `@specd/sdk` performs open and close
+    - **AND** the callback receives an opened `CodeGraphProvider`
+
+    #### Scenario: Successful command returns after cleanup
+
+    - **WHEN** a read-only graph command completes successfully
+    - **THEN** provider close completes through the SDK helper
+    - **AND** `withProvider` neither installs graph-store signal handlers nor calls `process.exit(0)`
+
+    #### Scenario: Configured provider reuses resolved kernel
+
+    - **GIVEN** configured context resolves a kernel
+    - **WHEN** a read-only graph command calls `withProvider`
+    - **THEN** the provider lifecycle receives that same resolved kernel
+    - **AND** it does not create a second configured kernel or workspace projection
+
+- op: modified
+  description: Route stats through the same shared read-only command lifecycle
+  selector:
+    type: section
+    matches: 'Requirement: Graph command platform imports'
+  content: |
+    #### Scenario: Read-only graph commands use shared context
+
+    - **WHEN** graph `search`, `hotspots`, `impact`, or `stats` executes
+    - **THEN** it resolves context via `resolveGraphCliContext` and opens via `withProvider`
+    - **AND** platform symbols are sourced from `@specd/sdk`
+
+    #### Scenario: Graph index uses SDK orchestration without withProvider
+
+    - **WHEN** `specd graph index` executes in the worker process
+    - **THEN** it calls `runIndexProjectGraph` from `@specd/sdk`
+    - **AND** it does not open a provider through `withProvider`

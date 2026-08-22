@@ -3,6 +3,46 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": ["cli:entrypoint", "core:config", "code-graph:composition", "cli:graph-cli-context"],
-  "implementation": []
+  "dependsOn": ["cli:entrypoint", "cli:graph-cli-context", "core:config", "code-graph:composition"],
+  "implementation": [
+    {
+      "file": "cli:src/commands/graph/hotspots.ts"
+    }
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Expose provider-ranked graph hotspots with scoped filters, safe bootstrap resolution, default risk policy, and text/structured output.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:3e78423fd776b52afbe582cf5d2d4d3e5f2656f85a857ef1c220cbd909552211",
+          "lastModified": "2026-07-20T16:47:44.490Z"
+        },
+        "verify.md": {
+          "hash": "sha256:3d65fab0041aac4763f7084ee66ef0aa654fadbbe10e41a4f5d8f59a5660bf6b",
+          "lastModified": "2026-07-20T16:47:44.491Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Graph Hotspots\n## Rules\n- `specd graph hotspots [--workspace <name>] [--kind <kinds>] [--file <path>] [--exclude-path <pattern>] [--exclude-workspace <name>] [--limit <n>] [--min-score <n>] [--include-importer-only] [--min-risk LOW|MEDIUM|HIGH|CRITICAL] [--config <path> | --path <path>] [--format text|json|toon]`; `--config` / `--path` exclusive.\n- Defaults: `kinds = class,method,function`, exclude importer-only, `minScore > 0`, `minRisk >= MEDIUM`, `limit = 20`. Explicit option changes only own default; scope/exclude filters add restrictions; `--include-importer-only` widens.\n- Context: `--config` direct; `--path` ignores discovery → VCS-root synthetic `default` workspace; no flags → autodiscover then VCS bootstrap fallback.\n- `--kind`: one comma list; trim/validate `SymbolKind`; invalid fails before query; multi-kind passed through; explicit list replaces default; omitted excludes `variable` / `interface`.\n- Resolve `cli:graph-cli-context`; `withProvider`; `provider.getHotspots(...)`; platform symbols `@specd/sdk`; pass all filters.\n- No pre-open lock probe. `GRAPH_BUSY`, `GRAPH_PROVIDER_STALE`, provider/open/retrieval infrastructure failure exit 3; option conflict exit 1.\n- Text ranked table: totals, score, risk, cross-workspace callers, kind, name, workspace-qualified path; empty `No hotspots found.` JSON/TOON: `totalSymbols`, `entries` with symbol, `score`, `directCallers`, `crossWorkspaceCallers`, `fileImporters`, `riskLevel`, `workspace`.\n- Help + `docs/cli/cli-reference.md`: signature, comma-list `--kind`, defaults/replacement, importer-only switch, config/path and bootstrap-only behavior.\n## Constraints\n- Provider computes score; shared `SymbolKind` validation; CLI never implements pre-open availability checks.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:3e78423fd776b52afbe582cf5d2d4d3e5f2656f85a857ef1c220cbd909552211",
+          "lastModified": "2026-07-20T16:47:44.490Z"
+        },
+        "verify.md": {
+          "hash": "sha256:3d65fab0041aac4763f7084ee66ef0aa654fadbbe10e41a4f5d8f59a5660bf6b",
+          "lastModified": "2026-07-20T16:47:44.491Z"
+        }
+      }
+    }
+  }
 }

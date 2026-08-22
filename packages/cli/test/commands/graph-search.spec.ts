@@ -82,7 +82,21 @@ function makeReferenceSymbolResult() {
 }
 
 function setup() {
-  const config = makeMockConfig()
+  const config = makeMockConfig({
+    workspaces: [
+      ...makeMockConfig().workspaces,
+      {
+        name: 'core',
+        specsPath: '/project/core/specs',
+        specsAdapter: { adapter: 'fs', config: { path: '/project/core/specs' } },
+        schemasPath: null,
+        schemasAdapter: null,
+        codeRoot: '/project/packages/core',
+        ownership: 'owned' as const,
+        isExternal: false,
+      },
+    ],
+  })
   vi.mocked(resolveGraphCliContext).mockResolvedValue({
     mode: 'configured',
     config,

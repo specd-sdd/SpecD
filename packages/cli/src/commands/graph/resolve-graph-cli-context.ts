@@ -18,8 +18,8 @@ export interface GraphCliContext {
   readonly kernel: Kernel | null
   /** Root directory used for graph storage. */
   readonly projectRoot: string
-  /** Resolved repository root. */
-  readonly vcsRoot: string
+  /** Resolved repository root, when bootstrap mode requires one. */
+  readonly vcsRoot: string | null
 }
 
 /**
@@ -52,7 +52,7 @@ export async function resolveGraphCliContext(options?: {
       configFilePath: context.configFilePath,
       kernel: context.kernel,
       projectRoot: context.config.projectRoot,
-      vcsRoot: await resolveRepoRoot(context.config.projectRoot),
+      vcsRoot: null,
     }
   }
 
@@ -65,7 +65,7 @@ export async function resolveGraphCliContext(options?: {
       configFilePath: context.configFilePath,
       kernel: context.kernel,
       projectRoot: context.config.projectRoot,
-      vcsRoot: await resolveRepoRoot(context.config.projectRoot),
+      vcsRoot: null,
     }
   }
 

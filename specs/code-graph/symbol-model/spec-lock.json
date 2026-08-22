@@ -62,7 +62,7 @@
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "Immutable language-agnostic code graph nodes, compact facts, deterministic lookups, scoped bindings, and typed relations.",
+      "value": "Modelo inmutable de nodos, referencias y bindings estructurados para grafo de código agnóstico de lenguaje.",
       "schema": {
         "name": "schema-std",
         "version": 1
@@ -73,13 +73,13 @@
           "lastModified": "2026-08-16T08:12:47.271Z"
         },
         "verify.md": {
-          "hash": "sha256:e77ea2eb90600a9afb2a292a9e73764b3ee23149f0b6dccefa71731ce34e5712",
-          "lastModified": "2026-08-16T08:12:47.274Z"
+          "hash": "sha256:f6398513df9fd2d7960e123adbe2480f082e7e5630d90f40c0e0e28a4d4bca12",
+          "lastModified": "2026-08-16T10:48:01.888Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# symbol-model\n\n## Rules\n\n### Core Entities\n- `FileNode`: `path` (`workspace:relative/path`), `configRelativePath`, `language`, `contentHash`, `workspace`, optional `embedding: Float32Array`. Equality by `path`.\n- `SpecNode`: `specId` (`workspace:package/topic`), `path`, `title`, `description`, `contentHash`, `content`, `dependsOn`, `workspace`. Equality by `specId`.\n- `SymbolNode`: `id` (`filePath+kind+name+line+column`), `name`, `kind: SymbolKind`, `filePath`, 1-based `line`, 0-based `column`, optional `comment`.\n- `DocumentNode`: searchable non-code file (`workspace:path`).\n\n### Analysis & State\n- Immutable compact `FileAnalysisDraft` & `FileAnalysis` (symbols, imports, binding/call facts, namespace context). Plain data, no AST/parser tree retention.\n- Optional `ParserState` & `AdapterSessionState` for same-run deterministic caching.\n- `IndexSession` & `SymbolIndex` bound lookups by relevant matches.\n\n### Closed Enums & Relations\n- `SymbolKind`: `function`, `class`, `method`, `variable`, `type`, `interface`, `enum`.\n- `Relation`: `source`, `target`, `type: RelationType`, optional `metadata` (e.g. `stale: boolean`).\n- `RelationType`: `IMPORTS` (v1.5), `DEPENDS_ON` (v1.5), `DEFINES` (v2), `EXPORTS` (v2), `CALLS` (v2), `CONSTRUCTS` (v2), `USES_TYPE` (v2), `EXTENDS` (v2), `IMPLEMENTS` (v2), `OVERRIDES` (v2), `COVERS_FILE` (v2+), `COVERS_SYMBOL` (v2+).\n\n### Hierarchy & Imports\n- `EXTENDS`: inherited type; `IMPLEMENTS`: contract symbol; `OVERRIDES`: concrete/replaced method. `OVERRIDES` persisted, not derived.\n- `ImportDeclaration`: `localName`, `originalName`, `specifier`, `isRelative`, optional `kind` (`named`|`namespace`|`default`|`side-effect`|`dynamic`|`require`|`blank`).\n\n### Scoped Bindings & Resolution\n- Immutable facts for scopes (file/class/type/method/block), bindings (local, param, property, inherited, imported, alias), calls (caller, receiver, kind).\n- Cycle detection on scope traversal: abort, return no result.\n- No runtime reflection/interprocedural data flow modeling.\n- Self-relations (`source === target`) dropped before persistence. Unresolved facts remain diagnostics, no speculative edges.\n\n### Errors & Identity\n- `SpecdCodeGraphError` extends `SpecdError`. Specific errors: `InvalidSymbolKindError`, `InvalidRelationTypeError`, `DuplicateSymbolIdError`, `StoreNotOpenError`.\n- Structured logical symbols (workspace, module/package, owner, symbol space, simple name, member form) distinct from occurrences; canonical ref stable across line shifts.\n- Case sensitivity follows language rules.\n- Coverage facts track index status (`indexed`, `excluded`, `parse-failed`, etc.) + content hash.\n\n## Constraints\n- Structural equality for value objects (except deterministic `SymbolNode.id`).\n- Closed `SymbolKind` and `RelationType`.\n- Runtime dependency: `@specd/core`.\n- `FileNode.embedding` deferred v2+.\n- `COVERS_FILE`/`COVERS_SYMBOL` deferred v2+.\n- `DEPENDS_ON` populated in v1.5 from `.specd-metadata.yaml`/`spec.md`.",
+      "value": "# Symbol Model\n\n## Rules\n\n- FileNode: canonical workspace:path, config path, language/hash/workspace, optional Float32Array embedding. SpecNode canonical ID/content/dependencies. SymbolNode deterministic occurrence ID, 1-based line/0-based column. DocumentNode searchable non-code.\n- Immutable FileAnalysisDraft/FileAnalysis data: symbols/imports/scoped bindings/calls/namespaces; never retain AST. Optional ParserState/AdapterSessionState caches; IndexSession/SymbolIndex semantic lookup.\n- Closed SymbolKind: function, class, method, variable, type, interface, enum. Relation types: IMPORTS, DEPENDS_ON, DEFINES, EXPORTS, CALLS, CONSTRUCTS, USES_TYPE, EXTENDS, IMPLEMENTS, OVERRIDES, COVERS_FILE, COVERS_SYMBOL.\n- ImportDeclaration describes local/original/specifier/relative + named|namespace|default|side-effect|dynamic|require|blank. EXTENDS inherited type; IMPLEMENTS contract; OVERRIDES persisted replacement.\n- Facts model nested scopes, bindings and calls. Scope cycles return no result; self-relations dropped; unresolved facts diagnostics only.\n- Logical symbols/bindings distinct from occurrences; canonical refs stable across shifts; preserve language case, public/local provenance, coverage status/hash.\n\n## Constraints\n\n- Structural value equality except deterministic SymbolNode.id.\n- No reflection/interprocedural flow. SpecdCodeGraphError extends SpecdError.\n- Runtime @specd/core; embedding/coverage edges version-gated.",
       "schema": {
         "name": "schema-std",
         "version": 1
@@ -90,8 +90,8 @@
           "lastModified": "2026-08-16T08:12:47.271Z"
         },
         "verify.md": {
-          "hash": "sha256:e77ea2eb90600a9afb2a292a9e73764b3ee23149f0b6dccefa71731ce34e5712",
-          "lastModified": "2026-08-16T08:12:47.274Z"
+          "hash": "sha256:f6398513df9fd2d7960e123adbe2480f082e7e5630d90f40c0e0e28a4d4bca12",
+          "lastModified": "2026-08-16T10:48:01.888Z"
         }
       }
     }

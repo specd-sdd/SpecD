@@ -52,7 +52,7 @@ describe('createSdkContext', () => {
   })
 
   it('forwards graph composition options into createGraphProvider', async () => {
-    const graphOptions = { graphStoreId: 'ladybug' }
+    const graphOptions = { graphStoreId: 'sqlite' }
     const ctx = await createSdkContext(sampleConfig, { graph: graphOptions })
 
     ctx.createGraphProvider()
@@ -116,7 +116,7 @@ describe('openSpecdHost', () => {
 
   it('forwards sdk options to createKernel and createGraphProvider', async () => {
     const kernelOptions = { additionalDestinations: [] }
-    const graphOptions = { graphStoreId: 'ladybug' }
+    const graphOptions = { graphStoreId: 'sqlite' }
 
     const result = await openSpecdHost({
       options: {
@@ -161,7 +161,7 @@ describe('openSpecdHost', () => {
     const result = await openSpecdHost({
       startDir: '/tmp/repository/subdir',
       allowBootstrapFallback: true,
-      options: { graph: { graphStoreId: 'ladybug' } },
+      options: { graph: { graphStoreId: 'sqlite' } },
     })
 
     expect(createVcsAdapter).toHaveBeenCalledWith('/tmp/repository/subdir')
@@ -172,7 +172,7 @@ describe('openSpecdHost', () => {
     expect(result.configFilePath).toBeNull()
     result.createGraphProvider()
     expect(createCodeGraphProvider).toHaveBeenCalledWith(syntheticConfig, {
-      graphStoreId: 'ladybug',
+      graphStoreId: 'sqlite',
     })
   })
 })

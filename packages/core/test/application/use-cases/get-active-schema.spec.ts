@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, type Mock } from 'vitest'
 import { GetActiveSchema } from '../../../src/application/use-cases/get-active-schema.js'
 import { ResolveSchema } from '../../../src/application/use-cases/resolve-schema.js'
 import { SchemaNotFoundError } from '../../../src/application/errors/schema-not-found-error.js'
@@ -10,6 +10,12 @@ import {
 import { type SchemaYamlData } from '../../../src/domain/services/build-schema.js'
 import { type Schema } from '../../../src/domain/value-objects/schema.js'
 import { makeSchema } from './helpers.js'
+
+type BuildSchemaFn = (
+  ref: string,
+  data: SchemaYamlData,
+  templates: ReadonlyMap<string, string>,
+) => Schema
 
 function minimalData(overrides: Partial<SchemaYamlData> = {}): SchemaYamlData {
   return {
@@ -52,12 +58,12 @@ function makeSut(
   overrides: {
     registry?: SchemaRegistry
     resolveSchema?: ResolveSchema
-    buildSchemaFn?: ReturnType<typeof vi.fn>
+    buildSchemaFn?: Mock<BuildSchemaFn>
   } = {},
 ) {
   const registry = overrides.registry ?? makeRegistry({})
   const buildSchemaFn =
-    overrides.buildSchemaFn ?? vi.fn().mockReturnValue(makeSchema({ name: 'test' }))
+    overrides.buildSchemaFn ?? vi.fn<BuildSchemaFn>().mockReturnValue(makeSchema({ name: 'test' }))
   const rawData = minimalData()
   const resolveSchema = overrides.resolveSchema ?? makeResolveSchema(rawResult(rawData))
   return {

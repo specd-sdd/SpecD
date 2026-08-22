@@ -4,6 +4,7 @@ import { output, parseFormat } from '../../formatter.js'
 import { cliError } from '../../handle-error.js'
 import { parseGraphKinds } from './parse-graph-kinds.js'
 import { resolveGraphCliContext } from './resolve-graph-cli-context.js'
+import { toGraphDisplayPath } from './resolve-impact-file-selectors.js'
 import { withProvider } from './with-provider.js'
 import { warnGraphStale } from './warn-graph-staleness.js'
 
@@ -90,8 +91,13 @@ JSON/TOON output schema:
       fileImporters: number
       riskLevel: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL"
       workspace: string
+      displayPath: string
     }>
   }
+
+  displayPath is the config-relative project path projected from the
+  canonical symbol.filePath identity; filePath remains the canonical
+  workspace-prefixed graph identity used for selectors and further queries.
 
 Exclude examples:
   specd graph hotspots --exclude-path "*:test/*"
@@ -142,89 +148,83 @@ Exclude examples:
             1,
           ),
         )
-        await withProvider(config, opts.format, async (provider) => {
-          await warnGraphStale(provider, config, kernel)
-          const options: HotspotOptions = {
-            ...(opts.workspace ? { workspace: opts.workspace } : undefined),
-            kinds: kinds ?? [...CLI_DEFAULT_HOTSPOT_KINDS],
-            ...(opts.file ? { filePath: opts.file } : undefined),
-            ...(opts.excludePath.length > 0 ? { excludePaths: opts.excludePath } : undefined),
-            ...(opts.excludeWorkspace.length > 0
-              ? { excludeWorkspaces: opts.excludeWorkspace }
-              : undefined),
-            ...(opts.limit !== undefined ? { limit: parseInt(opts.limit, 10) } : undefined),
-            ...(opts.minScore !== undefined
-              ? { minScore: parseInt(opts.minScore, 10) }
-              : undefined),
-            ...(opts.minRisk !== undefined ? { minRisk: opts.minRisk as RiskLevel } : undefined),
-            ...(opts.includeImporterOnly === true ? { includeImporterOnly: true } : undefined),
-          }
-
-          const result = await provider.getHotspots(options)
-
-          if (fmt === 'text') {
-            if (result.entries.length === 0) {
-              output('No hotspots found.', 'text')
-              return
+        await withProvider(
+          config,
+          opts.format,
+          async (provider) => {
+            await warnGraphStale(provider, config, kernel)
+            const options: HotspotOptions = {
+              ...(opts.workspace ? { workspace: opts.workspace } : undefined),
+              kinds: kinds ?? [...CLI_DEFAULT_HOTSPOT_KINDS],
+              ...(opts.file ? { filePath: opts.file } : undefined),
+              ...(opts.excludePath.length > 0 ? { excludePaths: opts.excludePath } : undefined),
+              ...(opts.excludeWorkspace.length > 0
+                ? { excludeWorkspaces: opts.excludeWorkspace }
+                : undefined),
+              ...(opts.limit !== undefined ? { limit: parseInt(opts.limit, 10) } : undefined),
+              ...(opts.minScore !== undefined
+                ? { minScore: parseInt(opts.minScore, 10) }
+                : undefined),
+              ...(opts.minRisk !== undefined ? { minRisk: opts.minRisk as RiskLevel } : undefined),
+              ...(opts.includeImporterOnly === true ? { includeImporterOnly: true } : undefined),
             }
 
-            const toDisplayPath = async (canonicalPath: string): Promise<string> => {
-              const file = await provider.getFile(canonicalPath)
-              if (file) return file.configRelativePath
-              const document = await provider.getDocument(canonicalPath)
-              if (document) return document.configRelativePath
-              const idx = canonicalPath.indexOf(':')
-              return idx === -1 ? canonicalPath : canonicalPath.substring(idx + 1)
-            }
+            const result = await provider.getHotspots(options)
 
-            const lines: string[] = []
-            lines.push(
-              `Hotspots (${String(result.entries.length)} of ${String(result.totalSymbols)} symbols):`,
-            )
-            lines.push('')
+            if (fmt === 'text') {
+              if (result.entries.length === 0) {
+                output('No hotspots found.', 'text')
+                return
+              }
 
-            // Header
-            lines.push(
-              `${'Score'.padStart(6)}  ${'Risk'.padEnd(8)}  ${'XWS'.padStart(3)}  ${'Kind'.padEnd(9)}  ${'Name'.padEnd(30)}  File`,
-            )
-            lines.push('─'.repeat(90))
+              const toDisplayPath = (canonicalPath: string): string =>
+                toGraphDisplayPath(config, canonicalPath)
 
-            for (const entry of result.entries) {
-              const sepIndex = entry.symbol.filePath.indexOf(':')
-              const ws = sepIndex !== -1 ? entry.symbol.filePath.substring(0, sepIndex) : ''
-              const displayPath = await toDisplayPath(entry.symbol.filePath)
+              const lines: string[] = []
               lines.push(
-                `${String(entry.score).padStart(6)}  ${entry.riskLevel.padEnd(8)}  ${String(entry.crossWorkspaceCallers).padStart(3)}  ${entry.symbol.kind.padEnd(9)}  ${entry.symbol.name.padEnd(30)}  [${ws}] ${displayPath}:${String(entry.symbol.line)}`,
+                `Hotspots (${String(result.entries.length)} of ${String(result.totalSymbols)} symbols):`,
+              )
+              lines.push('')
+
+              // Header
+              lines.push(
+                `${'Score'.padStart(6)}  ${'Risk'.padEnd(8)}  ${'XWS'.padStart(3)}  ${'Kind'.padEnd(9)}  ${'Name'.padEnd(30)}  File`,
+              )
+              lines.push('─'.repeat(90))
+
+              for (const entry of result.entries) {
+                const sepIndex = entry.symbol.filePath.indexOf(':')
+                const ws = sepIndex !== -1 ? entry.symbol.filePath.substring(0, sepIndex) : ''
+                const displayPath = toDisplayPath(entry.symbol.filePath)
+                lines.push(
+                  `${String(entry.score).padStart(6)}  ${entry.riskLevel.padEnd(8)}  ${String(entry.crossWorkspaceCallers).padStart(3)}  ${entry.symbol.kind.padEnd(9)}  ${entry.symbol.name.padEnd(30)}  [${ws}] ${displayPath}:${String(entry.symbol.line)}`,
+                )
+              }
+
+              output(lines.join('\n'), 'text')
+            } else {
+              output(
+                {
+                  totalSymbols: result.totalSymbols,
+                  entries: result.entries.map((e) => ({
+                    symbol: e.symbol,
+                    score: e.score,
+                    directCallers: e.directCallers,
+                    crossWorkspaceCallers: e.crossWorkspaceCallers,
+                    fileImporters: e.fileImporters,
+                    riskLevel: e.riskLevel,
+                    workspace: e.symbol.filePath.includes(':')
+                      ? e.symbol.filePath.substring(0, e.symbol.filePath.indexOf(':'))
+                      : '',
+                    displayPath: toGraphDisplayPath(config, e.symbol.filePath),
+                  })),
+                },
+                fmt,
               )
             }
-
-            output(lines.join('\n'), 'text')
-          } else {
-            output(
-              {
-                totalSymbols: result.totalSymbols,
-                entries: await Promise.all(
-                  result.entries.map(async (e) => {
-                    const file = await provider.getFile(e.symbol.filePath)
-                    return {
-                      symbol: e.symbol,
-                      score: e.score,
-                      directCallers: e.directCallers,
-                      crossWorkspaceCallers: e.crossWorkspaceCallers,
-                      fileImporters: e.fileImporters,
-                      riskLevel: e.riskLevel,
-                      workspace: e.symbol.filePath.includes(':')
-                        ? e.symbol.filePath.substring(0, e.symbol.filePath.indexOf(':'))
-                        : '',
-                      displayPath: file?.configRelativePath ?? e.symbol.filePath,
-                    }
-                  }),
-                ),
-              },
-              fmt,
-            )
-          }
-        })
+          },
+          { kernel },
+        )
       },
     )
 }

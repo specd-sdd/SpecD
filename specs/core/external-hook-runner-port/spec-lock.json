@@ -4,5 +4,41 @@
     "version": 1
   },
   "dependsOn": ["core:hook-execution-model", "core:schema-format", "default:_global/architecture"],
-  "implementation": []
+  "implementation": [],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Application port for typed external hook dispatch, execution, and workflow-compatible results.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:e2fcf698dfdae70f066071c88f4078e009418f7004b0c067143bcf700740a8a5",
+          "lastModified": "2026-05-25T06:02:58.443Z"
+        },
+        "verify.md": {
+          "hash": "sha256:9a0c211e0f2e4768e700c8a502c547b6e12a48bfd226db2c439c9437e78fd701",
+          "lastModified": "2026-05-04T16:57:12.941Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# ExternalHookRunner Port\n\n## Rules\n\n- `ExternalHookRunner` declares machine-readable accepted explicit external hook types; declaration solely controls dispatch. Never infer from registration name or implementation class.\n- Executes explicit entries using `external.type`, `external.config`, and current workflow template variables. Remains separate from shell-only `HookRunner`.\n- No registered runner declaring requested type: fail clearly; never ignore or treat as no-op.\n- Results match workflow hook semantics for pre-phase failures, post-phase reporting, and CLI/user-facing behavior.\n\n## Constraints\n\n- Application-layer port.\n- Accepted external hook types declared explicitly.\n- Unknown external hook types are hard errors.\n- Never conflate with `HookRunner`.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:e2fcf698dfdae70f066071c88f4078e009418f7004b0c067143bcf700740a8a5",
+          "lastModified": "2026-05-25T06:02:58.443Z"
+        },
+        "verify.md": {
+          "hash": "sha256:9a0c211e0f2e4768e700c8a502c547b6e12a48bfd226db2c439c9437e78fd701",
+          "lastModified": "2026-05-04T16:57:12.941Z"
+        }
+      }
+    }
+  }
 }

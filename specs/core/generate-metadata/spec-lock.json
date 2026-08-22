@@ -17,5 +17,41 @@
       "file": "core:src/application/use-cases/generate-spec-metadata.ts",
       "symbols": ["GenerateSpecMetadata"]
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Deterministically projects canonical spec metadata, hashes, provenance, dependencies, and fresh optimizations from one artifact/lock snapshot.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:6230999bdc9edb95d3e39b00dc83c08cd0da4208754c4a98a37557671345d391",
+          "lastModified": "2026-07-25T11:53:31.159Z"
+        },
+        "verify.md": {
+          "hash": "sha256:ea7fcded17be8b31be1f40c007428b6d49aa8a6ee90710ba0216d3c61b96134c",
+          "lastModified": "2026-07-25T11:53:31.160Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# GenerateSpecMetadata\n\n## Rules\n\n- Input: `specId` (`core/change` or `billing:invoices/create`). Output: `{ metadata: SpecMetadata, hasExtraction: boolean }`. `metadata` includes extracted fields, hashes, canonical `dependsOn`, implementation, fresh optimizations, and exact-call `provenance`.\n- Resolve schema through `SchemaProvider.get()`; propagate `SchemaNotFoundError` and `SchemaValidationError`. No `metadataExtraction`: return `{ metadata: {}, hasExtraction: false }` immediately.\n- Parse `specId` via `parseSpecId()`; select workspace `SpecRepository`. Unknown workspace: `WorkspaceNotFoundError`. Missing `SpecRepository.get()` result: `SpecNotFoundError`.\n- For each schema artifact type with `scope: spec`: derive filename from final `output` segment; infer format via `inferFormat()` with `plaintext` fallback; resolve parser from `ArtifactParserRegistry`; load through `SpecRepository.artifact()`. Skip missing parser or content.\n- Call async `extractMetadata()` with schema declarations, ASTs by artifact type ID, parser renderers, shared `ExtractorTransformRegistry`, and caller-owned artifact origin context. Await transform runtime; extracted `title`, `description`, `dependsOn`, `keywords`, `rules`, `constraints`, `scenarios`, and `context` are already normalized. Repository-backed transforms allowed; filesystem inference inside extraction engine forbidden.\n- Canonicalize `dependsOn`: extraction result is candidate; read `SpecRepository.readPersistedState(spec)` once. Persisted state present: use persisted `dependsOn`; if it differs from non-empty extracted value, fail explicitly. Persisted state absent: use current extracted value or `[]` as live artifact projection. Normalize artifact-local values only through declared extractor transforms. Found values that cannot normalize: fail explicitly; never drop silently.\n- Use one persisted-state observation per generation attempt for `dependsOn`, implementation, optimizations, and `provenance.persistedStateHash`. Hash via `SpecRepository.persistedStateMeta(spec, { includeHash: true })?.hash ?? null`, or same snapshot `originalHash`; never call removed `persistedStateHash(spec)`. Never mix or re-read snapshots.\n- Project persisted `optimizedDescription` and `optimizedContext` only when each field baseline is fresh against same-call artifacts and schema identity. Omit stale/absent fields. Never regenerate, invalidate, or mutate optimization state.\n- Hash every successfully loaded artifact through `ContentHasher.hash()` using SHA-256; key `contentHashes` by resolved filename. Exclude unloaded artifacts.\n- Return extracted fields plus canonical `dependsOn`, persisted implementation projection, fresh optimization fields, `contentHashes`, `generatedBy: core`, and exact-call `provenance`: artifact hashes/lastModified, `persistedStateHash` or `null`, schema identity, projection version, projection fingerprint. Return `hasExtraction: true`.\n- Config form `createGenerateSpecMetadata(config, options?)` must call `resolveGenerateSpecMetadataDeps(resolver)`, then canonical `createGenerateSpecMetadata(deps)`. Resolver obtains `listWorkspaces`, `schemaProvider`, `parsers`, `hasher`, `extractorTransforms`, and `workspaceRoutes`; no inline fs-shaped wiring.\n\n## Constraints\n\n- Deterministic schema-driven extraction; no LLM involvement.\n- `GenerateSpecMetadata` orchestrates; async `extractMetadata()` owns extraction logic.\n- Read-only operation: never write disk/persisted state or call `SpecRepository.writeMetadataSnapshot()` / `writePersistedState()`. Persistence belongs to `MaterializeSpecMetadata` and internal `PersistSpecMetadata`.\n- Optimization freshness uses only artifacts, schema, and persisted snapshot loaded during same call.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:6230999bdc9edb95d3e39b00dc83c08cd0da4208754c4a98a37557671345d391",
+          "lastModified": "2026-07-25T11:53:31.159Z"
+        },
+        "verify.md": {
+          "hash": "sha256:ea7fcded17be8b31be1f40c007428b6d49aa8a6ee90710ba0216d3c61b96134c",
+          "lastModified": "2026-07-25T11:53:31.160Z"
+        }
+      }
+    }
+  }
 }

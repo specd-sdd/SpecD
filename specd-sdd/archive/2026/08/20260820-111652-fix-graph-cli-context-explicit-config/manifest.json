@@ -1,0 +1,475 @@
+{
+  "name": "fix-graph-cli-context-explicit-config",
+  "createdAt": "2026-08-20T11:16:52.656Z",
+  "updatedAt": "2026-08-20T12:20:57.669Z",
+  "description": "Fixes graph CLI configured-mode resolution so explicit and discovered specd.yaml projects outside VCS preserve project configuration without repository validation. Bootstrap modes remain VCS-bound, and graph stats now preserves unavailable VCS health as provider output.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": ["cli:graph-cli-context", "cli:graph-stats"],
+  "specDependsOn": {
+    "cli:graph-cli-context": [
+      "cli:host-context",
+      "cli:entrypoint",
+      "core:config",
+      "sdk:with-open-graph-provider",
+      "sdk:composition"
+    ],
+    "cli:graph-stats": [
+      "cli:entrypoint",
+      "core:config",
+      "code-graph:staleness-detection",
+      "core:list-workspaces",
+      "code-graph:get-graph-health",
+      "sdk:with-open-graph-provider",
+      "sdk:host-context"
+    ]
+  },
+  "invalidationPolicy": "downstream",
+  "trackedImplementationFiles": [
+    {
+      "file": "docs/adr/0024-logical-symbol-resolution.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/code-graph/index.md",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/stats.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/with-provider.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/test/commands/graph-cli-context.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/graph-stats.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/README.md",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/package.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/composition/create-code-graph-provider.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/composition/graph-store-factory.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/ladybug/index.ts",
+      "state": "removed"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/ladybug/ladybug-graph-store.ts",
+      "state": "removed"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/ladybug/schema.ts",
+      "state": "removed"
+    },
+    {
+      "file": "packages/code-graph/test/composition/code-graph-provider.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/ladybug/ladybug-graph-store-multi-kind.spec.ts",
+      "state": "removed"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/ladybug/ladybug-graph-store.spec.ts",
+      "state": "removed"
+    },
+    {
+      "file": "packages/code-graph/vitest.config.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/sdk/test/composition/host-context.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "pnpm-lock.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/change-archive/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/graph-store/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/indexer/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/symbol-model/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/traversal/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/content-extraction/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/delta-format/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/external-hook-runner-port/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/generate-metadata/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/get-project-summary/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/hook-execution-model/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/hook-runner-port/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/regenerate-spec-metadata/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/run-step-hooks/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/schema-merge/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/selector-model/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/spec-lock/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/template-variables/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/validate-artifacts/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/sdk/composition/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/resolve-graph-cli-context.ts",
+      "state": "resolved"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "cli:graph-cli-context",
+      "file": "packages/cli/src/commands/graph/resolve-graph-cli-context.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["GraphCliContext", "resolveGraphCliContext"]
+    },
+    {
+      "specId": "cli:graph-cli-context",
+      "file": "packages/cli/test/commands/graph-cli-context.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:graph-stats",
+      "file": "packages/cli/test/commands/graph-stats.spec.ts",
+      "fileLinkExplicit": true
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:a42b20b2b77e2112e156fa8d13c645672ecec514702a367dcd995b780fd03d4a"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "cli:graph-cli-context",
+          "filename": "deltas/cli/graph-cli-context/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:df3eec03076dd707e7dad92b81005dbc5cfb1fe899c869b1566af33c21a6c292"
+        },
+        {
+          "key": "cli:graph-stats",
+          "filename": "deltas/cli/graph-stats/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:d23ed86cfe8ee90e63a50679ded0cba8750a0950c4367bde0d505a5e0a49779c"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "cli:graph-cli-context",
+          "filename": "deltas/cli/graph-cli-context/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:7dd4217dd668ea0109f6c920f5a01d8d74efb8abca8f3c21228174b19a05f4c2"
+        },
+        {
+          "key": "cli:graph-stats",
+          "filename": "deltas/cli/graph-stats/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:4f5437e25f95d07a6d1a02f3c25b80b1a83b36fcd3e1aaaf2e46c9a2d3147ffa"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:1ae507362f40da3e0496877c6234ee85a6a67185d7acf2c1af8ca69f85ca2019"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:6ac8a80e7697884faf8753e934c6ec01f28cfc8216c7c268093f14ac56ec5de9"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-08-20T11:16:52.656Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": ["cli:graph-cli-context", "cli:graph-stats"],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-08-20T11:16:52.687Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "cli:graph-cli-context"
+        },
+        {
+          "type": "specs",
+          "key": "cli:graph-stats"
+        },
+        {
+          "type": "verify",
+          "key": "cli:graph-cli-context"
+        },
+        {
+          "type": "verify",
+          "key": "cli:graph-stats"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-20T11:19:04.032Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-20T11:22:49.476Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-20T11:29:08.743Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-20T11:34:21.348Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-20T11:52:36.728Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-20T12:13:18.935Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-20T12:13:36.204Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "description-updated",
+      "at": "2026-08-20T12:19:38.058Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "description": "Fixes graph CLI configured-mode resolution so explicit and discovered specd.yaml projects outside VCS preserve project configuration without repository validation. Bootstrap modes remain VCS-bound, and graph stats now preserves unavailable VCS health as provider output."
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-08-20T12:20:36.500Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Tracked implementation files remain open for change \"fix-graph-cli-context-explicit-config\". Resolve or ignore them first.",
+      "commitStarted": false
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-20T12:20:57.669Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-08-20T12:20:57.725Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

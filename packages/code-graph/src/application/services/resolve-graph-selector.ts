@@ -1,5 +1,7 @@
 import { isAbsolute, relative } from 'node:path'
+import { InvalidGraphSelectorError } from '../../domain/errors/invalid-graph-selector-error.js'
 import { type GraphStore } from '../../domain/ports/graph-store.js'
+import { mapWithConcurrency } from '../../domain/services/map-with-concurrency.js'
 import { type DocumentNode } from '../../domain/value-objects/document-node.js'
 import { type FileNode } from '../../domain/value-objects/file-node.js'
 import { isSymbolKind, type SymbolKind } from '../../domain/value-objects/symbol-kind.js'
@@ -43,12 +45,15 @@ export type ResolvedSymbolSelectorResult =
 
 const MAX_AMBIGUITY_CANDIDATES = 10
 
+/** Ceiling for per-file resolution loops that lack a batch representation. */
+const RESOLVER_CONCURRENCY = 16
+
 /**
  * Resolves a raw file selector into canonical graph identities.
  * @param input - The raw selector string.
  * @param options - Graph resolution options.
  * @returns Matching canonical file-bearing graph entries.
- * @throws {Error} When the selector is empty.
+ * @throws {InvalidGraphSelectorError} When the selector is empty.
  */
 export async function resolveFileSelector(
   input: string,
@@ -56,7 +61,7 @@ export async function resolveFileSelector(
 ): Promise<ResolvedFileSelector[]> {
   const trimmed = input.trim()
   if (trimmed.length === 0) {
-    throw new Error('empty file selector')
+    throw new InvalidGraphSelectorError('empty file selector')
   }
 
   const direct = await resolveDirectPath(trimmed, options.store)
@@ -85,7 +90,7 @@ export async function resolveFileSelector(
  * @param input - The raw selector string.
  * @param options - Graph resolution options.
  * @returns Matching canonical symbol entries.
- * @throws {Error} When the selector is empty.
+ * @throws {InvalidGraphSelectorError} When the selector is empty.
  */
 export async function resolveSymbolSelector(
   input: string,
@@ -93,7 +98,7 @@ export async function resolveSymbolSelector(
 ): Promise<ResolvedSymbolSelectorResult> {
   const trimmed = input.trim()
   if (trimmed.length === 0) {
-    throw new Error('empty symbol selector')
+    throw new InvalidGraphSelectorError('empty symbol selector')
   }
 
   const direct = await options.store.getSymbol(trimmed)
@@ -106,14 +111,12 @@ export async function resolveSymbolSelector(
   const fullId = parseFullIdSelector(trimmed)
   if (fullId !== null) {
     const fileMatches = await resolveFileSelector(fullId.fileSelector, options)
-    const symbolMatches = await Promise.all(
-      fileMatches.map((file) =>
-        options.store.findSymbols({
-          filePath: file.canonicalPath,
-          kind: fullId.kind,
-          name: fullId.name,
-        }),
-      ),
+    const symbolMatches = await mapWithConcurrency(fileMatches, RESOLVER_CONCURRENCY, (file) =>
+      options.store.findSymbols({
+        filePath: file.canonicalPath,
+        kind: fullId.kind,
+        name: fullId.name,
+      }),
     )
     return resolvedResult(
       symbolMatches
@@ -130,14 +133,12 @@ export async function resolveSymbolSelector(
   const qualified = parseQualifiedSelector(trimmed)
   if (qualified !== null) {
     const fileMatches = await resolveFileSelector(qualified.fileSelector, options)
-    const symbolMatches = await Promise.all(
-      fileMatches.map((file) =>
-        options.store.findSymbols({
-          filePath: file.canonicalPath,
-          ...(qualified.kind !== undefined ? { kind: qualified.kind } : {}),
-          name: qualified.name,
-        }),
-      ),
+    const symbolMatches = await mapWithConcurrency(fileMatches, RESOLVER_CONCURRENCY, (file) =>
+      options.store.findSymbols({
+        filePath: file.canonicalPath,
+        ...(qualified.kind !== undefined ? { kind: qualified.kind } : {}),
+        name: qualified.name,
+      }),
     )
     return resolvedResult(
       symbolMatches.flat().map((symbol) => ({

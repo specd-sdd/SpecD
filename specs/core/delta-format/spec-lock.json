@@ -4,5 +4,41 @@
     "version": 1
   },
   "dependsOn": ["core:artifact-ast", "core:selector-model", "core:schema-format"],
-  "implementation": []
+  "implementation": [],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Structured YAML deltas atomically modify Markdown, JSON, YAML, and plain-text AST artifacts.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:bf8c937c9390beab3f0cce978ec39efc3ef805aa7704066ce4a56ee257610c30",
+          "lastModified": "2026-05-25T06:02:58.439Z"
+        },
+        "verify.md": {
+          "hash": "sha256:9ccffd20b88bb3d9d1372bf03699ff406008ec941bb1ae2a8c09dfb35740a4dd",
+          "lastModified": "2026-05-25T06:02:58.439Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Delta format\n## Rules\n- ArtifactParser port: fileExtensions, parse, apply, serialize, renderSubtree, nodeTypes, outline, deltaInstructions, parseDelta; adapters own format behavior, domain sees port only.\n- Compact default nodes: Markdown section; JSON property/array-item; YAML pair; text paragraph. Hints root type-keyed placeholders; full coverage via full detail.\n- Delta YAML path: deltas/<workspace>/<capability-path>/<artifact>.delta.yaml; infer target from filename; never sync delta files. Entries: added, modified, removed, no-op.\n- modified/removed require selector exact one match; resolve all selectors before mutation; failure gives DeltaApplicationError and zero partial application. after/before miss warns then append; parent miss errors.\n- added uses position.parent plus exactly one optional after/before/first/last; default last/root. modified alters body and optional rename; removed deletes. Declaration order applies.\n- content XOR value. modified content excludes identifier; added content includes identifier. rename only modified; reject existing or in-delta sibling collision.\n- Array target strategy: replace default, append, merge-by requiring mergeKey; merge-by replaces matching objects, appends new, preserves other existing.\n- no-op sole delta entry; only op/optional description. Caller skips base load, apply, delta/structural validation; hashes raw delta then markComplete.\n- Reject duplicate modifying/removing same node; invalid op-field combinations; multiple placement hints; non-array strategy; mergeKey mismatch.\n- deltaValidations run JSONPath rules against normalized YAML delta AST before apply.\n- Markdown body edits preserve unaffected inline metadata; serializer tracks unambiguous source marker style, else deterministic project conventions.\n## Constraints\n- selector.index XOR selector.where.\n- Any unresolved modified/removed selector hard error; after/before unresolved only warning.\n- DeltaApplicationError aborts entire delta.\n- YAML serialization preserves comments/formatting CST; JSON normalizes two-space indentation.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:bf8c937c9390beab3f0cce978ec39efc3ef805aa7704066ce4a56ee257610c30",
+          "lastModified": "2026-05-25T06:02:58.439Z"
+        },
+        "verify.md": {
+          "hash": "sha256:9ccffd20b88bb3d9d1372bf03699ff406008ec941bb1ae2a8c09dfb35740a4dd",
+          "lastModified": "2026-05-25T06:02:58.439Z"
+        }
+      }
+    }
+  }
 }

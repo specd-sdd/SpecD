@@ -1,0 +1,24 @@
+- op: modified
+  description: Verify SQLite as the sole built-in backend
+  selector:
+    type: section
+    matches: 'Requirement: Default backend role'
+  content: |
+    #### Scenario: SQLite is the sole built-in default backend
+
+    - **GIVEN** no external graph-store factories are supplied
+    - **WHEN** provider composition is created without an explicit `graphStoreId`
+    - **THEN** `sqlite` is selected
+    - **AND** no other backend id is registered
+
+    #### Scenario: SQLite satisfies current Code Graph consumers directly
+
+    - **WHEN** indexing, references, coverage, search, stats, traversal, impact, and hotspot flows run through the default backend
+    - **THEN** they satisfy their current graph contracts through `SQLiteGraphStore`
+    - **AND** their assertions rely only on the current SQLite-backed contract
+
+    #### Scenario: Re-index is the recovery boundary
+
+    - **GIVEN** persisted graph data is absent or incompatible after changing backend ownership
+    - **WHEN** the user performs a full graph re-index
+    - **THEN** SQLite rebuilds the graph from source and specs without a compatibility-migration path

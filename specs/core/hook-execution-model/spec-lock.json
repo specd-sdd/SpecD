@@ -15,5 +15,41 @@
     "cli:change-transition",
     "cli:change-archive"
   ],
-  "implementation": []
+  "implementation": [],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Defines hook types, dispatch, phase ordering, failures, manual skipping, and safe variable expansion across lifecycle operations.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:eac5d54ae3ded9b943f3b21be774d334598ee0740cb56207abcb36a1c9b0a7c6",
+          "lastModified": "2026-07-22T16:55:46.244Z"
+        },
+        "verify.md": {
+          "hash": "sha256:177793e170421568e68577c0cb85f9d34c5316e2994d4906dd925cc1b6a5273f",
+          "lastModified": "2026-07-22T16:55:46.245Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Hook Execution Model\n## Rules\n- Workflow entries declare `id` plus one payload: `instruction:`, shell `run:`, or `external: { type, config }`; schema validation rejects invalid payload combinations. Every workflow step may declare all hook kinds.\n- `instruction:` is passive text, consumed only by `GetHookInstructions` for step+phase and optional hook ID. Never process-executed; no exit code, output, side effects. `TransitionChange`, `ArchiveChange`, `RunStepHooks` skip it. `CompileContext` excludes it.\n- `run:` is executed only by `HookRunner`; never injected into agent context.\n- External hooks dispatch to registered external runner supporting `external.type`. No accepting runner MUST fail clearly. `HookRunner` remains shell-only.\n- `TransitionChange` and `ArchiveChange` auto-execute operational hooks through `RunStepHooks`. `Change` entity MUST NOT execute hooks.\n- `TransitionChange`: target-step pre-hooks before state change; post-hooks afterward. `ArchiveChange`: pre-hooks before any file mutation; post-hooks after completion.\n- Pre-phase is fail-fast: first non-zero `run:` or failed external hook stops remaining hooks. `TransitionChange` throws `HookFailedError` without transition; `ArchiveChange` throws before file changes; standalone `RunStepHooks` returns failure and CLI exits 2.\n- Post-phase is fail-soft: completed transition/archive is never rolled back; all hooks continue; failures collected in `postHookFailures`. Standalone CLI exits 2 if any failed.\n- Phase order: schema-level hooks in declaration order, then matching project `schemaOverrides` hooks in declaration order.\n- Manual control uses `skipHookPhases`. `TransitionChange`: `source.pre`, `source.post`, `target.pre`, `target.post`, `all`. `ArchiveChange`: `pre`, `post`, `all`. CLI `--skip-hooks` maps to selectors.\n- Manual sequence: read `specd change hook-instruction`; execute `specd change run-hooks`; invoke lifecycle command with skipped auto-phases; execute post hooks; read post instructions.\n- Before shell execution, `HookRunner` expands `{{change.name}}`, `{{change.path}}`, `{{project.root}}` and shell-escapes substitutions. Unknown paths remain unchanged. `{{change.workspace}}` MUST NOT exist; derive touched workspaces from `specIds`.\n\n## Constraints\n- `RunStepHooks` single execution engine for use cases and CLI.\n- Pre-hooks always fail-fast; post-hooks always fail-soft.\n- Schema hooks always precede project hooks per phase.\n- External backend differs from shell backend; lifecycle phase semantics identical.\n- Variable expansion and shell escaping belong to `HookRunner`, never callers.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:eac5d54ae3ded9b943f3b21be774d334598ee0740cb56207abcb36a1c9b0a7c6",
+          "lastModified": "2026-07-22T16:55:46.244Z"
+        },
+        "verify.md": {
+          "hash": "sha256:177793e170421568e68577c0cb85f9d34c5316e2994d4906dd925cc1b6a5273f",
+          "lastModified": "2026-07-22T16:55:46.245Z"
+        }
+      }
+    }
+  }
 }

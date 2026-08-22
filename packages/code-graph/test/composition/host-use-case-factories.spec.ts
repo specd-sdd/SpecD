@@ -8,6 +8,8 @@ import { createGetGraphHealth } from '../../src/composition/use-cases/get-graph-
 import { createIndexProjectGraph } from '../../src/composition/use-cases/index-project-graph.js'
 import { createGetSpecCoverage } from '../../src/composition/use-cases/get-spec-coverage.js'
 import { createGetChangeSpecCoverage } from '../../src/composition/use-cases/get-change-spec-coverage.js'
+import { Change } from '@specd/core'
+import { StubChangeRepository } from '../helpers/stub-change-repository.js'
 
 describe('host use case factories', () => {
   it('createGetGraphHealth returns new stateless instances', () => {
@@ -38,7 +40,7 @@ describe('host use case factories', () => {
   })
 
   it('createGetChangeSpecCoverage delegates to injected GetSpecCoverage', async () => {
-    const getSpecCoverage = {
+    const getSpecCoverage: GetSpecCoverage = {
       execute: vi.fn().mockResolvedValue({
         specId: 'core:foo',
         found: true,
@@ -47,18 +49,28 @@ describe('host use case factories', () => {
         fileCount: 1,
         symbolCount: 0,
       }),
-    } as unknown as GetSpecCoverage
-
-    const changes = {
-      get: vi.fn().mockResolvedValue({ specIds: ['core:foo'] }),
     }
+
+    const changes = new StubChangeRepository(
+      new Map([
+        [
+          'change-1',
+          new Change({
+            name: 'change-1',
+            createdAt: new Date('2026-01-01T00:00:00.000Z'),
+            specIds: ['core:foo'],
+            history: [],
+          }),
+        ],
+      ]),
+    )
 
     const useCase = createGetChangeSpecCoverage(getSpecCoverage)
     const provider = {} as CodeGraphHostPort
 
     const result = await useCase.execute({
       provider,
-      changes: changes as never,
+      changes,
       changeName: 'change-1',
     })
 

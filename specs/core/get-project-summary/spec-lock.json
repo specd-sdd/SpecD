@@ -35,36 +35,36 @@
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "GetProjectSummary returns count-only change-bucket + per-workspace spec aggregates without materializing lists.",
+      "value": "GetProjectSummary entrega conteos baratos del proyecto y enriquecimientos opcionales de changes o salud de specs.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:b169003e2b4fdcae11618a3a8ac0fa4424e3f06ee9f97111ac469fdbd95af0e0",
-          "lastModified": "2026-07-22T16:55:45.723Z"
+          "hash": "sha256:da5e8d115ea84818b321be68fcb45788419743a6812719ba0b75ffb9c2980a02",
+          "lastModified": "2026-07-26T11:52:20.566Z"
         },
         "verify.md": {
-          "hash": "sha256:b7e582a880f95bf214fed616e65ff27363f747bcd29e4af968f8c7db5aeb816b",
-          "lastModified": "2026-07-22T16:55:45.724Z"
+          "hash": "sha256:eb00add16d3c464cad3e4e753e79de94189d5c2fe13849597ae3c04ef7fa3ef8",
+          "lastModified": "2026-07-26T11:52:20.576Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# Get Project Summary\n\n## Rules\n- `GetProjectSummary.execute()` → `GetProjectSummaryResult`: `activeCount`, `draftCount`, `discardedCount`, `archivedCount`, `specsByWorkspace` (name→count), `workspaceCount`\n- MUST NOT include change entities, spec metadata, graph data, or context payloads\n- Counts via: `ChangeRepository.count()` / `countDrafts()` / `countDiscarded()`; archived via `ArchiveRepository.count()` or `ListArchived.execute().meta.total`\n- MUST NOT call `ListChanges`/`ListDrafts`/`ListDiscarded.execute()` just to measure `.length`\n- `archivedCount` MUST NOT use `items.length` when `meta.total` available\n- Spec counts: `ListWorkspaces.execute()` then `SpecRepository.count()` per `specRepo`; key by workspace `name`; preserve declaration order\n- MUST NOT call `ListSpecs.execute()` or materialize list entries to count\n- `workspaceCount` = workspaces from `ListWorkspaces`\n- MUST parallelize independent counts (e.g. `Promise.all`)\n- Constructor deps for count ports + `ListWorkspaces`; MUST NOT construct repos or read `specd.yaml` directly\n- `createGetProjectSummary(config)` wires from `SpecdConfig` like other `createList*` factories\n- Summary wiring MUST preserve complete downstream bootstrap (schema-driven change repos + canonical metadata-path spec repos); MUST NOT alternate/partial bootstrap\n- `createKernel()` wires on `kernel.project.getProjectSummary`\n- Config form → `resolveGetProjectSummaryDeps(resolver)` → `createGetProjectSummary(deps)`\n- Resolve: `changes: ChangeRepository`, `archive: ArchiveRepository`, `listWorkspaces: ListWorkspaces`\n- MUST NOT resolve `listChanges`/`listDrafts`/`listDiscarded`/`listArchived` — counts from repo `count*` APIs, never list-length\n- MUST NOT inline fs wiring\n\n## Constraints\n- MUST NOT invoke code-graph providers or context compilation\n- MUST NOT load spec metadata, change artifact content, or materialize list entries\n- MUST NOT mutate config, repositories, or stored changes",
+      "value": "# Get Project Summary\n\n## Rules\n\n- execute(input?) always returns active/draft/discarded/archived counts, ordered workspace→spec counts and workspace count. Default flags omit active, drafts, specsHealth keys.\n- Input includeChanges/includeSpecsHealth default false. Count path: ChangeRepository count/countDrafts/countDiscarded, ArchiveRepository count or meta.total, ListWorkspaces then each specRepo.count; independent I/O parallel.\n- includeChanges true: list active/drafts, load each change, CountTasks.execute({ change }); entries name/state/tasks { incomplete, total }, including empty arrays. Discarded/archived count only.\n- includeSpecsHealth true returns project GetSpecsHealth.execute({}).\n- Constructor gets repos/use cases, no direct config/fs. createGetProjectSummary(config, options?) → resolveGetProjectSummaryDeps(resolver) → canonical factory; createKernel exposes kernel.project.getProjectSummary.\n- Preserve schema-driven change and canonical metadata-path spec repository bootstrap.\n\n## Constraints\n\n- Default path no lists/details/tasks, metadata, graph/context or artifacts.\n- Enrich only enabled; never mutate config/repos/changes.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:b169003e2b4fdcae11618a3a8ac0fa4424e3f06ee9f97111ac469fdbd95af0e0",
-          "lastModified": "2026-07-22T16:55:45.723Z"
+          "hash": "sha256:da5e8d115ea84818b321be68fcb45788419743a6812719ba0b75ffb9c2980a02",
+          "lastModified": "2026-07-26T11:52:20.566Z"
         },
         "verify.md": {
-          "hash": "sha256:b7e582a880f95bf214fed616e65ff27363f747bcd29e4af968f8c7db5aeb816b",
-          "lastModified": "2026-07-22T16:55:45.724Z"
+          "hash": "sha256:eb00add16d3c464cad3e4e753e79de94189d5c2fe13849597ae3c04ef7fa3ef8",
+          "lastModified": "2026-07-26T11:52:20.576Z"
         }
       }
     }

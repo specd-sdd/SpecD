@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { InMemoryGraphStore } from '../../helpers/in-memory-graph-store.js'
 import { getUpstream } from '../../../src/domain/services/get-upstream.js'
 import { getDownstream } from '../../../src/domain/services/get-downstream.js'
@@ -236,6 +236,36 @@ describe('Traversal services', () => {
       expect(methodUpstream.levels.get(1)?.map((symbol) => symbol.name)).toContain('save')
     })
 
+    it('reads a wide upstream frontier through one logical relation batch', async () => {
+      const target = sym('target', 'target.ts', 1)
+      const callers = Array.from({ length: 128 }, (_, index) =>
+        sym(`caller${String(index)}`, 'callers.ts', index + 1),
+      )
+      await store.upsertFile(file('target.ts'), [target], [])
+      await store.upsertFile(
+        file('callers.ts'),
+        callers,
+        callers.map((caller, index) =>
+          createRelation({
+            source: caller.id,
+            target: target.id,
+            type: index % 2 === 0 ? RelationType.Calls : RelationType.UsesType,
+          }),
+        ),
+      )
+      const relationBatch = vi.spyOn(store, 'getIncomingSymbolRelations')
+      const symbolBatch = vi.spyOn(store, 'getSymbolsByIds')
+
+      const result = await getUpstream(store, target.id, { maxDepth: 1, includeFiles: false })
+
+      expect(result.totalCount).toBe(callers.length)
+      expect(relationBatch).toHaveBeenCalledTimes(2)
+      expect(relationBatch.mock.calls[0]?.[0]).toEqual([target.id])
+      expect(relationBatch.mock.calls[1]?.[0]).toHaveLength(callers.length)
+      expect(symbolBatch).toHaveBeenCalledTimes(1)
+      expect(symbolBatch.mock.calls[0]?.[0]).toHaveLength(callers.length)
+    })
+
     it('supports includeFiles to traverse file importers', async () => {
       const target = sym('target', 'y.ts', 1)
       const importerSym = sym('importerSym', 'x.ts', 1)
@@ -337,6 +367,36 @@ describe('Traversal services', () => {
 
       const result = await getDownstream(store, childClass.id)
       expect(result.levels.get(1)?.map((symbol) => symbol.name)).toContain('BaseService')
+    })
+
+    it('reads a wide downstream frontier through one logical relation batch', async () => {
+      const source = sym('source', 'source.ts', 1)
+      const targets = Array.from({ length: 128 }, (_, index) =>
+        sym(`target${String(index)}`, 'targets.ts', index + 1),
+      )
+      await store.upsertFile(file('source.ts'), [source], [])
+      await store.upsertFile(
+        file('targets.ts'),
+        targets,
+        targets.map((target, index) =>
+          createRelation({
+            source: source.id,
+            target: target.id,
+            type: index % 2 === 0 ? RelationType.Constructs : RelationType.UsesType,
+          }),
+        ),
+      )
+      const relationBatch = vi.spyOn(store, 'getOutgoingSymbolRelations')
+      const symbolBatch = vi.spyOn(store, 'getSymbolsByIds')
+
+      const result = await getDownstream(store, source.id, { maxDepth: 1, includeFiles: false })
+
+      expect(result.totalCount).toBe(targets.length)
+      expect(relationBatch).toHaveBeenCalledTimes(2)
+      expect(relationBatch.mock.calls[0]?.[0]).toEqual([source.id])
+      expect(relationBatch.mock.calls[1]?.[0]).toHaveLength(targets.length)
+      expect(symbolBatch).toHaveBeenCalledTimes(1)
+      expect(symbolBatch.mock.calls[0]?.[0]).toHaveLength(targets.length)
     })
 
     it('supports includeFiles to traverse file importees', async () => {

@@ -1,0 +1,28 @@
+- op: modified
+  description: 'Cover configured graph contexts without VCS while retaining bootstrap validation.'
+  selector:
+    type: section
+    matches: '^Requirement: resolveGraphCliContext uses SDK imports$'
+  content: |
+    #### Scenario: Configured mode uses resolveCliContext
+
+    - **WHEN** a graph command runs with `--config` or autodiscovered config
+    - **THEN** `resolveGraphCliContext` obtains kernel via `resolveCliContext`
+    - **AND** platform symbols are imported from `@specd/sdk`
+
+    #### Scenario: Configured mode outside a repository
+
+    - **GIVEN** a valid explicit or CWD-discovered `specd.yaml` has a project root outside VCS
+    - **WHEN** a graph command resolves configured context
+    - **THEN** it returns the configured project root without a VCS-root validation error
+    - **AND** its VCS root is absent for provider health handling
+
+    #### Scenario: Bootstrap mode uses synthetic default workspace
+
+    - **WHEN** a graph command runs with `--path` or no-config bootstrap fallback inside a repository
+    - **THEN** a synthetic `default` workspace is used with `codeRoot` at the resolved VCS root
+
+    #### Scenario: Bootstrap mode outside a repository fails
+
+    - **WHEN** a graph command enters `--path` or no-config bootstrap mode outside a repository
+    - **THEN** context resolution fails with the bootstrap validation error

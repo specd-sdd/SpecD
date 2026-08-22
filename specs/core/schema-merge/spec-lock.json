@@ -4,5 +4,41 @@
     "version": 1
   },
   "dependsOn": ["core:schema-format", "core:build-schema", "default:_global/architecture"],
-  "implementation": []
+  "implementation": [],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "mergeSchemaLayers aplica herencia, plugins y overrides a SchemaYamlData de forma pura, ordenada y validada.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:c8d7fb7a2d6d4b2bd85d1b6bb0efedbc04065d165ef1042f24e4a106c2973793",
+          "lastModified": "2026-05-25T06:02:58.478Z"
+        },
+        "verify.md": {
+          "hash": "sha256:0fa37a203b34f0e652fe721e5e14f3291c4f17b699fb13f5eeb73173a385e2fb",
+          "lastModified": "2026-05-25T06:02:58.478Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Schema Merge\n\n## Rules\n\n- Export synchronous pure mergeSchemaLayers(base: SchemaYamlData, layers: readonly SchemaLayer[]): SchemaYamlData in domain/services/merge-schema-layers.ts.\n- SchemaLayer source extends|plugin|override, human ref, optional operations remove/create/prepend/append/set.\n- Per-layer order remove → create → prepend → append → set. Layer order root-to-parent extends, declared plugins, one project override.\n- Identity: artifacts id; workflow step; hooks/validations/deltaValidations/rules/preHashCleanup id; metadataExtraction rules/constraints/scenarios/context id. Nested operation identifies parent then child.\n- remove deletes existing identity; null removes optional scalar; missing/required target throws SchemaValidationError. create/prepend/append reject collisions and preserve declared order. set scalars last-writer-wins, replaces existing array entry in-place.\n- Targets mirror top scalars, artifacts/workflow and nested fields. Post-merge validate unique IDs and artifact.requires references; errors identify layer/operation. Return new data, never mutate inputs.\n\n## Constraints\n\n- No I/O/fs/yaml/zod; synchronous domain service only.\n- No application/infrastructure/composition imports.\n- Operates intermediate SchemaYamlData below entities/buildSchema.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:c8d7fb7a2d6d4b2bd85d1b6bb0efedbc04065d165ef1042f24e4a106c2973793",
+          "lastModified": "2026-05-25T06:02:58.478Z"
+        },
+        "verify.md": {
+          "hash": "sha256:0fa37a203b34f0e652fe721e5e14f3291c4f17b699fb13f5eeb73173a385e2fb",
+          "lastModified": "2026-05-25T06:02:58.478Z"
+        }
+      }
+    }
+  }
 }

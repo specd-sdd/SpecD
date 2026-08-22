@@ -3,56 +3,44 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": [
-    "code-graph:graph-store",
-    "core:config",
-    "code-graph:symbol-model",
-    "code-graph:workspace-integration"
-  ],
+  "dependsOn": [],
   "implementation": [
     {
-      "file": "code-graph:src/infrastructure/ladybug/ladybug-graph-store.ts",
-      "symbols": ["LadybugGraphStore"]
-    },
-    {
-      "file": "code-graph:src/infrastructure/ladybug/schema.ts"
-    },
-    {
-      "file": "code-graph:test/infrastructure/ladybug/ladybug-graph-store.spec.ts"
+      "file": "code-graph:package.json"
     }
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "LadybugDB-backed GraphStore adapter providing Cypher query execution, FTS indexing, identity-ranked search, and CSV bulk loading.",
+      "value": "Define Ladybug `GraphStore`: config-rooted persistence, schema/search, safe Cypher, transactional bulk indexing, incremental state.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:61e95318ffd81d9b34bd1880cc689d6e922c1281d496b2f5ee6d42e9767e72c7",
-          "lastModified": "2026-08-16T08:12:48.057Z"
+          "hash": "sha256:bd055e2f233605cc4495a83315841c771e7ddb0c27dd663ab91d0e9ada0c6352",
+          "lastModified": "2026-08-16T10:48:01.639Z"
         },
         "verify.md": {
-          "hash": "sha256:bd81a1fc577554f96873f4a937e44e1f64ba19972312546b734d398048d8054e",
-          "lastModified": "2026-08-16T08:12:48.060Z"
+          "hash": "sha256:84d8baa3edd2e665ce8a146e3a4e4093cf1eff5a63c71bb870b8ad05ba778d35",
+          "lastModified": "2026-08-16T10:48:01.658Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# Ladybug Graph Store\n\n## Rules\n\n- `LadybugGraphStore` implements `GraphStore`; backend id `ladybug`; defer native binding readiness until `open()`; `close()` idempotent.\n- Storage paths: database/lock/WAL under `{configPath}/graph`, CSV scratch under `{configPath}/tmp` (cleaned post-run).\n- Schema & versioning: tables for `File`, `Symbol`, `Spec`, `Document`, `Meta`, and relation edges (`IMPORTS`, `DEFINES`, `CALLS`, `CONSTRUCTS`, `USES_TYPE`, `EXPORTS`, `DEPENDS_ON`, `COVERS_FILE`, `COVERS_SYMBOL`, `EXTENDS`, `IMPLEMENTS`, `OVERRIDES`). `COVERS_SYMBOL` preserves stale metadata. Versioning tracks schema; incompatible versions require `recreate()` full rebuild and `storage.epoch` rotation.\n- Cypher safety: user/external values MUST use prepared statements (`conn.prepare`, `conn.execute`, `$param`, `Record<string, LbugValue>`); direct `conn.query` restricted to DDL, compile-time constants, internal COPY paths.\n- FTS indexes: `symbol_fts` (`searchName`, `comment`), `spec_fts` (`title`, `description`, `content`), `document_fts` (`content`, paths), trigram source content index for queries ≥ 3 chars.\n- Query processing: join multi-token queries with `OR`; supplement FTS candidates with identity hits.\n- Reranking: exact canonical identity > exact token > prefix > suffix > real component > substring > content text.\n- Bulk loading: single transaction/session with bounded CSV `COPY` chunks, commits once, rebuilds FTS once post-commit. Scratch in `{configPath}/tmp` cleaned post-run.\n- Observations & latches: persists `IndexedInputObservation` records and workspace/global latches for incremental hydration.\n\n## Constraints\n\n- Infrastructure adapter; consumers depend on abstract `code-graph:graph-store`.\n- Backend id `ladybug`.\n- All persisted artifacts and scratch rooted under `configPath`.\n- Parameterized Cypher MUST use prepared statements with `$param`.",
+      "value": "# Ladybug Graph Store\n## Rules\n- `LadybugGraphStore` implements `GraphStore`; backend id `ladybug`; native readiness deferred to `open()`; `close()` idempotent.\n- Persist DB/lock/WAL under `{configPath}/graph`; scratch CSV `{configPath}/tmp`; create dirs; clean scratch after run.\n- `recreate()`: discard Ladybug graph + owned companions; rotate `storage.epoch`; reopen/rebuild. Callers use provider semantics, never delete files.\n- Persist `File`, `Symbol`, `Spec`, `Document`, `Meta`; relations `IMPORTS`, `DEFINES`, `CALLS`, `CONSTRUCTS`, `USES_TYPE`, `EXPORTS`, `DEPENDS_ON`, `COVERS_FILE`, `COVERS_SYMBOL`, `EXTENDS`, `IMPLEMENTS`, `OVERRIDES`; `COVERS_SYMBOL` retains stale metadata.\n- FTS: `symbol_fts` (`searchName`, `comment`), `spec_fts` (`title`, `description`, `content`), `document_fts` (content + paths); trigram source-content index ≥3-char queries. `Document` FTS primary discovery; persisted `File` content not searchable category.\n- FTS query: sanitized expanded tokens joined `OR`; supplement every candidate set with identity hits; rank exact canonical > exact token > prefix > suffix > component > substring > content; more matching identity tokens wins; snippets/1-based ranges.\n- Externally derived Cypher: `conn.prepare`, `conn.execute`, `$param`, `Record<string, LbugValue>` only. `conn.query` only DDL, compile-time constants, internal COPY/admin paths.\n- One indexing run: one transaction/session, bounded CSV `COPY`, one commit, one semantic/content FTS rebuild; no chunk rebuild. Set-based endpoint validation.\n- Persist `IndexedInputObservation`, workspace/global latches, VCS evidence, compact incremental facts, case precedence, bounded ambiguity, exact-file normalization, total/omitted matches.\n- Indexed structured workspace/surface/name/symbol-space/owner/member-form/exported-name fields drive lookup/ranking; never parse/substr-rank serialized canonical ids. Shared complete/raw/expanded plan filters before candidate limits; deterministic order; bounded short-query fallback; Code Graph verifies occurrences, suppression, per-file caps.\n- Schema upgrade exactly once (normally `10`→`11`); incompatible reads reject; repair destructively recreates, rotates generation, rebuilds FTS before ready.\n## Constraints\n- Infrastructure adapter; consumers use `code-graph:graph-store`.\n- All persisted/scratch artifacts rooted `configPath`; `ladybug` stable backend id.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:61e95318ffd81d9b34bd1880cc689d6e922c1281d496b2f5ee6d42e9767e72c7",
-          "lastModified": "2026-08-16T08:12:48.057Z"
+          "hash": "sha256:bd055e2f233605cc4495a83315841c771e7ddb0c27dd663ab91d0e9ada0c6352",
+          "lastModified": "2026-08-16T10:48:01.639Z"
         },
         "verify.md": {
-          "hash": "sha256:bd81a1fc577554f96873f4a937e44e1f64ba19972312546b734d398048d8054e",
-          "lastModified": "2026-08-16T08:12:48.060Z"
+          "hash": "sha256:84d8baa3edd2e665ce8a146e3a4e4093cf1eff5a63c71bb870b8ad05ba778d35",
+          "lastModified": "2026-08-16T10:48:01.658Z"
         }
       }
     }

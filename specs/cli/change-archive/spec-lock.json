@@ -17,5 +17,41 @@
     {
       "file": "cli:src/index.ts"
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Archives an archivable change by merging deltas into permanent specs, running hooks, moving files, and recording history.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:5fa3b7ed3772608426b6ed9a2e69b28380dc1e71462d9c6019b770788c700d98",
+          "lastModified": "2026-05-25T06:02:58.310Z"
+        },
+        "verify.md": {
+          "hash": "sha256:7cdd99751a68fb819648a4ed89d2b4ea8331aafe3b5063b7e8ad6859b10dfb5f",
+          "lastModified": "2026-05-25T06:02:58.310Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Change Archive\n\n## Rules\n\n- Canonical: `specd changes archive <name> [--skip-hooks <phases>] [--allow-overlap] [--format text|json|toon]`; alias: `specd change archive <name> [--skip-hooks <phases>] [--allow-overlap] [--format text|json|toon]`.\n- `<name>` required change name.\n- `--skip-hooks <phases>`: comma-separated `pre`, `post`, or `all`; omitted runs both phases. `all` skips every hook; caller must invoke `specd change run-hooks`.\n- `--allow-overlap`: permit archive despite spec overlap with active changes.\n- `--format text|json|toon`: default `text`.\n- Change must be `archivable`. Missing change, other state, delta conflict, or parse failure exits 1; non-archivable error goes to stderr as `error:` naming current state.\n- CLI delegates to `ArchiveChange`: merge all deltas into permanent spec directories; move change to path from `storage.archivePattern`; record archive history.\n- Default `archiving` `run:` hooks: pre before file changes, post after archive. `--skip-hooks` maps to archive hook-phase selector on `ArchiveChangeInput`.\n- Successful archive with failed post-hooks exits 2 and reports failures.\n- Success `text`: archive path; when overlap invalidates changes, `invalidated N overlapping changes:` plus each change and overlapping specs. Omit section when none.\n- Success `json`/`toon`: encoded `result: \"ok\"`, `name`, `archivePath`, and `invalidatedChanges` entries containing `name` and `specIds`; empty array when none. JSON exits 0.\n\n## Constraints\n\n- Archive only `archivable` changes.\n- Archive path determined by `storage.archivePattern` in `specd.yaml`.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:5fa3b7ed3772608426b6ed9a2e69b28380dc1e71462d9c6019b770788c700d98",
+          "lastModified": "2026-05-25T06:02:58.310Z"
+        },
+        "verify.md": {
+          "hash": "sha256:7cdd99751a68fb819648a4ed89d2b4ea8331aafe3b5063b7e8ad6859b10dfb5f",
+          "lastModified": "2026-05-25T06:02:58.310Z"
+        }
+      }
+    }
+  }
 }

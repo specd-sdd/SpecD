@@ -14,5 +14,41 @@
       "file": "core:src/application/use-cases/regenerate-spec-metadata.ts",
       "symbols": ["RegenerateSpecMetadata"]
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Force-rebuild metadata for one spec or scoped batches through canonical materialization with complete failure reporting.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:6fe210b4e155bffd38cd13328944830b354a8f96cb6048f4d8026ca12e21ba2d",
+          "lastModified": "2026-07-25T11:53:31.582Z"
+        },
+        "verify.md": {
+          "hash": "sha256:c82fbe8934a652e1123a76d6006109ccca74a7be206c172ca4a2cbe2cc5d87d6",
+          "lastModified": "2026-07-25T11:53:31.582Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Regenerate Spec Metadata\n\n## Rules\n\n- RegenerateSpecMetadata.execute(input): target one spec via specId, or batch optionally filtered by workspace names. Batch targets every discovered in-scope spec; no metadata-status selection.\n- Per target, invoke MaterializeSpecMetadata with policy: 'force'. Never duplicate generation, freshness comparison, or persistence.\n- Batch discovery: use ListWorkspaces plus each workspace repository spec-identity listing; never ListSpecs, which may materialize metadata and create use-case dependency cycle.\n- Single target: any MaterializeSpecMetadata failure, including forced cache-write failure, yields failed operation result.\n- Batch: continue after individual failures; return success/failure per targeted spec; any failure yields failing/non-zero overall outcome. Exclude workspaces/specs outside workspaces filter.\n- Follow Core use-case contract: class with async execute(input), explicit constructor dependencies.\n- Composition exposes RegenerateSpecMetadataDeps; resolveRegenerateSpecMetadataDeps(resolver: CompositionResolver): RegenerateSpecMetadataDeps; createRegenerateSpecMetadata(deps): RegenerateSpecMetadata; createRegenerateSpecMetadata(config: SpecdConfig, options?: CompositionResolutionOptions): RegenerateSpecMetadata.\n- resolveRegenerateSpecMetadataDeps(resolver) resolves at least MaterializeSpecMetadata and ListWorkspaces.\n- Config factory creates one CompositionResolver, derives dependencies via resolveRegenerateSpecMetadataDeps(resolver), delegates to canonical dependency factory.\n- Export RegenerateSpecMetadata, Input/Result types, Deps, and create* factory through Core public surface; re-export via SDK; expose Kernel.specs.regenerateMetadata.\n\n## Constraints\n\n- Forced regeneration unconditional across resolved scope; never select targets by metadata freshness.\n- specs generate-metadata CLI handlers delegate single-spec and unfiltered batch work directly to RegenerateSpecMetadata; never loop over MaterializeSpecMetadata.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:6fe210b4e155bffd38cd13328944830b354a8f96cb6048f4d8026ca12e21ba2d",
+          "lastModified": "2026-07-25T11:53:31.582Z"
+        },
+        "verify.md": {
+          "hash": "sha256:c82fbe8934a652e1123a76d6006109ccca74a7be206c172ca4a2cbe2cc5d87d6",
+          "lastModified": "2026-07-25T11:53:31.582Z"
+        }
+      }
+    }
+  }
 }

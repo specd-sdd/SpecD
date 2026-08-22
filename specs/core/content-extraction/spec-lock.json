@@ -4,5 +4,41 @@
     "version": 1
   },
   "dependsOn": ["core:selector-model", "core:artifact-ast"],
-  "implementation": []
+  "implementation": [],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Declarative extractor engine selects AST nodes and produces simple, grouped, or structured content with injected transforms.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:01a5c45056847f81382db58342b91ede22b2bbea5eae742f30867fa2a9f0aa5c",
+          "lastModified": "2026-05-25T06:02:58.437Z"
+        },
+        "verify.md": {
+          "hash": "sha256:eb3a1eebc5cd538e6b8395c35ea480dee83d8ae2e35a05229eeb07e61e91cff2",
+          "lastModified": "2026-05-25T06:02:58.437Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Content extraction\n## Rules\n- Extractor: selector required; extract content default, label, or both; optional capture, strip, groupBy label, transform string or { name, args? }, fields FieldMapping.\n- extract label = node.label; content = children only, leaf self; both = label + full subtree.\n- Simple no fields/groupBy: find selector nodes, extract, strip, capture each regex match as $1 (placeholders $0/$2+), transform each emitted value, return Promise<string[]>.\n- groupBy label: strip label group key; each item is child content.\n- fields: one StructuredExtraction per match. FieldMapping from content default, label, parentLabel or childSelector; childSelector overrides from; optional capture, strip, followSiblings, transform.\n- parentLabel uses nearest ancestor; childSelector resolves within match. followSiblings activates sequential child walk for every childSelector field: matching field becomes active; compatible following siblings append until mismatch/new field; capture yields $1 else full text.\n- SubtreeRenderer only renderSubtree(node); caller supplies parser-compatible renderer. Engine uses SelectorNode, not ArtifactNode.\n- Transform registry injected by caller; callback receives value, interpolated readonly args, opaque ReadonlyMap context; returns string or Promise<string>. Await async transforms.\n- Unknown transform, execution failure/rejection, or null returned after received value throws ExtractorTransformError; identifies transform level and field when applicable.\n- Kernel owns built-in registry plus additive external transforms. resolveSpecPath tries value then interpolated args in order for canonical spec ID.\n## Constraints\n- Engine no I/O/side effects; awaited work only injected transforms.\n- from and childSelector exclusive; followSiblings ineffective without childSelector.\n- Transform args declarative; placeholders can become undefined. Engine neither validates nor interprets context.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:01a5c45056847f81382db58342b91ede22b2bbea5eae742f30867fa2a9f0aa5c",
+          "lastModified": "2026-05-25T06:02:58.437Z"
+        },
+        "verify.md": {
+          "hash": "sha256:eb3a1eebc5cd538e6b8395c35ea480dee83d8ae2e35a05229eeb07e61e91cff2",
+          "lastModified": "2026-05-25T06:02:58.437Z"
+        }
+      }
+    }
+  }
 }

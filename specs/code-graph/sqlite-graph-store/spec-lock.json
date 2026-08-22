@@ -11,48 +11,150 @@
   ],
   "implementation": [
     {
-      "file": "code-graph:src/infrastructure/sqlite/sqlite-graph-store.ts",
-      "symbols": ["SQLiteGraphStore"]
+      "file": "code-graph:src/domain/errors/store-overload-error.ts",
+      "symbols": ["StoreOverloadError"]
     },
     {
-      "file": "code-graph:src/infrastructure/sqlite/schema.ts"
+      "file": "code-graph:src/domain/errors/store-worker-error.ts",
+      "symbols": ["StoreWorkerError"]
+    },
+    {
+      "file": "code-graph:src/domain/errors/index.ts"
+    },
+    {
+      "file": "code-graph:src/infrastructure/sqlite/sqlite-runtime-descriptor.ts",
+      "symbols": ["SqliteRuntimeDescriptor", "SQLiteGraphStoreOptions"]
+    },
+    {
+      "file": "code-graph:src/infrastructure/sqlite/sqlite-worker-protocol.ts",
+      "symbols": [
+        "SQLiteWorkerOperation",
+        "SQLiteWorkerRequest",
+        "SQLiteWorkerResponse",
+        "SerializedErrorPayload",
+        "SQLiteWorkerProgressEvent",
+        "SQLiteWorkerOperationMap",
+        "SerializableIndexWriteSessionMetadata"
+      ]
+    },
+    {
+      "file": "code-graph:src/infrastructure/sqlite/resolve-worker-path.ts",
+      "symbols": ["resolveSqliteWorkerPath"]
+    },
+    {
+      "file": "code-graph:src/infrastructure/sqlite/sqlite-graph-database.ts",
+      "symbols": [
+        "SQLiteGraphDatabase",
+        "getSymbolsByIds",
+        "getIncomingSymbolRelations",
+        "getOutgoingSymbolRelations"
+      ]
+    },
+    {
+      "file": "code-graph:src/infrastructure/sqlite/sqlite-worker.ts",
+      "symbols": [
+        "handleMessage",
+        "serializeError",
+        "createBulkSession",
+        "requireBulkSession",
+        "mergeReferenceFactChunks"
+      ]
+    },
+    {
+      "file": "code-graph:src/infrastructure/sqlite/sqlite-worker-client.ts",
+      "symbols": ["SQLiteWorkerClient", "drainPendingRequests"]
+    },
+    {
+      "file": "code-graph:src/infrastructure/sqlite/sqlite-graph-store.ts",
+      "symbols": [
+        "SQLiteGraphStore",
+        "clear",
+        "invalidateBulkSession",
+        "getSymbolsByIds",
+        "getIncomingSymbolRelations",
+        "getOutgoingSymbolRelations"
+      ]
+    },
+    {
+      "file": "code-graph:src/infrastructure/sqlite/index.ts"
+    },
+    {
+      "file": "code-graph:test/infrastructure/sqlite/sqlite-worker-protocol.spec.ts"
+    },
+    {
+      "file": "code-graph:test/infrastructure/sqlite/sqlite-worker-backpressure.spec.ts"
+    },
+    {
+      "file": "code-graph:test/infrastructure/sqlite/sqlite-worker-responsiveness.spec.ts"
+    },
+    {
+      "file": "code-graph:test/infrastructure/sqlite/sqlite-worker-dist.spec.ts"
+    },
+    {
+      "file": "code-graph:test/infrastructure/sqlite/sqlite-worker-lifecycle.spec.ts"
+    },
+    {
+      "file": "code-graph:src/domain/errors/spec-not-found-error.ts",
+      "symbols": ["SpecNotFoundError"]
+    },
+    {
+      "file": "code-graph:src/infrastructure/storage-generation.ts",
+      "symbols": ["rotateStorageGenerationAsync", "ensureStorageGenerationAsync"]
     },
     {
       "file": "code-graph:test/infrastructure/sqlite/sqlite-graph-store.spec.ts"
+    },
+    {
+      "file": "code-graph:test/integration/sqlite-wide-traversal.spec.ts"
+    },
+    {
+      "file": "code-graph:src/domain/errors/bulk-session-state-error.ts",
+      "symbols": ["BulkSessionStateError"]
+    },
+    {
+      "file": "code-graph:src/domain/errors/graph-schema-incompatible-error.ts",
+      "symbols": ["GraphSchemaIncompatibleError"]
+    },
+    {
+      "file": "code-graph:src/domain/errors/invalid-graph-store-configuration-error.ts",
+      "symbols": ["InvalidGraphStoreConfigurationError"]
+    },
+    {
+      "file": "code-graph:README.md"
     }
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "SQLite-backed GraphStore adapter providing atomic transactions, FTS5 identity-ranked search, schema versioning, and {configPath}/graph persistence.",
+      "value": "Define sole built-in SQLite `GraphStore`: dedicated-worker non-blocking ops, config-rooted persistence, atomic txns, FTS identity-aware search.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:6b4f7abc2e1d2272d48e5d8a9b19f5a3f26cbb32747603fb7772331d0ed297c6",
-          "lastModified": "2026-08-16T08:12:47.958Z"
+          "hash": "sha256:8b3f50127661dfa74fcf3b324e9f72c20e35f219380b3b3b461754e147005fb2",
+          "lastModified": "2026-08-22T07:00:53.691Z"
         },
         "verify.md": {
-          "hash": "sha256:4f65021609aac5a202abefadb757d9d9063d277e1c2efd0cb3826386adc440ab",
-          "lastModified": "2026-08-16T08:12:47.966Z"
+          "hash": "sha256:0cc5556209febfb98b45d2b5c20a9ed896c8115f15e01f310e1c99ad051a1646",
+          "lastModified": "2026-08-22T07:03:24.394Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# SQLite Graph Store\n\n## Rules\n\n- `SQLiteGraphStore` implements `GraphStore`; backend id `sqlite`; default when `graphStoreId` omitted.\n- Open/close: defer native bindings until `open()`; `close()` idempotent; initializes DDL/versioning on first open.\n- Storage paths: database/WAL under `{configPath}/graph`, temporary scratch under `{configPath}/tmp`.\n- Schema: tables for `File`, `Symbol`, `Spec`, `Document`, `Meta`, and relations `IMPORTS`, `DEFINES`, `CALLS`, `CONSTRUCTS`, `USES_TYPE`, `EXPORTS`, `DEPENDS_ON`, `COVERS_FILE`, `COVERS_SYMBOL`, `EXTENDS`, `IMPLEMENTS`, `OVERRIDES`. `COVERS_SYMBOL` preserves stale metadata.\n- FTS5 virtual tables: `symbol_fts` (`name`, `comment`), `spec_fts` (`title`, `description`, `content`), `document_fts` (`path`, `content`), trigram source content index for queries ≥ 3 chars.\n- Query processing: sanitize multi-token queries with `OR`; supplement FTS candidates with identity hits.\n- SQL ranking: exact canonical identity > exact token > prefix > suffix > real component > substring > BM25 body text. Never replace FTS with plain `LIKE`.\n- Transactions: `upsertFile`, `removeFile`, `upsertSpec`, `removeSpec`, bulk commits are atomic transactions.\n- Bulk indexing: single transaction, set-based endpoint validation, prepared/bulk inserts, commit once, rebuild FTS once post-commit. Scratch in `{configPath}/tmp` cleaned post-run.\n- Schema versioning: tracks backend schema version; incompatible versions reject reads and require `recreate()` full rebuild, `storage.epoch` rotation, and FTS rebuild.\n- Observations: persists `IndexedInputObservation` records and workspace/global latches for incremental hydration.\n\n## Constraints\n\n- Infrastructure adapter; consumers depend on abstract `code-graph:graph-store`.\n- Backend id `sqlite`.\n- All persisted artifacts rooted under `configPath`.",
+      "value": "# SQLite Graph Store\n## Rules\n- `SQLiteGraphStore` implements `GraphStore` via `better-sqlite3`; semantics per `code-graph:graph-store`; stable backend id `sqlite`; sole built-in backend, selected when no explicit `graphStoreId`.\n- All sync SQLite work (queries, mutations, txns, schema init, FTS, maintenance) runs inside dedicated persistent Node.js Worker Thread owned by open store; MUST NOT run on host event loop.\n- One open store = exactly one persistent worker + one SQLite connection; no per-op workers/pooling; concurrent `open()`/`close()` share in-flight lifecycle Promise.\n- Worker owns better-sqlite3 connection, prepared statements, transactions, schema work, FTS maintenance, backend fs work; native handles/prepared statements MUST NOT cross worker boundary.\n- Host/worker communicate via strongly typed structured-cloneable request/result/error/progress DTOs with monotonic correlation ids; no functions/native objects/class instances across boundary.\n- Worker processes ops through explicit FIFO serial queue; lifecycle, maintenance, reads, mutations never interleave.\n- Host validates `maxPendingOperations >= 1`; default 256 outstanding; beyond limit rejects immediately `StoreOverloadError` without disturbing accepted work.\n- `close()`: reject new work; drain accepted within `drainTimeoutMs` (default 5000ms); request worker-side db close; force terminate after graceful deadline; unsettled requests reject `StoreWorkerError`; await forced termination but never claim hard wall-clock bound during native execution.\n- Runtime config crossing boundary uses serializable `SqliteRuntimeDescriptor`; custom `modulePath` MAY select compatible binding; internal worker-path test overrides not public options.\n- Unexpected worker error/exit faults store + rejects outstanding with `StoreWorkerError`; recovery explicit `close()` then `open()`; never silent restart.\n- `close()` starting while `open()` pending: shutdown owns final lifecycle state; `open()` MUST NOT publish open afterward.\n- Bulk indexing via worker-side session `sessionId`; only session start creates state; staging/commit/rollback vs missing/finalized session reject; host enforces explicit active/committing/rolling-back/finished states bound to current store lifecycle generation.\n- Progress callbacks observational; callback failures isolated, MUST NOT abort worker operation or txn.\n- Closed-store recreation uses non-blocking host filesystem APIs for cleanup + storage-generation rotation.\n- Batch symbol/relation queries = set-based worker ops; one batch call crosses boundary as ONE RPC, not per symbol/relation type; set-based predicates; incoming/outgoing relation lookup queries all requested symbol ids + relation types together; large input sets split into deterministic bounded SQL parameter chunks inside worker (SQLite param limits cannot fail valid traversal); preserve deterministic ordering + empty-input semantics of abstract contract.\n- Exact batch node lookups (`getFilesByPaths`, `getDocumentsByPaths`, `getSpecsByIds`, `getSymbolsByIds`) = set-based worker ops; each logical batch crosses boundary once as one typed RPC, never per-node RPCs; `path IN (...)`/`id IN (...)` predicates; bounded SQL param chunks inside worker; dedupe repeated identities, omit unknown identities, preserve first requested-identity order; empty input returns empty array without RPC.\n- Persistence rooted at project-level `configPath`: graph dir `{configPath}/graph`, scratch `{configPath}/tmp`; DB file + WAL/shared-memory companions only under derived dirs; create dirs on demand.\n- Default backend role: durable persistence of file/document/symbol/spec/relation/meta state; atomic mutation semantics; full-text + identity-aware search for symbol/file/spec/document discovery; bulk indexing + full re-index; structured queries traversal/references/coverage/impact/hotspots/search/stats. Graph unreadable after backend change → full SQLite re-index = supported recovery path.\n- Destructive recreation: discard all persisted SQLite graph data under `{configPath}/graph` incl WAL/SHM companions belonging to same root; rotate persisted storage-generation marker; ready for clean rebuild from scratch on reopen.\n- Storage-generation sidecar under `{configPath}/graph` compatible with shared stale-detection contract (`graph/storage.epoch` acceptable); `open()` exposes current generation to owning provider; destructive recreation rotates generation so older open providers detect staleness and reopen.\n- Adapter owns SQLite-specific persisted schema: files, symbols, specs, relations, FTS indexes, store metadata; derived/backend-specific columns OK (normalized search text); physical schema implementation concern; storage-agnostic consumers depend on `code-graph:graph-store`, not this spec.\n- Persisted node kinds: `File` (incl source content for symbol snippet extraction), `Symbol`, `Spec`, `Document` (textual non-code), `Meta` records; File table includes source content for snippet derivation; Document table columns path (PK), configRelativePath, contentHash, content, workspace.\n- Persisted relation families: IMPORTS DEFINES CALLS CONSTRUCTS USES_TYPE EXPORTS DEPENDS_ON COVERS_FILE COVERS_SYMBOL EXTENDS IMPLEMENTS OVERRIDES; physical layout adapter choice if observable GraphStore semantics preserved; COVERS_SYMBOL entries preserve relation metadata so stale symbol-level links survive reload.\n- Search via FTS5 over symbol/spec/document incl Document content+paths; keep FTS MATCH candidate generation for `searchSymbols()`, `searchSpecs()`, `searchDocuments()`; sanitize + join multi-token queries with OR for broad discovery; expand raw tokens via shared specd/code-aware lexical policy before identity-aware ranking; supplement FTS candidates with identity-derived candidates when tokenization misses strong identity hit required by abstract contract.\n- Identity-aware ranking in SQL explicit ordering columns (computed rank columns/CASE), not BM25 weights alone: boost exact canonical identity matches (Spec ID, Symbol Name/ID, Document Path); strong non-exact identity matches ahead generic content-only (symbol declared-name equality vs comment/body-only hits; spec-id prefix/suffix/substring/component matches; document canonical-path/config-relative-path prefix/suffix/substring/component matches); count expanded query tokens matching selected identity fields, rank higher coverage above lower when intent competing; BM25 ranks remaining textual matches after identity preference applied.\n- Observable ordering: exact canonical identity first > identity-oriented non-exact hits > body/comment/content-only; exact token > prefix token > suffix token > arbitrary substring token; real identity-component match beats substring-only same identity field; more expanded identity-token coverage outranks fewer when relevance otherwise competing; generic term frequency in spec/document body MUST NOT outrank stronger spec-id/symbol-name/document-path match for same query intent.\n- FTS schema: `symbol_fts` (Symbol.name, Symbol.comment), `spec_fts` (Spec.title, Spec.description, Spec.content), `document_fts` (Document.path, Document.content); stemming/weighted BM25/identity boost unions/other SQLite ranking options allowed if abstract graph-store contract satisfied; ranking expressed via explicit SQL ordering logic over discovered candidate set; candidate discovery MAY combine FTS MATCH results + identity-derived candidates; MUST NOT replace FTS retrieval with plain whole-query LIKE filtering only.\n- Derive match-aware snippets + 1-based line range from persisted file source content or FTS matches; persisted File content used for snippet extraction SHALL NOT become separate full-text searchable file category.\n- Transactions execute entirely inside worker preserving atomic mutation semantics; txn MUST NOT span multiple host/worker round trips; each atomic mutation incl `upsertFile()`, `removeFile()`, `upsertSpec()`, `removeSpec()`, bulk commit = one self-contained worker operation; failure preserves previously committed graph state.\n- Bulk indexing stages data to worker-side session in bounded chunks, never one repository-sized structured-clone payload; commit makes complete session visible atomically in one SQLite transaction; reference-fact chunks merge with earlier chunks from same session; worker emits serializable progress stages cleanup/files/documents/symbols/specs/reference facts/observations/relations/search indexes forwarded to optional observational callback; prepared statements/temp tables/bounded SQL chunks MAY keep run stable; scratch artifacts stay under `{configPath}/tmp`.\n- Schema versioning: track backend-specific schema version; on open execute current SQLite schema definition → verify/record current version in persisted metadata → prepare required FTS structures; incompatible persisted version MAY require destructive rebuild rather than incremental migration.\n- Backend-specific companion files (WAL, shared-memory) MAY exist next to primary DB file; implementation detail, not part abstract GraphStore contract.\n- Reference schema upgrade: persist logical-symbol, declaration, member, symbol-space, binding, provenance, coverage, construct-range, selection-range fields required by `GraphStore`; structured lookup columns indexed; serialized canonical ids MUST NOT be parsed or substring-ranked for semantic lookup; canonical ids remain unique external identities; backend-local integer row keys MAY join physically if provider-visible ids unchanged.\n- Substring-capable source-content index + bounded short-query fallback per abstract store; reverse coverage + new traversal batch reads use set-based predicates + deterministic ordering.\n- Track reference schema version `9`; later schema-affecting change increments exactly once; incompatible data rejects ordinary reads; `graph index` rebuilds destructively, rotates `storage.epoch`, rebuilds search indexes before readiness.\n- Incremental-hydration state persists: indexed-input observations, freshness latches, VCS evidence, compact unchanged-file facts; one indexing run = one transaction, set-based endpoint validation, bounded writes, one commit, one semantic/content index rebuild.\n## Constraints\n- Infrastructure adapter, not part of abstract graph-store contract.\n- `sqlite` stable backend id selecting this adapter from multi-backend graph-store registry.\n- SQLite-specific file layout, FTS behavior, schema shape, schema-version handling defined here, not `code-graph:graph-store`.\n- All SQLite scratch files + persisted database artifacts rooted under configPath.\n- Storage-agnostic use cases + CLI commands MUST NOT depend on this spec unless truly requiring SQLite-specific behavior.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:6b4f7abc2e1d2272d48e5d8a9b19f5a3f26cbb32747603fb7772331d0ed297c6",
-          "lastModified": "2026-08-16T08:12:47.958Z"
+          "hash": "sha256:8b3f50127661dfa74fcf3b324e9f72c20e35f219380b3b3b461754e147005fb2",
+          "lastModified": "2026-08-22T07:00:53.691Z"
         },
         "verify.md": {
-          "hash": "sha256:4f65021609aac5a202abefadb757d9d9063d277e1c2efd0cb3826386adc440ab",
-          "lastModified": "2026-08-16T08:12:47.966Z"
+          "hash": "sha256:0cc5556209febfb98b45d2b5c20a9ed896c8115f15e01f310e1c99ad051a1646",
+          "lastModified": "2026-08-22T07:03:24.394Z"
         }
       }
     }

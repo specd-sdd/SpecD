@@ -7,8 +7,11 @@ import { createCodeGraphProvider } from '../../src/composition/create-code-graph
 import { createBootstrapGraphConfig } from '../../src/application/services/bootstrap-graph-config.js'
 import { StoreNotOpenError } from '../../src/domain/errors/store-not-open-error.js'
 import { GraphProviderStaleError } from '../../src/domain/errors/graph-provider-stale-error.js'
+import { InvalidGraphSelectorError } from '../../src/domain/errors/invalid-graph-selector-error.js'
+import { GraphStoreRegistryError } from '../../src/domain/errors/graph-store-registry-error.js'
 import { InMemoryGraphStore } from '../helpers/in-memory-graph-store.js'
 import { makeMockSpecRepository } from '../helpers/make-mock-spec-repository.js'
+import { SQLiteWorkerClient } from '../../src/infrastructure/sqlite/sqlite-worker-client.js'
 import { createFileNode } from '../../src/domain/value-objects/file-node.js'
 import { createSymbolNode } from '../../src/domain/value-objects/symbol-node.js'
 import {
@@ -43,18 +46,6 @@ describe('CodeGraphProvider', () => {
     const provider = await createCodeGraphProvider({
       storagePath: tempDir,
       projectRoot: tempDir,
-    })
-
-    expect(provider).toBeDefined()
-    await provider.close()
-  })
-
-  it('can be instantiated with a Ladybug backend', async () => {
-    tempDir = mkdtempSync(join(tmpdir(), 'specd-graph-provider-ladybug-'))
-    const provider = await createCodeGraphProvider({
-      storagePath: tempDir,
-      projectRoot: tempDir,
-      graphStoreId: 'ladybug',
     })
 
     expect(provider).toBeDefined()
@@ -114,6 +105,49 @@ describe('CodeGraphProvider', () => {
 
     expect(provider).toBeDefined()
     await provider.close()
+  })
+
+  it('selects an additive external factory and forwards its storage root', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'specd-graph-provider-external-'))
+    const externalStore = new InMemoryGraphStore()
+    const create = vi.fn(() => externalStore)
+
+    const provider = createCodeGraphProvider({
+      storagePath: tempDir,
+      projectRoot: tempDir,
+      graphStoreFactories: { 'external-test': { create } },
+      graphStoreId: 'external-test',
+    })
+
+    expect(create).toHaveBeenCalledOnce()
+    expect(create).toHaveBeenCalledWith({ storagePath: tempDir })
+    await provider.close()
+  })
+
+  it('rejects an external collision with the sqlite built-in before store construction', () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'specd-graph-provider-collision-'))
+    const create = vi.fn(() => new InMemoryGraphStore())
+
+    expect(() =>
+      createCodeGraphProvider({
+        storagePath: tempDir,
+        projectRoot: tempDir,
+        graphStoreFactories: { sqlite: { create } },
+      }),
+    ).toThrow(GraphStoreRegistryError)
+    expect(create).not.toHaveBeenCalled()
+  })
+
+  it('rejects an unknown backend without falling back to sqlite', () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'specd-graph-provider-unknown-'))
+
+    expect(() =>
+      createCodeGraphProvider({
+        storagePath: tempDir,
+        projectRoot: tempDir,
+        graphStoreId: 'unknown',
+      }),
+    ).toThrow(GraphStoreRegistryError)
   })
 
   it('delegates indexing to the IndexCodeGraph use case', async () => {
@@ -231,6 +265,52 @@ describe('CodeGraphProvider', () => {
     await provider[Symbol.asyncDispose]()
 
     await expect(provider.getStatistics()).rejects.toThrow(StoreNotOpenError)
+  })
+
+  it('throws StoreNotOpenError for analyzeImpact after close', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'specd-graph-provider-analyze-closed-'))
+    const provider = await createCodeGraphProvider({
+      storagePath: tempDir,
+      projectRoot: tempDir,
+    })
+    await provider.open()
+    await provider.close()
+
+    await expect(provider.analyzeImpact('core:src/state.ts:render', 'downstream')).rejects.toThrow(
+      StoreNotOpenError,
+    )
+  })
+
+  it('resolves a config-relative file selector to the canonical workspace path', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'specd-graph-provider-file-resolve-'))
+    const store = new InMemoryGraphStore()
+    const provider = createCodeGraphProvider({
+      storagePath: tempDir,
+      projectRoot: tempDir,
+      graphStoreFactories: { custom: { create: () => store } },
+      graphStoreId: 'custom',
+    })
+    await provider.open()
+    await store.upsertFile(
+      createFileNode({
+        path: 'root:src/messages.ts',
+        configRelativePath: 'packages/root/src/messages.ts',
+        language: 'typescript',
+        contentHash: 'hash',
+        workspace: 'root',
+      }),
+      [],
+      [],
+    )
+
+    const resolved = await provider.resolveFileSelector('packages/root/src/messages.ts')
+    expect(resolved).toHaveLength(1)
+    expect(resolved[0]).toMatchObject({
+      canonicalPath: 'root:src/messages.ts',
+      configRelativePath: 'packages/root/src/messages.ts',
+      workspace: 'root',
+    })
+    await provider.close()
   })
 
   it('exposes batch resolution under the open provider lifecycle', async () => {
@@ -443,5 +523,86 @@ describe('CodeGraphProvider', () => {
     })
     expect(store.recreateCount).toBe(1)
     await indexingProvider.close()
+  })
+
+  it('validates availability exactly once per provider batch operation', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'specd-graph-provider-batch-availability-'))
+    const provider = await createCodeGraphProvider({
+      storagePath: tempDir,
+      projectRoot: tempDir,
+      graphStoreId: 'sqlite',
+    })
+    await provider.open()
+    const sendRequest = vi.spyOn(SQLiteWorkerClient.prototype, 'sendRequest')
+    const snapshotCallCount = (): number =>
+      sendRequest.mock.calls.filter(([op]) => op === 'readStorageGenerationSnapshot').length
+
+    try {
+      expect(await provider.getSymbolsByIds(['core:missing-symbol'])).toEqual([])
+      expect(snapshotCallCount()).toBe(1)
+
+      expect(await provider.getFilesByPaths(['core:src/missing.ts'])).toEqual([])
+      expect(snapshotCallCount()).toBe(2)
+
+      expect(await provider.getDocumentsByPaths(['root:docs/missing.md'])).toEqual([])
+      expect(snapshotCallCount()).toBe(3)
+
+      expect(await provider.getSpecsByIds(['core:missing-spec'])).toEqual([])
+      expect(snapshotCallCount()).toBe(4)
+    } finally {
+      sendRequest.mockRestore()
+      await provider.close()
+    }
+  })
+
+  it('does not multiply availability validation across composite inner loops', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'specd-graph-provider-composite-availability-'))
+    const provider = await createCodeGraphProvider({
+      storagePath: tempDir,
+      projectRoot: tempDir,
+      graphStoreId: 'sqlite',
+    })
+    await provider.open()
+    const sendRequest = vi.spyOn(SQLiteWorkerClient.prototype, 'sendRequest')
+    const snapshotCallCount = (): number =>
+      sendRequest.mock.calls.filter(([op]) => op === 'readStorageGenerationSnapshot').length
+
+    try {
+      const result = await provider.analyzeFilesImpact(
+        ['core:src/a.ts', 'core:src/b.ts', 'core:src/c.ts'],
+        'upstream',
+        2,
+      )
+
+      expect(result.riskLevel).toBe('LOW')
+      expect(snapshotCallCount()).toBe(1)
+    } finally {
+      sendRequest.mockRestore()
+      await provider.close()
+    }
+  })
+
+  it('rejects empty selectors with the typed graph selector error', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'specd-graph-provider-selector-error-'))
+    const provider = await createCodeGraphProvider({
+      storagePath: tempDir,
+      projectRoot: tempDir,
+      graphStoreId: 'sqlite',
+    })
+    await provider.open()
+
+    try {
+      const fileError = await provider.resolveFileSelector('').catch((error: unknown) => error)
+      expect(fileError).toBeInstanceOf(InvalidGraphSelectorError)
+      expect((fileError as InvalidGraphSelectorError).code).toBe('INVALID_GRAPH_SELECTOR')
+      expect((fileError as InvalidGraphSelectorError).message).toBe('empty file selector')
+
+      const symbolError = await provider.resolveSymbolSelector('').catch((error: unknown) => error)
+      expect(symbolError).toBeInstanceOf(InvalidGraphSelectorError)
+      expect((symbolError as InvalidGraphSelectorError).code).toBe('INVALID_GRAPH_SELECTOR')
+      expect((symbolError as InvalidGraphSelectorError).message).toBe('empty symbol selector')
+    } finally {
+      await provider.close()
+    }
   })
 })

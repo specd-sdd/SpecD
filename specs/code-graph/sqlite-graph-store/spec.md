@@ -2,29 +2,92 @@
 
 ## Purpose
 
-`GraphStore` is the storage contract for the code graph, but SQLite has backend-specific
-behavior that should not leak into the abstract port spec. This spec defines the
-requirements that are specific to `SQLiteGraphStore`: its physical schema, persistence
-layout, full-text search behavior, transaction model, and operational role as the
-built-in default graph-store backend once it satisfies the full Ladybug feature set.
+`GraphStore` is the storage contract for the code graph, but SQLite has backend-specific behavior that should not leak into the abstract port spec. This spec defines the requirements specific to `SQLiteGraphStore`: its physical schema, persistence layout, full-text search behavior, transaction model, and role as the sole built-in graph-store backend.
 
 ## Requirements
 
 ### Requirement: SQLite-backed implementation
 
-`SQLiteGraphStore` SHALL implement the `GraphStore` contract using SQLite as the storage engine while preserving the abstract semantics defined by `code-graph:graph-store`.
+`SQLiteGraphStore` SHALL implement the abstract `GraphStore` contract using
+`better-sqlite3` as its SQLite engine while preserving the storage-neutral
+semantics defined by `code-graph:graph-store`.
 
-Within a composition that supports multiple registered graph-store backends, the stable backend id for this adapter SHALL remain `sqlite`.
+All synchronous SQLite queries, mutations, transactions, schema initialization,
+full-text search, and backend-owned maintenance MUST execute inside a dedicated,
+persistent Node.js Worker Thread (`node:worker_threads`) owned by the open store
+instance. Synchronous SQLite work MUST NOT execute on the host event-loop thread.
 
-The adapter MUST:
+The stable backend id SHALL remain `sqlite`. Runtime-specific native binding
+resolution MUST be deferred until `open()`, and `close()` MUST remain
+idempotent.
 
-- open and close a SQLite database connection safely
-- execute the SQLite-specific schema DDL on first use
-- keep backend-specific schema version state
-- translate the abstract graph-store operations into SQLite queries, transactions, and full-text search operations
-- support runtime-specific database-module binding through adapter construction or factory composition, while deferring any native module loading required by that binding until `open()`
+### Requirement: Worker-backed non-blocking execution
 
-`close()` MUST be idempotent.
+`SQLiteGraphStore` SHALL manage worker isolation and communication according
+to these invariants:
+
+1. Each open store owns exactly one persistent worker and one SQLite connection.
+   Workers MUST NOT be created per operation or pooled. Concurrent `open()` or
+   `close()` calls MUST share their respective in-flight lifecycle Promise.
+2. The worker owns the `better-sqlite3` connection, prepared statements,
+   transactions, schema work, FTS maintenance, and backend-owned filesystem work.
+   Native handles and prepared statements MUST NOT cross the worker boundary.
+3. Host and worker communicate through strongly typed, structured-cloneable
+   request, result, error, and progress DTOs with monotonic correlation ids.
+   Functions, native objects, and class instances MUST NOT cross the boundary.
+4. The worker MUST process operations through an explicit FIFO serial queue so
+   lifecycle, maintenance, reads, and mutations do not interleave.
+5. The host client MUST validate `maxPendingOperations >= 1` and enforce a
+   default limit of 256 outstanding operations. A request beyond the limit MUST
+   reject immediately with `StoreOverloadError` without disturbing accepted work.
+6. `close()` MUST reject new work, drain accepted operations within
+   `drainTimeoutMs` (default 5 000 ms), request worker-side database closure,
+   and force termination after the graceful deadline. Unsettled requests MUST
+   reject with `StoreWorkerError`. The store MUST await forced termination but
+   MUST NOT claim a hard wall-clock bound while native code is executing.
+7. SQLite runtime configuration crossing the boundary MUST use a serializable
+   `SqliteRuntimeDescriptor`. A custom `modulePath` MAY select a compatible
+   runtime binding. Internal worker-path test overrides MUST NOT be public options.
+8. Unexpected worker error or exit MUST fault the store and reject outstanding
+   operations with `StoreWorkerError`. Recovery is explicit `close()` then
+   `open()`; the store MUST NOT silently restart.
+9. If `close()` begins while `open()` is pending, shutdown MUST own the final
+   lifecycle state and `open()` MUST NOT subsequently publish `open`.
+10. Bulk indexing MUST use a worker-side session identified by `sessionId`.
+    Only session start creates state; staging, commit, and rollback against a
+    missing or finalized session MUST reject. Host sessions MUST enforce explicit
+    active, committing, rolling-back, and finished states and bind to the current
+    store lifecycle generation.
+11. Progress callbacks are observational. Callback failures MUST be isolated and
+    MUST NOT abort the worker operation or transaction.
+12. Closed-store recreation MUST use non-blocking host filesystem APIs for cleanup
+    and storage-generation rotation.
+
+### Requirement: Worker-efficient batch reads
+
+SQLite SHALL implement the batch symbol and relation queries defined by
+`GraphStore` as set-based worker operations. One batch call MUST cross the
+worker boundary as one RPC rather than one RPC per symbol or relation type.
+
+Batch symbol lookup SHALL use set-based predicates. Incoming and outgoing
+relation lookup SHALL query all requested symbol ids and relation types together.
+Large input sets MUST be divided into deterministic bounded SQL parameter chunks
+inside the worker so SQLite parameter limits cannot make a valid graph traversal
+fail. Results MUST preserve the deterministic ordering and empty-input semantics
+of the abstract contract.
+
+### Requirement: Worker-backed exact batch node lookups
+
+SQLite SHALL implement the exact batch node lookups defined by `GraphStore`
+(`getFilesByPaths`, `getDocumentsByPaths`, `getSpecsByIds`, and the existing
+`getSymbolsByIds`) as set-based worker operations. Each logical batch MUST cross
+the worker boundary once as one typed RPC and MUST NOT issue one RPC per node.
+
+File, document, spec, and symbol lookups SHALL use set-based predicates
+(`path IN (...)`, `id IN (...)`). Large input sets MUST be divided into
+deterministic bounded SQL parameter chunks inside the worker. Results MUST
+deduplicate repeated identities, omit unknown identities, preserve first
+requested-identity order, and return an empty array for empty input without RPC.
 
 ### Requirement: Config-derived persistence layout
 
@@ -42,17 +105,17 @@ MUST create the required directories on demand.
 
 ### Requirement: Default backend role
 
-The built-in code-graph composition SHALL treat `sqlite` as the default backend id
-when no explicit `graphStoreId` is selected.
+The built-in code-graph composition SHALL register `sqlite` as its sole built-in backend and SHALL select it when no explicit `graphStoreId` is provided.
 
-The SQLite backend therefore MUST preserve the full set of currently supported graph
-behaviors that Ladybug previously backed, including:
+SQLite MUST satisfy the current `GraphStore` contract and all code-graph consumer requirements directly, including:
 
-- durable persistence of file, symbol, spec, relation, and metadata state
+- durable persistence of file, document, symbol, spec, relation, and metadata state
 - atomic mutation semantics required by the abstract `GraphStore` contract
-- full-text search for symbols and specs
+- full-text and identity-aware search required by symbol, file, spec, and document discovery
 - bulk indexing and full re-index operations
-- query support for traversal-, impact-, hotspot-, search-, and stats-facing flows
+- structured query support for traversal, references, coverage, impact, hotspots, search, and statistics
+
+SQLite defines its own storage layout, query behavior, and output contract. If an existing graph cannot be read after a backend change, a full SQLite re-index is the supported recovery path.
 
 ### Requirement: Destructive recreation
 
@@ -105,11 +168,14 @@ The `Document` table SHALL include columns for `path` (PK), `configRelativePath`
 
 ### Requirement: Persisted relation storage
 
-The SQLite schema SHALL persist the relation families required by the abstract graph model:
+The SQLite schema SHALL persist every relation family required by the abstract
+graph model:
 
 - `IMPORTS`
 - `DEFINES`
 - `CALLS`
+- `CONSTRUCTS`
+- `USES_TYPE`
 - `EXPORTS`
 - `DEPENDS_ON`
 - `COVERS_FILE`
@@ -118,9 +184,9 @@ The SQLite schema SHALL persist the relation families required by the abstract g
 - `IMPLEMENTS`
 - `OVERRIDES`
 
-The adapter MAY represent relation storage with a single relation table, per-type tables, or another SQLite-appropriate layout, provided the observable `GraphStore` query semantics remain preserved.
-
-`COVERS_SYMBOL` entries MUST preserve relation metadata so symbol-level implementation links can surface `stale` state consistently after reload.
+The adapter MAY choose a SQLite-appropriate physical layout, provided all
+observable `GraphStore` semantics remain preserved. `COVERS_SYMBOL` entries
+MUST preserve relation metadata so stale symbol-level links survive reload.
 
 ### Requirement: SQLite full-text search
 
@@ -169,31 +235,29 @@ Persisted `File` content used for snippet extraction SHALL NOT, by itself, becom
 
 ### Requirement: Transactional mutation model
 
-`SQLiteGraphStore` SHALL use SQLite transactions to preserve the atomic mutation
-semantics required by the abstract `GraphStore` contract.
+`SQLiteGraphStore` SHALL execute SQLite transactions entirely inside the worker
+to preserve the atomic mutation semantics required by `GraphStore`.
 
-At minimum:
-
-- `upsertFile()` MUST replace file-local graph state atomically
-- `removeFile()` MUST remove file-local graph state atomically
-- `upsertSpec()` MUST replace spec-local graph state atomically
-- `removeSpec()` MUST remove spec-local graph state atomically
-- bulk indexing operations MUST commit all-or-nothing backend state for the batch they
-  claim to have persisted
-
-If a transaction fails, the backend MUST leave previously committed graph state intact.
+A transaction MUST NOT span multiple host/worker round trips. Each atomic
+mutation, including `upsertFile()`, `removeFile()`, `upsertSpec()`,
+`removeSpec()`, and bulk commit, MUST execute as one self-contained worker
+operation. Failure MUST preserve the previously committed graph state.
 
 ### Requirement: Bulk indexing support
 
 `SQLiteGraphStore` SHALL support efficient bulk indexing for large repositories.
 
-The adapter MAY use batching, prepared statements, temporary tables, or other
-SQLite-appropriate techniques to keep large indexing runs stable, provided the
-observable `GraphStore` contract is preserved.
+Bulk data MUST be staged to a worker-side session in bounded chunks rather than
+transferred as one repository-sized structured-clone payload. Commit MUST make
+the complete session visible atomically in one SQLite transaction. Reference-fact
+chunks MUST merge with earlier chunks from the same session.
 
-If the implementation materializes backend-owned scratch artifacts outside the primary
-database file, those artifacts MUST be scoped to `{configPath}/tmp` and cleaned up
-after successful completion.
+The worker MUST emit serializable progress stages for cleanup, files, documents,
+symbols, specs, reference facts, observations, relations, and search indexes.
+The host SHALL forward them to the optional observational callback.
+
+Prepared statements, temporary tables, and bounded SQL chunks MAY be used to keep
+the run stable. Any scratch artifacts MUST remain under `{configPath}/tmp`.
 
 ### Requirement: Schema versioning
 
@@ -220,15 +284,26 @@ abstract `GraphStore` contract.
 
 ### Requirement: Reference schema upgrade
 
-SQLite SHALL persist the enriched logical-symbol, declaration, member, symbol-space, binding, provenance, coverage, complete construct range, and declared-name selection range fields required by `GraphStore`. Structured workspace, surface, name, symbol-space, owner, member-form, and exported-name columns SHALL have indexes supporting semantic search and selector resolution without parsing or substring-ranking serialized canonical ids. Canonical ids remain unique external identities. Backend-local integer row keys MAY be used for physical joins when they do not change provider-visible ids.
+SQLite SHALL persist the logical-symbol, declaration, member, symbol-space,
+binding, provenance, coverage, construct-range, and selection-range fields
+required by `GraphStore`. Structured lookup columns SHALL be indexed; serialized
+canonical ids MUST NOT be parsed or substring-ranked to implement semantic lookup.
+Canonical ids remain unique external identities; backend-local integer row keys
+MAY be used for physical joins when provider-visible ids do not change.
 
-SQLite SHALL maintain a dedicated source-file content FTS index using substring-capable trigram tokenization. Candidate queries SHALL use the shared complete/raw/expanded query plan, honor filters before candidate limits, and return indexed content or precise evidence for Code Graph verification. Queries shorter than three characters SHALL use a bounded indexed/SQL fallback defined by the shared Store contract rather than returning every file for application-layer scanning.
+SQLite SHALL maintain the substring-capable source-content index and bounded
+short-query fallback required by the abstract store. Reverse coverage and new
+traversal batch reads SHALL use set-based predicates and deterministic ordering.
 
-Batched reverse coverage lookup SHALL use set-based predicates over deduplicated file paths and symbol ids and deterministic ordering.
+The backend SHALL track reference schema version `9`. A later schema-affecting
+change SHALL increment the version exactly once. Incompatible data MUST reject
+ordinary reads; `graph index` SHALL rebuild destructively, rotate
+`storage.epoch`, and rebuild search indexes before readiness.
 
-The backend SHALL increment its schema version exactly once relative to the version current when implementation begins; absent an intervening change this is `5` to `6`. An incompatible database MUST reject ordinary reads. `graph index` SHALL rebuild it destructively, rotate `storage.epoch`, and complete FTS rebuild before marking it ready.
-
-SQLite SHALL persist indexed-input observations, workspace/global latches, VCS-scope evidence, and compact unchanged-file facts required by incremental hydration. One indexing run SHALL use one database transaction, set-based relation endpoint validation, bounded prepared/bulk inserts, one commit, and one rebuild of all semantic and content FTS indexes. Chunk appends MUST NOT rebuild FTS independently.
+Indexed-input observations, freshness latches, VCS evidence, and compact
+unchanged-file facts SHALL remain persisted. One indexing run SHALL use one
+transaction, set-based endpoint validation, bounded writes, one commit, and one
+semantic/content index rebuild.
 
 ## Constraints
 
@@ -253,3 +328,7 @@ SQLite SHALL persist indexed-input observations, workspace/global latches, VCS-s
   and relation concepts
 - [`code-graph:workspace-integration`](../workspace-integration/spec.md)
   — workspace-prefixed file and spec identity rules
+
+## ADRs
+
+- [ADR-0025: Non-Blocking Worker-Thread SQLite Graph Store](../../../docs/adr/0025-nonblocking-worker-sqlite-graph-store.md) — the built-in SQLite backend executes on a persistent worker thread

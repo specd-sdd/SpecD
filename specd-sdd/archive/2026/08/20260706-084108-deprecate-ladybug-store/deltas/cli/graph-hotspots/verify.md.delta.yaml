@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'Existing hotspot scenarios already exercise the shared provider contract without Ladybug-specific expectations'

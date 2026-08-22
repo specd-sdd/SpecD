@@ -1,4 +1,5 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs'
+import { mkdir, open, rename, writeFile } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
 import { dirname, join } from 'node:path'
 import { type StorageGenerationSnapshot } from '../domain/ports/graph-store.js'
@@ -29,6 +30,25 @@ export function ensureStorageGeneration(storagePath: string): StorageGenerationS
 }
 
 /**
+ * Ensures asynchronously that the storage-generation sidecar exists and returns its snapshot.
+ *
+ * @param storagePath - Root path that owns the graph directory.
+ * @returns Current storage-generation snapshot.
+ */
+export async function ensureStorageGenerationAsync(
+  storagePath: string,
+): Promise<StorageGenerationSnapshot> {
+  const path = getStorageGenerationPath(storagePath)
+  await mkdir(dirname(path), { recursive: true })
+  try {
+    await writeFile(path, `${randomUUID()}\n`, { encoding: 'utf-8', flag: 'wx' })
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error
+  }
+  return readStorageGenerationAsync(storagePath)
+}
+
+/**
  * Rotates the storage-generation sidecar and returns the new snapshot.
  *
  * @param storagePath - Root path that owns the graph directory.
@@ -44,6 +64,23 @@ export function rotateStorageGeneration(storagePath: string): StorageGenerationS
 }
 
 /**
+ * Rotates asynchronously the storage-generation sidecar and returns the new snapshot.
+ *
+ * @param storagePath - Root path that owns the graph directory.
+ * @returns New storage-generation snapshot.
+ */
+export async function rotateStorageGenerationAsync(
+  storagePath: string,
+): Promise<StorageGenerationSnapshot> {
+  const path = getStorageGenerationPath(storagePath)
+  await mkdir(dirname(path), { recursive: true })
+  const temporaryPath = `${path}.${randomUUID()}.tmp`
+  await writeFile(temporaryPath, `${randomUUID()}\n`, 'utf-8')
+  await rename(temporaryPath, path)
+  return readStorageGenerationAsync(storagePath)
+}
+
+/**
  * Reads the current storage-generation snapshot.
  *
  * @param storagePath - Root path that owns the graph directory.
@@ -51,9 +88,31 @@ export function rotateStorageGeneration(storagePath: string): StorageGenerationS
  */
 export function readStorageGeneration(storagePath: string): StorageGenerationSnapshot {
   const path = getStorageGenerationPath(storagePath)
-  const stat = statSync(path)
+  const fileStat = statSync(path)
   return {
     token: readFileSync(path, 'utf-8').trim(),
-    mtimeMs: stat.mtimeMs,
+    mtimeMs: fileStat.mtimeMs,
+  }
+}
+
+/**
+ * Reads asynchronously the current storage-generation snapshot.
+ *
+ * @param storagePath - Root path that owns the graph directory.
+ * @returns Current storage-generation snapshot.
+ */
+export async function readStorageGenerationAsync(
+  storagePath: string,
+): Promise<StorageGenerationSnapshot> {
+  const handle = await open(getStorageGenerationPath(storagePath), 'r')
+  try {
+    const fileStat = await handle.stat()
+    const content = await handle.readFile('utf-8')
+    return {
+      token: content.trim(),
+      mtimeMs: fileStat.mtimeMs,
+    }
+  } finally {
+    await handle.close()
   }
 }
