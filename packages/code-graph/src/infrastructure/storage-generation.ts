@@ -1,5 +1,5 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs'
-import { mkdir, readFile, rename, stat, writeFile } from 'node:fs/promises'
+import { mkdir, open, rename, writeFile } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
 import { dirname, join } from 'node:path'
 import { type StorageGenerationSnapshot } from '../domain/ports/graph-store.js'
@@ -104,11 +104,15 @@ export function readStorageGeneration(storagePath: string): StorageGenerationSna
 export async function readStorageGenerationAsync(
   storagePath: string,
 ): Promise<StorageGenerationSnapshot> {
-  const path = getStorageGenerationPath(storagePath)
-  const fileStat = await stat(path)
-  const content = await readFile(path, 'utf-8')
-  return {
-    token: content.trim(),
-    mtimeMs: fileStat.mtimeMs,
+  const handle = await open(getStorageGenerationPath(storagePath), 'r')
+  try {
+    const fileStat = await handle.stat()
+    const content = await handle.readFile('utf-8')
+    return {
+      token: content.trim(),
+      mtimeMs: fileStat.mtimeMs,
+    }
+  } finally {
+    await handle.close()
   }
 }
