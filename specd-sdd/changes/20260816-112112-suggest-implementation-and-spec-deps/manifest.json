@@ -1,7 +1,7 @@
 {
   "name": "suggest-implementation-and-spec-deps",
   "createdAt": "2026-08-16T11:21:12.000Z",
-  "updatedAt": "2026-08-18T16:46:58.572Z",
+  "updatedAt": "2026-08-22T11:20:50.687Z",
   "description": "Add SDK use cases and CLI commands to suggest implementation links and spec dependencies with post-apply validation",
   "schema": {
     "name": "schema-std",
@@ -200,7 +200,7 @@
     },
     {
       "file": "packages/code-graph/src/infrastructure/ladybug/ladybug-graph-store.ts",
-      "state": "open"
+      "state": "removed"
     },
     {
       "file": "packages/sdk/src/orchestration/cache/fs-spec-deps-suggestion-cache.ts",
@@ -277,6 +277,542 @@
     {
       "file": "pnpm-lock.yaml",
       "state": "open"
+    },
+    {
+      "file": ".changeset/20260820-deprecate-ladybug-store-specd.md",
+      "state": "open"
+    },
+    {
+      "file": ".changeset/20260820-deprecate-ladybug-store.md",
+      "state": "open"
+    },
+    {
+      "file": ".changeset/20260820-fix-graph-cli-context-explicit-config-specd.md",
+      "state": "open"
+    },
+    {
+      "file": ".changeset/20260820-fix-graph-cli-context-explicit-config.md",
+      "state": "open"
+    },
+    {
+      "file": ".changeset/20260822-nonblocking-sqlite-graph-store-specd.md",
+      "state": "open"
+    },
+    {
+      "file": ".changeset/20260822-nonblocking-sqlite-graph-store.md",
+      "state": "open"
+    },
+    {
+      "file": "docs/adr/0024-logical-symbol-resolution.md",
+      "state": "open"
+    },
+    {
+      "file": "docs/adr/0025-nonblocking-worker-sqlite-graph-store.md",
+      "state": "open"
+    },
+    {
+      "file": "docs/code-graph/index.md",
+      "state": "open"
+    },
+    {
+      "file": "package.json",
+      "state": "open"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/hotspots.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/impact.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/resolve-graph-cli-context.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/resolve-impact-file-selectors.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/search.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/stats.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/with-provider.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/cli/test/commands/change-run-hooks.spec.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/cli/test/commands/change-transition.spec.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/cli/test/commands/graph-cli-context.spec.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/cli/test/commands/graph-impact.spec.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/cli/test/commands/graph-index.spec.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/cli/test/commands/graph-search.spec.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/cli/test/commands/graph-stats.spec.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/cli/test/commands/graph/resolve-impact-file-selectors.spec.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/cli/test/commands/helpers.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/cli/test/commands/plugins-update.spec.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/cli/test/commands/plugins.spec.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/cli/test/commands/project-init.spec.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/cli/test/commands/spec-optimizations.spec.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/cli/vitest.config.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/code-graph/README.md",
+      "state": "open"
+    },
+    {
+      "file": "packages/code-graph/package.json",
+      "state": "open"
+    },
+    {
+      "file": "packages/code-graph/src/application/services/resolve-graph-selector.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/code-graph/src/application/use-cases/index-code-graph.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/code-graph/src/composition/create-sqlite-graph-store-factory.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/code-graph/src/composition/graph-store-factory.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/code-graph/src/domain/errors/bulk-session-state-error.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/code-graph/src/domain/errors/graph-schema-incompatible-error.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/code-graph/src/domain/errors/index.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/code-graph/src/domain/errors/invalid-graph-selector-error.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/code-graph/src/domain/errors/invalid-graph-store-configuration-error.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/code-graph/src/domain/errors/spec-not-found-error.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/code-graph/src/domain/errors/store-overload-error.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/code-graph/src/domain/errors/store-worker-error.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/code-graph/src/domain/ports/graph-store.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/code-graph/src/domain/services/analyze-files-impact.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/code-graph/src/domain/services/compute-hotspots.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/code-graph/src/domain/services/get-downstream.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/code-graph/src/domain/services/get-upstream.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/code-graph/src/domain/services/map-with-concurrency.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/ladybug/index.ts",
+      "state": "removed"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/ladybug/schema.ts",
+      "state": "removed"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/sqlite/index.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/sqlite/resolve-worker-path.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/sqlite/sqlite-graph-database.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/sqlite/sqlite-runtime-descriptor.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/sqlite/sqlite-worker-client.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/sqlite/sqlite-worker-protocol.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/sqlite/sqlite-worker.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/storage-generation.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/get-change-spec-coverage.spec.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/code-graph/test/barrel.spec.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/code-graph/test/composition/code-graph-provider.spec.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/code-graph/test/composition/create-sqlite-graph-store-factory.spec.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/code-graph/test/composition/host-use-case-factories.spec.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/code-graph/test/domain/errors/specd-code-graph-error.spec.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/code-graph/test/domain/services/analyze-files-impact.spec.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/code-graph/test/domain/services/compute-hotspots.spec.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/code-graph/test/domain/services/traversal.spec.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/code-graph/test/helpers/stub-change-repository.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/ladybug/ladybug-graph-store-multi-kind.spec.ts",
+      "state": "removed"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/ladybug/ladybug-graph-store.spec.ts",
+      "state": "removed"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/sqlite/sqlite-graph-store.spec.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/sqlite/sqlite-worker-backpressure.spec.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/sqlite/sqlite-worker-dist.spec.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/sqlite/sqlite-worker-lifecycle.spec.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/sqlite/sqlite-worker-protocol.spec.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/sqlite/sqlite-worker-responsiveness.spec.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/code-graph/test/integration/sqlite-wide-traversal.spec.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/code-graph/test/run-vitest.sh",
+      "state": "removed"
+    },
+    {
+      "file": "packages/code-graph/vitest.config.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/get-active-schema.spec.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/validate-schema.spec.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/core/vitest.config.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/sdk/test/composition/host-context.spec.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/sdk/test/composition/with-open-graph-provider.spec.ts",
+      "state": "open"
+    },
+    {
+      "file": "pnpm-workspace.yaml",
+      "state": "open"
+    },
+    {
+      "file": "specs/cli/change-archive/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/cli/graph-cli-context/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/cli/graph-cli-context/spec.md",
+      "state": "open"
+    },
+    {
+      "file": "specs/cli/graph-cli-context/verify.md",
+      "state": "open"
+    },
+    {
+      "file": "specs/cli/graph-hotspots/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/cli/graph-hotspots/spec.md",
+      "state": "open"
+    },
+    {
+      "file": "specs/cli/graph-hotspots/verify.md",
+      "state": "open"
+    },
+    {
+      "file": "specs/cli/graph-impact/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/cli/graph-impact/spec.md",
+      "state": "open"
+    },
+    {
+      "file": "specs/cli/graph-impact/verify.md",
+      "state": "open"
+    },
+    {
+      "file": "specs/cli/graph-search/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/cli/graph-stats/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/cli/graph-stats/spec.md",
+      "state": "open"
+    },
+    {
+      "file": "specs/cli/graph-stats/verify.md",
+      "state": "open"
+    },
+    {
+      "file": "specs/code-graph/composition/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/code-graph/composition/spec.md",
+      "state": "open"
+    },
+    {
+      "file": "specs/code-graph/composition/verify.md",
+      "state": "open"
+    },
+    {
+      "file": "specs/code-graph/graph-store/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/code-graph/graph-store/spec.md",
+      "state": "open"
+    },
+    {
+      "file": "specs/code-graph/graph-store/verify.md",
+      "state": "open"
+    },
+    {
+      "file": "specs/code-graph/indexer/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/code-graph/ladybug-graph-store/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/code-graph/ladybug-graph-store/spec.md",
+      "state": "open"
+    },
+    {
+      "file": "specs/code-graph/ladybug-graph-store/verify.md",
+      "state": "open"
+    },
+    {
+      "file": "specs/code-graph/sqlite-graph-store/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/code-graph/sqlite-graph-store/spec.md",
+      "state": "open"
+    },
+    {
+      "file": "specs/code-graph/sqlite-graph-store/verify.md",
+      "state": "open"
+    },
+    {
+      "file": "specs/code-graph/symbol-model/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/code-graph/traversal/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/code-graph/traversal/spec.md",
+      "state": "open"
+    },
+    {
+      "file": "specs/code-graph/traversal/verify.md",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/content-extraction/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/delta-format/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/external-hook-runner-port/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/generate-metadata/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/get-project-summary/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/hook-execution-model/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/hook-runner-port/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/regenerate-spec-metadata/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/run-step-hooks/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/schema-merge/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/selector-model/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/spec-lock/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/template-variables/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/validate-artifacts/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/sdk/composition/spec-lock.json",
+      "state": "open"
     }
   ],
   "implementationLinks": [
@@ -313,17 +849,13 @@
       "specId": "cli:spec-implementation",
       "file": "packages/cli/src/commands/spec/implementation.ts",
       "fileLinkExplicit": false,
-      "symbols": [
-        "registerSpecImplementation"
-      ]
+      "symbols": ["registerSpecImplementation"]
     },
     {
       "specId": "cli:spec-deps",
       "file": "packages/cli/src/commands/spec/deps.ts",
       "fileLinkExplicit": false,
-      "symbols": [
-        "registerSpecDeps"
-      ]
+      "symbols": ["registerSpecDeps"]
     }
   ],
   "artifacts": [
@@ -344,9 +876,7 @@
     {
       "type": "specs",
       "optional": false,
-      "requires": [
-        "proposal"
-      ],
+      "requires": ["proposal"],
       "state": "complete",
       "files": [
         {
@@ -390,9 +920,7 @@
     {
       "type": "verify",
       "optional": false,
-      "requires": [
-        "specs"
-      ],
+      "requires": ["specs"],
       "state": "complete",
       "files": [
         {
@@ -436,11 +964,7 @@
     {
       "type": "design",
       "optional": false,
-      "requires": [
-        "proposal",
-        "specs",
-        "verify"
-      ],
+      "requires": ["proposal", "specs", "verify"],
       "state": "complete",
       "files": [
         {
@@ -454,10 +978,7 @@
     {
       "type": "tasks",
       "optional": false,
-      "requires": [
-        "specs",
-        "design"
-      ],
+      "requires": ["specs", "design"],
       "state": "complete",
       "files": [
         {
@@ -500,22 +1021,15 @@
       "affectedArtifacts": [
         {
           "type": "verify",
-          "files": [
-            "sdk:suggest-implementation-links",
-            "sdk:suggest-spec-dependencies"
-          ]
+          "files": ["sdk:suggest-implementation-links", "sdk:suggest-spec-dependencies"]
         },
         {
           "type": "design",
-          "files": [
-            "design"
-          ]
+          "files": ["design"]
         },
         {
           "type": "tasks",
-          "files": [
-            "tasks"
-          ]
+          "files": ["tasks"]
         }
       ]
     },
@@ -543,29 +1057,19 @@
       "affectedArtifacts": [
         {
           "type": "specs",
-          "files": [
-            "cli:spec-deps",
-            "cli:spec-implementation"
-          ]
+          "files": ["cli:spec-deps", "cli:spec-implementation"]
         },
         {
           "type": "verify",
-          "files": [
-            "cli:spec-deps",
-            "cli:spec-implementation"
-          ]
+          "files": ["cli:spec-deps", "cli:spec-implementation"]
         },
         {
           "type": "design",
-          "files": [
-            "design"
-          ]
+          "files": ["design"]
         },
         {
           "type": "tasks",
-          "files": [
-            "tasks"
-          ]
+          "files": ["tasks"]
         }
       ]
     },
@@ -582,10 +1086,7 @@
       "affectedArtifacts": [
         {
           "type": "specs",
-          "files": [
-            "cli:spec-deps",
-            "cli:spec-implementation"
-          ]
+          "files": ["cli:spec-deps", "cli:spec-implementation"]
         },
         {
           "type": "verify",
@@ -598,15 +1099,11 @@
         },
         {
           "type": "design",
-          "files": [
-            "design"
-          ]
+          "files": ["design"]
         },
         {
           "type": "tasks",
-          "files": [
-            "tasks"
-          ]
+          "files": ["tasks"]
         }
       ]
     },
@@ -623,15 +1120,11 @@
       "affectedArtifacts": [
         {
           "type": "design",
-          "files": [
-            "design"
-          ]
+          "files": ["design"]
         },
         {
           "type": "tasks",
-          "files": [
-            "tasks"
-          ]
+          "files": ["tasks"]
         }
       ]
     },
@@ -648,15 +1141,11 @@
       "affectedArtifacts": [
         {
           "type": "design",
-          "files": [
-            "design"
-          ]
+          "files": ["design"]
         },
         {
           "type": "tasks",
-          "files": [
-            "tasks"
-          ]
+          "files": ["tasks"]
         }
       ]
     },
@@ -673,15 +1162,11 @@
       "affectedArtifacts": [
         {
           "type": "design",
-          "files": [
-            "design"
-          ]
+          "files": ["design"]
         },
         {
           "type": "tasks",
-          "files": [
-            "tasks"
-          ]
+          "files": ["tasks"]
         }
       ]
     },
@@ -698,15 +1183,11 @@
       "affectedArtifacts": [
         {
           "type": "design",
-          "files": [
-            "design"
-          ]
+          "files": ["design"]
         },
         {
           "type": "tasks",
-          "files": [
-            "tasks"
-          ]
+          "files": ["tasks"]
         }
       ]
     },
@@ -723,15 +1204,11 @@
       "affectedArtifacts": [
         {
           "type": "design",
-          "files": [
-            "design"
-          ]
+          "files": ["design"]
         },
         {
           "type": "tasks",
-          "files": [
-            "tasks"
-          ]
+          "files": ["tasks"]
         }
       ]
     },
@@ -748,10 +1225,7 @@
       "affectedArtifacts": [
         {
           "type": "specs",
-          "files": [
-            "sdk:suggest-implementation-links",
-            "sdk:suggest-spec-dependencies"
-          ]
+          "files": ["sdk:suggest-implementation-links", "sdk:suggest-spec-dependencies"]
         },
         {
           "type": "verify",
@@ -764,15 +1238,11 @@
         },
         {
           "type": "design",
-          "files": [
-            "design"
-          ]
+          "files": ["design"]
         },
         {
           "type": "tasks",
-          "files": [
-            "tasks"
-          ]
+          "files": ["tasks"]
         }
       ]
     },
@@ -811,9 +1281,7 @@
       "affectedArtifacts": [
         {
           "type": "proposal",
-          "files": [
-            "proposal"
-          ]
+          "files": ["proposal"]
         },
         {
           "type": "specs",
@@ -835,15 +1303,11 @@
         },
         {
           "type": "design",
-          "files": [
-            "design"
-          ]
+          "files": ["design"]
         },
         {
           "type": "tasks",
-          "files": [
-            "tasks"
-          ]
+          "files": ["tasks"]
         }
       ]
     },
@@ -871,22 +1335,15 @@
       "affectedArtifacts": [
         {
           "type": "verify",
-          "files": [
-            "sdk:suggest-implementation-links",
-            "sdk:suggest-spec-dependencies"
-          ]
+          "files": ["sdk:suggest-implementation-links", "sdk:suggest-spec-dependencies"]
         },
         {
           "type": "design",
-          "files": [
-            "design"
-          ]
+          "files": ["design"]
         },
         {
           "type": "tasks",
-          "files": [
-            "tasks"
-          ]
+          "files": ["tasks"]
         }
       ]
     },
@@ -925,15 +1382,11 @@
       "affectedArtifacts": [
         {
           "type": "design",
-          "files": [
-            "design"
-          ]
+          "files": ["design"]
         },
         {
           "type": "tasks",
-          "files": [
-            "tasks"
-          ]
+          "files": ["tasks"]
         }
       ]
     },
@@ -961,9 +1414,7 @@
       "affectedArtifacts": [
         {
           "type": "specs",
-          "files": [
-            "sdk:suggest-implementation-links"
-          ]
+          "files": ["sdk:suggest-implementation-links"]
         },
         {
           "type": "verify",
@@ -976,15 +1427,11 @@
         },
         {
           "type": "design",
-          "files": [
-            "design"
-          ]
+          "files": ["design"]
         },
         {
           "type": "tasks",
-          "files": [
-            "tasks"
-          ]
+          "files": ["tasks"]
         }
       ]
     },
@@ -1001,16 +1448,11 @@
       "affectedArtifacts": [
         {
           "type": "specs",
-          "files": [
-            "sdk:suggest-implementation-links",
-            "sdk:suggest-spec-dependencies"
-          ]
+          "files": ["sdk:suggest-implementation-links", "sdk:suggest-spec-dependencies"]
         },
         {
           "type": "design",
-          "files": [
-            "design"
-          ]
+          "files": ["design"]
         },
         {
           "type": "verify",
@@ -1023,9 +1465,7 @@
         },
         {
           "type": "tasks",
-          "files": [
-            "tasks"
-          ]
+          "files": ["tasks"]
         }
       ]
     },
@@ -1042,15 +1482,11 @@
       "affectedArtifacts": [
         {
           "type": "design",
-          "files": [
-            "design"
-          ]
+          "files": ["design"]
         },
         {
           "type": "tasks",
-          "files": [
-            "tasks"
-          ]
+          "files": ["tasks"]
         }
       ]
     },
@@ -1067,27 +1503,19 @@
       "affectedArtifacts": [
         {
           "type": "specs",
-          "files": [
-            "sdk:suggest-implementation-links"
-          ]
+          "files": ["sdk:suggest-implementation-links"]
         },
         {
           "type": "verify",
-          "files": [
-            "sdk:suggest-implementation-links"
-          ]
+          "files": ["sdk:suggest-implementation-links"]
         },
         {
           "type": "design",
-          "files": [
-            "design"
-          ]
+          "files": ["design"]
         },
         {
           "type": "tasks",
-          "files": [
-            "tasks"
-          ]
+          "files": ["tasks"]
         }
       ]
     },
@@ -1104,28 +1532,19 @@
       "affectedArtifacts": [
         {
           "type": "specs",
-          "files": [
-            "sdk:suggest-implementation-links",
-            "sdk:suggest-spec-dependencies"
-          ]
+          "files": ["sdk:suggest-implementation-links", "sdk:suggest-spec-dependencies"]
         },
         {
           "type": "verify",
-          "files": [
-            "sdk:suggest-implementation-links"
-          ]
+          "files": ["sdk:suggest-implementation-links"]
         },
         {
           "type": "design",
-          "files": [
-            "design"
-          ]
+          "files": ["design"]
         },
         {
           "type": "tasks",
-          "files": [
-            "tasks"
-          ]
+          "files": ["tasks"]
         }
       ]
     },
@@ -1164,28 +1583,19 @@
       "affectedArtifacts": [
         {
           "type": "specs",
-          "files": [
-            "code-graph:language-adapter",
-            "sdk:suggest-implementation-links"
-          ]
+          "files": ["code-graph:language-adapter", "sdk:suggest-implementation-links"]
         },
         {
           "type": "verify",
-          "files": [
-            "code-graph:language-adapter"
-          ]
+          "files": ["code-graph:language-adapter"]
         },
         {
           "type": "design",
-          "files": [
-            "design"
-          ]
+          "files": ["design"]
         },
         {
           "type": "tasks",
-          "files": [
-            "tasks"
-          ]
+          "files": ["tasks"]
         }
       ]
     },
@@ -1202,9 +1612,7 @@
       "affectedArtifacts": [
         {
           "type": "specs",
-          "files": [
-            "sdk:suggest-implementation-links"
-          ]
+          "files": ["sdk:suggest-implementation-links"]
         },
         {
           "type": "verify",
@@ -1218,15 +1626,11 @@
         },
         {
           "type": "design",
-          "files": [
-            "design"
-          ]
+          "files": ["design"]
         },
         {
           "type": "tasks",
-          "files": [
-            "tasks"
-          ]
+          "files": ["tasks"]
         }
       ]
     },
@@ -1243,9 +1647,7 @@
       "affectedArtifacts": [
         {
           "type": "specs",
-          "files": [
-            "sdk:suggest-implementation-links"
-          ]
+          "files": ["sdk:suggest-implementation-links"]
         },
         {
           "type": "verify",
@@ -1259,15 +1661,11 @@
         },
         {
           "type": "design",
-          "files": [
-            "design"
-          ]
+          "files": ["design"]
         },
         {
           "type": "tasks",
-          "files": [
-            "tasks"
-          ]
+          "files": ["tasks"]
         }
       ]
     },
@@ -1328,9 +1726,7 @@
       "affectedArtifacts": [
         {
           "type": "proposal",
-          "files": [
-            "proposal"
-          ]
+          "files": ["proposal"]
         },
         {
           "type": "specs",
@@ -1354,15 +1750,11 @@
         },
         {
           "type": "design",
-          "files": [
-            "design"
-          ]
+          "files": ["design"]
         },
         {
           "type": "tasks",
-          "files": [
-            "tasks"
-          ]
+          "files": ["tasks"]
         }
       ]
     },
@@ -1401,9 +1793,7 @@
       "affectedArtifacts": [
         {
           "type": "specs",
-          "files": [
-            "sdk:suggest-implementation-links"
-          ]
+          "files": ["sdk:suggest-implementation-links"]
         },
         {
           "type": "verify",
@@ -1418,15 +1808,11 @@
         },
         {
           "type": "design",
-          "files": [
-            "design"
-          ]
+          "files": ["design"]
         },
         {
           "type": "tasks",
-          "files": [
-            "tasks"
-          ]
+          "files": ["tasks"]
         }
       ]
     },
@@ -1443,9 +1829,7 @@
       "affectedArtifacts": [
         {
           "type": "specs",
-          "files": [
-            "sdk:suggest-implementation-links"
-          ]
+          "files": ["sdk:suggest-implementation-links"]
         },
         {
           "type": "verify",
@@ -1460,15 +1844,11 @@
         },
         {
           "type": "design",
-          "files": [
-            "design"
-          ]
+          "files": ["design"]
         },
         {
           "type": "tasks",
-          "files": [
-            "tasks"
-          ]
+          "files": ["tasks"]
         }
       ]
     },
@@ -1485,9 +1865,7 @@
       "affectedArtifacts": [
         {
           "type": "specs",
-          "files": [
-            "sdk:suggest-implementation-links"
-          ]
+          "files": ["sdk:suggest-implementation-links"]
         },
         {
           "type": "verify",
@@ -1502,15 +1880,11 @@
         },
         {
           "type": "design",
-          "files": [
-            "design"
-          ]
+          "files": ["design"]
         },
         {
           "type": "tasks",
-          "files": [
-            "tasks"
-          ]
+          "files": ["tasks"]
         }
       ]
     },
@@ -1527,9 +1901,7 @@
       "affectedArtifacts": [
         {
           "type": "specs",
-          "files": [
-            "sdk:suggest-implementation-links"
-          ]
+          "files": ["sdk:suggest-implementation-links"]
         },
         {
           "type": "verify",
@@ -1544,15 +1916,11 @@
         },
         {
           "type": "design",
-          "files": [
-            "design"
-          ]
+          "files": ["design"]
         },
         {
           "type": "tasks",
-          "files": [
-            "tasks"
-          ]
+          "files": ["tasks"]
         }
       ]
     },
@@ -1569,9 +1937,7 @@
       "affectedArtifacts": [
         {
           "type": "specs",
-          "files": [
-            "sdk:suggest-implementation-links"
-          ]
+          "files": ["sdk:suggest-implementation-links"]
         },
         {
           "type": "verify",
@@ -1586,15 +1952,11 @@
         },
         {
           "type": "design",
-          "files": [
-            "design"
-          ]
+          "files": ["design"]
         },
         {
           "type": "tasks",
-          "files": [
-            "tasks"
-          ]
+          "files": ["tasks"]
         }
       ]
     },
@@ -1611,9 +1973,7 @@
       "affectedArtifacts": [
         {
           "type": "specs",
-          "files": [
-            "sdk:suggest-implementation-links"
-          ]
+          "files": ["sdk:suggest-implementation-links"]
         },
         {
           "type": "verify",
@@ -1628,15 +1988,11 @@
         },
         {
           "type": "design",
-          "files": [
-            "design"
-          ]
+          "files": ["design"]
         },
         {
           "type": "tasks",
-          "files": [
-            "tasks"
-          ]
+          "files": ["tasks"]
         }
       ]
     },
@@ -1653,9 +2009,7 @@
       "affectedArtifacts": [
         {
           "type": "specs",
-          "files": [
-            "sdk:suggest-implementation-links"
-          ]
+          "files": ["sdk:suggest-implementation-links"]
         },
         {
           "type": "verify",
@@ -1670,15 +2024,11 @@
         },
         {
           "type": "design",
-          "files": [
-            "design"
-          ]
+          "files": ["design"]
         },
         {
           "type": "tasks",
-          "files": [
-            "tasks"
-          ]
+          "files": ["tasks"]
         }
       ]
     },
@@ -1695,9 +2045,7 @@
       "affectedArtifacts": [
         {
           "type": "specs",
-          "files": [
-            "sdk:suggest-implementation-links"
-          ]
+          "files": ["sdk:suggest-implementation-links"]
         },
         {
           "type": "verify",
@@ -1712,15 +2060,11 @@
         },
         {
           "type": "design",
-          "files": [
-            "design"
-          ]
+          "files": ["design"]
         },
         {
           "type": "tasks",
-          "files": [
-            "tasks"
-          ]
+          "files": ["tasks"]
         }
       ]
     },
@@ -1737,9 +2081,7 @@
       "affectedArtifacts": [
         {
           "type": "specs",
-          "files": [
-            "sdk:suggest-implementation-links"
-          ]
+          "files": ["sdk:suggest-implementation-links"]
         },
         {
           "type": "verify",
@@ -1754,15 +2096,11 @@
         },
         {
           "type": "design",
-          "files": [
-            "design"
-          ]
+          "files": ["design"]
         },
         {
           "type": "tasks",
-          "files": [
-            "tasks"
-          ]
+          "files": ["tasks"]
         }
       ]
     },
@@ -1779,9 +2117,7 @@
       "affectedArtifacts": [
         {
           "type": "specs",
-          "files": [
-            "sdk:suggest-implementation-links"
-          ]
+          "files": ["sdk:suggest-implementation-links"]
         },
         {
           "type": "verify",
@@ -1796,15 +2132,11 @@
         },
         {
           "type": "design",
-          "files": [
-            "design"
-          ]
+          "files": ["design"]
         },
         {
           "type": "tasks",
-          "files": [
-            "tasks"
-          ]
+          "files": ["tasks"]
         }
       ]
     },
@@ -1821,9 +2153,7 @@
       "affectedArtifacts": [
         {
           "type": "specs",
-          "files": [
-            "sdk:suggest-implementation-links"
-          ]
+          "files": ["sdk:suggest-implementation-links"]
         },
         {
           "type": "verify",
@@ -1838,15 +2168,11 @@
         },
         {
           "type": "design",
-          "files": [
-            "design"
-          ]
+          "files": ["design"]
         },
         {
           "type": "tasks",
-          "files": [
-            "tasks"
-          ]
+          "files": ["tasks"]
         }
       ]
     },
@@ -1863,10 +2189,7 @@
       "affectedArtifacts": [
         {
           "type": "specs",
-          "files": [
-            "sdk:suggest-implementation-links",
-            "sdk:suggest-spec-dependencies"
-          ]
+          "files": ["sdk:suggest-implementation-links", "sdk:suggest-spec-dependencies"]
         },
         {
           "type": "verify",
@@ -1881,15 +2204,11 @@
         },
         {
           "type": "design",
-          "files": [
-            "design"
-          ]
+          "files": ["design"]
         },
         {
           "type": "tasks",
-          "files": [
-            "tasks"
-          ]
+          "files": ["tasks"]
         }
       ]
     },
@@ -1906,9 +2225,7 @@
       "affectedArtifacts": [
         {
           "type": "specs",
-          "files": [
-            "sdk:suggest-spec-dependencies"
-          ]
+          "files": ["sdk:suggest-spec-dependencies"]
         },
         {
           "type": "verify",
@@ -1923,15 +2240,11 @@
         },
         {
           "type": "design",
-          "files": [
-            "design"
-          ]
+          "files": ["design"]
         },
         {
           "type": "tasks",
-          "files": [
-            "tasks"
-          ]
+          "files": ["tasks"]
         }
       ]
     },
@@ -1948,9 +2261,7 @@
       "affectedArtifacts": [
         {
           "type": "specs",
-          "files": [
-            "sdk:suggest-spec-dependencies"
-          ]
+          "files": ["sdk:suggest-spec-dependencies"]
         },
         {
           "type": "verify",
@@ -1965,15 +2276,11 @@
         },
         {
           "type": "design",
-          "files": [
-            "design"
-          ]
+          "files": ["design"]
         },
         {
           "type": "tasks",
-          "files": [
-            "tasks"
-          ]
+          "files": ["tasks"]
         }
       ]
     },
@@ -1999,22 +2306,15 @@
         },
         {
           "type": "verify",
-          "files": [
-            "cli:spec-implementation",
-            "sdk:suggest-implementation-links"
-          ]
+          "files": ["cli:spec-implementation", "sdk:suggest-implementation-links"]
         },
         {
           "type": "design",
-          "files": [
-            "design"
-          ]
+          "files": ["design"]
         },
         {
           "type": "tasks",
-          "files": [
-            "tasks"
-          ]
+          "files": ["tasks"]
         }
       ]
     },
@@ -2031,15 +2331,11 @@
       "affectedArtifacts": [
         {
           "type": "design",
-          "files": [
-            "design"
-          ]
+          "files": ["design"]
         },
         {
           "type": "tasks",
-          "files": [
-            "tasks"
-          ]
+          "files": ["tasks"]
         }
       ]
     },
@@ -2056,29 +2352,19 @@
       "affectedArtifacts": [
         {
           "type": "specs",
-          "files": [
-            "sdk:suggest-implementation-links",
-            "sdk:suggest-spec-dependencies"
-          ]
+          "files": ["sdk:suggest-implementation-links", "sdk:suggest-spec-dependencies"]
         },
         {
           "type": "verify",
-          "files": [
-            "sdk:suggest-implementation-links",
-            "sdk:suggest-spec-dependencies"
-          ]
+          "files": ["sdk:suggest-implementation-links", "sdk:suggest-spec-dependencies"]
         },
         {
           "type": "design",
-          "files": [
-            "design"
-          ]
+          "files": ["design"]
         },
         {
           "type": "tasks",
-          "files": [
-            "tasks"
-          ]
+          "files": ["tasks"]
         }
       ]
     },
@@ -2095,29 +2381,19 @@
       "affectedArtifacts": [
         {
           "type": "specs",
-          "files": [
-            "sdk:suggest-implementation-links",
-            "sdk:suggest-spec-dependencies"
-          ]
+          "files": ["sdk:suggest-implementation-links", "sdk:suggest-spec-dependencies"]
         },
         {
           "type": "verify",
-          "files": [
-            "sdk:suggest-implementation-links",
-            "sdk:suggest-spec-dependencies"
-          ]
+          "files": ["sdk:suggest-implementation-links", "sdk:suggest-spec-dependencies"]
         },
         {
           "type": "design",
-          "files": [
-            "design"
-          ]
+          "files": ["design"]
         },
         {
           "type": "tasks",
-          "files": [
-            "tasks"
-          ]
+          "files": ["tasks"]
         }
       ]
     },
@@ -2134,27 +2410,19 @@
       "affectedArtifacts": [
         {
           "type": "specs",
-          "files": [
-            "sdk:suggest-implementation-links"
-          ]
+          "files": ["sdk:suggest-implementation-links"]
         },
         {
           "type": "verify",
-          "files": [
-            "sdk:suggest-implementation-links"
-          ]
+          "files": ["sdk:suggest-implementation-links"]
         },
         {
           "type": "design",
-          "files": [
-            "design"
-          ]
+          "files": ["design"]
         },
         {
           "type": "tasks",
-          "files": [
-            "tasks"
-          ]
+          "files": ["tasks"]
         }
       ]
     },
@@ -2171,29 +2439,19 @@
       "affectedArtifacts": [
         {
           "type": "specs",
-          "files": [
-            "sdk:suggest-implementation-links",
-            "sdk:suggest-spec-dependencies"
-          ]
+          "files": ["sdk:suggest-implementation-links", "sdk:suggest-spec-dependencies"]
         },
         {
           "type": "verify",
-          "files": [
-            "sdk:suggest-implementation-links",
-            "sdk:suggest-spec-dependencies"
-          ]
+          "files": ["sdk:suggest-implementation-links", "sdk:suggest-spec-dependencies"]
         },
         {
           "type": "design",
-          "files": [
-            "design"
-          ]
+          "files": ["design"]
         },
         {
           "type": "tasks",
-          "files": [
-            "tasks"
-          ]
+          "files": ["tasks"]
         }
       ]
     }
