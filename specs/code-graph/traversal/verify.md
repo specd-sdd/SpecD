@@ -79,7 +79,7 @@
 #### Scenario: Wide-graph hotspot ranking completes
 
 - **GIVEN** a wide graph containing many symbols
-- **AND** the SQLite store is configured with `maxPendingOperations: 32`
+- **AND** the SQLite store is configured with `maxPendingOperations: 16`
 - **WHEN** hotspot ranking is computed
 - **THEN** the computation completes without `StoreOverloadError`
 - **AND** score composition, scoped filters, ranking order, and risk classification remain unchanged
