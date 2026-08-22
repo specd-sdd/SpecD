@@ -3,11 +3,10 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": ["cli:entrypoint", "core:config", "code-graph:composition", "cli:graph-cli-context"],
+  "dependsOn": ["cli:entrypoint", "cli:graph-cli-context", "core:config", "code-graph:composition"],
   "implementation": [
     {
-      "file": "cli:src/commands/graph/hotspots.ts",
-      "symbols": ["registerGraphHotspots"]
+      "file": "cli:src/commands/graph/hotspots.ts"
     }
   ],
   "optimizations": {

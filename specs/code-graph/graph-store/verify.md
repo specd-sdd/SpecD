@@ -342,6 +342,65 @@
 - **WHEN** `getCoveringSpecsForSymbol('core:Change.transition')` is called
 - **THEN** the persisted `COVERS_SYMBOL` relation is returned
 
+### Requirement: Batched symbol traversal reads
+
+#### Scenario: Batch symbol lookup deduplicates and preserves requested order
+
+- **GIVEN** a requested id list contains duplicates, existing symbols, and an unknown id
+- **WHEN** `getSymbolsByIds()` is called
+- **THEN** each existing symbol is returned once in requested-id order
+- **AND** the unknown id is omitted
+
+#### Scenario: Relation batches filter and order the requested relation set
+
+- **GIVEN** the graph contains incoming and outgoing traversal relations of requested and unrequested types
+- **WHEN** incoming and outgoing batch queries request several symbol ids and relation types
+- **THEN** only relations matching the requested direction, ids, and types are returned
+- **AND** results are ordered by source, type, then target
+- **AND** `CALLS`, `CONSTRUCTS`, `USES_TYPE`, `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES` are supported
+
+#### Scenario: Empty batch performs no backend work
+
+- **WHEN** a symbol batch has no ids or a relation batch has no ids or relation types
+- **THEN** the result is an empty array
+- **AND** the backend query primitive is not invoked
+
+#### Scenario: Logical batch does not fan out by symbol or relation type
+
+- **GIVEN** a logical batch contains many distinct symbols and several relation types
+- **WHEN** a conforming backend executes it
+- **THEN** backend instrumentation observes a bounded batch operation rather than one storage call per symbol or relation type
+- **AND** transparent physical parameter chunking does not change the result
+
+### Requirement: Exact batch node retrieval
+
+#### Scenario: Exact file, document, and spec batches deduplicate and preserve requested order
+
+- **GIVEN** each requested path/id list contains duplicates, existing nodes, and an unknown identity
+- **WHEN** `getFilesByPaths()`, `getDocumentsByPaths()`, and `getSpecsByIds()` are called
+- **THEN** each existing node is returned once in first-requested identity order
+- **AND** unknown identities are omitted
+
+#### Scenario: Exact batch accepts arbitrary input order and empty input
+
+- **GIVEN** node identities supplied in arbitrary order, and separately an empty list
+- **WHEN** exact batch node operations are invoked
+- **THEN** results preserve first-requested identity order
+- **AND** empty input returns an empty array without backend work
+
+#### Scenario: Exact batch does not fan out by identity
+
+- **GIVEN** a logical batch contains many distinct identities
+- **WHEN** a conforming backend executes an exact batch node operation
+- **THEN** backend instrumentation observes a bounded batch operation rather than one storage call per identity
+
+#### Scenario: Display-path derivation never uses exact batch node retrieval
+
+- **GIVEN** an impact presentation task that must render project-relative paths
+- **WHEN** display paths are derived
+- **THEN** derivation uses project and workspace configuration only
+- **AND** `getFilesByPaths`, `getDocumentsByPaths`, `getSpecsByIds`, or `getSymbolsByIds` is not invoked for path derivation
+
 ### Requirement: Graph statistics
 
 #### Scenario: Statistics include all expected fields
@@ -398,14 +457,14 @@
 
 - **GIVEN** canonical ids whose serialized text contains overlapping names and delimiters
 - **WHEN** lookup, ranking, and selector resolution run by workspace, surface, name, space, owner, member form, or exported name
-- **THEN** SQLite and Ladybug use indexed structured fields and return equivalent results
-- **AND** neither backend parses or substring-ranks the serialized canonical ids
+- **THEN** the SQLite backend uses indexed structured fields and returns deterministic results
+- **AND** the serialized canonical ids are never parsed or substring-ranked
 
 #### Scenario: Incremental hydration and affected lookup have backend parity
 
 - **GIVEN** persisted declarations, bindings, importers, callers, type users, and hierarchy dependents
 - **WHEN** the complete reference snapshot and direct affected files are requested
-- **THEN** SQLite and Ladybug return equivalent deterministically ordered facts and file paths
+- **THEN** the SQLite backend returns deterministically ordered facts and file paths
 - **AND** affected lookup uses a bounded batch operation rather than one query per relation
 
 ### Requirement: Incompatible store handling

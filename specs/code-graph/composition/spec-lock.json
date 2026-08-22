@@ -17,18 +17,72 @@
   ],
   "implementation": [
     {
-      "file": "code-graph:src/composition/create-code-graph-provider.ts",
-      "symbols": ["createCodeGraphProvider", "createGraphStoreRegistry"]
+      "file": "code-graph:src/infrastructure/sqlite/sqlite-runtime-descriptor.ts",
+      "symbols": ["SqliteRuntimeDescriptor"]
     },
     {
-      "file": "code-graph:src/composition/graph-store-factory.ts",
-      "symbols": ["GraphStoreFactory", "CodeGraphCompositionOptions", "CodeGraphOptions"]
+      "file": "code-graph:src/composition/create-sqlite-graph-store-factory.ts",
+      "symbols": ["createSqliteGraphStoreFactory", "SqliteGraphStoreFactoryOptions"]
+    },
+    {
+      "file": "code-graph:src/public.ts"
+    },
+    {
+      "file": "code-graph:src/index.ts"
+    },
+    {
+      "file": "code-graph:package.json"
+    },
+    {
+      "file": "code-graph:src/infrastructure/sqlite/sqlite-graph-store.ts",
+      "symbols": ["SQLiteGraphStore", "beginBulkIndexSession", "bulkLoad"]
+    },
+    {
+      "file": "code-graph:src/infrastructure/tree-sitter/adapter-registry.ts",
+      "symbols": ["AdapterRegistry"]
+    },
+    {
+      "file": "code-graph:src/infrastructure/tree-sitter/typescript-language-adapter.ts",
+      "symbols": ["TypeScriptLanguageAdapter"]
+    },
+    {
+      "file": "code-graph:src/infrastructure/tree-sitter/python-language-adapter.ts",
+      "symbols": ["PythonLanguageAdapter"]
+    },
+    {
+      "file": "code-graph:src/infrastructure/tree-sitter/php-language-adapter.ts",
+      "symbols": ["PhpLanguageAdapter"]
+    },
+    {
+      "file": "code-graph:src/infrastructure/tree-sitter/go-language-adapter.ts",
+      "symbols": ["GoLanguageAdapter"]
+    },
+    {
+      "file": "code-graph:test/barrel.spec.ts"
+    },
+    {
+      "file": "code-graph:test/composition/create-sqlite-graph-store-factory.spec.ts"
     },
     {
       "file": "code-graph:test/composition/code-graph-provider.spec.ts"
     },
     {
-      "file": "code-graph:README.md"
+      "file": "code-graph:test/composition/host-use-case-factories.spec.ts"
+    },
+    {
+      "file": "code-graph:src/composition/code-graph-provider.ts"
+    },
+    {
+      "file": "code-graph:src/domain/errors/invalid-graph-selector-error.ts"
+    },
+    {
+      "file": "code-graph:test/domain/errors/specd-code-graph-error.spec.ts"
+    },
+    {
+      "file": "code-graph:src/composition/create-code-graph-provider.ts"
+    },
+    {
+      "file": "code-graph:src/composition/graph-store-factory.ts"
     }
   ],
   "optimizations": {

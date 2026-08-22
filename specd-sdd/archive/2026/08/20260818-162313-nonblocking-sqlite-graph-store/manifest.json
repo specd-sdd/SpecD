@@ -1,8 +1,8 @@
 {
   "name": "nonblocking-sqlite-graph-store",
   "createdAt": "2026-08-18T16:23:13.275Z",
-  "updatedAt": "2026-08-21T23:42:37.504Z",
-  "description": "Execute SQLite operations inside a persistent worker thread without blocking host event loop",
+  "updatedAt": "2026-08-22T07:00:53.663Z",
+  "description": "Move all synchronous better-sqlite3 work (queries, schema, FTS, bulk commits) into one dedicated persistent worker thread behind a typed RPC protocol with bounded backpressure, keeping the CLI event loop responsive during indexing and impact queries. Introduces storage-neutral exact batch node APIs (getSymbolsByIds/getFilesByPaths/getDocumentsByPaths/getSpecsByIds), batched traversal and hotspot-hierarchy reads, pure display-path projection in the CLI, and bounded concurrency where no batch representation exists — eliminating the STORE_OVERLOAD failures observed on wide real-repository graphs. Verified end-to-end against six affected specs with wide-graph low-limit regressions (maxPendingOperations 16/32) and real-workload runs.",
   "schema": {
     "name": "schema-std",
     "version": 1
@@ -51,15 +51,13 @@
       "core:config",
       "code-graph:traversal",
       "code-graph:workspace-integration",
-      "code-graph:resolve-symbol-reference",
-      "code-graph:composition,code-graph:graph-store"
+      "code-graph:resolve-symbol-reference"
     ],
     "cli:graph-hotspots": [
       "cli:entrypoint",
-      "core:config",
-      "code-graph:composition",
       "cli:graph-cli-context",
-      "code-graph:composition,code-graph:graph-store"
+      "core:config",
+      "code-graph:composition"
     ]
   },
   "invalidationPolicy": "downstream",
@@ -226,7 +224,7 @@
     },
     {
       "file": "specs/code-graph/sqlite-graph-store/spec-lock.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "docs/adr/0025-nonblocking-worker-sqlite-graph-store.md",
@@ -246,7 +244,7 @@
     },
     {
       "file": "packages/code-graph/test/application/use-cases/get-change-spec-coverage.spec.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/test/composition/create-sqlite-graph-store-factory.spec.ts",
@@ -258,7 +256,7 @@
     },
     {
       "file": "packages/code-graph/test/helpers/stub-change-repository.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/test/composition/code-graph-provider.spec.ts",
@@ -266,107 +264,107 @@
     },
     {
       "file": ".changeset/20260820-deprecate-ladybug-store-specd.md",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": ".changeset/20260820-deprecate-ladybug-store.md",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": ".changeset/20260820-fix-graph-cli-context-explicit-config-specd.md",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": ".changeset/20260820-fix-graph-cli-context-explicit-config.md",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "docs/adr/0024-logical-symbol-resolution.md",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/cli/src/commands/graph/hotspots.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/cli/src/commands/graph/impact.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/cli/src/commands/graph/resolve-graph-cli-context.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/cli/src/commands/graph/search.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/cli/src/commands/graph/stats.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/cli/src/commands/graph/with-provider.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/cli/test/commands/change-run-hooks.spec.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/cli/test/commands/change-transition.spec.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/cli/test/commands/graph-cli-context.spec.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/cli/test/commands/graph-impact.spec.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/cli/test/commands/graph-index.spec.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/cli/test/commands/graph-stats.spec.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/cli/test/commands/helpers.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/cli/test/commands/plugins-update.spec.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/cli/test/commands/plugins.spec.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/cli/test/commands/project-init.spec.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/cli/test/commands/spec-optimizations.spec.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/cli/vitest.config.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/README.md",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/code-graph/src/composition/create-code-graph-provider.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/code-graph/src/composition/graph-store-factory.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/code-graph/src/infrastructure/ladybug/index.ts",
@@ -386,167 +384,167 @@
     },
     {
       "file": "packages/code-graph/vitest.config.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/core/test/application/use-cases/get-active-schema.spec.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/core/test/application/use-cases/validate-schema.spec.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/core/vitest.config.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/sdk/test/composition/host-context.spec.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/sdk/test/composition/with-open-graph-provider.spec.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "pnpm-lock.yaml",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "pnpm-workspace.yaml",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/cli/change-archive/spec-lock.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/cli/graph-cli-context/spec-lock.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/cli/graph-cli-context/spec.md",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/cli/graph-cli-context/verify.md",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/cli/graph-hotspots/spec-lock.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/cli/graph-impact/spec-lock.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/cli/graph-search/spec-lock.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/cli/graph-stats/spec-lock.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/cli/graph-stats/spec.md",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/cli/graph-stats/verify.md",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/code-graph/composition/spec-lock.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/code-graph/composition/spec.md",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/code-graph/composition/verify.md",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/code-graph/ladybug-graph-store/spec-lock.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/code-graph/ladybug-graph-store/spec.md",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/code-graph/ladybug-graph-store/verify.md",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/code-graph/sqlite-graph-store/spec.md",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/code-graph/sqlite-graph-store/verify.md",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/core/content-extraction/spec-lock.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/core/delta-format/spec-lock.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/core/external-hook-runner-port/spec-lock.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/core/generate-metadata/spec-lock.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/core/get-project-summary/spec-lock.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/core/hook-execution-model/spec-lock.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/core/hook-runner-port/spec-lock.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/core/regenerate-spec-metadata/spec-lock.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/core/run-step-hooks/spec-lock.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/core/schema-merge/spec-lock.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/core/selector-model/spec-lock.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/core/spec-lock/spec-lock.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/core/template-variables/spec-lock.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/core/validate-artifacts/spec-lock.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/sdk/composition/spec-lock.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/src/domain/ports/graph-store.ts",
@@ -602,43 +600,43 @@
     },
     {
       "file": "packages/cli/src/commands/graph/resolve-impact-file-selectors.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/cli/test/commands/graph-search.spec.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/cli/test/commands/graph/resolve-impact-file-selectors.spec.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/code-graph/src/application/services/resolve-graph-selector.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/code-graph/src/application/use-cases/index-code-graph.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/code-graph/src/composition/code-graph-provider.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/code-graph/src/domain/services/compute-hotspots.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/code-graph/test/domain/services/compute-hotspots.spec.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/code-graph/src/domain/errors/invalid-graph-selector-error.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/code-graph/test/domain/errors/specd-code-graph-error.spec.ts",
-      "state": "open"
+      "state": "resolved"
     }
   ],
   "implementationLinks": [
@@ -777,11 +775,6 @@
     {
       "specId": "code-graph:sqlite-graph-store",
       "file": "packages/code-graph/test/infrastructure/sqlite/sqlite-worker-dist.spec.ts",
-      "fileLinkExplicit": true
-    },
-    {
-      "specId": "code-graph:sqlite-graph-store",
-      "file": "docs/code-graph/index.md",
       "fileLinkExplicit": true
     },
     {
@@ -959,26 +952,6 @@
     },
     {
       "specId": "code-graph:sqlite-graph-store",
-      "file": "docs/adr/0025-nonblocking-worker-sqlite-graph-store.md",
-      "fileLinkExplicit": true
-    },
-    {
-      "specId": "code-graph:composition",
-      "file": "docs/adr/0025-nonblocking-worker-sqlite-graph-store.md",
-      "fileLinkExplicit": true
-    },
-    {
-      "specId": "code-graph:graph-store",
-      "file": "docs/adr/0025-nonblocking-worker-sqlite-graph-store.md",
-      "fileLinkExplicit": true
-    },
-    {
-      "specId": "code-graph:traversal",
-      "file": "docs/adr/0025-nonblocking-worker-sqlite-graph-store.md",
-      "fileLinkExplicit": true
-    },
-    {
-      "specId": "code-graph:sqlite-graph-store",
       "file": "packages/code-graph/src/domain/errors/bulk-session-state-error.ts",
       "fileLinkExplicit": false,
       "symbols": ["BulkSessionStateError"]
@@ -1008,6 +981,91 @@
     {
       "specId": "code-graph:composition",
       "file": "packages/code-graph/test/composition/host-use-case-factories.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:graph-impact",
+      "file": "packages/cli/src/commands/graph/impact.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:graph-impact",
+      "file": "packages/cli/src/commands/graph/resolve-impact-file-selectors.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:graph-impact",
+      "file": "packages/cli/src/commands/graph/search.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:graph-hotspots",
+      "file": "packages/cli/src/commands/graph/hotspots.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:composition",
+      "file": "packages/code-graph/src/composition/code-graph-provider.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:composition",
+      "file": "packages/code-graph/src/domain/errors/invalid-graph-selector-error.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:composition",
+      "file": "packages/code-graph/test/domain/errors/specd-code-graph-error.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:traversal",
+      "file": "packages/code-graph/src/application/services/resolve-graph-selector.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:traversal",
+      "file": "packages/code-graph/src/application/use-cases/index-code-graph.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:traversal",
+      "file": "packages/code-graph/src/domain/services/compute-hotspots.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:traversal",
+      "file": "packages/code-graph/test/domain/services/compute-hotspots.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:graph-impact",
+      "file": "packages/cli/test/commands/graph-impact.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:graph-impact",
+      "file": "packages/cli/test/commands/graph-search.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:graph-impact",
+      "file": "packages/cli/test/commands/graph/resolve-impact-file-selectors.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:sqlite-graph-store",
+      "file": "packages/code-graph/README.md",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:composition",
+      "file": "packages/code-graph/src/composition/create-code-graph-provider.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:composition",
+      "file": "packages/code-graph/src/composition/graph-store-factory.ts",
       "fileLinkExplicit": true
     }
   ],
@@ -2963,6 +3021,77 @@
       },
       "from": "done",
       "to": "archivable"
+    },
+    {
+      "type": "description-updated",
+      "at": "2026-08-22T06:47:52.449Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "description": "Move all synchronous better-sqlite3 work (queries, schema, FTS, bulk commits) into one dedicated persistent worker thread behind a typed RPC protocol with bounded backpressure, keeping the CLI event loop responsive during indexing and impact queries. Introduces storage-neutral exact batch node APIs (getSymbolsByIds/getFilesByPaths/getDocumentsByPaths/getSpecsByIds), batched traversal and hotspot-hierarchy reads, pure display-path projection in the CLI, and bounded concurrency where no batch representation exists — eliminating the STORE_OVERLOAD failures observed on wide real-repository graphs. Verified end-to-end against six affected specs with wide-graph low-limit regressions (maxPendingOperations 16/32) and real-workload runs."
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-08-22T06:53:28.968Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Implementation link \"code-graph:sqlite-graph-store\" points outside workspace \"code-graph\" codeRoot.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-08-22T06:54:03.591Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Implementation link \"code-graph:sqlite-graph-store\" points outside workspace \"code-graph\" codeRoot.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-08-22T06:56:56.932Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'cli:graph-impact': extracted dependencies [cli:entrypoint, cli:graph-cli-context, core:config, code-graph:traversal, code-graph:workspace-integration, code-graph:resolve-symbol-reference] do not match persisted dependencies [cli:entrypoint, cli:graph-cli-context, core:config, code-graph:traversal, code-graph:workspace-integration, code-graph:resolve-symbol-reference, code-graph:composition,code-graph:graph-store]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-08-22T06:59:43.080Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'cli:graph-impact': extracted dependencies [cli:entrypoint, cli:graph-cli-context, core:config, code-graph:traversal, code-graph:workspace-integration, code-graph:resolve-symbol-reference] do not match persisted dependencies [cli:entrypoint, cli:graph-cli-context, core:config, code-graph:traversal, code-graph:workspace-integration, code-graph:resolve-symbol-reference, code-graph:composition, code-graph:graph-store]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-22T07:00:53.661Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
     }
-  ]
+  ],
+  "archivedAt": "2026-08-22T07:00:53.880Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
 }

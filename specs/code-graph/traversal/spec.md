@@ -20,6 +20,38 @@ The traversal follows `CALLS` relations in reverse (target → source). Cycles a
 
 `getDownstream(store: GraphStore, symbolId: string, options?: TraversalOptions): Promise<TraversalResult>` SHALL return all callees of the given symbol, transitively up to `maxDepth` (default: 3). Results are grouped by depth level following `CALLS` relations forward (source → target). Cycle detection applies as with upstream.
 
+### Requirement: Bounded batched traversal execution
+
+Upstream and downstream breadth-first traversal SHALL query each frontier through
+the `GraphStore` batch symbol and relation operations. One frontier MUST NOT
+issue one store request per symbol or per relation type. Newly reached symbol ids
+SHALL be deduplicated before their nodes are fetched in one logical batch.
+
+File impact, multi-file impact, change detection, and any per-symbol impact
+aggregation MUST use a fixed bounded concurrency budget whose number of active
+store operations does not grow with the number of input files, symbols, or
+frontier width. Multi-file impact SHALL share one memoized read view and one
+concurrency budget across all input files.
+
+Batching and scheduling MUST preserve the existing traversal direction, depth,
+cycle handling, deterministic ordering, affected-symbol/file sets, covering-spec
+evidence, dependent counts, and risk calculation. Backpressure is an adapter
+safety boundary; a valid traversal over a wide graph MUST NOT fail with
+`StoreOverloadError` merely because its input contains many distinct symbols.
+
+### Requirement: Bounded hotspot hierarchy retrieval
+
+Hotspot computation SHALL retrieve hierarchy signals (extenders, implementors,
+and overriders) through the `GraphStore` batch relation operations. One logical
+`getIncomingSymbolRelations` call SHALL carry all candidate symbol ids with the
+`EXTENDS`, `IMPLEMENTS`, and `OVERRIDES` relation types, and the results SHALL be
+folded in memory into per-symbol extender, implementor, and overrider counts.
+
+Hotspot computation MUST NOT issue one hierarchy query per candidate symbol. A
+valid hotspot ranking over a wide graph MUST NOT fail with `StoreOverloadError`
+merely because the graph contains many symbols. Score composition, scoped
+filters, ranking order, and risk classification MUST remain unchanged.
+
 ### Requirement: TraversalOptions and TraversalResult
 
 `TraversalOptions` is a value object with:
@@ -181,3 +213,7 @@ Traversal remains read-only. It SHALL project the coverage present in the open g
 - [`code-graph:symbol-model`](../symbol-model/spec.md) — logical symbols, public bindings, relations, and hierarchy semantics
 - [`code-graph:graph-store`](../graph-store/spec.md) — backend-neutral indexed query methods
 - [`code-graph:resolve-symbol-reference`](../resolve-symbol-reference/spec.md) — canonical and public-binding target selection
+
+## ADRs
+
+- [ADR-0025: Non-Blocking Worker-Thread SQLite Graph Store](../../../docs/adr/0025-nonblocking-worker-sqlite-graph-store.md) — bounded batched traversal and hotspot hierarchy retrieval keep wide-graph analysis within worker backpressure limits

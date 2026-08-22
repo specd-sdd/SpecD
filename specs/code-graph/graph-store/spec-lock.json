@@ -14,33 +14,44 @@
       "file": "code-graph:src/domain/ports/graph-store.ts",
       "symbols": [
         "GraphStore",
-        "ReferenceFactsWrite",
-        "LogicalDeclaration",
-        "LogicalSymbolLookup",
-        "PublicBindingLookup",
-        "LocalBindingLookup"
+        "getSymbolsByIds",
+        "getIncomingSymbolRelations",
+        "getOutgoingSymbolRelations"
       ]
     },
     {
       "file": "code-graph:test/helpers/in-memory-graph-store.ts",
-      "symbols": ["InMemoryGraphStore"]
+      "symbols": [
+        "InMemoryGraphStore",
+        "getSymbolsByIds",
+        "getIncomingSymbolRelations",
+        "getOutgoingSymbolRelations"
+      ]
     },
     {
-      "file": "code-graph:test/domain/ports/graph-store.contract.ts",
-      "symbols": ["graphStoreContractTests"]
+      "file": "code-graph:src/infrastructure/sqlite/sqlite-graph-database.ts",
+      "symbols": [
+        "SQLiteGraphDatabase",
+        "getSymbolsByIds",
+        "getIncomingSymbolRelations",
+        "getOutgoingSymbolRelations"
+      ]
     },
     {
       "file": "code-graph:src/infrastructure/sqlite/sqlite-graph-store.ts",
-      "symbols": ["SQLiteGraphStore"]
+      "symbols": [
+        "SQLiteGraphStore",
+        "getSymbolsByIds",
+        "getIncomingSymbolRelations",
+        "getOutgoingSymbolRelations"
+      ]
     },
     {
-      "file": "code-graph:src/domain/value-objects/source-search.ts"
+      "file": "code-graph:src/domain/services/analyze-file-impact.ts",
+      "symbols": ["createMemoizedReadStore"]
     },
     {
-      "file": "code-graph:src/domain/services/expand-search-query.ts"
-    },
-    {
-      "file": "code-graph:test/domain/services/expand-search-query.spec.ts"
+      "file": "code-graph:test/domain/ports/graph-store.contract.ts"
     }
   ],
   "optimizations": {

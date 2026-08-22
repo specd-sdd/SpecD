@@ -11,7 +11,116 @@
   ],
   "implementation": [
     {
-      "file": "code-graph:vitest.config.ts"
+      "file": "code-graph:src/domain/errors/store-overload-error.ts",
+      "symbols": ["StoreOverloadError"]
+    },
+    {
+      "file": "code-graph:src/domain/errors/store-worker-error.ts",
+      "symbols": ["StoreWorkerError"]
+    },
+    {
+      "file": "code-graph:src/domain/errors/index.ts"
+    },
+    {
+      "file": "code-graph:src/infrastructure/sqlite/sqlite-runtime-descriptor.ts",
+      "symbols": ["SqliteRuntimeDescriptor", "SQLiteGraphStoreOptions"]
+    },
+    {
+      "file": "code-graph:src/infrastructure/sqlite/sqlite-worker-protocol.ts",
+      "symbols": [
+        "SQLiteWorkerOperation",
+        "SQLiteWorkerRequest",
+        "SQLiteWorkerResponse",
+        "SerializedErrorPayload",
+        "SQLiteWorkerProgressEvent",
+        "SQLiteWorkerOperationMap",
+        "SerializableIndexWriteSessionMetadata"
+      ]
+    },
+    {
+      "file": "code-graph:src/infrastructure/sqlite/resolve-worker-path.ts",
+      "symbols": ["resolveSqliteWorkerPath"]
+    },
+    {
+      "file": "code-graph:src/infrastructure/sqlite/sqlite-graph-database.ts",
+      "symbols": [
+        "SQLiteGraphDatabase",
+        "getSymbolsByIds",
+        "getIncomingSymbolRelations",
+        "getOutgoingSymbolRelations"
+      ]
+    },
+    {
+      "file": "code-graph:src/infrastructure/sqlite/sqlite-worker.ts",
+      "symbols": [
+        "handleMessage",
+        "serializeError",
+        "createBulkSession",
+        "requireBulkSession",
+        "mergeReferenceFactChunks"
+      ]
+    },
+    {
+      "file": "code-graph:src/infrastructure/sqlite/sqlite-worker-client.ts",
+      "symbols": ["SQLiteWorkerClient", "drainPendingRequests"]
+    },
+    {
+      "file": "code-graph:src/infrastructure/sqlite/sqlite-graph-store.ts",
+      "symbols": [
+        "SQLiteGraphStore",
+        "clear",
+        "invalidateBulkSession",
+        "getSymbolsByIds",
+        "getIncomingSymbolRelations",
+        "getOutgoingSymbolRelations"
+      ]
+    },
+    {
+      "file": "code-graph:src/infrastructure/sqlite/index.ts"
+    },
+    {
+      "file": "code-graph:test/infrastructure/sqlite/sqlite-worker-protocol.spec.ts"
+    },
+    {
+      "file": "code-graph:test/infrastructure/sqlite/sqlite-worker-backpressure.spec.ts"
+    },
+    {
+      "file": "code-graph:test/infrastructure/sqlite/sqlite-worker-responsiveness.spec.ts"
+    },
+    {
+      "file": "code-graph:test/infrastructure/sqlite/sqlite-worker-dist.spec.ts"
+    },
+    {
+      "file": "code-graph:test/infrastructure/sqlite/sqlite-worker-lifecycle.spec.ts"
+    },
+    {
+      "file": "code-graph:src/domain/errors/spec-not-found-error.ts",
+      "symbols": ["SpecNotFoundError"]
+    },
+    {
+      "file": "code-graph:src/infrastructure/storage-generation.ts",
+      "symbols": ["rotateStorageGenerationAsync", "ensureStorageGenerationAsync"]
+    },
+    {
+      "file": "code-graph:test/infrastructure/sqlite/sqlite-graph-store.spec.ts"
+    },
+    {
+      "file": "code-graph:test/integration/sqlite-wide-traversal.spec.ts"
+    },
+    {
+      "file": "code-graph:src/domain/errors/bulk-session-state-error.ts",
+      "symbols": ["BulkSessionStateError"]
+    },
+    {
+      "file": "code-graph:src/domain/errors/graph-schema-incompatible-error.ts",
+      "symbols": ["GraphSchemaIncompatibleError"]
+    },
+    {
+      "file": "code-graph:src/domain/errors/invalid-graph-store-configuration-error.ts",
+      "symbols": ["InvalidGraphStoreConfigurationError"]
+    },
+    {
+      "file": "code-graph:README.md"
     }
   ],
   "optimizations": {

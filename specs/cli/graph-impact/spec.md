@@ -140,6 +140,34 @@ The JSON output MUST include aggregate impact fields to support automated risk a
 - `transitiveDepsCount`
 - `affectedFilesCount`
 
+### Requirement: Pure display-path projection
+
+The CLI SHALL render file paths in impact output by projecting canonical graph
+paths to project-relative display paths using project and workspace
+configuration alone. Path projection SHALL NOT perform graph reads, SHALL NOT
+resolve files or documents through the provider, and SHALL NOT require
+availability validation.
+
+For single-file impact, all affected-file display paths SHALL derive from the
+resolved project configuration. For multi-file impact, the display path for each
+input file SHALL derive from that file's own resolved workspace configuration,
+and every affected file SHALL be rendered exactly once per input file that
+contributed it.
+
+Formatting a result MUST NOT fan out one provider or store read per affected
+symbol or file. A multi-file impact result containing many affected symbols MUST
+format successfully without `StoreOverloadError`.
+
+### Requirement: Availability validated once per command
+
+The impact command SHALL perform exactly one availability/staleness validation
+per command run, after the provider is opened. Per-file, per-symbol, or
+per-affected-file availability checks MUST NOT be issued during aggregation or
+formatting.
+
+A valid impact analysis over a wide graph MUST NOT fail with `StoreOverloadError`
+merely because its input or result contains many distinct files or symbols.
+
 ### Requirement: Error cases
 
 Exactly one of `--file`, `--symbol`, or `--spec` must be provided. If none or more than one are passed, the command SHALL fail with a CLI error and exit code 1.
@@ -218,3 +246,7 @@ $ specd graph impact --file /repo/packages/core/src/auth.ts --format json
 - `code-graph:traversal` — canonical and public-binding impact
 - `code-graph:workspace-integration` — selector identity
 - `code-graph:resolve-symbol-reference` — target resolution and ambiguity
+
+## ADRs
+
+- [ADR-0025: Non-Blocking Worker-Thread SQLite Graph Store](../../../docs/adr/0025-nonblocking-worker-sqlite-graph-store.md) — impact presentation derives display paths from configuration alone and validates availability once per run

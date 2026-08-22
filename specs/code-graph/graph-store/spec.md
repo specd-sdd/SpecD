@@ -111,6 +111,57 @@ Unlike `upsertFile` which replaces all data for a file, `addRelations` is purely
 
 `SymbolQuery` is a value object with optional fields: `name` (glob or regex), `kinds` (array of `SymbolKind` for filtering by one or more kinds), `filePath` (exact match or glob), `comment` (substring match for full-text search within symbol comments), `caseSensitive` (boolean, defaults to `false` — when `false`, `name` and `comment` matching is case insensitive).
 
+### Requirement: Batched symbol traversal reads
+
+`GraphStore` SHALL expose storage-neutral batch queries for traversal:
+
+- `getSymbolsByIds(symbolIds: readonly string[]): Promise<SymbolNode[]>`
+  retrieves every existing requested symbol.
+- `getIncomingSymbolRelations(symbolIds: readonly string[], relationTypes: readonly RelationType[]): Promise<Relation[]>`
+  retrieves relations whose target is one of the requested symbols and whose type
+  is requested.
+- `getOutgoingSymbolRelations(symbolIds: readonly string[], relationTypes: readonly RelationType[]): Promise<Relation[]>`
+  retrieves relations whose source is one of the requested symbols and whose type
+  is requested.
+
+These operations MUST support `CALLS`, `CONSTRUCTS`, `USES_TYPE`,
+`EXTENDS`, `IMPLEMENTS`, and `OVERRIDES`. Inputs SHALL be deduplicated
+without changing observable meaning. Unknown symbol ids SHALL be omitted.
+Results MUST be deterministic across backends: symbols ordered by requested id
+order and relations ordered by source, type, then target. Empty symbol-id or
+relation-type input MUST return an empty array without backend work.
+
+A backend MUST execute each logical batch without requiring one storage call per
+symbol or per relation type. Physical parameter chunking is permitted when it is
+transparent to the result.
+
+### Requirement: Exact batch node retrieval
+
+`GraphStore` SHALL expose storage-neutral exact batch node lookups that mirror the
+`getSymbolsByIds` contract for the other primary node families:
+
+- `getFilesByPaths(paths: readonly string[]): Promise<FileNode[]>`
+  retrieves every existing requested file.
+- `getDocumentsByPaths(paths: readonly string[]): Promise<DocumentNode[]>`
+  retrieves every existing requested document.
+- `getSpecsByIds(specIds: readonly string[]): Promise<SpecNode[]>`
+  retrieves every existing requested spec.
+
+Every exact batch node operation MUST:
+
+- accept arbitrary input ordering;
+- deduplicate repeated requested identities so each identity is returned once;
+- preserve first-requested identity order in the result;
+- omit identities that do not exist;
+- return an empty array for empty input without backend work;
+- execute each logical batch without one storage call per identity.
+
+These operations complement the existing single-item APIs (`getFile`,
+`getDocument`, `getSymbol`, `getSpec`) and complete-collection APIs
+(`getAllFiles`, `getAllDocuments`, `getAllSpecs`), all of which remain available.
+Exact batch retrieval MUST NOT be used to re-implement display-path derivation;
+display paths are derivable from project/workspace configuration alone.
+
 ### Requirement: Graph statistics
 
 `GraphStore` SHALL provide `getStatistics(): Promise<GraphStatistics>` returning:
@@ -266,3 +317,7 @@ Relation endpoint validation and hierarchy/method lookup SHALL have batch operat
 - [`default:_global/architecture`](../../../_global/architecture/spec.md) — abstract-port and storage-boundary constraints
 - [`code-graph:staleness-detection`](../staleness-detection/spec.md) — persisted derivation metadata and freshness reporting
 - [`code-graph:document-model`](../document-model/spec.md) — document-node semantics and searchable textual resources
+
+## ADRs
+
+- [ADR-0025: Non-Blocking Worker-Thread SQLite Graph Store](../../../docs/adr/0025-nonblocking-worker-sqlite-graph-store.md) — exact batch node retrieval keeps traversal reads bounded on the worker-backed backend

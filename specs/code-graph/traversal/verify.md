@@ -42,6 +42,48 @@
 - **WHEN** `getDownstream(store, A.id, { includeFiles: true })` is called
 - **THEN** both the `CALLS` relation to B and the `IMPORTS` relation to Y are reflected in the result
 
+### Requirement: Bounded batched traversal execution
+
+#### Scenario: Wide upstream and downstream frontiers use logical batches
+
+- **GIVEN** one breadth-first frontier contains many distinct symbols and all supported traversal relation types
+- **WHEN** upstream and downstream traversal advance one level
+- **THEN** each direction uses a batch relation lookup and a batch symbol lookup for the frontier
+- **AND** no store request is issued per frontier symbol or relation type
+
+#### Scenario: Wide multi-file impact respects store backpressure
+
+- **GIVEN** many input files and symbols form wide overlapping frontiers
+- **AND** the SQLite store is configured with `maxPendingOperations: 32`
+- **WHEN** multi-file impact is analyzed to the configured depth
+- **THEN** the operation completes without `StoreOverloadError`
+- **AND** active store operations remain within one fixed concurrency budget independent of input width
+- **AND** repeated reads across files share one memoized read view
+
+#### Scenario: Batching preserves traversal semantics
+
+- **GIVEN** an equivalent graph containing cycles, hierarchy relations, static type dependencies, and covering specs
+- **WHEN** it is traversed with bounded batch scheduling
+- **THEN** direction, shallowest depth, truncation, affected symbols and files, and covering-spec evidence remain unchanged
+- **AND** deterministic ordering, dependent counts, and risk calculation remain unchanged
+
+### Requirement: Bounded hotspot hierarchy retrieval
+
+#### Scenario: Hierarchy signals arrive in one logical batch
+
+- **GIVEN** a hotspot candidate set with many distinct symbols
+- **WHEN** extender, implementor, and overrider signals are retrieved
+- **THEN** all candidate symbol ids and the `EXTENDS`, `IMPLEMENTS`, and `OVERRIDES` relation types are requested together in one logical batch relation lookup
+- **AND** per-candidate hierarchy queries are not issued
+
+#### Scenario: Wide-graph hotspot ranking completes
+
+- **GIVEN** a wide graph containing many symbols
+- **AND** the SQLite store is configured with `maxPendingOperations: 32`
+- **WHEN** hotspot ranking is computed
+- **THEN** the computation completes without `StoreOverloadError`
+- **AND** score composition, scoped filters, ranking order, and risk classification remain unchanged
+
 ### Requirement: Impact analysis
 
 #### Scenario: LOW risk — no dependents
