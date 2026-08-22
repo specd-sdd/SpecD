@@ -53,7 +53,7 @@ const RESOLVER_CONCURRENCY = 16
  * @param input - The raw selector string.
  * @param options - Graph resolution options.
  * @returns Matching canonical file-bearing graph entries.
- * @throws {Error} When the selector is empty.
+ * @throws {InvalidGraphSelectorError} When the selector is empty.
  */
 export async function resolveFileSelector(
   input: string,
@@ -90,7 +90,7 @@ export async function resolveFileSelector(
  * @param input - The raw selector string.
  * @param options - Graph resolution options.
  * @returns Matching canonical symbol entries.
- * @throws {Error} When the selector is empty.
+ * @throws {InvalidGraphSelectorError} When the selector is empty.
  */
 export async function resolveSymbolSelector(
   input: string,

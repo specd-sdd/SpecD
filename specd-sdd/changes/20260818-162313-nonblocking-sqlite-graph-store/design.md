@@ -488,3 +488,28 @@ by sqlite-graph-store.spec.ts one-RPC tests for all four operations.
 Parameter-limit regression (Task 5): new test "accounts for all bind parameters
 when chunking ids together with relation types" (6 types × 905 ids) passes,
 proving idChunkSize = 900 − |types| accounting on both directions.
+
+### Final pre-compliance pass (execution record)
+
+- JSDoc corrected: `@throws {InvalidGraphSelectorError}` on
+  `resolveFileSelector`/`resolveSymbolSelector` (application service) and
+  documented the same typed throw on the provider facade methods; no runtime
+  behavior changed.
+- Bind-parameter budget confirmed by inspection:
+  `idChunkSize = SQLITE_BATCH_PARAMETER_LIMIT(900) - uniqueTypes.length`,
+  RangeError guard when types exhaust the budget; every statement binds at most
+  900 parameters. Max ids per query: 899 (1 type), 898 (2 types), 897 (3 types).
+- New boundary test "respects the combined id and relation-type parameter
+  budget on both directions": 3 relation types × {896 below, 897 exactly at,
+  898 above} × incoming+outgoing; proves no bind error, no loss, no duplicates,
+  deterministic order across input permutations.
+- Ambiguity enrichment verified as one `getSymbolsByIds` batch; single-symbol
+  path direct lookup; zero provider/store reads in formatting.
+- Fan-out rescan of touched files: only fixed-cardinality Promise.all remain
+  (hotspot triple probe, resolver pairs); includeFiles per-file loop retained
+  per spec letter.
+- Regression: code-graph 675/675, cli 867/867, typecheck/lint clean both
+  packages, builds OK.
+- Real workloads after re-index: hotspots --min-risk HIGH (~2.7s),
+  sqlite-graph-database.ts impact (largest file), code-graph index.ts,
+  three-file impact — all exit 0 with zero STORE_OVERLOAD.

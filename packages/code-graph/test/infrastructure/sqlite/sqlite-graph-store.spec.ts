@@ -139,6 +139,71 @@ describe('SQLiteGraphStore', () => {
     await store.close()
   })
 
+  it('respects the combined id and relation-type parameter budget on both directions', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-rel-boundary-'))
+    const store = new SQLiteGraphStore(tempDir)
+    await store.open()
+
+    const threeTypes = [RelationType.Calls, RelationType.Extends, RelationType.Implements] as const
+    // With SQLITE_BATCH_PARAMETER_LIMIT = 900 and 3 types, the safe per-query
+    // id budget is exactly 897. Exercise below/at/above that boundary so a
+    // statement would exceed 900 bound parameters if types were not subtracted.
+    for (const symbolCount of [896, 897, 898] as const) {
+      const ring = Array.from({ length: symbolCount }, (_, index) =>
+        createSymbolNode({
+          name: `ring-${String(symbolCount)}-${String(index)}`,
+          kind: SymbolKind.Function,
+          filePath: `core:src/ring-${String(symbolCount)}.ts`,
+          line: index + 1,
+          column: 0,
+        }),
+      )
+      const file = createFileNode({
+        path: `core:src/ring-${String(symbolCount)}.ts`,
+        configRelativePath: `src/ring-${String(symbolCount)}.ts`,
+        language: 'typescript',
+        contentHash: `sha256:ring-${String(symbolCount)}`,
+        workspace: 'core',
+      })
+      const relations = threeTypes.flatMap((type) =>
+        ring.map((symbol, index) =>
+          createRelation({
+            source: symbol.id,
+            target: ring[(index + 1) % ring.length]!.id,
+            type,
+          }),
+        ),
+      )
+      await store.bulkLoad({ files: [file], symbols: ring, specs: [], relations })
+
+      const outgoing = await store.getOutgoingSymbolRelations(
+        ring.map((symbol) => symbol.id),
+        [...threeTypes],
+      )
+      expect(outgoing).toHaveLength(symbolCount * threeTypes.length)
+      expect(new Set(outgoing.map((r) => `${r.source}\u0000${r.type}`)).size).toBe(
+        symbolCount * threeTypes.length,
+      )
+
+      const incoming = await store.getIncomingSymbolRelations(
+        ring.map((symbol) => symbol.id),
+        [...threeTypes],
+      )
+      expect(incoming).toHaveLength(symbolCount * threeTypes.length)
+      expect(new Set(incoming.map((r) => `${r.target}\u0000${r.type}`)).size).toBe(
+        symbolCount * threeTypes.length,
+      )
+
+      // Deterministic ordering across repeated calls with different input order.
+      const outgoingAgain = await store.getOutgoingSymbolRelations(
+        [...ring].reverse().map((symbol) => symbol.id),
+        [...threeTypes],
+      )
+      expect(outgoingAgain).toEqual(outgoing)
+    }
+    await store.close()
+  })
+
   it('chunks more than 900 traversal ids inside one worker request without loss', async () => {
     tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-large-read-batch-'))
     const store = new SQLiteGraphStore(tempDir)

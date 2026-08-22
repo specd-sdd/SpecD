@@ -496,6 +496,7 @@ export class CodeGraphProviderImpl implements CodeGraphProvider {
    * Resolves a file-bearing selector into canonical graph identities.
    * @param input - The raw selector string.
    * @returns Matching canonical file or document entries.
+   * @throws {InvalidGraphSelectorError} When the selector is empty.
    */
   async resolveFileSelector(input: string): Promise<ResolvedFileSelector[]> {
     await this.assertAvailable()
@@ -509,6 +510,7 @@ export class CodeGraphProviderImpl implements CodeGraphProvider {
    * Resolves a symbol selector into canonical graph identities.
    * @param input - The raw selector string.
    * @returns Matching canonical symbol entries.
+   * @throws {InvalidGraphSelectorError} When the selector is empty.
    */
   async resolveSymbolSelector(input: string): Promise<ResolvedSymbolSelectorResult> {
     await this.assertAvailable()
