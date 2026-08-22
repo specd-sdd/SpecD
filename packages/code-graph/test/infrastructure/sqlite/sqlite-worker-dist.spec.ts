@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { existsSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { fileURLToPath } from 'node:url'
+import { join } from 'node:path'
 import { resolveSqliteWorkerPath } from '../../../src/infrastructure/sqlite/resolve-worker-path.js'
 import { SQLiteGraphStore } from '../../../src/infrastructure/sqlite/sqlite-graph-store.js'
 
@@ -21,7 +21,7 @@ describe('SQLiteWorker compiled dist integration', () => {
   })
 
   it('instantiates and operates SQLiteGraphStore against the resolved worker path', async () => {
-    tempDir = mkdtempSync(joinPath(tmpdir(), 'code-graph-sqlite-dist-test-'))
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-dist-test-'))
     const resolvedWorker = resolveSqliteWorkerPath()
     const store = new SQLiteGraphStore(tempDir, {
       workerPath: resolvedWorker,
@@ -33,7 +33,3 @@ describe('SQLiteWorker compiled dist integration', () => {
     await store.close()
   })
 })
-
-function joinPath(...parts: string[]): string {
-  return parts.join('/')
-}

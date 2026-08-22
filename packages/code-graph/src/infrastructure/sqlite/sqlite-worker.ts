@@ -601,6 +601,7 @@ export async function handleMessage(
         }
         const session = requireBulkSession(p.sessionId)
         const bulkPayload: BulkIndexPayload = {
+          ...(p.metadata ?? {}),
           files: session.files,
           documents: session.documents,
           symbols: session.symbols,
@@ -611,7 +612,6 @@ export async function handleMessage(
           removedFilePaths: session.removals,
           removedDocumentPaths: session.removedDocumentPaths,
           removedSpecIds: session.removedSpecIds,
-          ...(p.metadata || {}),
         }
         try {
           database.commitBulkIndex(bulkPayload, (stage: string) => {

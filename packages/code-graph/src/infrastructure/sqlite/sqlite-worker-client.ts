@@ -501,6 +501,7 @@ export class SQLiteWorkerClient {
           resolve(false)
         }
       }, 10)
+      checkInterval.unref?.()
     })
   }
 

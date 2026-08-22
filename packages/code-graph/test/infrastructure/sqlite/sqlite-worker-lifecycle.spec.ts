@@ -663,7 +663,7 @@ parentPort.on('message', (msg) => {
 
     // clear() invalidates the host token before its RPC enters the FIFO queue
     const clearing = store.clear()
-    await expect(session.writeFiles([file])).rejects.toThrow()
+    await expect(session.writeFiles([file])).rejects.toBeInstanceOf(StoreNotOpenError)
     await clearing
 
     // The store can immediately create a fresh session afterwards

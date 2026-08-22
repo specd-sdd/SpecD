@@ -58,6 +58,7 @@ describe('SQLiteWorkerClient backpressure and crash recovery', () => {
 
       await expect(pendingPromise).rejects.toThrow(StoreWorkerError)
       expect(client.isOpen).toBe(false)
+      await client.close()
     },
   )
 })

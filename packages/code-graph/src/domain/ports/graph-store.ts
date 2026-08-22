@@ -444,6 +444,7 @@ export abstract class GraphStore {
    * Retrieves existing symbols for a logical batch of identifiers.
    * Duplicate identifiers are ignored, unknown identifiers are omitted, and
    * results follow the first requested-id order.
+   * Empty input must return without backend work.
    * @param symbolIds - Symbol identifiers to retrieve.
    * @returns Existing symbols in deterministic requested-id order.
    */
@@ -451,6 +452,7 @@ export abstract class GraphStore {
 
   /**
    * Retrieves traversal relations targeting any requested symbol.
+   * Empty input must return without backend work.
    * @param symbolIds - Target symbol identifiers to match.
    * @param relationTypes - Relation types to include.
    * @returns Matching relations ordered by source, type, then target.
@@ -462,6 +464,7 @@ export abstract class GraphStore {
 
   /**
    * Retrieves traversal relations originating from any requested symbol.
+   * Empty input must return without backend work.
    * @param symbolIds - Source symbol identifiers to match.
    * @param relationTypes - Relation types to include.
    * @returns Matching relations ordered by source, type, then target.
@@ -475,6 +478,7 @@ export abstract class GraphStore {
    * Retrieves existing files for an exact batch of canonical paths.
    * Duplicate paths are ignored, unknown paths are omitted, and results follow
    * the first requested-path order.
+   * Empty input must return without backend work.
    * @param paths - Canonical file paths to retrieve.
    * @returns Existing files in deterministic requested-path order.
    */
@@ -484,6 +488,7 @@ export abstract class GraphStore {
    * Retrieves existing documents for an exact batch of canonical paths.
    * Duplicate paths are ignored, unknown paths are omitted, and results follow
    * the first requested-path order.
+   * Empty input must return without backend work.
    * @param paths - Canonical document paths to retrieve.
    * @returns Existing documents in deterministic requested-path order.
    */
@@ -493,6 +498,7 @@ export abstract class GraphStore {
    * Retrieves existing specs for an exact batch of identifiers.
    * Duplicate identifiers are ignored, unknown identifiers are omitted, and
    * results follow the first requested-id order.
+   * Empty input must return without backend work.
    * @param specIds - Spec identifiers to retrieve.
    * @returns Existing specs in deterministic requested-id order.
    */

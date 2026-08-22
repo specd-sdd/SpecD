@@ -9,11 +9,13 @@ import { fileURLToPath } from 'node:url'
  * for native Worker execution.
  *
  * @param overridePath - Optional explicit worker script path (e.g., from options).
+ * Non-empty values are trimmed before use.
  * @returns Absolute filesystem path to the worker entrypoint script.
  */
 export function resolveSqliteWorkerPath(overridePath?: string): string {
-  if (overridePath && overridePath.trim().length > 0) {
-    return overridePath
+  const trimmedOverride = overridePath?.trim()
+  if (trimmedOverride) {
+    return trimmedOverride
   }
 
   const relativeCandidates = [

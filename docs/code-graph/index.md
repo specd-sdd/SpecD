@@ -216,13 +216,13 @@ The SQLite backend executes on a dedicated worker thread via Node.js `node:worke
 Synchronous SQLite transactions, DDL statements, and FTS5 ranking operations run completely
 off the host event loop, preventing UI or server freezes during heavy read/write operations.
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│ Host Thread (CLI / SDK / Public API)                        │
-│   SQLiteGraphStore ──> SQLiteWorkerClient                   │
-│                          ├── Request correlation ID map     │
+```text
+┌──────────────────────────────────────────────────────────────┐
+│ Host Thread (CLI / SDK / Public API)                         │
+│   SQLiteGraphStore ──> SQLiteWorkerClient                    │
+│                          ├── Request correlation ID map      │
 │                          └── Bounded FIFO backpressure queue │
-└──────────────────────────────┬──────────────────────────────┘
+└──────────────────────────────┬───────────────────────────────┘
                                │ Worker MessagePort IPC
                                ▼
 ┌─────────────────────────────────────────────────────────────┐
