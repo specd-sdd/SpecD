@@ -17,6 +17,8 @@ export interface SetImplementationSuggestionInput {
   readonly title?: string | undefined
   readonly existing?: ImplementationSuggestionLockData | undefined
   readonly suggestions: readonly ImplementationSuggestionEntry[]
+  /** Real content hash (SHA-256) of the analyzed spec.md, when already computed by the caller. */
+  readonly specContentHash?: string | undefined
 }
 
 /**

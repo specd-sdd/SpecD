@@ -459,6 +459,7 @@ export class SuggestImplementationLinks {
             title: target.title,
             existing: existingLockData,
             suggestions,
+            ...(analysis.realContentHash ? { specContentHash: analysis.realContentHash } : {}),
           })
         }
 

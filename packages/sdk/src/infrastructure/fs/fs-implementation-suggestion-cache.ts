@@ -54,7 +54,13 @@ export class FsImplementationSuggestionCache extends ImplementationSuggestionCac
       super({})
       this.projectDir = optionsOrProjectDir
       const baseDir = isAbsolute(configPath) ? configPath : join(optionsOrProjectDir, configPath)
-      this.cachePath = join(baseDir, 'tmp', 'fs-cache', 'implementation-suggestions', 'suggestions.json')
+      this.cachePath = join(
+        baseDir,
+        'tmp',
+        'fs-cache',
+        'implementation-suggestions',
+        'suggestions.json',
+      )
     } else {
       super(optionsOrProjectDir)
       this.projectDir = optionsOrProjectDir.projectDir
@@ -62,7 +68,13 @@ export class FsImplementationSuggestionCache extends ImplementationSuggestionCac
       const baseDir = isAbsolute(effectiveConfig)
         ? effectiveConfig
         : join(optionsOrProjectDir.projectDir, effectiveConfig)
-      this.cachePath = join(baseDir, 'tmp', 'fs-cache', 'implementation-suggestions', 'suggestions.json')
+      this.cachePath = join(
+        baseDir,
+        'tmp',
+        'fs-cache',
+        'implementation-suggestions',
+        'suggestions.json',
+      )
     }
   }
 
@@ -117,9 +129,10 @@ export class FsImplementationSuggestionCache extends ImplementationSuggestionCac
       try {
         const health = await this.deps.codeGraphProvider.getGraphHealth()
         this._cachedGraphFingerprint = health?.currentRef ?? 'default'
-        this._cachedGraphLastIndexedAt = typeof (health as unknown as Record<string, unknown>)?.freshness === 'string'
-          ? String((health as unknown as Record<string, unknown>).freshness)
-          : new Date().toISOString()
+        this._cachedGraphLastIndexedAt =
+          typeof (health as unknown as Record<string, unknown>)?.freshness === 'string'
+            ? String((health as unknown as Record<string, unknown>).freshness)
+            : new Date().toISOString()
       } catch {
         this._cachedGraphFingerprint = 'default'
         this._cachedGraphLastIndexedAt = new Date().toISOString()
@@ -153,13 +166,24 @@ export class FsImplementationSuggestionCache extends ImplementationSuggestionCac
 
     try {
       const specData = await repo.get(SpecPath.parse(rawPath))
-      const artifactsMeta = (specData as unknown as { artifacts?: Array<Record<string, unknown>> })?.artifacts ?? []
+      const artifactsMeta =
+        (specData as unknown as { artifacts?: Array<Record<string, unknown>> })?.artifacts ?? []
       const mainArtifact = artifactsMeta.find((a) => a.filename === 'spec.md')
       const specRecord = specData as unknown as Record<string, unknown>
-      const lastModified = typeof mainArtifact?.lastModified === 'string'
-        ? mainArtifact.lastModified
-        : (typeof specRecord?.lastModified === 'string' ? specRecord.lastModified : '')
-      const hash = typeof mainArtifact?.hash === 'string' ? mainArtifact.hash : ''
+      const lastModified =
+        typeof mainArtifact?.lastModified === 'string'
+          ? mainArtifact.lastModified
+          : typeof specRecord?.lastModified === 'string'
+            ? specRecord.lastModified
+            : ''
+      let hash = typeof mainArtifact?.hash === 'string' ? mainArtifact.hash : ''
+      if (specData && typeof repo.artifactMeta === 'function') {
+        // `repo.get()` never includes artifact hashes; fetch the real SHA-256 explicitly.
+        const meta = await repo.artifactMeta(specData, 'spec.md', { includeHash: true })
+        if (typeof meta?.hash === 'string' && meta.hash.length > 0) {
+          hash = meta.hash
+        }
+      }
 
       return {
         lastModified,
@@ -196,10 +220,19 @@ export class FsImplementationSuggestionCache extends ImplementationSuggestionCac
       const currentStamp = await this.getSpecStamp(specId)
       const cachedStamp = cached.specStamp
       if (cachedStamp) {
-        if (cachedStamp.lastModified && currentStamp.lastModified && cachedStamp.lastModified === currentStamp.lastModified) {
+        if (
+          cachedStamp.lastModified &&
+          currentStamp.lastModified &&
+          cachedStamp.lastModified === currentStamp.lastModified
+        ) {
           return cached
         }
-        if (cachedStamp.hash && currentStamp.hash && cachedStamp.hash.length > 0 && cachedStamp.hash === currentStamp.hash) {
+        if (
+          cachedStamp.hash &&
+          currentStamp.hash &&
+          cachedStamp.hash.length > 0 &&
+          cachedStamp.hash === currentStamp.hash
+        ) {
           return cached
         }
         if (currentStamp.lastModified || currentStamp.hash) {
@@ -216,6 +249,10 @@ export class FsImplementationSuggestionCache extends ImplementationSuggestionCac
     await this.ensureLoaded()
     const { fingerprint, lastIndexedAt } = await this.getGraphFingerprint()
     const currentStamp = await this.getSpecStamp(specId)
+    const specStamp: ImplementationSuggestionSpecStamp =
+      input.specContentHash && input.specContentHash.length > 0
+        ? { ...currentStamp, hash: input.specContentHash }
+        : currentStamp
 
     this._header = {
       updatedAt: new Date().toISOString(),
@@ -228,8 +265,9 @@ export class FsImplementationSuggestionCache extends ImplementationSuggestionCac
     const entry: ImplementationSuggestionSpecEntry = {
       specId,
       title: input.title ?? this._data?.get(specId)?.title ?? specId,
-      specStamp: currentStamp,
-      existing: input.existing ?? this._data?.get(specId)?.existing ?? { files: [], symbols: [], dependsOn: [] },
+      specStamp,
+      existing: input.existing ??
+        this._data?.get(specId)?.existing ?? { files: [], symbols: [], dependsOn: [] },
       suggestions: input.suggestions,
     }
 
@@ -271,6 +309,9 @@ export class FsImplementationSuggestionCache extends ImplementationSuggestionCac
       return this._fileToSpecMap
     }
 
+    /**
+     *
+     */
     interface CandidateSpecMatch {
       specId: string
       isExisting: boolean
@@ -279,7 +320,12 @@ export class FsImplementationSuggestionCache extends ImplementationSuggestionCac
 
     const fileToCandidates = new Map<string, Map<string, CandidateSpecMatch>>()
 
-    const registerCandidate = (fileKey: string, specId: string, isExisting: boolean, score: number): void => {
+    const registerCandidate = (
+      fileKey: string,
+      specId: string,
+      isExisting: boolean,
+      score: number,
+    ): void => {
       if (!fileKey) return
       const keysToRegister = new Set<string>()
       keysToRegister.add(fileKey)
