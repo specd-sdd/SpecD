@@ -37,7 +37,7 @@
 - **WHEN** `SuggestImplementationLinks.execute({ specId: "default:non-existent-spec" })` is called
 - **THEN** it throws a `SpecNotFoundError` for `default:non-existent-spec` (instance of `SpecdError`)
 
-### Requirement: 2-Pass Analysis Algorithm
+### Requirement: 3-Tier Analysis Algorithm
 
 #### Scenario: Cache staleness fast-path and rebuild
 

@@ -18,7 +18,7 @@ The input interface MUST support:
 - `apply?: boolean`: Optionally apply suggested files and symbols to `spec-lock.json` via `UpdatePersistedSpecImplementation`.
 - `rebuildCache?: boolean`: Force invalidation and re-analysis of Pass 1/Pass 2 calculations.
 - `confidenceThreshold?: 'HIGH' | 'MEDIUM' | 'MED' | 'LOW'`: Filter suggestions by confidence level (normalizing shorthand `MED` to `MEDIUM`).
-- `onProgress?: OnSuggestImplementationProgress`: Optional progress callback emitting `start`, `spec-start`, `spec-done`, and `done` events.
+- `onProgress?: OnSuggestImplementationProgress`: Optional progress callback emitting `discovery-start`, `discovery-done`, `start`, `spec-start`, `spec-done`, and `done` events.
 
 ### Requirement: Input Validation & Error Handling
 
@@ -29,7 +29,7 @@ The input interface MUST support:
 - If `confidenceThreshold` is specified with an invalid string outside `['HIGH', 'MEDIUM', 'MED', 'LOW']`, `execute()` MUST throw `InvalidInputError`.
 - When `specId` or `specIds` are specified in input, `SuggestImplementationLinks` MUST verify that each requested spec exists in the target repositories. If any requested spec ID is not found, `execute()` MUST throw a `SpecNotFoundError`.
 
-### Requirement: 2-Pass Analysis Algorithm
+### Requirement: 3-Tier Analysis Algorithm
 
 `SuggestImplementationLinks` MUST execute a 3-tier cascade analysis algorithm with early short-circuiting:
 

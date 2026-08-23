@@ -13,7 +13,7 @@
 - [x] 2.1 Implement `SuggestImplementationLinks` use case
       `packages/sdk/src/orchestration/suggest-implementation-links.ts`: `SuggestImplementationLinks` class and `execute(input)` method
       Approach: Pass 1 parses `spec.md` AST code blocks and derives capability naming paths via `SpecRepository.list({ includeMeta: true })`. Pass 2 queries `code-graph` for BM25 symbol search and file matching, resolving canonical workspace paths via `code-graph`'s `getFile`. Mark suggestions with `alreadyIncluded: true/false`. Additive Set Union on `apply: true` skipping already included links.
-      (Req: Use Case Interface, Req: 2-Pass Analysis Algorithm, Req: Already-Included Marking, Req: Additive Mutation Semantics)
+      (Req: Use Case Interface, Req: 3-Tier Analysis Algorithm, Req: Already-Included Marking, Req: Additive Mutation Semantics)
 
 - [x] 2.2 Implement `createSuggestImplementationLinks` factory overloads
       `packages/sdk/src/orchestration/suggest-implementation-links.ts`: `createSuggestImplementationLinks` and `resolveSuggestImplementationLinksDeps`
@@ -33,7 +33,7 @@
 - [x] 2.5 Implement Token Affinity Scoring & Primary Symbol Differentiation
       `packages/sdk/src/orchestration/suggest-implementation-links.ts`: `computePathSpecAffinity`
       Approach: evaluate token coverage with regex `[\/\\_\-.:]+` and plural stemming, distinguish exact primary symbols (+200) from derivative symbols (+50), penalize candidates missing distinctive spec tokens (-100), and gate `HIGH` confidence.
-      (Req: 2-Pass Analysis Algorithm)
+      (Req: 3-Tier Analysis Algorithm)
 
 - [x] 2.6 Implement Directional Validation Pass & Direct Recommendation Transitive Reduction
       `packages/sdk/src/orchestration/suggest-spec-dependencies.ts`: Pass 2.5 & Pass 2.6

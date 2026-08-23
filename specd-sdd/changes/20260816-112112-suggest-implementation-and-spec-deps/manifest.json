@@ -1,7 +1,7 @@
 {
   "name": "suggest-implementation-and-spec-deps",
   "createdAt": "2026-08-16T11:21:12.000Z",
-  "updatedAt": "2026-08-23T21:11:15.705Z",
+  "updatedAt": "2026-08-23T21:14:42.686Z",
   "description": "Add SDK use cases and CLI commands to suggest implementation links and spec dependencies with post-apply validation",
   "schema": {
     "name": "schema-std",
@@ -895,7 +895,7 @@
           "key": "sdk:suggest-implementation-links",
           "filename": "specs/sdk/suggest-implementation-links/spec.md",
           "state": "complete",
-          "validatedHash": "sha256:97c027296a318e7e6f71bcb24de6ceca91d108ffbf4e26abc37ea641d928812a"
+          "validatedHash": "sha256:19ff3ee73487bb97d9cfdffb601c9b35cda734912f796df0035b7359f02d753d"
         },
         {
           "key": "sdk:suggest-spec-dependencies",
@@ -921,36 +921,36 @@
       "type": "verify",
       "optional": false,
       "requires": ["specs"],
-      "state": "pending-review",
+      "state": "complete",
       "files": [
         {
           "key": "cli:spec-implementation",
           "filename": "deltas/cli/spec-implementation/verify.md.delta.yaml",
-          "state": "pending-review",
+          "state": "complete",
           "validatedHash": "sha256:d165c8781de5ca61864ee1f76617d21f0b4e73ce9fc3ab962458b81f7f261300"
         },
         {
           "key": "cli:spec-deps",
           "filename": "deltas/cli/spec-deps/verify.md.delta.yaml",
-          "state": "pending-review",
+          "state": "complete",
           "validatedHash": "sha256:0710c85abf1e7c3943416b9c37df388aba8db673b14587f14ac09987b718afae"
         },
         {
           "key": "sdk:suggest-implementation-links",
           "filename": "specs/sdk/suggest-implementation-links/verify.md",
-          "state": "pending-review",
-          "validatedHash": "sha256:b363ff784cb2ba26d796fa13db393f311e9f44503cef40e3be72eceff83479c7"
+          "state": "complete",
+          "validatedHash": "sha256:8448d3c36edd99432c52f6d3b42649c0c5bc9c9633ba000191675159be25c33e"
         },
         {
           "key": "sdk:suggest-spec-dependencies",
           "filename": "specs/sdk/suggest-spec-dependencies/verify.md",
-          "state": "pending-review",
+          "state": "complete",
           "validatedHash": "sha256:f8baa51951fb883a4f8af61140a37458324cecae0a789346e8850ca9633538a2"
         },
         {
           "key": "code-graph:language-adapter",
           "filename": "deltas/code-graph/language-adapter/verify.md.delta.yaml",
-          "state": "pending-review",
+          "state": "complete",
           "validatedHash": "sha256:ee2c2f860bcde699dc72ba1f5d90f5de14dce37bed0ef726f760e20677d0a035"
         },
         {
@@ -985,7 +985,7 @@
           "key": "tasks",
           "filename": "tasks.md",
           "state": "complete",
-          "validatedHash": "sha256:df4ce55e856f98b87767c139d047bfa19d904fd2e9d8e2a308b25defcc3e0506"
+          "validatedHash": "sha256:d42b2e026dfaad09ae1a51d2a0bfb880f307c1972175089906133f2c7d045d60"
         }
       ]
     }
@@ -2582,6 +2582,42 @@
         {
           "type": "tasks",
           "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-23T21:14:40.354Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [sdk:suggest-implementation-links]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["sdk:suggest-implementation-links"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:spec-implementation",
+            "cli:spec-deps",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies",
+            "code-graph:language-adapter",
+            "code-graph:graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
         }
       ]
     }
