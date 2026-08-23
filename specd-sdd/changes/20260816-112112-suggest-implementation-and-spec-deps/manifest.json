@@ -1,7 +1,7 @@
 {
   "name": "suggest-implementation-and-spec-deps",
   "createdAt": "2026-08-16T11:21:12.000Z",
-  "updatedAt": "2026-08-23T19:53:31.410Z",
+  "updatedAt": "2026-08-23T20:49:51.603Z",
   "description": "Add SDK use cases and CLI commands to suggest implementation links and spec dependencies with post-apply validation",
   "schema": {
     "name": "schema-std",
@@ -895,7 +895,7 @@
           "key": "sdk:suggest-implementation-links",
           "filename": "specs/sdk/suggest-implementation-links/spec.md",
           "state": "complete",
-          "validatedHash": "sha256:7403b4b69ed0b8efc2e4061a446b202ccabf5073e9b79be4a423421b0387c155"
+          "validatedHash": "sha256:97c027296a318e7e6f71bcb24de6ceca91d108ffbf4e26abc37ea641d928812a"
         },
         {
           "key": "sdk:suggest-spec-dependencies",
@@ -927,13 +927,13 @@
           "key": "cli:spec-implementation",
           "filename": "deltas/cli/spec-implementation/verify.md.delta.yaml",
           "state": "complete",
-          "validatedHash": "sha256:ea55143ac739a62a2a1247729d52dbabcb01317b0e08eb2f862b9f5c0367b0a8"
+          "validatedHash": "sha256:d165c8781de5ca61864ee1f76617d21f0b4e73ce9fc3ab962458b81f7f261300"
         },
         {
           "key": "cli:spec-deps",
           "filename": "deltas/cli/spec-deps/verify.md.delta.yaml",
           "state": "complete",
-          "validatedHash": "sha256:0f63e828196f45f5f4440dae5b8570e1531c5ac54d33c648f0fa281757223067"
+          "validatedHash": "sha256:0710c85abf1e7c3943416b9c37df388aba8db673b14587f14ac09987b718afae"
         },
         {
           "key": "sdk:suggest-implementation-links",
@@ -2473,6 +2473,35 @@
         {
           "type": "verify",
           "files": ["sdk:suggest-implementation-links"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-23T20:49:37.963Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [sdk:suggest-implementation-links]; verify [cli:spec-deps, cli:spec-implementation]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["sdk:suggest-implementation-links"]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:spec-deps", "cli:spec-implementation"]
         },
         {
           "type": "design",

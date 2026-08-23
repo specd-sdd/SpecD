@@ -9,11 +9,11 @@
     #### Scenario: Suggest implementation subcommand
 
     - **GIVEN** a spec ID `cli:change-implementation`
-    - **WHEN** `specd spec implementation suggest cli:change-implementation` is executed
+    - **WHEN** `specd specs implementation suggest cli:change-implementation` is executed
     - **THEN** it prints suggested implementation links with confidence indicators.
 
     #### Scenario: Already-included marking in suggestions
 
     - **GIVEN** a spec with existing implementation links in `spec-lock.json`
-    - **WHEN** `specd spec implementation suggest <spec-id>` is executed and the algorithm re-discovers files already in spec-lock
+    - **WHEN** `specd specs implementation suggest <spec-id>` is executed and the algorithm re-discovers files already in spec-lock
     - **THEN** each suggestion displays `[already included]` or `[new]` to indicate its inclusion status.

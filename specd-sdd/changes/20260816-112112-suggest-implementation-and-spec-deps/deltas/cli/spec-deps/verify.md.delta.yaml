@@ -9,11 +9,11 @@
     #### Scenario: Suggest spec dependencies subcommand
 
     - **GIVEN** a spec ID `cli:change-implementation`
-    - **WHEN** `specd spec deps suggest cli:change-implementation` is executed
+    - **WHEN** `specd specs deps suggest cli:change-implementation` is executed
     - **THEN** it prints suggested inter-spec dependencies with code import reasons
 
     #### Scenario: Alignment change creation via CLI flag
 
     - **GIVEN** invalid specs detected after `--apply`
-    - **WHEN** `specd spec deps suggest cli:change-implementation --apply --create-change` is executed
+    - **WHEN** `specd specs deps suggest cli:change-implementation --apply --create-change` is executed
     - **THEN** an alignment change is created without interactive prompt
