@@ -1,7 +1,7 @@
 {
   "name": "suggest-implementation-and-spec-deps",
   "createdAt": "2026-08-16T11:21:12.000Z",
-  "updatedAt": "2026-08-23T23:18:32.042Z",
+  "updatedAt": "2026-08-23T23:23:08.279Z",
   "description": "Add SDK use cases and CLI commands to suggest implementation links and spec dependencies with post-apply validation",
   "schema": {
     "name": "schema-std",
@@ -869,7 +869,7 @@
           "key": "proposal",
           "filename": "proposal.md",
           "state": "complete",
-          "validatedHash": "sha256:e842050920be6d4608cf059cc1415eb74d837d575de0675f5790b599c3761e2a"
+          "validatedHash": "sha256:021b721e849b3a0e1371f5b042146fc8f033488dbf150c7bf780801db3afc654"
         }
       ]
     },
@@ -939,7 +939,7 @@
           "key": "sdk:suggest-implementation-links",
           "filename": "specs/sdk/suggest-implementation-links/verify.md",
           "state": "complete",
-          "validatedHash": "sha256:60274f299860a854bcbb621317dd3c8082e320cb6dfc577bdc0b596a1daaee3a"
+          "validatedHash": "sha256:dc59a2b3428e456fd51f5d3dd60ffb62f2e83cfa2ab2774a25b0d6e609fc8888"
         },
         {
           "key": "sdk:suggest-spec-dependencies",
@@ -971,7 +971,7 @@
           "key": "design",
           "filename": "design.md",
           "state": "complete",
-          "validatedHash": "sha256:3739cadb18245b1ec110c9a6bf688aab4369443e6952b3b0c47c463528b97ffb"
+          "validatedHash": "sha256:f508b1956804aa7501d68f28c3c257cb3aaf115a24e84ecad491812aabef7783"
         }
       ]
     },
@@ -2839,6 +2839,46 @@
         {
           "type": "design",
           "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-23T23:23:06.388Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]; verify [sdk:suggest-implementation-links]; design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "verify",
+          "files": ["sdk:suggest-implementation-links"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:spec-implementation",
+            "cli:spec-deps",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies",
+            "code-graph:language-adapter",
+            "code-graph:graph-store"
+          ]
         },
         {
           "type": "tasks",

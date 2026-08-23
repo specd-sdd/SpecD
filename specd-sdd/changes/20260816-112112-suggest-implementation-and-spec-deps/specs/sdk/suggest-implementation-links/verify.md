@@ -115,4 +115,5 @@
 
 - **GIVEN** an `onProgress` callback passed to `SuggestImplementationLinks.execute`
 - **WHEN** `execute({ specId: "cli:spec-implementation", onProgress })` executes
-- **THEN** `onProgress` receives sequential `start`, `spec-start`, `spec-done`, and `done` events
+- **THEN** `onProgress` receives the complete ordered event sequence: `discovery-start`, `discovery-done`, `start`, `spec-start`, `spec-done`, and `done`
+- **AND** both discovery events appear in their correct positions: `discovery-start` is the first event emitted and `discovery-done` precedes `start`
