@@ -174,7 +174,8 @@ export interface SuggestImplementationLinksInput {
   readonly all?: boolean
   readonly apply?: boolean
   readonly rebuildCache?: boolean
-  readonly confidenceThreshold?: 'HIGH' | 'MEDIUM' | 'LOW'
+  readonly confidenceThreshold?: 'HIGH' | 'MEDIUM' | 'MED' | 'LOW'
+  // Input validation normalizes shorthand `MED` (case-insensitive) to `MEDIUM` before execution.
   readonly onProgress?: OnSuggestImplementationProgress
 }
 

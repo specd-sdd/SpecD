@@ -1,7 +1,7 @@
 {
   "name": "suggest-implementation-and-spec-deps",
   "createdAt": "2026-08-16T11:21:12.000Z",
-  "updatedAt": "2026-08-23T23:07:27.283Z",
+  "updatedAt": "2026-08-23T23:18:32.042Z",
   "description": "Add SDK use cases and CLI commands to suggest implementation links and spec dependencies with post-apply validation",
   "schema": {
     "name": "schema-std",
@@ -939,7 +939,7 @@
           "key": "sdk:suggest-implementation-links",
           "filename": "specs/sdk/suggest-implementation-links/verify.md",
           "state": "complete",
-          "validatedHash": "sha256:8448d3c36edd99432c52f6d3b42649c0c5bc9c9633ba000191675159be25c33e"
+          "validatedHash": "sha256:60274f299860a854bcbb621317dd3c8082e320cb6dfc577bdc0b596a1daaee3a"
         },
         {
           "key": "sdk:suggest-spec-dependencies",
@@ -971,7 +971,7 @@
           "key": "design",
           "filename": "design.md",
           "state": "complete",
-          "validatedHash": "sha256:25da96d7e95a7968d788ac14a405bdc7accf8f305dcbb529860620332a3cc25f"
+          "validatedHash": "sha256:3739cadb18245b1ec110c9a6bf688aab4369443e6952b3b0c47c463528b97ffb"
         }
       ]
     },
@@ -2811,6 +2811,31 @@
       "cause": "artifact-drift",
       "message": "Invalidated because validated artifacts drifted: design [design]",
       "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-23T23:18:29.555Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [sdk:suggest-implementation-links]; design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["sdk:suggest-implementation-links"]
+        },
         {
           "type": "design",
           "files": ["design"]

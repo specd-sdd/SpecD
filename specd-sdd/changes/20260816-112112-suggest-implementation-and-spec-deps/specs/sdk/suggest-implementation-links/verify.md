@@ -31,6 +31,13 @@
 - **WHEN** `SuggestImplementationLinks.execute({ all: true, confidenceThreshold: "INVALID_THRESHOLD" as any })` is called
 - **THEN** it throws `InvalidInputError` (instance of `SpecdError`)
 
+#### Scenario: MED shorthand normalizes to MEDIUM
+
+- **GIVEN** a valid spec with suggestions
+- **WHEN** `SuggestImplementationLinks.execute({ specId, confidenceThreshold: "MED" })` is called
+- **THEN** the result is `ok`
+- **AND** every returned suggestion has confidence `HIGH` or `MEDIUM`
+
 #### Scenario: Non-existent spec ID error
 
 - **GIVEN** a spec ID `default:non-existent-spec` that does not exist in any spec repository
