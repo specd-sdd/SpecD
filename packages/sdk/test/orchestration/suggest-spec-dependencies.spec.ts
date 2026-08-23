@@ -10,6 +10,119 @@ import {
   SpecNotFoundError,
   type SpecRepository,
 } from '@specd/core'
+import {
+  ImplementationSuggestionCachePort,
+  type SetImplementationSuggestionInput,
+} from '../../src/application/ports/implementation-suggestion-cache-port.js'
+import { type ImplementationSuggestionSpecEntry } from '../../src/domain/value-objects/implementation-suggestion-cache.js'
+import {
+  SpecDepsSuggestionCachePort,
+  type SetSpecDepsSuggestionInput,
+} from '../../src/application/ports/spec-deps-suggestion-cache-port.js'
+import { type SpecDepsSuggestionSpecEntry } from '../../src/domain/value-objects/spec-deps-suggestion-cache.js'
+
+class InMemoryImplementationSuggestionCache extends ImplementationSuggestionCachePort {
+  private data = new Map<string, ImplementationSuggestionSpecEntry>()
+
+  async get(specId: string): Promise<ImplementationSuggestionSpecEntry | null> {
+    return this.data.get(specId) ?? null
+  }
+
+  async set(specId: string, input: SetImplementationSuggestionInput): Promise<void> {
+    this.data.set(specId, {
+      specId,
+      title: input.title ?? specId,
+      specStamp: input.specContentHash
+        ? { lastModified: '2026-08-16T12:00:00.000Z', hash: input.specContentHash, artifacts: [] }
+        : { lastModified: '', hash: '', artifacts: [] },
+      existing: input.existing ?? { files: [], symbols: [], dependsOn: [] },
+      suggestions: input.suggestions,
+    })
+  }
+
+  async setMany(entries: readonly ImplementationSuggestionSpecEntry[]): Promise<void> {
+    for (const entry of entries) {
+      this.data.set(entry.specId, entry)
+    }
+  }
+
+  async getAll(): Promise<ReadonlyMap<string, ImplementationSuggestionSpecEntry>> {
+    return this.data
+  }
+
+  async findSpecByFile(filePath: string): Promise<string | null> {
+    const map = await this.getFileToSpecMap()
+    if (map.has(filePath)) return map.get(filePath) ?? null
+    const rawPath = filePath.replace(/^[^:]+:/, '')
+    if (map.has(rawPath)) return map.get(rawPath) ?? null
+    const shortRelPath = rawPath.replace(/^(?:packages|apps)\/[^/]+\//, '')
+    if (map.has(shortRelPath)) return map.get(shortRelPath) ?? null
+    return null
+  }
+
+  async getFileToSpecMap(): Promise<ReadonlyMap<string, string>> {
+    const map = new Map<string, string>()
+    const register = (fileKey: string, specId: string): void => {
+      if (!fileKey) return
+      const keys = new Set<string>([fileKey])
+      const rawPath = fileKey.replace(/^[^:]+:/, '')
+      keys.add(rawPath)
+      keys.add(rawPath.replace(/^(?:packages|apps)\/[^/]+\//, ''))
+      for (const k of keys) {
+        if (!map.has(k)) map.set(k, specId)
+      }
+    }
+    for (const [specId, entry] of this.data.entries()) {
+      for (const f of entry.existing.files) register(f, specId)
+    }
+    for (const [specId, entry] of this.data.entries()) {
+      for (const s of entry.suggestions) {
+        if (s.confidence === 'HIGH') register(s.file, specId)
+      }
+    }
+    return map
+  }
+
+  async flush(): Promise<void> {}
+
+  async invalidate(): Promise<void> {
+    this.data.clear()
+  }
+}
+
+class InMemorySpecDepsSuggestionCache extends SpecDepsSuggestionCachePort {
+  private data = new Map<string, SpecDepsSuggestionSpecEntry>()
+
+  async get(specId: string): Promise<SpecDepsSuggestionSpecEntry | null> {
+    return this.data.get(specId) ?? null
+  }
+
+  async set(specId: string, input: SetSpecDepsSuggestionInput): Promise<void> {
+    this.data.set(specId, {
+      specId,
+      title: input.title ?? specId,
+      specStamp: { lastModified: '2026-08-16T12:00:00.000Z', hash: 'hash123', artifacts: [] },
+      existingDependsOn: input.existingDependsOn ?? [],
+      suggestedDependsOn: input.suggestedDependsOn,
+    })
+  }
+
+  async setMany(entries: readonly SpecDepsSuggestionSpecEntry[]): Promise<void> {
+    for (const entry of entries) {
+      this.data.set(entry.specId, entry)
+    }
+  }
+
+  async getAll(): Promise<ReadonlyMap<string, SpecDepsSuggestionSpecEntry>> {
+    return this.data
+  }
+
+  async flush(): Promise<void> {}
+
+  async invalidate(): Promise<void> {
+    this.data.clear()
+  }
+}
 
 function setupTest() {
   const suggestImplementationLinks = {
@@ -106,6 +219,8 @@ function setupTest() {
     updatePersistedDeps: updatePersistedDeps as any,
     validateSpecs: validateSpecs as any,
     codeGraphProvider,
+    cache: new InMemoryImplementationSuggestionCache(),
+    specDepsCache: new InMemorySpecDepsSuggestionCache(),
     projectDir: '/tmp/test-project',
   })
 
@@ -313,6 +428,8 @@ describe('SuggestSpecDependencies', () => {
       updatePersistedDeps: vi.fn() as any,
       validateSpecs: vi.fn() as any,
       codeGraphProvider,
+      cache: new InMemoryImplementationSuggestionCache(),
+      specDepsCache: new InMemorySpecDepsSuggestionCache(),
       projectDir: '/tmp/test-project-barrel',
     })
 
@@ -438,6 +555,8 @@ describe('SuggestSpecDependencies', () => {
       updatePersistedDeps: vi.fn() as any,
       validateSpecs: vi.fn() as any,
       codeGraphProvider,
+      cache: new InMemoryImplementationSuggestionCache(),
+      specDepsCache: new InMemorySpecDepsSuggestionCache(),
       projectDir: '/tmp/test-directional-validation',
     })
 
@@ -543,6 +662,8 @@ describe('SuggestSpecDependencies', () => {
       updatePersistedDeps: vi.fn() as any,
       validateSpecs: vi.fn() as any,
       codeGraphProvider,
+      cache: new InMemoryImplementationSuggestionCache(),
+      specDepsCache: new InMemorySpecDepsSuggestionCache(),
       projectDir: '/tmp/test-transitive-reduction',
     })
 
