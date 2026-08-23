@@ -156,6 +156,30 @@ export interface SuggestImplementationLinksDeps {
   readonly workspaces?: readonly { readonly name: string; readonly codeRoot: string }[]
 }
 
+/** Fixed lookups derived from the built-in adapter registry. */
+interface BuiltinRegistryData {
+  sourceExtensions: string[]
+  languageKeywords: Set<string>
+}
+
+let cachedBuiltinRegistryData: BuiltinRegistryData | undefined
+
+/**
+ * Lazily builds the built-in adapter registry once and caches its fixed lookups.
+ *
+ * @returns Supported extensions and reserved keywords for the built-in adapters.
+ */
+function getBuiltinRegistryData(): BuiltinRegistryData {
+  if (!cachedBuiltinRegistryData) {
+    const registry = createBuiltinAdapterRegistry()
+    cachedBuiltinRegistryData = {
+      sourceExtensions: registry.getSupportedExtensions(),
+      languageKeywords: registry.getReservedKeywords(),
+    }
+  }
+  return cachedBuiltinRegistryData
+}
+
 const SPEC_PROSE_KEYWORDS = new Set([
   'given',
   'when',
@@ -673,9 +697,7 @@ export class SuggestImplementationLinks {
     const codeBlockRegex = /```(?:typescript|ts)?\n([\s\S]*?)\n```/g
     let match: RegExpExecArray | null
 
-    const builtinRegistry = createBuiltinAdapterRegistry()
-    const sourceExtensions = builtinRegistry.getSupportedExtensions()
-    const languageKeywords = builtinRegistry.getReservedKeywords()
+    const { sourceExtensions, languageKeywords } = getBuiltinRegistryData()
 
     const isReservedKeyword = (word: string): boolean =>
       SPEC_PROSE_KEYWORDS.has(word) || languageKeywords.has(word)
