@@ -52,6 +52,29 @@ export type SuggestSpecDepsProgressEvent =
  */
 export type OnSuggestSpecDepsProgress = (event: SuggestSpecDepsProgressEvent) => void
 
+/** Minimal structural view of a file impact result consumed by this orchestration. */
+interface FileImpactLike {
+  affectedFiles?: readonly unknown[]
+}
+
+/**
+ * Runs a depth-1 downstream impact analysis, preferring `analyzeFileImportImpact`
+ * and falling back to `analyzeFileImpact` for providers that do not expose it.
+ *
+ * @param provider - Code graph provider
+ * @param filePath - File path to analyze
+ * @returns Impact result, or undefined when the provider returns nothing
+ */
+async function queryDownstreamImpact(
+  provider: CodeGraphProvider,
+  filePath: string,
+): Promise<FileImpactLike | undefined> {
+  if (typeof provider.analyzeFileImportImpact === 'function') {
+    return (await provider.analyzeFileImportImpact(filePath, 'downstream', 1)) as FileImpactLike
+  }
+  return (await provider.analyzeFileImpact(filePath, 'downstream', 1)) as FileImpactLike
+}
+
 /** Zod input schema for `SuggestSpecDependencies`. */
 export const suggestSpecDependenciesInputSchema = z
   .object({
@@ -406,21 +429,14 @@ export class SuggestSpecDependencies {
                 continue
               }
               try {
-                const impact =
-                  typeof this.deps.codeGraphProvider.analyzeFileImportImpact === 'function'
-                    ? await this.deps.codeGraphProvider.analyzeFileImportImpact(
-                        file,
-                        'downstream',
-                        1,
-                      )
-                    : await this.deps.codeGraphProvider.analyzeFileImpact(file, 'downstream', 1)
+                const impact = await queryDownstreamImpact(this.deps.codeGraphProvider, file)
                 Logger.debug('[SuggestSpecDependencies] analyzeFileImpact result', {
                   pathQuery: file,
                   affectedFiles: impact?.affectedFiles,
                 })
                 const affected = impact?.affectedFiles ?? []
                 for (const aff of affected) {
-                  const affObj = aff as unknown as Record<string, unknown>
+                  const affObj = aff as Record<string, unknown>
                   const affPath =
                     typeof aff === 'string'
                       ? aff
@@ -447,13 +463,12 @@ export class SuggestSpecDependencies {
                     affPath.endsWith('/index.d.ts')
                   if (isBarrelFile) {
                     try {
-                      const barrelImpact = await this.deps.codeGraphProvider.analyzeFileImpact(
+                      const barrelImpact = await queryDownstreamImpact(
+                        this.deps.codeGraphProvider,
                         affPath,
-                        'downstream',
-                        1,
                       )
                       for (const bAff of barrelImpact?.affectedFiles ?? []) {
-                        const bObj = bAff as unknown as Record<string, unknown>
+                        const bObj = bAff as Record<string, unknown>
                         const bPath =
                           typeof bAff === 'string'
                             ? bAff
@@ -572,16 +587,9 @@ export class SuggestSpecDependencies {
               let candidateDirectlyImportsTarget = false
               for (const cFile of candidateFiles) {
                 try {
-                  const cImpact =
-                    typeof this.deps.codeGraphProvider.analyzeFileImportImpact === 'function'
-                      ? await this.deps.codeGraphProvider.analyzeFileImportImpact(
-                          cFile,
-                          'downstream',
-                          1,
-                        )
-                      : await this.deps.codeGraphProvider.analyzeFileImpact(cFile, 'downstream', 1)
+                  const cImpact = await queryDownstreamImpact(this.deps.codeGraphProvider, cFile)
                   for (const aff of cImpact?.affectedFiles ?? []) {
-                    const affObj = aff as unknown as Record<string, unknown>
+                    const affObj = aff as Record<string, unknown>
                     const affPath =
                       typeof aff === 'string'
                         ? aff
