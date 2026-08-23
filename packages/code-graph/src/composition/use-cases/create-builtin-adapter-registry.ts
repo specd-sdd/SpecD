@@ -19,12 +19,14 @@ export function createBuiltinAdapterRegistry(
 /**
  * Creates an `AdapterRegistry` from a `SpecdConfig` configuration instance.
  *
+ * Compatibility-only overload: `SpecdConfig` carries no adapter-registration
+ * field, so this always returns the built-in registry. Custom adapters must be
+ * supplied through `CodeGraphCompositionOptions.adapters`.
+ *
  * @param config - SpecdConfig project configuration
  * @returns A populated AdapterRegistry instance
  */
-export function createBuiltinAdapterRegistry(
-  config: SpecdConfig,
-): AdapterRegistry
+export function createBuiltinAdapterRegistry(config: SpecdConfig): AdapterRegistry
 /**
  * Overload handler for creating a built-in `AdapterRegistry`.
  *
