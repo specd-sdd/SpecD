@@ -19,12 +19,8 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 const PROJECT_ROOT = resolve(__dirname, '../../../..')
 
-import {
-  type ImplementationSuggestionSpecEntry,
-} from '../../src/domain/value-objects/implementation-suggestion-cache.js'
-import {
-  type SetImplementationSuggestionInput,
-} from '../../src/application/ports/implementation-suggestion-cache-port.js'
+import { type ImplementationSuggestionSpecEntry } from '../../src/domain/value-objects/implementation-suggestion-cache.js'
+import { type SetImplementationSuggestionInput } from '../../src/application/ports/implementation-suggestion-cache-port.js'
 
 /**
  * In-memory test double for ImplementationSuggestionCachePort.
@@ -64,7 +60,8 @@ class InMemoryImplementationSuggestionCache extends ImplementationSuggestionCach
   async findSpecByFile(filePath: string): Promise<string | null> {
     for (const [specId, entry] of this.data.entries()) {
       if (entry.existing.files.includes(filePath)) return specId
-      if (entry.suggestions.some((s) => s.file === filePath && s.confidence === 'HIGH')) return specId
+      if (entry.suggestions.some((s) => s.file === filePath && s.confidence === 'HIGH'))
+        return specId
     }
     return null
   }
@@ -143,13 +140,17 @@ function setupTest() {
   const updatePersistedImplementation = {
     execute: vi.fn().mockResolvedValue({
       specId: 'sdk:suggest-implementation-links',
-      implementation: [{ file: 'sdk:packages/sdk/src/orchestration/suggest-implementation-links.ts' }],
+      implementation: [
+        { file: 'sdk:packages/sdk/src/orchestration/suggest-implementation-links.ts' },
+      ],
       created: true,
     }),
   }
 
   const codeGraphProvider = {
-    getGraphHealth: vi.fn().mockResolvedValue({ freshness: '2026-08-16T12:00:00Z', currentRef: 'ref1' }),
+    getGraphHealth: vi
+      .fn()
+      .mockResolvedValue({ freshness: '2026-08-16T12:00:00Z', currentRef: 'ref1' }),
     findSymbols: vi.fn().mockImplementation(async (query: { name: string }) => {
       if (query.name === 'SuggestImplementationLinks') {
         return [
@@ -157,7 +158,9 @@ function setupTest() {
             id: 'sym1',
             name: 'SuggestImplementationLinks',
             kind: 'class',
-            location: { filePath: 'packages/sdk/src/orchestration/suggest-implementation-links.ts' },
+            location: {
+              filePath: 'packages/sdk/src/orchestration/suggest-implementation-links.ts',
+            },
           },
         ]
       }
@@ -229,37 +232,71 @@ describe('SuggestImplementationLinks', () => {
   })
 
   it('restricts single-word PascalCase terms to top-level declared entities (parentId undefined)', async () => {
-    const { useCase, codeGraphProvider } = setupTest()
+    const { useCase, codeGraphProvider, specRepositories } = setupTest()
 
-    // Add single-word symbol "Change" in two files: one top-level, one child method
-    codeGraphProvider.findSymbols.mockImplementation(async (query: { name: string }) => {
-      if (query.name === 'Change') {
-        return [
-          {
-            id: 'top-level-change',
-            name: 'Change',
-            kind: 'class',
-            parentId: undefined,
-            location: { filePath: 'packages/core/src/domain/entities/change.ts' },
-          },
-          {
-            id: 'child-method-change',
-            name: 'Change',
-            kind: 'method',
-            parentId: 'unrelated-class',
-            location: { filePath: 'packages/core/src/unrelated/helper.ts' },
-          },
-        ]
-      }
-      return []
+    // Include the single-word term `Change` so it is extracted and queried against the graph.
+    const repo = specRepositories.get('sdk')!
+    ;(repo.artifact as ReturnType<typeof vi.fn>).mockResolvedValue({
+      content:
+        '# sdk:suggest-implementation-links\n\nReferences the `Change` entity.\n\n```typescript\nconst useCase = new SuggestImplementationLinks()\n```\n',
     })
+
+    // Single-word symbol "Change" declared twice across two existing sdk files:
+    // top-level (parentId undefined) vs child method (parentId set).
+    const topLevelChange = {
+      id: 'top-level-change',
+      name: 'Change',
+      kind: 'class',
+      parentId: undefined,
+      location: {
+        filePath: 'packages/sdk/src/domain/value-objects/implementation-suggestion-cache.ts',
+      },
+    }
+    const childMethodChange = {
+      id: 'child-method-change',
+      name: 'Change',
+      kind: 'method',
+      parentId: 'unrelated-class',
+      location: {
+        filePath: 'packages/sdk/src/application/ports/implementation-suggestion-cache-port.ts',
+      },
+    }
+    const titleSymbol = {
+      id: 'title-symbol',
+      name: 'SuggestImplementationLinks',
+      kind: 'class',
+      location: {
+        filePath: 'packages/sdk/src/orchestration/suggest-implementation-links.ts',
+      },
+    }
+    codeGraphProvider.findSymbols.mockImplementation(
+      async (query: { name?: string; filePath?: string }) => {
+        if (query.name === 'Change') return [topLevelChange, childMethodChange]
+        if (query.name === 'SuggestImplementationLinks') return [titleSymbol]
+        if (query.filePath?.includes('domain/value-objects/implementation-suggestion-cache')) {
+          // Declared symbols of the top-level file: Change is root-declared there.
+          return [topLevelChange, titleSymbol]
+        }
+        if (query.filePath?.includes('ports/implementation-suggestion-cache-port')) {
+          // Declared symbols of the other file: only the child-method Change lives there.
+          return [childMethodChange]
+        }
+        return []
+      },
+    )
 
     const result = await useCase.execute({
       specId: 'sdk:suggest-implementation-links',
     })
 
     expect(result.result).toBe('ok')
-    // top-level-change file should be present if matched, but child-method file without top-level match must not be selected as primary match
+    const suggestedFiles = result.specs[0]?.suggestions.map((s) => s.file) ?? []
+    expect(suggestedFiles).toContain(
+      'sdk:packages/sdk/src/domain/value-objects/implementation-suggestion-cache.ts',
+    )
+    expect(suggestedFiles).not.toContain(
+      'sdk:packages/sdk/src/application/ports/implementation-suggestion-cache-port.ts',
+    )
   })
 
   it('persists real SHA-256 content hash in cache stamp', async () => {
@@ -285,7 +322,11 @@ describe('SuggestImplementationLinks', () => {
     })
 
     expect(result.result).toBe('ok')
-    expect(result.specs[0]?.suggestions.every((s) => s.confidence === 'HIGH' || s.confidence === 'MEDIUM')).toBe(true)
+    expect(
+      result.specs[0]?.suggestions.every(
+        (s) => s.confidence === 'HIGH' || s.confidence === 'MEDIUM',
+      ),
+    ).toBe(true)
   })
 
   it('throws InvalidInputError when no targeting criteria is specified', async () => {
@@ -298,8 +339,12 @@ describe('SuggestImplementationLinks', () => {
   it('throws WorkspaceNotFoundError when requested workspace does not exist', async () => {
     const { useCase } = setupTest()
 
-    await expect(useCase.execute({ workspace: 'non-existent-ws' })).rejects.toThrow(WorkspaceNotFoundError)
-    await expect(useCase.execute({ workspace: 'non-existent-ws' })).rejects.toBeInstanceOf(SpecdError)
+    await expect(useCase.execute({ workspace: 'non-existent-ws' })).rejects.toThrow(
+      WorkspaceNotFoundError,
+    )
+    await expect(useCase.execute({ workspace: 'non-existent-ws' })).rejects.toBeInstanceOf(
+      SpecdError,
+    )
   })
 
   it('throws InvalidInputError when invalid confidence threshold is provided', async () => {
@@ -329,7 +374,8 @@ describe('SuggestImplementationLinks', () => {
   })
 
   it('supports factory constructor overloads', () => {
-    const { specRepositories, getPersistedImplementation, updatePersistedImplementation, cache } = setupTest()
+    const { specRepositories, getPersistedImplementation, updatePersistedImplementation, cache } =
+      setupTest()
 
     const instance = createSuggestImplementationLinks({
       specRepositories,
