@@ -813,7 +813,7 @@ export class SuggestSpecDependencies {
             postApplyValidation = {
               status: 'invalid-specs-detected',
               invalidSpecs,
-              suggestedAlignmentCommand: `specd changes create align-spec-deps --spec ${invalidSpecIds.join(' --spec ')}`,
+              suggestedAlignmentCommand: `node packages/cli/dist/index.js changes create align-spec-deps --spec ${invalidSpecIds.join(' --spec ')}`,
               ...(createdChangeInfo !== undefined ? { createdChange: createdChangeInfo } : {}),
             }
           } else {
