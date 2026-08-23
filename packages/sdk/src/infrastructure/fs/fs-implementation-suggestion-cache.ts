@@ -310,7 +310,7 @@ export class FsImplementationSuggestionCache extends ImplementationSuggestionCac
     }
 
     /**
-     *
+     * Candidate spec match for a file key, with ownership and score.
      */
     interface CandidateSpecMatch {
       specId: string
