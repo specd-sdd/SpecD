@@ -30,7 +30,7 @@ We will add two orchestration Use Cases in `@specd/sdk` following the `@specd/co
    - Composition helper `resolveSuggestSpecDependenciesDeps(resolver: CompositionResolver)` resolves dependencies from `CompositionResolver`.
    - Accesses persisted workspace specifications strictly through `SpecRepository.list({ includeMeta: true })` and `GetPersistedSpecDeps` ports.
    - **Full Cache Warm-up via Dry-Run Composition**: Executes `SuggestImplementationLinks.execute({ all: true, apply: false })` at the start of Pass 1 to build/warm the complete global implementation cache across all specs in the monorepo without mutating `spec-lock.json`.
-   - Deduces `dependsOn` spec-to-spec relationships using the populated global file-to-spec map and upstream code impact analysis (`analyzeFileImpact` at `maxDepth = 2` for barrel re-exports).
+   - Deduces `dependsOn` spec-to-spec relationships using the populated global file-to-spec map and upstream code impact analysis (`analyzeFileImpact`/`analyzeFileImportImpact` at depth `1`, with one conditional extra hop for barrel re-exports).
    - Prioritizes confirmed `spec-lock.json` implementation files over heuristic suggestions when mapping imports.
    - Supports targeting **all specs**, **workspace-scoped specs**, or **specific specs**.
    - Supports an additive `apply: true` mode that unions new dependency IDs into `spec-lock.json` via `UpdatePersistedSpecDeps`.
@@ -178,10 +178,10 @@ export function createSuggestSpecDependencies(
    - Executes `SuggestImplementationLinks.execute({ all: true, apply: false })` (dry-run mode) to ensure the global implementation cache (`.specd/tmp/fs-cache/implementation-suggestions/suggestions.json`) is 100% complete and warm for all specs in the monorepo.
    - Reads confirmed `spec-lock.json` files + high-confidence suggested files from the cache across all 267+ specs.
    - Builds a complete in-memory inverse index mapping every relative production source file to its owning `specId`.
-2. **Pass 2: AST Import Analysis & Impact Traversal (`maxDepth = 2`)**:
+2. **Pass 2: AST Import Analysis & Impact Traversal (depth `1` + conditional barrel hop)**:
    - For each target spec, takes its implementation files (confirmed or suggested).
    - Evaluates all `import` statements in those source files.
-   - Runs `analyzeFileImpact` (`maxDepth = 2`) to trace imports through barrel re-export files (e.g., `@specd/sdk` barrel exports resolving to `packages/core/src/application/use-cases/...`).
+   - Runs `analyzeFileImpact`/`analyzeFileImportImpact` (depth `1`, plus one conditional hop when the imported file is a barrel re-export) to trace imports through barrel re-export files (e.g., `@specd/sdk` barrel exports resolving to `packages/core/src/application/use-cases/...`).
    - Looks up imported target files in the global inverse map `file -> specId`.
    - Deduces inter-spec dependency: if Spec A's code imports a file owned by Spec B, then `Spec A dependsOn Spec B`.
 3. **Pass 3: Mutation & Post-Apply Schema Validation**:
