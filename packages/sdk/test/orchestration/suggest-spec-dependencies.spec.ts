@@ -490,6 +490,11 @@ describe('SuggestSpecDependencies', () => {
           {
             specId: 'core:spec-repository-port',
             title: 'SpecRepository Port',
+            specStamp: {
+              lastModified: '2026-01-01T00:00:00.000Z',
+              hash: 'stub-core-port-hash',
+              artifacts: [],
+            },
             existing: {
               files: ['core:packages/core/src/application/ports/spec-repository.ts'],
               symbols: [],
@@ -500,8 +505,28 @@ describe('SuggestSpecDependencies', () => {
           {
             specId: 'core:fs-spec-repository',
             title: 'FsSpecRepository',
+            specStamp: {
+              lastModified: '2026-01-01T00:00:00.000Z',
+              hash: 'stub-core-fs-hash',
+              artifacts: [],
+            },
             existing: {
               files: ['core:packages/core/src/infrastructure/fs/spec-repository.ts'],
+              symbols: [],
+              dependsOn: [],
+            },
+            suggestions: [],
+          },
+          {
+            specId: 'core:spec-lock',
+            title: 'SpecLock',
+            specStamp: {
+              lastModified: '2026-01-01T00:00:00.000Z',
+              hash: 'stub-core-lock-hash',
+              artifacts: [],
+            },
+            existing: {
+              files: ['core:packages/core/src/application/use-cases/spec-lock.ts'],
               symbols: [],
               dependsOn: [],
             },
@@ -514,6 +539,7 @@ describe('SuggestSpecDependencies', () => {
     const list = vi.fn().mockResolvedValue([
       { workspace: 'core', path: 'spec-repository-port', title: 'SpecRepository Port' },
       { workspace: 'core', path: 'fs-spec-repository', title: 'FsSpecRepository' },
+      { workspace: 'core', path: 'spec-lock', title: 'SpecLock' },
     ])
 
     const repo = { list } as unknown as SpecRepository
@@ -521,27 +547,35 @@ describe('SuggestSpecDependencies', () => {
 
     const codeGraphProvider = {
       analyzeFileImportImpact: vi.fn().mockImplementation(async (filePath: string) => {
-        // When checking what ports/spec-repository.ts imports: it imports nothing from fs
-        if (filePath.includes('ports/spec-repository.ts')) {
-          return { affectedFiles: [] }
-        }
-        // When checking what fs/spec-repository.ts imports: it imports ports/spec-repository.ts
-        if (filePath.includes('fs/spec-repository.ts')) {
+        // Downstream (outbound) impact of the target port file: it references the
+        // spec-lock use case directly plus an application barrel. The barrel hop
+        // seeds the inverted fs-adapter candidate without adding it to the
+        // target's direct outbound set.
+        if (filePath.endsWith('application/ports/spec-repository.ts')) {
           return {
-            affectedFiles: [{ filePath: 'packages/core/src/application/ports/spec-repository.ts' }],
+            affectedFiles: [
+              { filePath: 'packages/core/src/application/use-cases/spec-lock.ts' },
+              { filePath: 'packages/core/src/application/ports.ts' },
+            ],
           }
         }
-        return { affectedFiles: [] }
-      }),
-      analyzeFileImpact: vi.fn().mockImplementation(async (filePath: string) => {
-        // If an accidental hub/barrel was queried returning fs
-        if (filePath.includes('ports/spec-repository.ts')) {
+        // Barrel expansion: the application barrel re-exports the fs adapter.
+        if (filePath.endsWith('application/ports.ts')) {
           return {
             affectedFiles: [{ filePath: 'packages/core/src/infrastructure/fs/spec-repository.ts' }],
           }
         }
+        // Inverse check for the fs adapter: its code references the target port file
+        // while the target never imports it back -> inverted -> pruned in Pass 2.5.
+        if (filePath.includes('infrastructure/fs/spec-repository.ts')) {
+          return {
+            affectedFiles: [{ filePath: 'packages/core/src/application/ports/spec-repository.ts' }],
+          }
+        }
+        // Inverse check for spec-lock: no reference to the target port -> kept.
         return { affectedFiles: [] }
       }),
+      analyzeFileImpact: vi.fn().mockResolvedValue({ affectedFiles: [] }),
     } as any
 
     const getPersistedDeps = {
@@ -570,7 +604,12 @@ describe('SuggestSpecDependencies', () => {
     })
 
     expect(result.result).toBe('ok')
-    expect(result.specs[0]?.suggestedDependsOn).toHaveLength(0)
+    // Pass 2.5 must keep only the non-inverted candidate.
+    expect(result.specs[0]?.suggestedDependsOn).toHaveLength(1)
+    expect(result.specs[0]?.suggestedDependsOn[0]?.specId).toBe('core:spec-lock')
+    expect(
+      result.specs[0]?.suggestedDependsOn.some((d) => d.specId === 'core:fs-spec-repository'),
+    ).toBe(false)
   })
 
   it('prunes redundant candidate recommendation when another candidate recommendation directly depends on it (transitive reduction)', async () => {
