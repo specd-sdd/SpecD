@@ -521,7 +521,6 @@ export class SuggestSpecDependencies {
           // Validate that the target spec actually imports or depends on the candidate spec.
           // If the candidate spec imports the target spec, but the target does NOT import the candidate,
           // the dependency is inverted (e.g. implementation depending on port, not vice versa) and must be pruned.
-          const directImportMap = new Map<string, boolean>()
 
           if (this.deps.codeGraphProvider && suggestedMap.size > 0) {
             const targetFilesList = Array.from(implFiles)
@@ -580,8 +579,6 @@ export class SuggestSpecDependencies {
                   break
                 }
               }
-
-              directImportMap.set(candidateSpecId, targetDirectlyImportsCandidate)
 
               // Check if candidate imports target (inverse relationship)
               let candidateDirectlyImportsTarget = false
