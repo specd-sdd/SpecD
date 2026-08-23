@@ -787,7 +787,7 @@ export class SuggestSpecDependencies {
               const changePath =
                 typeof changeResultObj.changePath === 'string'
                   ? changeResultObj.changePath
-                  : join(projectDir, '.specd', 'changes', changeName)
+                  : join(projectDir, configPath, 'changes', changeName)
               const explorationFilePath = join(changePath, '.specd-exploration.md')
 
               const explorationContent = [
