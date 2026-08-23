@@ -45,8 +45,8 @@ We will add two orchestration Use Cases in `@specd/sdk` following the `@specd/co
    - `specd spec implementation suggest [<specPath>] [--spec <id>...] [--all] [--workspace <name>] [--apply] [--confidence <HIGH|MED>] [--rebuild-cache] [--format text|json|toon]`
    - `specd spec deps suggest [<specPath>] [--spec <id>...] [--all] [--workspace <name>] [--apply] [--create-change] [--rebuild-cache] [--format text|json|toon]`
 
-4. **Unified System Cache (`.specd/cache/`)**:
-   - Persists BOTH confirmed `spec-lock.json` data (`files`, `symbols`, `dependsOn`) AND inferred suggestions in `.specd/cache/implementation-suggestions.json` with domain-specific cache metadata interfaces (`ImplementationSuggestionCacheHeader`, `ImplementationSuggestionSpecStamp`, `ImplementationSuggestionSpecEntry`).
+4. **Unified System Cache (`.specd/tmp/fs-cache/`)**:
+   - Persists BOTH confirmed `spec-lock.json` data (`files`, `symbols`, `dependsOn`) AND inferred suggestions in `.specd/tmp/fs-cache/implementation-suggestions/suggestions.json` with domain-specific cache metadata interfaces (`ImplementationSuggestionCacheHeader`, `ImplementationSuggestionSpecStamp`, `ImplementationSuggestionSpecEntry`).
    - Implements a 2-stage staleness check (`lastModified` fast-path -> `hash` deep-check) using `SpecRepository.list({ includeMeta: true })` and `SpecRepository.getSpecMeta(..., { includeHash: true })`.
 
 ## Specs affected
@@ -73,7 +73,7 @@ We will add two orchestration Use Cases in `@specd/sdk` following the `@specd/co
 
 - **Packages**: `@specd/sdk` (orchestration use cases), `@specd/cli` (CLI subcommands).
 - **Core Independence**: `@specd/core` remains strictly independent of `@specd/code-graph`. The new use cases reside exclusively in `@specd/sdk`.
-- **System Storage**: Cache files are written to `.specd/cache/implementation-suggestions.json` (ignored in `.gitignore`).
+- **System Storage**: Cache files are written to `.specd/tmp/fs-cache/implementation-suggestions/suggestions.json` (ignored in `.gitignore`).
 
 ## Technical context
 
@@ -103,15 +103,21 @@ export class SuggestImplementationLinks {
 }
 
 // Composition Factory & Resolver Integration
-export function resolveSuggestImplementationLinksDeps(resolver: CompositionResolver): SuggestImplementationLinksDeps
+export function resolveSuggestImplementationLinksDeps(
+  resolver: CompositionResolver,
+): SuggestImplementationLinksDeps
 
-export function createSuggestImplementationLinks(deps: SuggestImplementationLinksDeps): SuggestImplementationLinks
-export function createSuggestImplementationLinks(config: SpecdConfig, options?: CompositionResolutionOptions): SuggestImplementationLinks
+export function createSuggestImplementationLinks(
+  deps: SuggestImplementationLinksDeps,
+): SuggestImplementationLinks
+export function createSuggestImplementationLinks(
+  config: SpecdConfig,
+  options?: CompositionResolutionOptions,
+): SuggestImplementationLinks
 export function createSuggestImplementationLinks(
   depsOrConfig: SuggestImplementationLinksDeps | SpecdConfig,
   options?: CompositionResolutionOptions,
 ): SuggestImplementationLinks
-
 
 export interface SuggestSpecDependenciesInput {
   readonly specId?: string
@@ -130,10 +136,17 @@ export class SuggestSpecDependencies {
 }
 
 // Composition Factory & Resolver Integration
-export function resolveSuggestSpecDependenciesDeps(resolver: CompositionResolver): SuggestSpecDependenciesDeps
+export function resolveSuggestSpecDependenciesDeps(
+  resolver: CompositionResolver,
+): SuggestSpecDependenciesDeps
 
-export function createSuggestSpecDependencies(deps: SuggestSpecDependenciesDeps): SuggestSpecDependencies
-export function createSuggestSpecDependencies(config: SpecdConfig, options?: CompositionResolutionOptions): SuggestSpecDependencies
+export function createSuggestSpecDependencies(
+  deps: SuggestSpecDependenciesDeps,
+): SuggestSpecDependencies
+export function createSuggestSpecDependencies(
+  config: SpecdConfig,
+  options?: CompositionResolutionOptions,
+): SuggestSpecDependencies
 export function createSuggestSpecDependencies(
   depsOrConfig: SuggestSpecDependenciesDeps | SpecdConfig,
   options?: CompositionResolutionOptions,
@@ -145,6 +158,7 @@ export function createSuggestSpecDependencies(
 ### 2. Detailed Execution Flow & Analysis Algorithm
 
 #### A. `SuggestImplementationLinks` Algorithm:
+
 1. **Pass 1: AST Code Block & Naming Derivative Extraction via `SpecRepository`**:
    - Calls `SpecRepository.list({ includeMeta: true })` to load all target spec entries with their physical artifact stamps (`artifacts[].lastModified`) and sidecar stamps (`persistedStateMeta`).
    - Evaluates 2-stage cache staleness for each spec (`lastModified` -> `hash` fallback).
@@ -155,12 +169,13 @@ export function createSuggestSpecDependencies(
    - Queries `code-graph` (BM25 symbol search and AST file matching).
    - Scores candidates (`HIGH` score > 150 for exact AST symbol match; `MEDIUM` score 80-149 for path derivatives; `LOW` for distant matches).
 3. **Pass 3: Cache Update & Mutation (`--apply`)**:
-   - Writes/updates `.specd/cache/implementation-suggestions.json`.
+   - Writes/updates `.specd/tmp/fs-cache/implementation-suggestions/suggestions.json`.
    - If `--apply` is passed, invokes `UpdatePersistedSpecImplementation` to perform set union merging discovered `files` and `symbols` into `spec-lock.json`.
 
 #### B. `SuggestSpecDependencies` Algorithm:
+
 1. **Pass 1: Cache Warm-up & Multi-Workspace Global File Map (`file -> specId`)**:
-   - Executes `SuggestImplementationLinks.execute({ all: true, apply: false })` (dry-run mode) to ensure the global implementation cache (`.specd/cache/implementation-suggestions.json`) is 100% complete and warm for all specs in the monorepo.
+   - Executes `SuggestImplementationLinks.execute({ all: true, apply: false })` (dry-run mode) to ensure the global implementation cache (`.specd/tmp/fs-cache/implementation-suggestions/suggestions.json`) is 100% complete and warm for all specs in the monorepo.
    - Reads confirmed `spec-lock.json` files + high-confidence suggested files from the cache across all 267+ specs.
    - Builds a complete in-memory inverse index mapping every relative production source file to its owning `specId`.
 2. **Pass 2: AST Import Analysis & Impact Traversal (`maxDepth = 2`)**:
@@ -214,15 +229,15 @@ The Use Cases determine staleness using a 2-stage evaluation via `SpecRepository
 2. **Stage 2: Deep `hash` Check (Fallback when `lastModified` changes)**:
    - If `lastModified` has changed (e.g. `touch` command, git checkout, or mtime shift), the Use Case retrieves artifact content hashes via `SpecRepository.getSpecMeta(specPath, { includeHash: true })` or `persistedStateMeta.hash`.
    - It compares `newHash` against `cachedSpec.specStamp.hash`:
-     - **If Hash Matches:** The content has NOT changed. The Use Case **updates `lastModified` in `.specd/cache/implementation-suggestions.json`** to match the new timestamp and preserves the Cache HIT.
+     - **If Hash Matches:** The content has NOT changed. The Use Case **updates `lastModified` in `.specd/tmp/fs-cache/implementation-suggestions/suggestions.json`** to match the new timestamp and preserves the Cache HIT.
      - **If Hash Differs:** Content has changed. ❌ **Cache MISS**: The Use Case recalculates Pass 1 & Pass 2 analysis for that spec and updates the cache with new suggestions and hashes.
 
 3. **Global Code-Graph Staleness (via `code-graph` Port)**:
    - The Use Case queries `GetGraphHealth` or `IndexProjectGraph` port to retrieve `lastIndexedAt` and `graphFingerprint`.
-   - If `lastIndexedAt` or `graphFingerprint` in `.specd/cache/implementation-suggestions.json` differs from the port, all cached suggestions are invalidated globally.
+   - If `lastIndexedAt` or `graphFingerprint` in `.specd/tmp/fs-cache/implementation-suggestions/suggestions.json` differs from the port, all cached suggestions are invalidated globally.
 
 4. **Explicit User Override (`rebuildCache: true` / `--rebuild-cache`)**:
-   - Passing `--rebuild-cache` (or `--force-rebuild`) bypasses cache comparisons, re-executes Pass 1 & Pass 2, and updates `.specd/cache/implementation-suggestions.json`.
+   - Passing `--rebuild-cache` (or `--force-rebuild`) bypasses cache comparisons, re-executes Pass 1 & Pass 2, and updates `.specd/tmp/fs-cache/implementation-suggestions/suggestions.json`.
 
 ```typescript
 export interface ImplementationSuggestionCacheHeader {
@@ -258,11 +273,11 @@ export interface ImplementationSuggestionSpecEntry {
 
 ### 4. Output Format Constraints & Interactivity Rules
 
-| Format | Interactive Prompt (`[y/N]`) | Auto-Creation via `--create-change` | Output Behavior |
-| :--- | :---: | :---: | :--- |
+| Format     |        Interactive Prompt (`[y/N]`)         |    Auto-Creation via `--create-change`     | Output Behavior                                                           |
+| :--------- | :-----------------------------------------: | :----------------------------------------: | :------------------------------------------------------------------------ |
 | **`text`** | ✅ Supported (if TTY & invalid specs exist) | ✅ Supported (only if invalid specs exist) | Renders human-readable clean text. Prompts in TTY if invalid specs exist. |
-| **`json`** | ❌ **DISABLED** (Never prompts) | ✅ Supported (only if invalid specs exist) | Returns pure JSON object schema. No interactive input read. |
-| **`toon`** | ❌ **DISABLED** (Never prompts) | ✅ Supported (only if invalid specs exist) | Returns high-density TOON format. No interactive input read. |
+| **`json`** |       ❌ **DISABLED** (Never prompts)       | ✅ Supported (only if invalid specs exist) | Returns pure JSON object schema. No interactive input read.               |
+| **`toon`** |       ❌ **DISABLED** (Never prompts)       | ✅ Supported (only if invalid specs exist) | Returns high-density TOON format. No interactive input read.              |
 
 - In `json` and `toon` formats, if post-apply validation detects invalid specs and `createAlignmentChange` was `false` (no `--create-change` flag), the result payload includes `postApplyValidation` with `invalidSpecs` and `suggestedAlignmentCommand`, but **does NOT pause or read stdin**.
 - If `createAlignmentChange` was `true` (or `--create-change` flag passed) AND invalid specs exist, the change is created silently and details are returned in `createdChange` within the JSON payload.
@@ -360,10 +375,7 @@ export interface SuggestSpecDependenciesResult {
     {
       "specId": "cli:change-implementation",
       "title": "Change Implementation",
-      "existingDependsOn": [
-        "core:change",
-        "code-graph:symbol-model"
-      ],
+      "existingDependsOn": ["core:change", "code-graph:symbol-model"],
       "suggestedDependsOn": [
         {
           "specId": "core:update-implementation-tracking",
@@ -441,9 +453,11 @@ When `createAlignmentChange` is triggered (via SDK option or CLI prompt/`--creat
 Generated: 2026-08-16
 
 ## Problem Statement
+
 The following specifications failed schema validation after updating lock dependencies in spec-lock.json via 'specd spec deps suggest --apply'. Their schema artifacts must be updated to align with the newly added lock dependencies.
 
 ## Affected Specs & Validation Failures
+
 - cli:change-implementation
   - [Artifact: spec] dependOn "core:update-implementation-tracking" is not referenced in spec requirements
   - [Artifact: spec] dependOn "core:get-implementation-review" is not referenced in spec requirements
@@ -451,13 +465,14 @@ The following specifications failed schema validation after updating lock depend
   - [Artifact: spec] dependOn "sdk:suggest-spec-dependencies" missing in requirements section
 
 ## Action Required
+
 1. Run '/specd-design' on this change.
 2. Update the failing schema artifacts (or write deltas) for each spec to resolve the validation failures described above.
 ```
 
 ---
 
-### 8. Unified Cache Format (`.specd/cache/implementation-suggestions.json`)
+### 8. Unified Cache Format (`.specd/tmp/fs-cache/implementation-suggestions/suggestions.json`)
 
 The system cache stores BOTH confirmed `spec-lock.json` entries (`existing`) and calculated suggestions (`suggestions`):
 
@@ -478,7 +493,11 @@ The system cache stores BOTH confirmed `spec-lock.json` entries (`existing`) and
         "lastModified": "2026-08-16T10:00:00.000Z",
         "hash": "sha256:0cc69855806077bffdc5273029210e75868912d6159162d85fe8b3d59ce95022",
         "artifacts": [
-          { "filename": "spec.md", "lastModified": "2026-08-16T10:00:00.000Z", "hash": "sha256:abc..." }
+          {
+            "filename": "spec.md",
+            "lastModified": "2026-08-16T10:00:00.000Z",
+            "hash": "sha256:abc..."
+          }
         ],
         "persistedStateHash": "sha256:0cc69855...",
         "persistedStateLastModified": "2026-08-16T10:00:00.000Z"
@@ -488,14 +507,8 @@ The system cache stores BOTH confirmed `spec-lock.json` entries (`existing`) and
           "packages/cli/src/commands/change/_implementation-tracking.ts",
           "packages/cli/src/commands/change/implementation.ts"
         ],
-        "symbols": [
-          "enrichImplementationTracking",
-          "registerChangeImplementation"
-        ],
-        "dependsOn": [
-          "core:change",
-          "code-graph:symbol-model"
-        ]
+        "symbols": ["enrichImplementationTracking", "registerChangeImplementation"],
+        "dependsOn": ["core:change", "code-graph:symbol-model"]
       },
       "suggestions": [
         {
@@ -540,6 +553,7 @@ specd spec deps suggest --spec cli:change-implementation --spec cli:spec-deps --
 ```
 
 **Clean Text Output:**
+
 ```text
 project root: /Users/monki/Documents/Proyectos/specd
 applied 4 spec dependency updates (union) to spec-lock.json

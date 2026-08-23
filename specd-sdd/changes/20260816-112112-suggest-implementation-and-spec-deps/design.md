@@ -5,10 +5,12 @@
 This design artifact is the **master technical specification** for implementing automated, static-analysis suggestion capabilities in `@specd/sdk` and exposing them via `@specd/cli`. An implementer reading this document and `tasks.md` has complete, unambiguous contracts, code signatures, step-by-step algorithms, data structures, and CLI handler specifications without needing to consult other artifacts.
 
 The feature consists of two orchestration use cases in `@specd/sdk`:
+
 1. `SuggestImplementationLinks` (`packages/sdk/src/orchestration/suggest-implementation-links.ts`)
 2. `SuggestSpecDependencies` (`packages/sdk/src/orchestration/suggest-spec-dependencies.ts`)
 
 And two CLI subcommands in `@specd/cli`:
+
 1. `specd specs implementation suggest` (`packages/cli/src/commands/spec/implementation.ts`)
 2. `specd specs deps suggest` (`packages/cli/src/commands/spec/deps.ts`)
 
@@ -129,9 +131,15 @@ export abstract class ImplementationSuggestionCachePort {
   abstract isGraphFresh(graphFingerprint: string): Promise<boolean>
   abstract get(specId: string): Promise<ImplementationSuggestionSpecEntry | null>
   abstract set(specId: string, entry: ImplementationSuggestionSpecEntry): Promise<void>
-  abstract setMany(entries: readonly ImplementationSuggestionSpecEntry[], meta?: { readonly graphFingerprint?: string; readonly graphLastIndexedAt?: string }): Promise<void>
+  abstract setMany(
+    entries: readonly ImplementationSuggestionSpecEntry[],
+    meta?: { readonly graphFingerprint?: string; readonly graphLastIndexedAt?: string },
+  ): Promise<void>
   abstract getAll(): Promise<ReadonlyMap<string, ImplementationSuggestionSpecEntry>>
-  abstract isSpecFresh(specId: string, currentStamp: ImplementationSuggestionSpecStamp): Promise<boolean>
+  abstract isSpecFresh(
+    specId: string,
+    currentStamp: ImplementationSuggestionSpecStamp,
+  ): Promise<boolean>
   abstract findSpecByFile(filePath: string): Promise<string | null>
   abstract getFileToSpecMap(): Promise<ReadonlyMap<string, string>>
   abstract flush(): Promise<void>
@@ -142,9 +150,15 @@ export abstract class SpecDepsSuggestionCachePort {
   abstract isGraphFresh(graphFingerprint: string): Promise<boolean>
   abstract get(specId: string): Promise<SpecDepsSuggestionSpecEntry | null>
   abstract set(specId: string, entry: SpecDepsSuggestionSpecEntry): Promise<void>
-  abstract setMany(entries: readonly SpecDepsSuggestionSpecEntry[], meta?: { readonly graphFingerprint?: string; readonly graphLastIndexedAt?: string }): Promise<void>
+  abstract setMany(
+    entries: readonly SpecDepsSuggestionSpecEntry[],
+    meta?: { readonly graphFingerprint?: string; readonly graphLastIndexedAt?: string },
+  ): Promise<void>
   abstract getAll(): Promise<ReadonlyMap<string, SpecDepsSuggestionSpecEntry>>
-  abstract isSpecFresh(specId: string, currentStamp: ImplementationSuggestionSpecStamp): Promise<boolean>
+  abstract isSpecFresh(
+    specId: string,
+    currentStamp: ImplementationSuggestionSpecStamp,
+  ): Promise<boolean>
   abstract flush(): Promise<void>
   abstract invalidate(): Promise<void>
 }
@@ -197,14 +211,21 @@ export class SuggestImplementationLinks {
 }
 
 // Composition Factory Triple & Resolver
-export function createSuggestImplementationLinks(deps: SuggestImplementationLinksDeps): SuggestImplementationLinks
-export function createSuggestImplementationLinks(config: import('@specd/core').SpecdConfig, options?: import('@specd/core').CompositionResolutionOptions): SuggestImplementationLinks
+export function createSuggestImplementationLinks(
+  deps: SuggestImplementationLinksDeps,
+): SuggestImplementationLinks
+export function createSuggestImplementationLinks(
+  config: import('@specd/core').SpecdConfig,
+  options?: import('@specd/core').CompositionResolutionOptions,
+): SuggestImplementationLinks
 export function createSuggestImplementationLinks(
   depsOrConfig: SuggestImplementationLinksDeps | import('@specd/core').SpecdConfig,
   options?: import('@specd/core').CompositionResolutionOptions,
 ): SuggestImplementationLinks
 
-export function resolveSuggestImplementationLinksDeps(resolver: import('@specd/core').CompositionResolver): SuggestImplementationLinksDeps
+export function resolveSuggestImplementationLinksDeps(
+  resolver: import('@specd/core').CompositionResolver,
+): SuggestImplementationLinksDeps
 ```
 
 ### 3. `SuggestSpecDependencies` DTOs & Use Case Class
@@ -284,14 +305,21 @@ export class SuggestSpecDependencies {
 }
 
 // Composition Factory Triple & Resolver
-export function createSuggestSpecDependencies(deps: SuggestSpecDependenciesDeps): SuggestSpecDependencies
-export function createSuggestSpecDependencies(config: import('@specd/core').SpecdConfig, options?: import('@specd/core').CompositionResolutionOptions): SuggestSpecDependencies
+export function createSuggestSpecDependencies(
+  deps: SuggestSpecDependenciesDeps,
+): SuggestSpecDependencies
+export function createSuggestSpecDependencies(
+  config: import('@specd/core').SpecdConfig,
+  options?: import('@specd/core').CompositionResolutionOptions,
+): SuggestSpecDependencies
 export function createSuggestSpecDependencies(
   depsOrConfig: SuggestSpecDependenciesDeps | import('@specd/core').SpecdConfig,
   options?: import('@specd/core').CompositionResolutionOptions,
 ): SuggestSpecDependencies
 
-export function resolveSuggestSpecDependenciesDeps(resolver: import('@specd/core').CompositionResolver): SuggestSpecDependenciesDeps
+export function resolveSuggestSpecDependenciesDeps(
+  resolver: import('@specd/core').CompositionResolver,
+): SuggestSpecDependenciesDeps
 ```
 
 ---
@@ -306,7 +334,7 @@ export function resolveSuggestSpecDependenciesDeps(resolver: import('@specd/core
    - If `input.specId` or `input.specIds` are provided, verify each spec ID exists in the repositories. If any spec ID is missing, throw `SpecNotFoundError`.
 
 2. **2-Stage Staleness Check (`lastModified` -> `hash`)**:
-   - Read `join(projectDir, configPath, 'cache', 'implementation-suggestions/suggestions.json')`.
+   - Read `join(projectDir, configPath, 'tmp', 'fs-cache', 'implementation-suggestions/suggestions.json')`.
    - Check `header.graphLastIndexedAt` and `header.graphFingerprint` against `code-graph` health stats. If graph generation shifted or `input.rebuildCache` is `true`, invalidate globally.
    - For each target spec:
      - Compare `entry.artifacts[].lastModified` against `cachedSpec.specStamp.lastModified`.

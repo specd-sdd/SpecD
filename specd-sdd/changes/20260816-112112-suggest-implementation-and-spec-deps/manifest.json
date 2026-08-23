@@ -1,7 +1,7 @@
 {
   "name": "suggest-implementation-and-spec-deps",
   "createdAt": "2026-08-16T11:21:12.000Z",
-  "updatedAt": "2026-08-23T21:14:42.686Z",
+  "updatedAt": "2026-08-23T21:35:32.334Z",
   "description": "Add SDK use cases and CLI commands to suggest implementation links and spec dependencies with post-apply validation",
   "schema": {
     "name": "schema-std",
@@ -869,7 +869,7 @@
           "key": "proposal",
           "filename": "proposal.md",
           "state": "complete",
-          "validatedHash": "sha256:d5e604db960391d4ac5b07b9d22795cfd157669a29020d98619bd171f88ba3eb"
+          "validatedHash": "sha256:72810292b83b54ef5a921de068dad346601c75aa8c3a8a6828c476e6dfd6e1a0"
         }
       ]
     },
@@ -971,7 +971,7 @@
           "key": "design",
           "filename": "design.md",
           "state": "complete",
-          "validatedHash": "sha256:a3a91eec049304107bb4de2c3df09910226bba587ec14bdd88cee40d6a57a26c"
+          "validatedHash": "sha256:8d77961a64c1d3d6f988ceced57bf136c5d06fba867cce9ec02eed625b017305"
         }
       ]
     },
@@ -2618,6 +2618,53 @@
         {
           "type": "design",
           "files": ["design"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-23T21:35:29.054Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]; design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:spec-implementation",
+            "cli:spec-deps",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies",
+            "code-graph:language-adapter",
+            "code-graph:graph-store"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:spec-implementation",
+            "cli:spec-deps",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies",
+            "code-graph:language-adapter",
+            "code-graph:graph-store"
+          ]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
         }
       ]
     }
