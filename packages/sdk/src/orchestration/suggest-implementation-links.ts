@@ -867,14 +867,24 @@ export class SuggestImplementationLinks {
       }
     }
 
+    // Validate each candidate source directory once before expanding its
+    // variants and extensions so the full cross product is never probed.
+    const projectRoot = this.deps.projectDir ?? '.'
+    const validPrefixes = new Set<string>()
     for (const subdir of searchSubdirs) {
-      for (const variant of pathVariants) {
-        const rel = subdir ? `${subdir}/${variant}` : variant
-        if (wsCodeRoot) {
-          for (const ext of sourceExtensions) {
-            derivedPaths.push(`${workspace}:${wsCodeRoot}/${rel}${ext}`)
-          }
+      const prefixes = wsCodeRoot
+        ? [subdir ? `${wsCodeRoot}/${subdir}` : wsCodeRoot, subdir]
+        : [subdir]
+      for (const prefix of prefixes) {
+        if (prefix === '' || (await asyncFileExists(join(projectRoot, prefix)))) {
+          validPrefixes.add(prefix)
         }
+      }
+    }
+
+    for (const prefix of validPrefixes) {
+      for (const variant of pathVariants) {
+        const rel = prefix ? `${prefix}/${variant}` : variant
         for (const ext of sourceExtensions) {
           derivedPaths.push(`${workspace}:${rel}${ext}`)
         }
