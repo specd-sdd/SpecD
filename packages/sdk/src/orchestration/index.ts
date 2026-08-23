@@ -49,10 +49,8 @@ export {
   type ImplementationSuggestionEntry,
   type ImplementationSuggestionSpecEntry,
   type ImplementationSuggestionsCacheFile,
-  CACHE_VERSION,
+  IMPLEMENTATION_SUGGESTION_CACHE_VERSION,
 } from '../domain/value-objects/implementation-suggestion-cache.js'
-export { ImplementationSuggestionCachePort } from '../application/ports/implementation-suggestion-cache-port.js'
-export { FsImplementationSuggestionCache } from '../infrastructure/fs/fs-implementation-suggestion-cache.js'
 
 export {
   type SpecDepsSuggestedItem,
@@ -61,5 +59,3 @@ export {
   type SpecDepsSuggestionsCacheFile,
   SPEC_DEPS_CACHE_VERSION,
 } from '../domain/value-objects/spec-deps-suggestion-cache.js'
-export { SpecDepsSuggestionCachePort } from '../application/ports/spec-deps-suggestion-cache-port.js'
-export { FsSpecDepsSuggestionCache } from '../infrastructure/fs/fs-spec-deps-suggestion-cache.js'

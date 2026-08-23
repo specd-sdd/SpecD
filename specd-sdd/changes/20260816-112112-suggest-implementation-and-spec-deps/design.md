@@ -381,7 +381,7 @@ export function resolveSuggestSpecDependenciesDeps(
      - Only if a strict score tie exists is the file retained as ambiguous.
 
 7. **Pass 3: Mutation & Persistence**:
-   - Persist calculated entries in `configPath/tmp/fs-cache/implementation-suggestions/suggestions.json` with `CACHE_VERSION = '1.1.0'`.
+   - Persist calculated entries in `configPath/tmp/fs-cache/implementation-suggestions/suggestions.json` with `IMPLEMENTATION_SUGGESTION_CACHE_VERSION = '1.1.0'`.
    - If `input.apply === true`:
      - Group suggestions by spec.
      - Invoke `deps.updatePersistedImplementation` with `action: 'add'` for each discovered `file` and `symbols`.

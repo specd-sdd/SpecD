@@ -1,5 +1,5 @@
 /** Version identifier for the implementation suggestions cache schema. */
-export const CACHE_VERSION = '1.1.0'
+export const IMPLEMENTATION_SUGGESTION_CACHE_VERSION = '1.1.0'
 
 /** Artifact metadata within spec stamp. */
 export interface ImplementationSuggestionArtifactStamp {

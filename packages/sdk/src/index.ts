@@ -22,8 +22,6 @@ export {
   createSuggestSpecDependencies,
   resolveSuggestSpecDependenciesDeps,
   suggestSpecDependenciesInputSchema,
-  ImplementationSuggestionCachePort,
-  FsImplementationSuggestionCache,
   type BuildImplementationReviewInput,
   type BuildImplementationReviewResult,
   type BuildProjectStatusSnapshotOptions,
@@ -53,13 +51,18 @@ export {
   type ImplementationSuggestionEntry,
   type ImplementationSuggestionSpecEntry,
   type ImplementationSuggestionsCacheFile,
-  SpecDepsSuggestionCachePort,
-  FsSpecDepsSuggestionCache,
   type SpecDepsSuggestedItem,
   type SpecDepsSuggestionSpecEntry,
   type SpecDepsSuggestionCacheHeader,
   type SpecDepsSuggestionsCacheFile,
 } from './orchestration/index.js'
+
+export { ImplementationSuggestionCachePort } from './application/ports/implementation-suggestion-cache-port.js'
+export { SpecDepsSuggestionCachePort } from './application/ports/spec-deps-suggestion-cache-port.js'
+export {
+  FsImplementationSuggestionCache,
+  FsSpecDepsSuggestionCache,
+} from './infrastructure/fs/index.js'
 
 export { InvalidProviderLifecycleError } from './domain/errors/index.js'
 

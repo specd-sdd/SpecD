@@ -11,7 +11,7 @@ import {
   type ImplementationSuggestionSpecEntry,
   type ImplementationSuggestionSpecStamp,
   type ImplementationSuggestionsCacheFile,
-  CACHE_VERSION,
+  IMPLEMENTATION_SUGGESTION_CACHE_VERSION,
 } from '../../domain/value-objects/implementation-suggestion-cache.js'
 
 /** Maximum spec fan-in threshold before a file is considered an ambiguous shared hub. */
@@ -97,7 +97,7 @@ export class FsImplementationSuggestionCache extends ImplementationSuggestionCac
       if (
         parsed &&
         parsed.header &&
-        parsed.header.cacheVersion === CACHE_VERSION &&
+        parsed.header.cacheVersion === IMPLEMENTATION_SUGGESTION_CACHE_VERSION &&
         typeof parsed.specs === 'object'
       ) {
         this._header = parsed.header
@@ -257,7 +257,7 @@ export class FsImplementationSuggestionCache extends ImplementationSuggestionCac
     this._header = {
       updatedAt: new Date().toISOString(),
       projectDir: this.projectDir,
-      cacheVersion: CACHE_VERSION,
+      cacheVersion: IMPLEMENTATION_SUGGESTION_CACHE_VERSION,
       graphLastIndexedAt: lastIndexedAt,
       graphFingerprint: fingerprint,
     }
@@ -284,7 +284,7 @@ export class FsImplementationSuggestionCache extends ImplementationSuggestionCac
     this._header = {
       updatedAt: new Date().toISOString(),
       projectDir: this.projectDir,
-      cacheVersion: CACHE_VERSION,
+      cacheVersion: IMPLEMENTATION_SUGGESTION_CACHE_VERSION,
       graphLastIndexedAt: lastIndexedAt,
       graphFingerprint: fingerprint,
     }
@@ -420,7 +420,7 @@ export class FsImplementationSuggestionCache extends ImplementationSuggestionCac
     const header: ImplementationSuggestionCacheHeader = this._header ?? {
       updatedAt: new Date().toISOString(),
       projectDir: this.projectDir,
-      cacheVersion: CACHE_VERSION,
+      cacheVersion: IMPLEMENTATION_SUGGESTION_CACHE_VERSION,
       graphLastIndexedAt: lastIndexedAt,
       graphFingerprint: fingerprint,
     }
