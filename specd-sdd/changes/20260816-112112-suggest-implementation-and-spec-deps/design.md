@@ -352,7 +352,7 @@ export function resolveSuggestSpecDependenciesDeps(
    - Filter candidate paths by checking disk existence (`existsSync(join(projectDir, path))`).
    - **Path & Token Affinity (`computePathSpecAffinity`)**:
      - Splits spec capability name and candidate file paths into normalized tokens with `[\/\\_\-.:]+` and plural stemming (`length > 2 && !endsWith('ss')`).
-     - Computes token coverage. If candidate file path lacks distinctive spec tokens (e.g., candidate missing `port` token for `core:spec-repository-port`), penalizes candidate with `-100` score penalty (`missing-distinctive-tokens`).
+     - Computes token coverage. If candidate file path lacks distinctive spec tokens (e.g., candidate missing `port` token for `core:spec-repository-port`), penalizes candidate with a per-token score penalty of `missingTokens.length * 150` (i.e. `-150` per missing token) and records the `missing-distinctive-tokens` reason. Candidates carrying that reason are excluded from `HIGH` confidence regardless of final score.
    - **Symbol Differentiation**:
      - Exact Primary Symbol Match: +200 points.
      - Derivative Symbol Match: +50 points.
