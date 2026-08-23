@@ -30,6 +30,7 @@ export class FsSpecDepsSuggestionCache extends SpecDepsSuggestionCachePort {
   private readonly cachePath: string
   private readonly projectDir: string
   private _data: Map<string, SpecDepsSuggestionSpecEntry> | null = null
+  private _loadPromise: Promise<void> | null = null
   private _header: SpecDepsSuggestionCacheHeader | null = null
   private _isDirty = false
   private _cachedGraphFingerprint: string | null = null
@@ -63,12 +64,22 @@ export class FsSpecDepsSuggestionCache extends SpecDepsSuggestionCachePort {
 
   /**
    * Lazily loads and parses the cache file from disk into memory once.
+   *
+   * Concurrent callers share a single in-flight load so none of them can
+   * observe or overwrite state while initialization is still running.
    */
   private async ensureLoaded(): Promise<void> {
     if (this._data !== null) {
       return
     }
+    this._loadPromise ??= this.loadFromDisk()
+    await this._loadPromise
+  }
 
+  /**
+   * Reads and parses the cache file into memory.
+   */
+  private async loadFromDisk(): Promise<void> {
     this._data = new Map()
     this._header = null
     this._isDirty = false
