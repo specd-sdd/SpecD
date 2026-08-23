@@ -61,7 +61,7 @@
 
 - [x] 4.1 Unit tests for `SuggestImplementationLinks`
       `packages/sdk/test/orchestration/suggest-implementation-links.spec.ts`: describe block verifying 2-pass scoring, 2-stage cache HIT, and additive apply
-      Approach: test with mock `SpecRepository` and `code-graph` ports. Verify sub-millisecond cache hits on unchanged stamps.
+      Approach: test with mock `SpecRepository` and `code-graph` ports. Verify cache hits deterministically by asserting cached output is returned and AST/code-graph calls are skipped on unchanged stamps.
 
 - [x] 4.2 Unit tests for `SuggestSpecDependencies`
       `packages/sdk/test/orchestration/suggest-spec-dependencies.spec.ts`: describe block verifying import tracing, dry-run cache warm-up, post-apply validation, and conditional change creation

@@ -1,7 +1,7 @@
 {
   "name": "suggest-implementation-and-spec-deps",
   "createdAt": "2026-08-16T11:21:12.000Z",
-  "updatedAt": "2026-08-23T22:39:19.492Z",
+  "updatedAt": "2026-08-23T22:39:51.480Z",
   "description": "Add SDK use cases and CLI commands to suggest implementation links and spec dependencies with post-apply validation",
   "schema": {
     "name": "schema-std",
@@ -985,7 +985,7 @@
           "key": "tasks",
           "filename": "tasks.md",
           "state": "complete",
-          "validatedHash": "sha256:d42b2e026dfaad09ae1a51d2a0bfb880f307c1972175089906133f2c7d045d60"
+          "validatedHash": "sha256:278b6b730f5aed3b35cbccb726c1d8d26f9f7f3ef29684fcb5f2cb6b84af412a"
         }
       ]
     }
@@ -2777,6 +2777,23 @@
           "type": "design",
           "files": ["design"]
         },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-23T22:39:50.363Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: tasks [tasks]",
+      "affectedArtifacts": [
         {
           "type": "tasks",
           "files": ["tasks"]
