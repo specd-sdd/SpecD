@@ -2,6 +2,12 @@ import { constants } from 'node:fs'
 import { readFile, access } from 'node:fs/promises'
 import { join, resolve, relative } from 'node:path'
 
+/**
+ * Checks whether a file exists at the given path.
+ *
+ * @param filePath - Absolute or relative path to check.
+ * @returns True when the path is accessible as a file.
+ */
 async function asyncFileExists(filePath: string): Promise<boolean> {
   try {
     await access(filePath, constants.F_OK)
@@ -28,7 +34,13 @@ import {
   WorkspaceNotFoundError,
   SpecPath,
 } from '@specd/core'
-import { type CodeGraphProvider, createCodeGraphProvider, createBuiltinAdapterRegistry, SymbolKind, type SymbolNode } from '@specd/code-graph'
+import {
+  type CodeGraphProvider,
+  createCodeGraphProvider,
+  createBuiltinAdapterRegistry,
+  SymbolKind,
+  type SymbolNode,
+} from '@specd/code-graph'
 import { z } from 'zod'
 import {
   type ImplementationSuggestionLockData,
@@ -48,20 +60,28 @@ const confidenceThresholdSchema = z
 export const suggestImplementationLinksInputSchema = z
   .object({
     specId: z.string().min(1, 'specId cannot be empty').optional(),
-    specIds: z.array(z.string().min(1, 'specId in specIds cannot be empty')).nonempty('specIds cannot be empty').optional(),
+    specIds: z
+      .array(z.string().min(1, 'specId in specIds cannot be empty'))
+      .nonempty('specIds cannot be empty')
+      .optional(),
     workspace: z.string().min(1, 'workspace cannot be empty').optional(),
     all: z.boolean().optional(),
     apply: z.boolean().optional(),
     rebuildCache: z.boolean().optional(),
     confidenceThreshold: confidenceThresholdSchema.optional(),
-    onProgress: z.custom<OnSuggestImplementationProgress>((val) => val === undefined || typeof val === 'function').optional(),
+    onProgress: z
+      .custom<OnSuggestImplementationProgress>(
+        (val) => val === undefined || typeof val === 'function',
+      )
+      .optional(),
   })
   .strict()
   .superRefine((val, ctx) => {
     if (!val.all && !val.workspace && !val.specId && (!val.specIds || val.specIds.length === 0)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: 'At least one target criterion (specId, specIds, workspace, or all) must be specified',
+        message:
+          'At least one target criterion (specId, specIds, workspace, or all) must be specified',
       })
     }
   })
@@ -75,6 +95,9 @@ export type SuggestImplementationProgressEvent =
   | { type: 'spec-done'; specId: string; candidatesCount: number }
   | { type: 'done'; totalSpecs: number; totalSuggestions: number }
 
+/**
+ *
+ */
 export type OnSuggestImplementationProgress = (event: SuggestImplementationProgressEvent) => void
 
 /** Input options for `SuggestImplementationLinks`. */
@@ -132,15 +155,87 @@ export interface SuggestImplementationLinksDeps {
 }
 
 const SPEC_PROSE_KEYWORDS = new Set([
-  'given', 'when', 'then', 'must', 'shall', 'should', 'each', 'all', 'more',
-  'some', 'only', 'can', 'may', 'result', 'status', 'error', 'message', 'input',
-  'output', 'options', 'target', 'index', 'array', 'object', 'set', 'get',
-  'after', 'before', 'first', 'second', 'third', 'next', 'last', 'will',
-  'into', 'onto', 'over', 'under', 'above', 'below', 'have', 'has', 'had',
-  'been', 'being', 'does', 'done', 'did', 'same', 'such', 'than', 'that',
-  'this', 'they', 'them', 'their', 'there', 'here', 'were', 'what', 'where',
-  'which', 'while', 'who', 'whom', 'whose', 'why', 'name', 'key', 'value',
-  'base', 'source', 'mode', 'data', 'item', 'list', 'path', 'file', 'the', 'and', 'with',
+  'given',
+  'when',
+  'then',
+  'must',
+  'shall',
+  'should',
+  'each',
+  'all',
+  'more',
+  'some',
+  'only',
+  'can',
+  'may',
+  'result',
+  'status',
+  'error',
+  'message',
+  'input',
+  'output',
+  'options',
+  'target',
+  'index',
+  'array',
+  'object',
+  'set',
+  'get',
+  'after',
+  'before',
+  'first',
+  'second',
+  'third',
+  'next',
+  'last',
+  'will',
+  'into',
+  'onto',
+  'over',
+  'under',
+  'above',
+  'below',
+  'have',
+  'has',
+  'had',
+  'been',
+  'being',
+  'does',
+  'done',
+  'did',
+  'same',
+  'such',
+  'than',
+  'that',
+  'this',
+  'they',
+  'them',
+  'their',
+  'there',
+  'here',
+  'were',
+  'what',
+  'where',
+  'which',
+  'while',
+  'who',
+  'whom',
+  'whose',
+  'why',
+  'name',
+  'key',
+  'value',
+  'base',
+  'source',
+  'mode',
+  'data',
+  'item',
+  'list',
+  'path',
+  'file',
+  'the',
+  'and',
+  'with',
 ])
 
 /**
@@ -167,7 +262,7 @@ function computePathSpecAffinity(
     .split(splitRegex)
     .map(normalize)
     .filter((t) => t.length >= 2)
-  
+
   const cleanPathWithoutExt = filePath.replace(/\.[^.]+$/, '')
   const pathTokens = cleanPathWithoutExt
     .split(splitRegex)
@@ -181,7 +276,8 @@ function computePathSpecAffinity(
   for (const st of rawSpecTokens) {
     if (
       pathTokenSet.has(st) ||
-      (st.length >= 4 && pathTokens.some((pt) => pt.length >= 4 && (pt.includes(st) || st.includes(pt))))
+      (st.length >= 4 &&
+        pathTokens.some((pt) => pt.length >= 4 && (pt.includes(st) || st.includes(pt))))
     ) {
       matched++
     } else {
@@ -217,7 +313,9 @@ export class SuggestImplementationLinks {
   async execute(input: SuggestImplementationLinksInput): Promise<SuggestImplementationLinksResult> {
     const parseResult = suggestImplementationLinksInputSchema.safeParse(input)
     if (!parseResult.success) {
-      const issues = parseResult.error.issues.map((i) => `${i.path.join('.') || 'input'}: ${i.message}`).join('; ')
+      const issues = parseResult.error.issues
+        .map((i) => `${i.path.join('.') || 'input'}: ${i.message}`)
+        .join('; ')
       throw new InvalidInputError(`Invalid SuggestImplementationLinks input: ${issues}`)
     }
     const validatedInput = parseResult.data
@@ -244,12 +342,22 @@ export class SuggestImplementationLinks {
       await cache.invalidate()
     }
 
-    if (this.deps.codeGraphProvider && typeof this.deps.codeGraphProvider.open === 'function') {
-      await this.deps.codeGraphProvider.open().catch(() => {})
+    let shouldCloseCodeGraphProvider = false
+    const codeGraphProvider = this.deps.codeGraphProvider
+    if (
+      codeGraphProvider &&
+      typeof codeGraphProvider.open === 'function' &&
+      (codeGraphProvider as { isOpen?: unknown }).isOpen !== true
+    ) {
+      await codeGraphProvider.open().catch(() => {})
+      shouldCloseCodeGraphProvider = true
     }
 
     try {
-      input.onProgress?.({ type: 'discovery-start', message: 'Discovering specifications across workspaces...' })
+      input.onProgress?.({
+        type: 'discovery-start',
+        message: 'Discovering specifications across workspaces...',
+      })
       const targetSpecs: Array<{
         specId: string
         workspace: string
@@ -264,7 +372,7 @@ export class SuggestImplementationLinks {
 
         await new Promise<void>((resolve) => setImmediate(resolve))
         const listResult = await repo.list(undefined, { includeMeta: true, includeSummary: true })
-        const entries = Array.isArray(listResult) ? listResult : listResult?.items ?? []
+        const entries = Array.isArray(listResult) ? listResult : (listResult?.items ?? [])
         for (const rawEntry of entries) {
           const entry = rawEntry as Record<string, unknown>
           const entryWorkspace = typeof entry.workspace === 'string' ? entry.workspace : ''
@@ -319,10 +427,16 @@ export class SuggestImplementationLinks {
           totalSpecs: targetSpecs.length,
         })
         let suggestions: ImplementationSuggestionEntry[] = []
-        let existingLockData: ImplementationSuggestionLockData = { files: [], symbols: [], dependsOn: [] }
+        let existingLockData: ImplementationSuggestionLockData = {
+          files: [],
+          symbols: [],
+          dependsOn: [],
+        }
 
         try {
-          const existingImpl = await this.deps.getPersistedImplementation.execute({ specId: target.specId })
+          const existingImpl = await this.deps.getPersistedImplementation.execute({
+            specId: target.specId,
+          })
           const existingFiles = existingImpl.implementation.map((link) => link.file)
           const existingSymbols = existingImpl.implementation.flatMap((link) => link.symbols ?? [])
           existingLockData = {
@@ -383,9 +497,15 @@ export class SuggestImplementationLinks {
           for (const sug of markedSuggestions) {
             if (sug.alreadyIncluded) continue
             try {
-              const updateInput = sug.symbols.length > 0
-                ? { specId: target.specId, action: 'add' as const, file: sug.file, symbols: sug.symbols }
-                : { specId: target.specId, action: 'add' as const, file: sug.file }
+              const updateInput =
+                sug.symbols.length > 0
+                  ? {
+                      specId: target.specId,
+                      action: 'add' as const,
+                      file: sug.file,
+                      symbols: sug.symbols,
+                    }
+                  : { specId: target.specId, action: 'add' as const, file: sug.file }
               const res = await this.deps.updatePersistedImplementation.execute(updateInput)
               if (res.created || res.implementation.length > 0) {
                 specMutated = true
@@ -426,8 +546,12 @@ export class SuggestImplementationLinks {
           : {}),
       }
     } finally {
-      if (this.deps.codeGraphProvider && typeof this.deps.codeGraphProvider.close === 'function') {
-        await this.deps.codeGraphProvider.close().catch(() => {})
+      if (
+        shouldCloseCodeGraphProvider &&
+        codeGraphProvider &&
+        typeof codeGraphProvider.close === 'function'
+      ) {
+        await codeGraphProvider.close().catch(() => {})
       }
     }
   }
@@ -548,7 +672,11 @@ export class SuggestImplementationLinks {
       }
     }
 
-    Logger.debug('[SuggestImplementationLinks] Resolved spec title', { workspace, capPath, specTitle })
+    Logger.debug('[SuggestImplementationLinks] Resolved spec title', {
+      workspace,
+      capPath,
+      specTitle,
+    })
 
     const isCompoundIdentifier = (name: string): boolean => {
       return /[a-z0-9][A-Z]/.test(name) || name.includes('_')
@@ -573,8 +701,19 @@ export class SuggestImplementationLinks {
 
     const primaryTargetSymbols = new Set<string>()
     const ARCHITECTURAL_STOPWORDS = new Set([
-      'port', 'adapter', 'service', 'usecase', 'use-case', 'view', 'entity',
-      'valueobject', 'value-object', 'specification', 'model', 'interface', 'class',
+      'port',
+      'adapter',
+      'service',
+      'usecase',
+      'use-case',
+      'view',
+      'entity',
+      'valueobject',
+      'value-object',
+      'specification',
+      'model',
+      'interface',
+      'class',
     ])
 
     if (specTitle) {
@@ -606,7 +745,10 @@ export class SuggestImplementationLinks {
     const nameOnly = cleanCapPath.split('/').pop() ?? cleanCapPath
     const cleanSpecSlug = nameOnly
     const kebabToPascal = (str: string): string =>
-      str.split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join('')
+      str
+        .split('-')
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+        .join('')
     const kebabToCamel = (str: string): string => {
       const p = kebabToPascal(str)
       return p.charAt(0).toLowerCase() + p.slice(1)
@@ -648,7 +790,11 @@ export class SuggestImplementationLinks {
 
     const derivedPaths: string[] = []
     const wsConfig = this.deps.workspaces?.find((w) => w.name === workspace)
-    const wsCodeRoot = wsConfig?.codeRoot ? wsConfig.codeRoot.replace(/^\.\//, '') : (workspace !== 'default' ? `packages/${workspace}` : '')
+    const wsCodeRoot = wsConfig?.codeRoot
+      ? wsConfig.codeRoot.replace(/^\.\//, '')
+      : workspace !== 'default'
+        ? `packages/${workspace}`
+        : ''
 
     const inlineRegex = /`([A-Za-z0-9_\-\.\/\(\)]+)`/g
     while ((match = inlineRegex.exec(content)) !== null) {
@@ -665,7 +811,10 @@ export class SuggestImplementationLinks {
       }
 
       if (isCodeIdentifierCandidate(word)) {
-        const cleanSym = word.replace(/\(.*\)$/, '').replace(/.*\./, '').trim()
+        const cleanSym = word
+          .replace(/\(.*\)$/, '')
+          .replace(/.*\./, '')
+          .trim()
         if (cleanSym.length >= 3 && !isReservedKeyword(cleanSym)) {
           extractedSymbols.add(cleanSym)
         }
@@ -742,7 +891,10 @@ export class SuggestImplementationLinks {
       derivedPaths,
     })
 
-    const suggestionMap = new Map<string, { symbols: Set<string>; score: number; reasons: Set<string> }>()
+    const suggestionMap = new Map<
+      string,
+      { symbols: Set<string>; score: number; reasons: Set<string> }
+    >()
 
     if (this.deps.codeGraphProvider) {
       await new Promise<void>((resolve) => setImmediate(resolve))
@@ -760,9 +912,12 @@ export class SuggestImplementationLinks {
               continue
             }
             const locObj = symObj.location as Record<string, unknown> | undefined
-            const relPath = typeof locObj?.filePath === 'string'
-              ? locObj.filePath
-              : (typeof symObj.filePath === 'string' ? symObj.filePath : '')
+            const relPath =
+              typeof locObj?.filePath === 'string'
+                ? locObj.filePath
+                : typeof symObj.filePath === 'string'
+                  ? symObj.filePath
+                  : ''
             if (!relPath) {
               continue
             }
@@ -796,7 +951,8 @@ export class SuggestImplementationLinks {
               cleanRelPath.startsWith('test/') ||
               cleanRelPath.endsWith('.spec.ts') ||
               cleanRelPath.endsWith('.test.ts') ||
-              (workspace !== 'default' && (cleanRelPath.startsWith('dev/') || cleanRelPath.includes('config.')))
+              (workspace !== 'default' &&
+                (cleanRelPath.startsWith('dev/') || cleanRelPath.includes('config.')))
             ) {
               continue
             }
@@ -805,22 +961,38 @@ export class SuggestImplementationLinks {
               continue
             }
             const filePath = `${workspace}:${cleanRelPath}`
-            const existing = suggestionMap.get(filePath) ?? { symbols: new Set(), score: 0, reasons: new Set() }
+            const existing = suggestionMap.get(filePath) ?? {
+              symbols: new Set(),
+              score: 0,
+              reasons: new Set(),
+            }
             existing.symbols.add(symbol)
 
-            const fileBaseName = cleanRelPath.split('/').pop()?.replace(/\.[^.]+$/, '').toLowerCase() ?? ''
+            const fileBaseName =
+              cleanRelPath
+                .split('/')
+                .pop()
+                ?.replace(/\.[^.]+$/, '')
+                .toLowerCase() ?? ''
             const symName = (gSym.name ?? symbol).toLowerCase()
 
             const isExactPrimaryMatch = Array.from(primaryTargetSymbols).some((p) => {
               return symName === p.toLowerCase()
             })
 
-            const isDerivativeMatch = !isExactPrimaryMatch && Array.from(primaryTargetSymbols).some((p) => {
-              const pLower = p.toLowerCase()
-              if (pLower.length >= 6 && (symName.startsWith(pLower) || symName.endsWith(pLower))) return true
-              if (fileBaseName === cleanSpecSlug && (symName.includes(pLower) || pLower.includes(symName))) return true
-              return false
-            })
+            const isDerivativeMatch =
+              !isExactPrimaryMatch &&
+              Array.from(primaryTargetSymbols).some((p) => {
+                const pLower = p.toLowerCase()
+                if (pLower.length >= 6 && (symName.startsWith(pLower) || symName.endsWith(pLower)))
+                  return true
+                if (
+                  fileBaseName === cleanSpecSlug &&
+                  (symName.includes(pLower) || pLower.includes(symName))
+                )
+                  return true
+                return false
+              })
 
             if (isExactPrimaryMatch) {
               existing.score += 200
@@ -876,20 +1048,42 @@ export class SuggestImplementationLinks {
           existing.score += 100
           existing.reasons.add('naming-derivative-match')
         } else {
-          const cleanFileName = cleanRelPath.split('/').pop()?.replace(/\.[^.]+$/, '') ?? ''
+          const cleanFileName =
+            cleanRelPath
+              .split('/')
+              .pop()
+              ?.replace(/\.[^.]+$/, '') ?? ''
           const entrySymbols = new Set<string>()
           for (const sym of extractedSymbols) {
             if (cleanFileName.toLowerCase().includes(sym.toLowerCase())) {
               entrySymbols.add(sym)
             }
           }
-          suggestionMap.set(dPath, { symbols: entrySymbols, score: 100, reasons: new Set(['naming-derivative-match']) })
+          suggestionMap.set(dPath, {
+            symbols: entrySymbols,
+            score: 100,
+            reasons: new Set(['naming-derivative-match']),
+          })
         }
       } else if (this.deps.codeGraphProvider && affinity.coverage >= 0.3) {
         // Hierarchical fallback: file path matches domain prefix (e.g. schema.ts)
         // Check if missing distinctive sub-tokens (e.g. 'which') exist inside candidate file via code-graph search
-        const genericNoise = new Set(['command', 'spec', 'specification', 'feature', 'service', 'handler', 'endpoint', 'controller', 'port', 'adapter', 'usecase'])
-        const distinctiveMissing = affinity.missingTokens.filter((t) => !genericNoise.has(t) && t.length >= 3)
+        const genericNoise = new Set([
+          'command',
+          'spec',
+          'specification',
+          'feature',
+          'service',
+          'handler',
+          'endpoint',
+          'controller',
+          'port',
+          'adapter',
+          'usecase',
+        ])
+        const distinctiveMissing = affinity.missingTokens.filter(
+          (t) => !genericNoise.has(t) && t.length >= 3,
+        )
         if (distinctiveMissing.length > 0) {
           let allFound = true
           for (const mToken of distinctiveMissing) {
@@ -914,7 +1108,10 @@ export class SuggestImplementationLinks {
                   limit: 5,
                   includeSnippet: false,
                 })
-                if ((searchRes?.files && searchRes.files.length > 0) || (searchRes?.symbols && searchRes.symbols.length > 0)) {
+                if (
+                  (searchRes?.files && searchRes.files.length > 0) ||
+                  (searchRes?.symbols && searchRes.symbols.length > 0)
+                ) {
                   tokenFound = true
                 }
               } catch {
@@ -927,12 +1124,18 @@ export class SuggestImplementationLinks {
             }
           }
           if (allFound) {
-            const existing = suggestionMap.get(dPath) ?? { symbols: new Set(), score: 0, reasons: new Set() }
+            const existing = suggestionMap.get(dPath) ?? {
+              symbols: new Set(),
+              score: 0,
+              reasons: new Set(),
+            }
             existing.score += 160
             existing.reasons.add('subtoken-content-match')
             existing.reasons.add('exact-token-affinity')
             try {
-              const declared = await this.deps.codeGraphProvider.findSymbols({ filePath: cleanRelPath })
+              const declared = await this.deps.codeGraphProvider.findSymbols({
+                filePath: cleanRelPath,
+              })
               for (const d of declared) {
                 if (d.name && isCodeIdentifierCandidate(d.name)) {
                   existing.symbols.add(d.name)
@@ -942,7 +1145,11 @@ export class SuggestImplementationLinks {
               // ignore
             }
             if (existing.symbols.size === 0) {
-              const cleanFileName = cleanRelPath.split('/').pop()?.replace(/\.[^.]+$/, '') ?? ''
+              const cleanFileName =
+                cleanRelPath
+                  .split('/')
+                  .pop()
+                  ?.replace(/\.[^.]+$/, '') ?? ''
               existing.symbols.add(cleanFileName)
             }
             suggestionMap.set(dPath, existing)
@@ -959,7 +1166,11 @@ export class SuggestImplementationLinks {
       let tagMatch: RegExpExecArray | null
       while ((tagMatch = tagRegex.exec(content)) !== null) {
         const tag = tagMatch[1]
-        if (tag && tag.length >= 3 && !['br', 'div', 'span', 'p', 'pre', 'code', 'table'].includes(tag.toLowerCase())) {
+        if (
+          tag &&
+          tag.length >= 3 &&
+          !['br', 'div', 'span', 'p', 'pre', 'code', 'table'].includes(tag.toLowerCase())
+        ) {
           distinctiveTags.add(`<${tag}>`)
           distinctiveTags.add(tag)
         }
@@ -969,7 +1180,10 @@ export class SuggestImplementationLinks {
       let reqMatch: RegExpExecArray | null
       while ((reqMatch = reqRegex.exec(content)) !== null) {
         const reqTitle = reqMatch[1] ?? ''
-        const words = reqTitle.split(/\s+/).map((w) => w.replace(/[^a-zA-Z0-9_-]/g, '')).filter((w) => w.length >= 4 && !isReservedKeyword(w.toLowerCase()))
+        const words = reqTitle
+          .split(/\s+/)
+          .map((w) => w.replace(/[^a-zA-Z0-9_-]/g, ''))
+          .filter((w) => w.length >= 4 && !isReservedKeyword(w.toLowerCase()))
         for (const w of words) {
           distinctiveTags.add(w)
         }
@@ -979,15 +1193,16 @@ export class SuggestImplementationLinks {
       for (const queryTerm of distinctiveTags) {
         await new Promise<void>((resolve) => setImmediate(resolve))
         try {
-          const searchRes = typeof this.deps.codeGraphProvider.search === 'function'
-            ? await this.deps.codeGraphProvider.search({
-                query: queryTerm,
-                categories: ['files', 'symbols'],
-                workspace: workspace !== 'default' ? workspace : undefined,
-                limit: 10,
-                includeSnippet: false,
-              })
-            : null
+          const searchRes =
+            typeof this.deps.codeGraphProvider.search === 'function'
+              ? await this.deps.codeGraphProvider.search({
+                  query: queryTerm,
+                  categories: ['files', 'symbols'],
+                  workspace: workspace !== 'default' ? workspace : undefined,
+                  limit: 10,
+                  includeSnippet: false,
+                })
+              : null
 
           for (const f of searchRes?.files ?? []) {
             const rawPath = f.file.path
@@ -1024,10 +1239,16 @@ export class SuggestImplementationLinks {
       const sortedHits = Array.from(fileHits.entries()).sort((a, b) => b[1].count - a[1].count)
       for (const [filePathKey, hitData] of sortedHits.slice(0, 5)) {
         const cleanPath = filePathKey.replace(/^[^:]+:/, '')
-        const hasTagMatch = Array.from(hitData.terms).some((t) => t.startsWith('<') && t.endsWith('>'))
+        const hasTagMatch = Array.from(hitData.terms).some(
+          (t) => t.startsWith('<') && t.endsWith('>'),
+        )
         if (hitData.count >= 2 || hasTagMatch) {
           const entrySymbols = new Set<string>()
-          const cleanFileName = cleanPath.split('/').pop()?.replace(/\.[^.]+$/, '') ?? ''
+          const cleanFileName =
+            cleanPath
+              .split('/')
+              .pop()
+              ?.replace(/\.[^.]+$/, '') ?? ''
           entrySymbols.add(cleanFileName)
           const fallbackScore = Math.min(140, 80 + hitData.count * 15)
           suggestionMap.set(filePathKey, {
@@ -1039,32 +1260,49 @@ export class SuggestImplementationLinks {
       }
     }
 
-    Logger.debug('[SuggestImplementationLinks] Candidate map after graph queries & derived path correlation', {
-      workspace,
-      capPath,
-      candidatesCount: suggestionMap.size,
-      candidates: Array.from(suggestionMap.entries()).map(([file, d]) => ({
-        file,
-        score: d.score,
-        symbols: Array.from(d.symbols),
-        reasons: Array.from(d.reasons),
-      })),
-    })
+    Logger.debug(
+      '[SuggestImplementationLinks] Candidate map after graph queries & derived path correlation',
+      {
+        workspace,
+        capPath,
+        candidatesCount: suggestionMap.size,
+        candidates: Array.from(suggestionMap.entries()).map(([file, d]) => ({
+          file,
+          score: d.score,
+          symbols: Array.from(d.symbols),
+          reasons: Array.from(d.reasons),
+        })),
+      },
+    )
 
     if (this.deps.codeGraphProvider) {
       for (const [filePath, data] of suggestionMap.entries()) {
         const cleanRelPath = filePath.replace(/^[^:]+:/, '')
         const shortRelPath = cleanRelPath.replace(/^packages\/[^/]+\//, '')
         try {
-          const declaredNodes1 = await this.deps.codeGraphProvider.findSymbols({ filePath: cleanRelPath })
-          const declaredNodes2 = await this.deps.codeGraphProvider.findSymbols({ filePath: shortRelPath })
-          const declaredNodes3 = await this.deps.codeGraphProvider.findSymbols({ filePath: filePath })
-          const declaredNodes4 = await this.deps.codeGraphProvider.findSymbols({ filePath: `*${cleanRelPath}` })
-          const allNodesRaw = [...declaredNodes1, ...declaredNodes2, ...declaredNodes3, ...declaredNodes4]
+          const declaredNodes1 = await this.deps.codeGraphProvider.findSymbols({
+            filePath: cleanRelPath,
+          })
+          const declaredNodes2 = await this.deps.codeGraphProvider.findSymbols({
+            filePath: shortRelPath,
+          })
+          const declaredNodes3 = await this.deps.codeGraphProvider.findSymbols({
+            filePath: filePath,
+          })
+          const declaredNodes4 = await this.deps.codeGraphProvider.findSymbols({
+            filePath: `*${cleanRelPath}`,
+          })
+          const allNodesRaw = [
+            ...declaredNodes1,
+            ...declaredNodes2,
+            ...declaredNodes3,
+            ...declaredNodes4,
+          ]
           const seenNodeIds = new Set<string>()
           const allNodes: SymbolNode[] = []
           for (const n of allNodesRaw) {
-            const k = n.id ?? `${n.name}:${(n as unknown as Record<string, unknown>).filePath}`
+            const k =
+              n.id ?? `${n.name}:${String((n as unknown as Record<string, unknown>).filePath)}`
             if (!seenNodeIds.has(k)) {
               seenNodeIds.add(k)
               allNodes.push(n)
@@ -1087,14 +1325,20 @@ export class SuggestImplementationLinks {
                 titleWords.push(word)
               }
             }
-            const pascalCompound = titleWords.length > 1
-              ? titleWords.map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join('')
-              : ''
+            const pascalCompound =
+              titleWords.length > 1
+                ? titleWords.map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join('')
+                : ''
             const compoundLower = pascalCompound.toLowerCase()
 
             const hasTitleMatch = allNodes.some((n) => {
               const nameLower = n.name.toLowerCase()
-              if (compoundLower && (nameLower === compoundLower || nameLower.includes(compoundLower) || compoundLower.includes(nameLower))) {
+              if (
+                compoundLower &&
+                (nameLower === compoundLower ||
+                  nameLower.includes(compoundLower) ||
+                  compoundLower.includes(nameLower))
+              ) {
                 return true
               }
               if (titleWords.length > 1) {
@@ -1108,11 +1352,14 @@ export class SuggestImplementationLinks {
             })
 
             if (!hasTitleMatch) {
-              Logger.debug('[SuggestImplementationLinks] Discarding candidate file lacking spec title symbol match', {
-                filePath,
-                specTitle,
-                declaredSymbols: allNodes.map((n) => n.name),
-              })
+              Logger.debug(
+                '[SuggestImplementationLinks] Discarding candidate file lacking spec title symbol match',
+                {
+                  filePath,
+                  specTitle,
+                  declaredSymbols: allNodes.map((n) => n.name),
+                },
+              )
               suggestionMap.delete(filePath)
               continue
             }
@@ -1120,7 +1367,11 @@ export class SuggestImplementationLinks {
 
           const topLevelNodeNames = new Set(
             allNodes
-              .filter((n) => !n.parentId && (n as unknown as Record<string, unknown>).parentSymbolId === undefined)
+              .filter(
+                (n) =>
+                  !n.parentId &&
+                  (n as unknown as Record<string, unknown>).parentSymbolId === undefined,
+              )
               .map((n) => n.name),
           )
 
@@ -1146,14 +1397,21 @@ export class SuggestImplementationLinks {
               verifiedSymbols.add(sym)
             } else {
               for (const node of matchingNodes) {
-                const parentId = node.parentId ?? ((node as unknown as Record<string, unknown>).parentSymbolId as string | undefined)
+                const parentId =
+                  node.parentId ??
+                  ((node as unknown as Record<string, unknown>).parentSymbolId as
+                    | string
+                    | undefined)
                 if (!parentId) {
                   verifiedSymbols.add(sym)
                 } else {
                   const parentNode = nodeById.get(parentId)
                   if (parentNode) {
                     if (extractedSymbols.has(parentNode.name) || extractedSymbols.has(sym)) {
-                      if (isCompoundIdentifier(parentNode.name) || topLevelNodeNames.has(parentNode.name)) {
+                      if (
+                        isCompoundIdentifier(parentNode.name) ||
+                        topLevelNodeNames.has(parentNode.name)
+                      ) {
                         verifiedSymbols.add(parentNode.name)
                       }
                     }
@@ -1172,7 +1430,9 @@ export class SuggestImplementationLinks {
             }
             const matchingNodes = nodeByName.get(sym) ?? []
             for (const node of matchingNodes) {
-              const parentId = node.parentId ?? ((node as unknown as Record<string, unknown>).parentSymbolId as string | undefined)
+              const parentId =
+                node.parentId ??
+                ((node as unknown as Record<string, unknown>).parentSymbolId as string | undefined)
               if (!parentId) {
                 verifiedSymbols.add(sym)
               }
@@ -1181,7 +1441,9 @@ export class SuggestImplementationLinks {
 
           if (verifiedSymbols.size === 0 && allNodes.length > 0) {
             for (const n of allNodes) {
-              const parentId = n.parentId ?? ((n as unknown as Record<string, unknown>).parentSymbolId as string | undefined)
+              const parentId =
+                n.parentId ??
+                ((n as unknown as Record<string, unknown>).parentSymbolId as string | undefined)
               if (!parentId && isCodeIdentifierCandidate(n.name)) {
                 verifiedSymbols.add(n.name)
               }
@@ -1201,7 +1463,8 @@ export class SuggestImplementationLinks {
         continue
       }
       let confidence: 'HIGH' | 'MEDIUM' | 'LOW' = 'LOW'
-      const hasExactTokenOrSlug = data.reasons.has('exact-token-affinity') || data.reasons.has('filename-slug-match')
+      const hasExactTokenOrSlug =
+        data.reasons.has('exact-token-affinity') || data.reasons.has('filename-slug-match')
       const hasPrimarySymbol = data.reasons.has('primary-symbol-match')
       const isCleanAffinity = !data.reasons.has('missing-distinctive-tokens')
 
@@ -1269,7 +1532,9 @@ export function resolveSuggestImplementationLinksDeps(
  * @param deps - Dependencies instance
  * @returns Configured `SuggestImplementationLinks`
  */
-export function createSuggestImplementationLinks(deps: SuggestImplementationLinksDeps): SuggestImplementationLinks
+export function createSuggestImplementationLinks(
+  deps: SuggestImplementationLinksDeps,
+): SuggestImplementationLinks
 /**
  * Factory function creating a `SuggestImplementationLinks` instance from configuration.
  *
@@ -1308,5 +1573,9 @@ export function createSuggestImplementationLinks(
 function isSuggestImplementationLinksDeps(
   value: SuggestImplementationLinksDeps | SpecdConfig,
 ): value is SuggestImplementationLinksDeps {
-  return 'specRepositories' in value && 'getPersistedImplementation' in value && 'updatePersistedImplementation' in value
+  return (
+    'specRepositories' in value &&
+    'getPersistedImplementation' in value &&
+    'updatePersistedImplementation' in value
+  )
 }
