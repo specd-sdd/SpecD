@@ -169,7 +169,14 @@ export class FsSpecDepsSuggestionCache extends SpecDepsSuggestionCachePort {
           : typeof specRecord?.lastModified === 'string'
             ? specRecord.lastModified
             : ''
-      const hash = typeof mainArtifact?.hash === 'string' ? mainArtifact.hash : ''
+      let hash = typeof mainArtifact?.hash === 'string' ? mainArtifact.hash : ''
+      if (specData && typeof repo.artifactMeta === 'function') {
+        // `repo.get()` never includes artifact hashes; fetch the real SHA-256 explicitly.
+        const meta = await repo.artifactMeta(specData, 'spec.md', { includeHash: true })
+        if (typeof meta?.hash === 'string' && meta.hash.length > 0) {
+          hash = meta.hash
+        }
+      }
 
       return {
         lastModified,
