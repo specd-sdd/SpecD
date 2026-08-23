@@ -341,7 +341,7 @@ export class SuggestImplementationLinks {
         specRepositories: this.deps.specRepositories,
         codeGraphProvider: this.deps.codeGraphProvider,
       })
-    if (input.rebuildCache) {
+    if (validatedInput.rebuildCache) {
       await cache.invalidate()
     }
 
@@ -357,7 +357,7 @@ export class SuggestImplementationLinks {
     }
 
     try {
-      input.onProgress?.({
+      validatedInput.onProgress?.({
         type: 'discovery-start',
         message: 'Discovering specifications across workspaces...',
       })
@@ -369,7 +369,7 @@ export class SuggestImplementationLinks {
       }> = []
 
       for (const [wsName, repo] of this.deps.specRepositories.entries()) {
-        if (input.workspace && input.workspace !== wsName) {
+        if (validatedInput.workspace && validatedInput.workspace !== wsName) {
           continue
         }
 
@@ -383,10 +383,10 @@ export class SuggestImplementationLinks {
           const entryTitle = typeof entry.title === 'string' ? entry.title : ''
           const specId = `${entryWorkspace}:${entryPath}`
 
-          if (input.specId && input.specId !== specId) {
+          if (validatedInput.specId && validatedInput.specId !== specId) {
             continue
           }
-          if (input.specIds && !input.specIds.includes(specId)) {
+          if (validatedInput.specIds && !validatedInput.specIds.includes(specId)) {
             continue
           }
 
@@ -399,13 +399,13 @@ export class SuggestImplementationLinks {
         }
       }
 
-      input.onProgress?.({ type: 'discovery-done', totalSpecs: targetSpecs.length })
+      validatedInput.onProgress?.({ type: 'discovery-done', totalSpecs: targetSpecs.length })
 
-      if (input.specId && !targetSpecs.some((s) => s.specId === input.specId)) {
-        throw new SpecNotFoundError(input.specId)
+      if (validatedInput.specId && !targetSpecs.some((s) => s.specId === validatedInput.specId)) {
+        throw new SpecNotFoundError(validatedInput.specId)
       }
-      if (input.specIds && input.specIds.length > 0) {
-        for (const id of input.specIds) {
+      if (validatedInput.specIds && validatedInput.specIds.length > 0) {
+        for (const id of validatedInput.specIds) {
           if (!targetSpecs.some((s) => s.specId === id)) {
             throw new SpecNotFoundError(id)
           }
@@ -417,13 +417,13 @@ export class SuggestImplementationLinks {
       let filesAddedCount = 0
       let symbolsAddedCount = 0
 
-      input.onProgress?.({ type: 'start', totalSpecs: targetSpecs.length })
+      validatedInput.onProgress?.({ type: 'start', totalSpecs: targetSpecs.length })
 
       for (let index = 0; index < targetSpecs.length; index++) {
         const target = targetSpecs[index]!
         // Yield to event loop so CLI spinners and TTY output can animate smoothly
         await new Promise<void>((resolve) => setImmediate(resolve))
-        input.onProgress?.({
+        validatedInput.onProgress?.({
           type: 'spec-start',
           specId: target.specId,
           index: index + 1,
@@ -451,7 +451,7 @@ export class SuggestImplementationLinks {
           // If not initialized or missing lock
         }
 
-        const cached = input.rebuildCache ? null : await cache.get(target.specId)
+        const cached = validatedInput.rebuildCache ? null : await cache.get(target.specId)
 
         let specStamp: ImplementationSuggestionSpecStamp | undefined
         if (cached) {
@@ -500,13 +500,13 @@ export class SuggestImplementationLinks {
           ...(specStamp ? { specStamp } : {}),
         })
 
-        input.onProgress?.({
+        validatedInput.onProgress?.({
           type: 'spec-done',
           specId: target.specId,
           candidatesCount: markedSuggestions.length,
         })
 
-        if (input.apply && markedSuggestions.length > 0) {
+        if (validatedInput.apply && markedSuggestions.length > 0) {
           let specMutated = false
           for (const sug of markedSuggestions) {
             if (sug.alreadyIncluded) continue
@@ -539,7 +539,7 @@ export class SuggestImplementationLinks {
       await cache.flush()
 
       const totalDiscovered = resultSpecs.reduce((acc, s) => acc + s.suggestions.length, 0)
-      input.onProgress?.({
+      validatedInput.onProgress?.({
         type: 'done',
         totalSpecs: resultSpecs.length,
         totalSuggestions: totalDiscovered,
@@ -547,9 +547,9 @@ export class SuggestImplementationLinks {
 
       return {
         result: 'ok',
-        ...(input.workspace ? { targetWorkspace: input.workspace } : {}),
+        ...(validatedInput.workspace ? { targetWorkspace: validatedInput.workspace } : {}),
         specs: resultSpecs,
-        ...(input.apply
+        ...(validatedInput.apply
           ? {
               appliedMutations: {
                 updatedSpecsCount,
