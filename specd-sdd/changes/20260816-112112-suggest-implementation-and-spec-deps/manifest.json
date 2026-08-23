@@ -1,7 +1,7 @@
 {
   "name": "suggest-implementation-and-spec-deps",
   "createdAt": "2026-08-16T11:21:12.000Z",
-  "updatedAt": "2026-08-23T21:35:32.334Z",
+  "updatedAt": "2026-08-23T21:41:58.544Z",
   "description": "Add SDK use cases and CLI commands to suggest implementation links and spec dependencies with post-apply validation",
   "schema": {
     "name": "schema-std",
@@ -129,10 +129,6 @@
     {
       "file": "packages/sdk/test/orchestration/suggest-spec-dependencies.spec.ts",
       "state": "open"
-    },
-    {
-      "file": "Users/monki/Documents/Proyectos/specd/.specd/config/cache/implementation-suggestions.json",
-      "state": "removed"
     },
     {
       "file": "packages/code-graph/src/composition/create-code-graph-provider.ts",
@@ -869,7 +865,7 @@
           "key": "proposal",
           "filename": "proposal.md",
           "state": "complete",
-          "validatedHash": "sha256:72810292b83b54ef5a921de068dad346601c75aa8c3a8a6828c476e6dfd6e1a0"
+          "validatedHash": "sha256:03fd4d99788527715cad22e07e25129e561c9b3312b5169e6f1d3243991be5d9"
         }
       ]
     },
@@ -971,7 +967,7 @@
           "key": "design",
           "filename": "design.md",
           "state": "complete",
-          "validatedHash": "sha256:8d77961a64c1d3d6f988ceced57bf136c5d06fba867cce9ec02eed625b017305"
+          "validatedHash": "sha256:f69941a86bd27bd0940b96b504b246d0b28bd433fc9bff6212ac92ed9a99d770"
         }
       ]
     },
@@ -2624,6 +2620,53 @@
     {
       "type": "invalidated",
       "at": "2026-08-23T21:35:29.054Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]; design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:spec-implementation",
+            "cli:spec-deps",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies",
+            "code-graph:language-adapter",
+            "code-graph:graph-store"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:spec-implementation",
+            "cli:spec-deps",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies",
+            "code-graph:language-adapter",
+            "code-graph:graph-store"
+          ]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-23T21:41:17.488Z",
       "by": {
         "name": "specd",
         "email": "system@getspecd.dev",
