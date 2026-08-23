@@ -45,6 +45,7 @@ import { z } from 'zod'
 import {
   type ImplementationSuggestionLockData,
   type ImplementationSuggestionEntry,
+  type ImplementationSuggestionSpecStamp,
 } from '../domain/value-objects/implementation-suggestion-cache.js'
 import { type ImplementationSuggestionCachePort } from '../application/ports/implementation-suggestion-cache-port.js'
 import { FsImplementationSuggestionCache } from '../infrastructure/fs/fs-implementation-suggestion-cache.js'
@@ -126,6 +127,8 @@ export interface SpecImplementationSuggestion {
   readonly title: string
   readonly existing: ImplementationSuggestionLockData
   readonly suggestions: readonly ImplementationSuggestionEntry[]
+  /** Stamp of the analyzed spec content when it could be resolved. */
+  readonly specStamp?: ImplementationSuggestionSpecStamp
 }
 
 /** Result of executing `SuggestImplementationLinks`. */
@@ -450,8 +453,10 @@ export class SuggestImplementationLinks {
 
         const cached = input.rebuildCache ? null : await cache.get(target.specId)
 
+        let specStamp: ImplementationSuggestionSpecStamp | undefined
         if (cached) {
           suggestions = [...cached.suggestions]
+          specStamp = cached.specStamp
         } else {
           const analysis = await this.analyzeSpec(target.workspace, target.path, target.title)
           suggestions = analysis.suggestions
@@ -461,6 +466,13 @@ export class SuggestImplementationLinks {
             suggestions,
             ...(analysis.realContentHash ? { specContentHash: analysis.realContentHash } : {}),
           })
+          if (analysis.lastModified || analysis.realContentHash) {
+            specStamp = {
+              lastModified: analysis.lastModified,
+              hash: analysis.realContentHash,
+              artifacts: [],
+            }
+          }
         }
 
         const filteredSuggestions = this.filterByConfidence(suggestions, normalizedConfidence)
@@ -485,6 +497,7 @@ export class SuggestImplementationLinks {
           title: target.title,
           existing: existingLockData,
           suggestions: markedSuggestions,
+          ...(specStamp ? { specStamp } : {}),
         })
 
         input.onProgress?.({
@@ -627,17 +640,22 @@ export class SuggestImplementationLinks {
     workspace: string,
     capPath: string,
     initialTitle?: string,
-  ): Promise<{ suggestions: ImplementationSuggestionEntry[]; realContentHash: string }> {
+  ): Promise<{
+    suggestions: ImplementationSuggestionEntry[]
+    realContentHash: string
+    lastModified: string
+  }> {
     const repo = this.deps.specRepositories.get(workspace)
-    if (!repo) return { suggestions: [], realContentHash: '' }
+    if (!repo) return { suggestions: [], realContentHash: '', lastModified: '' }
 
     Logger.debug('[SuggestImplementationLinks] Analyzing spec', { workspace, capPath })
 
     const spec = await repo.get(SpecPath.parse(capPath))
-    if (!spec) return { suggestions: [], realContentHash: '' }
+    if (!spec) return { suggestions: [], realContentHash: '', lastModified: '' }
 
     let content = ''
     let realContentHash = ''
+    let lastModified = ''
     if (typeof repo.artifact === 'function') {
       const mainArtifact = await repo.artifact(spec, 'spec.md')
       content = mainArtifact?.content ?? ''
@@ -646,6 +664,9 @@ export class SuggestImplementationLinks {
       const meta = await repo.artifactMeta(spec, 'spec.md', { includeHash: true })
       if (meta?.hash) {
         realContentHash = meta.hash
+      }
+      if (meta?.lastModified) {
+        lastModified = meta.lastModified
       }
     }
 
@@ -1503,7 +1524,7 @@ export class SuggestImplementationLinks {
       suggestions: sortedSuggestions,
     })
 
-    return { suggestions: sortedSuggestions, realContentHash }
+    return { suggestions: sortedSuggestions, realContentHash, lastModified }
   }
 }
 

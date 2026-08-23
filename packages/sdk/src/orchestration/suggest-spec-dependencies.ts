@@ -233,18 +233,22 @@ export class SuggestSpecDependencies {
           codeGraphProvider: this.deps.codeGraphProvider,
         })
       if (implResult?.specs && implResult.specs.length > 0) {
-        const entriesToPrime: ImplementationSuggestionSpecEntry[] = implResult.specs.map((s) => ({
-          specId: s.specId,
-          title: s.title,
-          specStamp: {
-            lastModified: '',
-            hash: '',
-            artifacts: [],
-          },
-          existing: s.existing,
-          suggestions: s.suggestions,
-        }))
-        await implCache.setMany(entriesToPrime)
+        const entriesToPrime: ImplementationSuggestionSpecEntry[] = []
+        for (const s of implResult.specs) {
+          // No valid stamp available -> do not persist the entry.
+          if (!s.specStamp || (!s.specStamp.lastModified && !s.specStamp.hash)) continue
+          entriesToPrime.push({
+            specId: s.specId,
+            title: s.title,
+            specStamp: s.specStamp,
+            existing: s.existing,
+            suggestions: s.suggestions,
+          })
+        }
+        if (entriesToPrime.length > 0) {
+          await implCache.setMany(entriesToPrime)
+          await implCache.flush()
+        }
       }
 
       const specDepsCache =

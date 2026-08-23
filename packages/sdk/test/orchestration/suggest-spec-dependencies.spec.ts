@@ -19,13 +19,31 @@ function setupTest() {
         {
           specId: 'sdk:suggest-spec-dependencies',
           title: 'SuggestSpecDependencies',
-          existing: { files: ['sdk:packages/sdk/src/orchestration/suggest-spec-dependencies.ts'], symbols: [], dependsOn: [] },
+          specStamp: {
+            lastModified: '2026-01-01T00:00:00.000Z',
+            hash: 'stub-sdk-hash',
+            artifacts: [],
+          },
+          existing: {
+            files: ['sdk:packages/sdk/src/orchestration/suggest-spec-dependencies.ts'],
+            symbols: [],
+            dependsOn: [],
+          },
           suggestions: [],
         },
         {
           specId: 'code-graph:traversal',
           title: 'Traversal',
-          existing: { files: ['code-graph:packages/code-graph/src/domain/services/analyze-file-impact.ts'], symbols: [], dependsOn: [] },
+          specStamp: {
+            lastModified: '2026-01-01T00:00:00.000Z',
+            hash: 'stub-cg-hash',
+            artifacts: [],
+          },
+          existing: {
+            files: ['code-graph:packages/code-graph/src/domain/services/analyze-file-impact.ts'],
+            symbols: [],
+            dependsOn: [],
+          },
           suggestions: [],
         },
       ],
@@ -160,7 +178,9 @@ describe('SuggestSpecDependencies', () => {
 
     expect(result.postApplyValidation?.status).toBe('invalid-specs-detected')
     expect(result.postApplyValidation?.invalidSpecs).toHaveLength(1)
-    expect(result.postApplyValidation?.suggestedAlignmentCommand).toContain('sdk:suggest-spec-dependencies')
+    expect(result.postApplyValidation?.suggestedAlignmentCommand).toContain(
+      'sdk:suggest-spec-dependencies',
+    )
   })
 
   it('marks existing dependencies with alreadyIncluded: true and status: already-configured', async () => {
@@ -201,7 +221,8 @@ describe('SuggestSpecDependencies', () => {
   })
 
   it('supports factory constructor overloads', () => {
-    const { suggestImplementationLinks, specRepositories, getPersistedDeps, updatePersistedDeps } = setupTest()
+    const { suggestImplementationLinks, specRepositories, getPersistedDeps, updatePersistedDeps } =
+      setupTest()
 
     const instance = createSuggestSpecDependencies({
       suggestImplementationLinks: suggestImplementationLinks as any,
@@ -221,13 +242,31 @@ describe('SuggestSpecDependencies', () => {
           {
             specId: 'cli:spec-deps',
             title: 'SpecDeps',
-            existing: { files: ['cli:packages/cli/src/commands/spec/deps.ts'], symbols: [], dependsOn: [] },
+            specStamp: {
+              lastModified: '2026-01-01T00:00:00.000Z',
+              hash: 'stub-cli-hash',
+              artifacts: [],
+            },
+            existing: {
+              files: ['cli:packages/cli/src/commands/spec/deps.ts'],
+              symbols: [],
+              dependsOn: [],
+            },
             suggestions: [],
           },
           {
             specId: 'sdk:suggest-spec-dependencies',
             title: 'SuggestSpecDependencies',
-            existing: { files: ['sdk:packages/sdk/src/orchestration/suggest-spec-dependencies.ts'], symbols: [], dependsOn: [] },
+            specStamp: {
+              lastModified: '2026-01-01T00:00:00.000Z',
+              hash: 'stub-sdk-hash',
+              artifacts: [],
+            },
+            existing: {
+              files: ['sdk:packages/sdk/src/orchestration/suggest-spec-dependencies.ts'],
+              symbols: [],
+              dependsOn: [],
+            },
             suggestions: [],
           },
         ],
@@ -241,24 +280,30 @@ describe('SuggestSpecDependencies', () => {
     const specRepositories = new Map<string, SpecRepository>([['cli', repo]])
 
     const getPersistedDeps = {
-      execute: vi.fn().mockResolvedValue({ specId: 'cli:spec-deps', dependsOn: [], initialized: true }),
+      execute: vi
+        .fn()
+        .mockResolvedValue({ specId: 'cli:spec-deps', dependsOn: [], initialized: true }),
     }
 
     const codeGraphProvider = {
-      analyzeFileImpact: vi.fn().mockImplementation(async (filePath: string, _dir: string, depth: number) => {
-        expect(depth).toBe(1)
-        if (filePath.includes('commands/spec/deps.ts')) {
-          return {
-            affectedFiles: [{ filePath: 'packages/sdk/src/index.ts' }],
+      analyzeFileImpact: vi
+        .fn()
+        .mockImplementation(async (filePath: string, _dir: string, depth: number) => {
+          expect(depth).toBe(1)
+          if (filePath.includes('commands/spec/deps.ts')) {
+            return {
+              affectedFiles: [{ filePath: 'packages/sdk/src/index.ts' }],
+            }
           }
-        }
-        if (filePath.includes('packages/sdk/src/index.ts')) {
-          return {
-            affectedFiles: [{ filePath: 'packages/sdk/src/orchestration/suggest-spec-dependencies.ts' }],
+          if (filePath.includes('packages/sdk/src/index.ts')) {
+            return {
+              affectedFiles: [
+                { filePath: 'packages/sdk/src/orchestration/suggest-spec-dependencies.ts' },
+              ],
+            }
           }
-        }
-        return { affectedFiles: [] }
-      }),
+          return { affectedFiles: [] }
+        }),
     } as any
 
     const useCase = new SuggestSpecDependencies({
@@ -293,8 +338,12 @@ describe('SuggestSpecDependencies', () => {
   it('throws WorkspaceNotFoundError when requested workspace does not exist', async () => {
     const { useCase } = setupTest()
 
-    await expect(useCase.execute({ workspace: 'non-existent-ws' })).rejects.toThrow(WorkspaceNotFoundError)
-    await expect(useCase.execute({ workspace: 'non-existent-ws' })).rejects.toBeInstanceOf(SpecdError)
+    await expect(useCase.execute({ workspace: 'non-existent-ws' })).rejects.toThrow(
+      WorkspaceNotFoundError,
+    )
+    await expect(useCase.execute({ workspace: 'non-existent-ws' })).rejects.toBeInstanceOf(
+      SpecdError,
+    )
   })
 
   it('throws SpecNotFoundError when target spec ID does not exist', async () => {
@@ -320,13 +369,21 @@ describe('SuggestSpecDependencies', () => {
           {
             specId: 'core:spec-repository-port',
             title: 'SpecRepository Port',
-            existing: { files: ['core:packages/core/src/application/ports/spec-repository.ts'], symbols: [], dependsOn: [] },
+            existing: {
+              files: ['core:packages/core/src/application/ports/spec-repository.ts'],
+              symbols: [],
+              dependsOn: [],
+            },
             suggestions: [],
           },
           {
             specId: 'core:fs-spec-repository',
             title: 'FsSpecRepository',
-            existing: { files: ['core:packages/core/src/infrastructure/fs/spec-repository.ts'], symbols: [], dependsOn: [] },
+            existing: {
+              files: ['core:packages/core/src/infrastructure/fs/spec-repository.ts'],
+              symbols: [],
+              dependsOn: [],
+            },
             suggestions: [],
           },
         ],
@@ -349,14 +406,18 @@ describe('SuggestSpecDependencies', () => {
         }
         // When checking what fs/spec-repository.ts imports: it imports ports/spec-repository.ts
         if (filePath.includes('fs/spec-repository.ts')) {
-          return { affectedFiles: [{ filePath: 'packages/core/src/application/ports/spec-repository.ts' }] }
+          return {
+            affectedFiles: [{ filePath: 'packages/core/src/application/ports/spec-repository.ts' }],
+          }
         }
         return { affectedFiles: [] }
       }),
       analyzeFileImpact: vi.fn().mockImplementation(async (filePath: string) => {
         // If an accidental hub/barrel was queried returning fs
         if (filePath.includes('ports/spec-repository.ts')) {
-          return { affectedFiles: [{ filePath: 'packages/core/src/infrastructure/fs/spec-repository.ts' }] }
+          return {
+            affectedFiles: [{ filePath: 'packages/core/src/infrastructure/fs/spec-repository.ts' }],
+          }
         }
         return { affectedFiles: [] }
       }),
@@ -380,7 +441,10 @@ describe('SuggestSpecDependencies', () => {
       projectDir: '/tmp/test-directional-validation',
     })
 
-    const result = await useCase.execute({ specId: 'core:spec-repository-port', rebuildCache: true })
+    const result = await useCase.execute({
+      specId: 'core:spec-repository-port',
+      rebuildCache: true,
+    })
 
     expect(result.result).toBe('ok')
     expect(result.specs[0]?.suggestedDependsOn).toHaveLength(0)
@@ -394,19 +458,46 @@ describe('SuggestSpecDependencies', () => {
           {
             specId: 'core:fs-spec-repository',
             title: 'FsSpecRepository',
-            existing: { files: ['core:packages/core/src/infrastructure/fs/spec-repository.ts'], symbols: [], dependsOn: [] },
+            specStamp: {
+              lastModified: '2026-01-01T00:00:00.000Z',
+              hash: 'stub-core-fs-hash',
+              artifacts: [],
+            },
+            existing: {
+              files: ['core:packages/core/src/infrastructure/fs/spec-repository.ts'],
+              symbols: [],
+              dependsOn: [],
+            },
             suggestions: [],
           },
           {
             specId: 'core:spec-repository-port',
             title: 'SpecRepository Port',
-            existing: { files: ['core:packages/core/src/application/ports/spec-repository.ts'], symbols: [], dependsOn: [] },
+            specStamp: {
+              lastModified: '2026-01-01T00:00:00.000Z',
+              hash: 'stub-core-port-hash',
+              artifacts: [],
+            },
+            existing: {
+              files: ['core:packages/core/src/application/ports/spec-repository.ts'],
+              symbols: [],
+              dependsOn: [],
+            },
             suggestions: [],
           },
           {
             specId: 'core:repository-port',
             title: 'Repository Base',
-            existing: { files: ['core:packages/core/src/application/ports/repository.ts'], symbols: [], dependsOn: [] },
+            specStamp: {
+              lastModified: '2026-01-01T00:00:00.000Z',
+              hash: 'stub-core-base-hash',
+              artifacts: [],
+            },
+            existing: {
+              files: ['core:packages/core/src/application/ports/repository.ts'],
+              symbols: [],
+              dependsOn: [],
+            },
             suggestions: [],
           },
         ],
