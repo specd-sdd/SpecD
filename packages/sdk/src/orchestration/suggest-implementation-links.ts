@@ -1530,7 +1530,12 @@ export function resolveSuggestImplementationLinksDeps(
     updatePersistedImplementation,
     getSpecMetadata,
     codeGraphProvider,
-    cache: new FsImplementationSuggestionCache(projectDir, resolver.config.configPath),
+    cache: new FsImplementationSuggestionCache({
+      projectDir,
+      configPath: resolver.config.configPath,
+      specRepositories,
+      codeGraphProvider,
+    }),
     projectDir,
     configPath: resolver.config.configPath,
     workspaces: resolver.config.workspaces,

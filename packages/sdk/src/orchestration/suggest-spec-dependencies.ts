@@ -30,14 +30,15 @@ import { type ImplementationSuggestionCachePort } from '../application/ports/imp
 import { FsImplementationSuggestionCache } from '../infrastructure/fs/fs-implementation-suggestion-cache.js'
 import { type SpecDepsSuggestionCachePort } from '../application/ports/spec-deps-suggestion-cache-port.js'
 import { FsSpecDepsSuggestionCache } from '../infrastructure/fs/fs-spec-deps-suggestion-cache.js'
-import {
-  type ImplementationSuggestionSpecEntry,
-} from '../domain/value-objects/implementation-suggestion-cache.js'
+import { type ImplementationSuggestionSpecEntry } from '../domain/value-objects/implementation-suggestion-cache.js'
 
 /** Progress event emitted during `SuggestSpecDependencies` execution. */
 export type SuggestSpecDepsProgressEvent =
   | { type: 'warmup-start'; message: string }
-  | { type: 'warmup-progress'; event: import('./suggest-implementation-links.js').SuggestImplementationProgressEvent }
+  | {
+      type: 'warmup-progress'
+      event: import('./suggest-implementation-links.js').SuggestImplementationProgressEvent
+    }
   | { type: 'warmup-done'; totalSpecs: number }
   | { type: 'start'; totalSpecs: number }
   | { type: 'spec-start'; specId: string; index: number; totalSpecs: number }
@@ -46,27 +47,36 @@ export type SuggestSpecDepsProgressEvent =
   | { type: 'validation-done'; status: string }
   | { type: 'done'; totalSpecs: number; totalDependencies: number }
 
+/**
+ *
+ */
 export type OnSuggestSpecDepsProgress = (event: SuggestSpecDepsProgressEvent) => void
 
 /** Zod input schema for `SuggestSpecDependencies`. */
 export const suggestSpecDependenciesInputSchema = z
   .object({
     specId: z.string().min(1, 'specId cannot be empty').optional(),
-    specIds: z.array(z.string().min(1, 'specId in specIds cannot be empty')).nonempty('specIds cannot be empty').optional(),
+    specIds: z
+      .array(z.string().min(1, 'specId in specIds cannot be empty'))
+      .nonempty('specIds cannot be empty')
+      .optional(),
     workspace: z.string().min(1, 'workspace cannot be empty').optional(),
     all: z.boolean().optional(),
     apply: z.boolean().optional(),
     rebuildCache: z.boolean().optional(),
     createAlignmentChange: z.boolean().optional(),
     changeNamePrefix: z.string().min(1, 'changeNamePrefix cannot be empty').optional(),
-    onProgress: z.custom<OnSuggestSpecDepsProgress>((val) => val === undefined || typeof val === 'function').optional(),
+    onProgress: z
+      .custom<OnSuggestSpecDepsProgress>((val) => val === undefined || typeof val === 'function')
+      .optional(),
   })
   .strict()
   .superRefine((val, ctx) => {
     if (!val.all && !val.workspace && !val.specId && (!val.specIds || val.specIds.length === 0)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: 'At least one target criterion (specId, specIds, workspace, or all) must be specified',
+        message:
+          'At least one target criterion (specId, specIds, workspace, or all) must be specified',
       })
     }
   })
@@ -180,7 +190,9 @@ export class SuggestSpecDependencies {
   async execute(input: SuggestSpecDependenciesInput): Promise<SuggestSpecDependenciesResult> {
     const parseResult = suggestSpecDependenciesInputSchema.safeParse(input)
     if (!parseResult.success) {
-      const issues = parseResult.error.issues.map((i) => `${i.path.join('.') || 'input'}: ${i.message}`).join('; ')
+      const issues = parseResult.error.issues
+        .map((i) => `${i.path.join('.') || 'input'}: ${i.message}`)
+        .join('; ')
       throw new InvalidInputError(`Invalid SuggestSpecDependencies input: ${issues}`)
     }
     const validatedInput = parseResult.data
@@ -200,7 +212,10 @@ export class SuggestSpecDependencies {
 
     try {
       // Pass 1: Warm-up implementation suggestion cache across monorepo
-      input.onProgress?.({ type: 'warmup-start', message: 'Warming up implementation cache across workspaces...' })
+      input.onProgress?.({
+        type: 'warmup-start',
+        message: 'Warming up implementation cache across workspaces...',
+      })
       const implResult = await this.deps.suggestImplementationLinks.execute({
         all: true,
         apply: false,
@@ -257,7 +272,7 @@ export class SuggestSpecDependencies {
           continue
         }
         const listResult = await repo.list(undefined, { includeMeta: true, includeSummary: true })
-        const entries = Array.isArray(listResult) ? listResult : listResult?.items ?? []
+        const entries = Array.isArray(listResult) ? listResult : (listResult?.items ?? [])
         for (const rawEntry of entries) {
           const entry = rawEntry as Record<string, unknown>
           const entryWorkspace = typeof entry.workspace === 'string' ? entry.workspace : ''
@@ -325,7 +340,9 @@ export class SuggestSpecDependencies {
           suggestedDependsOn = cachedSpecDep.suggestedDependsOn.map((item) => ({
             ...item,
             alreadyIncluded: existingDependsOn.includes(item.specId),
-            status: existingDependsOn.includes(item.specId) ? ('already-configured' as const) : ('new' as const),
+            status: existingDependsOn.includes(item.specId)
+              ? ('already-configured' as const)
+              : ('new' as const),
           }))
         } else {
           const cachedImpl = await implCache.get(target.specId)
@@ -382,12 +399,26 @@ export class SuggestSpecDependencies {
                 continue
               }
               const shortRelPath = rawPath.replace(/^(?:packages|apps)\/[^/]+\//, '')
-              const pathsToQuery = [file, rawPath, shortRelPath, `${target.workspace}:${shortRelPath}`]
+              const pathsToQuery = [
+                file,
+                rawPath,
+                shortRelPath,
+                `${target.workspace}:${shortRelPath}`,
+              ]
               for (const pathQuery of pathsToQuery) {
                 try {
-                  const impact = typeof this.deps.codeGraphProvider.analyzeFileImportImpact === 'function'
-                    ? await this.deps.codeGraphProvider.analyzeFileImportImpact(pathQuery, 'downstream', 1)
-                    : await this.deps.codeGraphProvider.analyzeFileImpact(pathQuery, 'downstream', 1)
+                  const impact =
+                    typeof this.deps.codeGraphProvider.analyzeFileImportImpact === 'function'
+                      ? await this.deps.codeGraphProvider.analyzeFileImportImpact(
+                          pathQuery,
+                          'downstream',
+                          1,
+                        )
+                      : await this.deps.codeGraphProvider.analyzeFileImpact(
+                          pathQuery,
+                          'downstream',
+                          1,
+                        )
                   Logger.debug('[SuggestSpecDependencies] analyzeFileImpact result', {
                     pathQuery,
                     affectedFiles: impact?.affectedFiles,
@@ -395,24 +426,42 @@ export class SuggestSpecDependencies {
                   const affected = impact?.affectedFiles ?? []
                   for (const aff of affected) {
                     const affObj = aff as unknown as Record<string, unknown>
-                    const affPath = typeof aff === 'string'
-                      ? aff
-                      : (typeof affObj.filePath === 'string' ? affObj.filePath : (typeof affObj.file === 'string' ? affObj.file : ''))
-                    
+                    const affPath =
+                      typeof aff === 'string'
+                        ? aff
+                        : typeof affObj.filePath === 'string'
+                          ? affObj.filePath
+                          : typeof affObj.file === 'string'
+                            ? affObj.file
+                            : ''
+
                     const mappedSpecId = await implCache.findSpecByFile(affPath)
                     Logger.debug('[SuggestSpecDependencies] Mapped affected file to spec', {
                       affPath,
                       mappedSpecId,
                     })
-                    const isBarrelFile = affPath.endsWith('/index.ts') || affPath.endsWith('/index.js') || affPath.endsWith('/ports.ts') || affPath.endsWith('/index.d.ts')
+                    const isBarrelFile =
+                      affPath.endsWith('/index.ts') ||
+                      affPath.endsWith('/index.js') ||
+                      affPath.endsWith('/ports.ts') ||
+                      affPath.endsWith('/index.d.ts')
                     if (isBarrelFile) {
                       try {
-                        const barrelImpact = await this.deps.codeGraphProvider.analyzeFileImpact(affPath, 'downstream', 1)
+                        const barrelImpact = await this.deps.codeGraphProvider.analyzeFileImpact(
+                          affPath,
+                          'downstream',
+                          1,
+                        )
                         for (const bAff of barrelImpact?.affectedFiles ?? []) {
                           const bObj = bAff as unknown as Record<string, unknown>
-                          const bPath = typeof bAff === 'string'
-                            ? bAff
-                            : (typeof bObj.filePath === 'string' ? bObj.filePath : (typeof bObj.file === 'string' ? bObj.file : ''))
+                          const bPath =
+                            typeof bAff === 'string'
+                              ? bAff
+                              : typeof bObj.filePath === 'string'
+                                ? bObj.filePath
+                                : typeof bObj.file === 'string'
+                                  ? bObj.file
+                                  : ''
                           const bMappedSpecId = await implCache.findSpecByFile(bPath)
                           if (bMappedSpecId && bMappedSpecId !== target.specId) {
                             if (!suggestedMap.has(bMappedSpecId)) {
@@ -467,17 +516,32 @@ export class SuggestSpecDependencies {
             for (const tFile of targetFilesList) {
               const rawTPath = tFile.replace(/^[^:]+:/, '')
               const shortRelTPath = rawTPath.replace(/^(?:packages|apps)\/[^/]+\//, '')
-              const tQueries = [tFile, rawTPath, shortRelTPath, `${target.workspace}:${shortRelTPath}`]
+              const tQueries = [
+                tFile,
+                rawTPath,
+                shortRelTPath,
+                `${target.workspace}:${shortRelTPath}`,
+              ]
               for (const tq of tQueries) {
                 try {
-                  const tImpact = typeof this.deps.codeGraphProvider.analyzeFileImportImpact === 'function'
-                    ? await this.deps.codeGraphProvider.analyzeFileImportImpact(tq, 'downstream', 1)
-                    : await this.deps.codeGraphProvider.analyzeFileImpact(tq, 'downstream', 1)
+                  const tImpact =
+                    typeof this.deps.codeGraphProvider.analyzeFileImportImpact === 'function'
+                      ? await this.deps.codeGraphProvider.analyzeFileImportImpact(
+                          tq,
+                          'downstream',
+                          1,
+                        )
+                      : await this.deps.codeGraphProvider.analyzeFileImpact(tq, 'downstream', 1)
                   for (const aff of tImpact?.affectedFiles ?? []) {
                     const affObj = aff as unknown as Record<string, unknown>
-                    const affPath = typeof aff === 'string'
-                      ? aff
-                      : (typeof affObj.filePath === 'string' ? affObj.filePath : (typeof affObj.file === 'string' ? affObj.file : ''))
+                    const affPath =
+                      typeof aff === 'string'
+                        ? aff
+                        : typeof affObj.filePath === 'string'
+                          ? affObj.filePath
+                          : typeof affObj.file === 'string'
+                            ? affObj.file
+                            : ''
                     if (affPath) {
                       targetOutboundFiles.add(affPath)
                       targetOutboundFiles.add(affPath.replace(/^[^:]+:/, ''))
@@ -501,7 +565,9 @@ export class SuggestSpecDependencies {
               }
 
               if (candidateFiles.size === 0) {
-                const parts = candidateSpecId.includes(':') ? candidateSpecId.split(':') : ['default', candidateSpecId]
+                const parts = candidateSpecId.includes(':')
+                  ? candidateSpecId.split(':')
+                  : ['default', candidateSpecId]
                 const cWs = parts[0] ?? 'default'
                 const cPath = parts[1] ?? candidateSpecId
                 const cRepo = this.deps.specRepositories.get(cWs)
@@ -515,7 +581,8 @@ export class SuggestSpecDependencies {
                           if (link.file) candidateFiles.add(link.file)
                         }
                       }
-                      const cImplList = (cSpecData as unknown as Record<string, unknown>)?.implementation
+                      const cImplList = (cSpecData as unknown as Record<string, unknown>)
+                        ?.implementation
                       const cFilesArr = (cImplList as Record<string, unknown> | undefined)?.files
                       if (Array.isArray(cFilesArr)) {
                         for (const f of cFilesArr) {
@@ -551,14 +618,24 @@ export class SuggestSpecDependencies {
                 const cQueries = [cFile, rawCPath, shortRelCPath]
                 for (const cq of cQueries) {
                   try {
-                    const cImpact = typeof this.deps.codeGraphProvider.analyzeFileImportImpact === 'function'
-                      ? await this.deps.codeGraphProvider.analyzeFileImportImpact(cq, 'downstream', 1)
-                      : await this.deps.codeGraphProvider.analyzeFileImpact(cq, 'downstream', 1)
+                    const cImpact =
+                      typeof this.deps.codeGraphProvider.analyzeFileImportImpact === 'function'
+                        ? await this.deps.codeGraphProvider.analyzeFileImportImpact(
+                            cq,
+                            'downstream',
+                            1,
+                          )
+                        : await this.deps.codeGraphProvider.analyzeFileImpact(cq, 'downstream', 1)
                     for (const aff of cImpact?.affectedFiles ?? []) {
                       const affObj = aff as unknown as Record<string, unknown>
-                      const affPath = typeof aff === 'string'
-                        ? aff
-                        : (typeof affObj.filePath === 'string' ? affObj.filePath : (typeof affObj.file === 'string' ? affObj.file : ''))
+                      const affPath =
+                        typeof aff === 'string'
+                          ? aff
+                          : typeof affObj.filePath === 'string'
+                            ? affObj.filePath
+                            : typeof affObj.file === 'string'
+                              ? affObj.file
+                              : ''
                       const rawAff = affPath.replace(/^[^:]+:/, '')
                       for (const tFile of targetFilesList) {
                         const rawT = tFile.replace(/^[^:]+:/, '')
@@ -642,11 +719,14 @@ export class SuggestSpecDependencies {
                 if (!suggestedMap.has(parentCandidateId)) continue
                 const parentDirectDeps = await getDirectDeps(parentCandidateId)
                 if (parentDirectDeps.has(candidateSpecId)) {
-                  Logger.debug('[SuggestSpecDependencies] Pruning redundant recommendation covered by parent candidate', {
-                    targetSpec: target.specId,
-                    prunedCandidate: candidateSpecId,
-                    coveredBy: parentCandidateId,
-                  })
+                  Logger.debug(
+                    '[SuggestSpecDependencies] Pruning redundant recommendation covered by parent candidate',
+                    {
+                      targetSpec: target.specId,
+                      prunedCandidate: candidateSpecId,
+                      coveredBy: parentCandidateId,
+                    },
+                  )
                   suggestedMap.delete(candidateSpecId)
                   break
                 }
@@ -683,9 +763,7 @@ export class SuggestSpecDependencies {
         })
 
         // Pass 3: Apply mutations if requested (only add new dependencies)
-        const newDepIds = suggestedDependsOn
-          .filter((d) => !d.alreadyIncluded)
-          .map((d) => d.specId)
+        const newDepIds = suggestedDependsOn.filter((d) => !d.alreadyIncluded).map((d) => d.specId)
 
         if (input.apply && newDepIds.length > 0) {
           try {
@@ -701,84 +779,100 @@ export class SuggestSpecDependencies {
         }
       }
 
-    // Post-apply validation & conditional change creation
-    let postApplyValidation: PostApplyValidationDiagnostic | undefined
+      // Post-apply validation & conditional change creation
+      let postApplyValidation: PostApplyValidationDiagnostic | undefined
 
-    if (input.apply && this.deps.validateSpecs) {
-      input.onProgress?.({ type: 'validation-start', message: 'Validating specifications consistency...' })
-      try {
-        const valRes = await this.deps.validateSpecs.execute({})
-        const invalidSpecs: Array<{ specId: string; failures: Array<{ artifactId: string; description: string }> }> = []
+      if (input.apply && this.deps.validateSpecs) {
+        input.onProgress?.({
+          type: 'validation-start',
+          message: 'Validating specifications consistency...',
+        })
+        try {
+          const valRes = await this.deps.validateSpecs.execute({})
+          const invalidSpecs: Array<{
+            specId: string
+            failures: Array<{ artifactId: string; description: string }>
+          }> = []
 
-        const valResObj = valRes as unknown as Record<string, unknown>
-        if (valResObj && 'issues' in valResObj && Array.isArray(valResObj.issues)) {
-          for (const issue of valResObj.issues as Array<Record<string, unknown>>) {
-            invalidSpecs.push({
-              specId: typeof issue.specId === 'string' ? issue.specId : '',
-              failures: (issue.failures as Array<{ artifactId: string; description: string }> | undefined) ?? [
-                { artifactId: 'specs', description: typeof issue.message === 'string' ? issue.message : 'Validation failed' },
-              ],
-            })
-          }
-        }
-
-        if (invalidSpecs.length > 0) {
-          const invalidSpecIds = invalidSpecs.map((s) => s.specId)
-          let createdChangeInfo: CreatedAlignmentChangeInfo | undefined
-
-          if (input.createAlignmentChange && this.deps.createChange) {
-            const prefix = input.changeNamePrefix ?? 'align-spec-deps'
-            const changeName = `${prefix}-${Date.now()}`
-            const changeResult = await this.deps.createChange.execute({
-              name: changeName,
-              specIds: invalidSpecIds,
-            })
-            const changeResultObj = changeResult as unknown as Record<string, unknown>
-            const changePath = typeof changeResultObj.changePath === 'string'
-              ? changeResultObj.changePath
-              : join(projectDir, '.specd', 'changes', changeName)
-            const explorationFilePath = join(changePath, '.specd-exploration.md')
-
-            const explorationContent = [
-              `# Exploration: Spec Dependency Alignment`,
-              ``,
-              `The following specs require alignment after dependency application:`,
-              ``,
-              ...invalidSpecs.flatMap((s) => [
-                `## Spec: ${s.specId}`,
-                ...s.failures.map((f) => `- [${f.artifactId}]: ${f.description}`),
-                ``,
-              ]),
-            ].join('\n')
-
-            await mkdir(changePath, { recursive: true })
-            await writeFile(explorationFilePath, explorationContent, 'utf-8')
-
-            createdChangeInfo = {
-              name: changeName,
-              changePath,
-              explorationFilePath,
-              specIds: invalidSpecIds,
+          const valResObj = valRes as unknown as Record<string, unknown>
+          if (valResObj && 'issues' in valResObj && Array.isArray(valResObj.issues)) {
+            for (const issue of valResObj.issues as Array<Record<string, unknown>>) {
+              invalidSpecs.push({
+                specId: typeof issue.specId === 'string' ? issue.specId : '',
+                failures: (issue.failures as
+                  | Array<{ artifactId: string; description: string }>
+                  | undefined) ?? [
+                  {
+                    artifactId: 'specs',
+                    description:
+                      typeof issue.message === 'string' ? issue.message : 'Validation failed',
+                  },
+                ],
+              })
             }
           }
 
-          postApplyValidation = {
-            status: 'invalid-specs-detected',
-            invalidSpecs,
-            suggestedAlignmentCommand: `specd changes create align-spec-deps --spec ${invalidSpecIds.join(' --spec ')}`,
-            ...(createdChangeInfo !== undefined ? { createdChange: createdChangeInfo } : {}),
+          if (invalidSpecs.length > 0) {
+            const invalidSpecIds = invalidSpecs.map((s) => s.specId)
+            let createdChangeInfo: CreatedAlignmentChangeInfo | undefined
+
+            if (input.createAlignmentChange && this.deps.createChange) {
+              const prefix = input.changeNamePrefix ?? 'align-spec-deps'
+              const changeName = `${prefix}-${Date.now()}`
+              const changeResult = await this.deps.createChange.execute({
+                name: changeName,
+                specIds: invalidSpecIds,
+              })
+              const changeResultObj = changeResult as unknown as Record<string, unknown>
+              const changePath =
+                typeof changeResultObj.changePath === 'string'
+                  ? changeResultObj.changePath
+                  : join(projectDir, '.specd', 'changes', changeName)
+              const explorationFilePath = join(changePath, '.specd-exploration.md')
+
+              const explorationContent = [
+                `# Exploration: Spec Dependency Alignment`,
+                ``,
+                `The following specs require alignment after dependency application:`,
+                ``,
+                ...invalidSpecs.flatMap((s) => [
+                  `## Spec: ${s.specId}`,
+                  ...s.failures.map((f) => `- [${f.artifactId}]: ${f.description}`),
+                  ``,
+                ]),
+              ].join('\n')
+
+              await mkdir(changePath, { recursive: true })
+              await writeFile(explorationFilePath, explorationContent, 'utf-8')
+
+              createdChangeInfo = {
+                name: changeName,
+                changePath,
+                explorationFilePath,
+                specIds: invalidSpecIds,
+              }
+            }
+
+            postApplyValidation = {
+              status: 'invalid-specs-detected',
+              invalidSpecs,
+              suggestedAlignmentCommand: `specd changes create align-spec-deps --spec ${invalidSpecIds.join(' --spec ')}`,
+              ...(createdChangeInfo !== undefined ? { createdChange: createdChangeInfo } : {}),
+            }
+          } else {
+            postApplyValidation = {
+              status: 'all-valid',
+              invalidSpecs: [],
+            }
           }
-        } else {
-          postApplyValidation = {
-            status: 'all-valid',
-            invalidSpecs: [],
-          }
+        } catch {
+          // Fallback if validateSpecs execution throws
         }
-      } catch {
-        // Fallback if validateSpecs execution throws
+        input.onProgress?.({
+          type: 'validation-done',
+          status: postApplyValidation?.status ?? 'all-valid',
+        })
       }
-      input.onProgress?.({ type: 'validation-done', status: postApplyValidation?.status ?? 'all-valid' })
-    }
 
       await specDepsCache.flush()
 
@@ -837,8 +931,18 @@ export function resolveSuggestSpecDependenciesDeps(
     validateSpecs,
     createChange,
     codeGraphProvider,
-    cache: new FsImplementationSuggestionCache(projectDir, resolver.config.configPath),
-    specDepsCache: new FsSpecDepsSuggestionCache(projectDir, resolver.config.configPath),
+    cache: new FsImplementationSuggestionCache({
+      projectDir,
+      configPath: resolver.config.configPath,
+      specRepositories,
+      codeGraphProvider,
+    }),
+    specDepsCache: new FsSpecDepsSuggestionCache({
+      projectDir,
+      configPath: resolver.config.configPath,
+      specRepositories,
+      codeGraphProvider,
+    }),
     projectDir,
     configPath: resolver.config.configPath,
   }
@@ -850,7 +954,9 @@ export function resolveSuggestSpecDependenciesDeps(
  * @param deps - Dependencies instance
  * @returns Configured `SuggestSpecDependencies`
  */
-export function createSuggestSpecDependencies(deps: SuggestSpecDependenciesDeps): SuggestSpecDependencies
+export function createSuggestSpecDependencies(
+  deps: SuggestSpecDependenciesDeps,
+): SuggestSpecDependencies
 /**
  * Factory function creating a `SuggestSpecDependencies` instance from configuration.
  *
