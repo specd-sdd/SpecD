@@ -508,14 +508,14 @@ graph LR
 
 ### Automated tests
 
-- Unit tests in `packages/sdk/tests/orchestration/suggest-implementation-links.test.ts`:
+- Unit tests in `packages/sdk/test/orchestration/suggest-implementation-links.spec.ts`:
   - Assert 2-pass symbol matching and confidence scoring.
   - Assert 2-stage cache HIT on unchanged `lastModified` stamp.
   - Assert additive set union when `apply: true`.
-- Unit tests in `packages/sdk/tests/orchestration/suggest-spec-dependencies.test.ts`:
-  - Assert import graph tracing and barrel re-export resolution (`maxDepth = 2`).
+- Unit tests in `packages/sdk/test/orchestration/suggest-spec-dependencies.spec.ts`:
+  - Assert import graph tracing and barrel re-export resolution (depth `1` plus a conditional barrel re-export hop).
   - Assert `ValidateSpecs` post-apply check and conditional alignment change creation.
-- CLI integration tests in `packages/cli/tests/commands/spec/implementation-suggest.test.ts` and `deps-suggest.test.ts`.
+- CLI integration tests in `packages/cli/test/commands/spec-implementation.spec.ts` and `spec-deps.spec.ts`.
 
 ### Manual / E2E verification
 

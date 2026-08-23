@@ -1,7 +1,7 @@
 {
   "name": "suggest-implementation-and-spec-deps",
   "createdAt": "2026-08-16T11:21:12.000Z",
-  "updatedAt": "2026-08-23T21:58:36.382Z",
+  "updatedAt": "2026-08-23T22:38:46.248Z",
   "description": "Add SDK use cases and CLI commands to suggest implementation links and spec dependencies with post-apply validation",
   "schema": {
     "name": "schema-std",
@@ -809,6 +809,10 @@
     {
       "file": "specs/sdk/composition/spec-lock.json",
       "state": "open"
+    },
+    {
+      "file": "packages/sdk/src/infrastructure/fs/index.ts",
+      "state": "open"
     }
   ],
   "implementationLinks": [
@@ -967,7 +971,7 @@
           "key": "design",
           "filename": "design.md",
           "state": "complete",
-          "validatedHash": "sha256:f69941a86bd27bd0940b96b504b246d0b28bd433fc9bff6212ac92ed9a99d770"
+          "validatedHash": "sha256:12d6fef711f5c51a27eeba46d0e1eb58a320c6c85a72602f9b33fed9889ac19b"
         }
       ]
     },
@@ -2704,6 +2708,27 @@
             "code-graph:language-adapter",
             "code-graph:graph-store"
           ]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-23T22:38:44.677Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
         },
         {
           "type": "tasks",
