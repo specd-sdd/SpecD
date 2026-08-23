@@ -1,7 +1,7 @@
 {
   "name": "suggest-implementation-and-spec-deps",
   "createdAt": "2026-08-16T11:21:12.000Z",
-  "updatedAt": "2026-08-23T20:49:51.603Z",
+  "updatedAt": "2026-08-23T20:57:35.608Z",
   "description": "Add SDK use cases and CLI commands to suggest implementation links and spec dependencies with post-apply validation",
   "schema": {
     "name": "schema-std",
@@ -883,7 +883,7 @@
           "key": "cli:spec-implementation",
           "filename": "deltas/cli/spec-implementation/spec.md.delta.yaml",
           "state": "complete",
-          "validatedHash": "sha256:a24db0a4a1e9aba97e078faafed0395c69f749398304eb8d018a6921c63bfa10"
+          "validatedHash": "sha256:b891ee05d6c9a24c35385fb94a0613ac8968968848899d73402d01d6c3806065"
         },
         {
           "key": "cli:spec-deps",
@@ -921,7 +921,7 @@
       "type": "verify",
       "optional": false,
       "requires": ["specs"],
-      "state": "complete",
+      "state": "pending-review",
       "files": [
         {
           "key": "cli:spec-implementation",
@@ -932,31 +932,31 @@
         {
           "key": "cli:spec-deps",
           "filename": "deltas/cli/spec-deps/verify.md.delta.yaml",
-          "state": "complete",
+          "state": "pending-review",
           "validatedHash": "sha256:0710c85abf1e7c3943416b9c37df388aba8db673b14587f14ac09987b718afae"
         },
         {
           "key": "sdk:suggest-implementation-links",
           "filename": "specs/sdk/suggest-implementation-links/verify.md",
-          "state": "complete",
+          "state": "pending-review",
           "validatedHash": "sha256:b363ff784cb2ba26d796fa13db393f311e9f44503cef40e3be72eceff83479c7"
         },
         {
           "key": "sdk:suggest-spec-dependencies",
           "filename": "specs/sdk/suggest-spec-dependencies/verify.md",
-          "state": "complete",
+          "state": "pending-review",
           "validatedHash": "sha256:f8baa51951fb883a4f8af61140a37458324cecae0a789346e8850ca9633538a2"
         },
         {
           "key": "code-graph:language-adapter",
           "filename": "deltas/code-graph/language-adapter/verify.md.delta.yaml",
-          "state": "complete",
+          "state": "pending-review",
           "validatedHash": "sha256:ee2c2f860bcde699dc72ba1f5d90f5de14dce37bed0ef726f760e20677d0a035"
         },
         {
           "key": "code-graph:graph-store",
           "filename": "deltas/code-graph/graph-store/verify.md.delta.yaml",
-          "state": "complete",
+          "state": "pending-review",
           "validatedHash": "sha256:78304bb5f557c40c5df8e90ea58193c9b4993b033c1c6b01852d9a3f0d988dc2"
         }
       ]
@@ -2502,6 +2502,42 @@
         {
           "type": "verify",
           "files": ["cli:spec-deps", "cli:spec-implementation"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-23T20:57:35.482Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:spec-implementation]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["cli:spec-implementation"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:spec-implementation",
+            "cli:spec-deps",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies",
+            "code-graph:language-adapter",
+            "code-graph:graph-store"
+          ]
         },
         {
           "type": "design",

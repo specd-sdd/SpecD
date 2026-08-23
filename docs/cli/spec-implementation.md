@@ -8,7 +8,7 @@ Manage persisted implementation links in `spec-lock.json`.
 specd specs implementation list <specPath>
 specd specs implementation add <specPath> --file <path> [--symbol <name>...]
 specd specs implementation remove <specPath> --file <path> [--symbol <name>...]
-specd specs implementation suggest [<specPath>] [--spec <id>...] [--all] [--workspace <name>] [--apply] [--confidence <HIGH|MED>] [--rebuild-cache]
+specd specs implementation suggest [<specPath>] [--spec <id>...] [--all] [--workspace <name>] [--apply] [--confidence <HIGH|MEDIUM|MED|LOW>] [--rebuild-cache]
 ```
 
 ## Behavior

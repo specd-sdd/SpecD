@@ -6,7 +6,7 @@
   content: |
     ### Requirement: Suggest subcommand
 
-    `specd specs implementation suggest [<spec-id>] [--spec <id>...] [--all] [--workspace <name>] [--apply] [--confidence <HIGH|MED>] [--rebuild-cache]` MUST invoke `SuggestImplementationLinks` in `@specd/sdk`.
+    `specd specs implementation suggest [<spec-id>] [--spec <id>...] [--all] [--workspace <name>] [--apply] [--confidence <HIGH|MEDIUM|MED|LOW>] [--rebuild-cache]` MUST invoke `SuggestImplementationLinks` in `@specd/sdk`.
 
     When `--apply` is passed, the command MUST delegate additive mutation to the SDK use case, which merges new discovered files and symbols into `spec-lock.json` via `UpdatePersistedSpecImplementation`.
 
