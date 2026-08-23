@@ -51,7 +51,7 @@
 
 - **GIVEN** a spec `core:spec-repository-port` with distinctive tokens `['spec', 'repository', 'port']`
 - **WHEN** evaluating candidate file `src/infrastructure/fs/spec-repository.ts` which lacks the `port` token
-- **THEN** candidate receives a `missing-distinctive-tokens` score penalty
+- **THEN** candidate receives a `missing-distinctive-tokens` score penalty of `-150` per missing distinctive token
 - **AND** is barred from receiving `HIGH` confidence
 
 #### Scenario: Primary exact symbol vs derivative symbol match differentiation

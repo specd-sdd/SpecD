@@ -1,7 +1,7 @@
 {
   "name": "suggest-implementation-and-spec-deps",
   "createdAt": "2026-08-16T11:21:12.000Z",
-  "updatedAt": "2026-08-22T11:25:42.913Z",
+  "updatedAt": "2026-08-23T19:53:31.410Z",
   "description": "Add SDK use cases and CLI commands to suggest implementation links and spec dependencies with post-apply validation",
   "schema": {
     "name": "schema-std",
@@ -895,7 +895,7 @@
           "key": "sdk:suggest-implementation-links",
           "filename": "specs/sdk/suggest-implementation-links/spec.md",
           "state": "complete",
-          "validatedHash": "sha256:56270354affcf4e83d7b48887e2a48e00dbb2ae2dbd698e1f0934f60c162419f"
+          "validatedHash": "sha256:7403b4b69ed0b8efc2e4061a446b202ccabf5073e9b79be4a423421b0387c155"
         },
         {
           "key": "sdk:suggest-spec-dependencies",
@@ -939,7 +939,7 @@
           "key": "sdk:suggest-implementation-links",
           "filename": "specs/sdk/suggest-implementation-links/verify.md",
           "state": "complete",
-          "validatedHash": "sha256:815c67bbcd437950e647ae6c74d6cc792abb64e467dbdd44659584e6641b2b7c"
+          "validatedHash": "sha256:b363ff784cb2ba26d796fa13db393f311e9f44503cef40e3be72eceff83479c7"
         },
         {
           "key": "sdk:suggest-spec-dependencies",
@@ -2444,6 +2444,35 @@
         {
           "type": "verify",
           "files": ["sdk:suggest-implementation-links", "sdk:suggest-spec-dependencies"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-23T19:53:31.286Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [sdk:suggest-implementation-links]; verify [sdk:suggest-implementation-links]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["sdk:suggest-implementation-links"]
+        },
+        {
+          "type": "verify",
+          "files": ["sdk:suggest-implementation-links"]
         },
         {
           "type": "design",

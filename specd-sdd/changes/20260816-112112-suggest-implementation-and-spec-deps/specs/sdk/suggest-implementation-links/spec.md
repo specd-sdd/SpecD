@@ -11,6 +11,7 @@ Correlating specifications with their implementation files and exported symbols 
 `SuggestImplementationLinks` SHALL expose an `async execute(input: SuggestImplementationLinksInput): Promise<SuggestImplementationLinksResult>` method.
 
 The input interface MUST support:
+
 - `specId?: string` or `specIds?: readonly string[]`: Target specific spec IDs.
 - `workspace?: string`: Target all specs within a specific workspace.
 - `all?: boolean`: Target all specs across all workspaces.
@@ -22,6 +23,7 @@ The input interface MUST support:
 ### Requirement: Input Validation & Error Handling
 
 `SuggestImplementationLinks` MUST validate input parameters before execution and throw specific errors extending `SpecdError`:
+
 - If no targeting option is specified (neither `specId`, `specIds`, `workspace`, nor `all: true`), `execute()` MUST throw `InvalidInputError`.
 - If `workspace` is specified but does not exist in configured spec repositories or is empty, `execute()` MUST throw `WorkspaceNotFoundError` or `InvalidInputError`.
 - If `confidenceThreshold` is specified with an invalid string outside `['HIGH', 'MEDIUM', 'MED', 'LOW']`, `execute()` MUST throw `InvalidInputError`.
@@ -30,6 +32,7 @@ The input interface MUST support:
 ### Requirement: 2-Pass Analysis Algorithm
 
 `SuggestImplementationLinks` MUST execute a 3-tier cascade analysis algorithm with early short-circuiting:
+
 1. **Tier 1 (AST Symbol & Direct Naming Derivatives)**:
    - Queries `SpecRepository.list({ includeMeta: true })` across target workspaces.
    - Evaluates 2-stage cache staleness (`lastModified` -> `hash` fallback) against `ImplementationSuggestionCachePort` (defaulting to `FsImplementationSuggestionCache` persisting under `configPath/tmp/fs-cache/implementation-suggestions/suggestions.json`) using domain-specific cache interfaces (`ImplementationSuggestionCacheHeader`, `ImplementationSuggestionSpecStamp`, `ImplementationSuggestionSpecEntry`).
@@ -39,7 +42,7 @@ The input interface MUST support:
    - Validates candidate file existence on disk (`existsSync`) before outputting suggestions.
    - Evaluates **Path & Spec Token Affinity (`computePathSpecAffinity`)**:
      - Normalizes spec capability segments and candidate file paths with token splitting `[\/\\_\-.:]+` and plural stemming (`length > 2 && !endsWith('ss')`).
-     - Computes token coverage. If candidate file path is missing distinctive spec tokens, assigns a score penalty (`-100`) and records `missing-distinctive-tokens` in reasons.
+     - Computes token coverage. If candidate file path is missing distinctive spec tokens, assigns a per-token score penalty (`missingTokens.length * 150`, i.e. `-150` per missing token) and records `missing-distinctive-tokens` in reasons. Candidates carrying `missing-distinctive-tokens` are excluded from `HIGH` confidence regardless of their final score.
    - Queries `code-graph` (`SymbolNode` search scoped directly to target workspace via `workspace` property on `SymbolQuery`).
    - Filters out variable symbol kinds (`SymbolKind.Variable`) and evaluates `parentId` relationships to preserve top-level parent class/interface symbols while sieving out loose child method matches in unrelated files.
    - Distinguishes compound identifiers from single-word PascalCase terms (`isCompoundIdentifier`), restricting single-word PascalCase candidate matches exclusively to candidate files that declare that term as their primary top-level entity (`parentId === undefined`).
@@ -69,6 +72,7 @@ When `apply: true` is passed, `SuggestImplementationLinks` MUST perform a set un
 ### Requirement: Standard Factory & Composition Overloads
 
 `SuggestImplementationLinks` MUST provide 3 factory overload signatures:
+
 - `createSuggestImplementationLinks(deps: SuggestImplementationLinksDeps): SuggestImplementationLinks`
 - `createSuggestImplementationLinks(config: SpecdConfig, options?: CompositionResolutionOptions): SuggestImplementationLinks`
 - `createSuggestImplementationLinks(depsOrConfig: SuggestImplementationLinksDeps | SpecdConfig, options?: CompositionResolutionOptions): SuggestImplementationLinks`
