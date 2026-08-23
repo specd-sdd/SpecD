@@ -59,6 +59,7 @@ describe('FsImplementationSuggestionCache', () => {
           confidence: 'HIGH',
           reasons: ['primary-symbol-match'],
           score: 300,
+          alreadyIncluded: false,
         },
       ],
     })

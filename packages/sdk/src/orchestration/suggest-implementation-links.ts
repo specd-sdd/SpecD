@@ -1533,6 +1533,7 @@ export class SuggestImplementationLinks {
         confidence,
         reasons: Array.from(data.reasons),
         score: data.score,
+        alreadyIncluded: false,
       })
     }
 

@@ -300,6 +300,7 @@ export interface ImplementationSuggestionEntry {
   readonly confidence: 'HIGH' | 'MEDIUM' | 'LOW'
   readonly reasons: readonly string[]
   readonly score: number
+  readonly alreadyIncluded: boolean
 }
 
 export interface SpecImplementationSuggestion {
