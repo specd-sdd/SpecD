@@ -317,7 +317,7 @@ describe('SuggestSpecDependencies', () => {
   })
 
   it('persists and utilizes SpecDepsSuggestionCachePort on subsequent execution', async () => {
-    const { useCase } = setupTest()
+    const { useCase, codeGraphProvider } = setupTest()
 
     const firstRun = await useCase.execute({
       specId: 'sdk:suggest-spec-dependencies',
@@ -327,12 +327,16 @@ describe('SuggestSpecDependencies', () => {
     expect(firstRun.result).toBe('ok')
     expect(firstRun.specs[0]?.suggestedDependsOn).toHaveLength(1)
 
+    codeGraphProvider.analyzeFileImpact.mockClear()
+
     const secondRun = await useCase.execute({
       specId: 'sdk:suggest-spec-dependencies',
     })
 
     expect(secondRun.result).toBe('ok')
     expect(secondRun.specs[0]?.suggestedDependsOn).toHaveLength(1)
+    // Cached run must be served entirely from SpecDepsSuggestionCachePort.
+    expect(codeGraphProvider.analyzeFileImpact).not.toHaveBeenCalled()
   })
 
   it('supports factory constructor overloads', () => {
