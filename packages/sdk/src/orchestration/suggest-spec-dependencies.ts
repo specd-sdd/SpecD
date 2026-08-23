@@ -383,6 +383,9 @@ export class SuggestSpecDependencies {
           }
 
           const suggestedMap = new Map<string, SuggestedSpecDependency>()
+          // Outbound (downstream) edges collected during Pass 2, reused by the
+          // Directional Validation Pass instead of re-querying the graph.
+          const targetOutboundFiles = new Set<string>()
 
           Logger.debug('[SuggestSpecDependencies] Processing target spec', {
             specId: target.specId,
@@ -402,107 +405,99 @@ export class SuggestSpecDependencies {
               ) {
                 continue
               }
-              const shortRelPath = rawPath.replace(/^(?:packages|apps)\/[^/]+\//, '')
-              const pathsToQuery = [
-                file,
-                rawPath,
-                shortRelPath,
-                `${target.workspace}:${shortRelPath}`,
-              ]
-              for (const pathQuery of pathsToQuery) {
-                try {
-                  const impact =
-                    typeof this.deps.codeGraphProvider.analyzeFileImportImpact === 'function'
-                      ? await this.deps.codeGraphProvider.analyzeFileImportImpact(
-                          pathQuery,
-                          'downstream',
-                          1,
-                        )
-                      : await this.deps.codeGraphProvider.analyzeFileImpact(
-                          pathQuery,
-                          'downstream',
-                          1,
-                        )
-                  Logger.debug('[SuggestSpecDependencies] analyzeFileImpact result', {
-                    pathQuery,
-                    affectedFiles: impact?.affectedFiles,
-                  })
-                  const affected = impact?.affectedFiles ?? []
-                  for (const aff of affected) {
-                    const affObj = aff as unknown as Record<string, unknown>
-                    const affPath =
-                      typeof aff === 'string'
-                        ? aff
-                        : typeof affObj.filePath === 'string'
-                          ? affObj.filePath
-                          : typeof affObj.file === 'string'
-                            ? affObj.file
-                            : ''
+              try {
+                const impact =
+                  typeof this.deps.codeGraphProvider.analyzeFileImportImpact === 'function'
+                    ? await this.deps.codeGraphProvider.analyzeFileImportImpact(
+                        file,
+                        'downstream',
+                        1,
+                      )
+                    : await this.deps.codeGraphProvider.analyzeFileImpact(file, 'downstream', 1)
+                Logger.debug('[SuggestSpecDependencies] analyzeFileImpact result', {
+                  pathQuery: file,
+                  affectedFiles: impact?.affectedFiles,
+                })
+                const affected = impact?.affectedFiles ?? []
+                for (const aff of affected) {
+                  const affObj = aff as unknown as Record<string, unknown>
+                  const affPath =
+                    typeof aff === 'string'
+                      ? aff
+                      : typeof affObj.filePath === 'string'
+                        ? affObj.filePath
+                        : typeof affObj.file === 'string'
+                          ? affObj.file
+                          : ''
 
-                    const mappedSpecId = await implCache.findSpecByFile(affPath)
-                    Logger.debug('[SuggestSpecDependencies] Mapped affected file to spec', {
-                      affPath,
-                      mappedSpecId,
-                    })
-                    const isBarrelFile =
-                      affPath.endsWith('/index.ts') ||
-                      affPath.endsWith('/index.js') ||
-                      affPath.endsWith('/ports.ts') ||
-                      affPath.endsWith('/index.d.ts')
-                    if (isBarrelFile) {
-                      try {
-                        const barrelImpact = await this.deps.codeGraphProvider.analyzeFileImpact(
-                          affPath,
-                          'downstream',
-                          1,
-                        )
-                        for (const bAff of barrelImpact?.affectedFiles ?? []) {
-                          const bObj = bAff as unknown as Record<string, unknown>
-                          const bPath =
-                            typeof bAff === 'string'
-                              ? bAff
-                              : typeof bObj.filePath === 'string'
-                                ? bObj.filePath
-                                : typeof bObj.file === 'string'
-                                  ? bObj.file
-                                  : ''
-                          const bMappedSpecId = await implCache.findSpecByFile(bPath)
-                          if (bMappedSpecId && bMappedSpecId !== target.specId) {
-                            if (!suggestedMap.has(bMappedSpecId)) {
-                              const isAlreadyIncluded = existingDependsOn.includes(bMappedSpecId)
-                              const targetOwner = await implCache.get(bMappedSpecId)
-                              suggestedMap.set(bMappedSpecId, {
-                                specId: bMappedSpecId,
-                                title: targetOwner?.title ?? bMappedSpecId,
-                                reason: `Code import relationship via ${bPath}`,
-                                status: isAlreadyIncluded ? 'already-configured' : 'new',
-                                alreadyIncluded: isAlreadyIncluded,
-                              })
-                            }
+                  if (affPath) {
+                    targetOutboundFiles.add(affPath)
+                    targetOutboundFiles.add(affPath.replace(/^[^:]+:/, ''))
+                  }
+
+                  const mappedSpecId = await implCache.findSpecByFile(affPath)
+                  Logger.debug('[SuggestSpecDependencies] Mapped affected file to spec', {
+                    affPath,
+                    mappedSpecId,
+                  })
+                  const isBarrelFile =
+                    affPath.endsWith('/index.ts') ||
+                    affPath.endsWith('/index.js') ||
+                    affPath.endsWith('/ports.ts') ||
+                    affPath.endsWith('/index.d.ts')
+                  if (isBarrelFile) {
+                    try {
+                      const barrelImpact = await this.deps.codeGraphProvider.analyzeFileImpact(
+                        affPath,
+                        'downstream',
+                        1,
+                      )
+                      for (const bAff of barrelImpact?.affectedFiles ?? []) {
+                        const bObj = bAff as unknown as Record<string, unknown>
+                        const bPath =
+                          typeof bAff === 'string'
+                            ? bAff
+                            : typeof bObj.filePath === 'string'
+                              ? bObj.filePath
+                              : typeof bObj.file === 'string'
+                                ? bObj.file
+                                : ''
+                        const bMappedSpecId = await implCache.findSpecByFile(bPath)
+                        if (bMappedSpecId && bMappedSpecId !== target.specId) {
+                          if (!suggestedMap.has(bMappedSpecId)) {
+                            const isAlreadyIncluded = existingDependsOn.includes(bMappedSpecId)
+                            const targetOwner = await implCache.get(bMappedSpecId)
+                            suggestedMap.set(bMappedSpecId, {
+                              specId: bMappedSpecId,
+                              title: targetOwner?.title ?? bMappedSpecId,
+                              reason: `Code import relationship via ${bPath}`,
+                              status: isAlreadyIncluded ? 'already-configured' : 'new',
+                              alreadyIncluded: isAlreadyIncluded,
+                            })
                           }
                         }
-                      } catch {
-                        // Ignore barrel expansion error
                       }
-                    }
-
-                    if (mappedSpecId && mappedSpecId !== target.specId) {
-                      if (!suggestedMap.has(mappedSpecId)) {
-                        const isAlreadyIncluded = existingDependsOn.includes(mappedSpecId)
-                        const targetOwner = await implCache.get(mappedSpecId)
-                        suggestedMap.set(mappedSpecId, {
-                          specId: mappedSpecId,
-                          title: targetOwner?.title ?? mappedSpecId,
-                          reason: `Code import relationship via ${affPath}`,
-                          status: isAlreadyIncluded ? 'already-configured' : 'new',
-                          alreadyIncluded: isAlreadyIncluded,
-                        })
-                      }
+                    } catch {
+                      // Ignore barrel expansion error
                     }
                   }
-                } catch (err) {
-                  Logger.debug('[SuggestSpecDependencies] Traversal error', { error: err })
+
+                  if (mappedSpecId && mappedSpecId !== target.specId) {
+                    if (!suggestedMap.has(mappedSpecId)) {
+                      const isAlreadyIncluded = existingDependsOn.includes(mappedSpecId)
+                      const targetOwner = await implCache.get(mappedSpecId)
+                      suggestedMap.set(mappedSpecId, {
+                        specId: mappedSpecId,
+                        title: targetOwner?.title ?? mappedSpecId,
+                        reason: `Code import relationship via ${affPath}`,
+                        status: isAlreadyIncluded ? 'already-configured' : 'new',
+                        alreadyIncluded: isAlreadyIncluded,
+                      })
+                    }
+                  }
                 }
+              } catch (err) {
+                Logger.debug('[SuggestSpecDependencies] Traversal error', { error: err })
               }
             }
           }
@@ -515,47 +510,6 @@ export class SuggestSpecDependencies {
 
           if (this.deps.codeGraphProvider && suggestedMap.size > 0) {
             const targetFilesList = Array.from(implFiles)
-            const targetOutboundFiles = new Set<string>()
-
-            for (const tFile of targetFilesList) {
-              const rawTPath = tFile.replace(/^[^:]+:/, '')
-              const shortRelTPath = rawTPath.replace(/^(?:packages|apps)\/[^/]+\//, '')
-              const tQueries = [
-                tFile,
-                rawTPath,
-                shortRelTPath,
-                `${target.workspace}:${shortRelTPath}`,
-              ]
-              for (const tq of tQueries) {
-                try {
-                  const tImpact =
-                    typeof this.deps.codeGraphProvider.analyzeFileImportImpact === 'function'
-                      ? await this.deps.codeGraphProvider.analyzeFileImportImpact(
-                          tq,
-                          'downstream',
-                          1,
-                        )
-                      : await this.deps.codeGraphProvider.analyzeFileImpact(tq, 'downstream', 1)
-                  for (const aff of tImpact?.affectedFiles ?? []) {
-                    const affObj = aff as unknown as Record<string, unknown>
-                    const affPath =
-                      typeof aff === 'string'
-                        ? aff
-                        : typeof affObj.filePath === 'string'
-                          ? affObj.filePath
-                          : typeof affObj.file === 'string'
-                            ? affObj.file
-                            : ''
-                    if (affPath) {
-                      targetOutboundFiles.add(affPath)
-                      targetOutboundFiles.add(affPath.replace(/^[^:]+:/, ''))
-                    }
-                  }
-                } catch {
-                  // ignore
-                }
-              }
-            }
 
             for (const candidateSpecId of Array.from(suggestedMap.keys())) {
               const candidateFiles = new Set<string>()
@@ -617,43 +571,37 @@ export class SuggestSpecDependencies {
               // Check if candidate imports target (inverse relationship)
               let candidateDirectlyImportsTarget = false
               for (const cFile of candidateFiles) {
-                const rawCPath = cFile.replace(/^[^:]+:/, '')
-                const shortRelCPath = rawCPath.replace(/^(?:packages|apps)\/[^/]+\//, '')
-                const cQueries = [cFile, rawCPath, shortRelCPath]
-                for (const cq of cQueries) {
-                  try {
-                    const cImpact =
-                      typeof this.deps.codeGraphProvider.analyzeFileImportImpact === 'function'
-                        ? await this.deps.codeGraphProvider.analyzeFileImportImpact(
-                            cq,
-                            'downstream',
-                            1,
-                          )
-                        : await this.deps.codeGraphProvider.analyzeFileImpact(cq, 'downstream', 1)
-                    for (const aff of cImpact?.affectedFiles ?? []) {
-                      const affObj = aff as unknown as Record<string, unknown>
-                      const affPath =
-                        typeof aff === 'string'
-                          ? aff
-                          : typeof affObj.filePath === 'string'
-                            ? affObj.filePath
-                            : typeof affObj.file === 'string'
-                              ? affObj.file
-                              : ''
-                      const rawAff = affPath.replace(/^[^:]+:/, '')
-                      for (const tFile of targetFilesList) {
-                        const rawT = tFile.replace(/^[^:]+:/, '')
-                        if (affPath === tFile || rawAff === rawT) {
-                          candidateDirectlyImportsTarget = true
-                          break
-                        }
+                try {
+                  const cImpact =
+                    typeof this.deps.codeGraphProvider.analyzeFileImportImpact === 'function'
+                      ? await this.deps.codeGraphProvider.analyzeFileImportImpact(
+                          cFile,
+                          'downstream',
+                          1,
+                        )
+                      : await this.deps.codeGraphProvider.analyzeFileImpact(cFile, 'downstream', 1)
+                  for (const aff of cImpact?.affectedFiles ?? []) {
+                    const affObj = aff as unknown as Record<string, unknown>
+                    const affPath =
+                      typeof aff === 'string'
+                        ? aff
+                        : typeof affObj.filePath === 'string'
+                          ? affObj.filePath
+                          : typeof affObj.file === 'string'
+                            ? affObj.file
+                            : ''
+                    const rawAff = affPath.replace(/^[^:]+:/, '')
+                    for (const tFile of targetFilesList) {
+                      const rawT = tFile.replace(/^[^:]+:/, '')
+                      if (affPath === tFile || rawAff === rawT) {
+                        candidateDirectlyImportsTarget = true
+                        break
                       }
-                      if (candidateDirectlyImportsTarget) break
                     }
-                  } catch {
-                    // ignore
+                    if (candidateDirectlyImportsTarget) break
                   }
-                  if (candidateDirectlyImportsTarget) break
+                } catch {
+                  // ignore
                 }
                 if (candidateDirectlyImportsTarget) break
               }
