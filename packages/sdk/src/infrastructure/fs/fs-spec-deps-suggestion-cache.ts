@@ -111,9 +111,10 @@ export class FsSpecDepsSuggestionCache extends SpecDepsSuggestionCachePort {
       try {
         const health = await this.deps.codeGraphProvider.getGraphHealth()
         this._cachedGraphFingerprint = health?.currentRef ?? 'default'
-        this._cachedGraphLastIndexedAt = typeof (health as unknown as Record<string, unknown>)?.freshness === 'string'
-          ? String((health as unknown as Record<string, unknown>).freshness)
-          : new Date().toISOString()
+        this._cachedGraphLastIndexedAt =
+          typeof (health as unknown as Record<string, unknown>)?.freshness === 'string'
+            ? String((health as unknown as Record<string, unknown>).freshness)
+            : new Date().toISOString()
       } catch {
         this._cachedGraphFingerprint = 'default'
         this._cachedGraphLastIndexedAt = new Date().toISOString()
@@ -147,12 +148,16 @@ export class FsSpecDepsSuggestionCache extends SpecDepsSuggestionCachePort {
 
     try {
       const specData = await repo.get(SpecPath.parse(rawPath))
-      const artifactsMeta = (specData as unknown as { artifacts?: Array<Record<string, unknown>> })?.artifacts ?? []
+      const artifactsMeta =
+        (specData as unknown as { artifacts?: Array<Record<string, unknown>> })?.artifacts ?? []
       const mainArtifact = artifactsMeta.find((a) => a.filename === 'spec.md')
       const specRecord = specData as unknown as Record<string, unknown>
-      const lastModified = typeof mainArtifact?.lastModified === 'string'
-        ? mainArtifact.lastModified
-        : (typeof specRecord?.lastModified === 'string' ? specRecord.lastModified : '')
+      const lastModified =
+        typeof mainArtifact?.lastModified === 'string'
+          ? mainArtifact.lastModified
+          : typeof specRecord?.lastModified === 'string'
+            ? specRecord.lastModified
+            : ''
       const hash = typeof mainArtifact?.hash === 'string' ? mainArtifact.hash : ''
 
       return {
@@ -190,10 +195,19 @@ export class FsSpecDepsSuggestionCache extends SpecDepsSuggestionCachePort {
       const currentStamp = await this.getSpecStamp(specId)
       const cachedStamp = cached.specStamp
       if (cachedStamp) {
-        if (cachedStamp.lastModified && currentStamp.lastModified && cachedStamp.lastModified === currentStamp.lastModified) {
+        if (
+          cachedStamp.lastModified &&
+          currentStamp.lastModified &&
+          cachedStamp.lastModified === currentStamp.lastModified
+        ) {
           return cached
         }
-        if (cachedStamp.hash && currentStamp.hash && cachedStamp.hash.length > 0 && currentStamp.hash === currentStamp.hash) {
+        if (
+          cachedStamp.hash &&
+          currentStamp.hash &&
+          cachedStamp.hash.length > 0 &&
+          cachedStamp.hash === currentStamp.hash
+        ) {
           return cached
         }
         if (currentStamp.lastModified || currentStamp.hash) {
@@ -223,7 +237,8 @@ export class FsSpecDepsSuggestionCache extends SpecDepsSuggestionCachePort {
       specId,
       title: input.title ?? this._data?.get(specId)?.title ?? specId,
       specStamp: currentStamp,
-      existingDependsOn: input.existingDependsOn ?? this._data?.get(specId)?.existingDependsOn ?? [],
+      existingDependsOn:
+        input.existingDependsOn ?? this._data?.get(specId)?.existingDependsOn ?? [],
       suggestedDependsOn: input.suggestedDependsOn,
     }
 
