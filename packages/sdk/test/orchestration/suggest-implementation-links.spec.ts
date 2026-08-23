@@ -317,6 +317,49 @@ describe('SuggestImplementationLinks', () => {
     )
   })
 
+  it('extracts identifiers from fenced code blocks with any language label and CRLF endings', async () => {
+    const { useCase, codeGraphProvider, specRepositories } = setupTest()
+
+    const repo = specRepositories.get('sdk')!
+    ;(repo.artifact as ReturnType<typeof vi.fn>).mockResolvedValue({
+      content: [
+        '# sdk:suggest-implementation-links',
+        '',
+        '```python',
+        'schemaValidator = SchemaValidatorFactory()',
+        '```',
+        '',
+        '```go',
+        'MergeSchemaLayers(ctx)',
+        '```',
+        '',
+        '```php',
+        '$cache = RenderSpecTreeCache::render();',
+        '```',
+        '',
+        '```\r\nLoadSpecDeltas()\r\n```',
+        '',
+      ].join('\n'),
+    })
+
+    await useCase.execute({
+      specId: 'sdk:suggest-implementation-links',
+      rebuildCache: true,
+    })
+
+    for (const symbol of [
+      'schemaValidator',
+      'SchemaValidatorFactory',
+      'MergeSchemaLayers',
+      'RenderSpecTreeCache',
+      'LoadSpecDeltas',
+    ]) {
+      expect(codeGraphProvider.findSymbols).toHaveBeenCalledWith(
+        expect.objectContaining({ name: symbol }),
+      )
+    }
+  })
+
   it('persists real SHA-256 content hash in cache stamp', async () => {
     const { useCase, cache } = setupTest()
 

@@ -694,7 +694,7 @@ export class SuggestImplementationLinks {
     }
 
     const extractedSymbols = new Set<string>()
-    const codeBlockRegex = /```(?:typescript|ts)?\n([\s\S]*?)\n```/g
+    const codeBlockRegex = /```[a-zA-Z0-9_-]*\r?\n([\s\S]*?)\r?\n```/g
     let match: RegExpExecArray | null
 
     const { sourceExtensions, languageKeywords } = getBuiltinRegistryData()
