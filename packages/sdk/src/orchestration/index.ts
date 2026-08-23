@@ -50,7 +50,6 @@ export {
   type ImplementationSuggestionSpecEntry,
   type ImplementationSuggestionsCacheFile,
   CACHE_VERSION,
-  RELATIVE_CACHE_PATH,
 } from '../domain/value-objects/implementation-suggestion-cache.js'
 export { ImplementationSuggestionCachePort } from '../application/ports/implementation-suggestion-cache-port.js'
 export { FsImplementationSuggestionCache } from '../infrastructure/fs/fs-implementation-suggestion-cache.js'
@@ -61,8 +60,6 @@ export {
   type SpecDepsSuggestionCacheHeader,
   type SpecDepsSuggestionsCacheFile,
   SPEC_DEPS_CACHE_VERSION,
-  SPEC_DEPS_RELATIVE_CACHE_PATH,
 } from '../domain/value-objects/spec-deps-suggestion-cache.js'
 export { SpecDepsSuggestionCachePort } from '../application/ports/spec-deps-suggestion-cache-port.js'
 export { FsSpecDepsSuggestionCache } from '../infrastructure/fs/fs-spec-deps-suggestion-cache.js'
-

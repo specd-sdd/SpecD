@@ -33,7 +33,3 @@ export interface SpecDepsSuggestionsCacheFile {
   readonly header: SpecDepsSuggestionCacheHeader
   readonly specs: Record<string, SpecDepsSuggestionSpecEntry>
 }
-
-/** Relative path to spec deps suggestion cache file. */
-export const SPEC_DEPS_RELATIVE_CACHE_PATH =
-  '.specd/tmp/fs-cache/spec-deps-suggestions/suggestions.json'

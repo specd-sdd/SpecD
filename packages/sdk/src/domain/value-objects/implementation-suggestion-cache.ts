@@ -55,6 +55,3 @@ export interface ImplementationSuggestionsCacheFile {
   readonly header: ImplementationSuggestionCacheHeader
   readonly specs: Record<string, ImplementationSuggestionSpecEntry>
 }
-
-/** Relative path to implementation suggestion cache file. */
-export const RELATIVE_CACHE_PATH = '.specd/tmp/fs-cache/implementation-suggestions/suggestions.json'
