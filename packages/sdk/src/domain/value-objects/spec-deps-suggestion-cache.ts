@@ -1,3 +1,5 @@
+import type { ImplementationSuggestionSpecStamp } from './implementation-suggestion-cache.js'
+
 /** Version identifier for the spec deps suggestions cache schema. */
 export const SPEC_DEPS_CACHE_VERSION = '1.1.0'
 
@@ -12,15 +14,7 @@ export interface SpecDepsSuggestedItem {
 export interface SpecDepsSuggestionSpecEntry {
   readonly specId: string
   readonly title: string
-  readonly specStamp: {
-    readonly lastModified: string
-    readonly hash: string
-    readonly artifacts: readonly {
-      readonly filename: string
-      readonly lastModified: string
-      readonly hash: string
-    }[]
-  }
+  readonly specStamp: ImplementationSuggestionSpecStamp
   readonly existingDependsOn: readonly string[]
   readonly suggestedDependsOn: readonly SpecDepsSuggestedItem[]
 }
@@ -41,4 +35,5 @@ export interface SpecDepsSuggestionsCacheFile {
 }
 
 /** Relative path to spec deps suggestion cache file. */
-export const SPEC_DEPS_RELATIVE_CACHE_PATH = '.specd/tmp/fs-cache/spec-deps-suggestions/suggestions.json'
+export const SPEC_DEPS_RELATIVE_CACHE_PATH =
+  '.specd/tmp/fs-cache/spec-deps-suggestions/suggestions.json'
