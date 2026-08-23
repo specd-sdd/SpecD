@@ -1,10 +1,9 @@
-import { describe, expect, it, vi } from 'vitest'
+import { beforeAll, afterAll, describe, expect, it, vi } from 'vitest'
 import {
   SuggestImplementationLinks,
   createSuggestImplementationLinks,
 } from '../../src/orchestration/suggest-implementation-links.js'
 import { ImplementationSuggestionCachePort } from '../../src/application/ports/implementation-suggestion-cache-port.js'
-import { type ImplementationSuggestionsCacheFile } from '../../src/domain/value-objects/implementation-suggestion-cache.js'
 import {
   SpecdError,
   InvalidInputError,
@@ -12,12 +11,31 @@ import {
   SpecNotFoundError,
   type SpecRepository,
 } from '@specd/core'
-import { fileURLToPath } from 'node:url'
-import { dirname, resolve } from 'node:path'
+import { dirname, join } from 'node:path'
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = dirname(__filename)
-const PROJECT_ROOT = resolve(__dirname, '../../../..')
+// Temporary fixture directory standing in for a project root, so the suite does
+// not depend on the real repository layout.
+const FIXTURE_ROOT = mkdtempSync(join(tmpdir(), 'suggest-impl-links-'))
+const FIXTURE_FILES = [
+  'packages/sdk/src/orchestration/suggest-implementation-links.ts',
+  'packages/sdk/src/domain/value-objects/implementation-suggestion-cache.ts',
+  'packages/sdk/src/application/ports/implementation-suggestion-cache-port.ts',
+  'packages/sdk/src/existing.ts',
+]
+
+beforeAll(() => {
+  for (const rel of FIXTURE_FILES) {
+    const abs = join(FIXTURE_ROOT, rel)
+    mkdirSync(dirname(abs), { recursive: true })
+    writeFileSync(abs, '// fixture\n')
+  }
+})
+
+afterAll(() => {
+  rmSync(FIXTURE_ROOT, { recursive: true, force: true })
+})
 
 import { type ImplementationSuggestionSpecEntry } from '../../src/domain/value-objects/implementation-suggestion-cache.js'
 import { type SetImplementationSuggestionInput } from '../../src/application/ports/implementation-suggestion-cache-port.js'
@@ -176,7 +194,7 @@ function setupTest() {
     updatePersistedImplementation: updatePersistedImplementation as any,
     codeGraphProvider,
     cache,
-    projectDir: PROJECT_ROOT,
+    projectDir: FIXTURE_ROOT,
   })
 
   return {
