@@ -1,4 +1,4 @@
-import { readFile, writeFile, mkdir, unlink } from 'node:fs/promises'
+import { readFile, writeFile, mkdir, unlink, rename } from 'node:fs/promises'
 import { dirname, isAbsolute, join } from 'node:path'
 import { SpecPath } from '@specd/core'
 import {
@@ -434,7 +434,9 @@ export class FsImplementationSuggestionCache extends ImplementationSuggestionCac
     }
 
     await mkdir(dirname(this.cachePath), { recursive: true })
-    await writeFile(this.cachePath, JSON.stringify(filePayload, null, 2), 'utf-8')
+    const tempPath = `${this.cachePath}.${process.pid}.tmp`
+    await writeFile(tempPath, JSON.stringify(filePayload, null, 2), 'utf-8')
+    await rename(tempPath, this.cachePath)
     this._isDirty = false
   }
 
