@@ -2,20 +2,6 @@ import { constants } from 'node:fs'
 import { readFile, access } from 'node:fs/promises'
 import { join, resolve, relative } from 'node:path'
 
-/**
- * Checks whether a file exists at the given path.
- *
- * @param filePath - Absolute or relative path to check.
- * @returns True when the path is accessible as a file.
- */
-async function asyncFileExists(filePath: string): Promise<boolean> {
-  try {
-    await access(filePath, constants.F_OK)
-    return true
-  } catch {
-    return false
-  }
-}
 import {
   type SpecRepository,
   type GetPersistedSpecImplementation,
@@ -49,6 +35,21 @@ import {
 } from '../domain/value-objects/implementation-suggestion-cache.js'
 import { type ImplementationSuggestionCachePort } from '../application/ports/implementation-suggestion-cache-port.js'
 import { FsImplementationSuggestionCache } from '../infrastructure/fs/fs-implementation-suggestion-cache.js'
+
+/**
+ * Checks whether a file exists at the given path.
+ *
+ * @param filePath - Absolute or relative path to check.
+ * @returns True when the path is accessible as a file.
+ */
+async function asyncFileExists(filePath: string): Promise<boolean> {
+  try {
+    await access(filePath, constants.F_OK)
+    return true
+  } catch {
+    return false
+  }
+}
 
 const confidenceThresholdSchema = z
   .enum(['HIGH', 'MEDIUM', 'MED', 'LOW', 'high', 'medium', 'med', 'low'])
@@ -96,9 +97,7 @@ export type SuggestImplementationProgressEvent =
   | { type: 'spec-done'; specId: string; candidatesCount: number }
   | { type: 'done'; totalSpecs: number; totalSuggestions: number }
 
-/**
- *
- */
+/** Callback invoked with progress events during suggestion analysis. */
 export type OnSuggestImplementationProgress = (event: SuggestImplementationProgressEvent) => void
 
 /** Input options for `SuggestImplementationLinks`. */
