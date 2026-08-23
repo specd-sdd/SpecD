@@ -126,4 +126,47 @@ describe('spec deps', () => {
       }),
     )
   })
+
+  it('suggest renders text output for existing deps, tags and validation by default', async () => {
+    setup()
+    const getOutput = captureStdout()
+    mockExecuteSuggestSpecDependencies.mockResolvedValueOnce({
+      result: 'ok',
+      specs: [
+        {
+          specId: 'default:auth/login',
+          title: 'Login',
+          existingDependsOn: ['default:auth/core'],
+          suggestedDependsOn: [
+            {
+              specId: 'default:auth/shared',
+              title: 'Shared Auth',
+              reason: 'Code import relationship',
+              alreadyIncluded: false,
+            },
+            {
+              specId: 'default:auth/core',
+              title: 'Core Auth',
+              reason: 'Already included dependency',
+              alreadyIncluded: true,
+            },
+          ],
+        },
+      ],
+      appliedMutations: { updatedSpecsCount: 1, depsAddedCount: 1 },
+      postApplyValidation: { status: 'all-valid', invalidSpecs: [] },
+    })
+    const program = makeProgram()
+    registerSpecDeps(program.command('spec'))
+
+    await program.parseAsync(['node', 'specd', 'spec', 'deps', 'suggest', 'auth/login'])
+
+    const out = getOutput()
+    expect(out).toContain('existing dependsOn:')
+    expect(out).toContain('default:auth/core')
+    expect(out).toContain('default:auth/shared [new]')
+    expect(out).toContain('default:auth/core [already included]')
+    expect(out).toContain('applied mutations: updated 1 specs (1 dependencies added)')
+    expect(out).toContain('post-apply validation: all specs valid')
+  })
 })

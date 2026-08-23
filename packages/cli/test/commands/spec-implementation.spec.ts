@@ -132,4 +132,40 @@ describe('spec implementation', () => {
       }),
     )
   })
+
+  it('suggest renders text output for existing files, confidence and mutations by default', async () => {
+    setup()
+    const getOutput = captureStdout()
+    mockExecuteSuggestImplementationLinks.mockResolvedValueOnce({
+      result: 'ok',
+      specs: [
+        {
+          specId: 'default:auth/login',
+          title: 'Login',
+          existing: { files: ['src/core.ts'], symbols: [], dependsOn: [] },
+          suggestions: [
+            {
+              file: 'src/auth.ts',
+              symbols: ['login'],
+              confidence: 'HIGH',
+              reasons: ['exact-ast-symbol-match'],
+              score: 160,
+              alreadyIncluded: false,
+            },
+          ],
+        },
+      ],
+      appliedMutations: { updatedSpecsCount: 1, filesAddedCount: 2, symbolsAddedCount: 3 },
+    })
+    const program = makeProgram()
+    registerSpecImplementation(program.command('spec'))
+
+    await program.parseAsync(['node', 'specd', 'spec', 'implementation', 'suggest', 'auth/login'])
+
+    const out = getOutput()
+    expect(out).toContain('existing:')
+    expect(out).toContain('src/core.ts')
+    expect(out).toContain('[new] [HIGH] src/auth.ts [login]')
+    expect(out).toContain('applied mutations: updated 1 specs (2 files, 3 symbols added)')
+  })
 })
