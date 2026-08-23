@@ -147,6 +147,7 @@ export function registerSpecImplementation(parent: Command): void {
 
   command
     .command('suggest [specPath]')
+    .allowExcessArguments(false)
     .description('Suggest implementation links for specs based on static analysis.')
     .option('--spec <id>', 'spec id (repeatable)', collect, [])
     .option('--all', 'suggest for all specs')
@@ -175,11 +176,17 @@ export function registerSpecImplementation(parent: Command): void {
           const { createSuggestImplementationLinks } = await import('@specd/sdk')
           const useCase = createSuggestImplementationLinks(config)
           const targetSpecId = specPath ? parseSpecId(specPath, config).specId : undefined
-          const specIds = opts.spec.length > 0 ? opts.spec.map((s) => parseSpecId(s, config).specId) : undefined
+          const specIds =
+            opts.spec.length > 0 ? opts.spec.map((s) => parseSpecId(s, config).specId) : undefined
           const fmt = parseFormat(opts.format)
 
-          const isInteractiveText = fmt === 'text' && Boolean(process.stderr?.isTTY || process.stdout?.isTTY)
-          const spinner = isInteractiveText ? (await import('nanospinner')).createSpinner('Analyzing implementation links...').start() : null
+          const isInteractiveText =
+            fmt === 'text' && Boolean(process.stderr?.isTTY || process.stdout?.isTTY)
+          const spinner = isInteractiveText
+            ? (await import('nanospinner'))
+                .createSpinner('Analyzing implementation links...')
+                .start()
+            : null
 
           let result
           try {
@@ -189,7 +196,9 @@ export function registerSpecImplementation(parent: Command): void {
               ...(opts.workspace !== undefined ? { workspace: opts.workspace } : {}),
               ...(opts.all !== undefined ? { all: opts.all } : {}),
               ...(opts.apply !== undefined ? { apply: opts.apply } : {}),
-              ...(opts.confidence !== undefined ? { confidenceThreshold: opts.confidence as 'HIGH' | 'MEDIUM' | 'MED' | 'LOW' } : {}),
+              ...(opts.confidence !== undefined
+                ? { confidenceThreshold: opts.confidence as 'HIGH' | 'MEDIUM' | 'MED' | 'LOW' }
+                : {}),
               ...(opts.rebuildCache !== undefined ? { rebuildCache: opts.rebuildCache } : {}),
               ...(spinner
                 ? {
@@ -197,9 +206,13 @@ export function registerSpecImplementation(parent: Command): void {
                       if (evt.type === 'discovery-start') {
                         spinner.update({ text: 'Discovering specifications across workspaces...' })
                       } else if (evt.type === 'start') {
-                        spinner.update({ text: `Analyzing implementation links for ${evt.totalSpecs} specification(s)...` })
+                        spinner.update({
+                          text: `Analyzing implementation links for ${evt.totalSpecs} specification(s)...`,
+                        })
                       } else if (evt.type === 'spec-start') {
-                        spinner.update({ text: `[${evt.index}/${evt.totalSpecs}] Analyzing ${evt.specId}...` })
+                        spinner.update({
+                          text: `[${evt.index}/${evt.totalSpecs}] Analyzing ${evt.specId}...`,
+                        })
                       }
                     },
                   }

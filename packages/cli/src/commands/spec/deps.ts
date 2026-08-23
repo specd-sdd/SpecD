@@ -171,6 +171,7 @@ export function registerSpecDeps(parent: Command): void {
 
   command
     .command('suggest [specPath]')
+    .allowExcessArguments(false)
     .description('Suggest spec dependencies based on AST import tracing.')
     .option('--spec <id>', 'spec id (repeatable)', collect, [])
     .option('--all', 'suggest for all specs')
@@ -199,11 +200,17 @@ export function registerSpecDeps(parent: Command): void {
           const { createSuggestSpecDependencies } = await import('@specd/sdk')
           const useCase = createSuggestSpecDependencies(config)
           const targetSpecId = specPath ? resolveSpecId(specPath, config) : undefined
-          const specIds = opts.spec.length > 0 ? opts.spec.map((s) => resolveSpecId(s, config)) : undefined
+          const specIds =
+            opts.spec.length > 0 ? opts.spec.map((s) => resolveSpecId(s, config)) : undefined
           const fmt = parseFormat(opts.format)
 
-          const isInteractiveText = fmt === 'text' && Boolean(process.stderr?.isTTY || process.stdout?.isTTY)
-          const spinner = isInteractiveText ? (await import('nanospinner')).createSpinner('Analyzing specification dependencies...').start() : null
+          const isInteractiveText =
+            fmt === 'text' && Boolean(process.stderr?.isTTY || process.stdout?.isTTY)
+          const spinner = isInteractiveText
+            ? (await import('nanospinner'))
+                .createSpinner('Analyzing specification dependencies...')
+                .start()
+            : null
 
           let result
           try {
@@ -213,21 +220,37 @@ export function registerSpecDeps(parent: Command): void {
               ...(opts.workspace !== undefined ? { workspace: opts.workspace } : {}),
               ...(opts.all !== undefined ? { all: opts.all } : {}),
               ...(opts.apply !== undefined ? { apply: opts.apply } : {}),
-              ...(opts.createChange !== undefined ? { createAlignmentChange: opts.createChange } : {}),
+              ...(opts.createChange !== undefined
+                ? { createAlignmentChange: opts.createChange }
+                : {}),
               ...(opts.rebuildCache !== undefined ? { rebuildCache: opts.rebuildCache } : {}),
               ...(spinner
                 ? {
                     onProgress: (evt) => {
                       if (evt.type === 'warmup-start') {
-                        spinner.update({ text: 'Warming up implementation cache across workspaces...' })
-                      } else if (evt.type === 'warmup-progress' && evt.event.type === 'discovery-start') {
+                        spinner.update({
+                          text: 'Warming up implementation cache across workspaces...',
+                        })
+                      } else if (
+                        evt.type === 'warmup-progress' &&
+                        evt.event.type === 'discovery-start'
+                      ) {
                         spinner.update({ text: 'Discovering specifications across workspaces...' })
-                      } else if (evt.type === 'warmup-progress' && evt.event.type === 'spec-start') {
-                        spinner.update({ text: `[${evt.event.index}/${evt.event.totalSpecs}] Warming cache: ${evt.event.specId}...` })
+                      } else if (
+                        evt.type === 'warmup-progress' &&
+                        evt.event.type === 'spec-start'
+                      ) {
+                        spinner.update({
+                          text: `[${evt.event.index}/${evt.event.totalSpecs}] Warming cache: ${evt.event.specId}...`,
+                        })
                       } else if (evt.type === 'start') {
-                        spinner.update({ text: `Tracing dependencies for ${evt.totalSpecs} specification(s)...` })
+                        spinner.update({
+                          text: `Tracing dependencies for ${evt.totalSpecs} specification(s)...`,
+                        })
                       } else if (evt.type === 'spec-start') {
-                        spinner.update({ text: `[${evt.index}/${evt.totalSpecs}] Tracing dependencies: ${evt.specId}...` })
+                        spinner.update({
+                          text: `[${evt.index}/${evt.totalSpecs}] Tracing dependencies: ${evt.specId}...`,
+                        })
                       } else if (evt.type === 'validation-start') {
                         spinner.update({ text: 'Validating specifications consistency...' })
                       }
