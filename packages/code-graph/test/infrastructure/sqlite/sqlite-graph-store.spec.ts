@@ -852,6 +852,96 @@ describe('SQLiteGraphStore', () => {
     await store.close()
   })
 
+  it('matches findSymbols workspace filters as exact case-sensitive prefixes without wildcards', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-test-'))
+
+    const store = new SQLiteGraphStore(tempDir)
+    await store.open()
+
+    const coreFile = createFileNode({
+      path: 'core:src/alpha.ts',
+      configRelativePath: '',
+      language: 'typescript',
+      contentHash: 'sha256:alpha',
+      workspace: 'core',
+    })
+    const upperFile = createFileNode({
+      path: 'CORE:src/beta.ts',
+      configRelativePath: '',
+      language: 'typescript',
+      contentHash: 'sha256:beta',
+      workspace: 'CORE',
+    })
+    const underscoreFile = createFileNode({
+      path: 'my_ws:src/gamma.ts',
+      configRelativePath: '',
+      language: 'typescript',
+      contentHash: 'sha256:gamma',
+      workspace: 'my_ws',
+    })
+    const percentFile = createFileNode({
+      path: 'a%b:src/delta.ts',
+      configRelativePath: '',
+      language: 'typescript',
+      contentHash: 'sha256:delta',
+      workspace: 'a%b',
+    })
+    const coreSymbol = createSymbolNode({
+      name: 'AlphaService',
+      kind: SymbolKind.Class,
+      filePath: coreFile.path,
+      line: 1,
+      column: 0,
+    })
+    const upperSymbol = createSymbolNode({
+      name: 'BetaService',
+      kind: SymbolKind.Class,
+      filePath: upperFile.path,
+      line: 1,
+      column: 0,
+    })
+    const underscoreSymbol = createSymbolNode({
+      name: 'GammaService',
+      kind: SymbolKind.Class,
+      filePath: underscoreFile.path,
+      line: 1,
+      column: 0,
+    })
+    const percentSymbol = createSymbolNode({
+      name: 'DeltaService',
+      kind: SymbolKind.Class,
+      filePath: percentFile.path,
+      line: 1,
+      column: 0,
+    })
+
+    await store.bulkLoad({
+      files: [coreFile, upperFile, underscoreFile, percentFile],
+      symbols: [coreSymbol, upperSymbol, underscoreSymbol, percentSymbol],
+      specs: [],
+      relations: [],
+    })
+
+    const exactCase = await store.findSymbols({ workspace: 'core' })
+    expect(exactCase.map((symbol) => symbol.id)).toEqual([coreSymbol.id])
+
+    const differentCase = await store.findSymbols({ workspace: 'CORE' })
+    expect(differentCase.map((symbol) => symbol.id)).toEqual([upperSymbol.id])
+
+    expect(await store.findSymbols({ workspace: 'Core' })).toHaveLength(0)
+
+    const literalUnderscore = await store.findSymbols({ workspace: 'my_ws' })
+    expect(literalUnderscore.map((symbol) => symbol.id)).toEqual([underscoreSymbol.id])
+    expect(await store.findSymbols({ workspace: 'mysws' })).toHaveLength(0)
+
+    const literalPercent = await store.findSymbols({ workspace: 'a%b' })
+    expect(literalPercent.map((symbol) => symbol.id)).toEqual([percentSymbol.id])
+    expect(await store.findSymbols({ workspace: 'ab' })).toHaveLength(0)
+    expect(await store.findSymbols({ workspace: 'a%%b' })).toHaveLength(0)
+
+    await store.close()
+  })
+
   it('expands specd/code-shaped queries before applying sqlite ranking', async () => {
     tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-test-'))
 

@@ -1176,8 +1176,10 @@ export class SQLiteGraphDatabase {
     }
 
     if (query.workspace !== undefined) {
-      conditions.push('file_path LIKE ?')
-      params.push(`${query.workspace}:%`)
+      // Exact, case-sensitive prefix match (mirrors InMemoryGraphStore.startsWith):
+      // avoids LIKE's ASCII case-folding and % / _ wildcard semantics.
+      conditions.push('substr(file_path, 1, length(?)) = ?')
+      params.push(`${query.workspace}:`, `${query.workspace}:`)
     }
 
     if (query.filePath !== undefined && !needsFilePathPatternFilter) {

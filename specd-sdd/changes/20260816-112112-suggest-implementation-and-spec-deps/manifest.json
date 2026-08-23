@@ -1,7 +1,7 @@
 {
   "name": "suggest-implementation-and-spec-deps",
   "createdAt": "2026-08-16T11:21:12.000Z",
-  "updatedAt": "2026-08-23T20:57:35.608Z",
+  "updatedAt": "2026-08-23T21:11:15.705Z",
   "description": "Add SDK use cases and CLI commands to suggest implementation links and spec dependencies with post-apply validation",
   "schema": {
     "name": "schema-std",
@@ -913,7 +913,7 @@
           "key": "code-graph:graph-store",
           "filename": "deltas/code-graph/graph-store/spec.md.delta.yaml",
           "state": "complete",
-          "validatedHash": "sha256:04d47e5762c89ec6a5cb216fbef62a7d508dd4fd35c0ab71458b1edd7f8244ed"
+          "validatedHash": "sha256:11c2d97e0cb74d7b5337b762a3c7765b7f3deec390723827f3d3bcae9b85e48e"
         }
       ]
     },
@@ -926,7 +926,7 @@
         {
           "key": "cli:spec-implementation",
           "filename": "deltas/cli/spec-implementation/verify.md.delta.yaml",
-          "state": "complete",
+          "state": "pending-review",
           "validatedHash": "sha256:d165c8781de5ca61864ee1f76617d21f0b4e73ce9fc3ab962458b81f7f261300"
         },
         {
@@ -956,7 +956,7 @@
         {
           "key": "code-graph:graph-store",
           "filename": "deltas/code-graph/graph-store/verify.md.delta.yaml",
-          "state": "pending-review",
+          "state": "complete",
           "validatedHash": "sha256:78304bb5f557c40c5df8e90ea58193c9b4993b033c1c6b01852d9a3f0d988dc2"
         }
       ]
@@ -2527,6 +2527,42 @@
         {
           "type": "specs",
           "files": ["cli:spec-implementation"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:spec-implementation",
+            "cli:spec-deps",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies",
+            "code-graph:language-adapter",
+            "code-graph:graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-23T21:11:15.473Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [code-graph:graph-store]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:graph-store"]
         },
         {
           "type": "verify",
