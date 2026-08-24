@@ -482,6 +482,54 @@ describe('SuggestSpecDependencies', () => {
     ).rejects.toBeInstanceOf(InvalidInputError)
   })
 
+  it('throws WorkspaceNotFoundError when a resolved workspace yields no specs', async () => {
+    const { suggestImplementationLinks } = setupTest()
+
+    const emptyRepo = {
+      list: vi.fn().mockResolvedValue([]),
+    } as unknown as SpecRepository
+    const repos = new Map<string, SpecRepository>([['empty', emptyRepo]])
+
+    const useCase = new SuggestSpecDependencies({
+      suggestImplementationLinks:
+        suggestImplementationLinks as unknown as SuggestImplementationLinks,
+      specRepositories: repos,
+      getPersistedDeps: vi.fn() as unknown as GetPersistedSpecDeps,
+      updatePersistedDeps: vi.fn() as unknown as UpdatePersistedSpecDeps,
+      validateSpecs: vi.fn() as unknown as ValidateSpecs,
+      cache: new InMemoryImplementationSuggestionCache(),
+      specDepsCache: new InMemorySpecDepsSuggestionCache(),
+      projectDir: '/tmp/test-empty-workspace',
+    })
+
+    await expect(useCase.execute({ workspace: 'empty' })).rejects.toBeInstanceOf(
+      WorkspaceNotFoundError,
+    )
+  })
+
+  it('throws InvalidInputError when all repositories are empty under all:true', async () => {
+    const { suggestImplementationLinks } = setupTest()
+
+    const emptyRepo = {
+      list: vi.fn().mockResolvedValue([]),
+    } as unknown as SpecRepository
+    const repos = new Map<string, SpecRepository>([['sdk', emptyRepo]])
+
+    const useCase = new SuggestSpecDependencies({
+      suggestImplementationLinks:
+        suggestImplementationLinks as unknown as SuggestImplementationLinks,
+      specRepositories: repos,
+      getPersistedDeps: vi.fn() as unknown as GetPersistedSpecDeps,
+      updatePersistedDeps: vi.fn() as unknown as UpdatePersistedSpecDeps,
+      validateSpecs: vi.fn() as unknown as ValidateSpecs,
+      cache: new InMemoryImplementationSuggestionCache(),
+      specDepsCache: new InMemorySpecDepsSuggestionCache(),
+      projectDir: '/tmp/test-empty-all',
+    })
+
+    await expect(useCase.execute({ all: true })).rejects.toBeInstanceOf(InvalidInputError)
+  })
+
   it('supports factory constructor overloads', () => {
     const { suggestImplementationLinks, specRepositories, getPersistedDeps, updatePersistedDeps } =
       setupTest()

@@ -360,6 +360,16 @@ export class SuggestSpecDependencies {
           }
         }
       }
+      // A workspace that resolves but yields no specs (or an empty monorepo
+      // under `all`) is an input error, not a silent empty result.
+      if (targetSpecs.length === 0) {
+        if (input.workspace !== undefined) {
+          throw new WorkspaceNotFoundError(input.workspace)
+        }
+        throw new InvalidInputError(
+          'No specs found to analyze — the configured spec repositories are empty',
+        )
+      }
 
       const resultSpecs: SpecDependencySuggestion[] = []
       let updatedSpecsCount = 0
