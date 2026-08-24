@@ -1332,7 +1332,7 @@ describe('CompileContext', () => {
   })
 
   describe('Requirement: Staleness detection and content fallback', () => {
-    it('emits staleness warning when contentHash does not match current file', async () => {
+    it('stays warning-free when stale metadata self-heals through regeneration', async () => {
       const loginSpec = makeSpec({
         workspace: 'default',
         name: 'auth/login',
@@ -1342,7 +1342,7 @@ describe('CompileContext', () => {
       const loginContent = '# Login\n'
       const jwtContent = '# JWT\n'
       const loginMetadata = freshMetadata(loginContent, { dependsOn: ['auth/jwt'] })
-      // Deliberately wrong hash → stale metadata
+      // Deliberately wrong hash → stale metadata that materialization must self-heal
       const staleMetadata = JSON.stringify({
         title: 'JWT',
         description: 'Old JWT spec.',
@@ -1373,9 +1373,9 @@ describe('CompileContext', () => {
         sections: ['rules'],
       })
 
-      const stalenessWarnings = result.warnings.filter((w) => w.type === 'stale-metadata')
-      expect(stalenessWarnings.length).toBeGreaterThan(0)
-      expect(stalenessWarnings[0]?.path).toBe('default:auth/jwt')
+      // Regeneration is provenance, not a warning condition
+      expect(result.warnings.filter((w) => w.type === 'stale-metadata')).toHaveLength(0)
+      expect(result.warnings.filter((w) => w.type === 'missing-metadata')).toHaveLength(0)
     })
 
     it('emits no staleness warning when all contentHashes match', async () => {
@@ -1692,9 +1692,9 @@ describe('CompileContext', () => {
         sections: ['rules'],
       })
 
-      // Should emit a staleness warning (no metadata) and include content from metadataExtraction
-      const stalenessWarnings = result.warnings.filter((w) => w.type === 'stale-metadata')
-      expect(stalenessWarnings.length).toBeGreaterThan(0)
+      // Change-scoped spec: extraction fallback over base artifacts yields content, silently
+      const missingWarnings = result.warnings.filter((w) => w.type === 'missing-metadata')
+      expect(missingWarnings).toHaveLength(0)
       const specEntry = result.specs.find((s) => s.specId.includes('auth/login'))
       expect(specEntry?.content).toContain('Some requirements.')
     })
@@ -2799,7 +2799,9 @@ describe('CompileContext', () => {
       const specEntry = result.specs.find((s) => s.specId === 'default:auth/login')
       expect(specEntry).toBeDefined()
       expect(specEntry!.description).toContain('Login spec.')
-      expect(specEntry!.content ?? '').toBe('')
+      // No extraction declared in schema → canonical metadata renders the content
+      expect(specEntry!.content).toContain('**Description:** Login spec.')
+      expect(specEntry!.content).toContain('Merged rule')
       expect(specEntry!.content).not.toContain('#### spec.md')
       expect(result.warnings.filter((w) => w.type === 'preview')).toHaveLength(0)
     })
@@ -3160,7 +3162,9 @@ describe('CompileContext', () => {
       const content = result.specs.find((s) => s.specId === 'default:auth/login')?.content ?? ''
       const specEntry = result.specs.find((s) => s.specId === 'default:auth/login')
       expect(specEntry?.description).toContain('Merged preview spec.')
-      expect(content).toBe('')
+      // No extraction declared in schema → canonical metadata renders the content
+      expect(content).toContain('**Description:** Merged preview spec.')
+      expect(content).toContain('Base rule')
       expect(content).not.toContain('#### spec.md')
     })
 
@@ -3366,7 +3370,7 @@ describe('CompileContext', () => {
       expect(baseResult.contextFingerprint).not.toBe(seededResult.contextFingerprint)
     })
 
-    it('changes when warnings change', async () => {
+    it('keeps warnings silent across metadata regeneration', async () => {
       const loginSpec = makeSpec({
         workspace: 'default',
         name: 'auth/login',
@@ -3407,9 +3411,9 @@ describe('CompileContext', () => {
         sections: ['rules'],
       })
 
+      // Regeneration is provenance — neither cache state may surface warnings
       expect(freshResult.warnings).toHaveLength(0)
-      expect(staleResult.warnings.length).toBeGreaterThan(0)
-      expect(freshResult.contextFingerprint).not.toBe(staleResult.contextFingerprint)
+      expect(staleResult.warnings).toHaveLength(0)
     })
 
     it('remains equal when only lifecycle state or blockers change', async () => {
@@ -3601,14 +3605,19 @@ describe('CompileContext', () => {
         'auth/login/spec.md': loginContent,
       })
 
-      const change = makeChange('my-change', { specIds: ['default:auth/login'] })
+      const change = makeChange('my-change', { specIds: [] })
       const schema = makeSchema()
       const { sut } = makeSut({ change, schema, specRepos: new Map([['default', specRepo]]) })
 
       const result = await sut.execute({
         name: 'my-change',
         step: 'implementing',
-        config: { ...noOp, llmOptimizedContext: true, contextMode: 'full' },
+        config: {
+          ...noOp,
+          llmOptimizedContext: true,
+          contextMode: 'full',
+          contextIncludeSpecs: ['default:auth/login'],
+        },
       })
 
       expect(result.specs[0]!.content).toContain('Optimized context rules and constraints')
@@ -3617,7 +3626,7 @@ describe('CompileContext', () => {
       expect(result.warnings).toHaveLength(0)
     })
 
-    it('emits stale-optimization warning when optimizedContext is missing and llmOptimizedContext is true', async () => {
+    it('emits missing-optimization warning when optimizedContext is absent and llmOptimizedContext is true', async () => {
       const loginSpec = makeSpec({
         workspace: 'default',
         name: 'auth/login',
@@ -3636,17 +3645,22 @@ describe('CompileContext', () => {
         'auth/login/spec.md': loginContent,
       })
 
-      const change = makeChange('my-change', { specIds: ['default:auth/login'] })
+      const change = makeChange('my-change', { specIds: [] })
       const schema = makeSchema()
       const { sut } = makeSut({ change, schema, specRepos: new Map([['default', specRepo]]) })
 
       const result = await sut.execute({
         name: 'my-change',
         step: 'implementing',
-        config: { ...noOp, llmOptimizedContext: true, contextMode: 'full' },
+        config: {
+          ...noOp,
+          llmOptimizedContext: true,
+          contextMode: 'full',
+          contextIncludeSpecs: ['default:auth/login'],
+        },
       })
 
-      expect(result.warnings.some((w) => w.type === 'stale-optimization')).toBe(true)
+      expect(result.warnings.some((w) => w.type === 'missing-optimization')).toBe(true)
     })
 
     it('bypasses optimizedContext when specific sections are requested that exclude rules or constraints', async () => {
@@ -3672,7 +3686,7 @@ describe('CompileContext', () => {
         'auth/login/spec.md': loginContent,
       })
 
-      const change = makeChange('my-change', { specIds: ['default:auth/login'] })
+      const change = makeChange('my-change', { specIds: [] })
       const schema = makeSchema()
       const { sut } = makeSut({ change, schema, specRepos: new Map([['default', specRepo]]) })
 
@@ -3680,7 +3694,12 @@ describe('CompileContext', () => {
       const resultOnlyRules = await sut.execute({
         name: 'my-change',
         step: 'implementing',
-        config: { ...noOp, llmOptimizedContext: true, contextMode: 'full' },
+        config: {
+          ...noOp,
+          llmOptimizedContext: true,
+          contextMode: 'full',
+          contextIncludeSpecs: ['default:auth/login'],
+        },
         sections: ['rules'],
       })
 
@@ -3695,7 +3714,12 @@ describe('CompileContext', () => {
       const resultOnlyConstraints = await sut.execute({
         name: 'my-change',
         step: 'implementing',
-        config: { ...noOp, llmOptimizedContext: true, contextMode: 'full' },
+        config: {
+          ...noOp,
+          llmOptimizedContext: true,
+          contextMode: 'full',
+          contextIncludeSpecs: ['default:auth/login'],
+        },
         sections: ['constraints'],
       })
 
@@ -3737,14 +3761,19 @@ describe('CompileContext', () => {
         'auth/login/spec.md': loginContent,
       })
 
-      const change = makeChange('my-change', { specIds: ['default:auth/login'] })
+      const change = makeChange('my-change', { specIds: [] })
       const schema = makeSchema()
       const { sut } = makeSut({ change, schema, specRepos: new Map([['default', specRepo]]) })
 
       const result = await sut.execute({
         name: 'my-change',
         step: 'implementing',
-        config: { ...noOp, llmOptimizedContext: true, contextMode: 'full' },
+        config: {
+          ...noOp,
+          llmOptimizedContext: true,
+          contextMode: 'full',
+          contextIncludeSpecs: ['default:auth/login'],
+        },
         sections: ['rules', 'constraints', 'scenarios'],
       })
 
@@ -3802,6 +3831,309 @@ describe('CompileContext', () => {
 
       expect(result.specs.every((entry) => entry.mode === 'full')).toBe(true)
       expect(result.specs[0]!.content).toContain('Login')
+    })
+  })
+
+  describe('Extracted-first rendering and warning semantics', () => {
+    const mergedV1 =
+      '# New Thing\n\n## Description\n\nBrand new capability.\n\n## Auth\n\n- Rule one'
+    const mergedV2 =
+      '# New Thing\n\n## Description\n\nBrand new capability v2.\n\n## Auth\n\n- Rule two'
+
+    const extractingParser: ArtifactParser = {
+      ...stubParser,
+      parse: (content: string) => ({
+        root: {
+          type: 'document',
+          children:
+            content.includes('## Description') && content.includes('## Auth')
+              ? [
+                  {
+                    type: 'section',
+                    label: 'Description',
+                    children: [
+                      {
+                        type: 'paragraph',
+                        value: content.includes('v2')
+                          ? 'Brand new capability v2.'
+                          : 'Brand new capability.',
+                      },
+                    ],
+                  },
+                  {
+                    type: 'section',
+                    label: 'Auth',
+                    children: [
+                      content.includes('Rule two')
+                        ? { type: 'list-item', label: 'Rule two', value: 'Rule two' }
+                        : { type: 'list-item', label: 'Rule one', value: 'Rule one' },
+                    ],
+                  },
+                ]
+              : [],
+        },
+      }),
+      renderSubtree: (node: {
+        value?: unknown
+        label?: unknown
+        children?: readonly unknown[]
+      }): string =>
+        (node.value as string | undefined) ??
+        (node.children ?? [])
+          .map((c) =>
+            (c as { value?: unknown }).value !== undefined
+              ? String((c as { value: unknown }).value)
+              : (c as { label?: unknown }).label !== undefined
+                ? String((c as { label: unknown }).label)
+                : '',
+          )
+          .filter(Boolean)
+          .join('\n'),
+    }
+
+    it('summary mode renders a change-only new spec from merged extraction without warnings', async () => {
+      const previewSpec: PreviewSpec = {
+        execute: vi.fn().mockResolvedValue({
+          specId: 'default:new-thing',
+          changeName: 'my-change',
+          files: [{ filename: 'spec.md', base: '', merged: mergedV1 }],
+          warnings: [],
+        }),
+      } as unknown as PreviewSpec
+
+      const change = makeChange('my-change', { specIds: ['default:new-thing'] })
+      const schema = makeSchema({
+        artifacts: [makeArtifactType('spec', { scope: 'spec' })],
+        metadataExtraction: defaultExtraction,
+      })
+      const parsers: ArtifactParserRegistry = new Map([['markdown', extractingParser]])
+
+      const { sut } = makeSut({
+        change,
+        schema,
+        specRepos: new Map([['default', makeSpecRepo([], {})]]),
+        previewSpec,
+        parsers,
+        getMetadata: missingGetSpecMetadata,
+      })
+
+      const result = await sut.execute({
+        name: 'my-change',
+        step: 'designing',
+        config: { ...noOp, contextMode: 'summary' },
+      })
+
+      const entry = result.specs.find((s) => s.specId === 'default:new-thing')
+      expect(entry).toBeDefined()
+      expect(entry!.mode).toBe('summary')
+      expect(entry!.title).toBe('New Thing')
+      expect(entry!.description).toContain('Brand new capability.')
+      expect(entry!.content).toBeUndefined()
+      expect(result.warnings).toHaveLength(0)
+    })
+
+    it('falls back to canonical metadata and warns preview when PreviewSpec throws', async () => {
+      const loginSpec = makeSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md'],
+      })
+      const loginContent = '# Login\n'
+      const metadata = freshMetadata(loginContent, { description: 'Login canonical.' })
+      const specRepo = makeSpecRepo([loginSpec], {
+        'auth/login/.specd-metadata.yaml': metadata,
+        'auth/login/spec.md': loginContent,
+      })
+      const previewSpec: PreviewSpec = {
+        execute: vi.fn().mockRejectedValue(new Error('preview exploded')),
+      } as unknown as PreviewSpec
+
+      const change = makeChange('my-change', { specIds: ['default:auth/login'] })
+      const schema = makeSchema()
+      const { sut } = makeSut({
+        change,
+        schema,
+        specRepos: new Map([['default', specRepo]]),
+        previewSpec,
+      })
+
+      const result = await sut.execute({
+        name: 'my-change',
+        step: 'designing',
+        config: { ...noOp, contextMode: 'summary' },
+      })
+
+      const entry = result.specs.find((s) => s.specId === 'default:auth/login')
+      expect(entry!.description).toContain('Login canonical.')
+      expect(result.warnings.filter((w) => w.type === 'preview')).toHaveLength(1)
+      expect(result.warnings.filter((w) => w.type === 'missing-metadata')).toHaveLength(0)
+    })
+
+    it('never applies lock optimizations to change-scoped specs', async () => {
+      const loginSpec = makeSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md'],
+      })
+      const loginContent = '# Login\n'
+      const metadataObj = {
+        title: 'Login',
+        description: 'Standard description',
+        optimizedDescription: 'Optimized description',
+        optimizedContext: 'Optimized context rules and constraints',
+        contentHashes: { 'spec.md': sha256Hex(loginContent) },
+        rules: [{ requirement: 'Auth', rules: ['Standard rule'] }],
+        provenance: metadataProvenance(loginContent),
+      }
+      const specRepo = makeSpecRepo([loginSpec], {
+        'auth/login/.specd-metadata.yaml': JSON.stringify(metadataObj),
+        'auth/login/spec.md': loginContent,
+      })
+
+      const change = makeChange('my-change', { specIds: ['default:auth/login'] })
+      const schema = makeSchema()
+      const { sut } = makeSut({ change, schema, specRepos: new Map([['default', specRepo]]) })
+
+      const result = await sut.execute({
+        name: 'my-change',
+        step: 'implementing',
+        config: { ...noOp, llmOptimizedContext: true, contextMode: 'full' },
+      })
+
+      expect(result.specs[0]!.content).not.toContain('Optimized context rules and constraints')
+      expect(result.specs[0]!.content).toContain('Standard rule')
+      expect(
+        result.warnings.filter(
+          (w) => w.type === 'missing-optimization' || w.type === 'stale-optimization',
+        ),
+      ).toHaveLength(0)
+    })
+
+    it('types stale-optimization from optimizationStatus for non-scoped specs', async () => {
+      const otherSpec = makeSpec({
+        workspace: 'default',
+        name: 'auth/other',
+        filenames: ['spec.md'],
+      })
+      const otherContent = '# Other\n'
+      const metadataObj = {
+        title: 'Other',
+        description: 'Other description',
+        optimizationStatus: { optimizedContext: 'stale' },
+        contentHashes: { 'spec.md': sha256Hex(otherContent) },
+        provenance: metadataProvenance(otherContent),
+      }
+      const specRepo = makeSpecRepo([otherSpec], {
+        'auth/other/.specd-metadata.yaml': JSON.stringify(metadataObj),
+        'auth/other/spec.md': otherContent,
+      })
+
+      const change = makeChange('my-change', { specIds: [] })
+      const schema = makeSchema()
+      const { sut } = makeSut({ change, schema, specRepos: new Map([['default', specRepo]]) })
+
+      const result = await sut.execute({
+        name: 'my-change',
+        step: 'implementing',
+        config: { ...noOp, llmOptimizedContext: true, contextIncludeSpecs: ['default:auth/other'] },
+      })
+
+      expect(
+        result.warnings.some(
+          (w) => w.type === 'stale-optimization' && w.path === 'default:auth/other',
+        ),
+      ).toBe(true)
+      expect(result.warnings.some((w) => w.type === 'missing-optimization')).toBe(false)
+    })
+
+    it('manifest-declared deps traverse for non-persisted scoped specs without warnings', async () => {
+      const sharedSpec = makeSpec({
+        workspace: 'default',
+        name: 'auth/shared',
+        filenames: ['spec.md', 'spec-lock.json'],
+      })
+      const sharedContent = '# Shared\n'
+      const specRepo = makeSpecRepo([sharedSpec], {
+        'auth/shared/spec.md': sharedContent,
+        'auth/shared/spec-lock.json': lockJson(['default:ghost']),
+      })
+
+      // auth/login does not exist in any repository; its deps come from the manifest
+      const change = makeChange('my-change', { specIds: ['default:auth/login'] })
+      change.setSpecDependsOn('default:auth/login', ['default:auth/shared'])
+
+      const schema = makeSchema()
+      const { sut } = makeSut({ change, schema, specRepos: new Map([['default', specRepo]]) })
+
+      const result = await sut.execute({
+        name: 'my-change',
+        step: 'designing',
+        config: noOp,
+        followDeps: true,
+      })
+
+      expect(result.specs.some((s) => s.specId === 'default:auth/shared')).toBe(true)
+      // ghost is neither persisted nor in scope → traversal skips it silently
+      expect(result.specs.some((s) => s.specId === 'default:ghost')).toBe(false)
+      // the scoped root itself is unresolvable everywhere → single legit warning
+      const missingPaths = result.warnings
+        .filter((w) => w.type === 'missing-metadata')
+        .map((w) => w.path)
+        .sort()
+      // login (scoped root, unresolvable) and shared (dep without extractable metadata)
+      expect(missingPaths).toEqual(['default:auth/login', 'default:auth/shared'])
+    })
+
+    it('delta edits invalidate cached unchanged fingerprints', async () => {
+      const previewSpec: PreviewSpec = {
+        execute: vi
+          .fn()
+          .mockResolvedValueOnce({
+            specId: 'default:new-thing',
+            changeName: 'my-change',
+            files: [{ filename: 'spec.md', base: '', merged: mergedV1 }],
+            warnings: [],
+          })
+          .mockResolvedValueOnce({
+            specId: 'default:new-thing',
+            changeName: 'my-change',
+            files: [{ filename: 'spec.md', base: '', merged: mergedV2 }],
+            warnings: [],
+          }),
+      } as unknown as PreviewSpec
+
+      const change = makeChange('my-change', { specIds: ['default:new-thing'] })
+      const schema = makeSchema({
+        artifacts: [makeArtifactType('spec', { scope: 'spec' })],
+        metadataExtraction: defaultExtraction,
+      })
+      const parsers: ArtifactParserRegistry = new Map([['markdown', extractingParser]])
+
+      const { sut } = makeSut({
+        change,
+        schema,
+        specRepos: new Map([['default', makeSpecRepo([], {})]]),
+        previewSpec,
+        parsers,
+        getMetadata: missingGetSpecMetadata,
+      })
+
+      const first = await sut.execute({
+        name: 'my-change',
+        step: 'designing',
+        config: { ...noOp, contextMode: 'full' },
+      })
+      expect(first.status).toBe('changed')
+      expect(first.specs[0]!.content).toContain('Brand new capability.')
+
+      const second = await sut.execute({
+        name: 'my-change',
+        step: 'designing',
+        config: { ...noOp, contextMode: 'full' },
+        fingerprint: first.contextFingerprint,
+      })
+      expect(second.status).toBe('changed')
+      expect(second.specs[0]!.content).toContain('Brand new capability v2.')
     })
   })
 })

@@ -35,6 +35,22 @@ export interface DependsOnFallback {
 }
 
 /**
+ * Behaviour options for {@link traverseDependsOn}.
+ */
+export interface TraverseDependsOnOptions {
+  /**
+   * How to handle discovered dependencies that do not resolve to a persisted
+   * spec in their workspace repository:
+   *
+   * - `'warn'` (default) — register the discovery first (legacy behaviour);
+   *   unmaterializable persisted specs additionally emit `missing-metadata`.
+   * - `'skip'` — probe existence BEFORE registration; unresolvable discoveries
+   *   are neither registered nor warned.
+   */
+  readonly unresolved?: 'warn' | 'skip'
+}
+
+/**
  * Recursively follows `dependsOn` links from a spec's `metadata.json`,
  * adding newly discovered specs to `dependsOnAdded`. Uses DFS with ancestor
  * tracking to detect and break cycles.
@@ -50,6 +66,7 @@ export interface DependsOnFallback {
  * @param maxDepth - Maximum traversal depth; `undefined` = unlimited
  * @param currentDepth - Current traversal depth (0 = starting spec)
  * @param fallback - Optional fallback config for extracting dependsOn from spec content
+ * @param options - Optional behaviour options (unresolved-dependency handling)
  */
 export async function traverseDependsOn(
   workspace: string,
@@ -63,6 +80,7 @@ export async function traverseDependsOn(
   maxDepth: number | undefined,
   currentDepth: number,
   fallback?: DependsOnFallback,
+  options?: TraverseDependsOnOptions,
 ): Promise<void> {
   const key = `${workspace}:${capPath}`
 
@@ -74,6 +92,18 @@ export async function traverseDependsOn(
   allSeen.add(key)
 
   if (!includedSpecs.has(key)) {
+    if (options?.unresolved === 'skip') {
+      const wsProbe = workspaces.get(workspace)
+      if (wsProbe === undefined) return
+      let probePath: SpecPath
+      try {
+        probePath = SpecPath.parse(capPath)
+      } catch {
+        return
+      }
+      const persistedSpec = await wsProbe.specRepo.get(probePath)
+      if (persistedSpec === null) return
+    }
     dependsOnAdded.set(key, { workspace, capPath })
   }
 
@@ -136,6 +166,7 @@ export async function traverseDependsOn(
       maxDepth,
       currentDepth + 1,
       fallback,
+      options,
     )
   }
 }

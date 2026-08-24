@@ -32,14 +32,6 @@ export function appendMaterializationDiagnostics(
   result: GetSpecMetadataResult,
   warnings: ContextWarning[],
 ): void {
-  if (result.regenerated) {
-    warnings.push({
-      type: 'stale-metadata',
-      path: specId,
-      message: `Metadata for '${specId}' was regenerated (${result.source}).`,
-    })
-  }
-
   for (const warning of result.warnings) {
     if (warning.kind === 'metadata-cache-write-failed') {
       warnings.push({

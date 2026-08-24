@@ -6,6 +6,7 @@ import {
   type GetProjectContextResult,
 } from '../../../src/application/use-cases/get-project-context.js'
 import { type CompileContextConfig } from '../../../src/application/use-cases/compile-context.js'
+import { type GetSpecMetadata } from '../../../src/application/use-cases/get-spec-metadata.js'
 import { SchemaNotFoundError } from '../../../src/application/errors/schema-not-found-error.js'
 import { Spec } from '../../../src/domain/entities/spec.js'
 import { ExtractorTransformError } from '../../../src/domain/errors/extractor-transform-error.js'
@@ -832,9 +833,52 @@ describe('GetProjectContext', () => {
 
       expect(
         result.warnings.some(
-          (w) => w.type === 'stale-optimization' && w.path === 'default:auth/login',
+          (w) => w.type === 'missing-optimization' && w.path === 'default:auth/login',
         ),
       ).toBe(true)
+    })
+
+    it('cache-miss regeneration does not emit a warning', async () => {
+      const schema = makeSchema([
+        makeArtifactType('specs', { scope: 'spec', output: 'spec.md', format: 'markdown' }),
+      ])
+      const hasher = makeContentHasher()
+      const spec = makeSpec({ workspace: 'default', name: 'auth/login', filenames: ['spec.md'] })
+      const repo = makeSpecRepository({
+        specs: [spec],
+        artifacts: { 'auth/login/spec.md': '# Content\n' },
+      })
+      const stubGet: GetSpecMetadata = {
+        execute: async () => ({
+          metadata: { title: 'Title', description: 'Desc', contentHashes: {} },
+          metadataFingerprint: 'fp-test',
+          source: 'generated',
+          regenerated: true,
+          warnings: [],
+        }),
+      } as unknown as GetSpecMetadata
+
+      const uc = new GetProjectContext(
+        makeListWorkspaces(new Map([['default', repo]])),
+        makeSchemaProvider(schema),
+        makeFileReader({ [configYamlPath]: 'config' }),
+        makeParsers(),
+        hasher,
+        stubGet,
+        createBuiltinExtractorTransforms(),
+        [],
+        {
+          projectRoot: '/project',
+          configPath,
+          contextIncludeSpecs: ['*'],
+        },
+      )
+
+      const result = await uc.execute({})
+
+      expect(result.warnings).toHaveLength(0)
+      const entry = result.specs.find((s) => s.specId === 'default:auth/login')
+      expect(entry?.title).toBe('Title')
     })
   })
 

@@ -10,6 +10,7 @@ export interface ContextWarning {
     | 'missing-parser'
     | 'missing-metadata'
     | 'preview'
+    | 'missing-optimization'
     | 'stale-optimization'
   /** The affected spec path, workspace name, or file path. */
   readonly path?: string

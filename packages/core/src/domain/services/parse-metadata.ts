@@ -77,6 +77,12 @@ export const specMetadataSchema = z
     generatedBy: z.enum(['core', 'agent']).optional(),
     optimizedDescription: z.string().optional(),
     optimizedContext: z.string().optional(),
+    optimizationStatus: z
+      .object({
+        optimizedDescription: z.enum(['missing', 'stale']).optional(),
+        optimizedContext: z.enum(['missing', 'stale']).optional(),
+      })
+      .optional(),
   })
   .passthrough()
 
@@ -220,6 +226,12 @@ export const permissiveSpecMetadataSchema = z
     generatedBy: z.enum(['core', 'agent']).optional(),
     optimizedDescription: z.string().min(1).optional(),
     optimizedContext: z.string().min(1).optional(),
+    optimizationStatus: z
+      .object({
+        optimizedDescription: z.enum(['missing', 'stale']).optional(),
+        optimizedContext: z.enum(['missing', 'stale']).optional(),
+      })
+      .optional(),
   })
   .passthrough()
 
@@ -265,6 +277,15 @@ export interface SpecMetadata {
   readonly optimizedDescription?: string
   /** Read-through projection of fresh lock-owned optimization state. */
   readonly optimizedContext?: string
+  /**
+   * Why lock-owned optimizations are absent from this projection, per field.
+   * Present only when a field is NOT projected; omitted (or per-key 'present'
+   * by omission) when optimizations are fresh. Absent on legacy persisted caches.
+   */
+  readonly optimizationStatus?: {
+    readonly optimizedDescription?: 'missing' | 'stale'
+    readonly optimizedContext?: 'missing' | 'stale'
+  }
   readonly provenance?: SpecMetadataProvenance
 }
 
