@@ -104,6 +104,9 @@ class InMemorySpecDepsSuggestionCache extends SpecDepsSuggestionCachePort {
       specStamp: { lastModified: '2026-08-16T12:00:00.000Z', hash: 'hash123', artifacts: [] },
       existingDependsOn: input.existingDependsOn ?? [],
       suggestedDependsOn: input.suggestedDependsOn,
+      ...(input.fileToSpecFingerprint
+        ? { fileToSpecFingerprint: input.fileToSpecFingerprint }
+        : {}),
     })
   }
 
@@ -337,6 +340,119 @@ describe('SuggestSpecDependencies', () => {
     expect(secondRun.specs[0]?.suggestedDependsOn).toHaveLength(1)
     // Cached run must be served entirely from SpecDepsSuggestionCachePort.
     expect(codeGraphProvider.analyzeFileImpact).not.toHaveBeenCalled()
+  })
+
+  it('recomputes cached suggestions when an imported file changes owner between runs', async () => {
+    const implCache = new InMemoryImplementationSuggestionCache()
+    const depsCache = new InMemorySpecDepsSuggestionCache()
+    const { useCase, suggestImplementationLinks, specRepositories } = setupTest()
+
+    const codeGraphProvider = {
+      analyzeFileImpact: vi.fn().mockImplementation(async (filePath: string) => {
+        if (filePath.includes('suggest-spec-dependencies.ts')) {
+          return {
+            affectedFiles: [
+              { filePath: 'packages/code-graph/src/domain/services/analyze-file-impact.ts' },
+            ],
+          }
+        }
+        return { affectedFiles: [] }
+      }),
+    } as any
+
+    const localUseCase = new SuggestSpecDependencies({
+      suggestImplementationLinks: suggestImplementationLinks as any,
+      specRepositories,
+      getPersistedDeps: {
+        execute: vi.fn().mockResolvedValue({
+          specId: 'sdk:suggest-spec-dependencies',
+          dependsOn: [],
+          initialized: true,
+        }),
+      } as any,
+      updatePersistedDeps: {
+        execute: vi.fn().mockResolvedValue({ created: false }),
+      } as any,
+      validateSpecs: { execute: vi.fn().mockResolvedValue({ issues: [] }) } as any,
+      codeGraphProvider,
+      cache: implCache,
+      specDepsCache: depsCache,
+      projectDir: '/tmp/test-owner-change',
+    })
+    void useCase
+
+    const firstRun = await localUseCase.execute({
+      specId: 'sdk:suggest-spec-dependencies',
+      rebuildCache: true,
+    })
+
+    expect(firstRun.result).toBe('ok')
+    expect(firstRun.specs[0]?.suggestedDependsOn.map((d) => d.specId)).toEqual([
+      'code-graph:traversal',
+    ])
+
+    // Ownership of the imported file moves from the traversal spec to a new
+    // spec. Mutate the warm-up source so run 2 primes the shifted ownership;
+    // the target's own stamp stays identical throughout.
+    suggestImplementationLinks.execute.mockResolvedValue({
+      result: 'ok',
+      specs: [
+        {
+          specId: 'sdk:suggest-spec-dependencies',
+          title: 'SuggestSpecDependencies',
+          specStamp: {
+            lastModified: '2026-01-01T00:00:00.000Z',
+            hash: 'stub-sdk-hash',
+            artifacts: [],
+          },
+          existing: {
+            files: ['sdk:packages/sdk/src/orchestration/suggest-spec-dependencies.ts'],
+            symbols: [],
+            dependsOn: [],
+          },
+          suggestions: [],
+        },
+        {
+          specId: 'code-graph:traversal',
+          title: 'Traversal',
+          specStamp: {
+            lastModified: '2026-01-02T00:00:00.000Z',
+            hash: 'stub-cg-hash-v2',
+            artifacts: [],
+          },
+          existing: {
+            files: ['code-graph:packages/code-graph/src/domain/services/other-file.ts'],
+            symbols: [],
+            dependsOn: [],
+          },
+          suggestions: [],
+        },
+        {
+          specId: 'code-graph:new-owner',
+          title: 'NewOwner',
+          specStamp: {
+            lastModified: '2026-01-03T00:00:00.000Z',
+            hash: 'stub-new-owner-hash',
+            artifacts: [],
+          },
+          existing: {
+            files: ['code-graph:packages/code-graph/src/domain/services/analyze-file-impact.ts'],
+            symbols: [],
+            dependsOn: [],
+          },
+          suggestions: [],
+        },
+      ],
+    })
+
+    const secondRun = await localUseCase.execute({
+      specId: 'sdk:suggest-spec-dependencies',
+    })
+
+    expect(secondRun.result).toBe('ok')
+    const depIds = secondRun.specs[0]?.suggestedDependsOn.map((d) => d.specId) ?? []
+    expect(depIds).toContain('code-graph:new-owner')
+    expect(depIds).not.toContain('code-graph:traversal')
   })
 
   it('supports factory constructor overloads', () => {

@@ -17,6 +17,12 @@ export interface SpecDepsSuggestionSpecEntry {
   readonly specStamp: ImplementationSuggestionSpecStamp
   readonly existingDependsOn: readonly string[]
   readonly suggestedDependsOn: readonly SpecDepsSuggestedItem[]
+  /**
+   * Fingerprint of the global implementation file-to-spec map used when this
+   * entry was computed. A mismatch on read means ownership of imported files
+   * changed and suggestions must be recomputed.
+   */
+  readonly fileToSpecFingerprint?: string
 }
 
 /** Cache header metadata. */

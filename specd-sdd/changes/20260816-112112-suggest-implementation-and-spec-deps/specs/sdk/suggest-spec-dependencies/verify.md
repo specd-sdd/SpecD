@@ -53,6 +53,13 @@
 - **THEN** it detects cache version mismatch against active `SPEC_DEPS_CACHE_VERSION` (`1.1.0`)
 - **AND** invalidates the old cache file, regenerating fresh suggestions
 
+#### Scenario: Imported file ownership change invalidates cached suggestions
+
+- **GIVEN** a cached deps entry whose suggestions were computed when an imported file mapped to spec A
+- **WHEN** the global implementation file-to-spec map changes so the same file now maps to spec B, and `SuggestSpecDependencies.execute({ specId })` runs again without `rebuildCache`
+- **THEN** the stored `fileToSpecFingerprint` mismatches the recomputed fingerprint
+- **AND** the cached entry is discarded and suggestions are recomputed, suggesting spec B instead of spec A
+
 #### Scenario: Post-apply validation and conditional alignment change creation
 
 - **GIVEN** `SuggestSpecDependencies.execute({ specId: "cli:change-implementation", apply: true, createAlignmentChange: true })` is executed

@@ -1,7 +1,7 @@
 {
   "name": "suggest-implementation-and-spec-deps",
   "createdAt": "2026-08-16T11:21:12.000Z",
-  "updatedAt": "2026-08-23T23:23:08.279Z",
+  "updatedAt": "2026-08-24T07:29:39.711Z",
   "description": "Add SDK use cases and CLI commands to suggest implementation links and spec dependencies with post-apply validation",
   "schema": {
     "name": "schema-std",
@@ -813,6 +813,10 @@
     {
       "file": "packages/sdk/src/infrastructure/fs/index.ts",
       "state": "open"
+    },
+    {
+      "file": "packages/sdk/test/infrastructure/fs/fs-cache-concurrent-load.spec.ts",
+      "state": "open"
     }
   ],
   "implementationLinks": [
@@ -901,7 +905,7 @@
           "key": "sdk:suggest-spec-dependencies",
           "filename": "specs/sdk/suggest-spec-dependencies/spec.md",
           "state": "complete",
-          "validatedHash": "sha256:dca22bc79cd1678d7acaa865aa468a6be49b949c68e50112907125153098fb7d"
+          "validatedHash": "sha256:c6fbe7f1d7ad8e5fa14e4579a2f27f8640532e8c7782fdadfa85e306ceb12b00"
         },
         {
           "key": "code-graph:language-adapter",
@@ -945,7 +949,7 @@
           "key": "sdk:suggest-spec-dependencies",
           "filename": "specs/sdk/suggest-spec-dependencies/verify.md",
           "state": "complete",
-          "validatedHash": "sha256:f8baa51951fb883a4f8af61140a37458324cecae0a789346e8850ca9633538a2"
+          "validatedHash": "sha256:7ea4b3225115f9a0d1e776f01561c3f95e072ef0e3aaf4c011cc87ef53a292a4"
         },
         {
           "key": "code-graph:language-adapter",
@@ -2879,6 +2883,35 @@
             "code-graph:language-adapter",
             "code-graph:graph-store"
           ]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-24T07:29:37.104Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [sdk:suggest-spec-dependencies]; verify [sdk:suggest-spec-dependencies]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["sdk:suggest-spec-dependencies"]
+        },
+        {
+          "type": "verify",
+          "files": ["sdk:suggest-spec-dependencies"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
         },
         {
           "type": "tasks",

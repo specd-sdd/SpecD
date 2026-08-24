@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import {
@@ -73,6 +74,28 @@ async function queryDownstreamImpact(
     return (await provider.analyzeFileImportImpact(filePath, 'downstream', 1)) as FileImpactLike
   }
   return (await provider.analyzeFileImpact(filePath, 'downstream', 1)) as FileImpactLike
+}
+
+/**
+ * Computes a stable fingerprint of the global implementation file-to-spec map
+ * so cached dependency suggestions can detect ownership changes of imported
+ * files between runs.
+ *
+ * @param cache - Implementation suggestion cache providing the mapping
+ * @returns Hex fingerprint, or null when the map is unavailable
+ */
+async function computeFileToSpecFingerprint(
+  cache: ImplementationSuggestionCachePort,
+): Promise<string | null> {
+  try {
+    const map = await cache.getFileToSpecMap()
+    const parts = Array.from(map.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([file, specId]) => `${file}=>${specId}`)
+    return createHash('sha256').update(parts.join('|')).digest('hex')
+  } catch {
+    return null
+  }
 }
 
 /** Zod input schema for `SuggestSpecDependencies`. */
@@ -286,6 +309,10 @@ export class SuggestSpecDependencies {
         await specDepsCache.invalidate()
       }
 
+      // Snapshot the global file-to-spec ownership after warm-up so cached
+      // dependency suggestions can be invalidated when it shifts.
+      const expectedMapFingerprint = await computeFileToSpecFingerprint(implCache)
+
       // Determine target specs
       const targetSpecs: Array<{
         specId: string
@@ -359,7 +386,21 @@ export class SuggestSpecDependencies {
           // Not initialized
         }
 
-        const cachedSpecDep = input.rebuildCache ? null : await specDepsCache.get(target.specId)
+        let cachedSpecDep = input.rebuildCache ? null : await specDepsCache.get(target.specId)
+        if (
+          cachedSpecDep &&
+          expectedMapFingerprint !== null &&
+          cachedSpecDep.fileToSpecFingerprint &&
+          cachedSpecDep.fileToSpecFingerprint !== expectedMapFingerprint
+        ) {
+          // Ownership of imported files changed since this entry was computed:
+          // discard the cached suggestions so they are recomputed below.
+          Logger.debug('[SuggestSpecDependencies] Discarding stale deps cache entry', {
+            specId: target.specId,
+            reason: 'file-to-spec fingerprint mismatch',
+          })
+          cachedSpecDep = null
+        }
 
         let suggestedDependsOn: SuggestedSpecDependency[] = []
 
@@ -703,6 +744,9 @@ export class SuggestSpecDependencies {
             title: target.title,
             existingDependsOn,
             suggestedDependsOn: storedSuggestedItems,
+            ...(expectedMapFingerprint !== null
+              ? { fileToSpecFingerprint: expectedMapFingerprint }
+              : {}),
           })
         }
 

@@ -16,6 +16,8 @@ export interface SetSpecDepsSuggestionInput {
   readonly title?: string | undefined
   readonly existingDependsOn?: readonly string[] | undefined
   readonly suggestedDependsOn: readonly SpecDepsSuggestedItem[]
+  /** Fingerprint of the implementation file-to-spec map at computation time. */
+  readonly fileToSpecFingerprint?: string | undefined
 }
 
 /**
