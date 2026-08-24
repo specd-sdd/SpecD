@@ -65,14 +65,22 @@ export class FsSpecDepsSuggestionCache extends SpecDepsSuggestionCachePort {
   /**
    * Lazily loads and parses the cache file from disk into memory once.
    *
-   * Concurrent callers share a single in-flight load so none of them can
-   * observe or overwrite state while initialization is still running.
+   * Concurrent callers share a single in-flight load. The in-flight promise is
+   * checked and awaited BEFORE the `_data` guard because `loadFromDisk`
+   * initializes `_data` synchronously; callers arriving mid-load must not
+   * observe the empty map.
    */
   private async ensureLoaded(): Promise<void> {
+    if (this._loadPromise) {
+      await this._loadPromise
+      return
+    }
     if (this._data !== null) {
       return
     }
-    this._loadPromise ??= this.loadFromDisk()
+    this._loadPromise = this.loadFromDisk().finally(() => {
+      this._loadPromise = null
+    })
     await this._loadPromise
   }
 
