@@ -100,6 +100,70 @@ describe('FsImplementationSuggestionCache', () => {
     expect(diskContent).toContain('cli:spec-deps')
     expect(diskContent).toContain('fingerprint-1')
   })
+
+  it('treats a differing hash as stale even when lastModified matches', async () => {
+    const get = vi.fn().mockResolvedValue({
+      workspace: 'cli',
+      path: 'spec-deps',
+      artifacts: [{ filename: 'spec.md', lastModified: '2026-08-17T12:00:00Z', hash: 'hash-a' }],
+    })
+    const mockRepo = {
+      get,
+    } as unknown as SpecRepository
+
+    const cache = new FsImplementationSuggestionCache({
+      projectDir: testDir,
+      configPath: '.specd',
+      specRepositories: new Map([['cli', mockRepo]]),
+    })
+
+    await cache.set('cli:spec-deps', {
+      title: 'SpecDeps',
+      existing: { files: [], symbols: [], dependsOn: [] },
+      suggestions: [],
+    })
+
+    // Same lastModified, different content hash -> must NOT serve the cache.
+    get.mockResolvedValue({
+      workspace: 'cli',
+      path: 'spec-deps',
+      artifacts: [{ filename: 'spec.md', lastModified: '2026-08-17T12:00:00Z', hash: 'hash-b' }],
+    })
+
+    expect(await cache.get('cli:spec-deps')).toBeNull()
+  })
+
+  it('keeps entries fresh on matching hashes even when lastModified drifts', async () => {
+    const get = vi.fn().mockResolvedValue({
+      workspace: 'cli',
+      path: 'spec-deps',
+      artifacts: [{ filename: 'spec.md', lastModified: '2026-08-17T12:00:00Z', hash: 'hash-a' }],
+    })
+    const mockRepo = {
+      get,
+    } as unknown as SpecRepository
+
+    const cache = new FsImplementationSuggestionCache({
+      projectDir: testDir,
+      configPath: '.specd',
+      specRepositories: new Map([['cli', mockRepo]]),
+    })
+
+    await cache.set('cli:spec-deps', {
+      title: 'SpecDeps',
+      existing: { files: [], symbols: [], dependsOn: [] },
+      suggestions: [],
+    })
+
+    // Same hash, drifted lastModified -> hash is authoritative, still fresh.
+    get.mockResolvedValue({
+      workspace: 'cli',
+      path: 'spec-deps',
+      artifacts: [{ filename: 'spec.md', lastModified: '2026-09-01T00:00:00Z', hash: 'hash-a' }],
+    })
+
+    expect(await cache.get('cli:spec-deps')).not.toBeNull()
+  })
 })
 
 describe('FsSpecDepsSuggestionCache', () => {
@@ -204,5 +268,37 @@ describe('FsSpecDepsSuggestionCache', () => {
     expect(regenerated.header.cacheVersion).toBe(SPEC_DEPS_CACHE_VERSION)
     expect(regenerated.specs['core:legacy']).toBeUndefined()
     expect(regenerated.specs['core:fresh']).toBeDefined()
+  })
+
+  it('treats a differing hash as stale even when lastModified matches', async () => {
+    const get = vi.fn().mockResolvedValue({
+      workspace: 'cli',
+      path: 'spec-deps',
+      artifacts: [{ filename: 'spec.md', lastModified: '2026-08-17T12:00:00Z', hash: 'hash-a' }],
+    })
+    const mockRepo = {
+      get,
+    } as unknown as SpecRepository
+
+    const cache = new FsSpecDepsSuggestionCache({
+      projectDir: testDir,
+      configPath: '.specd',
+      specRepositories: new Map([['cli', mockRepo]]),
+    })
+
+    await cache.set('cli:spec-deps', {
+      title: 'SpecDeps',
+      existingDependsOn: [],
+      suggestedDependsOn: [],
+    })
+
+    // Same lastModified, different content hash -> must NOT serve the cache.
+    get.mockResolvedValue({
+      workspace: 'cli',
+      path: 'spec-deps',
+      artifacts: [{ filename: 'spec.md', lastModified: '2026-08-17T12:00:00Z', hash: 'hash-b' }],
+    })
+
+    expect(await cache.get('cli:spec-deps')).toBeNull()
   })
 })

@@ -239,18 +239,22 @@ export class FsImplementationSuggestionCache extends ImplementationSuggestionCac
       const currentStamp = await this.getSpecStamp(specId)
       const cachedStamp = cached.specStamp
       if (cachedStamp) {
+        // Content hash is authoritative whenever both sides provide one: a
+        // differing hash is stale even if lastModified still matches (coarse
+        // mtimes, git checkouts). Timestamps only decide when a usable hash is
+        // missing on either side.
+        const hashComparable =
+          typeof cachedStamp.hash === 'string' &&
+          cachedStamp.hash.length > 0 &&
+          typeof currentStamp.hash === 'string' &&
+          currentStamp.hash.length > 0
+        if (hashComparable) {
+          return cachedStamp.hash === currentStamp.hash ? cached : null
+        }
         if (
           cachedStamp.lastModified &&
           currentStamp.lastModified &&
           cachedStamp.lastModified === currentStamp.lastModified
-        ) {
-          return cached
-        }
-        if (
-          cachedStamp.hash &&
-          currentStamp.hash &&
-          cachedStamp.hash.length > 0 &&
-          cachedStamp.hash === currentStamp.hash
         ) {
           return cached
         }
