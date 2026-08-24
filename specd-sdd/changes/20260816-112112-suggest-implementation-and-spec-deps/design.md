@@ -546,11 +546,14 @@ documented here as accepted debt for this change:
 Rationale: default-injection keeps one-line usage for CLI hosts and scripts; refactoring to
 a pure composition-root model is deferred to a dedicated architecture change.
 
-**Graph-index lock routing (F6/N1 resolution).** `acquireGraphIndexLock` / `getGraphIndexLockPath`
-are re-exported through `@specd/sdk` from the code-graph `"./internal"` development barrel
-(`@specd/sdk` acting as an advanced in-monorepo caller). This keeps the code-graph public `.`
-barrel free of infrastructure implementations and leaves `@specd/cli` depending on
-`@specd/sdk` only, per `_global/architecture`.
+**Graph-index lock routing (deferred).** `@specd/cli` currently imports
+`acquireGraphIndexLock` from the code-graph `"./internal"` development barrel and declares a
+direct `@specd/code-graph` dependency. This knowingly deviates from `_global/architecture`
+(hosts must go through `@specd/sdk`; public barrels must stay free of infrastructure) and is
+accepted as debt: no approved composition boundary exists today for this host-facing
+capability. A dedicated follow-up change will introduce a fork-based isolated indexer worker
+owned by `@specd/sdk`, at which point the CLI drops both the internal import and the direct
+dependency.
 
 ## Open questions
 

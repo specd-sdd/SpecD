@@ -129,11 +129,6 @@ export {
   type ImpactResult,
   CODE_GRAPH_VERSION,
 } from '@specd/code-graph'
-// Host-orchestration utility for delivery CLIs that spawn graph-index workers.
-// Taken from the code-graph internal development barrel: @specd/sdk is an
-// advanced in-monorepo caller, and the public code-graph "." barrel must stay
-// free of infrastructure implementations (default:_global/architecture).
-export { acquireGraphIndexLock, getGraphIndexLockPath } from '@specd/code-graph/internal'
 
 export { codeGraphVersion, getCodeGraphVersion } from './shared/code-graph-version.js'
 
