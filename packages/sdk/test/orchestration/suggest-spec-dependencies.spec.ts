@@ -2,14 +2,20 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   SuggestSpecDependencies,
   createSuggestSpecDependencies,
+  type SuggestSpecDepsProgressEvent,
 } from '../../src/orchestration/suggest-spec-dependencies.js'
+import { type SuggestImplementationLinks } from '../../src/orchestration/suggest-implementation-links.js'
 import {
   SpecdError,
   InvalidInputError,
   WorkspaceNotFoundError,
   SpecNotFoundError,
+  type GetPersistedSpecDeps,
+  type UpdatePersistedSpecDeps,
+  type ValidateSpecs,
   type SpecRepository,
 } from '@specd/core'
+import { type CodeGraphProvider } from '@specd/code-graph'
 import {
   ImplementationSuggestionCachePort,
   type SetImplementationSuggestionInput,
@@ -202,25 +208,27 @@ function setupTest() {
     }),
   }
 
-  const codeGraphProvider = {
-    analyzeFileImpact: vi.fn().mockImplementation(async (filePath: string) => {
-      if (filePath.includes('suggest-spec-dependencies.ts')) {
-        return {
-          affectedFiles: [
-            { filePath: 'packages/code-graph/src/domain/services/analyze-file-impact.ts' },
-          ],
-        }
+  const analyzeFileImpact = vi.fn().mockImplementation(async (filePath: string) => {
+    if (filePath.includes('suggest-spec-dependencies.ts')) {
+      return {
+        affectedFiles: [
+          { filePath: 'packages/code-graph/src/domain/services/analyze-file-impact.ts' },
+        ],
       }
-      return { affectedFiles: [] }
-    }),
-  } as any
+    }
+    return { affectedFiles: [] }
+  })
+
+  const codeGraphProvider = {
+    analyzeFileImpact,
+  } as unknown as CodeGraphProvider
 
   const useCase = new SuggestSpecDependencies({
-    suggestImplementationLinks: suggestImplementationLinks as any,
+    suggestImplementationLinks: suggestImplementationLinks as unknown as SuggestImplementationLinks,
     specRepositories,
-    getPersistedDeps: getPersistedDeps as any,
-    updatePersistedDeps: updatePersistedDeps as any,
-    validateSpecs: validateSpecs as any,
+    getPersistedDeps: getPersistedDeps as unknown as GetPersistedSpecDeps,
+    updatePersistedDeps: updatePersistedDeps as unknown as UpdatePersistedSpecDeps,
+    validateSpecs: validateSpecs as unknown as ValidateSpecs,
     codeGraphProvider,
     cache: new InMemoryImplementationSuggestionCache(),
     specDepsCache: new InMemorySpecDepsSuggestionCache(),
@@ -233,6 +241,7 @@ function setupTest() {
     getPersistedDeps,
     updatePersistedDeps,
     validateSpecs,
+    analyzeFileImpact,
     codeGraphProvider,
     specRepositories,
   }
@@ -320,7 +329,7 @@ describe('SuggestSpecDependencies', () => {
   })
 
   it('persists and utilizes SpecDepsSuggestionCachePort on subsequent execution', async () => {
-    const { useCase, codeGraphProvider } = setupTest()
+    const { useCase, analyzeFileImpact } = setupTest()
 
     const firstRun = await useCase.execute({
       specId: 'sdk:suggest-spec-dependencies',
@@ -330,7 +339,7 @@ describe('SuggestSpecDependencies', () => {
     expect(firstRun.result).toBe('ok')
     expect(firstRun.specs[0]?.suggestedDependsOn).toHaveLength(1)
 
-    codeGraphProvider.analyzeFileImpact.mockClear()
+    analyzeFileImpact.mockClear()
 
     const secondRun = await useCase.execute({
       specId: 'sdk:suggest-spec-dependencies',
@@ -339,7 +348,7 @@ describe('SuggestSpecDependencies', () => {
     expect(secondRun.result).toBe('ok')
     expect(secondRun.specs[0]?.suggestedDependsOn).toHaveLength(1)
     // Cached run must be served entirely from SpecDepsSuggestionCachePort.
-    expect(codeGraphProvider.analyzeFileImpact).not.toHaveBeenCalled()
+    expect(analyzeFileImpact).not.toHaveBeenCalled()
   })
 
   it('recomputes cached suggestions when an imported file changes owner between runs', async () => {
@@ -358,10 +367,11 @@ describe('SuggestSpecDependencies', () => {
         }
         return { affectedFiles: [] }
       }),
-    } as any
+    } as unknown as CodeGraphProvider
 
     const localUseCase = new SuggestSpecDependencies({
-      suggestImplementationLinks: suggestImplementationLinks as any,
+      suggestImplementationLinks:
+        suggestImplementationLinks as unknown as SuggestImplementationLinks,
       specRepositories,
       getPersistedDeps: {
         execute: vi.fn().mockResolvedValue({
@@ -369,11 +379,13 @@ describe('SuggestSpecDependencies', () => {
           dependsOn: [],
           initialized: true,
         }),
-      } as any,
+      } as unknown as GetPersistedSpecDeps,
       updatePersistedDeps: {
         execute: vi.fn().mockResolvedValue({ created: false }),
-      } as any,
-      validateSpecs: { execute: vi.fn().mockResolvedValue({ issues: [] }) } as any,
+      } as unknown as UpdatePersistedSpecDeps,
+      validateSpecs: {
+        execute: vi.fn().mockResolvedValue({ issues: [] }),
+      } as unknown as ValidateSpecs,
       codeGraphProvider,
       cache: implCache,
       specDepsCache: depsCache,
@@ -455,15 +467,31 @@ describe('SuggestSpecDependencies', () => {
     expect(depIds).not.toContain('code-graph:traversal')
   })
 
+  it('throws InvalidInputError when createAlignmentChange lacks a CreateChange dependency', async () => {
+    const { useCase } = setupTest()
+
+    // setupTest wires no createChange dependency, so requesting an alignment
+    // change must propagate InvalidInputError instead of degrading to the
+    // fail-open all-valid fallback.
+    await expect(
+      useCase.execute({
+        specId: 'sdk:suggest-spec-dependencies',
+        apply: true,
+        createAlignmentChange: true,
+      }),
+    ).rejects.toBeInstanceOf(InvalidInputError)
+  })
+
   it('supports factory constructor overloads', () => {
     const { suggestImplementationLinks, specRepositories, getPersistedDeps, updatePersistedDeps } =
       setupTest()
 
     const instance = createSuggestSpecDependencies({
-      suggestImplementationLinks: suggestImplementationLinks as any,
+      suggestImplementationLinks:
+        suggestImplementationLinks as unknown as SuggestImplementationLinks,
       specRepositories,
-      getPersistedDeps: getPersistedDeps as any,
-      updatePersistedDeps: updatePersistedDeps as any,
+      getPersistedDeps: getPersistedDeps as unknown as GetPersistedSpecDeps,
+      updatePersistedDeps: updatePersistedDeps as unknown as UpdatePersistedSpecDeps,
     })
 
     expect(instance).toBeInstanceOf(SuggestSpecDependencies)
@@ -520,33 +548,36 @@ describe('SuggestSpecDependencies', () => {
         .mockResolvedValue({ specId: 'cli:spec-deps', dependsOn: [], initialized: true }),
     }
 
+    const analyzeFileImpact = vi
+      .fn()
+      .mockImplementation(async (filePath: string, _dir: string, depth: number) => {
+        expect(depth).toBe(1)
+        if (filePath.includes('commands/spec/deps.ts')) {
+          return {
+            affectedFiles: [{ filePath: 'packages/sdk/src/index.ts' }],
+          }
+        }
+        if (filePath.includes('packages/sdk/src/index.ts')) {
+          return {
+            affectedFiles: [
+              { filePath: 'packages/sdk/src/orchestration/suggest-spec-dependencies.ts' },
+            ],
+          }
+        }
+        return { affectedFiles: [] }
+      })
+
     const codeGraphProvider = {
-      analyzeFileImpact: vi
-        .fn()
-        .mockImplementation(async (filePath: string, _dir: string, depth: number) => {
-          expect(depth).toBe(1)
-          if (filePath.includes('commands/spec/deps.ts')) {
-            return {
-              affectedFiles: [{ filePath: 'packages/sdk/src/index.ts' }],
-            }
-          }
-          if (filePath.includes('packages/sdk/src/index.ts')) {
-            return {
-              affectedFiles: [
-                { filePath: 'packages/sdk/src/orchestration/suggest-spec-dependencies.ts' },
-              ],
-            }
-          }
-          return { affectedFiles: [] }
-        }),
-    } as any
+      analyzeFileImpact,
+    } as unknown as CodeGraphProvider
 
     const useCase = new SuggestSpecDependencies({
-      suggestImplementationLinks: suggestImplementationLinks as any,
+      suggestImplementationLinks:
+        suggestImplementationLinks as unknown as SuggestImplementationLinks,
       specRepositories,
-      getPersistedDeps: getPersistedDeps as any,
-      updatePersistedDeps: vi.fn() as any,
-      validateSpecs: vi.fn() as any,
+      getPersistedDeps: getPersistedDeps as unknown as GetPersistedSpecDeps,
+      updatePersistedDeps: vi.fn() as unknown as UpdatePersistedSpecDeps,
+      validateSpecs: vi.fn() as unknown as ValidateSpecs,
       codeGraphProvider,
       cache: new InMemoryImplementationSuggestionCache(),
       specDepsCache: new InMemorySpecDepsSuggestionCache(),
@@ -558,7 +589,7 @@ describe('SuggestSpecDependencies', () => {
     expect(result.result).toBe('ok')
     expect(result.specs[0]?.suggestedDependsOn).toHaveLength(1)
     expect(result.specs[0]?.suggestedDependsOn[0]?.specId).toBe('sdk:suggest-spec-dependencies')
-    expect(codeGraphProvider.analyzeFileImpact).toHaveBeenCalledWith(
+    expect(analyzeFileImpact).toHaveBeenCalledWith(
       expect.stringContaining('index.ts'),
       'downstream',
       1,
@@ -692,7 +723,7 @@ describe('SuggestSpecDependencies', () => {
         return { affectedFiles: [] }
       }),
       analyzeFileImpact: vi.fn().mockResolvedValue({ affectedFiles: [] }),
-    } as any
+    } as unknown as CodeGraphProvider
 
     const getPersistedDeps = {
       execute: vi.fn().mockResolvedValue({
@@ -703,11 +734,12 @@ describe('SuggestSpecDependencies', () => {
     }
 
     const useCase = new SuggestSpecDependencies({
-      suggestImplementationLinks: suggestImplementationLinks as any,
+      suggestImplementationLinks:
+        suggestImplementationLinks as unknown as SuggestImplementationLinks,
       specRepositories,
-      getPersistedDeps: getPersistedDeps as any,
-      updatePersistedDeps: vi.fn() as any,
-      validateSpecs: vi.fn() as any,
+      getPersistedDeps: getPersistedDeps as unknown as GetPersistedSpecDeps,
+      updatePersistedDeps: vi.fn() as unknown as UpdatePersistedSpecDeps,
+      validateSpecs: vi.fn() as unknown as ValidateSpecs,
       codeGraphProvider,
       cache: new InMemoryImplementationSuggestionCache(),
       specDepsCache: new InMemorySpecDepsSuggestionCache(),
@@ -803,7 +835,7 @@ describe('SuggestSpecDependencies', () => {
         }
         return { affectedFiles: [] }
       }),
-    } as any
+    } as unknown as CodeGraphProvider
 
     const getPersistedDeps = {
       execute: vi.fn().mockImplementation(async ({ specId }: { specId: string }) => {
@@ -815,11 +847,12 @@ describe('SuggestSpecDependencies', () => {
     }
 
     const useCase = new SuggestSpecDependencies({
-      suggestImplementationLinks: suggestImplementationLinks as any,
+      suggestImplementationLinks:
+        suggestImplementationLinks as unknown as SuggestImplementationLinks,
       specRepositories,
-      getPersistedDeps: getPersistedDeps as any,
-      updatePersistedDeps: vi.fn() as any,
-      validateSpecs: vi.fn() as any,
+      getPersistedDeps: getPersistedDeps as unknown as GetPersistedSpecDeps,
+      updatePersistedDeps: vi.fn() as unknown as UpdatePersistedSpecDeps,
+      validateSpecs: vi.fn() as unknown as ValidateSpecs,
       codeGraphProvider,
       cache: new InMemoryImplementationSuggestionCache(),
       specDepsCache: new InMemorySpecDepsSuggestionCache(),
@@ -835,7 +868,7 @@ describe('SuggestSpecDependencies', () => {
 
   it('emits onProgress events during execution', async () => {
     const { useCase } = setupTest()
-    const events: any[] = []
+    const events: SuggestSpecDepsProgressEvent[] = []
 
     await useCase.execute({
       specId: 'sdk:suggest-spec-dependencies',

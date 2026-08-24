@@ -783,6 +783,15 @@ export class SuggestSpecDependencies {
       // Post-apply validation & conditional change creation
       let postApplyValidation: PostApplyValidationDiagnostic | undefined
 
+      // Input contract: requesting an alignment change without a CreateChange
+      // dependency is always invalid. Validated OUTSIDE the try below so the
+      // error propagates instead of degrading to the fail-open fallback.
+      if (input.createAlignmentChange && !this.deps.createChange) {
+        throw new InvalidInputError(
+          'createAlignmentChange requires a CreateChange dependency, but none was injected',
+        )
+      }
+
       if (input.apply && this.deps.validateSpecs) {
         input.onProgress?.({
           type: 'validation-start',
@@ -816,12 +825,6 @@ export class SuggestSpecDependencies {
           if (invalidSpecs.length > 0) {
             const invalidSpecIds = invalidSpecs.map((s) => s.specId)
             let createdChangeInfo: CreatedAlignmentChangeInfo | undefined
-
-            if (input.createAlignmentChange && !this.deps.createChange) {
-              throw new InvalidInputError(
-                'createAlignmentChange requires a CreateChange dependency, but none was injected',
-              )
-            }
 
             if (input.createAlignmentChange && this.deps.createChange) {
               const prefix = input.changeNamePrefix ?? 'align-spec-deps'
