@@ -379,11 +379,16 @@ export class FsImplementationSuggestionCache extends ImplementationSuggestionCac
     for (const [fileKey, candidateMap] of fileToCandidates.entries()) {
       if (candidateMap.size === 1) {
         result.set(fileKey, Array.from(candidateMap.keys())[0]!)
-      } else if (candidateMap.size > 1 && candidateMap.size < SHARED_HUB_SPEC_THRESHOLD) {
+      } else if (candidateMap.size > 1) {
         const existingCandidates = Array.from(candidateMap.values()).filter((c) => c.isExisting)
         if (existingCandidates.length === 1) {
+          // A unique spec-lock owner is authoritative even when extra high-confidence
+          // suggestions push shared-hub files past SHARED_HUB_SPEC_THRESHOLD.
           result.set(fileKey, existingCandidates[0]!.specId)
-        } else if (existingCandidates.length === 0) {
+        } else if (
+          candidateMap.size < SHARED_HUB_SPEC_THRESHOLD &&
+          existingCandidates.length === 0
+        ) {
           const sorted = Array.from(candidateMap.values()).sort((a, b) => b.score - a.score)
           const top = sorted[0]!
           const runnerUp = sorted[1]!
