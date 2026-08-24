@@ -33,6 +33,7 @@ export class FsSpecDepsSuggestionCache extends SpecDepsSuggestionCachePort {
   private _loadPromise: Promise<void> | null = null
   private _header: SpecDepsSuggestionCacheHeader | null = null
   private _isDirty = false
+  private _generation = 0
   private _cachedGraphFingerprint: string | null = null
   private _cachedGraphLastIndexedAt: string | null = null
 
@@ -88,6 +89,9 @@ export class FsSpecDepsSuggestionCache extends SpecDepsSuggestionCachePort {
    * Reads and parses the cache file into memory.
    */
   private async loadFromDisk(): Promise<void> {
+    // Generation token: invalidate() bumps it so a load that completes after
+    // invalidation discards its results instead of repopulating stale entries.
+    const generation = this._generation
     this._data = new Map()
     this._header = null
     this._isDirty = false
@@ -95,6 +99,9 @@ export class FsSpecDepsSuggestionCache extends SpecDepsSuggestionCachePort {
     try {
       const content = await readFile(this.cachePath, 'utf-8')
       const parsed = JSON.parse(content) as SpecDepsSuggestionsCacheFile
+      if (generation !== this._generation) {
+        return
+      }
       if (
         parsed &&
         parsed.header &&
@@ -339,6 +346,7 @@ export class FsSpecDepsSuggestionCache extends SpecDepsSuggestionCachePort {
 
   /** @inheritdoc */
   async invalidate(): Promise<void> {
+    this._generation += 1
     this._data = new Map()
     this._header = null
     this._isDirty = false

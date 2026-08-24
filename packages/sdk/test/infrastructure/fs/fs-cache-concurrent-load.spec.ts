@@ -138,6 +138,38 @@ describe('FS cache concurrent cold load', () => {
     expect(readFileMock).toHaveBeenCalledTimes(1)
   })
 
+  it('implementation cache: invalidate during pending cold load discards loaded entries', async () => {
+    const cache = new FsImplementationSuggestionCache({ projectDir: testDir })
+    const deferred = deferredRead()
+    vi.mocked(readFileMock).mockReturnValueOnce(deferred.promise)
+
+    const pendingGet = cache.get('cli:spec-deps') // triggers cold load
+    await cache.invalidate() // while the disk load is still in flight
+
+    deferred.resolve(implCacheFile('cli:spec-deps'))
+    await Promise.all([pendingGet, Promise.resolve()])
+
+    // The completed load must NOT repopulate invalidated entries.
+    expect(await cache.get('cli:spec-deps')).toBeNull()
+    expect((await cache.getAll()).size).toBe(0)
+  })
+
+  it('spec deps cache: invalidate during pending cold load discards loaded entries', async () => {
+    const cache = new FsSpecDepsSuggestionCache({ projectDir: testDir })
+    const deferred = deferredRead()
+    vi.mocked(readFileMock).mockReturnValueOnce(deferred.promise)
+
+    const pendingGet = cache.get('core:spec-lock') // triggers cold load
+    await cache.invalidate() // while the disk load is still in flight
+
+    deferred.resolve(depsCacheFile('core:spec-lock'))
+    await Promise.all([pendingGet, Promise.resolve()])
+
+    // The completed load must NOT repopulate invalidated entries.
+    expect(await cache.get('core:spec-lock')).toBeNull()
+    expect((await cache.getAll()).size).toBe(0)
+  })
+
   it('spec deps cache: set issued mid-load waits and preserves loaded entry', async () => {
     const cache = new FsSpecDepsSuggestionCache({ projectDir: testDir })
     const deferred = deferredRead()

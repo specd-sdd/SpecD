@@ -38,6 +38,7 @@ export class FsImplementationSuggestionCache extends ImplementationSuggestionCac
   private _header: ImplementationSuggestionCacheHeader | null = null
   private _fileToSpecMap: Map<string, string> | null = null
   private _isDirty = false
+  private _generation = 0
   private _cachedGraphFingerprint: string | null = null
   private _cachedGraphLastIndexedAt: string | null = null
 
@@ -105,6 +106,9 @@ export class FsImplementationSuggestionCache extends ImplementationSuggestionCac
    * Reads and parses the cache file into memory.
    */
   private async loadFromDisk(): Promise<void> {
+    // Generation token: invalidate() bumps it so a load that completes after
+    // invalidation discards its results instead of repopulating stale entries.
+    const generation = this._generation
     this._data = new Map()
     this._header = null
     this._fileToSpecMap = null
@@ -113,6 +117,9 @@ export class FsImplementationSuggestionCache extends ImplementationSuggestionCac
     try {
       const content = await readFile(this.cachePath, 'utf-8')
       const parsed = JSON.parse(content) as ImplementationSuggestionsCacheFile
+      if (generation !== this._generation) {
+        return
+      }
       if (
         parsed &&
         parsed.header &&
@@ -470,6 +477,7 @@ export class FsImplementationSuggestionCache extends ImplementationSuggestionCac
 
   /** @inheritdoc */
   async invalidate(): Promise<void> {
+    this._generation += 1
     this._data = new Map()
     this._header = null
     this._fileToSpecMap = null
