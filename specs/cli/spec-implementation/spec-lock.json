@@ -8,5 +8,41 @@
     "cli:entrypoint",
     "core:get-persisted-spec-implementation"
   ],
-  "implementation": []
+  "implementation": [],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "`specd specs implementation` CLI: list/add/remove persisted implementation links via Kernel.specs; no CLI-owned mutation logic.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:ec3e29c9eab947b64ed074d01559453f8db4851ec38cdc36580bcef4b8c204a8",
+          "lastModified": "2026-08-17T09:55:41.793Z"
+        },
+        "verify.md": {
+          "hash": "sha256:332d620ddc8a9e1aac119fe8684a9925470e2440ed90aab30d5086be18a3ab7b",
+          "lastModified": "2026-08-17T09:55:41.794Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Specs Implementation CLI\n\n## Rules\n\n- Command group `specd specs implementation`; every subcommand accepts `--format text|json|toon` (default text).\n- `list <spec-id>` → call `Kernel.specs.getPersistedImplementation`, print link list; distinguish file-level entries (no `symbols`) from symbol-level (`symbols` present).\n- Uninitialized spec in `list`: MUST report spec not initialized, never indistinguishable empty list; text output distinguishes cases, JSON/TOON include `initialized` field.\n- `add <spec-id> --file <path> [--symbol <name>...]` → `Kernel.specs.updatePersistedImplementation` with `action: add`, raw `--file` value, supplied `--symbol` values; print resulting persisted list.\n- `remove <spec-id> --file <path> [--symbol <name>...]` → same call with `action: remove`; print resulting persisted list.\n- Handlers MUST NOT perform file-existence checks, canonical `workspace:path` normalization, workspace-boundary validation, or persisted-state writes. Every mutation = one `updatePersistedImplementation` call, flags mapped directly onto `UpdatePersistedSpecImplementationInput`.\n- Users supply raw project-relative paths (same form accepted by `specd changes implementation`); never require canonical `workspace:path` input — normalization belongs to `UpdatePersistedSpecImplementation`.\n- Error mapping, exit code 1 with `error:` message: `SpecNotFoundError` names unresolved spec; `ImplementationFileNotFoundError` + `ImplementationWorkspaceBoundaryError` describe invalid path; `ArtifactConflictError` reports concurrent modification, instruct retry; `ReadOnlyWorkspaceError` gives no configuration workaround.\n\n## Constraints\n\n- Never read/write spec-lock.json directly; every operation flows through Kernel.specs.getPersistedImplementation / Kernel.specs.updatePersistedImplementation.\n- Distinct from `changes implementation`: operates on canonical post-archive persisted state, not change-time tracked files/confirmed links.\n- Every leaf subcommand calls `.allowExcessArguments(false)`",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:ec3e29c9eab947b64ed074d01559453f8db4851ec38cdc36580bcef4b8c204a8",
+          "lastModified": "2026-08-17T09:55:41.793Z"
+        },
+        "verify.md": {
+          "hash": "sha256:332d620ddc8a9e1aac119fe8684a9925470e2440ed90aab30d5086be18a3ab7b",
+          "lastModified": "2026-08-17T09:55:41.794Z"
+        }
+      }
+    }
+  }
 }

@@ -1,16 +1,12 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest'
 import { EventEmitter } from 'node:events'
 import { spawn } from 'node:child_process'
-import { acquireGraphIndexLock } from '@specd/code-graph/internal'
+import { acquireGraphIndexLock } from '@specd/sdk'
 import { captureStdout } from './helpers.js'
 
 vi.mock('node:child_process', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:child_process')>()
   return { ...actual, spawn: vi.fn() }
-})
-vi.mock('@specd/code-graph/internal', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@specd/code-graph/internal')>()
-  return { ...actual, acquireGraphIndexLock: vi.fn(() => vi.fn()) }
 })
 
 vi.mock('../../src/helpers/sdk-host.js', () => ({
@@ -21,6 +17,7 @@ vi.mock('@specd/sdk', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@specd/sdk')>()
   return {
     ...actual,
+    acquireGraphIndexLock: vi.fn(() => vi.fn()),
     createVcsAdapter: vi.fn().mockResolvedValue({
       ref: vi.fn().mockResolvedValue('abc1234def'),
       rootDir: vi.fn().mockResolvedValue('/project'),

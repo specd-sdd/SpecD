@@ -9,5 +9,41 @@
     "core:update-spec-deps",
     "core:initialize-persisted-spec-state"
   ],
-  "implementation": []
+  "implementation": [],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Use case mutating a spec's persisted dependsOn via add/remove/set/clear with optimistic concurrency and conditional state creation.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:2d0742a4ef476b5e012a54e443370d73f78ccc75ba2eec408ca22d83614b2065",
+          "lastModified": "2026-08-17T09:55:42.151Z"
+        },
+        "verify.md": {
+          "hash": "sha256:e7dcb9421c0d6dd961071ea45974fb3cb67f63116e792a452a0d52779ec679a2",
+          "lastModified": "2026-08-17T09:55:42.151Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# UpdatePersistedSpecDeps\n\n## Rules\n\n- Input: `specId` required; optional `add`/`remove`/`set` (readonly string arrays), `clear` (bool).\n- `set`/`clear` mutually exclusive with each other and with `add`/`remove`; zero ops → typed validation error.\n- Remove applied before add; `add` idempotent (no duplicates after removals).\n- Read current state via `SpecRepository.readPersistedState(spec)`; keep `originalHash` for concurrency.\n- Missing state + `set`/`clear`: build initial base with effective project schema and supplied list (`[]` for `clear`); MUST NOT run deterministic artifact derivation.\n- Missing state + non-empty `add`: derive initial base via `resolveInitialPersistedDependsOn()` (canonical artifact projection under effective schema, else `[]`), then merge `add`.\n- Missing state + `remove`, or merge result empty: no-op — return `dependsOn: []`, `created: false`, skip `writePersistedState`.\n- Apply via pure shared `applyPersistedSpecStatePatch()` (dependsOn only); pass full resulting `PersistedSpecState` to `SpecRepository.writePersistedState()`.\n- Write with `expectedRevision` = observed `originalHash` (`null` if state was absent); revision drift → propagate `ArtifactConflictError`; never retry/rebase.\n- Unresolvable specId → throw `SpecNotFoundError`.\n- Result `{ specId, dependsOn, created }`; `created: true` only when this call created persisted state.\n- Config factory `createUpdatePersistedSpecDeps(config, options?)` delegates via `resolveUpdatePersistedSpecDepsDeps(resolver)` resolving `specs: ReadonlyMap<string, SpecRepository>` + `initializePersistedSpecState` collaborator; factory MUST NOT inline fs wiring.\n\n## Constraints\n\n- Mutates canonical persisted lock state only — never a change draft `specDependsOn`; MUST NOT import dependency values from persisted metadata.\n- `readOnly` workspace → reject with `ReadOnlyWorkspaceError` before any I/O.\n- No actor identity/attribution.\n",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:2d0742a4ef476b5e012a54e443370d73f78ccc75ba2eec408ca22d83614b2065",
+          "lastModified": "2026-08-17T09:55:42.151Z"
+        },
+        "verify.md": {
+          "hash": "sha256:e7dcb9421c0d6dd961071ea45974fb3cb67f63116e792a452a0d52779ec679a2",
+          "lastModified": "2026-08-17T09:55:42.151Z"
+        }
+      }
+    }
+  }
 }

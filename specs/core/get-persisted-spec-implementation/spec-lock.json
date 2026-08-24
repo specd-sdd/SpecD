@@ -4,5 +4,41 @@
     "version": 1
   },
   "dependsOn": ["core:spec-repository-port", "core:spec-id-format"],
-  "implementation": []
+  "implementation": [],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Read-only use case exposing persisted implementation links from spec lock state; returns initialized false without creating state.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:5ebc0af04feafc359527493b954b63662cb2a65d5b02a10bba95998b3ef3c5cd",
+          "lastModified": "2026-08-17T09:55:42.057Z"
+        },
+        "verify.md": {
+          "hash": "sha256:6f87ed47d97193e9136d4001cef5379ddb689cd987d88b46a40665f18cef9b8e",
+          "lastModified": "2026-08-17T09:55:42.057Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# GetPersistedSpecImplementation\n\nRead-only exposure of persisted implementation links — the durable archived traceability record.\n\n## Rules\n\n- `execute` input `GetPersistedSpecImplementationInput`: specId (required, fully-qualified spec identity).\n- Resolve spec workspace repository, call SpecRepository.readPersistedState(spec). MUST NOT read spec-lock.json directly; MUST NOT materialize or read generated metadata to answer this query.\n- Persisted state exists → GetPersistedSpecImplementationResult: specId (fully-qualified), implementation (exact readonly PersistedImplementationLink[] from snapshot, stored order), initialized true. Each link preserves file-level (symbols absent) vs symbol-level (symbols present non-empty) distinction unchanged from storage.\n- readPersistedState returns null → result with implementation [] and initialized false. MUST NOT create persisted state as side effect of this read.\n- Spec identity unresolvable to existing spec artifact set in its workspace → throw SpecNotFoundError.\n- Config factory createGetPersistedSpecImplementation(config, options?) derives deps via resolveGetPersistedSpecImplementationDeps(resolver) then delegates to canonical createGetPersistedSpecImplementation(deps). Resolver provides: specs ReadonlyMap<string, SpecRepository> (one repository instance per workspace). Helper is the only use-case-specific composition entry; factory MUST NOT reconstruct fs-shaped wiring inline.\n\n## Constraints\n\n- Strictly read-only — never creates, mutates, or writes persisted state\n- Returned list = durable archived traceability record; NOT autodetected candidates or in-progress change tracking state\n- readOnly workspace ownership does not affect this operation — reads always permitted",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:5ebc0af04feafc359527493b954b63662cb2a65d5b02a10bba95998b3ef3c5cd",
+          "lastModified": "2026-08-17T09:55:42.057Z"
+        },
+        "verify.md": {
+          "hash": "sha256:6f87ed47d97193e9136d4001cef5379ddb689cd987d88b46a40665f18cef9b8e",
+          "lastModified": "2026-08-17T09:55:42.057Z"
+        }
+      }
+    }
+  }
 }

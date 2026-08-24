@@ -76,7 +76,10 @@ export class UpdatePersistedSpecDeps {
       throw new WorkspaceNotFoundError(workspace)
     }
     if (repo.ownership() === 'readOnly') {
-      throw new ReadOnlyWorkspaceError(workspace)
+      throw new ReadOnlyWorkspaceError(
+        `Workspace "${workspace}" is read-only: persisted dependencies cannot be modified. ` +
+          `Change the workspace ownership in specd.yaml to allow writes.`,
+      )
     }
 
     const spec = await repo.get(SpecPath.parse(capPath))

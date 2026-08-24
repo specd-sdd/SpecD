@@ -529,6 +529,29 @@ graph LR
 - `docs/cli/spec-deps.md`: Document `specd specs deps suggest [<spec-id>] [--spec <id>...] [--all] [--workspace <name>] [--apply] [--create-change] [--rebuild-cache]`.
 - `docs/cli/cli-reference.md`: Update main CLI reference index for `spec implementation suggest` and `spec deps suggest`.
 
+## Architectural exceptions (accepted debt)
+
+These deviations from `_global/architecture` (and `sdk:composition`) are deliberate,
+documented here as accepted debt for this change:
+
+1. **Default adapter instantiation inside orchestration use cases.** `SuggestImplementationLinks`
+   and `SuggestSpecDependencies` construct `FsImplementationSuggestionCache` / `FsSpecDepsSuggestionCache`
+   as defaults when no port is injected. Ports remain fully injectable (every test uses
+   in-memory doubles), but the hexagonal ideal would resolve defaults in a composition root.
+2. **Direct `mkdir`/`writeFile` inside `execute()`** when creating the post-apply alignment
+   change exploration file, instead of an extracted filesystem port.
+3. **Public SDK barrel re-exports the Fs cache adapters** so host packages can wire them
+   without reaching into internal paths.
+
+Rationale: default-injection keeps one-line usage for CLI hosts and scripts; refactoring to
+a pure composition-root model is deferred to a dedicated architecture change.
+
+**Graph-index lock routing (F6/N1 resolution).** `acquireGraphIndexLock` / `getGraphIndexLockPath`
+are re-exported through `@specd/sdk` from the code-graph `"./internal"` development barrel
+(`@specd/sdk` acting as an advanced in-monorepo caller). This keeps the code-graph public `.`
+barrel free of infrastructure implementations and leaves `@specd/cli` depending on
+`@specd/sdk` only, per `_global/architecture`.
+
 ## Open questions
 
 - None.

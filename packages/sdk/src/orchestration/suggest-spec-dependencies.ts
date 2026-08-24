@@ -817,6 +817,12 @@ export class SuggestSpecDependencies {
             const invalidSpecIds = invalidSpecs.map((s) => s.specId)
             let createdChangeInfo: CreatedAlignmentChangeInfo | undefined
 
+            if (input.createAlignmentChange && !this.deps.createChange) {
+              throw new InvalidInputError(
+                'createAlignmentChange requires a CreateChange dependency, but none was injected',
+              )
+            }
+
             if (input.createAlignmentChange && this.deps.createChange) {
               const prefix = input.changeNamePrefix ?? 'align-spec-deps'
               const changeName = `${prefix}-${Date.now()}`

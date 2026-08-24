@@ -38,7 +38,7 @@ The input interface MUST support:
    - Leverages `ImplementationSuggestionCachePort.findSpecByFile()` to resolve any relative production source file or barrel re-export to its owning `specId` in $O(1)$ without ad-hoc loops or manual hub filtering in the use case.
    - Initializes `SpecDepsSuggestionCachePort` (defaulting to `FsSpecDepsSuggestionCache` persisting under `.specd/tmp/fs-cache/spec-deps-suggestions/suggestions.json`).
 2. **Pass 2 (AST Import Traversal, Directional Validation & Transitive Reduction)**:
-   - Evaluates `SpecDepsSuggestionCachePort.isSpecFresh` (validating `cacheVersion === '1.1.0'`). On cache HIT (and when `rebuildCache` is false), serves cached suggested dependencies directly.
+   - Evaluates cached-entry freshness through `SpecDepsSuggestionCachePort.get()` (header `cacheVersion === '1.1.0'` is enforced when the cache file loads; per-entry graph-fingerprint and target-spec stamp validation happens inside `get()`). On cache HIT (and when `rebuildCache` is false), serves cached suggested dependencies directly.
    - Additionally validates the cached entry's `fileToSpecFingerprint` against a fingerprint of the current global implementation file-to-spec map (computed after warm-up). When both values are present and differ — e.g. an imported file changed owner between runs without touching the target spec stamp or graph fingerprint — the entry is treated as a MISS and suggestions are recomputed.
    - On cache miss, evaluates `import` statements in target spec implementation files (retrieved via `SpecRepository` and `SuggestImplementationLinks`).
    - Runs `analyzeFileImpact` (`maxDepth = 1`) via `code-graph:traversal` to trace direct import relationships using workspace-normalized relative paths.
@@ -57,6 +57,8 @@ The input interface MUST support:
    - If invalid specs exist (`status: "invalid-specs-detected"`) AND `createAlignmentChange: true` is authorized:
      - Creates a single alignment change gathering ALL failing specs: `align-spec-deps-<timestamp>`.
      - Writes `<changePath>/.specd-exploration.md` detailing exact schema validation failures `[artifactId: description]`.
+   - If `createAlignmentChange: true` is set but no `CreateChange` dependency is injected, `execute()` MUST throw `InvalidInputError` instead of silently ignoring the flag.
+   - If `ValidateSpecs` itself throws, post-apply validation degrades gracefully to `status: "all-valid"` (fail-open) so a broken validator never blocks apply; the thrown error is logged at debug level.
    - If all specs are valid (`status: "all-valid"`), NO alignment change is created under any circumstances.
 
 ### Requirement: Standard Factory & Composition Overloads

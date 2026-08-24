@@ -1,11 +1,12 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest'
-import { rm, mkdir, readFile } from 'node:fs/promises'
+import { rm, mkdir, readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { type SpecRepository } from '@specd/core'
 import { type CodeGraphProvider } from '@specd/code-graph'
 import { FsImplementationSuggestionCache } from '../../../src/infrastructure/fs/fs-implementation-suggestion-cache.js'
 import { FsSpecDepsSuggestionCache } from '../../../src/infrastructure/fs/fs-spec-deps-suggestion-cache.js'
+import { SPEC_DEPS_CACHE_VERSION } from '../../../src/domain/value-objects/spec-deps-suggestion-cache.js'
 
 describe('FsImplementationSuggestionCache', () => {
   const testDir = join(tmpdir(), `specd-impl-cache-test-${Date.now()}`)
@@ -159,5 +160,49 @@ describe('FsSpecDepsSuggestionCache', () => {
 
     await cache.invalidate()
     expect(await cache.get('cli:spec-deps')).toBeNull()
+  })
+
+  it('discards and regenerates a cache file persisted with an older cacheVersion', async () => {
+    const cacheDir = join(testDir, '.specd', 'tmp', 'fs-cache', 'spec-deps-suggestions')
+    await mkdir(cacheDir, { recursive: true })
+    const cachePath = join(cacheDir, 'suggestions.json')
+    await writeFile(
+      cachePath,
+      JSON.stringify({
+        header: {
+          updatedAt: '2026-01-01T00:00:00.000Z',
+          projectDir: testDir,
+          cacheVersion: '1.0.0',
+        },
+        specs: {
+          'core:legacy': {
+            specId: 'core:legacy',
+            title: 'Legacy',
+            specStamp: { lastModified: '', hash: '', artifacts: [] },
+            existingDependsOn: [],
+            suggestedDependsOn: [],
+          },
+        },
+      }),
+      'utf-8',
+    )
+
+    const cache = new FsSpecDepsSuggestionCache({ projectDir: testDir })
+
+    // Version mismatch -> entry is not served.
+    expect(await cache.get('core:legacy')).toBeNull()
+
+    // Regeneration: next flush rewrites the file under the active version.
+    await cache.set('core:fresh', {
+      title: 'Fresh',
+      existingDependsOn: [],
+      suggestedDependsOn: [],
+    })
+    await cache.flush()
+
+    const regenerated = JSON.parse(await readFile(cachePath, 'utf-8'))
+    expect(regenerated.header.cacheVersion).toBe(SPEC_DEPS_CACHE_VERSION)
+    expect(regenerated.specs['core:legacy']).toBeUndefined()
+    expect(regenerated.specs['core:fresh']).toBeDefined()
   })
 })

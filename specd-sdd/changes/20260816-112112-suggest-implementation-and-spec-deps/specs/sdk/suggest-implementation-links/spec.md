@@ -49,7 +49,7 @@ The input interface MUST support:
    - Differentiates **Exact Primary Symbol Match** (+200 points) from **Derivative Symbol Match** (+50 points).
    - Discards candidate files that do not declare any symbol matching the spec title (or compound/all title tokens).
    - Assigns a confidence level (`HIGH` >= 150 with clean affinity, `MEDIUM` 80–149, `LOW` < 80) and numeric score to each candidate.
-   - If Tier 1 produces matching candidates with `HIGH` or `MEDIUM` confidence, the algorithm short-circuits and returns.
+   - Tier 2 refines and extends the Tier 1 candidate set (it does not short-circuit it): hierarchical-domain candidates compete in the same ranked list by score/confidence.
 2. **Tier 2 (Hierarchical Domain Prefix Derivation & Sub-token Content Match)**:
    - For multi-segment capability slugs (e.g. `schema-which-command`), derives parent domain candidates across standard source folders (e.g. `src/commands/schema.ts`, `src/application/schema.ts`).
    - Verifies whether missing distinctive sub-tokens (e.g. `which`) exist inside candidate file content via disk inspection and SQLite FTS5 search in `code-graph`.

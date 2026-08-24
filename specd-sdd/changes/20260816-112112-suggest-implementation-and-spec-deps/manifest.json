@@ -1,7 +1,7 @@
 {
   "name": "suggest-implementation-and-spec-deps",
   "createdAt": "2026-08-16T11:21:12.000Z",
-  "updatedAt": "2026-08-24T07:29:39.711Z",
+  "updatedAt": "2026-08-24T11:06:50.655Z",
   "description": "Add SDK use cases and CLI commands to suggest implementation links and spec dependencies with post-apply validation",
   "schema": {
     "name": "schema-std",
@@ -817,6 +817,54 @@
     {
       "file": "packages/sdk/test/infrastructure/fs/fs-cache-concurrent-load.spec.ts",
       "state": "open"
+    },
+    {
+      "file": "specs/cli/spec-deps/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/cli/spec-implementation/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/get-persisted-spec-deps/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/get-persisted-spec-implementation/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/update-persisted-spec-deps/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/update-persisted-spec-implementation/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/update-spec-deps/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/index-graph.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/update-persisted-spec-deps.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/update-persisted-spec-implementation.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/core/src/domain/errors/artifact-conflict-error.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/cli/package.json",
+      "state": "open"
     }
   ],
   "implementationLinks": [
@@ -899,13 +947,13 @@
           "key": "sdk:suggest-implementation-links",
           "filename": "specs/sdk/suggest-implementation-links/spec.md",
           "state": "complete",
-          "validatedHash": "sha256:19ff3ee73487bb97d9cfdffb601c9b35cda734912f796df0035b7359f02d753d"
+          "validatedHash": "sha256:e98ec4213acacdc08ee72c18aeadf26b5fc8bd3ecf621c98f11fb3d89ada16c3"
         },
         {
           "key": "sdk:suggest-spec-dependencies",
           "filename": "specs/sdk/suggest-spec-dependencies/spec.md",
           "state": "complete",
-          "validatedHash": "sha256:c6fbe7f1d7ad8e5fa14e4579a2f27f8640532e8c7782fdadfa85e306ceb12b00"
+          "validatedHash": "sha256:7292149d3de74e3746f0032fb9c0d8812b6892f5027325d9b56ed03281cea1b0"
         },
         {
           "key": "code-graph:language-adapter",
@@ -975,7 +1023,7 @@
           "key": "design",
           "filename": "design.md",
           "state": "complete",
-          "validatedHash": "sha256:f508b1956804aa7501d68f28c3c257cb3aaf115a24e84ecad491812aabef7783"
+          "validatedHash": "sha256:ac35032d14461a72b896b1ef8cbd14c38b8b3d54615a22802850758ffc850b41"
         }
       ]
     },
@@ -2918,6 +2966,279 @@
           "files": ["tasks"]
         }
       ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-24T07:34:23.497Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [sdk:suggest-spec-dependencies]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["sdk:suggest-spec-dependencies"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:spec-implementation",
+            "cli:spec-deps",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies",
+            "code-graph:language-adapter",
+            "code-graph:graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-24T07:36:57.512Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-24T07:37:30.048Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-24T07:40:01.873Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-24T07:51:16.944Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-24T08:00:31.122Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-24T08:24:54.915Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:spec-implementation",
+            "cli:spec-deps",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies",
+            "code-graph:language-adapter",
+            "code-graph:graph-store"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:spec-implementation",
+            "cli:spec-deps",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies",
+            "code-graph:language-adapter",
+            "code-graph:graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-24T08:24:54.915Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-24T08:28:53.068Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-24T08:28:54.262Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-24T08:56:52.938Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-24T09:23:24.699Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:spec-implementation",
+            "cli:spec-deps",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies",
+            "code-graph:language-adapter",
+            "code-graph:graph-store"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:spec-implementation",
+            "cli:spec-deps",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies",
+            "code-graph:language-adapter",
+            "code-graph:graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-24T09:23:24.699Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-24T09:28:53.804Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-24T09:28:59.525Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-24T11:01:04.876Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
     }
   ]
 }

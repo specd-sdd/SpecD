@@ -360,6 +360,38 @@ describe('SuggestImplementationLinks', () => {
     }
   })
 
+  it('marks suggestions pointing at already-linked files with alreadyIncluded: true', async () => {
+    const { useCase, cache } = setupTest()
+
+    // setupTest seeds getPersistedImplementation with the existing link
+    // `sdk:packages/sdk/src/existing.ts` (symbol ExistingSymbol). Prime the
+    // cache with a suggestion targeting that same file.
+    await cache.set('sdk:suggest-implementation-links', {
+      title: 'SuggestImplementationLinks',
+      specContentHash: 'hash123',
+      existing: { files: [], symbols: [], dependsOn: [] },
+      suggestions: [
+        {
+          file: 'sdk:packages/sdk/src/existing.ts',
+          symbols: ['ExistingSymbol'],
+          confidence: 'HIGH',
+          reasons: ['primary-symbol-match'],
+          score: 200,
+          alreadyIncluded: false,
+        },
+      ],
+    })
+
+    const result = await useCase.execute({
+      specId: 'sdk:suggest-implementation-links',
+    })
+
+    expect(result.result).toBe('ok')
+    const sug = result.specs[0]?.suggestions.find((s) => s.file.endsWith('existing.ts'))
+    expect(sug).toBeDefined()
+    expect(sug?.alreadyIncluded).toBe(true)
+  })
+
   it('persists real SHA-256 content hash in cache stamp', async () => {
     const { useCase, cache } = setupTest()
 
@@ -457,10 +489,16 @@ describe('SuggestImplementationLinks', () => {
       onProgress: (evt) => events.push(evt),
     })
 
-    expect(events.length).toBeGreaterThan(0)
-    expect(events.some((e) => e.type === 'start')).toBe(true)
-    expect(events.some((e) => e.type === 'spec-start')).toBe(true)
-    expect(events.some((e) => e.type === 'spec-done')).toBe(true)
-    expect(events.some((e) => e.type === 'done')).toBe(true)
+    const types = events.map((e) => e.type as string)
+    expect(types.length).toBeGreaterThan(0)
+    // Complete ordered sequence: discovery-start ... discovery-done ... start
+    // ... spec-start ... spec-done ... done
+    expect(types[0]).toBe('discovery-start')
+    const indexOf = (t: string): number => types.indexOf(t)
+    expect(indexOf('discovery-done')).toBeGreaterThan(0)
+    expect(indexOf('discovery-done')).toBeLessThan(indexOf('start'))
+    expect(indexOf('start')).toBeLessThan(indexOf('spec-start'))
+    expect(indexOf('spec-start')).toBeLessThan(indexOf('spec-done'))
+    expect(indexOf('spec-done')).toBeLessThan(types.lastIndexOf('done'))
   })
 })

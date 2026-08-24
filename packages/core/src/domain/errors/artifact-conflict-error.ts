@@ -53,7 +53,8 @@ export class ArtifactConflictError extends SpecdError {
    */
   constructor(filename: string, incomingContent: string, currentContent: string) {
     super(
-      `Artifact "${filename}" was modified after it was loaded — save aborted to prevent data loss`,
+      `Artifact "${filename}" was modified after it was loaded — save aborted to prevent data loss. ` +
+        `Re-load the artifact and retry your change to apply it on top of the latest content.`,
     )
     this._filename = filename
     this._incomingContent = incomingContent

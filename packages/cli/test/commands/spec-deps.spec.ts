@@ -5,7 +5,10 @@ import {
   makeProgram,
   mockProcessExit,
   captureStdout,
+  captureStderr,
+  ExitSentinel,
 } from './helpers.js'
+import { ReadOnlyWorkspaceError } from '@specd/sdk'
 
 vi.mock('../../src/helpers/cli-context.js', () => ({
   resolveCliContext: vi.fn(),
@@ -168,5 +171,217 @@ describe('spec deps', () => {
     expect(out).toContain('default:auth/core [already included]')
     expect(out).toContain('applied mutations: updated 1 specs (1 dependencies added)')
     expect(out).toContain('post-apply validation: all specs valid')
+  })
+
+  it('add delegates to kernel.specs.updatePersistedDeps', async () => {
+    const { kernel } = setup()
+    vi.mocked(kernel.specs.updatePersistedDeps.execute).mockResolvedValue({
+      specId: 'default:auth/login',
+      dependsOn: ['core:a', 'core:b'],
+    })
+
+    const program = makeProgram()
+    registerSpecDeps(program.command('spec'))
+    await program.parseAsync([
+      'node',
+      'specd',
+      'spec',
+      'deps',
+      'add',
+      'auth/login',
+      '--dep',
+      'core:a',
+      '--dep',
+      'core:b',
+    ])
+
+    expect(kernel.specs.updatePersistedDeps.execute).toHaveBeenCalledWith({
+      specId: 'default:auth/login',
+      add: ['core:a', 'core:b'],
+    })
+  })
+
+  it('remove delegates to kernel.specs.updatePersistedDeps', async () => {
+    const { kernel } = setup()
+    vi.mocked(kernel.specs.updatePersistedDeps.execute).mockResolvedValue({
+      specId: 'default:auth/login',
+      dependsOn: [],
+    })
+
+    const program = makeProgram()
+    registerSpecDeps(program.command('spec'))
+    await program.parseAsync([
+      'node',
+      'specd',
+      'spec',
+      'deps',
+      'remove',
+      'auth/login',
+      '--dep',
+      'core:a',
+    ])
+
+    expect(kernel.specs.updatePersistedDeps.execute).toHaveBeenCalledWith({
+      specId: 'default:auth/login',
+      remove: ['core:a'],
+    })
+  })
+
+  it('clear delegates to kernel.specs.updatePersistedDeps', async () => {
+    const { kernel } = setup()
+    vi.mocked(kernel.specs.updatePersistedDeps.execute).mockResolvedValue({
+      specId: 'default:auth/login',
+      dependsOn: [],
+    })
+
+    const program = makeProgram()
+    registerSpecDeps(program.command('spec'))
+    await program.parseAsync(['node', 'specd', 'spec', 'deps', 'clear', 'auth/login'])
+
+    expect(kernel.specs.updatePersistedDeps.execute).toHaveBeenCalledWith({
+      specId: 'default:auth/login',
+      clear: true,
+    })
+  })
+
+  it('set without --dep flags clears the list', async () => {
+    const { kernel } = setup()
+    vi.mocked(kernel.specs.updatePersistedDeps.execute).mockResolvedValue({
+      specId: 'default:auth/login',
+      dependsOn: [],
+    })
+
+    const program = makeProgram()
+    registerSpecDeps(program.command('spec'))
+    await program.parseAsync(['node', 'specd', 'spec', 'deps', 'set', 'auth/login'])
+
+    expect(kernel.specs.updatePersistedDeps.execute).toHaveBeenCalledWith({
+      specId: 'default:auth/login',
+      set: [],
+    })
+  })
+
+  it('remove on an uninitialized spec is a no-op, not an error', async () => {
+    const { kernel } = setup()
+    const getOutput = captureStdout()
+    vi.mocked(kernel.specs.updatePersistedDeps.execute).mockResolvedValue({
+      specId: 'default:auth/login',
+      dependsOn: [],
+    })
+
+    const program = makeProgram()
+    registerSpecDeps(program.command('spec'))
+    await program.parseAsync([
+      'node',
+      'specd',
+      'spec',
+      'deps',
+      'remove',
+      'auth/login',
+      '--dep',
+      'core:a',
+    ])
+
+    expect(process.exit).not.toHaveBeenCalled()
+    expect(getOutput()).toContain('dependsOn: (empty)')
+  })
+
+  it('list includes initialized:false in json output for uninitialized specs', async () => {
+    const { kernel } = setup()
+    vi.mocked(kernel.specs.getPersistedDeps.execute).mockResolvedValue({
+      specId: 'default:auth/login',
+      dependsOn: [],
+      initialized: false,
+    })
+    const getOutput = captureStdout()
+
+    const program = makeProgram()
+    registerSpecDeps(program.command('spec'))
+    await program.parseAsync([
+      'node',
+      'specd',
+      'spec',
+      'deps',
+      'list',
+      'auth/login',
+      '--format',
+      'json',
+    ])
+
+    expect(JSON.parse(getOutput())).toMatchObject({ initialized: false })
+  })
+
+  it('list reports uninitialized spec distinctly in text output', async () => {
+    const { kernel } = setup()
+    vi.mocked(kernel.specs.getPersistedDeps.execute).mockResolvedValue({
+      specId: 'default:auth/login',
+      dependsOn: [],
+      initialized: false,
+    })
+    const getOutput = captureStdout()
+
+    const program = makeProgram()
+    registerSpecDeps(program.command('spec'))
+    await program.parseAsync(['node', 'specd', 'spec', 'deps', 'list', 'auth/login'])
+
+    expect(getOutput()).toContain('is not initialized — run specs init first')
+  })
+
+  it('maps readOnly workspace errors to exit code 1 with actionable message', async () => {
+    const { kernel } = setup()
+    vi.mocked(kernel.specs.updatePersistedDeps.execute).mockRejectedValue(
+      new ReadOnlyWorkspaceError(
+        'Workspace "platform" is read-only: persisted dependencies cannot be modified. ' +
+          'Change the workspace ownership in specd.yaml to allow writes.',
+      ),
+    )
+    const stderr = captureStderr()
+
+    const program = makeProgram()
+    registerSpecDeps(program.command('spec'))
+    try {
+      await program.parseAsync([
+        'node',
+        'specd',
+        'spec',
+        'deps',
+        'add',
+        'auth/login',
+        '--dep',
+        'core:a',
+      ])
+    } catch (err) {
+      expect(err).toBeInstanceOf(ExitSentinel)
+      expect((err as ExitSentinel).code).toBe(1)
+    }
+
+    expect(stderr()).toContain('error:')
+    expect(stderr()).toContain('read-only')
+  })
+
+  it('list accepts --format toon', async () => {
+    const { kernel } = setup()
+    vi.mocked(kernel.specs.getPersistedDeps.execute).mockResolvedValue({
+      specId: 'default:auth/login',
+      dependsOn: ['core:a'],
+      initialized: true,
+    })
+    const getOutput = captureStdout()
+
+    const program = makeProgram()
+    registerSpecDeps(program.command('spec'))
+    await program.parseAsync([
+      'node',
+      'specd',
+      'spec',
+      'deps',
+      'list',
+      'auth/login',
+      '--format',
+      'toon',
+    ])
+
+    expect(process.exit).not.toHaveBeenCalled()
+    expect(getOutput().length).toBeGreaterThan(0)
   })
 })

@@ -1,6 +1,6 @@
 import { Command, Option } from 'commander'
 import { spawn, type ChildProcess } from 'node:child_process'
-import { acquireGraphIndexLock } from '@specd/code-graph/internal'
+import { acquireGraphIndexLock } from '@specd/sdk'
 import {
   runIndexProjectGraph,
   type IndexPhaseMetric,

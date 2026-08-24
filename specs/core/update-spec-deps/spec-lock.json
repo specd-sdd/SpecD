@@ -15,5 +15,41 @@
     {
       "file": "core:src/composition/use-cases/update-spec-deps.ts"
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Change-scoped use case updating a spec draft's dependsOn via add/remove/set during authoring as the highest-priority resolution source.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:84b8cedb91fa046e993b4f1bae67aa3214c70585ae681256a2ac653759c18098",
+          "lastModified": "2026-08-17T09:55:42.156Z"
+        },
+        "verify.md": {
+          "hash": "sha256:004f29d177cd6acbdab229a6c8ff227191bbf3ab4027282253a146979584933d",
+          "lastModified": "2026-08-17T09:55:42.156Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# UpdateSpecDeps\n\n## Rules\n\n- Updates declared `dependsOn` for one spec within a change, stored in `change.specDependsOn` — highest-priority resolution source so CompileContext resolves full graph before metadata exists.\n- Input `UpdateSpecDepsInput`: `name` (change slug), `specId` required; optional `add`/`remove`/`set` readonly string arrays.\n- Load change via `ChangeRepository.get(name)`; missing → throw `ChangeNotFoundError`.\n- `specId` MUST exist in `change.specIds`, else Error (spec not in change).\n- `set` mutually exclusive with `add`/`remove`; zero operations → Error.\n- `set` replaces entire list, discarding previous. `remove` validates each ID exists in current deps — sequential; first missing ID aborts with error naming it. `add` idempotent — duplicates silently skipped. Removals processed before additions when both given.\n- Persist via `ChangeRepository.mutate(name, fn)`: callback receives fresh persisted Change, calls `change.setSpecDependsOn(specId, result)`, returns it; repository persists manifest. Returns `UpdateSpecDepsResult { specId, dependsOn }`.\n- Validation/lookup failures MUST use typed `SpecdError` subclasses (never generic Error); messages follow default:_global/error-handling-conventions.\n- Config factory `createUpdateSpecDeps(config, options?)` delegates via `resolveUpdateSpecDepsDeps(resolver)` resolving `changes: ChangeRepository`; factory MUST NOT inline fs wiring.\n\n## Constraints\n\n- Does NOT trigger approval invalidation — dependency metadata op, not scope change.\n- No actor identity resolution — not recorded as actor-attributed events.\n- Dependency IDs parsed via parseSpecId — lenient format validation, invalid formats do not throw.\n",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:84b8cedb91fa046e993b4f1bae67aa3214c70585ae681256a2ac653759c18098",
+          "lastModified": "2026-08-17T09:55:42.156Z"
+        },
+        "verify.md": {
+          "hash": "sha256:004f29d177cd6acbdab229a6c8ff227191bbf3ab4027282253a146979584933d",
+          "lastModified": "2026-08-17T09:55:42.156Z"
+        }
+      }
+    }
+  }
 }

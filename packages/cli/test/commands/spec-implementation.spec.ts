@@ -5,7 +5,10 @@ import {
   makeProgram,
   mockProcessExit,
   captureStdout,
+  captureStderr,
+  ExitSentinel,
 } from './helpers.js'
+import { ChangeNotFoundError } from '@specd/sdk'
 
 vi.mock('../../src/helpers/cli-context.js', () => ({
   resolveCliContext: vi.fn(),
@@ -131,6 +134,154 @@ describe('spec implementation', () => {
         specId: 'default:auth/login',
       }),
     )
+  })
+
+  it('remove delegates to kernel.specs.updatePersistedImplementation', async () => {
+    const { kernel } = setup()
+    vi.mocked(kernel.specs.updatePersistedImplementation.execute).mockResolvedValue({
+      specId: 'default:auth/login',
+      implementation: [],
+      created: false,
+    })
+
+    const program = makeProgram()
+    registerSpecImplementation(program.command('spec'))
+    await program.parseAsync([
+      'node',
+      'specd',
+      'spec',
+      'implementation',
+      'remove',
+      'auth/login',
+      '--file',
+      'src/auth.ts',
+      '--symbol',
+      'login',
+    ])
+
+    expect(kernel.specs.updatePersistedImplementation.execute).toHaveBeenCalledWith({
+      specId: 'default:auth/login',
+      action: 'remove',
+      file: 'src/auth.ts',
+      symbols: ['login'],
+    })
+  })
+
+  it('list reports uninitialized spec distinctly in text output', async () => {
+    const { kernel } = setup()
+    vi.mocked(kernel.specs.getPersistedImplementation.execute).mockResolvedValue({
+      specId: 'default:auth/login',
+      implementation: [],
+      initialized: false,
+    })
+    const getOutput = captureStdout()
+
+    const program = makeProgram()
+    registerSpecImplementation(program.command('spec'))
+    await program.parseAsync(['node', 'specd', 'spec', 'implementation', 'list', 'auth/login'])
+
+    expect(getOutput()).toContain('is not initialized — run specs init first')
+  })
+
+  it('list includes initialized:false in json output for uninitialized specs', async () => {
+    const { kernel } = setup()
+    vi.mocked(kernel.specs.getPersistedImplementation.execute).mockResolvedValue({
+      specId: 'default:auth/login',
+      implementation: [],
+      initialized: false,
+    })
+    const getOutput = captureStdout()
+
+    const program = makeProgram()
+    registerSpecImplementation(program.command('spec'))
+    await program.parseAsync([
+      'node',
+      'specd',
+      'spec',
+      'implementation',
+      'list',
+      'auth/login',
+      '--format',
+      'json',
+    ])
+
+    expect(JSON.parse(getOutput())).toMatchObject({ initialized: false })
+  })
+
+  it('suggest renders [already included] tag for linked files', async () => {
+    setup()
+    const getOutput = captureStdout()
+    mockExecuteSuggestImplementationLinks.mockResolvedValueOnce({
+      result: 'ok',
+      specs: [
+        {
+          specId: 'default:auth/login',
+          title: 'Login',
+          existing: { files: ['src/auth.ts'], symbols: [], dependsOn: [] },
+          suggestions: [
+            {
+              file: 'src/auth.ts',
+              symbols: ['login'],
+              confidence: 'HIGH',
+              reasons: ['exact-ast-symbol-match'],
+              score: 160,
+              alreadyIncluded: true,
+            },
+          ],
+        },
+      ],
+    })
+    const program = makeProgram()
+    registerSpecImplementation(program.command('spec'))
+
+    await program.parseAsync(['node', 'specd', 'spec', 'implementation', 'suggest', 'auth/login'])
+
+    expect(getOutput()).toContain('[already included] [HIGH] src/auth.ts')
+  })
+
+  it('list accepts --format toon', async () => {
+    const { kernel } = setup()
+    vi.mocked(kernel.specs.getPersistedImplementation.execute).mockResolvedValue({
+      specId: 'default:auth/login',
+      implementation: [{ file: 'default:src/auth.ts' }],
+      initialized: true,
+    })
+    const getOutput = captureStdout()
+
+    const program = makeProgram()
+    registerSpecImplementation(program.command('spec'))
+    await program.parseAsync([
+      'node',
+      'specd',
+      'spec',
+      'implementation',
+      'list',
+      'auth/login',
+      '--format',
+      'toon',
+    ])
+
+    expect(process.exit).not.toHaveBeenCalled()
+    expect(getOutput().length).toBeGreaterThan(0)
+  })
+
+  it('maps typed errors to exit code 1 with error prefix', async () => {
+    const { kernel } = setup()
+    vi.mocked(kernel.specs.getPersistedImplementation.execute).mockRejectedValue(
+      new ChangeNotFoundError('nonexistent'),
+    )
+    const stderr = captureStderr()
+
+    const program = makeProgram()
+    registerSpecImplementation(program.command('spec'))
+    try {
+      await program.parseAsync(['node', 'specd', 'spec', 'implementation', 'list', 'auth/login'])
+    } catch (err) {
+      expect(err).toBeInstanceOf(ExitSentinel)
+      expect((err as ExitSentinel).code).toBe(1)
+    }
+
+    expect(stderr()).toContain('error:')
   })
 
   it('suggest renders text output for existing files, confidence and mutations by default', async () => {
