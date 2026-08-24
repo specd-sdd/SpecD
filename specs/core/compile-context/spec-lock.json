@@ -19,12 +19,33 @@
     "core:composition-resolver",
     "core:project-metadata",
     "core:spec-optimization",
-    "core:get-spec-metadata"
+    "core:get-spec-metadata",
+    "core:content-extraction"
   ],
   "implementation": [
     {
+      "file": "core:src/application/use-cases/_shared/materialize-context-spec-metadata.ts",
+      "symbols": ["appendMaterializationDiagnostics"]
+    },
+    {
+      "file": "core:src/application/use-cases/_shared/context-warning.ts",
+      "symbols": ["ContextWarning"]
+    },
+    {
+      "file": "core:src/domain/services/parse-metadata.ts",
+      "symbols": ["SpecMetadata", "specMetadataSchema", "strictSpecMetadataSchema"]
+    },
+    {
+      "file": "core:src/application/use-cases/generate-spec-metadata.ts",
+      "symbols": ["buildFreshOptimizationProjections"]
+    },
+    {
       "file": "core:src/application/use-cases/compile-context.ts",
       "symbols": ["CompileContext"]
+    },
+    {
+      "file": "core:src/application/use-cases/_shared/depends-on-traversal.ts",
+      "symbols": ["traverseDependsOn", "TraverseDependsOnOptions"]
     }
   ],
   "optimizations": {

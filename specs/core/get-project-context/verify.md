@@ -183,6 +183,21 @@
 - **THEN** the warning is forwarded into the result's `warnings` array
 - **AND** it is not logged again by this use case
 
+#### Scenario: Cache-miss regeneration does not emit a warning
+
+- **GIVEN** `GetSpecMetadata` regenerates a projection (`regenerated: true`) without persistence failures
+- **WHEN** `GetProjectContext` renders that spec
+- **THEN** the entry renders normally from the regenerated projection
+- **AND** no warning about the regeneration appears in `warnings`
+
+#### Scenario: Per-spec optimization warning distinguishes missing vs stale
+
+- **GIVEN** `llmOptimizedContext: true`
+- **AND** an included spec whose materialized projection lacks usable `optimizedContext`
+- **WHEN** `GetProjectContext` renders that spec
+- **THEN** the warning type is `missing-optimization` when the lock records no optimization
+- **AND** the warning type is `stale-optimization` when the lock records an optimization with drifted baselines
+
 #### Scenario: Only rendered specs are materialized
 
 - **GIVEN** `contextMode: "list"` and one or more included specs
