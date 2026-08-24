@@ -1,0 +1,41 @@
+# Delta for core:get-spec-context verify.md — optimization type split + regeneration provenance
+- op: added
+  description: 'Two distinct optimization warning types'
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Prefer LLM-optimized context'
+    after:
+      type: section
+      matches: 'Scenario: Falls back to standard context and warns when optimization is stale or missing'
+  content: |
+    #### Scenario: Emits missing-optimization when lock records no optimization
+
+    - **GIVEN** `llmOptimizedContext: true`
+    - **AND** the spec's lock owns no optimization value for the field
+    - **WHEN** `GetSpecContext.execute` builds the entry
+    - **THEN** the warning type is `missing-optimization`
+
+    #### Scenario: Emits stale-optimization when baselines drifted
+
+    - **GIVEN** `llmOptimizedContext: true`
+    - **AND** the spec's lock owns an optimization whose artifact baselines no longer match current persisted artifacts
+    - **WHEN** `GetSpecContext.execute` builds the entry
+    - **THEN** the warning type is `stale-optimization`
+
+- op: added
+  description: 'Regeneration provenance is not a warning'
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Build context entry from metadata'
+    after:
+      type: section
+      matches: 'Scenario: Materialization warnings are forwarded without duplicate logging'
+  content: |
+    #### Scenario: Cache-miss regeneration does not emit a warning
+
+    - **GIVEN** `GetSpecMetadata` regenerates the projection (`regenerated: true`) without persistence failures
+    - **WHEN** `GetSpecContext` builds the entry
+    - **THEN** the entry renders normally from the regenerated projection
+    - **AND** no warning about the regeneration appears in `warnings`

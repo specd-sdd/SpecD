@@ -1,0 +1,35 @@
+# Delta for core:get-project-context verify.md — optimization type split + regeneration provenance
+- op: added
+  description: 'Regeneration provenance is not a warning'
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Renders spec content from metadata when fresh'
+    after:
+      type: section
+      matches: 'Scenario: Materialization warnings forwarded without duplicate logging'
+  content: |
+    #### Scenario: Cache-miss regeneration does not emit a warning
+
+    - **GIVEN** `GetSpecMetadata` regenerates a projection (`regenerated: true`) without persistence failures
+    - **WHEN** `GetProjectContext` renders that spec
+    - **THEN** the entry renders normally from the regenerated projection
+    - **AND** no warning about the regeneration appears in `warnings`
+
+- op: added
+  description: 'Optimization warnings distinguish missing vs stale'
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Renders spec content from metadata when fresh'
+    after:
+      type: section
+      matches: 'Scenario: Cache-miss regeneration does not emit a warning'
+  content: |
+    #### Scenario: Per-spec optimization warning distinguishes missing vs stale
+
+    - **GIVEN** `llmOptimizedContext: true`
+    - **AND** an included spec whose materialized projection lacks usable `optimizedContext`
+    - **WHEN** `GetProjectContext` renders that spec
+    - **THEN** the warning type is `missing-optimization` when the lock records no optimization
+    - **AND** the warning type is `stale-optimization` when the lock records an optimization with drifted baselines

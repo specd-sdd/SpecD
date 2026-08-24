@@ -1,0 +1,4 @@
+releases:
+  core:compile-context: minor
+  core:get-spec-context: patch
+  core:get-project-context: patch

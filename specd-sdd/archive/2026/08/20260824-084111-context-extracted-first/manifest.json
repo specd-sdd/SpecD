@@ -1,0 +1,483 @@
+{
+  "name": "context-extracted-first",
+  "createdAt": "2026-08-24T08:41:11.588Z",
+  "updatedAt": "2026-08-24T14:58:38.057Z",
+  "description": "CompileContext now renders change-scoped specs from their merged delta view - extracted-first through the schema's metadataExtraction engine - in every display mode, falling back to canonical metadata only when no merged content is usable. Context warnings were aligned with actionable semantics: spurious new-spec metadata warnings and cache-miss regeneration noise are gone, lock optimizations never apply to specs under modification, and out-of-scope specs now distinguish missing-optimization from stale-optimization. dependsOn traversal handles non-persisted change specs structurally via manifest-first ordering and existence-checked registration.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": ["core:compile-context", "core:get-spec-context", "core:get-project-context"],
+  "specDependsOn": {
+    "core:compile-context": [
+      "core:change",
+      "core:config",
+      "core:spec-metadata",
+      "core:schema-format",
+      "core:delta-format",
+      "core:selector-model",
+      "core:spec-id-format",
+      "core:workspace",
+      "core:get-artifact-instruction",
+      "core:get-hook-instructions",
+      "core:preview-spec",
+      "core:refresh-implementation-tracking",
+      "core:composition-resolver",
+      "core:project-metadata",
+      "core:spec-optimization",
+      "core:get-spec-metadata",
+      "core:content-extraction"
+    ],
+    "core:get-spec-context": [
+      "core:config",
+      "core:compile-context",
+      "core:spec-metadata",
+      "core:storage",
+      "core:workspace",
+      "core:spec-id-format",
+      "core:list-workspaces",
+      "core:composition-resolver",
+      "core:spec-optimization",
+      "core:get-spec-metadata"
+    ],
+    "core:get-project-context": [
+      "core:config",
+      "core:compile-context",
+      "core:spec-metadata",
+      "core:schema-format",
+      "default:_global/architecture",
+      "core:composition-resolver",
+      "core:project-metadata",
+      "core:spec-optimization",
+      "core:get-spec-metadata"
+    ]
+  },
+  "invalidationPolicy": "downstream",
+  "trackedImplementationFiles": [
+    {
+      "file": "packages/core/src/application/use-cases/_shared/materialize-context-spec-metadata.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/_shared/context-warning.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/services/parse-metadata.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/generate-spec-metadata.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/compile-context.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/_shared/depends-on-traversal.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/get-spec-context.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/get-project-context.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "GRAPH_INDEX_LOCK_NOTES.md",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/_shared/depends-on-traversal.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/compile-context.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/get-project-context.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/get-spec-context.spec.ts",
+      "state": "resolved"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "core:compile-context",
+      "file": "packages/core/src/application/use-cases/_shared/materialize-context-spec-metadata.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["appendMaterializationDiagnostics"]
+    },
+    {
+      "specId": "core:get-spec-context",
+      "file": "packages/core/src/application/use-cases/_shared/materialize-context-spec-metadata.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["appendMaterializationDiagnostics"]
+    },
+    {
+      "specId": "core:get-project-context",
+      "file": "packages/core/src/application/use-cases/_shared/materialize-context-spec-metadata.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["appendMaterializationDiagnostics"]
+    },
+    {
+      "specId": "core:compile-context",
+      "file": "packages/core/src/application/use-cases/_shared/context-warning.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["ContextWarning"]
+    },
+    {
+      "specId": "core:compile-context",
+      "file": "packages/core/src/domain/services/parse-metadata.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["SpecMetadata", "specMetadataSchema", "strictSpecMetadataSchema"]
+    },
+    {
+      "specId": "core:compile-context",
+      "file": "packages/core/src/application/use-cases/generate-spec-metadata.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["buildFreshOptimizationProjections"]
+    },
+    {
+      "specId": "core:compile-context",
+      "file": "packages/core/src/application/use-cases/compile-context.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["CompileContext"]
+    },
+    {
+      "specId": "core:compile-context",
+      "file": "packages/core/src/application/use-cases/_shared/depends-on-traversal.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["traverseDependsOn", "TraverseDependsOnOptions"]
+    },
+    {
+      "specId": "core:get-spec-context",
+      "file": "packages/core/src/application/use-cases/get-spec-context.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["GetSpecContext"]
+    },
+    {
+      "specId": "core:get-project-context",
+      "file": "packages/core/src/application/use-cases/get-project-context.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["GetProjectContext"]
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:83710a7db90dcbf4d0b14f087fd4dfcd1c74d683d13d0af0f7983dca6a2b515b"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:compile-context",
+          "filename": "deltas/core/compile-context/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:657b4294fb1f0bb5a7b7330f4fbc1f91c59b23dc34e7de206e123350606140b1"
+        },
+        {
+          "key": "core:get-spec-context",
+          "filename": "deltas/core/get-spec-context/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:d542221aa33d86a200f0ba928f4521e0a80e2c75cecf74368e78617752254205"
+        },
+        {
+          "key": "core:get-project-context",
+          "filename": "deltas/core/get-project-context/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:33616933d6cfc71fae36b65b9bd729d35b8947adbf6ae62aeee3a2bcb55c5adb"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:compile-context",
+          "filename": "deltas/core/compile-context/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:347dea4244f843e5827c0a43f9b8f10bf81656d97a5b91e05000b12e3fb75d74"
+        },
+        {
+          "key": "core:get-spec-context",
+          "filename": "deltas/core/get-spec-context/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:8a5a3b95a1c38d401e7d9dd7d39b579ceadbff4810de520821439cef6268a5cf"
+        },
+        {
+          "key": "core:get-project-context",
+          "filename": "deltas/core/get-project-context/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:5874fdfa469985d5da5e0b3009a5c83855764d62a30515b98b63a2c43e5ccab6"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:b239a3ae9323e38d3703660884e05f2c10cad3162130e3861b9069e0c9d1089c"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:9ae3152c4872edcab00c3b5b0bb6bc463690fb18fc7182e15fb140fa346e3439"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-08-24T08:41:11.588Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": ["core:compile-context", "core:get-spec-context", "core:get-project-context"],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-08-24T08:41:11.613Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "core:compile-context"
+        },
+        {
+          "type": "specs",
+          "key": "core:get-spec-context"
+        },
+        {
+          "type": "specs",
+          "key": "core:get-project-context"
+        },
+        {
+          "type": "verify",
+          "key": "core:compile-context"
+        },
+        {
+          "type": "verify",
+          "key": "core:get-spec-context"
+        },
+        {
+          "type": "verify",
+          "key": "core:get-project-context"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-24T08:54:36.046Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-24T09:28:03.251Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["core:compile-context", "core:get-spec-context", "core:get-project-context"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:compile-context", "core:get-spec-context", "core:get-project-context"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-24T09:53:07.357Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [core:compile-context]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["core:compile-context"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-24T10:28:38.941Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-24T10:29:57.472Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-24T12:12:42.409Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-24T14:51:19.958Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-24T14:52:12.313Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "description-updated",
+      "at": "2026-08-24T14:58:27.759Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "description": "CompileContext now renders change-scoped specs from their merged delta view - extracted-first through the schema's metadataExtraction engine - in every display mode, falling back to canonical metadata only when no merged content is usable. Context warnings were aligned with actionable semantics: spurious new-spec metadata warnings and cache-miss regeneration noise are gone, lock optimizations never apply to specs under modification, and out-of-scope specs now distinguish missing-optimization from stale-optimization. dependsOn traversal handles non-persisted change specs structurally via manifest-first ordering and existence-checked registration."
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-24T14:58:38.056Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-08-24T14:58:38.234Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

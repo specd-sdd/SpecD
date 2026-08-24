@@ -1,0 +1,23 @@
+# Delta for core:get-project-context spec.md — shared sink warning semantics + optimization type split
+- op: modified
+  description: 'Regeneration is provenance not warning; per-spec optimization warnings use the missing/stale type split'
+  selector:
+    type: section
+    matches: 'Requirement: Renders spec content from metadata when fresh'
+  content: |
+    For each included spec, the use case MUST first classify the entry's display mode from `config.contextMode`. It MUST call `GetSpecMetadata.execute({ specId })` only when that mode actually needs structured metadata-derived content (summary fields or full section content). List-mode entries MUST NOT trigger materialization.
+
+    - In `list` mode, emit list entries with no title, description, or content, and do not call `GetSpecMetadata`.
+    - In `summary` mode, obtain metadata via `GetSpecMetadata` and render title and description only.
+    - In `full` mode, obtain metadata via `GetSpecMetadata` and render description, rules, constraints, and scenarios as applicable. **If no `sections` filter is active (input is absent or empty), it MUST default to rendering Description + Rules + Constraints.** If a `sections` filter is provided, it overrides this default.
+    - In `hybrid` mode, render the same output as `full` because project context has no change-scoped tier.
+
+    Section filters MUST NOT affect list-mode or summary-mode entries.
+
+    Cache-miss regeneration is provenance information carried on the materialization result (`source`, `regenerated`) — this use case MUST NOT emit a warning solely because a projection was regenerated. Only actionable materialization failures such as `metadata-cache-write-failed` MUST be forwarded into the result's `warnings` array without being logged again.
+
+    When `llmOptimizedContext` is enabled and a rendered spec's materialized projection lacks a usable `optimizedContext`, the use case emits an optimization warning typed `missing-optimization` (never optimized) or `stale-optimization` (recorded but baselines drifted), with remediation instructions: "Launch specd-spec-context-optimizer agent to refresh". This use case remains change-agnostic: it applies no change-scope exemptions.
+
+    #### Scenario: Default sections in full mode
+
+    When a spec is rendered in `full` mode (including `hybrid` mode which resolves to `full` here) and no `sections` filter is active (input is absent or empty), it MUST default to rendering **Description + Rules + Constraints**.
