@@ -4,6 +4,7 @@ import { PythonLanguageAdapter } from '../../infrastructure/tree-sitter/python-l
 import { GoLanguageAdapter } from '../../infrastructure/tree-sitter/go-language-adapter.js'
 import { PhpLanguageAdapter } from '../../infrastructure/tree-sitter/php-language-adapter.js'
 import { type LanguageAdapter } from '../../domain/value-objects/language-adapter.js'
+import { type AdapterRegistryPort } from '../../domain/ports/adapter-registry-port.js'
 import { type SpecdConfig } from '@specd/core'
 
 /**
@@ -15,7 +16,7 @@ import { type SpecdConfig } from '@specd/core'
  */
 export function createBuiltinAdapterRegistry(
   extraAdapters?: readonly LanguageAdapter[],
-): AdapterRegistry
+): AdapterRegistryPort
 /**
  * Creates an `AdapterRegistry` from a `SpecdConfig` configuration instance.
  *
@@ -26,7 +27,7 @@ export function createBuiltinAdapterRegistry(
  * @param config - SpecdConfig project configuration
  * @returns A populated AdapterRegistry instance
  */
-export function createBuiltinAdapterRegistry(config: SpecdConfig): AdapterRegistry
+export function createBuiltinAdapterRegistry(config: SpecdConfig): AdapterRegistryPort
 /**
  * Overload handler for creating a built-in `AdapterRegistry`.
  *
@@ -35,7 +36,7 @@ export function createBuiltinAdapterRegistry(config: SpecdConfig): AdapterRegist
  */
 export function createBuiltinAdapterRegistry(
   depsOrConfig?: readonly LanguageAdapter[] | SpecdConfig,
-): AdapterRegistry {
+): AdapterRegistryPort {
   const registry = new AdapterRegistry()
   registry.register(new TypeScriptLanguageAdapter())
   registry.register(new PythonLanguageAdapter())

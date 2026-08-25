@@ -60,12 +60,27 @@
 - **THEN** the stored `fileToSpecFingerprint` mismatches the recomputed fingerprint
 - **AND** the cached entry is discarded and suggestions are recomputed, suggesting spec B instead of spec A
 
-#### Scenario: Post-apply validation and conditional alignment change creation
+#### Scenario: Canonical validation entries create one alignment change
 
 - **GIVEN** `SuggestSpecDependencies.execute({ specId: "cli:change-implementation", apply: true, createAlignmentChange: true })` is executed
-- **WHEN** post-apply validation via `ValidateSpecs` returns `status: "invalid-specs-detected"`
+- **WHEN** `ValidateSpecs` returns `{ failed: 2, entries: [{ spec, passed: false, failures, warnings }, ...] }`
 - **THEN** an alignment change `align-spec-deps-<timestamp>` is created
-- **AND** its `.specd-exploration.md` contains the exact schema failure descriptions `[artifactId: description]`
+- **AND** `CreateChange.execute` receives the exact schema failure descriptions `[artifactId: description]` as `explorationContent`
+- **AND** the application use case never reads a nonexistent `issues` field or performs a direct filesystem write
+
+#### Scenario: Missing dependencies fail before mutation
+
+- **GIVEN** `apply: true` without a `ValidateSpecs` dependency, or `createAlignmentChange: true` without a `CreateChange` dependency
+- **WHEN** `execute` is called
+- **THEN** it throws `InvalidInputError`
+- **AND** `UpdatePersistedSpecDeps` is not called
+
+#### Scenario: Validator failure remains observable
+
+- **GIVEN** `ValidateSpecs.execute` throws after dependencies are applied
+- **WHEN** `SuggestSpecDependencies.execute` handles post-apply validation
+- **THEN** the validator error is propagated or represented by an explicit failure result
+- **AND** it is never reported as `{ status: "all-valid", invalidSpecs: [] }`
 
 #### Scenario: No change creation when all specs are valid
 
@@ -73,13 +88,13 @@
 - **WHEN** `SuggestSpecDependencies.execute({ specId: "cli:change-implementation", apply: true, createAlignmentChange: true })` completes
 - **THEN** no alignment change is created
 
-### Requirement: Standard Factory & Composition Overloads
+### Requirement: Dependency-injected factory
 
-#### Scenario: Config-based factory resolution
+#### Scenario: Canonical factory accepts resolved dependencies
 
-- **GIVEN** a resolved `SpecdConfig` instance
-- **WHEN** `createSuggestSpecDependencies(config)` is called
-- **THEN** it resolves all dependencies via `resolveSuggestSpecDependenciesDeps` and returns a wired `SuggestSpecDependencies` instance
+- **GIVEN** a complete `SuggestSpecDependenciesDeps` object
+- **WHEN** `createSuggestSpecDependencies(deps)` is called
+- **THEN** it returns a wired `SuggestSpecDependencies` instance without constructing filesystem adapters
 
 #### Scenario: Progress callback events emission
 

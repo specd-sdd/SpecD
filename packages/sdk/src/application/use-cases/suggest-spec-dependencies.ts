@@ -1,37 +1,22 @@
 import { createHash } from 'node:crypto'
-import { mkdir, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
 import {
   type SpecRepository,
   type GetPersistedSpecDeps,
   type UpdatePersistedSpecDeps,
   type ValidateSpecs,
   type CreateChange,
-  createGetPersistedSpecDeps,
-  createUpdatePersistedSpecDeps,
-  createValidateSpecs,
-  createCreateChange,
-  type SpecdConfig,
-  type CompositionResolutionOptions,
-  type CompositionResolver,
-  createCompositionResolver,
   SpecNotFoundError,
   InvalidInputError,
   WorkspaceNotFoundError,
   SpecPath,
   Logger,
 } from '@specd/core'
-import { type CodeGraphProvider, createCodeGraphProvider } from '@specd/code-graph'
+import { type CodeGraphProvider } from '@specd/code-graph'
 import { z } from 'zod'
-import {
-  SuggestImplementationLinks,
-  createSuggestImplementationLinks,
-} from './suggest-implementation-links.js'
-import { type ImplementationSuggestionCachePort } from '../application/ports/implementation-suggestion-cache-port.js'
-import { FsImplementationSuggestionCache } from '../infrastructure/fs/fs-implementation-suggestion-cache.js'
-import { type SpecDepsSuggestionCachePort } from '../application/ports/spec-deps-suggestion-cache-port.js'
-import { FsSpecDepsSuggestionCache } from '../infrastructure/fs/fs-spec-deps-suggestion-cache.js'
-import { type ImplementationSuggestionSpecEntry } from '../domain/value-objects/implementation-suggestion-cache.js'
+import { SuggestImplementationLinks } from './suggest-implementation-links.js'
+import { type ImplementationSuggestionCachePort } from '../ports/implementation-suggestion-cache-port.js'
+import { type SpecDepsSuggestionCachePort } from '../ports/spec-deps-suggestion-cache-port.js'
+import { type ImplementationSuggestionSpecEntry } from '../../domain/value-objects/implementation-suggestion-cache.js'
 
 /** Progress event emitted during `SuggestSpecDependencies` execution. */
 export type SuggestSpecDepsProgressEvent =
@@ -170,7 +155,6 @@ export interface SpecDependencySuggestion {
 export interface CreatedAlignmentChangeInfo {
   readonly name: string
   readonly changePath: string
-  readonly explorationFilePath: string
   readonly specIds: readonly string[]
 }
 
@@ -213,7 +197,6 @@ export interface SuggestSpecDependenciesDeps {
   readonly cache?: ImplementationSuggestionCachePort
   readonly specDepsCache?: SpecDepsSuggestionCachePort
   readonly projectDir?: string
-  readonly configPath?: string
 }
 
 /**
@@ -243,14 +226,22 @@ export class SuggestSpecDependencies {
     }
     const validatedInput = parseResult.data
 
+    if (validatedInput.apply === true && this.deps.validateSpecs === undefined) {
+      throw new InvalidInputError(
+        'apply requires a ValidateSpecs dependency, but none was injected',
+      )
+    }
+    if (validatedInput.createAlignmentChange === true && this.deps.createChange === undefined) {
+      throw new InvalidInputError(
+        'createAlignmentChange requires a CreateChange dependency, but none was injected',
+      )
+    }
+
     if (validatedInput.workspace !== undefined) {
       if (!this.deps.specRepositories.has(validatedInput.workspace)) {
         throw new WorkspaceNotFoundError(validatedInput.workspace)
       }
     }
-
-    const projectDir = this.deps.projectDir ?? process.cwd()
-    const configPath = this.deps.configPath ?? '.specd'
 
     if (this.deps.codeGraphProvider && typeof this.deps.codeGraphProvider.open === 'function') {
       await this.deps.codeGraphProvider.open().catch(() => {})
@@ -270,14 +261,10 @@ export class SuggestSpecDependencies {
       })
       input.onProgress?.({ type: 'warmup-done', totalSpecs: implResult?.specs?.length ?? 0 })
 
-      const implCache =
-        this.deps.cache ??
-        new FsImplementationSuggestionCache({
-          projectDir,
-          configPath,
-          specRepositories: this.deps.specRepositories,
-          codeGraphProvider: this.deps.codeGraphProvider,
-        })
+      const implCache = this.deps.cache
+      if (implCache === undefined) {
+        throw new InvalidInputError('SuggestSpecDependencies requires an implementation cache port')
+      }
       if (implResult?.specs && implResult.specs.length > 0) {
         const entriesToPrime: ImplementationSuggestionSpecEntry[] = []
         for (const s of implResult.specs) {
@@ -297,14 +284,10 @@ export class SuggestSpecDependencies {
         }
       }
 
-      const specDepsCache =
-        this.deps.specDepsCache ??
-        new FsSpecDepsSuggestionCache({
-          projectDir,
-          configPath,
-          specRepositories: this.deps.specRepositories,
-          codeGraphProvider: this.deps.codeGraphProvider,
-        })
+      const specDepsCache = this.deps.specDepsCache
+      if (specDepsCache === undefined) {
+        throw new InvalidInputError('SuggestSpecDependencies requires a spec-deps cache port')
+      }
       if (input.rebuildCache) {
         await specDepsCache.invalidate()
       }
@@ -777,116 +760,79 @@ export class SuggestSpecDependencies {
         const newDepIds = suggestedDependsOn.filter((d) => !d.alreadyIncluded).map((d) => d.specId)
 
         if (input.apply && newDepIds.length > 0) {
-          try {
-            await this.deps.updatePersistedDeps.execute({
-              specId: target.specId,
-              add: newDepIds,
-            })
-            updatedSpecsCount += 1
-            depsAddedCount += newDepIds.length
-          } catch {
-            // Ignore mutation errors
-          }
+          await this.deps.updatePersistedDeps.execute({
+            specId: target.specId,
+            add: newDepIds,
+          })
+          updatedSpecsCount += 1
+          depsAddedCount += newDepIds.length
         }
       }
 
       // Post-apply validation & conditional change creation
       let postApplyValidation: PostApplyValidationDiagnostic | undefined
 
-      // Input contract: requesting an alignment change without a CreateChange
-      // dependency is always invalid. Validated OUTSIDE the try below so the
-      // error propagates instead of degrading to the fail-open fallback.
-      if (input.createAlignmentChange && !this.deps.createChange) {
-        throw new InvalidInputError(
-          'createAlignmentChange requires a CreateChange dependency, but none was injected',
-        )
-      }
-
       if (input.apply && this.deps.validateSpecs) {
         input.onProgress?.({
           type: 'validation-start',
           message: 'Validating specifications consistency...',
         })
-        try {
-          const valRes = await this.deps.validateSpecs.execute({})
-          const invalidSpecs: Array<{
-            specId: string
-            failures: Array<{ artifactId: string; description: string }>
-          }> = []
+        const valRes = await this.deps.validateSpecs.execute({})
+        const invalidSpecs = valRes.entries
+          .filter((entry) => !entry.passed)
+          .map((entry) => ({
+            specId: entry.spec,
+            failures: [
+              ...entry.failures,
+              ...entry.warnings.map((warning) => ({
+                artifactId: warning.artifactId,
+                description: `Warning: ${warning.description}`,
+              })),
+            ],
+          }))
 
-          const valResObj = valRes as unknown as Record<string, unknown>
-          if (valResObj && 'issues' in valResObj && Array.isArray(valResObj.issues)) {
-            for (const issue of valResObj.issues as Array<Record<string, unknown>>) {
-              invalidSpecs.push({
-                specId: typeof issue.specId === 'string' ? issue.specId : '',
-                failures: (issue.failures as
-                  | Array<{ artifactId: string; description: string }>
-                  | undefined) ?? [
-                  {
-                    artifactId: 'specs',
-                    description:
-                      typeof issue.message === 'string' ? issue.message : 'Validation failed',
-                  },
-                ],
-              })
+        if (invalidSpecs.length > 0) {
+          const invalidSpecIds = invalidSpecs.map((s) => s.specId)
+          let createdChangeInfo: CreatedAlignmentChangeInfo | undefined
+
+          if (input.createAlignmentChange && this.deps.createChange) {
+            const prefix = input.changeNamePrefix ?? 'align-spec-deps'
+            const changeName = `${prefix}-${Date.now()}`
+            const explorationContent = [
+              `# Exploration: Spec Dependency Alignment`,
+              ``,
+              `The following specs require alignment after dependency application:`,
+              ``,
+              ...invalidSpecs.flatMap((s) => [
+                `## Spec: ${s.specId}`,
+                ...s.failures.map((f) => `- [${f.artifactId}]: ${f.description}`),
+                ``,
+              ]),
+            ].join('\n')
+            const changeResult = await this.deps.createChange.execute({
+              name: changeName,
+              specIds: invalidSpecIds,
+              explorationContent,
+            })
+
+            createdChangeInfo = {
+              name: changeName,
+              changePath: changeResult.changePath,
+              specIds: invalidSpecIds,
             }
           }
 
-          if (invalidSpecs.length > 0) {
-            const invalidSpecIds = invalidSpecs.map((s) => s.specId)
-            let createdChangeInfo: CreatedAlignmentChangeInfo | undefined
-
-            if (input.createAlignmentChange && this.deps.createChange) {
-              const prefix = input.changeNamePrefix ?? 'align-spec-deps'
-              const changeName = `${prefix}-${Date.now()}`
-              const changeResult = await this.deps.createChange.execute({
-                name: changeName,
-                specIds: invalidSpecIds,
-              })
-              const changeResultObj = changeResult as unknown as Record<string, unknown>
-              const changePath =
-                typeof changeResultObj.changePath === 'string'
-                  ? changeResultObj.changePath
-                  : join(projectDir, configPath, 'changes', changeName)
-              const explorationFilePath = join(changePath, '.specd-exploration.md')
-
-              const explorationContent = [
-                `# Exploration: Spec Dependency Alignment`,
-                ``,
-                `The following specs require alignment after dependency application:`,
-                ``,
-                ...invalidSpecs.flatMap((s) => [
-                  `## Spec: ${s.specId}`,
-                  ...s.failures.map((f) => `- [${f.artifactId}]: ${f.description}`),
-                  ``,
-                ]),
-              ].join('\n')
-
-              await mkdir(changePath, { recursive: true })
-              await writeFile(explorationFilePath, explorationContent, 'utf-8')
-
-              createdChangeInfo = {
-                name: changeName,
-                changePath,
-                explorationFilePath,
-                specIds: invalidSpecIds,
-              }
-            }
-
-            postApplyValidation = {
-              status: 'invalid-specs-detected',
-              invalidSpecs,
-              suggestedAlignmentCommand: `node packages/cli/dist/index.js changes create align-spec-deps --spec ${invalidSpecIds.join(' --spec ')}`,
-              ...(createdChangeInfo !== undefined ? { createdChange: createdChangeInfo } : {}),
-            }
-          } else {
-            postApplyValidation = {
-              status: 'all-valid',
-              invalidSpecs: [],
-            }
+          postApplyValidation = {
+            status: 'invalid-specs-detected',
+            invalidSpecs,
+            suggestedAlignmentCommand: `node packages/cli/dist/index.js changes create align-spec-deps --spec ${invalidSpecIds.join(' --spec ')}`,
+            ...(createdChangeInfo !== undefined ? { createdChange: createdChangeInfo } : {}),
           }
-        } catch {
-          // Fallback if validateSpecs execution throws
+        } else {
+          postApplyValidation = {
+            status: 'all-valid',
+            invalidSpecs: [],
+          }
         }
         input.onProgress?.({
           type: 'validation-done',
@@ -926,49 +872,6 @@ export class SuggestSpecDependencies {
 }
 
 /**
- * Resolves dependencies for `SuggestSpecDependencies` from a composition resolver.
- *
- * @param resolver - Composition resolver instance
- * @returns Resolved dependencies bundle
- */
-export function resolveSuggestSpecDependenciesDeps(
-  resolver: CompositionResolver,
-): SuggestSpecDependenciesDeps {
-  const specRepositories = resolver.getSpecRepositories()
-  const projectDir = resolver.config.projectRoot
-
-  const getPersistedDeps = createGetPersistedSpecDeps(resolver.config)
-  const updatePersistedDeps = createUpdatePersistedSpecDeps(resolver.config)
-  const validateSpecs = createValidateSpecs(resolver.config)
-  const createChange = createCreateChange(resolver.config)
-  const codeGraphProvider = createCodeGraphProvider(resolver.config)
-
-  return {
-    suggestImplementationLinks: createSuggestImplementationLinks(resolver.config),
-    specRepositories,
-    getPersistedDeps,
-    updatePersistedDeps,
-    validateSpecs,
-    createChange,
-    codeGraphProvider,
-    cache: new FsImplementationSuggestionCache({
-      projectDir,
-      configPath: resolver.config.configPath,
-      specRepositories,
-      codeGraphProvider,
-    }),
-    specDepsCache: new FsSpecDepsSuggestionCache({
-      projectDir,
-      configPath: resolver.config.configPath,
-      specRepositories,
-      codeGraphProvider,
-    }),
-    projectDir,
-    configPath: resolver.config.configPath,
-  }
-}
-
-/**
  * Factory function creating a `SuggestSpecDependencies` instance.
  *
  * @param deps - Dependencies instance
@@ -976,48 +879,6 @@ export function resolveSuggestSpecDependenciesDeps(
  */
 export function createSuggestSpecDependencies(
   deps: SuggestSpecDependenciesDeps,
-): SuggestSpecDependencies
-/**
- * Factory function creating a `SuggestSpecDependencies` instance from configuration.
- *
- * @param config - SpecD project configuration
- * @param options - Composition resolution options
- * @returns Configured `SuggestSpecDependencies`
- */
-export function createSuggestSpecDependencies(
-  config: SpecdConfig,
-  options?: CompositionResolutionOptions,
-): SuggestSpecDependencies
-/**
- * Factory function overload handler.
- *
- * @param depsOrConfig - Dependencies or configuration
- * @param options - Composition resolution options
- * @returns Configured `SuggestSpecDependencies`
- */
-export function createSuggestSpecDependencies(
-  depsOrConfig: SuggestSpecDependenciesDeps | SpecdConfig,
-  options?: CompositionResolutionOptions,
 ): SuggestSpecDependencies {
-  if (isSuggestSpecDependenciesDeps(depsOrConfig)) {
-    return new SuggestSpecDependencies(depsOrConfig)
-  }
-  const resolver = createCompositionResolver(depsOrConfig, options)
-  return new SuggestSpecDependencies(resolveSuggestSpecDependenciesDeps(resolver))
-}
-
-/**
- * Type guard for `SuggestSpecDependenciesDeps`.
- *
- * @param value - Candidate object
- * @returns True if value satisfies `SuggestSpecDependenciesDeps`
- */
-function isSuggestSpecDependenciesDeps(
-  value: SuggestSpecDependenciesDeps | SpecdConfig,
-): value is SuggestSpecDependenciesDeps {
-  return (
-    'suggestImplementationLinks' in value &&
-    'getPersistedDeps' in value &&
-    'updatePersistedDeps' in value
-  )
+  return new SuggestSpecDependencies(deps)
 }

@@ -211,6 +211,14 @@ export interface ChangeProps {
   readonly trackedImplementationFiles?: readonly TrackedImplementationFile[]
   /** Confirmed implementation links for the active change. */
   readonly implementationLinks?: readonly ImplementationLink[]
+  /** Cheap metadata indicating whether lazily loaded exploration content exists. */
+  readonly explorationMeta?: ExplorationMeta | null
+}
+
+/** Cheap observation metadata for optional exploration content. */
+export interface ExplorationMeta {
+  readonly lastModified: string
+  readonly size: number
 }
 
 /** Explicit review states for tracked implementation files. */
@@ -262,6 +270,7 @@ export class Change {
   private _invalidationPolicy: InvalidationPolicy
   private _trackedImplementationFiles: Map<string, TrackedImplementationFileState>
   private _implementationLinks: Map<string, ImplementationLink>
+  private readonly _explorationMeta: ExplorationMeta | null
 
   /**
    * Creates a new `Change` from the given properties.
@@ -305,6 +314,7 @@ export class Change {
         this._setImplementationLink(link)
       }
     }
+    this._explorationMeta = props.explorationMeta ?? null
   }
 
   /** Unique slug name identifying this change. */
@@ -338,6 +348,11 @@ export class Change {
   /** Optional free-text description of the change's purpose. */
   get description(): string | undefined {
     return this._description
+  }
+
+  /** Metadata-only indication that exploration content exists in the repository. */
+  get explorationMeta(): ExplorationMeta | null {
+    return this._explorationMeta === null ? null : { ...this._explorationMeta }
   }
 
   /** Schema name recorded at creation time, derived from the `created` history event. */

@@ -181,6 +181,38 @@ export function registerSpecDeps(parent: Command): void {
     .option('--rebuild-cache', 'force cache invalidation')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
+    .addHelpText(
+      'after',
+      `
+JSON/TOON output schema:
+  {
+    result: "ok",
+    targetWorkspace?: string,
+    specs: Array<{
+      specId: string,
+      title: string,
+      existingDependsOn: string[],
+      suggestedDependsOn: Array<{
+        specId: string,
+        title: string,
+        reason: string,
+        status?: "already-configured" | "new",
+        alreadyIncluded?: boolean
+      }>
+    }>,
+    appliedMutations?: { updatedSpecsCount: number, depsAddedCount: number },
+    postApplyValidation?: {
+      status: "all-valid" | "invalid-specs-detected",
+      invalidSpecs: Array<{ specId: string, failures: Array<{ artifactId: string, description: string }> }>,
+      suggestedAlignmentCommand?: string,
+      createdChange?: { name: string, changePath: string, specIds: string[] }
+    }
+  }
+
+Example:
+  specd specs deps suggest cli:spec-deps --apply --format toon
+`,
+    )
     .action(
       async (
         specPath: string | undefined,

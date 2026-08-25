@@ -64,6 +64,24 @@ function setup() {
 afterEach(() => vi.restoreAllMocks())
 
 describe('spec implementation', () => {
+  it('documents the structured suggest response without executing the use case', async () => {
+    mockExecuteSuggestImplementationLinks.mockClear()
+    const getStdout = captureStdout()
+    const program = makeProgram()
+    const spec = program.command('spec')
+    registerSpecImplementation(spec)
+    try {
+      await program.parseAsync(['node', 'specd', 'spec', 'implementation', 'suggest', '--help'])
+    } catch {
+      /* Commander exit override */
+    }
+
+    const help = getStdout()
+    expect(help).toContain('JSON/TOON output schema:')
+    expect(help).toContain('alreadyIncluded: boolean')
+    expect(mockExecuteSuggestImplementationLinks).not.toHaveBeenCalled()
+  })
+
   it('list delegates to kernel.specs.getPersistedImplementation', async () => {
     const { kernel } = setup()
     vi.mocked(kernel.specs.getPersistedImplementation.execute).mockResolvedValue({

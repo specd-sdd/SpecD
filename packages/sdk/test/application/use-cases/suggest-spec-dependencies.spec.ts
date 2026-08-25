@@ -3,8 +3,9 @@ import {
   SuggestSpecDependencies,
   createSuggestSpecDependencies,
   type SuggestSpecDepsProgressEvent,
-} from '../../src/orchestration/suggest-spec-dependencies.js'
-import { type SuggestImplementationLinks } from '../../src/orchestration/suggest-implementation-links.js'
+  type SuggestSpecDependenciesDeps,
+} from '../../../src/application/use-cases/suggest-spec-dependencies.js'
+import { type SuggestImplementationLinks } from '../../../src/application/use-cases/suggest-implementation-links.js'
 import {
   SpecdError,
   InvalidInputError,
@@ -14,18 +15,19 @@ import {
   type UpdatePersistedSpecDeps,
   type ValidateSpecs,
   type SpecRepository,
+  type CreateChange,
 } from '@specd/core'
 import { type CodeGraphProvider } from '@specd/code-graph'
 import {
   ImplementationSuggestionCachePort,
   type SetImplementationSuggestionInput,
-} from '../../src/application/ports/implementation-suggestion-cache-port.js'
-import { type ImplementationSuggestionSpecEntry } from '../../src/domain/value-objects/implementation-suggestion-cache.js'
+} from '../../../src/application/ports/implementation-suggestion-cache-port.js'
+import { type ImplementationSuggestionSpecEntry } from '../../../src/domain/value-objects/implementation-suggestion-cache.js'
 import {
   SpecDepsSuggestionCachePort,
   type SetSpecDepsSuggestionInput,
-} from '../../src/application/ports/spec-deps-suggestion-cache-port.js'
-import { type SpecDepsSuggestionSpecEntry } from '../../src/domain/value-objects/spec-deps-suggestion-cache.js'
+} from '../../../src/application/ports/spec-deps-suggestion-cache-port.js'
+import { type SpecDepsSuggestionSpecEntry } from '../../../src/domain/value-objects/spec-deps-suggestion-cache.js'
 
 class InMemoryImplementationSuggestionCache extends ImplementationSuggestionCachePort {
   private data = new Map<string, ImplementationSuggestionSpecEntry>()
@@ -147,7 +149,7 @@ function setupTest() {
             artifacts: [],
           },
           existing: {
-            files: ['sdk:packages/sdk/src/orchestration/suggest-spec-dependencies.ts'],
+            files: ['sdk:packages/sdk/src/application/use-cases/suggest-spec-dependencies.ts'],
             symbols: [],
             dependsOn: [],
           },
@@ -204,7 +206,10 @@ function setupTest() {
 
   const validateSpecs = {
     execute: vi.fn().mockResolvedValue({
-      issues: [],
+      entries: [],
+      totalSpecs: 0,
+      passed: 0,
+      failed: 0,
     }),
   }
 
@@ -287,15 +292,29 @@ describe('SuggestSpecDependencies', () => {
     expect(result.postApplyValidation?.status).toBe('all-valid')
   })
 
+  it('propagates dependency mutation failures', async () => {
+    const { useCase, updatePersistedDeps } = setupTest()
+    updatePersistedDeps.execute.mockRejectedValueOnce(new Error('lock write failed'))
+
+    await expect(
+      useCase.execute({ specId: 'sdk:suggest-spec-dependencies', apply: true }),
+    ).rejects.toThrow('lock write failed')
+  })
+
   it('handles invalid specs after applying dependencies and reports diagnostic', async () => {
     const { useCase, validateSpecs } = setupTest()
     validateSpecs.execute.mockResolvedValueOnce({
-      issues: [
+      entries: [
         {
-          specId: 'sdk:suggest-spec-dependencies',
+          spec: 'sdk:suggest-spec-dependencies',
+          passed: false,
           failures: [{ artifactId: 'specs', description: 'Missing requirement link' }],
+          warnings: [],
         },
       ],
+      totalSpecs: 1,
+      passed: 0,
+      failed: 1,
     })
 
     const result = await useCase.execute({
@@ -308,6 +327,71 @@ describe('SuggestSpecDependencies', () => {
     expect(result.postApplyValidation?.suggestedAlignmentCommand).toContain(
       'sdk:suggest-spec-dependencies',
     )
+  })
+
+  it('passes formatted exploration content to CreateChange without writing files', async () => {
+    const { useCase, validateSpecs } = setupTest()
+    const createChange = {
+      execute: vi.fn().mockResolvedValue({ change: {}, changePath: '/changes/alignment' }),
+    }
+    validateSpecs.execute.mockResolvedValueOnce({
+      entries: [
+        {
+          spec: 'sdk:suggest-spec-dependencies',
+          passed: false,
+          failures: [{ artifactId: 'specs', description: 'Missing requirement link' }],
+          warnings: [],
+        },
+      ],
+      totalSpecs: 1,
+      passed: 0,
+      failed: 1,
+    })
+    const withCreate = new SuggestSpecDependencies({
+      ...(useCase as unknown as { deps: SuggestSpecDependenciesDeps }).deps,
+      createChange: createChange as unknown as CreateChange,
+    })
+
+    const result = await withCreate.execute({
+      specId: 'sdk:suggest-spec-dependencies',
+      apply: true,
+      createAlignmentChange: true,
+    })
+
+    expect(createChange.execute).toHaveBeenCalledWith(
+      expect.objectContaining({
+        specIds: ['sdk:suggest-spec-dependencies'],
+        explorationContent: expect.stringContaining('[specs]: Missing requirement link'),
+      }),
+    )
+    expect(result.postApplyValidation?.createdChange).toEqual(
+      expect.objectContaining({ changePath: '/changes/alignment' }),
+    )
+  })
+
+  it('fails before mutation when apply lacks ValidateSpecs', async () => {
+    const { useCase, updatePersistedDeps } = setupTest()
+    const { validateSpecs: _validateSpecs, ...deps } = (
+      useCase as unknown as { deps: SuggestSpecDependenciesDeps }
+    ).deps
+    const withoutValidation = new SuggestSpecDependencies(deps)
+
+    await expect(
+      withoutValidation.execute({ specId: 'sdk:suggest-spec-dependencies', apply: true }),
+    ).rejects.toBeInstanceOf(InvalidInputError)
+    expect(updatePersistedDeps.execute).not.toHaveBeenCalled()
+  })
+
+  it('propagates validation failures instead of reporting all-valid', async () => {
+    const { useCase, validateSpecs } = setupTest()
+    validateSpecs.execute.mockRejectedValueOnce(new Error('validator unavailable'))
+
+    await expect(
+      useCase.execute({
+        specId: 'sdk:suggest-spec-dependencies',
+        apply: true,
+      }),
+    ).rejects.toThrow('validator unavailable')
   })
 
   it('marks existing dependencies with alreadyIncluded: true and status: already-configured', async () => {
@@ -418,7 +502,7 @@ describe('SuggestSpecDependencies', () => {
             artifacts: [],
           },
           existing: {
-            files: ['sdk:packages/sdk/src/orchestration/suggest-spec-dependencies.ts'],
+            files: ['sdk:packages/sdk/src/application/use-cases/suggest-spec-dependencies.ts'],
             symbols: [],
             dependsOn: [],
           },
@@ -574,7 +658,7 @@ describe('SuggestSpecDependencies', () => {
               artifacts: [],
             },
             existing: {
-              files: ['sdk:packages/sdk/src/orchestration/suggest-spec-dependencies.ts'],
+              files: ['sdk:packages/sdk/src/application/use-cases/suggest-spec-dependencies.ts'],
               symbols: [],
               dependsOn: [],
             },
@@ -608,7 +692,7 @@ describe('SuggestSpecDependencies', () => {
         if (filePath.includes('packages/sdk/src/index.ts')) {
           return {
             affectedFiles: [
-              { filePath: 'packages/sdk/src/orchestration/suggest-spec-dependencies.ts' },
+              { filePath: 'packages/sdk/src/application/use-cases/suggest-spec-dependencies.ts' },
             ],
           }
         }

@@ -16,33 +16,6 @@ export {
   type ReviewedImplementationSymbol,
 } from './build-implementation-review.js'
 export {
-  SuggestImplementationLinks,
-  createSuggestImplementationLinks,
-  resolveSuggestImplementationLinksDeps,
-  suggestImplementationLinksInputSchema,
-  type SuggestImplementationLinksInput,
-  type SuggestImplementationLinksResult,
-  type SpecImplementationSuggestion,
-  type SuggestImplementationLinksDeps,
-  type SuggestImplementationProgressEvent,
-  type OnSuggestImplementationProgress,
-} from './suggest-implementation-links.js'
-export {
-  SuggestSpecDependencies,
-  createSuggestSpecDependencies,
-  resolveSuggestSpecDependenciesDeps,
-  suggestSpecDependenciesInputSchema,
-  type SuggestSpecDependenciesInput,
-  type SuggestSpecDependenciesResult,
-  type SpecDependencySuggestion,
-  type SuggestedSpecDependency,
-  type PostApplyValidationDiagnostic,
-  type CreatedAlignmentChangeInfo,
-  type SuggestSpecDependenciesDeps,
-  type SuggestSpecDepsProgressEvent,
-  type OnSuggestSpecDepsProgress,
-} from './suggest-spec-dependencies.js'
-export {
   type ImplementationSuggestionCacheHeader,
   type ImplementationSuggestionSpecStamp,
   type ImplementationSuggestionLockData,

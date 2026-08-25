@@ -38,6 +38,8 @@ export interface CreateChangeInput {
   readonly invalidationPolicy?: InvalidationPolicy
   /** When `true` and `specIds` is non-empty, run overlap detection after persistence. */
   readonly includeOverlapCheck?: boolean
+  /** Optional initial exploration content persisted by the change repository. */
+  readonly explorationContent?: string
 }
 
 /** Effective schema identity recorded on the created event. */
@@ -144,7 +146,11 @@ export class CreateChange {
         : {}),
     })
 
-    await this._changes.create(change)
+    if (input.explorationContent !== undefined && input.explorationContent.length > 0) {
+      await this._changes.create(change, { explorationContent: input.explorationContent })
+    } else {
+      await this._changes.create(change)
+    }
     await this._changes.scaffold(change, (specId) => this._specExists(workspaceMap, specId))
     const changePath = this._changes.changePath(change)
 

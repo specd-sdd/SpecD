@@ -10,3 +10,11 @@ export {
   withOpenGraphProvider,
   type WithOpenGraphProviderOptions,
 } from './with-open-graph-provider.js'
+export {
+  createSuggestImplementationLinks,
+  resolveSuggestImplementationLinksDeps,
+} from './suggest-implementation-links.js'
+export {
+  createSuggestSpecDependencies,
+  resolveSuggestSpecDependenciesDeps,
+} from './suggest-spec-dependencies.js'

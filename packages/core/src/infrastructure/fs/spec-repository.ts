@@ -587,24 +587,7 @@ export class FsSpecRepository extends SpecRepository {
       allowedSpecArtifactFilenames(spec),
     )
 
-    let stat: Awaited<ReturnType<typeof fs.stat>>
-    try {
-      stat = await fs.stat(filePath)
-    } catch (err) {
-      if (isEnoent(err)) return null
-      throw err
-    }
-
-    const lastModified = stat.mtime.toISOString()
-    if (options?.includeHash !== true) {
-      return { lastModified }
-    }
-
-    const fileContent = await fs.readFile(filePath, 'utf8')
-    return {
-      lastModified,
-      hash: sha256(fileContent),
-    }
+    return this._observeArtifact(filePath, options?.includeHash === true)
   }
 
   /**
@@ -1016,13 +999,49 @@ export class FsSpecRepository extends SpecRepository {
   ): Promise<Spec> {
     const artifacts: SpecArtifactEntry[] = await Promise.all(
       filenames.map(async (filename) => {
-        const stat = await fs.stat(path.join(dir, filename))
-        return { filename, lastModified: stat.mtime.toISOString() }
+        const observation = await this._observeArtifact(path.join(dir, filename), false)
+        if (observation === null) {
+          throw new Error(`Artifact disappeared while loading spec: ${filename}`)
+        }
+        return {
+          filename,
+          lastModified: observation.lastModified,
+          size: observation.size,
+        }
       }),
     )
     const persistedStateStamp = await this._statSidecar(this._specLockFilePath(name))
     const generatedMetadataStamp = await this._statSidecar(this._metadataFilePath(name))
     return new Spec(this.workspace(), name, artifacts, persistedStateStamp, generatedMetadataStamp)
+  }
+
+  /**
+   * Observes one artifact through the adapter's canonical stat/hash path.
+   *
+   * @param filePath - Absolute artifact path
+   * @param includeHash - Whether to read content and include its SHA-256 hash
+   * @returns Artifact observation, or `null` when absent
+   */
+  private async _observeArtifact(
+    filePath: string,
+    includeHash: boolean,
+  ): Promise<ArtifactMeta | null> {
+    let stat: Awaited<ReturnType<typeof fs.stat>>
+    try {
+      stat = await fs.stat(filePath)
+    } catch (err) {
+      if (isEnoent(err)) return null
+      throw err
+    }
+
+    const observation: ArtifactMeta = {
+      lastModified: stat.mtime.toISOString(),
+      size: stat.size,
+    }
+    if (!includeHash) return observation
+
+    const content = await fs.readFile(filePath, 'utf8')
+    return { ...observation, hash: sha256(content) }
   }
 
   /**

@@ -142,6 +142,7 @@ export function makeChange(
  */
 export class StubChangeRepository extends ChangeRepository {
   readonly store = new Map<string, Change>()
+  readonly explorations = new Map<string, string>()
 
   constructor(initial: Change[] = []) {
     super({ workspace: 'test', ownership: 'owned', isExternal: false, configPath: '/tmp' })
@@ -168,11 +169,22 @@ export class StubChangeRepository extends ChangeRepository {
     return toDiscardedChangeView(change)
   }
 
-  async create(change: Change): Promise<void> {
+  async create(change: Change, options?: { readonly explorationContent?: string }): Promise<void> {
     if (this.store.has(change.name)) {
       throw new ChangeAlreadyExistsError(change.name)
     }
     this.store.set(change.name, change)
+    if (options?.explorationContent !== undefined && options.explorationContent.length > 0) {
+      this.explorations.set(change.name, options.explorationContent)
+    }
+  }
+
+  async readExploration(change: Change): Promise<string | null> {
+    return this.explorations.get(change.name) ?? null
+  }
+
+  async writeExploration(change: Change, content: string): Promise<void> {
+    if (content.length > 0) this.explorations.set(change.name, content)
   }
 
   private async _persist(change: Change): Promise<void> {
@@ -182,6 +194,7 @@ export class StubChangeRepository extends ChangeRepository {
 
   async delete(change: Change): Promise<void> {
     this.store.delete(change.name)
+    this.explorations.delete(change.name)
   }
 
   async list(options?: ActiveChangeListOptions) {
@@ -466,11 +479,13 @@ export class StubSpecRepository extends SpecRepository {
     if (artifact === null) return null
     const hasher = new NodeContentHasher()
     const lastModified = new Date().toISOString()
+    const size = Buffer.byteLength(artifact.content, 'utf8')
     if (options?.includeHash !== true) {
-      return { lastModified }
+      return { lastModified, size }
     }
     return {
       lastModified,
+      size,
       hash: artifact.originalHash ?? hasher.hash(artifact.content),
     }
   }

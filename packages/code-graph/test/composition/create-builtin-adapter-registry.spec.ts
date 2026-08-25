@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { createBuiltinAdapterRegistry } from '../../src/composition/use-cases/create-builtin-adapter-registry.js'
+import { createBuiltinAdapterRegistry } from '../../src/composition/index.js'
 import { AdapterRegistry } from '../../src/infrastructure/tree-sitter/adapter-registry.js'
+import { type AdapterRegistryPort } from '../../src/domain/ports/adapter-registry-port.js'
 import { type LanguageAdapter } from '../../src/domain/value-objects/language-adapter.js'
 
 describe('createBuiltinAdapterRegistry', () => {
   it('creates an AdapterRegistry instance populated with built-in language adapters', () => {
-    const registry = createBuiltinAdapterRegistry()
+    const registry: AdapterRegistryPort = createBuiltinAdapterRegistry()
 
     expect(registry).toBeInstanceOf(AdapterRegistry)
     const extensions = registry.getSupportedExtensions()

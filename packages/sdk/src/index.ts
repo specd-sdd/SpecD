@@ -4,6 +4,10 @@ export {
   createSdkContext,
   openSpecdHost,
   withOpenGraphProvider,
+  createSuggestImplementationLinks,
+  createSuggestSpecDependencies,
+  resolveSuggestImplementationLinksDeps,
+  resolveSuggestSpecDependenciesDeps,
   type OpenSpecdHostInput,
   type OpenSpecdHostResult,
   type SdkHostContext,
@@ -14,14 +18,6 @@ export {
   buildImplementationReview,
   buildProjectStatusSnapshot,
   runIndexProjectGraph,
-  SuggestImplementationLinks,
-  createSuggestImplementationLinks,
-  resolveSuggestImplementationLinksDeps,
-  suggestImplementationLinksInputSchema,
-  SuggestSpecDependencies,
-  createSuggestSpecDependencies,
-  resolveSuggestSpecDependenciesDeps,
-  suggestSpecDependenciesInputSchema,
   type BuildImplementationReviewInput,
   type BuildImplementationReviewResult,
   type BuildProjectStatusSnapshotOptions,
@@ -30,21 +26,6 @@ export {
   type ReviewedImplementationSymbol,
   type RunIndexProjectGraphInput,
   type RunIndexProjectGraphResult,
-  type SuggestImplementationLinksInput,
-  type SuggestImplementationLinksResult,
-  type SpecImplementationSuggestion,
-  type SuggestImplementationLinksDeps,
-  type SuggestImplementationProgressEvent,
-  type OnSuggestImplementationProgress,
-  type SuggestSpecDependenciesInput,
-  type SuggestSpecDependenciesResult,
-  type SpecDependencySuggestion,
-  type SuggestedSpecDependency,
-  type PostApplyValidationDiagnostic,
-  type CreatedAlignmentChangeInfo,
-  type SuggestSpecDependenciesDeps,
-  type SuggestSpecDepsProgressEvent,
-  type OnSuggestSpecDepsProgress,
   type ImplementationSuggestionCacheHeader,
   type ImplementationSuggestionSpecStamp,
   type ImplementationSuggestionLockData,
@@ -57,13 +38,35 @@ export {
   type SpecDepsSuggestionsCacheFile,
 } from './orchestration/index.js'
 
+export {
+  SuggestImplementationLinks,
+  createSuggestImplementationLinks as createSuggestImplementationLinksFromDeps,
+  suggestImplementationLinksInputSchema,
+  type SuggestImplementationLinksInput,
+  type SuggestImplementationLinksResult,
+  type SpecImplementationSuggestion,
+  type SuggestImplementationLinksDeps,
+  type SuggestImplementationProgressEvent,
+  type OnSuggestImplementationProgress,
+  type SuggestionFileObserver,
+} from './application/use-cases/suggest-implementation-links.js'
+export {
+  SuggestSpecDependencies,
+  createSuggestSpecDependencies as createSuggestSpecDependenciesFromDeps,
+  suggestSpecDependenciesInputSchema,
+  type SuggestSpecDependenciesInput,
+  type SuggestSpecDependenciesResult,
+  type SpecDependencySuggestion,
+  type SuggestedSpecDependency,
+  type PostApplyValidationDiagnostic,
+  type CreatedAlignmentChangeInfo,
+  type SuggestSpecDependenciesDeps,
+  type SuggestSpecDepsProgressEvent,
+  type OnSuggestSpecDepsProgress,
+} from './application/use-cases/suggest-spec-dependencies.js'
+
 export { ImplementationSuggestionCachePort } from './application/ports/implementation-suggestion-cache-port.js'
 export { SpecDepsSuggestionCachePort } from './application/ports/spec-deps-suggestion-cache-port.js'
-export {
-  FsImplementationSuggestionCache,
-  FsSpecDepsSuggestionCache,
-} from './infrastructure/fs/index.js'
-
 export { InvalidProviderLifecycleError } from './domain/errors/index.js'
 
 export * from './core-reexports.js'

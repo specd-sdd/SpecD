@@ -164,6 +164,143 @@ describe('FsImplementationSuggestionCache', () => {
 
     expect(await cache.get('cli:spec-deps')).not.toBeNull()
   })
+
+  it('stage 1: equal size+mtime is a HIT without requesting any content hash', async () => {
+    const get = vi.fn().mockResolvedValue({
+      workspace: 'cli',
+      path: 'spec-deps',
+      artifacts: [{ filename: 'spec.md', lastModified: '2026-08-17T12:00:00Z', size: 100 }],
+    })
+    const artifactMeta = vi
+      .fn()
+      .mockResolvedValue({ lastModified: '2026-08-17T12:00:00Z', size: 100, hash: 'hash-a' })
+    const mockRepo = { get, artifactMeta } as unknown as SpecRepository
+
+    const cache = new FsImplementationSuggestionCache({
+      projectDir: testDir,
+      configPath: '.specd',
+      specRepositories: new Map([['cli', mockRepo]]),
+    })
+
+    await cache.set('cli:spec-deps', {
+      title: 'SpecDeps',
+      existing: { files: [], symbols: [], dependsOn: [] },
+      suggestions: [],
+    })
+    artifactMeta.mockClear()
+
+    // Same mtime + same size: stage 1 decides, no hash fetch on read.
+    expect(await cache.get('cli:spec-deps')).not.toBeNull()
+    expect(artifactMeta).not.toHaveBeenCalled()
+  })
+
+  it('stage 1: a differing byte-size is a MISS without any hash comparison', async () => {
+    const get = vi.fn().mockResolvedValue({
+      workspace: 'cli',
+      path: 'spec-deps',
+      artifacts: [{ filename: 'spec.md', lastModified: '2026-08-17T12:00:00Z', size: 100 }],
+    })
+    const artifactMeta = vi
+      .fn()
+      .mockResolvedValue({ lastModified: '2026-08-17T12:00:00Z', size: 100, hash: 'hash-a' })
+    const mockRepo = { get, artifactMeta } as unknown as SpecRepository
+
+    const cache = new FsImplementationSuggestionCache({
+      projectDir: testDir,
+      configPath: '.specd',
+      specRepositories: new Map([['cli', mockRepo]]),
+    })
+
+    await cache.set('cli:spec-deps', {
+      title: 'SpecDeps',
+      existing: { files: [], symbols: [], dependsOn: [] },
+      suggestions: [],
+    })
+
+    get.mockResolvedValue({
+      workspace: 'cli',
+      path: 'spec-deps',
+      artifacts: [{ filename: 'spec.md', lastModified: '2026-08-17T12:00:00Z', size: 250 }],
+    })
+
+    expect(await cache.get('cli:spec-deps')).toBeNull()
+  })
+
+  it('stage 2: drifted mtime with equal size falls through to hash precedence', async () => {
+    const get = vi.fn().mockResolvedValue({
+      workspace: 'cli',
+      path: 'spec-deps',
+      artifacts: [{ filename: 'spec.md', lastModified: '2026-08-17T12:00:00Z', size: 100 }],
+    })
+    const artifactMeta = vi
+      .fn()
+      .mockResolvedValue({ lastModified: '2026-08-17T12:00:00Z', size: 100, hash: 'hash-a' })
+    const mockRepo = { get, artifactMeta } as unknown as SpecRepository
+
+    const cache = new FsImplementationSuggestionCache({
+      projectDir: testDir,
+      configPath: '.specd',
+      specRepositories: new Map([['cli', mockRepo]]),
+    })
+
+    await cache.set('cli:spec-deps', {
+      title: 'SpecDeps',
+      existing: { files: [], symbols: [], dependsOn: [] },
+      suggestions: [],
+    })
+
+    // Content changed within the same byte length and a newer mtime.
+    get.mockResolvedValue({
+      workspace: 'cli',
+      path: 'spec-deps',
+      artifacts: [{ filename: 'spec.md', lastModified: '2026-09-01T00:00:00Z', size: 100 }],
+    })
+    artifactMeta.mockResolvedValue({
+      lastModified: '2026-09-01T00:00:00Z',
+      size: 100,
+      hash: 'hash-b',
+    })
+
+    expect(await cache.get('cli:spec-deps')).toBeNull()
+  })
+
+  it('stage 2: drifted mtime with equal size and equal hash stays fresh', async () => {
+    const get = vi.fn().mockResolvedValue({
+      workspace: 'cli',
+      path: 'spec-deps',
+      artifacts: [{ filename: 'spec.md', lastModified: '2026-08-17T12:00:00Z', size: 100 }],
+    })
+    const artifactMeta = vi
+      .fn()
+      .mockResolvedValue({ lastModified: '2026-08-17T12:00:00Z', size: 100, hash: 'hash-a' })
+    const mockRepo = { get, artifactMeta } as unknown as SpecRepository
+
+    const cache = new FsImplementationSuggestionCache({
+      projectDir: testDir,
+      configPath: '.specd',
+      specRepositories: new Map([['cli', mockRepo]]),
+    })
+
+    await cache.set('cli:spec-deps', {
+      title: 'SpecDeps',
+      existing: { files: [], symbols: [], dependsOn: [] },
+      suggestions: [],
+    })
+
+    // Pure mtime drift (e.g. touch): content identical -> still fresh.
+    get.mockResolvedValue({
+      workspace: 'cli',
+      path: 'spec-deps',
+      artifacts: [{ filename: 'spec.md', lastModified: '2026-09-01T00:00:00Z', size: 100 }],
+    })
+    artifactMeta.mockResolvedValue({
+      lastModified: '2026-09-01T00:00:00Z',
+      size: 100,
+      hash: 'hash-a',
+    })
+
+    expect(await cache.get('cli:spec-deps')).not.toBeNull()
+  })
 })
 
 describe('FsSpecDepsSuggestionCache', () => {
@@ -300,5 +437,84 @@ describe('FsSpecDepsSuggestionCache', () => {
     })
 
     expect(await cache.get('cli:spec-deps')).toBeNull()
+  })
+
+  it('deps cache stage 1: a differing byte-size is a MISS', async () => {
+    const get = vi.fn().mockResolvedValue({
+      workspace: 'cli',
+      path: 'spec-deps',
+      artifacts: [{ filename: 'spec.md', lastModified: '2026-08-17T12:00:00Z', size: 100 }],
+    })
+    const artifactMeta = vi
+      .fn()
+      .mockResolvedValue({ lastModified: '2026-08-17T12:00:00Z', size: 100, hash: 'hash-a' })
+    const mockRepo = { get, artifactMeta } as unknown as SpecRepository
+
+    const cache = new FsSpecDepsSuggestionCache({
+      projectDir: testDir,
+      configPath: '.specd',
+      specRepositories: new Map([['cli', mockRepo]]),
+    })
+
+    await cache.set('cli:spec-deps', {
+      title: 'SpecDeps',
+      existingDependsOn: [],
+      suggestedDependsOn: [],
+    })
+
+    get.mockResolvedValue({
+      workspace: 'cli',
+      path: 'spec-deps',
+      artifacts: [{ filename: 'spec.md', lastModified: '2026-08-17T12:00:00Z', size: 250 }],
+    })
+
+    expect(await cache.get('cli:spec-deps')).toBeNull()
+  })
+
+  it('deps cache stage 2: drifted mtime with equal size falls through to hash precedence', async () => {
+    const get = vi.fn().mockResolvedValue({
+      workspace: 'cli',
+      path: 'spec-deps',
+      artifacts: [{ filename: 'spec.md', lastModified: '2026-08-17T12:00:00Z', size: 100 }],
+    })
+    const artifactMeta = vi
+      .fn()
+      .mockResolvedValue({ lastModified: '2026-08-17T12:00:00Z', size: 100, hash: 'hash-a' })
+    const mockRepo = { get, artifactMeta } as unknown as SpecRepository
+
+    const cache = new FsSpecDepsSuggestionCache({
+      projectDir: testDir,
+      configPath: '.specd',
+      specRepositories: new Map([['cli', mockRepo]]),
+    })
+
+    await cache.set('cli:spec-deps', {
+      title: 'SpecDeps',
+      existingDependsOn: [],
+      suggestedDependsOn: [],
+    })
+
+    // Content changed within the same byte length and a newer mtime.
+    get.mockResolvedValue({
+      workspace: 'cli',
+      path: 'spec-deps',
+      artifacts: [{ filename: 'spec.md', lastModified: '2026-09-01T00:00:00Z', size: 100 }],
+    })
+    artifactMeta.mockResolvedValue({
+      lastModified: '2026-09-01T00:00:00Z',
+      size: 100,
+      hash: 'hash-b',
+    })
+
+    expect(await cache.get('cli:spec-deps')).toBeNull()
+
+    // Pure mtime drift with identical content -> still fresh (hash-a === hash-a).
+    artifactMeta.mockResolvedValue({
+      lastModified: '2026-10-01T00:00:00Z',
+      size: 100,
+      hash: 'hash-a',
+    })
+
+    expect(await cache.get('cli:spec-deps')).not.toBeNull()
   })
 })

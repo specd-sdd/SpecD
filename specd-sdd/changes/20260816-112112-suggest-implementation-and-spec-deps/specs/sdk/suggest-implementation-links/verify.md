@@ -77,6 +77,20 @@
 - **AND** confirms sub-token `which` in the file content via `code-graph` FTS search
 - **AND** returns `src/commands/schema.ts` with `HIGH` confidence and declared top-level symbols
 
+#### Scenario: Tier 2 retains Tier 1 candidates and controls only Tier 3 fallback
+
+- **GIVEN** Tier 1 produced one candidate and Tier 2 produced a second hierarchical-domain candidate
+- **WHEN** Tier 2 completes
+- **THEN** both candidates compete in the returned ranked set
+- **AND** Tier 3 is not invoked because the combined set is non-empty
+
+#### Scenario: Missing file observer is rejected
+
+- **GIVEN** dependencies without a file-observation port
+- **WHEN** `createSuggestImplementationLinks(deps)` is called
+- **THEN** construction fails with `InvalidInputError`
+- **AND** no fallback assumes candidate files exist
+
 #### Scenario: Tier 3 fallback tag and keyword co-occurrence search
 
 - **GIVEN** a declarative spec `default:rules-injection` yielding zero candidates in Tiers 1 and 2
@@ -103,13 +117,13 @@
 - **THEN** it invokes `UpdatePersistedSpecImplementation` with action `add` only for suggestions with `alreadyIncluded: false`
 - **AND** existing links in `spec-lock.json` are retained alongside newly applied links
 
-### Requirement: Standard Factory & Composition Overloads
+### Requirement: Dependency-injected factory
 
-#### Scenario: Config-based factory resolution
+#### Scenario: Canonical factory accepts resolved dependencies
 
-- **GIVEN** a resolved `SpecdConfig` instance
-- **WHEN** `createSuggestImplementationLinks(config)` is called
-- **THEN** it resolves all dependencies via `resolveSuggestImplementationLinksDeps` and returns a wired `SuggestImplementationLinks` instance
+- **GIVEN** a complete `SuggestImplementationLinksDeps` object
+- **WHEN** `createSuggestImplementationLinks(deps)` is called
+- **THEN** it returns a wired `SuggestImplementationLinks` instance without constructing filesystem adapters
 
 #### Scenario: Progress callback events emission
 

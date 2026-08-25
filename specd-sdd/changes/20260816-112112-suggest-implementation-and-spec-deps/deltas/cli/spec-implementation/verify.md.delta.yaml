@@ -17,3 +17,18 @@
     - **GIVEN** a spec with existing implementation links in `spec-lock.json`
     - **WHEN** `specd specs implementation suggest <spec-id>` is executed and the algorithm re-discovers files already in spec-lock
     - **THEN** each suggestion displays `[already included]` or `[new]` to indicate its inclusion status.
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    ### Requirement: Suggest structured-output help schema
+
+    #### Scenario: JSON and TOON help documents the leaf response
+
+    - **GIVEN** the `specs implementation suggest` leaf command
+    - **WHEN** its help is rendered for structured output
+    - **THEN** JSON and TOON examples and the implementation-suggestion response shape are present
+    - **AND** the suggestion use case is not executed

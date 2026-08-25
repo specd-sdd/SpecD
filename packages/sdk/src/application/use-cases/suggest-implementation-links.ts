@@ -1,5 +1,3 @@
-import { constants } from 'node:fs'
-import { readFile, access } from 'node:fs/promises'
 import { join, resolve, relative } from 'node:path'
 
 import {
@@ -7,13 +5,6 @@ import {
   type GetPersistedSpecImplementation,
   type UpdatePersistedSpecImplementation,
   type GetSpecMetadata,
-  createGetPersistedSpecImplementation,
-  createUpdatePersistedSpecImplementation,
-  createGetSpecMetadata,
-  type SpecdConfig,
-  type CompositionResolutionOptions,
-  type CompositionResolver,
-  createCompositionResolver,
   Logger,
   SpecNotFoundError,
   InvalidInputError,
@@ -22,7 +13,6 @@ import {
 } from '@specd/core'
 import {
   type CodeGraphProvider,
-  createCodeGraphProvider,
   createBuiltinAdapterRegistry,
   SymbolKind,
   type SymbolNode,
@@ -32,9 +22,8 @@ import {
   type ImplementationSuggestionLockData,
   type ImplementationSuggestionEntry,
   type ImplementationSuggestionSpecStamp,
-} from '../domain/value-objects/implementation-suggestion-cache.js'
-import { type ImplementationSuggestionCachePort } from '../application/ports/implementation-suggestion-cache-port.js'
-import { FsImplementationSuggestionCache } from '../infrastructure/fs/fs-implementation-suggestion-cache.js'
+} from '../../domain/value-objects/implementation-suggestion-cache.js'
+import { type ImplementationSuggestionCachePort } from '../ports/implementation-suggestion-cache-port.js'
 
 /**
  * Checks whether a file exists at the given path.
@@ -42,13 +31,9 @@ import { FsImplementationSuggestionCache } from '../infrastructure/fs/fs-impleme
  * @param filePath - Absolute or relative path to check.
  * @returns True when the path is accessible as a file.
  */
-async function asyncFileExists(filePath: string): Promise<boolean> {
-  try {
-    await access(filePath, constants.F_OK)
-    return true
-  } catch {
-    return false
-  }
+export interface SuggestionFileObserver {
+  exists(filePath: string): Promise<boolean>
+  readText(filePath: string): Promise<string>
 }
 
 const confidenceThresholdSchema = z
@@ -151,8 +136,8 @@ export interface SuggestImplementationLinksDeps {
   readonly symbolModelPort?: unknown
   readonly codeGraphProvider?: CodeGraphProvider
   readonly cache?: ImplementationSuggestionCachePort
+  readonly fileObserver: SuggestionFileObserver
   readonly projectDir?: string
-  readonly configPath?: string
   readonly workspaces?: readonly { readonly name: string; readonly codeRoot: string }[]
 }
 
@@ -354,16 +339,10 @@ export class SuggestImplementationLinks {
 
     const normalizedConfidence = validatedInput.confidenceThreshold
 
-    const projectDir = this.deps.projectDir ?? process.cwd()
-    const configPath = this.deps.configPath ?? '.specd'
-    const cache =
-      this.deps.cache ??
-      new FsImplementationSuggestionCache({
-        projectDir,
-        configPath,
-        specRepositories: this.deps.specRepositories,
-        codeGraphProvider: this.deps.codeGraphProvider,
-      })
+    const cache = this.deps.cache
+    if (cache === undefined) {
+      throw new InvalidInputError('SuggestImplementationLinks requires an injected cache port')
+    }
     if (validatedInput.rebuildCache) {
       await cache.invalidate()
     }
@@ -493,6 +472,7 @@ export class SuggestImplementationLinks {
             specStamp = {
               lastModified: analysis.lastModified,
               hash: analysis.realContentHash,
+              ...(analysis.realContentSize !== undefined ? { size: analysis.realContentSize } : {}),
               artifacts: [],
             }
           }
@@ -533,24 +513,20 @@ export class SuggestImplementationLinks {
           let specMutated = false
           for (const sug of markedSuggestions) {
             if (sug.alreadyIncluded) continue
-            try {
-              const updateInput =
-                sug.symbols.length > 0
-                  ? {
-                      specId: target.specId,
-                      action: 'add' as const,
-                      file: sug.file,
-                      symbols: sug.symbols,
-                    }
-                  : { specId: target.specId, action: 'add' as const, file: sug.file }
-              const res = await this.deps.updatePersistedImplementation.execute(updateInput)
-              if (res.created || res.implementation.length > 0) {
-                specMutated = true
-                filesAddedCount += 1
-                symbolsAddedCount += sug.symbols.length
-              }
-            } catch {
-              // Ignore boundary errors during apply
+            const updateInput =
+              sug.symbols.length > 0
+                ? {
+                    specId: target.specId,
+                    action: 'add' as const,
+                    file: sug.file,
+                    symbols: sug.symbols,
+                  }
+                : { specId: target.specId, action: 'add' as const, file: sug.file }
+            const res = await this.deps.updatePersistedImplementation.execute(updateInput)
+            if (res.created || res.implementation.length > 0) {
+              specMutated = true
+              filesAddedCount += 1
+              symbolsAddedCount += sug.symbols.length
             }
           }
           if (specMutated) {
@@ -667,6 +643,7 @@ export class SuggestImplementationLinks {
     suggestions: ImplementationSuggestionEntry[]
     realContentHash: string
     lastModified: string
+    realContentSize?: number
   }> {
     const repo = this.deps.specRepositories.get(workspace)
     if (!repo) return { suggestions: [], realContentHash: '', lastModified: '' }
@@ -679,6 +656,7 @@ export class SuggestImplementationLinks {
     let content = ''
     let realContentHash = ''
     let lastModified = ''
+    let realContentSize: number | undefined
     if (typeof repo.artifact === 'function') {
       const mainArtifact = await repo.artifact(spec, 'spec.md')
       content = mainArtifact?.content ?? ''
@@ -690,6 +668,9 @@ export class SuggestImplementationLinks {
       }
       if (meta?.lastModified) {
         lastModified = meta.lastModified
+      }
+      if (meta && typeof meta.size === 'number') {
+        realContentSize = meta.size
       }
     }
 
@@ -919,7 +900,7 @@ export class SuggestImplementationLinks {
         ? [subdir ? `${wsCodeRoot}/${subdir}` : wsCodeRoot, subdir]
         : [subdir]
       for (const prefix of prefixes) {
-        if (prefix === '' || (await asyncFileExists(join(projectRoot, prefix)))) {
+        if (prefix === '' || (await this._fileExists(join(projectRoot, prefix)))) {
           validPrefixes.add(prefix)
         }
       }
@@ -1010,7 +991,7 @@ export class SuggestImplementationLinks {
               continue
             }
             const fullDiskPath = join(this.deps.projectDir ?? '.', cleanRelPath)
-            if (!(await asyncFileExists(fullDiskPath))) {
+            if (!(await this._fileExists(fullDiskPath))) {
               continue
             }
             const filePath = `${workspace}:${cleanRelPath}`
@@ -1049,7 +1030,7 @@ export class SuggestImplementationLinks {
 
             if (isExactPrimaryMatch) {
               existing.score += 200
-              existing.reasons.add('primary-symbol-match')
+              existing.reasons.add('exact-primary-symbol-match')
             } else if (isDerivativeMatch) {
               existing.score += 50
               existing.reasons.add('derivative-symbol-match')
@@ -1091,7 +1072,7 @@ export class SuggestImplementationLinks {
     for (const dPath of derivedPaths) {
       const cleanRelPath = dPath.replace(/^[^:]+:/, '')
       const fullDiskPath = join(this.deps.projectDir ?? '.', cleanRelPath)
-      if (!(await asyncFileExists(fullDiskPath))) {
+      if (!(await this._fileExists(fullDiskPath))) {
         continue
       }
       const affinity = computePathSpecAffinity(capPath, cleanRelPath)
@@ -1142,8 +1123,8 @@ export class SuggestImplementationLinks {
           for (const mToken of distinctiveMissing) {
             let tokenFound = false
             try {
-              if (await asyncFileExists(fullDiskPath)) {
-                const diskContent = (await readFile(fullDiskPath, 'utf8')).toLowerCase()
+              if (await this._fileExists(fullDiskPath)) {
+                const diskContent = (await this._readText(fullDiskPath)).toLowerCase()
                 if (diskContent.includes(mToken.toLowerCase())) {
                   tokenFound = true
                 }
@@ -1275,7 +1256,7 @@ export class SuggestImplementationLinks {
               continue
             }
             const fullDiskPath = join(this.deps.projectDir ?? '.', cleanPath)
-            if (!(await asyncFileExists(fullDiskPath))) continue
+            if (!(await this._fileExists(fullDiskPath))) continue
 
             const filePathKey = `${workspace}:${cleanPath}`
             const current = fileHits.get(filePathKey) ?? { count: 0, terms: new Set() }
@@ -1518,7 +1499,7 @@ export class SuggestImplementationLinks {
       let confidence: 'HIGH' | 'MEDIUM' | 'LOW' = 'LOW'
       const hasExactTokenOrSlug =
         data.reasons.has('exact-token-affinity') || data.reasons.has('filename-slug-match')
-      const hasPrimarySymbol = data.reasons.has('primary-symbol-match')
+      const hasPrimarySymbol = data.reasons.has('exact-primary-symbol-match')
       const isCleanAffinity = !data.reasons.has('missing-distinctive-tokens')
 
       if (data.score >= 150 && (hasPrimarySymbol || hasExactTokenOrSlug) && isCleanAffinity) {
@@ -1546,42 +1527,32 @@ export class SuggestImplementationLinks {
       suggestions: sortedSuggestions,
     })
 
-    return { suggestions: sortedSuggestions, realContentHash, lastModified }
+    return {
+      suggestions: sortedSuggestions,
+      realContentHash,
+      lastModified,
+      ...(realContentSize !== undefined ? { realContentSize } : {}),
+    }
   }
-}
 
-/**
- * Resolves dependencies for `SuggestImplementationLinks` from a composition resolver.
- *
- * @param resolver - Composition resolver instance
- * @returns Resolved dependencies bundle
- */
-export function resolveSuggestImplementationLinksDeps(
-  resolver: CompositionResolver,
-): SuggestImplementationLinksDeps {
-  const specRepositories = resolver.getSpecRepositories()
-  const projectDir = resolver.config.projectRoot
+  /**
+   * Observes file existence through an injected edge dependency.
+   *
+   * @param filePath - Candidate source path
+   * @returns Whether the candidate exists
+   */
+  private async _fileExists(filePath: string): Promise<boolean> {
+    return this.deps.fileObserver.exists(filePath)
+  }
 
-  const getPersistedImplementation = createGetPersistedSpecImplementation(resolver.config)
-  const updatePersistedImplementation = createUpdatePersistedSpecImplementation(resolver.config)
-  const getSpecMetadata = createGetSpecMetadata(resolver.config)
-  const codeGraphProvider = createCodeGraphProvider(resolver.config)
-
-  return {
-    specRepositories,
-    getPersistedImplementation,
-    updatePersistedImplementation,
-    getSpecMetadata,
-    codeGraphProvider,
-    cache: new FsImplementationSuggestionCache({
-      projectDir,
-      configPath: resolver.config.configPath,
-      specRepositories,
-      codeGraphProvider,
-    }),
-    projectDir,
-    configPath: resolver.config.configPath,
-    workspaces: resolver.config.workspaces,
+  /**
+   * Reads source text through an injected edge dependency.
+   *
+   * @param filePath - Candidate source path
+   * @returns Source text
+   */
+  private async _readText(filePath: string): Promise<string> {
+    return this.deps.fileObserver.readText(filePath)
   }
 }
 
@@ -1590,51 +1561,15 @@ export function resolveSuggestImplementationLinksDeps(
  *
  * @param deps - Dependencies instance
  * @returns Configured `SuggestImplementationLinks`
+ * @throws {InvalidInputError} When the required file-observation port is absent
  */
 export function createSuggestImplementationLinks(
   deps: SuggestImplementationLinksDeps,
-): SuggestImplementationLinks
-/**
- * Factory function creating a `SuggestImplementationLinks` instance from configuration.
- *
- * @param config - SpecD project configuration
- * @param options - Composition resolution options
- * @returns Configured `SuggestImplementationLinks`
- */
-export function createSuggestImplementationLinks(
-  config: SpecdConfig,
-  options?: CompositionResolutionOptions,
-): SuggestImplementationLinks
-/**
- * Factory function overload handler.
- *
- * @param depsOrConfig - Dependencies or configuration
- * @param options - Composition resolution options
- * @returns Configured `SuggestImplementationLinks`
- */
-export function createSuggestImplementationLinks(
-  depsOrConfig: SuggestImplementationLinksDeps | SpecdConfig,
-  options?: CompositionResolutionOptions,
 ): SuggestImplementationLinks {
-  if (isSuggestImplementationLinksDeps(depsOrConfig)) {
-    return new SuggestImplementationLinks(depsOrConfig)
+  if (deps.fileObserver === undefined) {
+    throw new InvalidInputError(
+      'SuggestImplementationLinks requires an injected file-observation port',
+    )
   }
-  const resolver = createCompositionResolver(depsOrConfig, options)
-  return new SuggestImplementationLinks(resolveSuggestImplementationLinksDeps(resolver))
-}
-
-/**
- * Type guard for `SuggestImplementationLinksDeps`.
- *
- * @param value - Candidate object
- * @returns True if value satisfies `SuggestImplementationLinksDeps`
- */
-function isSuggestImplementationLinksDeps(
-  value: SuggestImplementationLinksDeps | SpecdConfig,
-): value is SuggestImplementationLinksDeps {
-  return (
-    'specRepositories' in value &&
-    'getPersistedImplementation' in value &&
-    'updatePersistedImplementation' in value
-  )
+  return new SuggestImplementationLinks(deps)
 }

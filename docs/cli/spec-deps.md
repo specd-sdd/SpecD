@@ -21,7 +21,10 @@ Each subcommand accepts `--format text|json|toon` (default `text`) and `--config
 - `add` appends every supplied `--dep` id; duplicates are ignored by the use case.
 - `remove` on an uninitialized spec reports a no-op instead of an error.
 - `suggest` traces AST import graphs and barrel re-exports to deduce inter-spec dependencies.
-- `suggest --apply` unions suggested dependencies into `spec-lock.json` and runs post-apply validation. If invalid specs exist and `--create-change` is set, creates an alignment change with `.specd-exploration.md`.
+- A cold dependency-suggestion run warms implementation suggestions for every configured spec before analyzing the requested target. On large workspaces this initial dry run can take substantially longer than cached runs; JSON/TOON output is emitted only after analysis completes.
+- `suggest --apply` unions suggested dependencies into `spec-lock.json` and runs post-apply validation against the canonical per-spec validation entries.
+- If invalid specs exist and `--create-change` is set, the SDK supplies diagnostic exploration content to `CreateChange`; the active change repository decides how to persist it (`FsChangeRepository` uses `.specd-exploration.md`).
+- JSON/TOON results expose `postApplyValidation.status`, `invalidSpecs`, the suggested alignment command, and optional created-change metadata without prompting. Validator and mutation failures remain errors and are never reported as `all-valid`.
 - Missing lock: `set` / `clear` create incidental state; non-empty `add` creates via initialization; `remove` / empty `add` are no-ops.
 
 ## Errors

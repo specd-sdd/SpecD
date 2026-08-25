@@ -11,7 +11,7 @@
     When `--apply` is passed, the command MUST delegate additive mutation to the SDK use case, which merges new discovered dependency IDs into `spec-lock.json` via `UpdatePersistedSpecDeps`.
 
     When `--apply` is passed and post-apply validation detects invalid specs:
-    - If `--create-change` is passed, the SDK use case MUST create a single alignment change gathering ALL invalid specs and write `.specd-exploration.md`.
+    - If `--create-change` is passed, the SDK use case MUST create a single alignment change gathering ALL invalid specs and supply its exploration content through `CreateChange`.
     - If `--create-change` is NOT passed, the CLI MUST log a suggested alignment command for the user to run manually.
     - Machine-readable formats (`json` and `toon`) MUST NEVER prompt or block stdin.
 
@@ -22,3 +22,13 @@
       matches: '^Spec Dependencies$'
   content: |
     - [`sdk:suggest-spec-dependencies`](../../sdk/suggest-spec-dependencies/spec.md) — orchestration use case for inferring spec dependencies
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    ### Requirement: Suggest structured-output help schema
+
+    The `suggest` leaf command MUST register JSON and TOON help examples and response-shape documentation using the shared structured-output help mechanism required by `cli:entrypoint`. Help for `--format json` and `--format toon` MUST describe the actual dependency-suggestion and post-apply validation result shape and MUST remain available without executing the command.

@@ -21,3 +21,13 @@
       matches: '^Spec Dependencies$'
   content: |
     - [`sdk:suggest-implementation-links`](../../sdk/suggest-implementation-links/spec.md) — orchestration use case for inferring spec implementation links
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    ### Requirement: Suggest structured-output help schema
+
+    The `suggest` leaf command MUST register JSON and TOON help examples and response-shape documentation using the shared structured-output help mechanism required by `cli:entrypoint`. Help for `--format json` and `--format toon` MUST describe the actual suggestion result shape and MUST remain available without executing the command.

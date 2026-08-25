@@ -1,7 +1,7 @@
 {
   "name": "suggest-implementation-and-spec-deps",
   "createdAt": "2026-08-16T11:21:12.000Z",
-  "updatedAt": "2026-08-24T12:03:37.574Z",
+  "updatedAt": "2026-08-25T07:44:24.399Z",
   "description": "Add SDK use cases and CLI commands to suggest implementation links and spec dependencies with post-apply validation",
   "schema": {
     "name": "schema-std",
@@ -13,7 +13,13 @@
     "sdk:suggest-implementation-links",
     "sdk:suggest-spec-dependencies",
     "code-graph:language-adapter",
-    "code-graph:graph-store"
+    "code-graph:graph-store",
+    "core:fs-spec-repository",
+    "core:spec-repository-port",
+    "core:create-change",
+    "core:change-repository-port",
+    "core:fs-change-repository",
+    "sdk:composition"
   ],
   "specDependsOn": {
     "cli:spec-implementation": [
@@ -39,13 +45,74 @@
       "sdk:suggest-implementation-links",
       "code-graph:traversal",
       "core:get-persisted-spec-deps",
-      "core:update-persisted-spec-deps"
+      "core:update-persisted-spec-deps",
+      "core:create-change"
     ],
     "code-graph:graph-store": [
       "code-graph:symbol-model",
       "default:_global/architecture",
       "code-graph:staleness-detection",
       "code-graph:document-model"
+    ],
+    "core:fs-spec-repository": [
+      "default:_global/architecture",
+      "core:composition",
+      "core:storage",
+      "core:spec-repository-port",
+      "core:spec-lock",
+      "core:spec-metadata",
+      "core:spec-optimization"
+    ],
+    "core:spec-repository-port": [
+      "core:repository-port",
+      "default:_global/architecture",
+      "core:change",
+      "core:storage",
+      "core:workspace",
+      "core:spec-id-format",
+      "core:spec-metadata",
+      "core:content-extraction",
+      "core:search-specs",
+      "default:_global/logging",
+      "core:spec-lock"
+    ],
+    "core:create-change": [
+      "core:change",
+      "default:_global/architecture",
+      "core:get-active-schema",
+      "core:spec-overlap",
+      "core:composition-resolver",
+      "core:change-repository-port"
+    ],
+    "core:change-repository-port": [
+      "core:repository-port",
+      "default:_global/architecture",
+      "core:change",
+      "core:read-only-change-view",
+      "core:drafted-change-view",
+      "core:discarded-change-view",
+      "core:drafted-change-read-only-error",
+      "core:storage",
+      "core:change-manifest",
+      "default:_global/logging",
+      "core:change-list-entry"
+    ],
+    "core:fs-change-repository": [
+      "default:_global/architecture",
+      "core:composition",
+      "core:storage",
+      "core:change-list-entry",
+      "core:change-repository-port"
+    ],
+    "sdk:composition": [
+      "default:_global/architecture",
+      "core:composition",
+      "code-graph:composition",
+      "cli:host-context",
+      "sdk:context-markdown",
+      "sdk:build-implementation-review",
+      "sdk:suggest-implementation-links",
+      "sdk:suggest-spec-dependencies"
     ]
   },
   "invalidationPolicy": "downstream",
@@ -80,11 +147,11 @@
     },
     {
       "file": "packages/sdk/src/orchestration/suggest-implementation-links.ts",
-      "state": "resolved"
+      "state": "removed"
     },
     {
       "file": "packages/sdk/src/orchestration/suggest-spec-dependencies.ts",
-      "state": "resolved"
+      "state": "removed"
     },
     {
       "file": "packages/cli/src/commands/spec/implementation.ts",
@@ -108,27 +175,27 @@
     },
     {
       "file": "packages/cli/test/commands/spec-deps.spec.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/cli/test/commands/spec-implementation.spec.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/sdk/src/index.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/sdk/src/orchestration/index.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/sdk/test/orchestration/suggest-implementation-links.spec.ts",
-      "state": "open"
+      "state": "removed"
     },
     {
       "file": "packages/sdk/test/orchestration/suggest-spec-dependencies.spec.ts",
-      "state": "open"
+      "state": "removed"
     },
     {
       "file": "packages/code-graph/src/composition/create-code-graph-provider.ts",
@@ -556,7 +623,7 @@
     },
     {
       "file": "packages/code-graph/test/helpers/stub-change-repository.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/code-graph/test/infrastructure/ladybug/ladybug-graph-store-multi-kind.spec.ts",
@@ -865,38 +932,125 @@
     {
       "file": "packages/cli/package.json",
       "state": "open"
+    },
+    {
+      "file": "packages/core/src/application/ports/spec-repository.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/core/src/domain/entities/spec.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/core/src/infrastructure/fs/spec-repository.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/helpers.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/infrastructure/fs/spec-repository.spec.ts",
+      "state": "open"
+    },
+    {
+      "file": "docs/core/ports.md",
+      "state": "open"
+    },
+    {
+      "file": "packages/sdk/src/infrastructure/fs/spec-stamp-source.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/sdk/src/infrastructure/fs/write-json-atomic.ts",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/fs-spec-repository/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/list-specs/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/search-specs/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "specs/core/create-change/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/create-change.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/create-change.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/ports/change-repository.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/entities/change.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/infrastructure/fs/change-repository.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/infrastructure/fs/change-repository.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/composition/suggestion-use-cases.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/sdk/src/composition/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/composition/suggest-implementation-links.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/composition/suggest-spec-dependencies.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/test/composition/package-boundary.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/fs-change-repository/spec-lock.json",
+      "state": "open"
+    },
+    {
+      "file": "packages/sdk/src/application/use-cases/suggest-implementation-links.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/sdk/src/application/use-cases/suggest-spec-dependencies.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/code-graph/src/composition/index.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/sdk/test/application/use-cases/suggest-implementation-links.spec.ts",
+      "state": "open"
+    },
+    {
+      "file": "packages/sdk/test/application/use-cases/suggest-spec-dependencies.spec.ts",
+      "state": "open"
     }
   ],
   "implementationLinks": [
-    {
-      "specId": "sdk:suggest-implementation-links",
-      "file": "packages/sdk/src/orchestration/suggest-implementation-links.ts",
-      "fileLinkExplicit": false,
-      "symbols": [
-        "SuggestImplementationLinks",
-        "createSuggestImplementationLinks",
-        "resolveSuggestImplementationLinksDeps",
-        "SuggestImplementationLinksInput",
-        "SuggestImplementationLinksResult",
-        "SpecImplementationSuggestion"
-      ]
-    },
-    {
-      "specId": "sdk:suggest-spec-dependencies",
-      "file": "packages/sdk/src/orchestration/suggest-spec-dependencies.ts",
-      "fileLinkExplicit": false,
-      "symbols": [
-        "SuggestSpecDependencies",
-        "createSuggestSpecDependencies",
-        "resolveSuggestSpecDependenciesDeps",
-        "SuggestSpecDependenciesInput",
-        "SuggestSpecDependenciesResult",
-        "SpecDependencySuggestion",
-        "SuggestedSpecDependency",
-        "PostApplyValidationDiagnostic",
-        "CreatedAlignmentChangeInfo"
-      ]
-    },
     {
       "specId": "cli:spec-implementation",
       "file": "packages/cli/src/commands/spec/implementation.ts",
@@ -908,6 +1062,152 @@
       "file": "packages/cli/src/commands/spec/deps.ts",
       "fileLinkExplicit": false,
       "symbols": ["registerSpecDeps"]
+    },
+    {
+      "specId": "core:create-change",
+      "file": "packages/core/src/application/use-cases/create-change.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["CreateChange", "CreateChangeInput"]
+    },
+    {
+      "specId": "core:create-change",
+      "file": "packages/core/test/application/use-cases/create-change.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:change-repository-port",
+      "file": "packages/core/src/application/ports/change-repository.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["ChangeRepository", "ExplorationMeta", "CreateChangeStorageOptions"]
+    },
+    {
+      "specId": "core:change-repository-port",
+      "file": "packages/core/src/domain/entities/change.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["Change", "ExplorationMeta"]
+    },
+    {
+      "specId": "core:change-repository-port",
+      "file": "packages/core/test/application/use-cases/helpers.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["StubChangeRepository"]
+    },
+    {
+      "specId": "core:fs-change-repository",
+      "file": "packages/core/src/infrastructure/fs/change-repository.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["FsChangeRepository"]
+    },
+    {
+      "specId": "core:fs-change-repository",
+      "file": "packages/core/test/infrastructure/fs/change-repository.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "sdk:composition",
+      "file": "packages/sdk/src/composition/index.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "sdk:composition",
+      "file": "packages/sdk/src/index.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:spec-implementation",
+      "file": "packages/cli/test/commands/spec-implementation.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:spec-deps",
+      "file": "packages/cli/test/commands/spec-deps.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "sdk:composition",
+      "file": "packages/sdk/src/composition/suggest-implementation-links.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["createSuggestImplementationLinks", "resolveSuggestImplementationLinksDeps"]
+    },
+    {
+      "specId": "sdk:composition",
+      "file": "packages/sdk/src/composition/suggest-spec-dependencies.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["createSuggestSpecDependencies", "resolveSuggestSpecDependenciesDeps"]
+    },
+    {
+      "specId": "sdk:composition",
+      "file": "packages/sdk/test/composition/package-boundary.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:change-repository-port",
+      "file": "packages/code-graph/test/helpers/stub-change-repository.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["StubChangeRepository"]
+    },
+    {
+      "specId": "sdk:suggest-implementation-links",
+      "file": "packages/sdk/src/application/use-cases/suggest-implementation-links.ts",
+      "fileLinkExplicit": false,
+      "symbols": [
+        "SuggestImplementationLinks",
+        "createSuggestImplementationLinks",
+        "computePathSpecAffinity"
+      ]
+    },
+    {
+      "specId": "sdk:suggest-spec-dependencies",
+      "file": "packages/sdk/src/application/use-cases/suggest-spec-dependencies.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["SuggestSpecDependencies", "createSuggestSpecDependencies"]
+    },
+    {
+      "specId": "code-graph:language-adapter",
+      "file": "packages/code-graph/src/composition/use-cases/create-builtin-adapter-registry.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["createBuiltinAdapterRegistry"]
+    },
+    {
+      "specId": "code-graph:language-adapter",
+      "file": "packages/code-graph/src/composition/index.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:fs-spec-repository",
+      "file": "packages/core/src/infrastructure/fs/spec-repository.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["FsSpecRepository"]
+    },
+    {
+      "specId": "sdk:suggest-implementation-links",
+      "file": "packages/sdk/test/application/use-cases/suggest-implementation-links.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "sdk:suggest-spec-dependencies",
+      "file": "packages/sdk/test/application/use-cases/suggest-spec-dependencies.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:language-adapter",
+      "file": "packages/code-graph/test/composition/create-builtin-adapter-registry.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:fs-spec-repository",
+      "file": "packages/core/test/infrastructure/fs/spec-repository.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:spec-implementation",
+      "file": "docs/cli/spec-implementation.md",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:spec-deps",
+      "file": "docs/cli/spec-deps.md",
+      "fileLinkExplicit": true
     }
   ],
   "artifacts": [
@@ -921,7 +1221,7 @@
           "key": "proposal",
           "filename": "proposal.md",
           "state": "complete",
-          "validatedHash": "sha256:021b721e849b3a0e1371f5b042146fc8f033488dbf150c7bf780801db3afc654"
+          "validatedHash": "sha256:156ec9333bb38c6a706f89e501711be7883ca95916cc00f8e6402aaf78c24c0e"
         }
       ]
     },
@@ -935,37 +1235,73 @@
           "key": "cli:spec-implementation",
           "filename": "deltas/cli/spec-implementation/spec.md.delta.yaml",
           "state": "complete",
-          "validatedHash": "sha256:b891ee05d6c9a24c35385fb94a0613ac8968968848899d73402d01d6c3806065"
+          "validatedHash": "sha256:38e6a3f9d24371c582760d812bc66e0ca8a10eb2234d79f85d7c528edfb56d59"
         },
         {
           "key": "cli:spec-deps",
           "filename": "deltas/cli/spec-deps/spec.md.delta.yaml",
           "state": "complete",
-          "validatedHash": "sha256:463060a42bfb1f7b8e28177ea57a20f906157f26958f0414b738c6b6048f1681"
+          "validatedHash": "sha256:072348e3cf52f281bc227fcd0165a470c40fb914f4b6b33ade8dd9084b480cf7"
         },
         {
           "key": "sdk:suggest-implementation-links",
           "filename": "specs/sdk/suggest-implementation-links/spec.md",
           "state": "complete",
-          "validatedHash": "sha256:e98ec4213acacdc08ee72c18aeadf26b5fc8bd3ecf621c98f11fb3d89ada16c3"
+          "validatedHash": "sha256:acd9a1247b0d88db6f05d754d00bf00dd3c2f5419a5ea469e10e0c2f7e450e41"
         },
         {
           "key": "sdk:suggest-spec-dependencies",
           "filename": "specs/sdk/suggest-spec-dependencies/spec.md",
           "state": "complete",
-          "validatedHash": "sha256:7292149d3de74e3746f0032fb9c0d8812b6892f5027325d9b56ed03281cea1b0"
+          "validatedHash": "sha256:264af2fe6d39e8422e80da46c39fdc59a8bad80635a2ae7f46e98ca47a791044"
         },
         {
           "key": "code-graph:language-adapter",
           "filename": "deltas/code-graph/language-adapter/spec.md.delta.yaml",
           "state": "complete",
-          "validatedHash": "sha256:b34b7efe703947d4139f60e25f1b2dfeb69b357ba5ed89f21d6945ce55157288"
+          "validatedHash": "sha256:94f102e6efaf2e7d6fdc4e9047e5ae486ec73b8cadbe23f14fcf0f818cc7f303"
         },
         {
           "key": "code-graph:graph-store",
           "filename": "deltas/code-graph/graph-store/spec.md.delta.yaml",
           "state": "complete",
           "validatedHash": "sha256:11c2d97e0cb74d7b5337b762a3c7765b7f3deec390723827f3d3bcae9b85e48e"
+        },
+        {
+          "key": "core:fs-spec-repository",
+          "filename": "deltas/core/fs-spec-repository/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:ce475d514e591f527702d0f631ec9228677201b9c67c71f04a863c55e27fba2f"
+        },
+        {
+          "key": "core:spec-repository-port",
+          "filename": "deltas/core/spec-repository-port/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:1c26cd0b140862af94928852026bb603d7149d1fe6e2ce75e2d5c00b84e10283"
+        },
+        {
+          "key": "core:create-change",
+          "filename": "deltas/core/create-change/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:b950a894e2d3e0911f97349c96995cc29a474e7299dc6ef2800f13fd134492b8"
+        },
+        {
+          "key": "core:change-repository-port",
+          "filename": "deltas/core/change-repository-port/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:885254b392417c962ba0491b1e3c54e46d62a7fd579f99ef25f6586ab4affda2"
+        },
+        {
+          "key": "core:fs-change-repository",
+          "filename": "deltas/core/fs-change-repository/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:422644b3c965950bdbaf46c1036dc22c30f2ce60b12f3d415b1481dc9ba4438c"
+        },
+        {
+          "key": "sdk:composition",
+          "filename": "deltas/sdk/composition/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:c548003e6e2e0eaf35c0e2d03f8cc53dc2c335a9b602a69aa86a5c9f80e74448"
         }
       ]
     },
@@ -979,37 +1315,73 @@
           "key": "cli:spec-implementation",
           "filename": "deltas/cli/spec-implementation/verify.md.delta.yaml",
           "state": "complete",
-          "validatedHash": "sha256:d165c8781de5ca61864ee1f76617d21f0b4e73ce9fc3ab962458b81f7f261300"
+          "validatedHash": "sha256:3e4441f2f42c3db9ee54bd42898f65a775d2eb2deab16ef8ed5f6dde9f26b0cc"
         },
         {
           "key": "cli:spec-deps",
           "filename": "deltas/cli/spec-deps/verify.md.delta.yaml",
           "state": "complete",
-          "validatedHash": "sha256:0710c85abf1e7c3943416b9c37df388aba8db673b14587f14ac09987b718afae"
+          "validatedHash": "sha256:97002707d06783c77dd33a5c228332fc30dc42d6336dc444e8b41faf9ab8744f"
         },
         {
           "key": "sdk:suggest-implementation-links",
           "filename": "specs/sdk/suggest-implementation-links/verify.md",
           "state": "complete",
-          "validatedHash": "sha256:dc59a2b3428e456fd51f5d3dd60ffb62f2e83cfa2ab2774a25b0d6e609fc8888"
+          "validatedHash": "sha256:c1b061b7c6ef164ea3c35722a606b58c58ba72f17a11284d28087b2e1b3ec020"
         },
         {
           "key": "sdk:suggest-spec-dependencies",
           "filename": "specs/sdk/suggest-spec-dependencies/verify.md",
           "state": "complete",
-          "validatedHash": "sha256:7ea4b3225115f9a0d1e776f01561c3f95e072ef0e3aaf4c011cc87ef53a292a4"
+          "validatedHash": "sha256:fc0ff7be6eb4bb8971650c44af37834ac9d7b21640cd5ea705105a8ff409d13e"
         },
         {
           "key": "code-graph:language-adapter",
           "filename": "deltas/code-graph/language-adapter/verify.md.delta.yaml",
           "state": "complete",
-          "validatedHash": "sha256:ee2c2f860bcde699dc72ba1f5d90f5de14dce37bed0ef726f760e20677d0a035"
+          "validatedHash": "sha256:682caded9bd671b11c02b03a68081ae98edd96550075dd0a540d4a8648b3600d"
         },
         {
           "key": "code-graph:graph-store",
           "filename": "deltas/code-graph/graph-store/verify.md.delta.yaml",
           "state": "complete",
           "validatedHash": "sha256:78304bb5f557c40c5df8e90ea58193c9b4993b033c1c6b01852d9a3f0d988dc2"
+        },
+        {
+          "key": "core:fs-spec-repository",
+          "filename": "deltas/core/fs-spec-repository/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:253d1cbe86a38471117244185c74913ccc0f1851962dbf85018ee5a6ec271444"
+        },
+        {
+          "key": "core:spec-repository-port",
+          "filename": "deltas/core/spec-repository-port/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:4170d7bffe1decafaf6e2bdc836823714b90faf276f859f7e4c638b1754a3e7c"
+        },
+        {
+          "key": "core:create-change",
+          "filename": "deltas/core/create-change/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:6fb60de271a4550200db30a936dc676efd0eb7057bfc5c65a9a278fbbc07c24d"
+        },
+        {
+          "key": "core:change-repository-port",
+          "filename": "deltas/core/change-repository-port/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:03649f63d731f2d4866c6607d49703e158c898a1f6a3f2e3ba77354de67194af"
+        },
+        {
+          "key": "core:fs-change-repository",
+          "filename": "deltas/core/fs-change-repository/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:1fa64dcee37a879b0673d7445f9ac1389809b8704c0186bc0ef670d0d1afa7e3"
+        },
+        {
+          "key": "sdk:composition",
+          "filename": "deltas/sdk/composition/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:e787eff670e69bfdc5fc0ad2c6bff89b728f7136aeae650fa36d7d80e9c7cf2f"
         }
       ]
     },
@@ -1023,7 +1395,7 @@
           "key": "design",
           "filename": "design.md",
           "state": "complete",
-          "validatedHash": "sha256:b07fbbac758d3fc7dc4a161fd159c19c41e9be4337c58ee97ec3ffdf48d65405"
+          "validatedHash": "sha256:b40cfb7f1ea2fdfd1fe97074134a571375448816fed32a646fa7ddf36d40c9e0"
         }
       ]
     },
@@ -1037,7 +1409,7 @@
           "key": "tasks",
           "filename": "tasks.md",
           "state": "complete",
-          "validatedHash": "sha256:278b6b730f5aed3b35cbccb726c1d8d26f9f7f3ef29684fcb5f2cb6b84af412a"
+          "validatedHash": "sha256:c2e2fbace785114463545332c5af8c8d47ede60aad56abf7da0a123ff7679e04"
         }
       ]
     }
@@ -3268,6 +3640,1068 @@
         "name": "specd",
         "email": "system@getspecd.dev",
         "provider": "system"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-24T12:56:28.438Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-24T12:56:29.540Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-24T12:57:51.111Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-24T12:59:13.796Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [sdk:suggest-implementation-links]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["sdk:suggest-implementation-links"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:spec-implementation",
+            "cli:spec-deps",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies",
+            "code-graph:language-adapter",
+            "code-graph:graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-24T12:59:13.796Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-24T14:13:41.364Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-24T14:24:56.554Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:spec-implementation",
+            "cli:spec-deps",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies",
+            "code-graph:language-adapter",
+            "code-graph:graph-store"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:spec-implementation",
+            "cli:spec-deps",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies",
+            "code-graph:language-adapter",
+            "code-graph:graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-08-24T14:24:56.558Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:fs-spec-repository"
+        },
+        {
+          "type": "verify",
+          "key": "core:fs-spec-repository"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-24T14:34:26.142Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:spec-implementation",
+            "cli:spec-deps",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies",
+            "code-graph:language-adapter",
+            "code-graph:graph-store",
+            "core:fs-spec-repository"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:spec-implementation",
+            "cli:spec-deps",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies",
+            "code-graph:language-adapter",
+            "code-graph:graph-store",
+            "core:fs-spec-repository"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-08-24T14:34:26.149Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:spec-repository-port"
+        },
+        {
+          "type": "verify",
+          "key": "core:spec-repository-port"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-24T14:53:37.887Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [core:fs-spec-repository, core:spec-repository-port]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["core:fs-spec-repository", "core:spec-repository-port"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-24T15:06:56.484Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-24T15:06:57.726Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-24T15:41:10.230Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-24T15:54:18.664Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:spec-implementation",
+            "cli:spec-deps",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies",
+            "code-graph:language-adapter",
+            "code-graph:graph-store",
+            "core:fs-spec-repository",
+            "core:spec-repository-port"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:spec-implementation",
+            "cli:spec-deps",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies",
+            "code-graph:language-adapter",
+            "code-graph:graph-store",
+            "core:fs-spec-repository",
+            "core:spec-repository-port"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-24T15:54:18.664Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-24T15:57:22.737Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-24T15:57:24.032Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-24T16:14:38.505Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:spec-implementation",
+            "cli:spec-deps",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies",
+            "code-graph:language-adapter",
+            "code-graph:graph-store",
+            "core:fs-spec-repository",
+            "core:spec-repository-port"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:spec-implementation",
+            "cli:spec-deps",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies",
+            "code-graph:language-adapter",
+            "code-graph:graph-store",
+            "core:fs-spec-repository",
+            "core:spec-repository-port"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-24T16:14:38.505Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-24T16:17:45.200Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-24T16:17:46.418Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-24T16:44:28.988Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-24T17:11:36.064Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:spec-implementation",
+            "cli:spec-deps",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies",
+            "code-graph:language-adapter",
+            "code-graph:graph-store",
+            "core:fs-spec-repository",
+            "core:spec-repository-port"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:spec-implementation",
+            "cli:spec-deps",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies",
+            "code-graph:language-adapter",
+            "code-graph:graph-store",
+            "core:fs-spec-repository",
+            "core:spec-repository-port"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-24T17:11:36.064Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-24T17:23:17.950Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-24T17:29:48.665Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:spec-implementation",
+            "cli:spec-deps",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies",
+            "code-graph:language-adapter",
+            "code-graph:graph-store",
+            "core:fs-spec-repository",
+            "core:spec-repository-port"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:spec-implementation",
+            "cli:spec-deps",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies",
+            "code-graph:language-adapter",
+            "code-graph:graph-store",
+            "core:fs-spec-repository",
+            "core:spec-repository-port"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-08-24T17:29:48.670Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:create-change"
+        },
+        {
+          "type": "verify",
+          "key": "core:create-change"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-24T17:31:00.178Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:spec-implementation",
+            "cli:spec-deps",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies",
+            "code-graph:language-adapter",
+            "code-graph:graph-store",
+            "core:fs-spec-repository",
+            "core:spec-repository-port",
+            "core:create-change"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:spec-implementation",
+            "cli:spec-deps",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies",
+            "code-graph:language-adapter",
+            "code-graph:graph-store",
+            "core:fs-spec-repository",
+            "core:spec-repository-port",
+            "core:create-change"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-08-24T17:31:00.187Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:change-repository-port"
+        },
+        {
+          "type": "verify",
+          "key": "core:change-repository-port"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-24T17:31:04.734Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:spec-implementation",
+            "cli:spec-deps",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies",
+            "code-graph:language-adapter",
+            "code-graph:graph-store",
+            "core:fs-spec-repository",
+            "core:spec-repository-port",
+            "core:create-change",
+            "core:change-repository-port"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:spec-implementation",
+            "cli:spec-deps",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies",
+            "code-graph:language-adapter",
+            "code-graph:graph-store",
+            "core:fs-spec-repository",
+            "core:spec-repository-port",
+            "core:create-change",
+            "core:change-repository-port"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-08-24T17:31:04.742Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:fs-change-repository"
+        },
+        {
+          "type": "verify",
+          "key": "core:fs-change-repository"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-24T17:31:08.445Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:spec-implementation",
+            "cli:spec-deps",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies",
+            "code-graph:language-adapter",
+            "code-graph:graph-store",
+            "core:fs-spec-repository",
+            "core:spec-repository-port",
+            "core:create-change",
+            "core:change-repository-port",
+            "core:fs-change-repository"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:spec-implementation",
+            "cli:spec-deps",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies",
+            "code-graph:language-adapter",
+            "code-graph:graph-store",
+            "core:fs-spec-repository",
+            "core:spec-repository-port",
+            "core:create-change",
+            "core:change-repository-port",
+            "core:fs-change-repository"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-08-24T17:31:08.451Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "sdk:composition"
+        },
+        {
+          "type": "verify",
+          "key": "sdk:composition"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-24T17:44:42.334Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-24T17:46:30.769Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-24T18:21:09.799Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-24T18:30:09.044Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:spec-implementation",
+            "cli:spec-deps",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies",
+            "code-graph:language-adapter",
+            "code-graph:graph-store",
+            "core:fs-spec-repository",
+            "core:spec-repository-port",
+            "core:create-change",
+            "core:change-repository-port",
+            "core:fs-change-repository",
+            "sdk:composition"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:spec-implementation",
+            "cli:spec-deps",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies",
+            "code-graph:language-adapter",
+            "code-graph:graph-store",
+            "core:fs-spec-repository",
+            "core:spec-repository-port",
+            "core:create-change",
+            "core:change-repository-port",
+            "core:fs-change-repository",
+            "sdk:composition"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-24T18:30:09.044Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-24T18:32:01.492Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-24T18:40:10.239Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-24T18:41:14.637Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-24T19:15:33.166Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-24T19:43:34.615Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "cli:spec-implementation",
+            "cli:spec-deps",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies",
+            "code-graph:language-adapter",
+            "code-graph:graph-store",
+            "core:fs-spec-repository",
+            "core:spec-repository-port",
+            "core:create-change",
+            "core:change-repository-port",
+            "core:fs-change-repository",
+            "sdk:composition"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:spec-implementation",
+            "cli:spec-deps",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies",
+            "code-graph:language-adapter",
+            "code-graph:graph-store",
+            "core:fs-spec-repository",
+            "core:spec-repository-port",
+            "core:create-change",
+            "core:change-repository-port",
+            "core:fs-change-repository",
+            "sdk:composition"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-24T19:43:34.615Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
       },
       "from": "verifying",
       "to": "designing"

@@ -18,11 +18,13 @@ specd specs implementation suggest [<specPath>] [--spec <id>...] [--all] [--work
 - `remove` with `symbols` drops only those names; without `symbols`, removes the whole entry.
 - `suggest` performs static analysis and Code Graph symbol correlation to deduce candidate implementation files and AST symbols.
 - `suggest --apply` performs an additive set union, updating `spec-lock.json` without overriding or deleting existing confirmed links.
+- `suggest` marks every candidate with `alreadyIncluded` and emits `result`, `specs`, `existing`, and ranked `suggestions` in JSON/TOON formats; machine formats never prompt.
 - Missing lock: `add` creates incidental state; `remove` is a no-op.
 
 ## Errors
 
-| Error                                  | Cause                            |
-| -------------------------------------- | -------------------------------- |
-| `ImplementationFileNotFoundError`      | File missing on disk             |
-| `ImplementationWorkspaceBoundaryError` | File outside workspace code root |
+| Error                                  | Cause                                            |
+| -------------------------------------- | ------------------------------------------------ |
+| `ImplementationFileNotFoundError`      | File missing on disk                             |
+| `ImplementationWorkspaceBoundaryError` | File outside workspace code root                 |
+| `InvalidInputError`                    | Missing target, cache, or required file observer |

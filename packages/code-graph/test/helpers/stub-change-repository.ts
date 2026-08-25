@@ -88,6 +88,12 @@ export class StubChangeRepository extends ChangeRepository {
 
   async create(_change: Change): Promise<void> {}
 
+  async readExploration(_change: Change): Promise<string | null> {
+    return null
+  }
+
+  async writeExploration(_change: Change, _content: string): Promise<void> {}
+
   async delete(_change: Change): Promise<void> {}
 
   async artifact(_change: Change, _filename: string): Promise<SpecArtifact | null> {

@@ -12,6 +12,8 @@ export interface ImplementationSuggestionArtifactStamp {
 export interface ImplementationSuggestionSpecStamp {
   readonly lastModified: string
   readonly hash: string
+  /** Byte length of the main artifact from the same stat as `lastModified`, when the adapter exposes cheap metadata. Enables the size/mtime pre-filter. */
+  readonly size?: number
   readonly artifacts: readonly ImplementationSuggestionArtifactStamp[]
 }
 

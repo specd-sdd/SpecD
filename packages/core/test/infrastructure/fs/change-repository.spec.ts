@@ -137,6 +137,37 @@ describe('FsChangeRepository', () => {
       await expect(ctx.repo.create(duplicate)).rejects.toBeInstanceOf(ChangeAlreadyExistsError)
     })
 
+    it('persists exploration lazily and exposes metadata without content', async () => {
+      const change = makeChange('explored-change')
+      await ctx.repo.create(change, { explorationContent: '# Discovery' })
+
+      const loaded = await ctx.repo.get(change.name)
+      expect(loaded?.explorationMeta).toMatchObject({ size: Buffer.byteLength('# Discovery') })
+      expect(loaded).not.toHaveProperty('explorationContent')
+      await expect(ctx.repo.readExploration(change)).resolves.toBe('# Discovery')
+    })
+
+    it('does not create exploration when initial content is absent or empty', async () => {
+      const absent = makeChange('no-exploration')
+      const empty = makeChange('empty-exploration')
+      await ctx.repo.create(absent)
+      await ctx.repo.create(empty, { explorationContent: '' })
+
+      await expect(ctx.repo.readExploration(absent)).resolves.toBeNull()
+      await expect(ctx.repo.readExploration(empty)).resolves.toBeNull()
+      expect((await ctx.repo.get(absent.name))?.explorationMeta).toBeNull()
+    })
+
+    it('cleans up first-create state when exploration persistence fails', async () => {
+      const change = makeChange('broken-exploration')
+      vi.spyOn(ctx.repo, 'writeExploration').mockRejectedValueOnce(new Error('disk full'))
+
+      await expect(ctx.repo.create(change, { explorationContent: '# Discovery' })).rejects.toThrow(
+        'disk full',
+      )
+      await expect(ctx.repo.get(change.name)).resolves.toBeNull()
+    })
+
     it('given a new change, when create is called, then only the manifest is written (no artifact content)', async () => {
       const change = makeChange('add-auth', new Date('2024-03-15T10:00:00.000Z'))
       await ctx.repo.create(change)

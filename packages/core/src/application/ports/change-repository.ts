@@ -28,6 +28,17 @@ export interface MutateResult<T> {
   readonly change: Change
 }
 
+/** Cheap observation metadata for optional change exploration content. */
+export interface ExplorationMeta {
+  readonly lastModified: string
+  readonly size: number
+}
+
+/** Optional semantic data persisted with a change on first create. */
+export interface CreateChangeStorageOptions {
+  readonly explorationContent?: string
+}
+
 /** Options for listing active changes. */
 export interface ActiveChangeListOptions extends ListOptions {
   readonly includeDescription?: boolean
@@ -220,7 +231,13 @@ export abstract class ChangeRepository extends Repository {
    * @param change - The new change to persist
    * @throws {ChangeAlreadyExistsError} When the name collides across buckets
    */
-  abstract create(change: Change): Promise<void>
+  abstract create(change: Change, options?: CreateChangeStorageOptions): Promise<void>
+
+  /** Loads optional exploration content explicitly, without coupling callers to storage layout. */
+  abstract readExploration(change: Change): Promise<string | null>
+
+  /** Persists non-empty exploration content using the adapter's native representation. */
+  abstract writeExploration(change: Change, content: string): Promise<void>
 
   /**
    * Deletes the entire change directory and all its contents.

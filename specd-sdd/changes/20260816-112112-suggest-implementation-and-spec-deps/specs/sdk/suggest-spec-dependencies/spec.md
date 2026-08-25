@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Maintaining canonical inter-spec `dependsOn` locks in `spec-lock.json` ensures full traceability across workspace capabilities. `SuggestSpecDependencies` is an orchestration use case in `@specd/sdk` that automatically deduces inter-spec dependencies by analyzing code import graphs and barrel re-exports, validating post-apply spec health, and conditionally orchestrating requirement alignment changes.
+Maintaining canonical inter-spec `dependsOn` locks in `spec-lock.json` ensures full traceability across workspace capabilities. `SuggestSpecDependencies` is an application use case in `@specd/sdk` that automatically deduces inter-spec dependencies by analyzing code import graphs and barrel re-exports, validating post-apply spec health, and conditionally requesting requirement-alignment changes through Core ports.
 
 ## Requirements
 
@@ -38,7 +38,7 @@ The input interface MUST support:
    - Leverages `ImplementationSuggestionCachePort.findSpecByFile()` to resolve any relative production source file or barrel re-export to its owning `specId` in $O(1)$ without ad-hoc loops or manual hub filtering in the use case.
    - Initializes `SpecDepsSuggestionCachePort` (defaulting to `FsSpecDepsSuggestionCache` persisting under `.specd/tmp/fs-cache/spec-deps-suggestions/suggestions.json`).
 2. **Pass 2 (AST Import Traversal, Directional Validation & Transitive Reduction)**:
-   - Evaluates cached-entry freshness through `SpecDepsSuggestionCachePort.get()` (header `cacheVersion === '1.1.0'` is enforced when the cache file loads; per-entry graph-fingerprint and target-spec stamp validation happens inside `get()`). On cache HIT (and when `rebuildCache` is false), serves cached suggested dependencies directly.
+   - Evaluates cached-entry freshness through `SpecDepsSuggestionCachePort.get()` (header `cacheVersion === '1.1.0'` is enforced when the cache file loads; per-entry validation inside `get()` applies the same three-stage identity check as the implementation cache — cheap size/mtime pre-filter, then content-hash precedence, then timestamp fallback). On cache HIT (and when `rebuildCache` is false), serves cached suggested dependencies directly.
    - Additionally validates the cached entry's `fileToSpecFingerprint` against a fingerprint of the current global implementation file-to-spec map (computed after warm-up). When both values are present and differ — e.g. an imported file changed owner between runs without touching the target spec stamp or graph fingerprint — the entry is treated as a MISS and suggestions are recomputed.
    - On cache miss, evaluates `import` statements in target spec implementation files (retrieved via `SpecRepository` and `SuggestImplementationLinks`).
    - Runs `analyzeFileImpact` (`maxDepth = 1`) via `code-graph:traversal` to trace direct import relationships using workspace-normalized relative paths.
@@ -52,28 +52,26 @@ The input interface MUST support:
    - Retains all non-pruned detected code import relationships in `suggestedDependsOn`, tagging each item with `status: 'already-configured' | 'new'` and `alreadyIncluded: boolean` so dependencies already present in `existingDependsOn` are explicitly rendered with `[already included]` tags in CLI output.
    - Persists computed spec dependency suggestions to `SpecDepsSuggestionCachePort` with header `cacheVersion: '1.1.0'`, storing the file-to-spec map fingerprint as `fileToSpecFingerprint` on each entry.
 3. **Pass 3 (Mutation, Post-Apply Validation & Conditional Change Creation)**:
+   - Before any mutation, requires a `ValidateSpecs` dependency and, when `createAlignmentChange: true`, a `CreateChange` dependency. Missing required dependencies MUST raise `InvalidInputError` before `UpdatePersistedSpecDeps` is called.
    - When `apply: true` is set, unions ONLY NEW dependency spec IDs (`alreadyIncluded === false`) into `spec-lock.json` via `UpdatePersistedSpecDeps`.
-   - Runs `ValidateSpecs` (`kernel.specs.validate`).
+   - Always runs `ValidateSpecs` (`kernel.specs.validate`) after mutation; validation is not an optional post-apply collaborator. It MUST interpret the canonical result `{ entries, totalSpecs, passed, failed }`: each entry with `passed: false` is invalid, and its `failures` and `warnings` provide the diagnostic detail. The use case MUST NOT depend on an `issues` property or synthesize validity from a non-contract field.
    - If invalid specs exist (`status: "invalid-specs-detected"`) AND `createAlignmentChange: true` is authorized:
      - Creates a single alignment change gathering ALL failing specs: `align-spec-deps-<timestamp>`.
-     - Writes `<changePath>/.specd-exploration.md` detailing exact schema validation failures `[artifactId: description]`.
-   - If `createAlignmentChange: true` is set but no `CreateChange` dependency is injected, `execute()` MUST throw `InvalidInputError` instead of silently ignoring the flag.
-   - If `ValidateSpecs` itself throws, post-apply validation degrades gracefully to `status: "all-valid"` (fail-open) so a broken validator never blocks apply; the thrown error is logged at debug level.
+     - Passes the formatted schema validation failures (`[artifactId: description]`) as optional `explorationContent` to `CreateChange.execute`; it MUST NOT write a repository path or exploration file directly.
+   - If `ValidateSpecs` itself throws, the failure MUST remain observable to the caller and MUST NOT be converted to `{ status: "all-valid", invalidSpecs: [] }`. A validator failure cannot prove that mutated specs are valid.
    - If all specs are valid (`status: "all-valid"`), NO alignment change is created under any circumstances.
 
-### Requirement: Standard Factory & Composition Overloads
+### Requirement: Dependency-injected factory
 
-`SuggestSpecDependencies` MUST provide 3 factory overload signatures:
+The application module MUST provide the canonical dependency-injected factory:
 
 - `createSuggestSpecDependencies(deps: SuggestSpecDependenciesDeps): SuggestSpecDependencies`
-- `createSuggestSpecDependencies(config: SpecdConfig, options?: CompositionResolutionOptions): SuggestSpecDependencies`
-- `createSuggestSpecDependencies(depsOrConfig: SuggestSpecDependenciesDeps | SpecdConfig, options?: CompositionResolutionOptions): SuggestSpecDependencies`
 
-And a dependency resolution helper `resolveSuggestSpecDependenciesDeps(resolver: CompositionResolver): SuggestSpecDependenciesDeps`.
+Config-based overloads and concrete dependency resolution belong to `sdk:composition` and MUST delegate to this canonical factory.
 
 ## Constraints
 
-- Operates through `SpecRepository` and core application ports for spec and lock data access. Alignment change scaffolding (directory creation and `.specd-exploration.md` file writing) is permitted as a lightweight infrastructure concern within the orchestration layer.
+- Operates exclusively through `SpecRepository`, cache ports, and core application use cases for spec, lock, validation, and change data access. The application module MUST NOT import `node:fs`, filesystem repositories, filesystem caches, or repository path conventions.
 - Never creates an alignment change if post-apply validation returns `status: "all-valid"`.
 
 ## Spec Dependencies
@@ -82,3 +80,4 @@ And a dependency resolution helper `resolveSuggestSpecDependenciesDeps(resolver:
 - [`code-graph:traversal`](../../code-graph/traversal/spec.md) — impact and import graph traversal
 - [`core:get-persisted-spec-deps`](../../core/get-persisted-spec-deps/spec.md) — query persisted dependencies
 - [`core:update-persisted-spec-deps`](../../core/update-persisted-spec-deps/spec.md) — mutate persisted dependencies
+- [`core:create-change`](../../core/create-change/spec.md) — create an optional alignment change and supply its exploration content

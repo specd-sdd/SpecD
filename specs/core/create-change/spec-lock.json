@@ -18,36 +18,36 @@
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "CreateChange: unique named Change, actor+created event, schema resolve, optional overlap, scaffold.",
+      "value": "Creates unique, provenance-recorded changes with schema resolution, dependency seeding, scaffolding, and optional overlap detection.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:b541a78c736528e7150ff05fcabeec43f202755f085c87520fb23026c7510d58",
-          "lastModified": "2026-07-06T14:22:54.156Z"
+          "hash": "sha256:ac69280f43c876e95436af994dd3ed39bafa981116910b20b724a1119cfbf12c",
+          "lastModified": "2026-08-17T09:55:42.018Z"
         },
         "verify.md": {
-          "hash": "sha256:1a322f8c983feb54906e6a6a3f9b66cae036b9e4b0bdf15205dd13d6c1a45dbb",
-          "lastModified": "2026-07-06T14:22:54.157Z"
+          "hash": "sha256:4336aab73268a58e71123804ef223910233099a4d2a3dae50b77361c438a9f1d",
+          "lastModified": "2026-08-17T09:55:42.018Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# CreateChange\n\n## Rules\n- Input: `name` (kebab slug), optional `description`, `specIds`, optional `schemaName`+`schemaVersion` (both or neither), optional `invalidationPolicy` (`none|surgical|downstream|global`), optional `includeOverlapCheck`.\n- Both schema fields absent → `GetActiveSchema.execute()` → `name()`/`version()`. One only → validation error. Errors from GetActiveSchema propagate.\n- `includeOverlapCheck` + non-empty `specIds` → after persist/scaffold `DetectOverlap.execute({ name })`; success → `overlapReport`; throw → omit, creation still succeeds. Else no DetectOverlap.\n- Name exists → `ChangeAlreadyExistsError`. Actor via `ActorResolver` on `created` event.\n- History: exactly one `created` (`type`, `at`, `by`, `specIds`, `schemaName`, `schemaVersion`). `createdAt` same Date as event `at`.\n- Seed `specDependsOn`: `readPersistedDependsOn` → else `metadata.json.dependsOn` → else `[]`; skip non-existent specs.\n- Persist `ChangeRepository.save` → `scaffold(change, specExists)` via `ListWorkspaces`. Result: `{ change, changePath, overlapReport? }`.\n- Deps: ChangeRepository, ListWorkspaces, ActorResolver, GetActiveSchema, DetectOverlap. Config factory via `resolveCreateChangeDeps` only.\n\n## Constraints\n- No state transitions (starts drafting). Scaffold dirs only — no artifact file R/W. Same Date for createdAt + event.",
+      "value": "# CreateChange\n\n## Rules\n- `CreateChangeInput`: required `name` kebab-case slug, `specIds`; optional `description`, paired `schemaName`+`schemaVersion`, `invalidationPolicy` (`none|surgical|downstream|global`), `includeOverlapCheck`.\n- Both schema fields absent: call `GetActiveSchema.execute()`; use `schema.name()` and `schema.version()`. Both present: use directly, no call. Only one: validation error before persistence. Propagate schema errors unchanged.\n- Reject existing name with `ChangeAlreadyExistsError`. Resolve actor through `ActorResolver` before construction.\n- Construct `Change` with same `Date` for `createdAt` and sole initial `created` event; event records actor, `specIds`, effective schema name/version. Include description only when supplied.\n- Seed `specDependsOn` for existing specs: `readPersistedDependsOn(spec)`; else canonical `metadata.json.dependsOn`; else `[]`. Skip non-existent specs. Use `ListWorkspaces` repositories.\n- Persist via `ChangeRepository.create`; scaffold via `ChangeRepository.scaffold(change, specExists)`; derive `changePath` via `ChangeRepository.changePath(change)`.\n- If `includeOverlapCheck === true` and `specIds` non-empty, after persistence/scaffolding call `DetectOverlap.execute({ name: input.name })`; include successful `overlapReport`; swallow failure and omit report. Otherwise never call.\n- Return `{ change, changePath, overlapReport? }`.\n- Dependencies: `ChangeRepository`, `ListWorkspaces`, `ActorResolver`, `GetActiveSchema`, `DetectOverlap`.\n- Config `createCreateChange(config, options?)` must call `resolveCreateChangeDeps(resolver)`, then canonical `createCreateChange(deps)`. Resolver obtains `changes`, `listWorkspaces`, `actor`, `getActiveSchema`, `detectOverlap`; no inline fs wiring.\n\n## Constraints\n- No state transitions; new change remains drafting.\n- No artifact file reads/writes; scaffold directories only.\n- `createdAt` and created-event `at` use identical `Date` instance.\n",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:b541a78c736528e7150ff05fcabeec43f202755f085c87520fb23026c7510d58",
-          "lastModified": "2026-07-06T14:22:54.156Z"
+          "hash": "sha256:ac69280f43c876e95436af994dd3ed39bafa981116910b20b724a1119cfbf12c",
+          "lastModified": "2026-08-17T09:55:42.018Z"
         },
         "verify.md": {
-          "hash": "sha256:1a322f8c983feb54906e6a6a3f9b66cae036b9e4b0bdf15205dd13d6c1a45dbb",
-          "lastModified": "2026-07-06T14:22:54.157Z"
+          "hash": "sha256:4336aab73268a58e71123804ef223910233099a4d2a3dae50b77361c438a9f1d",
+          "lastModified": "2026-08-17T09:55:42.018Z"
         }
       }
     }

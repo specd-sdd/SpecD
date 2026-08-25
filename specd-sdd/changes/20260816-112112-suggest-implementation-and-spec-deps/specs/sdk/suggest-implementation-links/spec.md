@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Correlating specifications with their implementation files and exported symbols is a critical step in spec-driven development. `SuggestImplementationLinks` is an orchestration use case in `@specd/sdk` that deduces suggested implementation files and AST symbols for workspace specifications without requiring manual entry or LLM tokens, leveraging AST code block parsing from spec requirements, naming derivatives, and symbol search in `code-graph`.
+Correlating specifications with their implementation files and exported symbols is a critical step in spec-driven development. `SuggestImplementationLinks` is an application use case in `@specd/sdk` that deduces suggested implementation files and AST symbols for workspace specifications without requiring manual entry or LLM tokens, leveraging AST code block parsing from spec requirements, naming derivatives, and symbol search in `code-graph`.
 
 ## Requirements
 
@@ -35,26 +35,30 @@ The input interface MUST support:
 
 1. **Tier 1 (AST Symbol & Direct Naming Derivatives)**:
    - Queries `SpecRepository.list({ includeMeta: true })` across target workspaces.
-   - Evaluates 2-stage cache staleness (`lastModified` -> `hash` fallback) against `ImplementationSuggestionCachePort` (defaulting to `FsImplementationSuggestionCache` persisting under `configPath/tmp/fs-cache/implementation-suggestions/suggestions.json`) using domain-specific cache interfaces (`ImplementationSuggestionCacheHeader`, `ImplementationSuggestionSpecStamp`, `ImplementationSuggestionSpecEntry`).
+   - Evaluates cache staleness against `ImplementationSuggestionCachePort` (defaulting to `FsImplementationSuggestionCache` persisting under `configPath/tmp/fs-cache/implementation-suggestions/suggestions.json`) with a three-stage identity check that avoids paying for content hashes in the common case:
+     1. **Cheap size/mtime pre-filter**: when the cached stamp carries `size` and the current artifact observation exposes `size`, equal `lastModified` + equal `size` is FRESH without computing any hash; a differing `size` is STALE (byte-length difference proves content change).
+     2. **Content-hash precedence**: when the pre-filter cannot decide (mtime drifted with equal size) or no `size` is available, both usable hashes are compared — mismatch is stale, match is fresh, regardless of `lastModified`.
+     3. **Timestamp fallback**: only when neither side provides a usable hash does `lastModified` decide, as before.
+   - Uses domain-specific cache interfaces (`ImplementationSuggestionCacheHeader`, `ImplementationSuggestionSpecStamp`, `ImplementationSuggestionSpecEntry`).
    - Reads `spec.md` artifacts via `SpecRepository` for cache misses.
    - Extracts explicit symbol identifiers from spec metadata (`GetSpecMetadata` title with fallbacks to `readMetadataSnapshot` and Markdown H1 title), AST code blocks, and backticked terms matching generic code identifier patterns (PascalCase, camelCase with internal uppercase, function invocation syntax `fn()`, dot notation `Obj.method`), ignoring reserved language keywords and universal grammar stop-words (`SPEC_PROSE_KEYWORDS`).
    - Derives naming convention file path candidates from capability names.
-   - Validates candidate file existence on disk (`existsSync`) before outputting suggestions.
+   - Validates candidate file existence through an injected file-observation dependency before outputting suggestions.
    - Evaluates **Path & Spec Token Affinity (`computePathSpecAffinity`)**:
      - Normalizes spec capability segments and candidate file paths with token splitting `[\/\\_\-.:]+` and plural stemming (`length > 2 && !endsWith('ss')`).
      - Computes token coverage. If candidate file path is missing distinctive spec tokens, assigns a per-token score penalty (`missingTokens.length * 150`, i.e. `-150` per missing token) and records `missing-distinctive-tokens` in reasons. Candidates carrying `missing-distinctive-tokens` are excluded from `HIGH` confidence regardless of their final score.
    - Queries `code-graph` (`SymbolNode` search scoped directly to target workspace via `workspace` property on `SymbolQuery`).
    - Filters out variable symbol kinds (`SymbolKind.Variable`) and evaluates `parentId` relationships to preserve top-level parent class/interface symbols while sieving out loose child method matches in unrelated files.
    - Distinguishes compound identifiers from single-word PascalCase terms (`isCompoundIdentifier`), restricting single-word PascalCase candidate matches exclusively to candidate files that declare that term as their primary top-level entity (`parentId === undefined`).
-   - Differentiates **Exact Primary Symbol Match** (+200 points) from **Derivative Symbol Match** (+50 points).
+   - Differentiates **Exact Primary Symbol Match** (+200 points, reason exactly `exact-primary-symbol-match`) from **Derivative Symbol Match** (+50 points).
    - Discards candidate files that do not declare any symbol matching the spec title (or compound/all title tokens).
    - Assigns a confidence level (`HIGH` >= 150 with clean affinity, `MEDIUM` 80–149, `LOW` < 80) and numeric score to each candidate.
-   - Tier 2 refines and extends the Tier 1 candidate set (it does not short-circuit it): hierarchical-domain candidates compete in the same ranked list by score/confidence.
+   - Tier 2 refines and extends the Tier 1 candidate set: hierarchical-domain candidates compete in the same ranked list by score/confidence. Completion of Tier 2 ends the cascade only when the combined Tier 1/Tier 2 set is non-empty; it does not discard or bypass Tier 1 candidates.
 2. **Tier 2 (Hierarchical Domain Prefix Derivation & Sub-token Content Match)**:
    - For multi-segment capability slugs (e.g. `schema-which-command`), derives parent domain candidates across standard source folders (e.g. `src/commands/schema.ts`, `src/application/schema.ts`).
    - Verifies whether missing distinctive sub-tokens (e.g. `which`) exist inside candidate file content via disk inspection and SQLite FTS5 search in `code-graph`.
    - Assigns `subtoken-content-match` bonus (+160 points) and associates top-level exported AST symbols from the matched domain container.
-   - If Tier 2 produces matching candidates, the algorithm short-circuits and returns.
+   - If the combined Tier 1/Tier 2 set contains matching candidates after Tier 2, the algorithm returns that ranked set and does not invoke Tier 3.
 3. **Tier 3 (Fallback Syntax Tag & Requirement Keyword Co-occurrence Search)**:
    - Triggered **only when Tiers 1 and 2 yield zero candidate suggestions**.
    - Extracts distinctive syntax tags (e.g. `<rules>`, `<template>`) and keywords from Requirement headings in `spec.md`.
@@ -69,20 +73,18 @@ Each `ImplementationSuggestionEntry` in the result MUST include an `alreadyInclu
 
 When `apply: true` is passed, `SuggestImplementationLinks` MUST perform a set union merging new discovered files and symbols into `spec-lock.json` via `UpdatePersistedSpecImplementation`, preserving all existing confirmed links. Suggestions with `alreadyIncluded: true` MUST be skipped during mutation.
 
-### Requirement: Standard Factory & Composition Overloads
+### Requirement: Dependency-injected factory
 
-`SuggestImplementationLinks` MUST provide 3 factory overload signatures:
+The application module MUST provide the canonical dependency-injected factory:
 
 - `createSuggestImplementationLinks(deps: SuggestImplementationLinksDeps): SuggestImplementationLinks`
-- `createSuggestImplementationLinks(config: SpecdConfig, options?: CompositionResolutionOptions): SuggestImplementationLinks`
-- `createSuggestImplementationLinks(depsOrConfig: SuggestImplementationLinksDeps | SpecdConfig, options?: CompositionResolutionOptions): SuggestImplementationLinks`
 
-And a dependency resolution helper `resolveSuggestImplementationLinksDeps(resolver: CompositionResolver): SuggestImplementationLinksDeps`.
+Config-based overloads and concrete dependency resolution belong to `sdk:composition` and MUST delegate to this canonical factory.
 
 ## Constraints
 
-- Operates through `SpecRepository` and core application ports for spec and lock data access. Candidate file existence validation (`existsSync`) is permitted as a lightweight infrastructure concern within the orchestration layer.
-- Caching is abstracted via `ImplementationSuggestionCachePort`, with `FsImplementationSuggestionCache` persisting under `configPath/tmp/fs-cache/implementation-suggestions/suggestions.json` (defaults to `.specd/tmp/fs-cache/implementation-suggestions/suggestions.json`).
+- Operates exclusively through `SpecRepository`, `ImplementationSuggestionCachePort`, a required injected file-observation port, and core application ports. The application module MUST NOT import `node:fs`, filesystem repositories, filesystem caches, or config-path conventions. Composition MUST provide the observer explicitly; the use case MUST NOT install a permissive fallback that assumes files exist.
+- Caching is abstracted via `ImplementationSuggestionCachePort`; selection and construction of `FsImplementationSuggestionCache` belongs to `sdk:composition`.
 
 ## Spec Dependencies
 

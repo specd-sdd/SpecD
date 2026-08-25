@@ -6,9 +6,9 @@
   content: |
     ### Requirement: Built-in Adapter Registry Composition Factory & Keyword Discovery
 
-    `createBuiltinAdapterRegistry` SHALL be a standalone composition factory in `@specd/code-graph` exposed at `create-builtin-adapter-registry.ts` and re-exported in composition entrypoints.
+    `createBuiltinAdapterRegistry` SHALL be a standalone composition factory in `@specd/code-graph` exposed at `create-builtin-adapter-registry.ts` and re-exported from `src/composition/index.ts` and the curated package entrypoint.
 
-    It SHALL instantiate an `AdapterRegistry` pre-populated with built-in language adapters (`TypeScriptLanguageAdapter`, `PythonLanguageAdapter`, `GoLanguageAdapter`, `PhpLanguageAdapter`) and register any optional custom `LanguageAdapter` instances provided.
+    It SHALL instantiate an `AdapterRegistry` pre-populated with built-in language adapters (`TypeScriptLanguageAdapter`, `PythonLanguageAdapter`, `GoLanguageAdapter`, `PhpLanguageAdapter`) and register any optional custom `LanguageAdapter` instances provided, but every public overload MUST return `AdapterRegistryPort` rather than the concrete `AdapterRegistry` implementation.
 
     The composition factory MUST support standard overload signatures (`extraAdapters?: readonly LanguageAdapter[]` and `config: SpecdConfig`).
 

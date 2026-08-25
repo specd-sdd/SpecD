@@ -25,5 +25,41 @@
       "file": "core:src/infrastructure/fs/fs-spec-index-cache.ts",
       "symbols": ["FsSpecIndexCache"]
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Filesystem SpecRepository with strict config validation, indexed projections, atomic state persistence, metadata observations, and fingerprints.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:490366fad29e1abe2bd739a6c047772336fb23e622ba2a4e757f09d9c8451769",
+          "lastModified": "2026-08-17T09:55:42.030Z"
+        },
+        "verify.md": {
+          "hash": "sha256:9b65fc846934308d205ba08aa3f18b3a55e15665c05e677364a979287d94bc9b",
+          "lastModified": "2026-08-17T09:55:42.030Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# FsSpecRepository\n\n## Rules\n\n- Constructor accepts `context: SpecRepositoryConfig` plus `config: FsSpecRepositoryConfig`; validate only `config` via Zod with `path: string`, `metadataPath: string`. Require both physical directories; otherwise throw `StorageDirectoryNotFoundError`.\n- `createFsSpecStorageFactory(): SpecStorageFactory`; `create(context, config)` forwards arguments unchanged into `FsSpecRepository`.\n- Delegate `list`, `count`, `reindex`, invalidation to `FsSpecIndexCache` at `{configPath}/tmp/fs-cache/specs/<workspace>/`; never directly access `.specd-index.jsonl` or `.specd-index-meta.json`. Sort capability paths lexicographically ascending. Use shared mutate/lock, atomic publish, invalidation, then `sourceFiles` mtime freshness; no TTL or `generatedAt`-only freshness.\n- Index full CLI-ready `SpecListEntry`: always `workspace`, `path`, `title`; title = trimmed non-empty metadata title, else final path segment. Cache `summary` per `core:spec-repository-port` / `core:list-specs`; determine `spec.md` presence through `Spec.artifacts`. Cache Meta lastModified observations from existing `sourceFiles`; never enrich index wire solely for Meta. Swallow per-spec title/summary/Meta errors and retain fallback entry. `includeSummary` / `includeMeta` project cache only, with no list-time reads; Meta never includes `hash`; `includeMetadataStatus` forbidden. Relevant create/delete/publish/content/metadata/lock mutations upsert or invalidate bucket.\n- `get()` populates stamps without content reads: present schema artifacts become `SpecArtifactEntry { filename, lastModified }` from `stat` mtime ISO-8601; lock and generated metadata stamps use `{ present, lastModified }`, absent as `{ present: false, lastModified: null }`. Content belongs to `artifact()`, `readMetadataSnapshot()`, `persistedStateMeta(..., { includeHash: true })`, `specFingerprint()`.\n- `readPersistedState(spec)` / `writePersistedState(spec, state, options)` use `spec-lock.json` and canonical writer shared with staged `publish()`: validate complete `PersistedSpecState`, stable deterministic JSON, existing atomic writer, hashes from exact serialized bytes. Persist state exactly; no schema selection, dependency extraction, patches, defaults, or legacy `unknown` schema. Missing lock reads `null`. `expectedRevision: null` requires absence; value must match current hash; mismatch raises repository conflict. Success returns `PersistedSpecStateSnapshot`. Both methods throw `ReadOnlyWorkspaceError` before I/O for read-only ownership.\n- `readMetadataSnapshot(spec)` returns missing `{ kind: \"missing\", revision: null }`, invalid `{ kind: \"invalid\", revision, error }`, or present `{ kind: \"present\", metadata, revision }`; never freshness. `writeMetadataSnapshot` may use raw-byte SHA-256 revision; enforce expected revision absence/match and conflict on mismatch. It bypasses authored-source ownership guard, allowing read-only workspace metadata cache writes. `artifactMeta` reuses existing artifact stat/hash path.\n- `persistedStateMeta` and `generatedMetadataMeta`: `lastModified` from `stat`, SHA-256 exact-byte `hash` only with `includeHash === true`, `null` if absent. No `persistedStateHash(spec)`.\n- `artifactMeta(spec, filename, options?)` reuses artifact stat/hash implementation; hash only with `includeHash === true`.\n- `specFingerprint(spec)`: alphabetically ordered filename-bound artifact content hashes + persisted-state hash (or absent sentinel), then hash; exclude generated metadata.\n- Never own/write `{configPath}/tmp/fs-cache/validate-specs/<workspace>/`; belongs to `ValidationResultCache` FS adapter.\n\n## Constraints\n\n- Infrastructure-level; lives in `infrastructure/fs/`.\n- Implements `SpecRepository` abstract port.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:490366fad29e1abe2bd739a6c047772336fb23e622ba2a4e757f09d9c8451769",
+          "lastModified": "2026-08-17T09:55:42.030Z"
+        },
+        "verify.md": {
+          "hash": "sha256:9b65fc846934308d205ba08aa3f18b3a55e15665c05e677364a979287d94bc9b",
+          "lastModified": "2026-08-17T09:55:42.030Z"
+        }
+      }
+    }
+  }
 }

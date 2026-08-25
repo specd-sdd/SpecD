@@ -1,9 +1,11 @@
 import { SpecPath } from '../value-objects/spec-path.js'
 
-/** Cheap presence + lastModified for one schema artifact on {@link Spec}. */
+/** Cheap presence + identity metadata for one schema artifact on {@link Spec}. */
 export interface SpecArtifactEntry {
   readonly filename: string
   readonly lastModified: string
+  /** Byte length observed from the same stat as `lastModified`, when the adapter family exposes cheap file metadata. */
+  readonly size?: number
 }
 
 /** Cheap presence + lastModified for a spec sidecar (`spec-lock.json`, `metadata.json`). */

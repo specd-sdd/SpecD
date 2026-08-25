@@ -10,6 +10,12 @@
 
     - **GIVEN** built-in language adapters registered in `@specd/code-graph`
     - **WHEN** `createBuiltinAdapterRegistry()` is called
-    - **THEN** it returns an `AdapterRegistry` containing all built-in language adapters
+    - **THEN** its public type is `AdapterRegistryPort` and it contains all built-in language adapters
     - **AND** `registry.getSupportedExtensions()` returns extensions including `.ts`, `.py`, `.go`, and `.php`
     - **AND** `registry.getReservedKeywords()` returns aggregated reserved keywords from all registered adapters (including `class`, `def`, `func`, `interface`, `async`)
+
+    #### Scenario: Factory is available from composition
+
+    - **WHEN** a caller imports from the code-graph composition entrypoint
+    - **THEN** `createBuiltinAdapterRegistry` is exported
+    - **AND** no caller must import the concrete registry implementation

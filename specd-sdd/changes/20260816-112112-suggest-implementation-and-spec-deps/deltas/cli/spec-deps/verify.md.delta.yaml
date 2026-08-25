@@ -17,3 +17,18 @@
     - **GIVEN** invalid specs detected after `--apply`
     - **WHEN** `specd specs deps suggest cli:change-implementation --apply --create-change` is executed
     - **THEN** an alignment change is created without interactive prompt
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    ### Requirement: Suggest structured-output help schema
+
+    #### Scenario: JSON and TOON help documents the leaf response
+
+    - **GIVEN** the `specs deps suggest` leaf command
+    - **WHEN** its help is rendered for structured output
+    - **THEN** JSON and TOON examples and the dependency-suggestion/post-validation response shape are present
+    - **AND** the suggestion use case is not executed

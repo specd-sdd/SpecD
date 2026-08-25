@@ -33,6 +33,7 @@ import {
   type DiscardedChangeListOptions,
   type DraftedChangeListOptions,
   type MutateResult,
+  type CreateChangeStorageOptions,
 } from '../../application/ports/change-repository.js'
 import { type ListResult } from '../../application/ports/repository.js'
 import {
@@ -93,6 +94,8 @@ export interface FsChangeRepositoryConfig {
 export const FsChangeOptionsSchema = z.object({
   path: z.string(),
 })
+
+const EXPLORATION_FILENAME = '.specd-exploration.md'
 
 /**
  * Metadata persisted inside a change lock directory.
@@ -652,14 +655,43 @@ export class FsChangeRepository extends ChangeRepository {
    * Persists a new change for the first time.
    *
    * @param change - The new change to persist
+   * @param options - Optional storage-specific content to persist with the change
    * @throws {ChangeAlreadyExistsError} When the name collides across buckets
    */
-  override async create(change: Change): Promise<void> {
+  override async create(change: Change, options?: CreateChangeStorageOptions): Promise<void> {
     const existing = await this._resolveDir(change.name)
     if (existing !== null) {
       throw new ChangeAlreadyExistsError(change.name)
     }
     await this._persistManifest(change)
+    if (options?.explorationContent !== undefined && options.explorationContent.length > 0) {
+      try {
+        await this.writeExploration(change, options.explorationContent)
+      } catch (error) {
+        await this.delete(change)
+        throw error
+      }
+    }
+  }
+
+  /** @inheritdoc */
+  override async readExploration(change: Change): Promise<string | null> {
+    const dir = await this._resolveDir(change.name, { includeDiscarded: false })
+    if (dir === null) return null
+    try {
+      return await fs.readFile(path.join(dir, EXPLORATION_FILENAME), 'utf8')
+    } catch (error) {
+      if (isEnoent(error)) return null
+      throw error
+    }
+  }
+
+  /** @inheritdoc */
+  override async writeExploration(change: Change, content: string): Promise<void> {
+    if (content.length === 0) return
+    const dir = await this._resolveDir(change.name, { includeDiscarded: false })
+    if (dir === null) throw new ChangeNotFoundError(change.name)
+    await writeFileAtomic(path.join(dir, EXPLORATION_FILENAME), content)
   }
 
   /**
@@ -1353,6 +1385,7 @@ export class FsChangeRepository extends ChangeRepository {
     const specExistence = await this._buildSpecExistenceMap(manifest.specIds)
     let manifestNormalized = false
     let hasChangesToPersist = false
+    const explorationMeta = await this._explorationMeta(dir)
 
     // Validate schema compatibility
     if (this._activeSchema !== undefined) {
@@ -1471,6 +1504,7 @@ export class FsChangeRepository extends ChangeRepository {
       ...(manifest.invalidationPolicy !== undefined
         ? { invalidationPolicy: manifest.invalidationPolicy }
         : {}),
+      explorationMeta,
     })
 
     // Sync artifacts against schema to reconcile with current artifact types and specIds.
@@ -1573,6 +1607,24 @@ export class FsChangeRepository extends ChangeRepository {
     }
 
     return { change, hasChangesToPersist }
+  }
+
+  /**
+   * Stats optional exploration content without reading its bytes.
+   *
+   * @param dir - Absolute path to the change directory
+   * @returns Metadata when exploration content exists, otherwise `null`
+   */
+  private async _explorationMeta(
+    dir: string,
+  ): Promise<{ lastModified: string; size: number } | null> {
+    try {
+      const stat = await fs.stat(path.join(dir, EXPLORATION_FILENAME))
+      return { lastModified: stat.mtime.toISOString(), size: stat.size }
+    } catch (error) {
+      if (isEnoent(error)) return null
+      throw error
+    }
   }
 
   /**

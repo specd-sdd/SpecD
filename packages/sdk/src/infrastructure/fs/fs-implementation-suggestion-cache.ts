@@ -1,6 +1,12 @@
-import { readFile, writeFile, mkdir, unlink, rename } from 'node:fs/promises'
-import { dirname, isAbsolute, join } from 'node:path'
-import { SpecPath } from '@specd/core'
+import { readFile, unlink } from 'node:fs/promises'
+import { writeJsonAtomic } from './write-json-atomic.js'
+import {
+  decideFreshness,
+  enrichSpecHash,
+  readSpecStamp,
+  timestampFallback,
+} from './spec-stamp-source.js'
+import { isAbsolute, join } from 'node:path'
 import {
   ImplementationSuggestionCachePort,
   type ImplementationSuggestionCachePortDeps,
@@ -174,57 +180,6 @@ export class FsImplementationSuggestionCache extends ImplementationSuggestionCac
     }
   }
 
-  /**
-   * Reads current spec file stamp from injected repository.
-   *
-   * @param specId - Target canonical spec identifier
-   * @returns Current spec stamp or empty stamp if not found
-   */
-  private async getSpecStamp(specId: string): Promise<ImplementationSuggestionSpecStamp> {
-    const colonIdx = specId.indexOf(':')
-    const workspace = colonIdx >= 0 ? specId.substring(0, colonIdx) : ''
-    const rawPath = colonIdx >= 0 ? specId.substring(colonIdx + 1) : specId
-
-    const repo = this.deps.specRepositories?.get(workspace)
-    if (!repo) {
-      return { lastModified: '', hash: '', artifacts: [] }
-    }
-
-    try {
-      const specData = await repo.get(SpecPath.parse(rawPath))
-      const artifactsMeta =
-        (specData as unknown as { artifacts?: Array<Record<string, unknown>> })?.artifacts ?? []
-      const mainArtifact = artifactsMeta.find((a) => a.filename === 'spec.md')
-      const specRecord = specData as unknown as Record<string, unknown>
-      const lastModified =
-        typeof mainArtifact?.lastModified === 'string'
-          ? mainArtifact.lastModified
-          : typeof specRecord?.lastModified === 'string'
-            ? specRecord.lastModified
-            : ''
-      let hash = typeof mainArtifact?.hash === 'string' ? mainArtifact.hash : ''
-      if (specData && typeof repo.artifactMeta === 'function') {
-        // `repo.get()` never includes artifact hashes; fetch the real SHA-256 explicitly.
-        const meta = await repo.artifactMeta(specData, 'spec.md', { includeHash: true })
-        if (typeof meta?.hash === 'string' && meta.hash.length > 0) {
-          hash = meta.hash
-        }
-      }
-
-      return {
-        lastModified,
-        hash,
-        artifacts: artifactsMeta.map((a) => ({
-          filename: typeof a.filename === 'string' ? a.filename : '',
-          lastModified: typeof a.lastModified === 'string' ? a.lastModified : '',
-          hash: typeof a.hash === 'string' ? a.hash : '',
-        })),
-      }
-    } catch {
-      return { lastModified: '', hash: '', artifacts: [] }
-    }
-  }
-
   /** @inheritdoc */
   async get(specId: string): Promise<ImplementationSuggestionSpecEntry | null> {
     await this.ensureLoaded()
@@ -243,30 +198,21 @@ export class FsImplementationSuggestionCache extends ImplementationSuggestionCac
 
     // 2. Validate spec freshness if specRepositories are available
     if (this.deps.specRepositories) {
-      const currentStamp = await this.getSpecStamp(specId)
+      const currentStamp: ImplementationSuggestionSpecStamp = {
+        ...(await readSpecStamp(this.deps, specId)),
+      }
       const cachedStamp = cached.specStamp
       if (cachedStamp) {
-        // Content hash is authoritative whenever both sides provide one: a
-        // differing hash is stale even if lastModified still matches (coarse
-        // mtimes, git checkouts). Timestamps only decide when a usable hash is
-        // missing on either side.
-        const hashComparable =
-          typeof cachedStamp.hash === 'string' &&
-          cachedStamp.hash.length > 0 &&
-          typeof currentStamp.hash === 'string' &&
-          currentStamp.hash.length > 0
-        if (hashComparable) {
-          return cachedStamp.hash === currentStamp.hash ? cached : null
+        let decision = decideFreshness(cachedStamp, currentStamp)
+        if (decision === 'needs-hash') {
+          await enrichSpecHash(this.deps, specId, currentStamp)
+          decision = decideFreshness(cachedStamp, currentStamp)
         }
-        if (
-          cachedStamp.lastModified &&
-          currentStamp.lastModified &&
-          cachedStamp.lastModified === currentStamp.lastModified
-        ) {
-          return cached
+        if (decision === 'needs-hash') {
+          decision = timestampFallback(cachedStamp, currentStamp)
         }
-        if (currentStamp.lastModified || currentStamp.hash) {
-          return null // Spec exists and stamp differs -> stale
+        if (decision === 'stale') {
+          return null
         }
       }
     }
@@ -278,7 +224,12 @@ export class FsImplementationSuggestionCache extends ImplementationSuggestionCac
   async set(specId: string, input: SetImplementationSuggestionInput): Promise<void> {
     await this.ensureLoaded()
     const { fingerprint, lastIndexedAt } = await this.getGraphFingerprint()
-    const currentStamp = await this.getSpecStamp(specId)
+    const currentStamp: ImplementationSuggestionSpecStamp = {
+      ...(await readSpecStamp(this.deps, specId)),
+    }
+    // Persist the authoritative identity so future reads can run stage-2 hash
+    // comparisons without re-fetching: real SHA-256 + stat-backed size.
+    await enrichSpecHash(this.deps, specId, currentStamp)
     const specStamp: ImplementationSuggestionSpecStamp =
       input.specContentHash && input.specContentHash.length > 0
         ? { ...currentStamp, hash: input.specContentHash }
@@ -468,10 +419,7 @@ export class FsImplementationSuggestionCache extends ImplementationSuggestionCac
       specs: specsRecord,
     }
 
-    await mkdir(dirname(this.cachePath), { recursive: true })
-    const tempPath = `${this.cachePath}.${process.pid}.tmp`
-    await writeFile(tempPath, JSON.stringify(filePayload, null, 2), 'utf-8')
-    await rename(tempPath, this.cachePath)
+    await writeJsonAtomic(this.cachePath, JSON.stringify(filePayload, null, 2))
     this._isDirty = false
   }
 

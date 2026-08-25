@@ -60,6 +60,25 @@ describe('CreateChange', () => {
       expect(result.changePath).toBe('/test/changes/add-oauth')
     })
 
+    it('delegates optional initial exploration to the repository', async () => {
+      const repo = makeChangeRepository()
+      const createSpy = vi.spyOn(repo, 'create')
+      const uc = makeCreateChange(repo, makeListWorkspaces(new Map()))
+
+      const result = await uc.execute({
+        name: 'add-oauth',
+        specIds: ['auth/login'],
+        schemaName: 'specd-std',
+        schemaVersion: 1,
+        explorationContent: '# Exploration',
+      })
+
+      expect(createSpy).toHaveBeenCalledWith(result.change, {
+        explorationContent: '# Exploration',
+      })
+      await expect(repo.readExploration(result.change)).resolves.toBe('# Exploration')
+    })
+
     it('seeds the creation history event', async () => {
       const repo = makeChangeRepository()
       const uc = makeCreateChange(repo, makeListWorkspaces(new Map()))

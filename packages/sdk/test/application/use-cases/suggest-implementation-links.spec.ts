@@ -2,8 +2,9 @@ import { beforeAll, afterAll, describe, expect, it, vi } from 'vitest'
 import {
   SuggestImplementationLinks,
   createSuggestImplementationLinks,
-} from '../../src/orchestration/suggest-implementation-links.js'
-import { ImplementationSuggestionCachePort } from '../../src/application/ports/implementation-suggestion-cache-port.js'
+  type SuggestImplementationLinksDeps,
+} from '../../../src/application/use-cases/suggest-implementation-links.js'
+import { ImplementationSuggestionCachePort } from '../../../src/application/ports/implementation-suggestion-cache-port.js'
 import {
   SpecdError,
   InvalidInputError,
@@ -19,11 +20,16 @@ import { tmpdir } from 'node:os'
 // not depend on the real repository layout.
 const FIXTURE_ROOT = mkdtempSync(join(tmpdir(), 'suggest-impl-links-'))
 const FIXTURE_FILES = [
-  'packages/sdk/src/orchestration/suggest-implementation-links.ts',
+  'packages/sdk/src/application/use-cases/suggest-implementation-links.ts',
   'packages/sdk/src/domain/value-objects/implementation-suggestion-cache.ts',
   'packages/sdk/src/application/ports/implementation-suggestion-cache-port.ts',
   'packages/sdk/src/existing.ts',
 ]
+
+const fileObserver = {
+  exists: async () => true,
+  readText: async () => '',
+}
 
 beforeAll(() => {
   for (const rel of FIXTURE_FILES) {
@@ -37,8 +43,8 @@ afterAll(() => {
   rmSync(FIXTURE_ROOT, { recursive: true, force: true })
 })
 
-import { type ImplementationSuggestionSpecEntry } from '../../src/domain/value-objects/implementation-suggestion-cache.js'
-import { type SetImplementationSuggestionInput } from '../../src/application/ports/implementation-suggestion-cache-port.js'
+import { type ImplementationSuggestionSpecEntry } from '../../../src/domain/value-objects/implementation-suggestion-cache.js'
+import { type SetImplementationSuggestionInput } from '../../../src/application/ports/implementation-suggestion-cache-port.js'
 
 /**
  * In-memory test double for ImplementationSuggestionCachePort.
@@ -159,7 +165,7 @@ function setupTest() {
     execute: vi.fn().mockResolvedValue({
       specId: 'sdk:suggest-implementation-links',
       implementation: [
-        { file: 'sdk:packages/sdk/src/orchestration/suggest-implementation-links.ts' },
+        { file: 'sdk:packages/sdk/src/application/use-cases/suggest-implementation-links.ts' },
       ],
       created: true,
     }),
@@ -177,7 +183,7 @@ function setupTest() {
             name: 'SuggestImplementationLinks',
             kind: 'class',
             location: {
-              filePath: 'packages/sdk/src/orchestration/suggest-implementation-links.ts',
+              filePath: 'packages/sdk/src/application/use-cases/suggest-implementation-links.ts',
             },
           },
         ]
@@ -194,6 +200,7 @@ function setupTest() {
     updatePersistedImplementation: updatePersistedImplementation as any,
     codeGraphProvider,
     cache,
+    fileObserver,
     projectDir: FIXTURE_ROOT,
   })
 
@@ -223,6 +230,7 @@ describe('SuggestImplementationLinks', () => {
     const topSuggestion = result.specs[0]?.suggestions[0]
     expect(topSuggestion?.confidence).toBe('HIGH')
     expect(topSuggestion?.file).toContain('suggest-implementation-links.ts')
+    expect(topSuggestion?.reasons).toContain('exact-primary-symbol-match')
   })
 
   it('performs additive set union when apply: true is passed', async () => {
@@ -284,7 +292,7 @@ describe('SuggestImplementationLinks', () => {
       name: 'SuggestImplementationLinks',
       kind: 'class',
       location: {
-        filePath: 'packages/sdk/src/orchestration/suggest-implementation-links.ts',
+        filePath: 'packages/sdk/src/application/use-cases/suggest-implementation-links.ts',
       },
     }
     codeGraphProvider.findSymbols.mockImplementation(
@@ -475,9 +483,78 @@ describe('SuggestImplementationLinks', () => {
       getPersistedImplementation: getPersistedImplementation as any,
       updatePersistedImplementation: updatePersistedImplementation as any,
       cache,
+      fileObserver,
     })
 
     expect(instance).toBeInstanceOf(SuggestImplementationLinks)
+  })
+
+  it('rejects factory construction without a file observer', () => {
+    const { specRepositories, getPersistedImplementation, updatePersistedImplementation, cache } =
+      setupTest()
+
+    expect(() =>
+      createSuggestImplementationLinks({
+        specRepositories,
+        getPersistedImplementation: getPersistedImplementation as any,
+        updatePersistedImplementation: updatePersistedImplementation as any,
+        cache,
+      } as unknown as SuggestImplementationLinksDeps),
+    ).toThrow(InvalidInputError)
+  })
+
+  it('propagates implementation mutation failures', async () => {
+    const { useCase, updatePersistedImplementation } = setupTest()
+    updatePersistedImplementation.execute.mockRejectedValueOnce(new Error('write failed'))
+
+    await expect(
+      useCase.execute({ specId: 'sdk:suggest-implementation-links', apply: true }),
+    ).rejects.toThrow('write failed')
+  })
+
+  it('retains Tier 1 candidates when Tier 2 adds hierarchical candidates', async () => {
+    const { useCase, specRepositories, codeGraphProvider } = setupTest()
+    const repo = specRepositories.get('sdk')!
+    ;(repo.list as ReturnType<typeof vi.fn>).mockResolvedValueOnce([
+      { workspace: 'sdk', path: 'schema-which-command', title: 'SchemaWhichCommand' },
+    ])
+    ;(repo.artifact as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      content: '# SchemaWhichCommand\n\n### Requirement: Which lookup\n',
+    })
+    codeGraphProvider.findSymbols.mockImplementation(
+      async (query: { name?: string; filePath?: string }) => {
+        if (query.name === 'SchemaWhichCommand') {
+          return [
+            {
+              name: 'SchemaWhichCommand',
+              kind: 'class',
+              location: { filePath: 'packages/sdk/src/schema-which-command.ts' },
+            },
+          ]
+        }
+        if (query.filePath?.endsWith('/schema.ts')) {
+          return [{ name: 'SchemaCommand', kind: 'class', location: { filePath: query.filePath } }]
+        }
+        return []
+      },
+    )
+    const deps = (useCase as unknown as { deps: SuggestImplementationLinksDeps }).deps
+    const tieredUseCase = new SuggestImplementationLinks({
+      ...deps,
+      cache: new InMemoryImplementationSuggestionCache(),
+      fileObserver: {
+        exists: async () => true,
+        readText: async () => 'which',
+      },
+    })
+
+    const result = await tieredUseCase.execute({ specId: 'sdk:schema-which-command' })
+    const suggestions = result.specs[0]?.suggestions ?? []
+
+    expect(suggestions.some((entry) => entry.reasons.includes('exact-primary-symbol-match'))).toBe(
+      true,
+    )
+    expect(suggestions.some((entry) => entry.reasons.includes('subtoken-content-match'))).toBe(true)
   })
 
   it('emits onProgress events during execution', async () => {

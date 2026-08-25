@@ -157,6 +157,33 @@ export function registerSpecImplementation(parent: Command): void {
     .option('--rebuild-cache', 'force cache invalidation')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
+    .addHelpText(
+      'after',
+      `
+JSON/TOON output schema:
+  {
+    result: "ok",
+    targetWorkspace?: string,
+    specs: Array<{
+      specId: string,
+      title: string,
+      existing: { files: string[], symbols: string[], dependsOn: string[] },
+      suggestions: Array<{
+        file: string,
+        symbols: string[],
+        confidence: "HIGH" | "MEDIUM" | "LOW",
+        reasons: string[],
+        score: number,
+        alreadyIncluded: boolean
+      }>
+    }>,
+    appliedMutations?: { updatedSpecsCount: number, filesAddedCount: number, symbolsAddedCount: number }
+  }
+
+Example:
+  specd specs implementation suggest cli:spec-implementation --format json
+`,
+    )
     .action(
       async (
         specPath: string | undefined,

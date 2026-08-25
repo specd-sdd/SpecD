@@ -62,6 +62,24 @@ function setup() {
 afterEach(() => vi.restoreAllMocks())
 
 describe('spec deps', () => {
+  it('documents dependency and post-validation structured output without execution', async () => {
+    mockExecuteSuggestSpecDependencies.mockClear()
+    const getStdout = captureStdout()
+    const program = makeProgram()
+    const spec = program.command('spec')
+    registerSpecDeps(spec)
+    try {
+      await program.parseAsync(['node', 'specd', 'spec', 'deps', 'suggest', '--help'])
+    } catch {
+      /* Commander exit override */
+    }
+
+    const help = getStdout()
+    expect(help).toContain('JSON/TOON output schema:')
+    expect(help).toContain('postApplyValidation?:')
+    expect(mockExecuteSuggestSpecDependencies).not.toHaveBeenCalled()
+  })
+
   it('list delegates to kernel.specs.getPersistedDeps', async () => {
     const { kernel } = setup()
     vi.mocked(kernel.specs.getPersistedDeps.execute).mockResolvedValue({
