@@ -258,12 +258,21 @@ function buildFreshOptimizationProjections(
     | undefined,
   currentArtifactState: PersistedArtifactState,
   schemaIdentity: PersistedSchemaIdentity,
-): Pick<SpecMetadata, 'optimizedDescription' | 'optimizedContext'> {
+): Pick<SpecMetadata, 'optimizedDescription' | 'optimizedContext' | 'optimizationStatus'> {
   if (optimizations === undefined) {
-    return {}
+    return {
+      optimizationStatus: {
+        optimizedDescription: 'missing',
+        optimizedContext: 'missing',
+      },
+    }
   }
 
-  const result: { optimizedDescription?: string; optimizedContext?: string } = {}
+  const result: {
+    optimizedDescription?: string
+    optimizedContext?: string
+    optimizationStatus?: NonNullable<SpecMetadata['optimizationStatus']>
+  } = {}
 
   if (optimizations.optimizedDescription !== undefined) {
     const freshness = classifyOptimizationFieldFreshness(
@@ -273,6 +282,16 @@ function buildFreshOptimizationProjections(
     )
     if (freshness.fresh) {
       result.optimizedDescription = optimizations.optimizedDescription.value
+    } else {
+      result.optimizationStatus = {
+        ...result.optimizationStatus,
+        optimizedDescription: 'stale',
+      }
+    }
+  } else {
+    result.optimizationStatus = {
+      ...result.optimizationStatus,
+      optimizedDescription: 'missing',
     }
   }
 
@@ -284,6 +303,16 @@ function buildFreshOptimizationProjections(
     )
     if (freshness.fresh) {
       result.optimizedContext = optimizations.optimizedContext.value
+    } else {
+      result.optimizationStatus = {
+        ...result.optimizationStatus,
+        optimizedContext: 'stale',
+      }
+    }
+  } else {
+    result.optimizationStatus = {
+      ...result.optimizationStatus,
+      optimizedContext: 'missing',
     }
   }
 

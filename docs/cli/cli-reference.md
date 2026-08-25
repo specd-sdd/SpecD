@@ -796,14 +796,14 @@ specd specs search <query> [options]
 
 Search spec content across workspaces. Uses the code graph index when available for fast full-text search; falls back to filesystem search with a warning on stderr.
 
-| Option | Description |
-| | ---------------------------- | -------------------------------------------------------------------- | -- |
-| `--workspace <name>` | Filter by workspace name. Repeatable. |
-| `--graph` | Require code graph index; error if unavailable. |
-| `--summary` | Include a short description for each result. |
-| `--limit <n>` | Maximum results (default: 20). |
-| `--format text\|json\|toon` | Output format. |
-| `--config <path>` | Config file path. |
+| Option                      | Description                                     |
+| --------------------------- | ----------------------------------------------- |
+| `--workspace <name>`        | Filter by workspace name. Repeatable.           |
+| `--graph`                   | Require code graph index; error if unavailable. |
+| `--summary`                 | Include a short description for each result.    |
+| `--limit <n>`               | Maximum results (default: 20).                  |
+| `--format text\|json\|toon` | Output format.                                  |
+| `--config <path>`           | Config file path.                               |
 
 Examples:
 
@@ -1197,27 +1197,32 @@ Indexes project graph inputs into the code graph. When a `specd.yaml` is supplie
 
 Indexing is also the recovery path for incompatible derived storage. Ordinary graph
 reads do not migrate or repair a schema, derivation fingerprint, or storage generation.
-`graph index` recreates incompatible derived data, rotates the generation, re-extracts
-all source facts, and reports `fullRebuildReason` in structured output (and
-`full rebuild: <reason>` in text). `--force` remains available for an explicit rebuild.
-No change manifest, spec, or implementation link is modified by this recovery.
+`graph index` can repair incompatible derived data, rotates the generation during that
+closed-store repair, re-extracts all source facts, and reports `fullRebuildReason` in
+structured output (and `full rebuild: <reason>` in text). `--force` is an explicit
+logical full rebuild: healthy runs reprocess every selected input without physically
+recreating SQLite. If the first open reports the typed recoverable storage condition,
+the isolated SDK task closes that transient provider, recreates closed storage, and
+retries once. Non-forced indexes and unrelated failures never delete storage. No change
+manifest, spec, or implementation link is modified by this recovery.
 Completed results also include counts and elapsed milliseconds for import resolution,
 dependency facts, adapter relations, re-exports, hierarchy/overrides, persistence,
 and search-index rebuilding in text and structured output.
 
-The CLI parent owns the shared graph-index lock and runs indexing in a child process,
-forwarding `SIGINT`/`SIGTERM` and returning the child's exit status. The child is marked
-with `SPECD_GRAPH_INDEX_WORKER=true` and `SPECD_GRAPH_INDEX_LOCK_HELD=true` so the
-provider does not reacquire the parent lock. `SPECD_GRAPH_INDEX_NO_WORKER=true` is the
-explicit in-process bypass for controlled embedding and tests.
+Code Graph owns the shared writer lock and the process-isolated worker used for every
+production index run. The CLI supplies its trusted packaged task through the SDK and
+renders only the returned progress, result, and typed failure. During an active run,
+Code Graph forwards `SIGINT` or `SIGTERM` to that run's child, waits for cleanup, and
+returns a typed failure without terminating or re-signalling the CLI host. There is no
+public in-process indexing mode.
 
-| Option                      | Description                                                           |
-| --------------------------- | --------------------------------------------------------------------- |
-| `--force`                   | Recreate the graph backend and run a full re-index.                   |
-| `--config <path>`           | Config file path. Mutually exclusive with `--path`.                   |
-| `--path <path>`             | Repository root bootstrap path. Ignores any discovered config.        |
-| `--exclude-path <pattern>`  | Gitignore-syntax pattern to exclude (repeatable; merges with config). |
-| `--format text\|json\|toon` | Output format.                                                        |
+| Option                      | Description                                                                                    |
+| --------------------------- | ---------------------------------------------------------------------------------------------- |
+| `--force`                   | Logically rebuild every selected graph input; typed incompatible storage may be repaired once. |
+| `--config <path>`           | Config file path. Mutually exclusive with `--path`.                                            |
+| `--path <path>`             | Repository root bootstrap path. Ignores any discovered config.                                 |
+| `--exclude-path <pattern>`  | Gitignore-syntax pattern to exclude (repeatable; merges with config).                          |
+| `--format text\|json\|toon` | Output format.                                                                                 |
 
 #### Config fields: `graph.includePaths`, `graph.excludePaths`, `graph.respectGitignore`, and `workspace.graph.allowedPaths`
 
@@ -1270,12 +1275,14 @@ specd graph index --exclude-path "packages/generated/*" --exclude-path "tmp/"
 
 #### Shared indexing lock
 
-`graph index` is the writer-side owner of a shared graph lock stored under `{configPath}/graph/index.lock`.
+Code Graph manages a shared writer lock for `graph index`; the CLI does not acquire,
+inspect, or release it.
 
 - while this lock is held, provider-backed read commands such as `graph search`, `graph hotspots`, `graph stats`, and `graph impact` may fail with `GRAPH_BUSY`
 - long-lived hosts may also surface `GRAPH_PROVIDER_STALE` if the backing storage generation changes after they opened a provider
 - the user-facing busy message remains: `The code graph is currently being indexed. Try again in a few seconds.`
-- the lock is removed when `graph index` exits normally and is also cleaned up on termination signals
+- the lock is released after normal completion and after every terminal failure,
+  including a forwarded termination signal
 
 ---
 

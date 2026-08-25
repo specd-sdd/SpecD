@@ -1,0 +1,140 @@
+- op: modified
+  description: 'Separate forced logical indexing from closed-provider physical recovery'
+  selector:
+    type: section
+    matches: '^Requirement: CodeGraphProvider facade$'
+  content: |
+    `CodeGraphProvider` SHALL be the top-level API object that wraps all code graph
+    functionality behind one lifecycle-managed facade.
+
+    Public responsibilities include:
+
+    - Indexing: `index(options: IndexOptions): Promise<IndexResult>` — when
+      `options.force` is true, it SHALL clear logical graph contents and ensure the
+      indexer reprocesses every selected input. Force MUST NOT invoke physical storage
+      recreation.
+    - Recovery: `recreate(): Promise<void>` — physically recreates unrecoverable graph
+      storage only while the provider is closed. It MUST reject a call while open with a
+      typed closed-provider precondition error and leave the provider closed after a
+      successful recreation.
+    - Querying: `getSymbol`, `findSymbols`, `getFile`, `getDocument`, config-relative
+      file/document lookups, spec/coverage lookups, and statistics delegate to the
+      store; exact batch and full-text-search operations retain their existing contracts.
+    - Traversal, impact, and selector normalization retain their existing facade
+      contracts. `clear(): Promise<void>` removes logical graph contents from an opened
+      reusable store; it does not replace the physical database or storage generation.
+    - Lifecycle: `open(): Promise<void>`, `close(): Promise<void>` — manages backend
+      resources. `open()` remains parameterless and surfaces a typed recoverable
+      storage-open error for corruption or incompatible schema; it MUST NOT recreate
+      storage implicitly.
+
+    `getSpec(specId)` returns undefined for absent data. Each composite provider
+    operation performs exactly one availability/staleness validation before bounded
+    fan-out. Composite availability, delegation, and result semantics remain unchanged. Public
+    callers MUST NOT use recreation as ordinary indexing maintenance: the SDK forced
+    reindex orchestration is the supported recovery path. Worker protocol operations and
+    lock-helper methods remain internal.
+
+- op: modified
+  description: 'Expose the high-level isolated worker while keeping lock and IPC internals private'
+  selector:
+    type: section
+    matches: '^Requirement: Package exports$'
+  content: |
+    The `@specd/code-graph` `"."` public barrel SHALL export only:
+
+    - composition and wiring: `createCodeGraphProvider`, type-only
+      `CodeGraphProvider`, `CodeGraphCompositionOptions`, `CodeGraphOptions`,
+      `GraphStoreFactory`, `GraphStoreFactoryOptions`,
+      `SqliteGraphStoreFactoryOptions`, `createSqliteGraphStoreFactory`,
+      `SqliteRuntimeDescriptor`, and `SQLiteGraphStoreOptions`;
+    - isolated graph indexing: `runIsolatedGraphIndex` plus its host-facing input,
+      progress, result, and typed worker failure contracts;
+    - host use cases: `GetGraphHealth`, `GetGraphHealthInput`,
+      `GetGraphHealthResult`, `createGetGraphHealth`, `IndexProjectGraph`,
+      `IndexProjectGraphInput`, `createIndexProjectGraph`, `GetSpecCoverage`,
+      `GetSpecCoverageInput`, `GetSpecCoverageResult`, `createGetSpecCoverage`,
+      `GetChangeSpecCoverage`, `GetChangeSpecCoverageInput`,
+      `GetChangeSpecCoverageResult`, and `createGetChangeSpecCoverage`;
+    - VCS and config: `buildProjectGraphConfig`, `createBootstrapGraphConfig`, and
+      `GraphConfigOverrides`;
+    - public indexer and discovery types: `IndexOptions`,
+      `IndexProgressCallback`, `ProjectGraphConfig`, `WorkspaceIndexTarget`,
+      `DiscoveredSpec`, `IndexResult`, `IndexError`, `WorkspaceIndexBreakdown`,
+      `DiscoverFilesOptions`, and `DEFAULT_EXCLUDE_PATHS`;
+    - traversal and impact: `TraversalOptions`, `TraversalResult`, `ImpactResult`,
+      `FileImpactResult`, `ChangeDetectionResult`, `RiskLevel`, and
+      `analyzeFilesImpact`;
+    - hotspots: `DEFAULT_HOTSPOT_KINDS`, `HotspotEntry`, `HotspotOptions`, and
+      `HotspotResult`;
+    - search: `SearchOptions`, `expandSymbolName`, `expandSearchQuery`, and
+      `expandSearchToken`;
+    - staleness and fingerprint: `isGraphStale`, `computeGraphFingerprint`,
+      `computeRootFingerprint`, `computeWorkspaceFingerprint`,
+      `parseFingerprintMap`, `serializeFingerprintMap`,
+      `detectFingerprintMismatch`, and `GraphFingerprintInput`;
+    - language adapter: `LanguageAdapter`;
+    - model vocabulary: `FileNode`, `DocumentNode`, `SymbolNode`, `SpecNode`,
+      `Relation`, `SymbolKind`, `RelationType`, `SymbolQuery`, `GraphStatistics`,
+      `ImportDeclaration`, `ImportDeclarationKind`, `SourceLocation`,
+      `BindingScopeKind`, `BindingSourceKind`, `BindingScope`, `BindingFact`,
+      `CallForm`, `CallFact`, and `ResolvedDependency`;
+    - `SpecdCodeGraphError` and public subclasses including `StoreNotOpenError`,
+      `InvalidSymbolKindError`, `InvalidRelationTypeError`,
+      `DuplicateSymbolIdError`, `SpecNotFoundError`, `GraphProviderStaleError`,
+      `StoreOverloadError`, `StoreWorkerError`, `BulkSessionStateError`,
+      `InvalidGraphStoreConfigurationError`, `GraphSchemaIncompatibleError`,
+      `GraphStorageRecoveryRequiredError`, `GraphStoreRecreateRequiresClosedError`, the
+      graph busy error surfaced by isolated execution, and isolated-worker failure
+      subclasses;
+    - `CODE_GRAPH_VERSION`.
+
+    Raw index-lock acquisition, release, path, and unlocked-assertion helpers MUST
+    NOT be available from `"."`. Raw IPC envelopes, child bootstrap commands,
+    process-launcher adapters, the executable child implementation, concrete store
+    classes, and test-only worker protocol helpers MUST also remain internal.
+    Host-facing isolated-worker input/progress/result/error contracts are not raw IPC
+    DTOs and SHALL remain public.
+
+    `InMemoryIndexSession`, the concrete SQLite adapter, and other composition
+    internals SHALL remain available only from `"./internal"` where currently
+    supported. Removed Ladybug symbols MUST NOT be reintroduced.
+
+- op: modified
+  description: 'Ship the child entrypoint without creating a public executable subpath'
+  selector:
+    type: section
+    matches: '^Requirement: Public and internal entry points$'
+  content: |
+    `@specd/code-graph` MUST publish:
+
+    - `src/public.ts` (or equivalent) as `"."` — the curated public surface aligned
+      with **Package exports**;
+    - `src/index.ts` as `"./internal"` — the full development barrel including
+      indexer internals, store adapter symbols, raw lock helpers, process-launcher
+      adapters, and `InMemoryIndexSession`;
+    - a built ESM isolated-worker child entrypoint under `dist/`, resolved internally
+      by `runIsolatedGraphIndex` relative to its installed module location.
+
+    `package.json` exports MUST map the public and internal import entrypoints. The
+    executable child file MUST be included in published package contents but MUST NOT
+    be exposed as a host-selectable package export. The `"."` barrel MUST NOT use
+    unrestricted star exports that leak internal symbols.
+
+- op: modified
+  description: 'Register the isolated worker capability in composition context'
+  selector:
+    type: section
+    matches: '^Spec Dependencies$'
+  content: |
+    - [`code-graph:symbol-model`](../symbol-model/spec.md) — graph and reference vocabulary
+    - [`code-graph:graph-store`](../graph-store/spec.md) — persistence contract
+    - [`code-graph:indexer`](../indexer/spec.md) — indexing pipeline
+    - [`code-graph:traversal`](../traversal/spec.md) — query-side traversal
+    - [`default:_global/architecture`](../../_global/architecture/spec.md) — hexagonal layering
+    - [`code-graph:get-graph-health`](../get-graph-health/spec.md) — health orchestration
+    - [`code-graph:index-project-graph`](../index-project-graph/spec.md) — index orchestration
+    - [`code-graph:get-spec-coverage`](../get-spec-coverage/spec.md) — spec coverage
+    - [`code-graph:get-change-spec-coverage`](../get-change-spec-coverage/spec.md) — change coverage
+    - [`code-graph:resolve-symbol-reference`](../resolve-symbol-reference/spec.md) — conservative reference resolution
+    - [`code-graph:isolated-index-worker`](../isolated-index-worker/spec.md) — lock-aware child-process execution for graph indexing

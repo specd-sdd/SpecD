@@ -99,9 +99,11 @@ After seeding, `CompileContext` applies the five-step resolution:
 2. **Project-level exclude patterns** — always applied; removes specs matched by any project-level exclude pattern from the accumulated set, except mandatory `change.specIds` seed entries from this call.
 3. **Workspace-level include patterns** — applied only for workspaces active in the current change (a workspace is active if any of its spec IDs appears in `change.specIds`).
 4. **Workspace-level exclude patterns** — applied only for active workspaces; removes further specs from the set, except mandatory `change.specIds` seed entries from this call.
-5. **`dependsOn` traversal** — only performed when `followDeps: true` is passed. Starting from `change.specIds`, `CompileContext` resolves each spec's canonical dependency projection from `SpecRepository.metadata()`, then follows links transitively until no new specs are discovered or the `depth` limit is reached. Specs added in this step are **not** subject to the exclude rules from steps 2 or 4. When `followDeps` is `false` or absent, this step is skipped entirely. This works in all change states (designing, ready, implementing, etc.) — it is not gated on reaching `ready`.
+5. **`dependsOn` traversal** — only performed when `followDeps: true` is passed. Starting from `change.specIds`, `CompileContext` resolves each spec's dependency information using the resolution order defined in `Requirement: dependsOn resolution order`, then follows links transitively until no new specs are discovered or the `depth` limit is reached. Manifest-declared dependencies MUST be consulted before any repository access, so dependencies declared for change-scoped specs that are not yet persisted traverse transitively instead of being dropped. Specs added in this step are **not** subject to the exclude rules from steps 2 or 4. When `followDeps` is `false` or absent, this step is skipped entirely. This works in all change states (designing, ready, implementing, etc.) — it is not gated on reaching `ready`.
 
-When a spec in the traversal has no metadata, `CompileContext` emits a `missing-metadata` warning identifying the spec and suggesting metadata generation. Traversal then continues with any dependency information available from the change manifest's `specDependsOn` or from schema extraction fallback when the schema actually declares `metadataExtraction.dependsOn`.
+During traversal, a discovered spec MUST pass an existence check against the corresponding workspace `SpecRepository` BEFORE it is registered into the collected set: unresolvable discoveries are neither registered nor warned — they are skipped silently. Warnings for genuinely unresolvable references surface later through seeding or rendering paths.
+
+When a persisted spec's metadata cannot be materialized at all during traversal, `CompileContext` emits a `missing-metadata` warning identifying the spec and continues with any dependency information available from the change manifest's `specDependsOn` or from schema extraction fallback when the schema declares `metadataExtraction.dependsOn`. Non-persisted specs never produce this warning merely for lacking persisted state.
 
 When a spec in the traversal has stale metadata, `CompileContext` keeps the persisted canonical metadata result visible to the caller, emits a `stale-metadata` warning, and applies the dependency-resolution rules below without collapsing stale metadata into the same case as missing metadata.
 
@@ -121,6 +123,7 @@ After collecting all context specs (steps 1-5), `CompileContext` MUST classify e
 
 - All collected specs are emitted as summary entries.
 - Entries include spec ID, title, description, source, and mode, but no full content.
+- For specs in `change.specIds`, `title` and `description` MUST come from schema-driven extraction over the merged preview artifact set (see `Requirement: Extracted-first rendering for change-scoped specs`), falling back to the canonical metadata projection when the merged view is unavailable or yields nothing.
 - `sections` filters have no effect.
 
 **When `contextMode` is `'full'`:**
@@ -136,13 +139,29 @@ After collecting all context specs (steps 1-5), `CompileContext` MUST classify e
 
 Display-mode classification MUST happen after the full collection pipeline (steps 1-5) completes and before rendering. The `hybrid` mode preserves the previous tiered behavior, except that direct change-spec inclusion is controlled by `includeChangeSpecs`.
 
+### Requirement: Extracted-first rendering for change-scoped specs
+
+For every collected spec whose ID is in `change.specIds`, `CompileContext` MUST treat the merged artifact set produced by `PreviewSpec` (persisted artifacts plus validated deltas, including spec files that exist only inside the change directory) as the PRIMARY content source in every display mode except `list`. This applies in summary mode exactly as in full and hybrid modes.
+
+Title, description, and section-filtered content for these specs MUST be obtained by running the schema's `metadataExtraction` engine over the merged artifact set — the same format-agnostic, selector-driven pipeline used for canonical metadata generation. Markdown-specific heuristics (such as H1 regular expressions) MUST NOT be used as the primary extractor.
+
+The fallback ladder, applied in order, is:
+
+1. Schema-driven extraction over the merged preview artifact set.
+2. The canonical `GetSpecMetadata` projection (persisted, self-healing) — used when preview is unavailable, returns no files, or extraction yields no usable fields.
+3. Schema-driven extraction over the base persisted artifact set — used when no merged view exists and the canonical projection is unusable.
+
+While any rung of the ladder produces usable data, `CompileContext` MUST NOT emit metadata-absence warnings (`stale-metadata` or `missing-metadata`) for the spec. A spec that exists only inside the change therefore compiles cleanly without persisted metadata.
+
+Lock-owned LLM optimizations MUST NOT be applied to change-scoped specs (see `Requirement: Prefer LLM-optimized context`).
+
 ### Requirement: dependsOn resolution order
 
 For each spec in Step 5, `dependsOn` is resolved using a three-tier fallback:
 
-1. `change.specDependsOn[specId]` — per-spec dependencies declared in the change manifest (highest priority)
-2. The canonical normalized dependency projection obtained by calling `GetSpecMetadata.execute({ specId })` — self-healing, so a missing or stale cache is regenerated rather than treated as a frozen stale snapshot
-3. Schema `metadataExtraction.dependsOn` engine — extracts `dependsOn` from spec content only when materialization cannot produce a projection at all and the schema declares dependency extraction, using the shared extractor-transform registry and caller-owned origin context bag
+1. `change.specDependsOn[specId]` — per-spec dependencies declared in the change manifest (highest priority). This tier MUST be consulted before any repository access, so dependencies declared for change-scoped specs that are not yet persisted resolve normally.
+2. The canonical normalized dependency projection obtained by calling `GetSpecMetadata.execute({ specId })` — self-healing, so a missing or stale cache is regenerated rather than treated as a frozen stale snapshot.
+3. Schema `metadataExtraction.dependsOn` engine — extracts `dependsOn` from spec content only when materialization cannot produce a projection at all and the schema declares dependency extraction, using the shared extractor-transform registry and caller-owned origin context bag. For change-scoped specs, extraction operates over the merged preview artifact set; for all other specs, over the base persisted artifact set.
 
 The first tier that returns a non-empty result is used. If all tiers return empty, the spec is treated as having no dependencies.
 
@@ -154,15 +173,13 @@ A detected cycle is an internal traversal condition, not a user-facing warning. 
 
 ### Requirement: Staleness detection and content fallback
 
-Whenever `CompileContext` needs structured metadata-derived content for a spec that is actually included in the compiled context — summary fields (`title`, `description`) or section-filtered full content (`rules`, `constraints`, `scenarios`) — it MUST obtain that content by calling `GetSpecMetadata.execute({ specId })` with the default `'if-needed'` policy rather than reading `SpecRepository.metadata()` and reasoning about freshness itself.
+Whenever `CompileContext` needs structured metadata-derived content for a spec that is actually included in the compiled context — summary fields (`title`, `description`) or section-filtered full content (`rules`, `constraints`, `scenarios`) — it MUST follow the source rules defined in `Requirement: Extracted-first rendering for change-scoped specs` for specs in `change.specIds`, and obtain content via `GetSpecMetadata.execute({ specId })` with the default `'if-needed'` policy for all other specs — never by reading `SpecRepository.metadata()` and reasoning about freshness itself.
 
 `CompileContext` only materializes specs it actually renders (it MUST NOT eagerly materialize every collected spec before display-mode classification narrows the set).
 
 - When materialization returns `source: 'persisted'` with `regenerated: false`, `CompileContext` uses the returned structured content directly.
-- When materialization regenerates the projection (`regenerated: true`) or falls back after a source-conflict retry, `CompileContext` still uses the returned in-memory projection — it is a valid, current projection by construction — but forwards any `metadata-cache-write-failed` or generation warning returned by `GetSpecMetadata` into its own `warnings` array without logging it again.
-- When materialization cannot produce a valid projection at all (e.g. the schema has no `metadataExtraction` declarations and generation yields nothing), `CompileContext` emits a `missing-metadata` warning identifying the spec path and renders an empty/minimal entry for that spec rather than throwing.
-
-For specs in `change.specIds`, when `CompileContext` is rendering section-filtered full content and merged preview artifacts are available from `PreviewSpec`, the same materialization flow MUST operate over the merged artifact set rather than over the base spec files — `GetSpecMetadata` delegates to `MaterializeSpecMetadata`, which accepts the caller-provided merged content for this case so merged previews and non-merged specs stay on the same rendering path for `sections`.
+- When materialization regenerates the projection (`regenerated: true`) or falls back after a source-conflict retry, `CompileContext` still uses the returned in-memory projection — it is a valid, current projection by construction. Cache-miss regeneration is provenance information carried on the structured result (`source`, `regenerated`), NOT a warning condition: `CompileContext` MUST NOT emit a warning solely because a projection was regenerated. Only actionable materialization failures — such as `metadata-cache-write-failed` — are forwarded into the `warnings` array.
+- When materialization cannot produce a valid projection at all (e.g. the schema has no `metadataExtraction` declarations and generation yields nothing), `CompileContext` emits a `missing-metadata` warning identifying the spec path and renders an empty/minimal entry for that spec rather than throwing. This warning MUST NOT fire while the extracted-first fallback ladder still yields usable data for change-scoped specs.
 
 When `sections` is absent, full-mode spec content is rendered from ordered spec-scoped artifact files rather than from metadata sections. In that case metadata materialization is not required to render the full-content body, though a materialized projection may still supply summary fields.
 
@@ -203,7 +220,9 @@ It MUST NOT include lifecycle state, requested-step availability, blocking artif
 
 ### Requirement: Missing spec IDs emit a warning
 
-If a spec ID from an include pattern or `dependsOn` reference does not exist in the corresponding `SpecRepository`, `CompileContext` must emit a warning identifying the missing spec ID and skip it — no error is thrown. This allows the context to be compiled even when specs are temporarily absent, while making the gap visible.
+If a spec ID selected by an include pattern or otherwise referenced during collection (outside `dependsOn` traversal) does not exist in the corresponding `SpecRepository`, `CompileContext` must emit a warning identifying the missing spec ID and skip it — no error is thrown. This allows the context to be compiled even when specs are temporarily absent, while making the gap visible.
+
+Dependencies discovered during `dependsOn` traversal are governed by the traversal existence check (see `Requirement: Context spec collection`): unresolvable discoveries are skipped without registration and without a warning. References that reach rendering through seeding remain warned at rendering time when no content source can resolve them.
 
 ### Requirement: Unknown workspace qualifiers emit a warning
 
@@ -213,6 +232,8 @@ If a pattern or `dependsOn` entry references a workspace name that has no corres
 
 `CompileContext` MUST calculate the fingerprint from the canonicalized emitted logical context: project context entries, spec entries, context diagnostics, and result-shaping inputs that change those emitted entries. It MUST NOT include lifecycle state, lifecycle availability, or lifecycle blockers. The requested step affects the fingerprint only when it changes emitted context, such as the effective section selection.
 
+Because change-scoped spec entries are rendered from merged preview content, any edit to a change's deltas changes the emitted entries and therefore the fingerprint. A cached `'unchanged'` result MUST NOT survive delta modifications.
+
 When `fingerprint` matches the current context fingerprint, the result's `status` MUST be `'unchanged'` and `projectContext` and `specs` MUST be empty arrays. Otherwise, the result's `status` MUST be `'changed'` and it MUST return the assembled context with the new fingerprint.
 
 ### Requirement: Prefer LLM-optimized context
@@ -221,11 +242,18 @@ If `llmOptimizedContext: true` is active in the project configuration, the conte
 
 **Strict Bypass**: `optimizedContext` usage is strictly bypassed (forced to `false`) if `sections` is passed but does not include both `rules` and `constraints`. This is because the monolithic optimized context cannot be filtered by individual sections. If `scenarios` are requested while `optimizedContext` is active, the scenarios MUST still be extracted and appended to the result. `optimizedDescription` preference is unaffected by this bypass.
 
+**Change-scope bypass**: for specs whose IDs appear in `change.specIds`, lock-owned optimizations (`optimizedContext` and `optimizedDescription`) MUST NOT be applied — they describe pre-change content by definition and the merged artifact set is authoritative. These specs render through the extracted-first ladder regardless of optimization freshness. This bypass is independent of the `sections` Strict Bypass and applies in every display mode.
+
 ### Requirement: Optimization warning signal
 
-When `llmOptimizedContext` is enabled, the system MUST emit a `stale-optimization` warning for each spec whose materialized metadata reports a missing or stale `optimizedContext` field, per the per-field freshness recorded on the spec's lock-owned optimization state.
+When `llmOptimizedContext` is enabled, optimization warnings are emitted ONLY for collected specs that are NOT in `change.specIds`. Two distinct conditions are distinguished as separate warning types:
 
-The warning message MUST include remediation instructions: "Launch specd-spec-context-optimizer agent to refresh".
+- `missing-optimization` — the spec's lock-owned state records no optimization value for the field at all (never optimized).
+- `stale-optimization` — an optimization is recorded but its artifact or schema baselines no longer match the current persisted artifacts (drifted after a content change).
+
+Both warning messages MUST include remediation instructions: "Launch specd-spec-context-optimizer agent to refresh".
+
+Specs inside `change.specIds` MUST NOT produce optimization warnings: their lock state is irrelevant while the change is in flight because optimizations are never applied to them.
 
 ### Requirement: Config-based factory delegates through resolveCompileContextDeps
 
@@ -265,7 +293,7 @@ The helper is the only use-case-specific composition entry for config-based boot
 - `depth` is only meaningful when `followDeps: true`; it limits traversal levels (1 = direct deps only)
 - `sections` applies only to full-mode spec content rendering; summary-mode specs and project context entries are unaffected
 - Cycle detection is mandatory — cycles in `dependsOn` must not cause infinite loops
-- Fresh metadata (via `SpecRepository.metadata()`) is always preferred; the `metadataExtraction` fallback is only used when metadata is absent or stale
+- For specs outside `change.specIds`, fresh canonical metadata is preferred; the `metadataExtraction` fallback is only used when metadata is absent or stale. For specs inside `change.specIds`, schema-driven extraction over the merged preview set is the primary source (extracted-first), with canonical metadata as fallback
 - `contextMode` supports `list`, `summary`, `full`, and `hybrid`; when omitted, `summary` is used
 - In `hybrid`, only direct `change.specIds` entries included via `includeChangeSpecs: true` are full; other collected specs remain summaries
 - `PreviewSpec` errors MUST NOT block context compilation — `CompileContext` falls back to base content on any preview failure
@@ -308,6 +336,7 @@ const result = await compileContext.execute({
 - [`core:schema-format`](../schema-format/spec.md)
 - [`core:delta-format`](../delta-format/spec.md)
 - [`core:selector-model`](../selector-model/spec.md)
+- [`core:content-extraction`](../content-extraction/spec.md) — format-agnostic extraction engine that backs extracted-first rendering for change-scoped specs
 - [`core:spec-id-format`](../spec-id-format/spec.md)
 - [`core:workspace`](../workspace/spec.md)
 - [`core:get-artifact-instruction`](../get-artifact-instruction/spec.md)
@@ -316,5 +345,5 @@ const result = await compileContext.execute({
 - [`core:refresh-implementation-tracking`](../refresh-implementation-tracking/spec.md)
 - [`core:project-metadata`](../project-metadata/spec.md)
 - [`core:get-spec-metadata`](../get-spec-metadata/spec.md) — self-healing metadata read (`if-needed`) used instead of direct repository freshness checks
-- [`core:spec-optimization`](../spec-optimization/spec.md) — per-field optimization freshness backing the stale-optimization warning
+- [`core:spec-optimization`](../spec-optimization/spec.md) — per-field optimization freshness backing the optimization warning signals
 - [`core:composition-resolver`](../composition-resolver/spec.md)

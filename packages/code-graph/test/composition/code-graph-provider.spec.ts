@@ -1,12 +1,11 @@
 import { describe, it, expect, afterEach, vi } from 'vitest'
-import { mkdtempSync, readdirSync, rmSync, writeFileSync, mkdirSync } from 'node:fs'
+import { mkdtempSync, readdirSync, rmSync, writeFileSync, mkdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { type SpecRepository, type Spec } from '@specd/core'
 import { createCodeGraphProvider } from '../../src/composition/create-code-graph-provider.js'
 import { createBootstrapGraphConfig } from '../../src/application/services/bootstrap-graph-config.js'
 import { StoreNotOpenError } from '../../src/domain/errors/store-not-open-error.js'
-import { GraphProviderStaleError } from '../../src/domain/errors/graph-provider-stale-error.js'
 import { InvalidGraphSelectorError } from '../../src/domain/errors/invalid-graph-selector-error.js'
 import { GraphStoreRegistryError } from '../../src/domain/errors/graph-store-registry-error.js'
 import { InMemoryGraphStore } from '../helpers/in-memory-graph-store.js'
@@ -20,6 +19,10 @@ import {
   SymbolSpace,
 } from '../../src/domain/value-objects/symbol-reference.js'
 import { SymbolKind } from '../../src/domain/value-objects/symbol-kind.js'
+import { acquireGraphIndexLockByStoragePath } from '../../src/infrastructure/index-lock.js'
+import { GraphBusyError } from '../../src/domain/errors/graph-busy-error.js'
+import { GraphStorageRecoveryRequiredError } from '../../src/domain/errors/graph-storage-recovery-required-error.js'
+import { GraphStoreRecreateRequiresClosedError } from '../../src/domain/errors/graph-store-recreate-requires-closed-error.js'
 
 const makeMockRepo = makeMockSpecRepository
 
@@ -185,6 +188,47 @@ describe('CodeGraphProvider', () => {
     await provider.close()
   })
 
+  it('uses logical clear rather than physical recreation for forced indexing', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'specd-graph-provider-force-clear-'))
+    const codeRoot = join(tempDir, 'workspace')
+    mkdirSync(codeRoot, { recursive: true })
+    writeFileSync(join(codeRoot, 'entry.ts'), 'export const forced = 1\n')
+    const store = new InMemoryGraphStore()
+    const clear = vi.spyOn(store, 'clear')
+    const recreate = vi.spyOn(store, 'recreate')
+    const provider = createCodeGraphProvider({
+      storagePath: tempDir,
+      projectRoot: tempDir,
+      graphStoreFactories: { custom: { create: () => store } },
+      graphStoreId: 'custom',
+    })
+    await provider.open()
+
+    const result = await provider.index({
+      projectRoot: tempDir,
+      vcsRoot: tempDir,
+      force: true,
+      workspaces: [
+        {
+          name: 'default',
+          prefix: null,
+          codeRoot,
+          specRepo: makeMockRepo(),
+          ownership: 'owned',
+          isExternal: false,
+        },
+      ],
+      graphConfig: { includePaths: [], workspaces: new Map() },
+    })
+
+    expect(clear).toHaveBeenCalledOnce()
+    expect(recreate).not.toHaveBeenCalled()
+    expect(result.fullRebuild).toBe(true)
+    expect(result.fullRebuildReason).toContain('logical')
+    expect(result.filesIndexed).toBe(1)
+    await provider.close()
+  })
+
   it('can be instantiated from SpecdConfig', async () => {
     tempDir = mkdtempSync(join(tmpdir(), 'specd-graph-provider-specd-config-'))
     const config = createBootstrapGraphConfig({
@@ -198,6 +242,71 @@ describe('CodeGraphProvider', () => {
     expect(stats.fileCount).toBe(0)
 
     await provider.close()
+  })
+
+  it('keeps reader availability locked while an index lease is held', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'specd-graph-provider-reader-lock-'))
+    const provider = createCodeGraphProvider({ storagePath: tempDir, projectRoot: tempDir })
+    await provider.open()
+    const release = acquireGraphIndexLockByStoragePath(tempDir)
+    try {
+      await expect(provider.getStatistics()).rejects.toThrow(GraphBusyError)
+    } finally {
+      release()
+      await provider.close()
+    }
+  })
+
+  it('accepts only a matching parent lock handoff for indexing', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'specd-graph-provider-handoff-'))
+    const previousRoot = process.env['SPECD_GRAPH_INDEX_LOCK_ROOT']
+    const previousToken = process.env['SPECD_GRAPH_INDEX_LOCK_TOKEN']
+    const release = acquireGraphIndexLockByStoragePath(tempDir)
+    const lockPath = join(tempDir, 'graph', 'index.lock')
+    const lock = JSON.parse(readFileSync(lockPath, 'utf8')) as { version: 1; token: string }
+    writeFileSync(lockPath, JSON.stringify({ ...lock, pid: process.ppid }))
+    process.env['SPECD_GRAPH_INDEX_LOCK_ROOT'] = tempDir
+    process.env['SPECD_GRAPH_INDEX_LOCK_TOKEN'] = lock.token
+    const store = new InMemoryGraphStore()
+    const provider = createCodeGraphProvider({
+      storagePath: tempDir,
+      projectRoot: tempDir,
+      graphStoreFactories: { custom: { create: () => store } },
+      graphStoreId: 'custom',
+    })
+    const codeRoot = join(tempDir, 'workspace')
+    mkdirSync(codeRoot, { recursive: true })
+    try {
+      await provider.open()
+      await expect(
+        provider.index({
+          projectRoot: tempDir,
+          vcsRoot: tempDir,
+          workspaces: [
+            {
+              name: 'default',
+              prefix: null,
+              codeRoot,
+              specRepo: makeMockRepo(),
+              ownership: 'owned',
+              isExternal: false,
+            },
+          ],
+          graphConfig: { includePaths: [], workspaces: new Map() },
+        }),
+      ).resolves.toBeDefined()
+      // Indexing consumes the matching handoff, while the separate SQLite-backed
+      // reader-lock regression above proves reads never consume it.
+      await expect(provider.getStatistics()).resolves.toBeDefined()
+    } finally {
+      await provider.close()
+      if (previousRoot === undefined) delete process.env['SPECD_GRAPH_INDEX_LOCK_ROOT']
+      else process.env['SPECD_GRAPH_INDEX_LOCK_ROOT'] = previousRoot
+      if (previousToken === undefined) delete process.env['SPECD_GRAPH_INDEX_LOCK_TOKEN']
+      else process.env['SPECD_GRAPH_INDEX_LOCK_TOKEN'] = previousToken
+      rmSync(lockPath, { force: true })
+      release()
+    }
   })
 
   it('close is idempotent and can be safely called multiple times', async () => {
@@ -233,7 +342,7 @@ describe('CodeGraphProvider', () => {
     await provider.close()
   })
 
-  it('throws GraphProviderStaleError when the backing store generation changes externally', async () => {
+  it('requires a provider to be closed before physical recreation', async () => {
     tempDir = mkdtempSync(join(tmpdir(), 'specd-graph-provider-stale-'))
     const customStore = new InMemoryGraphStore()
     const provider = await createCodeGraphProvider({
@@ -247,11 +356,22 @@ describe('CodeGraphProvider', () => {
       graphStoreId: 'custom',
     })
     await provider.open()
-    await customStore.recreate()
-
-    await expect(provider.getStatistics()).rejects.toThrow(GraphProviderStaleError)
-
+    await expect(provider.recreate()).rejects.toBeInstanceOf(GraphStoreRecreateRequiresClosedError)
     await provider.close()
+
+    await expect(provider.recreate()).resolves.toBeUndefined()
+  })
+
+  it('serializes physical recreation with the graph index lock', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'specd-graph-provider-recreate-lock-'))
+    const provider = createCodeGraphProvider({ storagePath: tempDir, projectRoot: tempDir })
+    const release = acquireGraphIndexLockByStoragePath(tempDir)
+    try {
+      await expect(provider.recreate()).rejects.toBeInstanceOf(GraphBusyError)
+    } finally {
+      release()
+      await provider.close()
+    }
   })
 
   it('supports async disposal', async () => {
@@ -484,7 +604,7 @@ describe('CodeGraphProvider', () => {
     await provider.close()
   })
 
-  it('repairs incompatible storage only through the indexing-specific open path', async () => {
+  it('propagates recoverable storage open errors until a closed caller recreates', async () => {
     tempDir = mkdtempSync(join(tmpdir(), 'specd-graph-provider-repair-'))
     class IncompatibleStore extends InMemoryGraphStore {
       incompatible = true
@@ -492,7 +612,10 @@ describe('CodeGraphProvider', () => {
 
       override async open(): Promise<void> {
         if (this.incompatible) {
-          throw new Error('SQLite graph storage schema 10 is incompatible with expected 11')
+          throw new GraphStorageRecoveryRequiredError(
+            'schema is incompatible',
+            'SCHEMA_INCOMPATIBLE',
+          )
         }
         await super.open()
       }
@@ -513,16 +636,13 @@ describe('CodeGraphProvider', () => {
       })
 
     const readProvider = createProvider()
-    await expect(readProvider.open()).rejects.toThrow('incompatible')
+    await expect(readProvider.open()).rejects.toBeInstanceOf(GraphStorageRecoveryRequiredError)
     expect(store.recreateCount).toBe(0)
 
-    const indexingProvider = createProvider()
-    await expect(indexingProvider.openForIndexing()).resolves.toEqual({
-      fullRebuild: true,
-      fullRebuildReason: 'SCHEMA_INCOMPATIBLE',
-    })
+    await readProvider.recreate()
     expect(store.recreateCount).toBe(1)
-    await indexingProvider.close()
+    await readProvider.open()
+    await readProvider.close()
   })
 
   it('validates availability exactly once per provider batch operation', async () => {

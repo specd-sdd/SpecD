@@ -1,4 +1,5 @@
 import { type CodeGraphHostPort } from '../ports/code-graph-host-port.js'
+import { type GetSpecMetadata } from '@specd/core'
 import {
   type IndexProgressCallback,
   type ProjectGraphConfig,
@@ -17,10 +18,12 @@ export interface IndexProjectGraphInput {
   readonly vcsRef?: string
   readonly force?: boolean
   readonly onProgress?: IndexProgressCallback
+  /** Materialized spec metadata source used for spec-content fingerprinting. */
+  readonly getSpecMetadata?: GetSpecMetadata
 }
 
 /**
- * Executes project graph indexing with optional force recreate.
+ * Executes project graph indexing with optional forced logical reindex.
  */
 export class IndexProjectGraph {
   /**
@@ -39,6 +42,7 @@ export class IndexProjectGraph {
       ...(input.force === true ? { force: true } : {}),
       ...(input.vcsRef !== undefined ? { vcsRef: input.vcsRef } : {}),
       ...(input.onProgress !== undefined ? { onProgress: input.onProgress } : {}),
+      ...(input.getSpecMetadata !== undefined ? { getSpecMetadata: input.getSpecMetadata } : {}),
     })
   }
 }

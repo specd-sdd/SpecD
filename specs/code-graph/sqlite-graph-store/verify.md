@@ -53,12 +53,6 @@
 - **THEN** new incoming operations reject with `StoreNotOpenError`
 - **AND** all previously accepted pending operations are drained to completion before the worker closes the SQLite database and terminates
 
-#### Scenario: Recreate serializes exclusively against concurrent reads and writes
-
-- **GIVEN** concurrent queries and a `recreate()` operation dispatched to the store
-- **WHEN** the worker serial execution queue processes them in order
-- **THEN** earlier queries complete before recreation, recreation finishes cleanly, and subsequent queries execute against the freshly recreated store without race conditions
-
 #### Scenario: Serializable runtime descriptor loads custom module in worker
 
 - **GIVEN** a `SqliteRuntimeDescriptor` specifying a custom `modulePath`
@@ -254,15 +248,24 @@
 
 ### Requirement: Destructive recreation
 
-#### Scenario: Recreate discards SQLite-owned graph files under the graph root
+#### Scenario: SQLite recreation requires a closed worker
 
-- **GIVEN** SQLite persistence already exists under `{configPath}/graph`
-- **WHEN** `SQLiteGraphStore.recreate()` is invoked through the abstract force-reset
-  path
-- **THEN** the previously persisted SQLite graph state is discarded
-- **AND** any SQLite-owned companion artifacts in the same graph root are discarded
-  with it
-- **AND** callers do not target SQLite filenames directly
+- **GIVEN** an open SQLite graph store
+- **WHEN** `recreate()` is requested
+- **THEN** it rejects with the typed closed-store precondition error
+
+#### Scenario: Closed SQLite recreation leaves no native handle
+
+- **GIVEN** a closed SQLite store with an incompatible schema
+- **WHEN** `recreate()` completes
+- **THEN** the graph directory and companion files were replaced and generation rotated
+- **AND** no database or worker is reopened until explicit `open()`
+
+#### Scenario: Healthy force clears without delete-reopen lifecycle
+
+- **GIVEN** an opened healthy SQLite store
+- **WHEN** force indexing runs
+- **THEN** it uses logical clear and full reanalysis without physical recreation
 
 ### Requirement: Storage generation sidecar
 

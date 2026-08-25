@@ -127,13 +127,33 @@ Both are pure synchronous functions: no I/O, no kernel access, no process side e
 
 ## Orchestration
 
-| Function                     | Purpose                                                    |
-| ---------------------------- | ---------------------------------------------------------- |
-| `buildProjectStatusSnapshot` | `GetProjectSummary` + optional `GetGraphHealth` / hotspots |
-| `runIndexProjectGraph`       | `listWorkspaces` + VCS ref + `IndexProjectGraph`           |
-| `buildImplementationReview`  | Core raw tracking + one Code Graph resolution batch        |
+| Function                     | Purpose                                                      |
+| ---------------------------- | ------------------------------------------------------------ |
+| `buildProjectStatusSnapshot` | `GetProjectSummary` + optional `GetGraphHealth` / hotspots   |
+| `runIndexProjectGraph`       | `listWorkspaces` + VCS ref + `IndexProjectGraph`             |
+| `runIsolatedGraphIndex`      | Code Graph-owned isolated child execution for a trusted task |
+| `buildImplementationReview`  | Core raw tracking + one Code Graph resolution batch          |
 
 All return structured data — formatting stays in delivery presenters.
+
+`runIsolatedGraphIndex` is the SDK re-export for a host that needs to run a trusted,
+installed graph-index task in a child process. The host supplies a graph storage root,
+an absolute task path or `file:` URL, JSON-serializable input, and optionally receives
+ordered progress values. Code Graph acquires and releases the shared writer lock,
+launches and supervises the child, validates IPC, and forwards `SIGINT`/`SIGTERM` only
+for the active run. Typed worker failures are re-exported alongside the function.
+
+The task itself can call `runIndexProjectGraph` after reconstructing the intended SDK
+context. This separates parent-side isolation from child-side project orchestration.
+The SDK intentionally does not expose raw lock acquisition, lock paths or leases,
+handoff tokens, child bootstrap controls, or raw IPC envelopes.
+
+For a transient `runIndexProjectGraph({ force: true })` call, the SDK may repair a
+typed `GraphStorageRecoveryRequiredError` exactly once: it closes the failed transient
+provider, recreates closed derived storage, and retries open. Healthy force runs are
+logical full rebuilds and do not physically recreate storage. Non-forced calls,
+explicit providers, recovery failures, second-open failures, and unrelated errors do
+not retry or receive deletion authority.
 
 ### Unified graph operations
 
@@ -207,14 +227,14 @@ them in the SDK or CLI.
 
 `@specd/cli` and `@specd/mcp` depend on `@specd/sdk` only — no direct `@specd/core` or `@specd/code-graph` runtime imports in delivery hosts.
 
-| CLI surface                            | SDK entry                                        |
-| -------------------------------------- | ------------------------------------------------ |
-| `resolveCliContext`                    | `openSpecdHost` + `buildCliKernelOptions`        |
-| `project status`                       | `buildProjectStatusSnapshot`                     |
-| `graph stats`                          | `withOpenGraphProvider` + `createGetGraphHealth` |
-| `graph index`                          | `runIndexProjectGraph`                           |
-| `graph search` / `hotspots` / `impact` | `withOpenGraphProvider` via `withProvider`       |
-| `changes implementation` / status      | `buildImplementationReview`                      |
+| CLI surface                            | SDK entry                                                        |
+| -------------------------------------- | ---------------------------------------------------------------- |
+| `resolveCliContext`                    | `openSpecdHost` + `buildCliKernelOptions`                        |
+| `project status`                       | `buildProjectStatusSnapshot`                                     |
+| `graph stats`                          | `withOpenGraphProvider` + `createGetGraphHealth`                 |
+| `graph index`                          | `runIsolatedGraphIndex` → packaged task → `runIndexProjectGraph` |
+| `graph search` / `hotspots` / `impact` | `withOpenGraphProvider` via `withProvider`                       |
+| `changes implementation` / status      | `buildImplementationReview`                                      |
 
 ## Re-exports
 
@@ -222,8 +242,9 @@ The SDK root exports explicit symbols from the curated `@specd/core` and `@specd
 
 - `createDefaultConfigLoader`, `createConfigWriter`, `createKernel`, kernel-equivalent `createX` factories, and repository factories
 - Standalone `createX` factories (e.g. `createGetStatus`, `createResolveSchema`) for hosts that need a single use case without `createKernel`
-- Host orchestration: `openSpecdHost`, `withOpenGraphProvider`, `buildProjectStatusSnapshot`, `runIndexProjectGraph`, `buildImplementationReview`
-- Graph helpers: `createGetGraphHealth`, `GetGraphHealthResult`, `IndexResult`, `HotspotResult`, `GraphProviderStaleError`
+- Host orchestration: `openSpecdHost`, `withOpenGraphProvider`, `buildProjectStatusSnapshot`, `runIndexProjectGraph`, `runIsolatedGraphIndex`, `buildImplementationReview`
+- Isolated worker contracts and typed failures: `GraphIndexJsonValue`, `GraphIndexTask`, `RunIsolatedGraphIndexInput`, `GraphIndexWorkerStartError`, `GraphIndexTaskContractError`, `GraphIndexTaskExecutionError`, `GraphIndexWorkerProtocolError`, `GraphIndexWorkerExitError`, `GraphIndexWorkerSignalError`, and `GraphIndexProgressHandlerError`
+- Graph helpers: `createGetGraphHealth`, `GetGraphHealthResult`, `IndexResult`, `HotspotResult`, `GraphProviderStaleError`, `GraphStorageRecoveryRequiredError`, `GraphStoreRecreateRequiresClosedError`
 - `SDK_VERSION`, `CORE_VERSION`, `CODE_GRAPH_VERSION`
 
 For package-level semantics (domain model, graph indexing, plugin ports), see the **Core** and **Code graph** package reference sections.

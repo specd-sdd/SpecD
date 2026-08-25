@@ -8,6 +8,11 @@ import { SpecNotFoundError } from '../../domain/errors/spec-not-found-error.js'
 import { BulkSessionStateError } from '../../domain/errors/bulk-session-state-error.js'
 import { InvalidGraphStoreConfigurationError } from '../../domain/errors/invalid-graph-store-configuration-error.js'
 import { GraphSchemaIncompatibleError } from '../../domain/errors/graph-schema-incompatible-error.js'
+import {
+  GraphStorageRecoveryRequiredError,
+  type GraphStorageRecoveryReason,
+} from '../../domain/errors/graph-storage-recovery-required-error.js'
+import { GraphStoreRecreateRequiresClosedError } from '../../domain/errors/graph-store-recreate-requires-closed-error.js'
 import { resolveSqliteWorkerPath } from './resolve-worker-path.js'
 import {
   type SerializedErrorPayload,
@@ -87,6 +92,8 @@ export function serializeWorkerError(error: unknown): SerializedErrorPayload {
     const details: Record<string, unknown> = {}
     if (error instanceof SpecNotFoundError && typeof error.specId === 'string') {
       details.specId = error.specId
+    } else if (error instanceof GraphStorageRecoveryRequiredError) {
+      details.recoveryReason = error.reason
     } else if (typeof errorRecord.specId === 'string') {
       details.specId = errorRecord.specId
     }
@@ -145,6 +152,14 @@ export function deserializeWorkerError(payload: SerializedErrorPayload): Error {
   }
   if (payload.code === 'GRAPH_SCHEMA_INCOMPATIBLE') {
     return new GraphSchemaIncompatibleError(payload.message)
+  }
+  if (payload.code === 'GRAPH_STORAGE_RECOVERY_REQUIRED') {
+    const reason: GraphStorageRecoveryReason =
+      payload.details?.recoveryReason === 'CORRUPT' ? 'CORRUPT' : 'SCHEMA_INCOMPATIBLE'
+    return new GraphStorageRecoveryRequiredError(payload.message, reason)
+  }
+  if (payload.code === 'GRAPH_STORE_RECREATE_REQUIRES_CLOSED') {
+    return new GraphStoreRecreateRequiresClosedError(payload.message)
   }
 
   const err = new Error(payload.message)
@@ -309,8 +324,10 @@ export class SQLiteWorkerClient {
   }
 
   /**
-   * Drains in-flight requests, closes the database connection in the worker,
-   * and terminates the worker thread. Concurrent invocations share the same shutdown promise.
+   * Drains in-flight requests, asks the worker to close its database and message port,
+   * then waits for its cooperative exit. A forced termination is only used when that
+   * shutdown sequence does not finish within the drain deadline. Concurrent invocations
+   * share the same shutdown promise.
    *
    * @param drainTimeoutMs - Maximum time in milliseconds to wait for accepted operations to drain.
    * @returns Promise resolving when the worker has shut down cleanly.
@@ -344,6 +361,8 @@ export class SQLiteWorkerClient {
 
     this.closePromise = (async () => {
       const deadline = Date.now() + drainTimeoutMs
+      let workerExitedCleanly = false
+      let workerExit: Promise<number> | undefined
 
       try {
         // 1. If currently opening, wait for open attempt to settle within the deadline
@@ -372,12 +391,23 @@ export class SQLiteWorkerClient {
         // 3. If drained successfully and worker is still healthy, send clean DB close RPC
         //    with remaining time from the shared deadline using withDeadline.
         if (drained && !this.faulted && this.worker) {
+          const worker = this.worker
+          // Register the exit listener before posting close. The worker closes its
+          // MessagePort immediately after acknowledging the request, so its exit may
+          // otherwise race the host's response handler.
+          workerExit = this.waitForWorkerExit(worker)
           try {
             await withDeadline(
               this.sendRequestInternal('close', {}, true),
               deadline,
               () => new StoreWorkerError('Worker close RPC timed out'),
             )
+            const exitCode = await withDeadline(
+              workerExit,
+              deadline,
+              () => new StoreWorkerError('Worker shutdown timed out while awaiting worker exit'),
+            )
+            workerExitedCleanly = exitCode === 0
           } catch {
             // Ignore error sending close to worker during shutdown (timeout or worker gone)
           }
@@ -395,12 +425,16 @@ export class SQLiteWorkerClient {
           this.pendingRequests.clear()
         }
 
-        // 5. Force terminate worker thread unconditionally
+        // 5. A healthy worker closes its MessagePort after the close ACK and exits
+        //    naturally. Only use Worker.terminate() as a bounded fallback for a
+        //    stalled, crashed, or non-zero shutdown.
         if (this.worker) {
-          try {
-            await this.worker.terminate()
-          } catch {
-            // Ignore termination errors
+          if (!workerExitedCleanly) {
+            try {
+              await this.worker.terminate()
+            } catch {
+              // Ignore termination errors
+            }
           }
           this.worker = undefined
         }
@@ -508,6 +542,20 @@ export class SQLiteWorkerClient {
         }
       }, 10)
       checkInterval.unref?.()
+    })
+  }
+
+  /**
+   * Observes the next exit for a worker that is being cooperatively shut down.
+   * The listener is installed before the close request is posted to avoid losing
+   * an immediate exit between the close acknowledgement and host-side handling.
+   *
+   * @param worker - The active worker expected to exit after its close acknowledgement.
+   * @returns Promise resolving with the worker's exit code.
+   */
+  private waitForWorkerExit(worker: Worker): Promise<number> {
+    return new Promise<number>((resolve) => {
+      worker.once('exit', resolve)
     })
   }
 

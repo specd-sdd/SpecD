@@ -123,22 +123,6 @@ describe('withOpenGraphProvider', () => {
     expect(order).toEqual(['beforeOpen', 'open', 'fn'])
   })
 
-  it('uses a specialized open operation and passes its result to the callback', async () => {
-    const provider = makeProvider()
-    const specializedOpen = vi.fn().mockResolvedValue({ repaired: true })
-
-    const result = await withOpenGraphProvider(
-      makeContext(provider),
-      async (_openedProvider, openResult) => openResult,
-      { open: specializedOpen },
-    )
-
-    expect(result).toEqual({ repaired: true })
-    expect(specializedOpen).toHaveBeenCalledWith(provider)
-    expect(provider.open).not.toHaveBeenCalled()
-    expect(provider.close).toHaveBeenCalledOnce()
-  })
-
   it('runs close and afterClose when open fails after beforeOpen', async () => {
     const provider = makeProvider()
     const order: string[] = []
@@ -175,6 +159,147 @@ describe('withOpenGraphProvider', () => {
     ).rejects.toBe(openError)
     expect(provider.close).toHaveBeenCalledOnce()
     expect(afterClose).toHaveBeenCalledWith(provider)
+  })
+
+  it('closes, recovers, and retries a failed parameterless open exactly once', async () => {
+    const provider = makeProvider()
+    const openError = new Error('open failed')
+    const order: string[] = []
+    provider.open
+      .mockImplementationOnce(() => {
+        order.push('initial-open')
+        throw openError
+      })
+      .mockImplementationOnce(() => {
+        order.push('retry-open')
+      })
+    provider.close.mockImplementation(() => {
+      order.push('close')
+    })
+    const recoverOpenFailure = vi.fn(async (error: unknown) => {
+      order.push('recover')
+      expect(error).toBe(openError)
+      return true
+    })
+
+    await withOpenGraphProvider(
+      makeContext(provider),
+      async () => {
+        order.push('fn')
+      },
+      { recoverOpenFailure },
+    )
+
+    expect(provider.open).toHaveBeenCalledTimes(2)
+    expect(recoverOpenFailure).toHaveBeenCalledWith(openError, provider)
+    expect(order).toEqual(['initial-open', 'close', 'recover', 'retry-open', 'fn', 'close'])
+  })
+
+  it('preserves the initial open failure when recovery declines it', async () => {
+    const provider = makeProvider()
+    const openError = new Error('open failed')
+    const recoverOpenFailure = vi.fn(async () => false)
+    provider.open.mockRejectedValue(openError)
+
+    await expect(
+      withOpenGraphProvider(makeContext(provider), async () => 'ok', { recoverOpenFailure }),
+    ).rejects.toBe(openError)
+
+    expect(recoverOpenFailure).toHaveBeenCalledWith(openError, provider)
+    expect(provider.open).toHaveBeenCalledOnce()
+    expect(provider.close).toHaveBeenCalledOnce()
+  })
+
+  it('closes finally before afterClose when recovery throws without masking the recovery error', async () => {
+    const provider = makeProvider()
+    const initialOpenError = new Error('initial open failed')
+    const recoveryError = new Error('recovery failed')
+    const order: string[] = []
+    provider.open.mockImplementation(() => {
+      order.push('open')
+      throw initialOpenError
+    })
+    provider.close
+      .mockImplementationOnce(() => {
+        order.push('close')
+      })
+      .mockImplementationOnce(() => {
+        order.push('final-close')
+        throw new Error('final close failed')
+      })
+    const recoverOpenFailure = vi.fn(async () => {
+      order.push('recover')
+      throw recoveryError
+    })
+    const afterClose = vi.fn(async () => {
+      order.push('afterClose')
+      throw new Error('afterClose failed')
+    })
+
+    await expect(
+      withOpenGraphProvider(makeContext(provider), async () => 'ok', {
+        recoverOpenFailure,
+        afterClose,
+      }),
+    ).rejects.toBe(recoveryError)
+
+    expect(provider.open).toHaveBeenCalledOnce()
+    expect(recoverOpenFailure).toHaveBeenCalledOnce()
+    expect(provider.close).toHaveBeenCalledTimes(2)
+    expect(afterClose).toHaveBeenCalledOnce()
+    expect(order).toEqual(['open', 'close', 'recover', 'final-close', 'afterClose'])
+  })
+
+  it('closes finally before afterClose when retry open fails without a third open', async () => {
+    const provider = makeProvider()
+    const initialOpenError = new Error('initial open failed')
+    const retryOpenError = new Error('retry open failed')
+    const order: string[] = []
+    provider.open
+      .mockImplementationOnce(() => {
+        order.push('initial-open')
+        throw initialOpenError
+      })
+      .mockImplementationOnce(() => {
+        order.push('retry-open')
+        throw retryOpenError
+      })
+    provider.close
+      .mockImplementationOnce(() => {
+        order.push('close')
+      })
+      .mockImplementationOnce(() => {
+        order.push('final-close')
+        throw new Error('final close failed')
+      })
+    const recoverOpenFailure = vi.fn(async () => {
+      order.push('recover')
+      return true
+    })
+    const afterClose = vi.fn(async () => {
+      order.push('afterClose')
+      throw new Error('afterClose failed')
+    })
+
+    await expect(
+      withOpenGraphProvider(makeContext(provider), async () => 'ok', {
+        recoverOpenFailure,
+        afterClose,
+      }),
+    ).rejects.toBe(retryOpenError)
+
+    expect(provider.open).toHaveBeenCalledTimes(2)
+    expect(recoverOpenFailure).toHaveBeenCalledOnce()
+    expect(provider.close).toHaveBeenCalledTimes(2)
+    expect(afterClose).toHaveBeenCalledOnce()
+    expect(order).toEqual([
+      'initial-open',
+      'close',
+      'recover',
+      'retry-open',
+      'final-close',
+      'afterClose',
+    ])
   })
 
   it('does not call process.exit', async () => {

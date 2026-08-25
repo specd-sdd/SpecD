@@ -442,4 +442,42 @@ describe('traverseDependsOn', () => {
     expect(added.has('default:auth/shared')).toBe(false)
     expect(warnings.filter((w) => w.type === 'missing-metadata')).toHaveLength(1)
   })
+
+  it('skip option drops unresolvable discoveries without registration or warning', async () => {
+    // auth/login (persisted) depends on auth/shared; shared's lock references
+    // default:ghost, which is not persisted. In skip mode ghost is neither
+    // registered nor warned.
+    const repo = makeSpecRepository({
+      specs: [makeTraversalSpec('auth/login'), makeTraversalSpec('auth/shared')],
+      artifacts: {
+        'auth/login/spec-lock.json': lockJson(['default:auth/shared']),
+        'auth/shared/spec-lock.json': lockJson(['default:ghost']),
+      },
+    })
+    const workspaces = await makeWorkspaceMap(new Map([['default', repo]]))
+    const included = new Map<string, ResolvedSpec>()
+    const added = new Map<string, ResolvedSpec>()
+    const seen = new Set<string>()
+    const warnings: ContextWarning[] = []
+
+    await traverseDependsOn(
+      'default',
+      'auth/login',
+      included,
+      added,
+      seen,
+      new Set(),
+      workspaces,
+      warnings,
+      undefined,
+      0,
+      undefined,
+      { unresolved: 'skip' },
+    )
+
+    expect(added.has('default:auth/login')).toBe(true)
+    expect(added.has('default:auth/shared')).toBe(true)
+    expect(added.has('default:ghost')).toBe(false)
+    expect(warnings).toHaveLength(0)
+  })
 })

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { makeSpec } from '../../helpers/make-spec.js'
 import { GetSpecContext } from '../../../src/application/use-cases/get-spec-context.js'
+import { type GetSpecMetadata } from '../../../src/application/use-cases/get-spec-metadata.js'
 import { Spec } from '../../../src/domain/entities/spec.js'
 import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
 import { createBuiltinExtractorTransforms } from '../../../src/composition/extractor-transforms/index.js'
@@ -302,5 +303,86 @@ describe('GetSpecContext', () => {
       'default:auth/shared',
     ])
     expect(result.warnings.some((warning) => warning.type === 'missing-metadata')).toBe(true)
+  })
+
+  describe('optimization warning typing and regeneration provenance', () => {
+    function stubGetSpecMetadata(
+      metadata: Record<string, unknown>,
+      opts: { regenerated?: boolean } = {},
+    ): GetSpecMetadata {
+      return {
+        execute: async () => ({
+          metadata,
+          metadataFingerprint: 'fp-test',
+          source: opts.regenerated === true ? 'generated' : 'persisted',
+          regenerated: opts.regenerated ?? false,
+          warnings: [],
+        }),
+      } as unknown as GetSpecMetadata
+    }
+
+    function makeUc(getMetadata: GetSpecMetadata): GetSpecContext {
+      const hasher = makeContentHasher()
+      const repo = makeSpecRepository({
+        specs: [makeSpec({ workspace: 'default', name: 'auth/login', filenames: ['spec.md'] })],
+        artifacts: { 'auth/login/spec.md': '# Login\n' },
+      })
+      return new GetSpecContext(
+        makeListWorkspaces(new Map([['default', repo]])),
+        hasher,
+        getMetadata,
+        makeSchemaProvider(makeSchema()),
+        makeParsers(),
+        createBuiltinExtractorTransforms(),
+      )
+    }
+
+    it('types missing-optimization when no optimization status is recorded', async () => {
+      const uc = makeUc(stubGetSpecMetadata({ title: 'Login', description: 'Handles login' }))
+      const result = await uc.execute({
+        workspace: 'default',
+        specPath: SpecPath.parse('auth/login'),
+        contextMode: 'summary',
+        llmOptimizedContext: true,
+      })
+      expect(result.warnings.some((w) => w.type === 'missing-optimization')).toBe(true)
+    })
+
+    it('types stale-optimization from optimizationStatus baselines', async () => {
+      const uc = makeUc(
+        stubGetSpecMetadata({
+          title: 'Login',
+          description: 'Handles login',
+          optimizationStatus: { optimizedContext: 'stale' },
+        }),
+      )
+      const result = await uc.execute({
+        workspace: 'default',
+        specPath: SpecPath.parse('auth/login'),
+        contextMode: 'summary',
+        llmOptimizedContext: true,
+      })
+      expect(
+        result.warnings.some(
+          (w) => w.type === 'stale-optimization' && w.path === 'default:auth/login',
+        ),
+      ).toBe(true)
+    })
+
+    it('cache-miss regeneration does not emit a warning', async () => {
+      const uc = makeUc(
+        stubGetSpecMetadata(
+          { title: 'Login', description: 'Handles login' },
+          { regenerated: true },
+        ),
+      )
+      const result = await uc.execute({
+        workspace: 'default',
+        specPath: SpecPath.parse('auth/login'),
+        contextMode: 'summary',
+      })
+      expect(result.entries[0]!.stale).toBe(false)
+      expect(result.warnings).toHaveLength(0)
+    })
   })
 })

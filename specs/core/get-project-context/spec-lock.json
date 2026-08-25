@@ -16,45 +16,46 @@
   ],
   "implementation": [
     {
-      "file": "core:src/application/use-cases/get-project-context.ts",
-      "symbols": ["GetProjectContext"]
+      "file": "core:src/application/use-cases/_shared/materialize-context-spec-metadata.ts",
+      "symbols": ["appendMaterializationDiagnostics"]
     },
     {
-      "file": "core:test/application/use-cases/get-project-context.spec.ts"
+      "file": "core:src/application/use-cases/get-project-context.ts",
+      "symbols": ["GetProjectContext"]
     }
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "Compiles project-level context (steps 1–4) with all workspaces active; change-independent CompileContext counterpart.",
+      "value": "Compiles change-independent project context across all workspaces, with dependency traversal and fresh optimized-context preference.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:5b4716afc05b707976adc452928e2c6aaee435df75506544c727476c5212be34",
-          "lastModified": "2026-07-25T11:53:31.515Z"
+          "hash": "sha256:e589b5e570492cfa18bd30b74032723a16fb25c3044a9a70f064a22a76b6690f",
+          "lastModified": "2026-08-24T14:58:38.206Z"
         },
         "verify.md": {
-          "hash": "sha256:1907f0bfe7f6f7a4cbdae26dbb9b704b02f91731cabc182fa5562d76204453d9",
-          "lastModified": "2026-07-25T11:53:31.515Z"
+          "hash": "sha256:7b43947fcb8ec7fb4b64873481a5f6c1b947ec8cf0986f42ddcc110d13834f8e",
+          "lastModified": "2026-08-24T14:58:38.207Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# GetProjectContext\n\n## Rules\n- `execute(input: GetProjectContextInput)`: optional `contextMode` (`'list'|'summary'|'full'|'hybrid'`), `llmOptimizedContext`, `followDeps`, `depth`, `sections` (`ReadonlyArray<SpecSection>`). MUST NOT include `config`.\n- Returns `GetProjectContextResult`: `contextEntries`, `specs` (`ContextSpecEntry[]`, all `source: 'includePattern'`), `warnings`. Mode from `config.contextMode`; `hybrid`≡`full` (no change specs). Full mode = structured metadata/extraction, NOT raw markdown.\n- Resolve schema via `SchemaProvider.get()` first; `SchemaNotFoundError`/`SchemaValidationError` propagate.\n- Render `config.context` in order before specs: `instruction` → `**Source: instruction**`; `file` via `FileReader` → `**Source: <path>**` (headings +1); missing file → `missing-file` warning + skip.\n- Apply project `contextIncludeSpecs` then `contextExcludeSpecs` across all workspaces via same `listMatchingSpecs` as `CompileContext` (all workspaces active).\n- MUST NOT apply workspace-level context patterns.\n- `followDeps: true`: traverse `dependsOn` via `GetSpecMetadata.execute` (self-healing) then schema `metadataExtraction.dependsOn` fallback; shared extractor-transform registry; respect `depth`; fail if transforms cannot normalize; NEVER read `spec-lock.json` directly.\n- Render: `list` = no GetSpecMetadata; `summary` = title+description; `full`/`hybrid` = sections — default Description+Rules+Constraints when `sections` absent/empty. Forward GetSpecMetadata warnings.\n- Fallback when no projection: `missing-metadata` warning → live extraction → empty heading if no declarations; fail on transform failure.\n- Deps: `listWorkspaces`, `schemaProvider`, `files`, `getMetadata`, `parsers`, `defaultConfig` (`CompileContextConfig`). Shallow-merge `defaultConfig` with runtime overrides at execute start.\n- `llmOptimizedContext` on → prefer fresh cached optimized project context from `core:project-metadata`; off → never return cache as primary. Stale/empty → warn + standard compile; warning MUST include \"Launch specd-project-context-optimizer agent to generate it\".\n- Config factory: `resolveGetProjectContextDeps(resolver)` → `createGetProjectContext(deps)`; deps include hasher, extractorTransforms, workspaceRoutes, defaultConfig — no inline fs wiring.\n\n## Constraints\n- No change context — all workspaces active.\n- Workspace-level patterns never applied.\n- Specs matched by multiple includes appear once.\n- Context entries before spec content.\n- Async: `Promise<GetProjectContextResult>`.\n- Same formatting as `CompileContext`.\n- `dependsOn` traversal only when `followDeps: true`.",
+      "value": "# GetProjectContext\n\n## Rules\n- `execute(input: GetProjectContextInput)` accepts optional `contextMode` (`'list' | 'summary' | 'full' | 'hybrid'`), `llmOptimizedContext`, `followDeps`, `depth`, `sections: ReadonlyArray<SpecSection>`; MUST NOT accept `config`. Runtime overrides shallow-merge into construction-time `defaultConfig`.\n- Return `Promise<GetProjectContextResult>` containing ordered `contextEntries`, deduplicated `specs: ContextSpecEntry[]`, `warnings`. All specs use `source: 'includePattern'`. `hybrid` equals `full`. Full output MUST be structured metadata/extraction, never raw markdown.\n- Resolve schema first through `SchemaProvider.get()`; propagate `SchemaNotFoundError` and `SchemaValidationError`.\n- Render `config.context` before specs, declaration order. `instruction` label: `**Source: instruction**`. `file`: read through `FileReader`, label `**Source: <path>**`, shift headings +1. Missing file: emit `missing-file`, skip entry.\n- Collect across all workspaces via project `contextIncludeSpecs`; remove project `contextExcludeSpecs`; use `CompileContext` `listMatchingSpecs`. Never apply workspace-level patterns.\n- With `followDeps: true`, traverse transitive `dependsOn`; respect `depth` (`1` = direct, absent = unlimited). Resolve through `GetSpecMetadata.execute({ specId })` default `'if-needed'`; only if no projection, fallback to schema `metadataExtraction.dependsOn` using shared extractor-transform registry and caller-owned origin context. Add discovered specs. Transform normalization failure MUST fail explicitly. Never read `spec-lock.json` directly.\n- Rendering by effective `contextMode`: `list` emits IDs only and MUST NOT call `GetSpecMetadata`; `summary` emits title + description; `full`/`hybrid` emits selected structured sections. Absent/empty `sections` defaults to Description + Rules + Constraints; explicit filter overrides. Filters do not affect list/summary.\n- Do not warn solely for regenerated projections. Forward actionable materialization warnings such as `metadata-cache-write-failed` without logging again.\n- With `llmOptimizedContext`, rendered specs lacking usable `optimizedContext` emit `missing-optimization` or `stale-optimization`; remediation MUST say `Launch specd-spec-context-optimizer agent to refresh`. No change-scope exemptions.\n- If `GetSpecMetadata` cannot produce valid projection: emit `missing-metadata`; live-extract through schema declarations, shared transforms, caller-owned origin context; apply same section filtering; render empty heading when declarations absent. Found-but-unnormalizable transformed values MUST fail explicitly.\n- Constructor deps: `listWorkspaces: ListWorkspaces`, `schemaProvider: SchemaProvider`, `files: FileReader`, `getMetadata: GetSpecMetadata`, `parsers: ArtifactParserRegistry`, `defaultConfig: CompileContextConfig`; schema resolves lazily.\n- When `llmOptimizedContext` enabled, prefer fresh non-empty cached optimized project context from `core:project-metadata`. Freshness uses semantic fingerprints: `specd.yaml`, referenced `contextFiles`, included-spec materialized metadata fingerprints. Disabled, stale, or empty cache: standard compilation; stale/empty emits warning containing `Launch specd-project-context-optimizer agent to generate it`.\n- Config factory `createGetProjectContext(config, options?)` MUST call `resolveGetProjectContextDeps(resolver)`, then canonical `createGetProjectContext(deps)`. Resolver supplies `listWorkspaces`, `schemaProvider`, `files`, `getMetadata`, `parsers`, `hasher`, `extractorTransforms`, `workspaceRoutes`, `defaultConfig`; factory MUST NOT rebuild fs wiring inline.\n\n## Constraints\n- No change context; all workspaces active.\n- Project patterns only; workspace patterns forbidden.\n- Duplicate include matches collapse to one spec.\n- Context entries precede spec content.\n- Formatting matches `CompileContext`.\n- Dependency traversal requires explicit `followDeps: true`.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:5b4716afc05b707976adc452928e2c6aaee435df75506544c727476c5212be34",
-          "lastModified": "2026-07-25T11:53:31.515Z"
+          "hash": "sha256:e589b5e570492cfa18bd30b74032723a16fb25c3044a9a70f064a22a76b6690f",
+          "lastModified": "2026-08-24T14:58:38.206Z"
         },
         "verify.md": {
-          "hash": "sha256:1907f0bfe7f6f7a4cbdae26dbb9b704b02f91731cabc182fa5562d76204453d9",
-          "lastModified": "2026-07-25T11:53:31.515Z"
+          "hash": "sha256:7b43947fcb8ec7fb4b64873481a5f6c1b947ec8cf0986f42ddcc110d13834f8e",
+          "lastModified": "2026-08-24T14:58:38.207Z"
         }
       }
     }

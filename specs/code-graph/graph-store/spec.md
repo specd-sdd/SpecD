@@ -37,25 +37,33 @@ Backends MAY represent those concepts differently internally, but they MUST pres
 
 ### Requirement: Connection lifecycle
 
-`GraphStore` SHALL expose explicit `open(): Promise<void>` and `close(): Promise<void>` operations together with any backend-specific lifecycle state needed by the adapter.
+`GraphStore.open()` SHALL remain an explicit parameterless lifecycle operation. It
+MUST NOT clear or recreate storage implicitly. When the adapter detects corruption
+or a schema incompatibility that cannot be opened safely, it MUST reject with a
+typed recoverable storage-open error; all other failures retain their own error
+identity.
 
-The `open()` method prepares the concrete backend for read/write operations. It MAY perform backend-native module loading, runtime-specific binding resolution, schema preparation, or storage-generation checks required before the store can serve requests.
+Open prepares the concrete backend for reads and writes and MAY perform native
+loading, binding resolution, schema preparation, or generation checks.
 
-The `close()` method releases backend resources and MUST be idempotent. Calling `close()` more than once, or combining it with future async-dispose support, MUST NOT fail merely because the store was already closed.
+`close()` MUST be idempotent and leave the store observably closed, including after
+a partial open failure. Callers can therefore decide whether a typed recovery is
+authorized without retaining a live database handle.
 
 ### Requirement: Store recreation
 
-`GraphStore` SHALL provide `recreate(): Promise<void>` as the abstract destructive reset capability used by provider-owned indexing flows.
+`recreate()` SHALL be a physical recovery operation for storage that is corrupt,
+incompatible, or otherwise unusable. It MUST require the store to be closed and
+reject an open-store invocation with a typed precondition error. On success it
+removes/replaces backend persistence and rotates the storage generation while
+leaving the store closed; a caller must later call `open()` explicitly.
 
-`recreate()` is stronger than `clear()`: it resets the backend's persisted storage layer, not just the logical graph contents.
+`clear()` is distinct: it operates on an opened healthy store, removes only logical
+indexed contents, preserves the physical database and storage generation, and is
+the operation used by a forced full reindex.
 
-The concrete backend owns how recreation is performed. A backend MAY delete files, recreate schema state, rotate generation metadata, or rebuild internal search artifacts, provided all of the following hold after `recreate()` completes:
-
-- all previously indexed graph data is gone
-- the persisted backend state is ready for a fresh indexing run
-- callers do not need to know backend-specific filenames, lockfiles, WAL files, or schema artifacts
-
-Host-facing code MUST NOT depend on backend-specific reset mechanics or on direct store recreation APIs. The owning `CodeGraphProvider` decides when recreation is required as part of `index(...)`, `clear()`, or other internal maintenance paths.
+Host-facing callers MUST NOT rely on backend filenames, WAL files, or direct store
+mechanics; provider and SDK contracts determine when recovery is authorized.
 
 ### Requirement: Storage generation tracking
 

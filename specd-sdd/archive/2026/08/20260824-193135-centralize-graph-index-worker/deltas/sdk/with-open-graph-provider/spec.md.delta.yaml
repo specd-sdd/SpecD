@@ -1,0 +1,35 @@
+- op: modified
+  description: 'Add a generic bounded open-failure recovery callback without changing open()'
+  selector:
+    type: section
+    matches: '^Requirement: withOpenGraphProvider signature$'
+  content: |
+    `withOpenGraphProvider<T>(ctx: SdkHostContext, fn: (provider:
+    CodeGraphProvider) => Promise<T>, options?: WithOpenGraphProviderOptions):
+    Promise<T>` SHALL create a provider, run `beforeOpen` after creation, call
+    parameterless `provider.open()`, invoke `fn`, close the provider, and then run
+    `afterClose` under the existing ordering and error rules.
+
+    `WithOpenGraphProviderOptions` retains `beforeOpen?: (provider:
+    CodeGraphProvider) => Promise<void>` and `afterClose?: (provider:
+    CodeGraphProvider) => Promise<void>`.
+
+    `WithOpenGraphProviderOptions` SHALL additionally support an optional generic
+    `recoverOpenFailure(error, provider): Promise<boolean>` callback. Following an
+    initial open failure, the helper MUST first attempt `provider.close()`, then invoke
+    the callback with that closed provider and the original error. If the callback
+    resolves `true`, the helper SHALL retry `provider.open()` exactly once; it MUST NOT
+    call the callback again for a failed retry. A false result preserves the original
+    error. This option does not alter the `CodeGraphProvider.open()` contract.
+
+- op: modified
+  description: 'Preserve error identity while supporting one generic recovery attempt'
+  selector:
+    type: section
+    matches: '^Requirement: Error propagation$'
+  content: |
+    When `fn` throws, the helper MUST attempt close without masking the original error.
+    When initial open fails, it MUST close before optional recovery. A recovery callback
+    failure or a retry-open failure is terminal; `afterClose` still runs after final
+    cleanup. The helper MUST never retry implicitly, swallow non-recoverable errors, or
+    call `process.exit()`.

@@ -9,33 +9,57 @@ Without an up-to-date code graph, all graph-based queries return stale or empty 
 ### Requirement: Command signature
 
 ```text
-specd graph index [--force] [--exclude-path <pattern>] [--config <path> | --path <path>] [--format text|json|toon]
+specd graph index [--force] [--exclude-path <pattern>...] [--config <path> | --path <path>] [--format text|json|toon]
 ```
 
-- `--force` — optional; recreate the graph store from scratch
-- `--exclude-path <pattern>` — optional, repeatable; additional patterns to exclude during file discovery
-- `--config <path>` — optional; explicit path to `specd.yaml`
-- `--path <path>` — optional; repo-root bootstrap mode
-- `--format text|json|toon` — optional; output format, defaults to `text`
-
-`--config` and `--path` are mutually exclusive.
+- `--force` is optional and requests a full logical reindex: indexed contents are
+  cleared and every selected input is reprocessed.
+- If a typed recoverable storage-open failure occurs, `--force` also authorizes the
+  SDK use case to recreate closed storage and retry once; it does not authorize
+  deletion for ordinary open failures.
+- `--exclude-path <pattern>` is optional and repeatable.
+- `--config <path>` and `--path <path>` remain mutually exclusive.
+- `--format text|json|toon` defaults to text.
 
 ### Requirement: Indexing behaviour
 
-Index execution MUST go through `runIndexProjectGraph(ctx, input)` inside `@specd/sdk`. The worker process (or current process when worker bypass is active) obtains an `SdkHostContext` through the shared SDK composition boundary. When the CLI has already resolved a configured kernel for command context or parent-lock ownership, the worker/bypass path SHALL reuse that kernel rather than reload configuration or build a parallel kernel; bootstrap mode SHALL create the equivalent SDK context from the resolved bootstrap config.
+Index execution MUST go through the high-level `runIsolatedGraphIndex` capability
+imported from `@specd/sdk`. The CLI SHALL provide:
 
-The command SHALL retain CLI-only concerns:
+- the graph storage root resolved for the command context;
+- the URL of its trusted, packaged graph-index task module;
+- JSON-serializable task input containing the explicit configured or bootstrap
+  context descriptor plus `force` and additional exclude paths;
+- a progress callback that renders text-mode progress while leaving structured
+  modes presentation-neutral.
 
-- shared graph indexing lock acquisition in the parent process before spawning a worker
-- worker subprocess isolation via `child_process.spawn` unless `SPECD_GRAPH_INDEX_NO_WORKER=true`
-- `onProgress` callback wiring for text-mode progress output
-- passing `force: true` to `runIndexProjectGraph` when `--force` is set
+The CLI MUST NOT import, acquire, inspect, assert, release, or otherwise coordinate
+the graph index lock. It MUST NOT spawn or fork a graph-index process itself. Lock
+acquisition, child creation, signal forwarding, IPC validation, termination
+classification, and cleanup belong to the code-graph isolated worker.
 
-The command handler invokes `runIndexProjectGraph` for index execution; workspace assembly and `IndexProjectGraph` orchestration live in `@specd/sdk`.
+The packaged CLI task SHALL execute inside the isolated child. It SHALL reconstruct
+an SDK host context equivalent to the parent's explicit configured or bootstrap
+descriptor and invoke `runIndexProjectGraph(ctx, input)` exactly once. Because an
+in-memory kernel cannot cross a process boundary, the task MUST NOT claim or attempt
+to reuse the same kernel object identity. It MUST preserve the selected config path
+or bootstrap root and MUST NOT perform implicit project substitution.
 
-Unless `SPECD_GRAPH_INDEX_NO_WORKER` is set to `true` (test-only bypass), the parent CLI process SHALL spawn a child worker via `child_process.spawn` reusing the same CLI arguments. The parent acquires the shared graph indexing lock before spawning. The worker receives `SPECD_GRAPH_INDEX_WORKER=true` and `SPECD_GRAPH_INDEX_LOCK_HELD=true` in its environment, performs indexing via `runIndexProjectGraph`, and inherits stdio from the parent. The parent forwards `SIGINT` and `SIGTERM` to the worker, releases the lock when the worker exits, and propagates the worker exit code (or reports worker failure on non-zero exit).
+Workspace assembly, VCS resolution, spec metadata materialization, provider
+lifecycle, repair handling, and `IndexProjectGraph` orchestration SHALL remain in
+`runIndexProjectGraph` inside `@specd/sdk`; the CLI task MUST NOT reproduce them.
 
-When `SPECD_GRAPH_INDEX_NO_WORKER` is `true`, indexing runs in the current process without spawning a worker. This bypass exists only for automated tests.
+Production execution SHALL always use the process-isolated worker. CLI-specific
+`SPECD_GRAPH_INDEX_WORKER` and `SPECD_GRAPH_INDEX_NO_WORKER` execution branches are
+not part of the target command behaviour. Tests SHALL use explicit worker/task
+seams without changing the production path.
+
+The parent CLI SHALL receive typed progress, result, and failure outcomes from the
+high-level worker. It SHALL render the successful `RunIndexProjectGraphResult`
+using the existing text, JSON, or TOON contract. Per-file indexing errors remain a
+successful result; busy, fork, task, protocol, abnormal-exit, signal, provider, and
+other infrastructure failures SHALL follow the command's existing system-error
+path.
 
 ### Requirement: Output format
 
@@ -91,12 +115,26 @@ Text output SHALL state when a destructive full rebuild occurred and why. JSON a
 
 ## Constraints
 
-- Index execution orchestration lives in `@specd/sdk` — the CLI does not assemble workspace targets, VCS refs, or `IndexProjectGraph` inputs inline
-- Lock management and worker subprocess isolation remain CLI-only adapter concerns
-- `process.exit(0)` is called explicitly after closing the provider to prevent LadybugDB native threads from keeping the process alive
-- `--force` is forwarded to `runIndexProjectGraph` input
-- Worker subprocess isolation keeps native graph-store threads out of the parent CLI process; tests bypass spawning via `SPECD_GRAPH_INDEX_NO_WORKER`
-- Platform symbols for the graph index handler come from `@specd/sdk`
+- Index execution orchestration lives in `@specd/sdk`; the CLI does not assemble
+  workspace targets, VCS refs, spec metadata collaborators, or
+  `IndexProjectGraph` inputs inline.
+- Lock ownership, process supervision, the worker entrypoint, IPC, signals, and
+  cleanup live in `@specd/code-graph` behind the high-level worker API.
+- CLI MUST import graph platform capabilities through `@specd/sdk` and MUST NOT
+  declare or import `@specd/code-graph` directly.
+- CLI MUST NOT expose task-module selection as a command option; its task module is
+  trusted, packaged, and version-affine with the installed CLI.
+- Production indexing always crosses the code-graph child-process boundary; test
+  seams do not create a user-visible no-worker mode.
+- `--force` and additional exclude paths are forwarded through serializable task
+  input to `runIndexProjectGraph`.
+- A non-forced command, and a forced command with any non-recoverable open error,
+  preserves the typed open error and MUST NOT delete graph storage.
+- Worker and provider failures are rendered through the existing CLI typed error
+  and exit contract; the graph runtime does not render CLI output or call host
+  `process.exit()`.
+- Successful output preserves all existing index result, per-workspace, phase,
+  rebuild, coverage, and per-file error fields.
 
 ## Examples
 
@@ -128,8 +166,15 @@ $ specd graph index --format json
 
 ## Spec Dependencies
 
-- [`cli:entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
-- [`core:config`](../../core/config/spec.md) — configured operation, explicit config path handling, and bootstrap-mode relationship
-- [`core:list-workspaces`](../../core/list-workspaces/spec.md) — centralized project orchestration (via SDK)
-- [`sdk:run-index-project-graph`](../../sdk/run-index-project-graph/spec.md) — index execution orchestration
-- [`sdk:host-context`](../../sdk/host-context/spec.md) — shared SDK host composition and resolved-context reuse
+- [`cli:entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output
+  conventions, and the delivery-host SDK boundary
+- [`core:config`](../../core/config/spec.md) — configured operation, explicit config
+  path handling, and bootstrap-mode relationship
+- [`core:list-workspaces`](../../core/list-workspaces/spec.md) — centralized project
+  orchestration through SDK
+- [`sdk:run-index-project-graph`](../../sdk/run-index-project-graph/spec.md) — index
+  execution orchestration performed by the injected CLI task
+- [`sdk:host-context`](../../sdk/host-context/spec.md) — equivalent SDK host context
+  reconstruction inside the child
+- `code-graph:isolated-index-worker` — lock-aware process isolation and injected
+  task execution consumed through SDK

@@ -15,7 +15,16 @@
     "core:spec-optimization",
     "core:get-spec-metadata"
   ],
-  "implementation": [],
+  "implementation": [
+    {
+      "file": "core:src/application/use-cases/_shared/materialize-context-spec-metadata.ts",
+      "symbols": ["appendMaterializationDiagnostics"]
+    },
+    {
+      "file": "core:src/application/use-cases/get-spec-context.ts",
+      "symbols": ["GetSpecContext"]
+    }
+  ],
   "optimizations": {
     "optimizedDescription": {
       "value": "Builds mode-aware spec context, optionally traversing dependencies via self-healing metadata with stale optimization warnings.",

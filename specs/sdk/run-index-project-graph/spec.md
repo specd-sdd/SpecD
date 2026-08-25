@@ -8,23 +8,25 @@
 
 ### Requirement: runIndexProjectGraph orchestration
 
-`runIndexProjectGraph(ctx: SdkHostContext, input: RunIndexProjectGraphInput): Promise<RunIndexProjectGraphResult>` SHALL:
+`runIndexProjectGraph(ctx: SdkHostContext, input: RunIndexProjectGraphInput):
+Promise<RunIndexProjectGraphResult>` SHALL reject lifecycle hooks paired with an
+explicit provider using `InvalidProviderLifecycleError`, resolve config and all or
+selected workspaces, prepare project root, graph config, version, VCS, force, and
+progress inputs, and invoke `IndexProjectGraph` on an opened provider.
 
-1. Validate input combinations:
-   - IF `input.provider` is provided AND (`input.beforeOpen` is provided OR `input.afterClose` is provided), throw `InvalidProviderLifecycleError` (a `SpecdError` with `code: 'INVALID_PROVIDER_LIFECYCLE'`)
-2. Resolve `SpecdConfig` via `ctx.kernel.project.getConfig.execute()`
-3. Call `ctx.kernel.project.listWorkspaces.execute()` for workspace targets
-4. Prepare `projectRoot`, `workspaces`, `graphConfig`, `codeGraphVersion`, `vcsRoot`, `vcsRef`, `force`, and `onProgress`
-5. If `input.provider` is provided:
-   - Expect `input.provider` to be an already open `CodeGraphProvider` instance
-   - Invoke `createIndexProjectGraph()` directly on `input.provider`
-   - MUST NOT close `input.provider` on completion or failure
-6. If `input.provider` is omitted:
-   - Run inside `withOpenGraphProvider(ctx, async (provider) => { ... }, { beforeOpen: input.beforeOpen, afterClose: input.afterClose })`
-   - Invoke `createIndexProjectGraph()` on the opened transient provider
-   - Close the transient provider upon completion
+An explicit `input.provider` MUST already be open. The SDK MUST NOT close,
+recreate, or retry that caller-owned provider; force still reaches
+`IndexProjectGraph` as a logical full-reindex intent.
 
-`input.workspaces` MAY restrict indexing to a subset; when omitted, all configured workspaces MUST be indexed.
+For a transient provider, the SDK SHALL use `withOpenGraphProvider`. If, and only
+if, `input.force` is true and initial `open()` rejects with the typed recoverable
+storage-open error, the use case SHALL request exactly one recovery through the
+helper: after that provider is closed, call `provider.recreate()`, then retry
+`open()` and the index operation once. It MUST preserve caller hooks and run cleanup
+exactly once per provider lifetime.
+
+The SDK MUST rethrow non-recoverable errors, an untyped error, a recovery failure,
+or a second open failure without deletion or further retry.
 
 ### Requirement: Lock acquisition out of scope
 
@@ -40,9 +42,10 @@ When `input.onProgress` is provided, the orchestration MUST forward progress eve
 
 ### Requirement: Repair lifecycle passthrough
 
-`runIndexProjectGraph` SHALL carry incompatibility-repair intent and full-rebuild results without lossy mapping. When an old schema cannot open for normal reads, the SDK SHALL use the provider's indexing-specific lifecycle/repair path rather than fail before `IndexProjectGraph` can rebuild it.
-
-The SDK MUST preserve provider ownership of destructive recreation and SHALL still execute caller lifecycle hooks and cleanup exactly once.
+The SDK SHALL report the final full-rebuild result without lossy mapping. It owns
+the force-only decision to recover a typed failed open, while Code Graph owns the
+`recreate()` primitive and its closed-provider precondition. Normal reads and
+non-forced indexing surface the original typed open failure unchanged.
 
 ## Spec Dependencies
 

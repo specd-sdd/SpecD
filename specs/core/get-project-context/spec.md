@@ -75,7 +75,9 @@ For each included spec, the use case MUST first classify the entry's display mod
 
 Section filters MUST NOT affect list-mode or summary-mode entries.
 
-Any `metadata-cache-write-failed` or generation warning returned by `GetSpecMetadata` MUST be forwarded into the result's `warnings` array without being logged again.
+Cache-miss regeneration is provenance information carried on the materialization result (`source`, `regenerated`) — this use case MUST NOT emit a warning solely because a projection was regenerated. Only actionable materialization failures such as `metadata-cache-write-failed` MUST be forwarded into the result's `warnings` array without being logged again.
+
+When `llmOptimizedContext` is enabled and a rendered spec's materialized projection lacks a usable `optimizedContext`, the use case emits an optimization warning typed `missing-optimization` (never optimized) or `stale-optimization` (recorded but baselines drifted), with remediation instructions: "Launch specd-spec-context-optimizer agent to refresh". This use case remains change-agnostic: it applies no change-scope exemptions.
 
 #### Scenario: Default sections in full mode
 

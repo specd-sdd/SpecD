@@ -1,0 +1,29 @@
+- op: modified
+  selector:
+    type: section
+    matches: '^Requirement: Destructive recreation$'
+  content: |
+    #### Scenario: SQLite recreation requires a closed worker
+
+    - **GIVEN** an open SQLite graph store
+    - **WHEN** `recreate()` is requested
+    - **THEN** it rejects with the typed closed-store precondition error
+
+    #### Scenario: Closed SQLite recreation leaves no native handle
+
+    - **GIVEN** a closed SQLite store with an incompatible schema
+    - **WHEN** `recreate()` completes
+    - **THEN** the graph directory and companion files were replaced and generation rotated
+    - **AND** no database or worker is reopened until explicit `open()`
+
+    #### Scenario: Healthy force clears without delete-reopen lifecycle
+
+    - **GIVEN** an opened healthy SQLite store
+    - **WHEN** force indexing runs
+    - **THEN** it uses logical clear and full reanalysis without physical recreation
+
+- op: removed
+  description: 'Recreation is closed-only and cannot serialize with queries on an open worker.'
+  selector:
+    type: section
+    matches: '^Scenario: Recreate serializes exclusively against concurrent reads and writes$'

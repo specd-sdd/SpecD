@@ -78,7 +78,8 @@
 #### Scenario: Internal components not exported
 
 - **WHEN** a consumer imports from `@specd/code-graph`
-- **THEN** `LadybugGraphStore`, `SQLiteGraphStore`, `AdapterRegistry`, built-in language adapters, and `IndexCodeGraph` are not available as imports
+- **THEN** `LadybugGraphStore`, `SQLiteGraphStore`, `AdapterRegistry`, built-in
+  language adapters, and `IndexCodeGraph` are not available as imports
 
 #### Scenario: LanguageAdapter interface is exported
 
@@ -88,29 +89,69 @@
 #### Scenario: Graph-store composition types are exported
 
 - **WHEN** a consumer wants to register or select a backend explicitly
-- **THEN** `GraphStoreFactory`, `CodeGraphOptions`, `CodeGraphCompositionOptions`, `SqliteRuntimeDescriptor`, `SQLiteGraphStoreOptions`, and `createSqliteGraphStoreFactory` are available as imports
+- **THEN** `GraphStoreFactory`, `CodeGraphOptions`, `CodeGraphCompositionOptions`,
+  `SqliteRuntimeDescriptor`, `SQLiteGraphStoreOptions`, and
+  `createSqliteGraphStoreFactory` are available as imports
 
 #### Scenario: Model types are exported
 
 - **WHEN** a consumer needs to type-annotate results
-- **THEN** `FileNode`, `SymbolNode`, `SpecNode`, `Relation`, `SymbolKind`, and `RelationType` are available as imports
+- **THEN** `FileNode`, `SymbolNode`, `SpecNode`, `Relation`, `SymbolKind`, and
+  `RelationType` are available as imports
 
 #### Scenario: Workspace integration types are exported
 
 - **WHEN** a consumer needs to build workspace targets
-- **THEN** `WorkspaceIndexTarget`, `WorkspaceIndexBreakdown`, and `DiscoveredSpec` are available as imports
+- **THEN** `WorkspaceIndexTarget`, `WorkspaceIndexBreakdown`, and
+  `DiscoveredSpec` are available as imports
 
 #### Scenario: SpecNotFoundError is exported
 
 - **WHEN** a consumer imports from `@specd/code-graph`
 - **THEN** `SpecNotFoundError` is available as an import
-- **AND** thrown instances expose machine-readable code `SPEC_NOT_FOUND` and the requested spec id
+- **AND** thrown instances expose machine-readable code `SPEC_NOT_FOUND` and the
+  requested spec id
+
+#### Scenario: Isolated index worker is exported as a high-level capability
+
+- **WHEN** a host imports from `@specd/code-graph`
+- **THEN** `runIsolatedGraphIndex` and its host-facing input, progress, result,
+  and typed failure contracts are available
+- **AND** the API does not require the host to acquire a lock, fork a process, or
+  exchange raw protocol messages
+
+#### Scenario: Recovery is explicit and closed-only
+
+- **GIVEN** an opened provider with healthy indexed data
+- **WHEN** `index({ force: true })` runs
+- **THEN** logical contents are cleared and every selected input is reconsidered
+- **AND** `recreate()` is not invoked
+
+#### Scenario: Recreation rejects an open provider
+
+- **WHEN** `recreate()` is invoked while the provider is open
+- **THEN** it rejects with `GraphStoreRecreateRequiresClosedError`
+
+#### Scenario: Raw index coordination remains internal
+
+- **WHEN** the curated `@specd/code-graph` declarations are inspected
+- **THEN** raw lock acquisition, assertion, path derivation, release tokens,
+  process adapters, child bootstrap functions, and IPC envelopes are absent
+- **AND** the internal entry retains only the raw primitives required by package
+  internals and repository tests
+
+#### Scenario: Recovery error contracts are public
+
+- **WHEN** a delivery host imports from the curated package entry
+- **THEN** it can distinguish `GraphStorageRecoveryRequiredError` and
+  `GraphStoreRecreateRequiresClosedError` without importing store internals
 
 #### Scenario: Concrete store adapters are available only from the internal entry
 
 - **GIVEN** a consumer importing from `@specd/code-graph/internal`
 - **WHEN** the internal entry is queried for concrete store adapter symbols
-- **THEN** `SQLiteGraphStore`, `AdapterRegistry`, and the built-in language adapters are importable
+- **THEN** `SQLiteGraphStore`, `AdapterRegistry`, and the built-in language adapters
+  are importable
 - **AND** none of those symbols are importable from `@specd/code-graph` (`"."`)
 - **AND** `LadybugGraphStore` is not importable from either entrypoint
 
@@ -126,6 +167,20 @@
 - **WHEN** importing from `@specd/code-graph` `"."`
 - **THEN** `InMemoryIndexSession` is not available at compile time
 - **AND** importing from `@specd/code-graph/internal` succeeds
+
+#### Scenario: Built package resolves the isolated child entry
+
+- **GIVEN** `@specd/code-graph` has been built and installed as a package
+- **WHEN** `runIsolatedGraphIndex` starts its child using the module-relative URL
+  compiled into the public implementation
+- **THEN** the ESM child file resolves from the package `dist` tree and starts
+  without source-tree paths or TypeScript loaders
+
+#### Scenario: Child runtime has no public package subpath
+
+- **WHEN** package exports and generated declarations are inspected
+- **THEN** no public export subpath resolves the isolated child runtime
+- **AND** consumers interact with it only through `runIsolatedGraphIndex`
 
 ### Requirement: Lifecycle management
 

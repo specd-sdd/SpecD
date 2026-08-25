@@ -8,25 +8,36 @@ Consumers of `@specd/code-graph` should not need to know how the store, indexer,
 
 ### Requirement: CodeGraphProvider facade
 
-`CodeGraphProvider` SHALL be the top-level API object that wraps all code graph functionality behind one lifecycle-managed facade.
+`CodeGraphProvider` SHALL be the top-level API object that wraps all code graph
+functionality behind one lifecycle-managed facade.
 
 Public responsibilities include:
 
-- Indexing: `index(options: IndexOptions): Promise<IndexResult>` — runs `IndexCodeGraph` and owns any provider-internal force-reset or lock policy required by indexing
-- Querying: `getSymbol(id)`, `findSymbols(query)`, `getFile(path)`, `getDocument(path)`, `findFilesByConfigRelativePath(configRelativePath)`, `findDocumentsByConfigRelativePath(configRelativePath)`, `getSpec(specId)`, `getSpecDependencies(specId)`, `getSpecDependents(specId)`, `getCoveredFiles(specId)`, `getCoveringSpecsForFile(filePath)`, `getCoveredSymbols(specId)`, `getCoveringSpecsForSymbol(symbolId)`, `getStatistics()` — delegates to `GraphStore`
-- Exact batch querying: `getSymbolsByIds(ids)`, `getFilesByPaths(paths)`, `getDocumentsByPaths(paths)`, `getSpecsByIds(ids)` — delegates to `GraphStore` exact batch node operations
-- Search: `searchSymbols(options: SearchOptions)`, `searchSpecs(options: SearchOptions)`, `searchDocuments(options: SearchOptions)` — full-text search with exact-match prioritization, delegates to `GraphStore`
-- Maintenance: `clear(): Promise<void>` — clears persisted graph contents while preserving the provider lifecycle contract
-- Traversal: `getUpstream(symbolId, options?)`, `getDownstream(symbolId, options?)` — delegates to traversal functions
-- Impact: `analyzeImpact(target, direction)`, `analyzeFileImpact(filePath, direction)`, `analyzeFilesImpact(filePaths, direction, maxDepth)`, `analyzeSpecImpact(specId, direction)`, `detectChanges(changedFiles)`, `getHotspots(options?)` — delegates to impact/traversal functions
-- Selector normalization: `resolveFileSelector(selector: string): Promise<ResolvedFileSelector[]>`, `resolveSymbolSelector(selector: string): Promise<ResolvedSymbolSelectorResult>` — resolves project-relative or absolute paths to canonical graph identities
-- Lifecycle: `open(): Promise<void>`, `close(): Promise<void>` — manages the store connection and backend resource lifetime
+- Indexing: `index(options: IndexOptions): Promise<IndexResult>` — when
+  `options.force` is true, it SHALL clear logical graph contents and ensure the
+  indexer reprocesses every selected input. Force MUST NOT invoke physical storage
+  recreation.
+- Recovery: `recreate(): Promise<void>` — physically recreates unrecoverable graph
+  storage only while the provider is closed. It MUST reject a call while open with a
+  typed closed-provider precondition error and leave the provider closed after a
+  successful recreation.
+- Querying: `getSymbol`, `findSymbols`, `getFile`, `getDocument`, config-relative
+  file/document lookups, spec/coverage lookups, and statistics delegate to the
+  store; exact batch and full-text-search operations retain their existing contracts.
+- Traversal, impact, and selector normalization retain their existing facade
+  contracts. `clear(): Promise<void>` removes logical graph contents from an opened
+  reusable store; it does not replace the physical database or storage generation.
+- Lifecycle: `open(): Promise<void>`, `close(): Promise<void>` — manages backend
+  resources. `open()` remains parameterless and surfaces a typed recoverable
+  storage-open error for corruption or incompatible schema; it MUST NOT recreate
+  storage implicitly.
 
-`getSpec(specId)` returns `undefined` when the spec is not indexed. Callers that require existence MAY throw domain-specific errors above the provider layer.
-
-Every composite provider operation (traversal, impact, hotspots, change detection, indexing) SHALL perform exactly one availability/staleness validation before fanning out its store reads. A composite operation MUST NOT revalidate availability once per symbol, file, or frontier, and MUST NOT produce `StoreOverloadError` merely because it processes a wide graph. Composite operations SHALL fan out only through the bounded batch and concurrency contracts of the underlying store and traversal layers.
-
-Public callers MUST NOT depend on `recreate()`, worker protocol operations, or exposed lock-helper methods. Force-reset behavior, worker-efficient batch reads, and indexing locks are provider-owned internal concerns.
+`getSpec(specId)` returns undefined for absent data. Each composite provider
+operation performs exactly one availability/staleness validation before bounded
+fan-out. Composite availability, delegation, and result semantics remain unchanged. Public
+callers MUST NOT use recreation as ordinary indexing maintenance: the SDK forced
+reindex orchestration is the supported recovery path. Worker protocol operations and
+lock-helper methods remain internal.
 
 ### Requirement: Factory function
 
@@ -73,31 +84,79 @@ The built-in graph-store registry SHALL contain exactly the `sqlite` backend. Th
 
 The `@specd/code-graph` `"."` public barrel SHALL export only:
 
-- Composition and wiring: `createCodeGraphProvider`, type-only `CodeGraphProvider`, `CodeGraphCompositionOptions`, `CodeGraphOptions`, `GraphStoreFactory`, `GraphStoreFactoryOptions`, `SqliteGraphStoreFactoryOptions`, `createSqliteGraphStoreFactory`, `SqliteRuntimeDescriptor`, `SQLiteGraphStoreOptions`
-- Host use cases: `GetGraphHealth`, `GetGraphHealthInput`, `GetGraphHealthResult`, `createGetGraphHealth`, `IndexProjectGraph`, `IndexProjectGraphInput`, `createIndexProjectGraph`, `GetSpecCoverage`, `GetSpecCoverageInput`, `GetSpecCoverageResult`, `createGetSpecCoverage`, `GetChangeSpecCoverage`, `GetChangeSpecCoverageInput`, `GetChangeSpecCoverageResult`, `createGetChangeSpecCoverage`
-- VCS and config: `buildProjectGraphConfig`, `createBootstrapGraphConfig`, `GraphConfigOverrides`
-- Public indexer and discovery types: `IndexOptions`, `IndexProgressCallback`, `ProjectGraphConfig`, `WorkspaceIndexTarget`, `DiscoveredSpec`, `IndexResult`, `IndexError`, `WorkspaceIndexBreakdown`, `DiscoverFilesOptions`, `DEFAULT_EXCLUDE_PATHS`
-- Traversal and impact: `TraversalOptions`, `TraversalResult`, `ImpactResult`, `FileImpactResult`, `ChangeDetectionResult`, `RiskLevel`, `analyzeFilesImpact`
-- Hotspots: `DEFAULT_HOTSPOT_KINDS`, `HotspotEntry`, `HotspotOptions`, `HotspotResult`
-- Search: `SearchOptions`, `expandSymbolName`, `expandSearchQuery`, `expandSearchToken`
-- Staleness and fingerprint: `isGraphStale`, `computeGraphFingerprint`, `computeRootFingerprint`, `computeWorkspaceFingerprint`, `parseFingerprintMap`, `serializeFingerprintMap`, `detectFingerprintMismatch`, `GraphFingerprintInput`
-- Language adapter: `LanguageAdapter`
-- Model vocabulary: `FileNode`, `DocumentNode`, `SymbolNode`, `SpecNode`, `Relation`, `SymbolKind`, `RelationType`, `SymbolQuery`, `GraphStatistics`, `ImportDeclaration`, `ImportDeclarationKind`, `SourceLocation`, `BindingScopeKind`, `BindingSourceKind`, `BindingScope`, `BindingFact`, `CallForm`, `CallFact`, `ResolvedDependency`
-- `SpecdCodeGraphError` and public subclasses including `StoreNotOpenError`, `InvalidSymbolKindError`, `InvalidRelationTypeError`, `DuplicateSymbolIdError`, `SpecNotFoundError`, `GraphProviderStaleError`, `StoreOverloadError`, `StoreWorkerError`, `BulkSessionStateError`, `InvalidGraphStoreConfigurationError`, `GraphSchemaIncompatibleError`
-- `CODE_GRAPH_VERSION`
+- composition and wiring: `createCodeGraphProvider`, type-only
+  `CodeGraphProvider`, `CodeGraphCompositionOptions`, `CodeGraphOptions`,
+  `GraphStoreFactory`, `GraphStoreFactoryOptions`,
+  `SqliteGraphStoreFactoryOptions`, `createSqliteGraphStoreFactory`,
+  `SqliteRuntimeDescriptor`, and `SQLiteGraphStoreOptions`;
+- isolated graph indexing: `runIsolatedGraphIndex` plus its host-facing input,
+  progress, result, and typed worker failure contracts;
+- host use cases: `GetGraphHealth`, `GetGraphHealthInput`,
+  `GetGraphHealthResult`, `createGetGraphHealth`, `IndexProjectGraph`,
+  `IndexProjectGraphInput`, `createIndexProjectGraph`, `GetSpecCoverage`,
+  `GetSpecCoverageInput`, `GetSpecCoverageResult`, `createGetSpecCoverage`,
+  `GetChangeSpecCoverage`, `GetChangeSpecCoverageInput`,
+  `GetChangeSpecCoverageResult`, and `createGetChangeSpecCoverage`;
+- VCS and config: `buildProjectGraphConfig`, `createBootstrapGraphConfig`, and
+  `GraphConfigOverrides`;
+- public indexer and discovery types: `IndexOptions`,
+  `IndexProgressCallback`, `ProjectGraphConfig`, `WorkspaceIndexTarget`,
+  `DiscoveredSpec`, `IndexResult`, `IndexError`, `WorkspaceIndexBreakdown`,
+  `DiscoverFilesOptions`, and `DEFAULT_EXCLUDE_PATHS`;
+- traversal and impact: `TraversalOptions`, `TraversalResult`, `ImpactResult`,
+  `FileImpactResult`, `ChangeDetectionResult`, `RiskLevel`, and
+  `analyzeFilesImpact`;
+- hotspots: `DEFAULT_HOTSPOT_KINDS`, `HotspotEntry`, `HotspotOptions`, and
+  `HotspotResult`;
+- search: `SearchOptions`, `expandSymbolName`, `expandSearchQuery`, and
+  `expandSearchToken`;
+- staleness and fingerprint: `isGraphStale`, `computeGraphFingerprint`,
+  `computeRootFingerprint`, `computeWorkspaceFingerprint`,
+  `parseFingerprintMap`, `serializeFingerprintMap`,
+  `detectFingerprintMismatch`, and `GraphFingerprintInput`;
+- language adapter: `LanguageAdapter`;
+- model vocabulary: `FileNode`, `DocumentNode`, `SymbolNode`, `SpecNode`,
+  `Relation`, `SymbolKind`, `RelationType`, `SymbolQuery`, `GraphStatistics`,
+  `ImportDeclaration`, `ImportDeclarationKind`, `SourceLocation`,
+  `BindingScopeKind`, `BindingSourceKind`, `BindingScope`, `BindingFact`,
+  `CallForm`, `CallFact`, and `ResolvedDependency`;
+- `SpecdCodeGraphError` and public subclasses including `StoreNotOpenError`,
+  `InvalidSymbolKindError`, `InvalidRelationTypeError`,
+  `DuplicateSymbolIdError`, `SpecNotFoundError`, `GraphProviderStaleError`,
+  `StoreOverloadError`, `StoreWorkerError`, `BulkSessionStateError`,
+  `InvalidGraphStoreConfigurationError`, `GraphSchemaIncompatibleError`,
+  `GraphStorageRecoveryRequiredError`, `GraphStoreRecreateRequiresClosedError`, the
+  graph busy error surfaced by isolated execution, and isolated-worker failure
+  subclasses;
+- `CODE_GRAPH_VERSION`.
 
-Worker protocol DTOs, worker clients, concrete store classes, test-only worker-path overrides, database internals, lock helpers, and recreation helpers MUST NOT be exported from `"."`.
+Raw index-lock acquisition, release, path, and unlocked-assertion helpers MUST
+NOT be available from `"."`. Raw IPC envelopes, child bootstrap commands,
+process-launcher adapters, the executable child implementation, concrete store
+classes, and test-only worker protocol helpers MUST also remain internal.
+Host-facing isolated-worker input/progress/result/error contracts are not raw IPC
+DTOs and SHALL remain public.
 
-`InMemoryIndexSession`, the concrete SQLite adapter, and other composition internals MAY remain available from `"./internal"`. Removed Ladybug symbols MUST NOT be reintroduced.
+`InMemoryIndexSession`, the concrete SQLite adapter, and other composition
+internals SHALL remain available only from `"./internal"` where currently
+supported. Removed Ladybug symbols MUST NOT be reintroduced.
 
 ### Requirement: Public and internal entry points
 
 `@specd/code-graph` MUST publish:
 
-- `src/public.ts` (or equivalent) as `"."` — curated public surface aligned with **Package exports** below
-- `src/index.ts` as `"./internal"` — full barrel including indexer internals, store adapter symbols, and `InMemoryIndexSession`
+- `src/public.ts` (or equivalent) as `"."` — the curated public surface aligned
+  with **Package exports**;
+- `src/index.ts` as `"./internal"` — the full development barrel including
+  indexer internals, store adapter symbols, raw lock helpers, process-launcher
+  adapters, and `InMemoryIndexSession`;
+- a built ESM isolated-worker child entrypoint under `dist/`, resolved internally
+  by `runIsolatedGraphIndex` relative to its installed module location.
 
-`package.json` `exports` MUST map these entry points. The `"."` barrel MUST NOT use unrestricted `export *` of infrastructure modules.
+`package.json` exports MUST map the public and internal import entrypoints. The
+executable child file MUST be included in published package contents but MUST NOT
+be exposed as a host-selectable package export. The `"."` barrel MUST NOT use
+unrestricted star exports that leak internal symbols.
 
 ### Requirement: Lifecycle management
 
@@ -201,6 +260,7 @@ await provider.close()
 - [`code-graph:get-spec-coverage`](../get-spec-coverage/spec.md) — spec coverage
 - [`code-graph:get-change-spec-coverage`](../get-change-spec-coverage/spec.md) — change coverage
 - [`code-graph:resolve-symbol-reference`](../resolve-symbol-reference/spec.md) — conservative reference resolution
+- [`code-graph:isolated-index-worker`](../isolated-index-worker/spec.md) — lock-aware child-process execution for graph indexing
 
 ## ADRs
 

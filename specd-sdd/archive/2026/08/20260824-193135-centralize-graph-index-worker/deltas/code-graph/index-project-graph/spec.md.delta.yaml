@@ -1,0 +1,36 @@
+- op: modified
+  description: 'Make force a logical full reindex rather than physical store recreation'
+  selector:
+    type: section
+    matches: '^Requirement: Supports force recreate$'
+  rename: 'Requirement: Supports forced logical reindex'
+  content: |
+    `IndexProjectGraph` SHALL forward `force` to `CodeGraphProvider.index()` as a
+    request for a complete logical reindex. A forced run MUST clear reusable indexed
+    contents and bypass incremental reuse so every selected input is reconsidered.
+
+    `IndexProjectGraph` MUST NOT call `CodeGraphProvider.recreate()` and MUST NOT
+    implement physical-storage recovery. The provider supplied to this use case is
+    already open; recoverable open failures are handled by the SDK lifecycle owner
+    before this use case is invoked.
+
+- op: modified
+  description: 'Keep the use case constrained to an already-open provider'
+  selector:
+    type: section
+    matches: '^Requirement: Accepts open provider and prepared inputs$'
+  content: |
+    `IndexProjectGraph` SHALL accept an already-open `CodeGraphProvider` and prepared
+    project inputs. `IndexProjectGraphInput` MUST include `provider`, `projectRoot`,
+    `workspaces`, `graphConfig`, `codeGraphVersion`, `vcsRoot`, optional `vcsRef`,
+    optional `force`, and optional `onProgress`; `vcsRoot` is forwarded unchanged.
+
+    It MUST NOT resolve workspaces, acquire locks, spawn processes, open, close, clear
+    directly, recreate, or otherwise own storage lifecycle. Its only force
+    responsibility is forwarding the force intent to provider indexing.
+
+- op: removed
+  description: 'Remove legacy provider-owned repair responsibility now owned by SDK open lifecycle'
+  selector:
+    type: section
+    matches: '^Requirement: Incompatibility repair execution$'

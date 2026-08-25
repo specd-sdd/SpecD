@@ -432,15 +432,18 @@ export class CompileContext {
         } catch {
           continue
         }
-        const spec = await repo.get(specPathObj)
-        if (!spec) continue
 
+        // Tier 1: manifest-declared deps — no repository access, so deps
+        // declared for non-persisted change-scoped specs still traverse.
         let dependsOnList: string[] | undefined
 
         const manifestDeps = change.specDependsOn.get(specId)
         if (manifestDeps !== undefined && manifestDeps.length > 0) {
           dependsOnList = [...manifestDeps]
         } else {
+          const spec = await repo.get(specPathObj)
+          if (!spec) continue
+
           try {
             const materialized = await this._getMetadata.execute({ specId })
             appendMaterializationDiagnostics(specId, materialized, warnings)
@@ -453,11 +456,49 @@ export class CompileContext {
             })
 
             if (depFallback !== undefined && depFallback.extraction.dependsOn !== undefined) {
+              // Change-scoped specs extract from their merged preview set; all
+              // other specs fall back to base persisted artifacts.
+              let mergedForDep: SpecContentFile[] | undefined
+              try {
+                const preview = await this._previewSpec.execute({ name: input.name, specId })
+                if (preview.files.length > 0) {
+                  const descriptorsByFilename = new Map(
+                    schema
+                      .artifacts()
+                      .filter((artifactType) => artifactType.scope === 'spec')
+                      .map((artifactType) => [
+                        artifactType.output.split('/').pop()!,
+                        {
+                          artifactId: artifactType.id,
+                          format:
+                            artifactType.format ??
+                            inferFormat(artifactType.output.split('/').pop()!) ??
+                            'plaintext',
+                        },
+                      ]),
+                  )
+                  mergedForDep = preview.files.flatMap((file) => {
+                    const descriptor = descriptorsByFilename.get(file.filename)
+                    if (descriptor === undefined) return []
+                    return [
+                      {
+                        artifactId: descriptor.artifactId,
+                        filename: file.filename,
+                        content: file.merged,
+                        format: descriptor.format,
+                      },
+                    ]
+                  })
+                }
+              } catch {
+                mergedForDep = undefined
+              }
               dependsOnList = await this._extractDependsOnFallback(
                 repo,
                 spec,
                 workspaceMap,
                 depFallback,
+                mergedForDep,
               )
             }
           }
@@ -478,6 +519,7 @@ export class CompileContext {
               input.depth,
               0,
               depFallback,
+              { unresolved: 'skip' },
             )
           }
         }
@@ -563,60 +605,12 @@ export class CompileContext {
         continue
       }
 
-      let metadata: SpecMetadata | null = null
-      try {
-        metadata = await materializeContextSpecMetadata(this._getMetadata, specId, warnings)
-      } catch {
-        metadata = null
-      }
+      const isScoped = specIdsSet.has(specId)
 
-      // Check for missing optimization if enabled
-      if (shouldUseOptimizedContext && metadata !== null) {
-        if (metadata.optimizedContext === undefined || metadata.optimizedContext === '') {
-          warnings.push({
-            type: 'stale-optimization',
-            path: specId,
-            message: `Spec '${specId}' is missing LLM-optimized context. Launch specd-spec-context-optimizer agent to refresh.`,
-          })
-        }
-      }
-
-      // Extract title and description from metadata (needed for both modes)
-      let title = ''
-      let description = ''
-
-      if (metadata !== null) {
-        title = metadata.title ?? ''
-        description =
-          (config.llmOptimizedContext && metadata.optimizedDescription) ||
-          metadata.description ||
-          ''
-      }
-
+      // Extracted-first: preview merge is the primary source for scoped specs.
       let baseFiles: SpecContentFile[] | undefined
       let mergedFiles: SpecContentFile[] | undefined
-
-      if (mode === 'summary') {
-        // Summary only — no content rendering.
-        if (title === '') {
-          baseFiles = await this._loadBaseSpecFiles(specRepo, spec, specArtifactDescriptors)
-          title = this._extractTitleFromFiles(baseFiles)
-        }
-        if (metadata === null) {
-          warnings.push({
-            type: 'stale-metadata',
-            path: specId,
-            message: `No metadata for '${specId}' — summary may lack description`,
-          })
-        }
-        specs.push({ specId, title, description, source, mode })
-        continue
-      }
-
-      // Full content rendering.
-      // Attempt materialized delta view for specs in the change's specIds
-      let content: string | undefined
-      if (specIdsSet.has(specId)) {
+      if (isScoped) {
         try {
           const preview = await this._previewSpec.execute({
             name: input.name,
@@ -638,68 +632,145 @@ export class CompileContext {
         }
       }
 
-      const displayFiles =
-        mergedFiles ??
-        (baseFiles ??= await this._loadBaseSpecFiles(specRepo, spec, specArtifactDescriptors))
-
-      if (title === '') {
-        title = this._extractTitleFromFiles(displayFiles)
+      /** A candidate field/content set produced by one ladder rung. */
+      interface LadderView {
+        readonly title: string
+        readonly description: string
+        readonly content?: string | undefined
       }
+      /**
+       * Determines whether a ladder rung produced enough data to render an entry.
+       *
+       * @param view - Candidate view from the current rung
+       * @returns Whether any field carries usable content
+       */
+      const usable = (view: LadderView | undefined): boolean =>
+        view !== undefined &&
+        (view.title !== '' || view.description !== '' || (view.content ?? '') !== '')
 
-      // Fall back to metadata or extraction if preview didn't produce content
-      if (content === undefined) {
-        if (mergedFiles !== undefined) {
-          const extraction = schema.metadataExtraction()
-          if (extraction !== undefined) {
-            content = await this._renderExtractedSectionsFromFiles(
-              schema,
-              mergedFiles,
-              workspace,
-              capPath,
-              workspaceMap,
-              sectionsFilter,
-              shouldUseOptimizedContext,
-            )
-          } else {
-            content = ''
+      let view: LadderView | undefined
+
+      // Rung 1: schema-driven extraction over the merged artifact set.
+      if (mergedFiles !== undefined) {
+        const extraction = schema.metadataExtraction()
+        if (extraction !== undefined) {
+          const repositories = new Map<string, SpecRepository>()
+          for (const wsEntry of workspaceMap.values()) {
+            repositories.set(wsEntry.name, wsEntry.specRepo)
           }
-        } else {
-          if (metadata !== null) {
-            content = this._renderFromMetadata(metadata, sectionsFilter, shouldUseOptimizedContext)
-          } else {
-            if (metadata !== null) {
-              warnings.push({
-                type: 'stale-metadata',
-                path: specId,
-                message: `Metadata for '${specId}' is stale — falling back to extracted sections`,
-              })
-            } else {
-              warnings.push({
-                type: 'stale-metadata',
-                path: specId,
-                message: `No metadata for '${specId}' — falling back to extracted sections`,
-              })
-            }
-
-            const extraction = schema.metadataExtraction()
-            if (extraction !== undefined) {
-              content = await this._renderExtractedSectionsFromFiles(
-                schema,
-                displayFiles,
-                workspace,
-                capPath,
-                workspaceMap,
-                sectionsFilter,
-                shouldUseOptimizedContext,
-              )
-            } else {
-              content = ''
-            }
+          const extracted = await extractMetadataFromSpecArtifacts({
+            effectiveSpecSchema: schema,
+            workspace,
+            specPath: SpecPath.parse(capPath),
+            artifacts: mergedFiles,
+            parsers: this._parsers,
+            extractorTransforms: this._extractorTransforms,
+            repositories,
+            workspaceRoutes: this._workspaceRoutes,
+          })
+          const rungTitle =
+            (extracted.metadata.title ?? '') !== ''
+              ? (extracted.metadata.title ?? '')
+              : this._extractTitleFromFiles(mergedFiles)
+          view = {
+            title: rungTitle,
+            description: extracted.metadata.description ?? '',
+            content:
+              mode === 'summary'
+                ? undefined
+                : this._renderFromMetadata(extracted.metadata, sectionsFilter, false),
           }
         }
       }
 
-      specs.push({ specId, title, description, source, mode, content })
+      // Rung 2: canonical projection — the primary path for non-scoped specs.
+      let metadata: SpecMetadata | null = null
+      if (!usable(view)) {
+        try {
+          metadata = await materializeContextSpecMetadata(this._getMetadata, specId, warnings)
+        } catch {
+          metadata = null
+        }
+        if (metadata !== null) {
+          const llmFlag = isScoped ? false : shouldUseOptimizedContext
+          view = {
+            title: metadata.title ?? '',
+            description: (llmFlag && metadata.optimizedDescription) || metadata.description || '',
+            content:
+              mode === 'summary'
+                ? undefined
+                : this._renderFromMetadata(metadata, sectionsFilter, llmFlag),
+          }
+        }
+      }
+
+      // Rung 3: extraction over base persisted artifacts (scoped only).
+      if (isScoped && !usable(view)) {
+        const displayFiles =
+          mergedFiles ??
+          (baseFiles ??= await this._loadBaseSpecFiles(specRepo, spec, specArtifactDescriptors))
+        const extraction = schema.metadataExtraction()
+        if (extraction !== undefined) {
+          const fallbackContent = await this._renderExtractedSectionsFromFiles(
+            schema,
+            displayFiles,
+            workspace,
+            capPath,
+            workspaceMap,
+            sectionsFilter,
+            false,
+          )
+          view = {
+            title: this._extractTitleFromFiles(displayFiles),
+            description: '',
+            content: mode === 'summary' ? undefined : fallbackContent,
+          }
+        }
+      }
+
+      // All rungs exhausted — warn once and emit a minimal entry.
+      const finalView: LadderView = view ?? {
+        title: this._extractTitleFromFiles(
+          baseFiles ?? (await this._loadBaseSpecFiles(specRepo, spec, specArtifactDescriptors)),
+        ),
+        description: '',
+        content: mode === 'summary' ? undefined : '',
+      }
+      if (!usable(finalView)) {
+        warnings.push({
+          type: 'missing-metadata',
+          path: specId,
+          message: `No metadata for '${specId}' — falling back to extracted sections`,
+        })
+      }
+
+      // Optimization warnings — non-scoped only, typed via lock baselines.
+      if (
+        shouldUseOptimizedContext &&
+        !isScoped &&
+        metadata !== null &&
+        (metadata.optimizedContext === undefined || metadata.optimizedContext === '')
+      ) {
+        const status = metadata.optimizationStatus?.optimizedContext ?? 'missing'
+        const warningType = status === 'stale' ? 'stale-optimization' : 'missing-optimization'
+        warnings.push({
+          type: warningType,
+          path: specId,
+          message:
+            status === 'stale'
+              ? `Spec '${specId}' drifted since its last LLM-optimization. Launch specd-spec-context-optimizer agent to refresh.`
+              : `Spec '${specId}' has never been LLM-optimized. Launch specd-spec-context-optimizer agent to refresh.`,
+        })
+      }
+
+      specs.push({
+        specId,
+        title: finalView.title,
+        description: finalView.description,
+        source,
+        mode,
+        ...(finalView.content !== undefined ? { content: finalView.content } : {}),
+      })
     }
 
     // --- Calculate fingerprint (after all fields are ready) ---
@@ -975,6 +1046,7 @@ export class CompileContext {
    * @param spec - The spec entity to extract from
    * @param workspaces - Orchestrated workspace map
    * @param fallback - Fallback configuration with extraction rules and parsers
+   * @param preloadedFiles - Optional merged artifact set to extract from instead of base files
    * @returns Extracted dependsOn array, or undefined if extraction yields nothing
    */
   private async _extractDependsOnFallback(
@@ -982,6 +1054,7 @@ export class CompileContext {
     spec: Spec,
     workspaces: Map<string, ProjectWorkspace>,
     fallback: DependsOnFallback,
+    preloadedFiles?: SpecContentFile[],
   ): Promise<string[] | undefined> {
     const descriptors = fallback.schemaArtifacts
       .filter((artifactType) => artifactType.scope === 'spec')
@@ -991,8 +1064,13 @@ export class CompileContext {
         format:
           artifactType.format ?? inferFormat(artifactType.output.split('/').pop()!) ?? 'plaintext',
       }))
-    const files = await this._loadBaseSpecFiles(specRepo, spec, descriptors)
-    if (files.length === 0) return undefined
+    let files: readonly SpecContentFile[]
+    if (preloadedFiles !== undefined && preloadedFiles.length > 0) {
+      files = preloadedFiles
+    } else {
+      files = await this._loadBaseSpecFiles(specRepo, spec, descriptors)
+      if (files.length === 0) return undefined
+    }
 
     // Map ProjectWorkspace to direct repos for extractMetadataFromSpecArtifacts
     const repositories = new Map<string, SpecRepository>()

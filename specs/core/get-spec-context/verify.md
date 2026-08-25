@@ -57,6 +57,13 @@
 - **THEN** the warning is forwarded into the result's `warnings` array
 - **AND** it is not logged again by this use case
 
+#### Scenario: Cache-miss regeneration does not emit a warning
+
+- **GIVEN** `GetSpecMetadata` regenerates the projection (`regenerated: true`) without persistence failures
+- **WHEN** `GetSpecContext` builds the entry
+- **THEN** the entry renders normally from the regenerated projection
+- **AND** no warning about the regeneration appears in `warnings`
+
 ### Requirement: Stale or absent metadata produces minimal entry
 
 #### Scenario: Materialization failure yields stale list entry in list mode
@@ -210,6 +217,20 @@
 - **WHEN** `GetSpecContext` is executed
 - **THEN** the entry uses the standard `context`
 - **AND** a `stale-optimization` warning identifying the spec is emitted with remediation instructions mentioning `specd-spec-context-optimizer`
+
+#### Scenario: Emits missing-optimization when lock records no optimization
+
+- **GIVEN** `llmOptimizedContext: true`
+- **AND** the spec's lock owns no optimization value for the field
+- **WHEN** `GetSpecContext.execute` builds the entry
+- **THEN** the warning type is `missing-optimization`
+
+#### Scenario: Emits stale-optimization when baselines drifted
+
+- **GIVEN** `llmOptimizedContext: true`
+- **AND** the spec's lock owns an optimization whose artifact baselines no longer match current persisted artifacts
+- **WHEN** `GetSpecContext.execute` builds the entry
+- **THEN** the warning type is `stale-optimization`
 
 #### Scenario: Optimization freshness is derived from lock-owned baselines, not metadata document freshness
 

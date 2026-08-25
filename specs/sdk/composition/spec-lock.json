@@ -9,14 +9,43 @@
     "code-graph:composition",
     "cli:host-context",
     "sdk:context-markdown",
-    "sdk:build-implementation-review"
+    "sdk:build-implementation-review",
+    "code-graph:isolated-index-worker"
   ],
   "implementation": [
     {
-      "file": "sdk:test/barrel.spec.ts"
+      "file": "sdk:src/index.ts",
+      "symbols": [
+        "runIsolatedGraphIndex",
+        "GraphIndexWorkerStartError",
+        "GraphIndexTaskContractError",
+        "GraphIndexTaskExecutionError",
+        "GraphIndexWorkerProtocolError",
+        "GraphIndexWorkerExitError",
+        "GraphIndexWorkerSignalError",
+        "GraphIndexProgressHandlerError"
+      ]
     },
     {
-      "file": "sdk:src/index.ts"
+      "file": "sdk:test/barrel.spec.ts",
+      "symbols": ["@specd/sdk barrel"]
+    },
+    {
+      "file": "sdk:test/fixtures/publish-shaped-worker-consumer.ts"
+    },
+    {
+      "file": "sdk:src/composition/with-open-graph-provider.ts",
+      "symbols": ["withOpenGraphProvider"]
+    },
+    {
+      "file": "sdk:src/orchestration/run-index-project-graph.ts",
+      "symbols": ["runIndexProjectGraph"]
+    },
+    {
+      "file": "sdk:test/composition/with-open-graph-provider.spec.ts"
+    },
+    {
+      "file": "sdk:test/orchestration/run-index-project-graph.spec.ts"
     }
   ],
   "optimizations": {

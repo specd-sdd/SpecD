@@ -20,39 +20,31 @@ Hosts (`graph index`, SDK `runIndexProjectGraph`) currently assemble workspace t
 
 and MUST return the resulting `IndexResult` unchanged.
 
-### Requirement: Supports force recreate
+### Requirement: Supports forced logical reindex
 
-When `input.force` is true, `IndexProjectGraph` MUST pass that intent through the `IndexOptions` forwarded to `provider.index(...)`.
+`IndexProjectGraph` SHALL forward `force` to `CodeGraphProvider.index()` as a
+request for a complete logical reindex. A forced run MUST clear reusable indexed
+contents and bypass incremental reuse so every selected input is reconsidered.
 
-`IndexProjectGraph` MUST NOT call `provider.recreate()` directly. The provider owns any destructive reset, storage-generation rotation, and lock policy required to honor force reindex semantics.
+`IndexProjectGraph` MUST NOT call `CodeGraphProvider.recreate()` and MUST NOT
+implement physical-storage recovery. The provider supplied to this use case is
+already open; recoverable open failures are handled by the SDK lifecycle owner
+before this use case is invoked.
 
 ### Requirement: Accepts open provider and prepared inputs
 
-`IndexProjectGraphInput` MUST include:
+`IndexProjectGraph` SHALL accept an already-open `CodeGraphProvider` and prepared
+project inputs. `IndexProjectGraphInput` MUST include `provider`, `projectRoot`,
+`workspaces`, `graphConfig`, `codeGraphVersion`, `vcsRoot`, optional `vcsRef`,
+optional `force`, and optional `onProgress`; `vcsRoot` is forwarded unchanged.
 
-- `provider: CodeGraphProvider` (already opened)
-- `projectRoot: string`
-- `workspaces: WorkspaceIndexTarget[]`
-- `graphConfig: ProjectGraphConfig`
-- `codeGraphVersion: string`
-- `vcsRoot: string | null`
-- optional `vcsRef: string`
-- optional `force: boolean`
-- optional `onProgress: IndexProgressCallback`
-
-`vcsRoot` MUST be forwarded unchanged to the `IndexOptions` passed to `provider.index(...)`.
-
-The use case MUST NOT resolve workspaces from `specd.yaml`, acquire locks, spawn subprocesses, or perform direct destructive reset calls against the provider or store.
+It MUST NOT resolve workspaces, acquire locks, spawn processes, open, close, clear
+directly, recreate, or otherwise own storage lifecycle. Its only force
+responsibility is forwarding the force intent to provider indexing.
 
 ### Requirement: Factory wires dependencies
 
 `createIndexProjectGraph()` in composition MUST return a stateless `IndexProjectGraph` instance.
-
-### Requirement: Incompatibility repair execution
-
-`IndexProjectGraph` SHALL support provider-owned repair when the persisted backend schema or graph derivation is incompatible. The indexing path MAY open or recreate through an indexing-specific provider operation even when ordinary reads reject the old store.
-
-The result SHALL report whether a full rebuild occurred and a stable rebuild reason such as explicit force, backend schema incompatibility, or derivation mismatch. Repair SHALL rotate storage generation and MUST NOT expose the store as ready until indexing and search-index rebuild complete.
 
 ## Constraints
 

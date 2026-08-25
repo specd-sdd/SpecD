@@ -113,7 +113,8 @@ export interface IndexOptions {
   readonly codeGraphVersion?: string
 
   /**
-   * Whether provider-owned indexing should recreate persisted backend state first.
+   * Whether provider-owned indexing should clear healthy derived state and
+   * reanalyse every selected input.
    */
   readonly force?: boolean
 

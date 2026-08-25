@@ -23,11 +23,18 @@ For each resolved spec, the use case SHALL load all artifact files and obtain us
 - `full` — include `spec`, `stale`, title, description, rules, constraints, and scenarios when available.
 - `hybrid` — equivalent to `full` for a single-spec context command, because there is no change-scoped tier.
 
-When materialization succeeds, the entry SHALL render from the returned metadata according to that mode, and `stale` SHALL be `false`. In full mode, `rules`, `constraints`, and `scenarios` are included when no section filter is active or when the corresponding section is requested. Any `metadata-cache-write-failed` or generation warning returned by `GetSpecMetadata` SHALL be forwarded into the result's `warnings` array without being logged again by this use case.
+When materialization succeeds, the entry SHALL render from the returned metadata according to that mode, and `stale` SHALL be `false`. In full mode, `rules`, `constraints`, and `scenarios` are included when no section filter is active or when the corresponding section is requested.
+
+Cache-miss regeneration is provenance information carried on the materialization result (`source`, `regenerated`) and exposed through diagnostics surfaces — this use case MUST NOT emit a warning solely because a projection was regenerated. Only actionable materialization failures such as `metadata-cache-write-failed` SHALL be forwarded into the result's `warnings` array without being logged again by this use case.
 
 ### Requirement: Prefer LLM-optimized context
 
-If `llmOptimizedContext: true` is active in the project configuration, the use case SHALL prefer `optimizedContext` for the spec if the materialized metadata reports it as present and fresh. If missing, stale, or empty, it SHALL fall back to the standard `context` and SHALL emit a `stale-optimization` warning identifying the spec, with remediation instructions: "Launch specd-spec-context-optimizer agent to refresh".
+If `llmOptimizedContext: true` is active in the project configuration, the use case SHALL prefer `optimizedContext` for the spec if the materialized metadata reports it as present and fresh. If missing, stale, or empty, it SHALL fall back to the standard `context` and SHALL emit an optimization warning identifying the spec, with remediation instructions: "Launch specd-spec-context-optimizer agent to refresh".
+
+The warning type MUST distinguish the two conditions:
+
+- `missing-optimization` — the spec's lock-owned state records no optimization value for the field at all (never optimized).
+- `stale-optimization` — an optimization is recorded but its artifact or schema baselines no longer match the current persisted artifacts (drifted after a content change).
 
 Optimization freshness is derived from the per-field artifact and schema baselines recorded on the spec's lock-owned optimization state (see [`core:spec-optimization`](../spec-optimization/spec.md)), not from the metadata document's own freshness.
 

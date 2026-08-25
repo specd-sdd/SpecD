@@ -32,6 +32,21 @@
 - **WHEN** `CompileContext.execute` is called with `includeChangeSpecs: false` and `followDeps: true`
 - **THEN** `core:config` is included through `dependsOn` traversal
 
+#### Scenario: Manifest-declared deps traverse for non-persisted change specs
+
+- **GIVEN** `change.specIds` includes `core:new-facade`, which is not persisted
+- **AND** the change manifest declares `specDependsOn["core:new-facade"] = ["core:existing"]`
+- **WHEN** `CompileContext.execute` runs with `followDeps: true`
+- **THEN** `core:existing` is discovered and included through traversal
+- **AND** no `missing-metadata` warning is emitted for `core:new-facade`
+
+#### Scenario: Traversal discoveries that resolve nowhere are skipped silently
+
+- **GIVEN** a persisted spec's dependency graph references `ws:ghost`, which exists neither in any repository nor in the change
+- **WHEN** traversal reaches `ws:ghost` with `followDeps: true`
+- **THEN** `ws:ghost` is not registered into the collected set
+- **AND** no warning is emitted during traversal registration
+
 ### Requirement: Context display modes
 
 #### Scenario: Summary mode is the default when contextMode is omitted
@@ -74,6 +89,29 @@
 - **WHEN** `CompileContext.execute` is called
 - **THEN** that spec is emitted in summary mode
 
+### Requirement: Extracted-first rendering for change-scoped specs
+
+#### Scenario: Summary mode renders a change-only new spec from merged extraction
+
+- **GIVEN** a change whose `specIds` include `core:new-thing`, which has spec files inside the change directory but does not exist in any workspace repository
+- **AND** no persisted metadata exists for `core:new-thing`
+- **WHEN** `CompileContext.execute` is called with `contextMode: "summary"`
+- **THEN** the entry for `core:new-thing` carries title and description extracted from the merged preview artifact set via the schema's `metadataExtraction` engine
+- **AND** no `stale-metadata` or `missing-metadata` warning is emitted for it
+
+#### Scenario: Preview unavailable falls back to canonical metadata projection
+
+- **GIVEN** a change-scoped spec whose `PreviewSpec` execution fails
+- **WHEN** `CompileContext.execute` renders it
+- **THEN** the entry falls back to the canonical `GetSpecMetadata` projection for title, description, and sections
+- **AND** a `preview` warning identifying the fallback is emitted
+
+#### Scenario: Change-scoped specs never apply lock-owned optimizations
+
+- **GIVEN** a change-scoped spec whose lock records a fresh, non-empty `optimizedContext`
+- **WHEN** `CompileContext.execute` renders it in any display mode
+- **THEN** the rendered content comes from the merged artifact set extraction, never from the lock optimization
+
 ### Requirement: Cycle detection during dependsOn traversal
 
 #### Scenario: Cycle broken without infinite loop
@@ -92,12 +130,13 @@
 - **WHEN** `CompileContext` renders that spec
 - **THEN** it uses the returned structured content directly
 
-#### Scenario: Regenerated projection is used and its warnings are forwarded
+#### Scenario: Regenerated projection is used without emitting a regeneration warning
 
-- **GIVEN** `GetSpecMetadata` regenerates the projection (`regenerated: true`) or falls back after a source-conflict retry
+- **GIVEN** materialization regenerates a projection (`regenerated: true`) while remaining usable
+- **AND** the regeneration result carries no `metadata-cache-write-failed` failure
 - **WHEN** `CompileContext` renders that spec
-- **THEN** it uses the returned in-memory projection
-- **AND** it forwards any `metadata-cache-write-failed` or generation warning into its own `warnings` array without logging it again
+- **THEN** the regenerated projection is used directly
+- **AND** no warning is emitted about the regeneration itself
 
 #### Scenario: Materialization failure emits missing-metadata and renders a minimal entry
 
@@ -132,6 +171,12 @@
 - **GIVEN** an include pattern matches a spec ID that does not exist in `SpecRepository`
 - **WHEN** `CompileContext.execute` is called
 - **THEN** a warning is emitted identifying the missing path, the path is skipped, and no error is thrown
+
+#### Scenario: Traversal-discovered unresolvable dependency is skipped without warning
+
+- **GIVEN** a dependency reference discovered only through `dependsOn` traversal pointing at a spec absent from all repositories
+- **WHEN** traversal attempts to register the discovery
+- **THEN** the discovery is dropped without a warning
 
 ### Requirement: dependsOn resolution order
 
@@ -208,6 +253,13 @@
 - **GIVEN** a compiled context with a recorded fingerprint
 - **WHEN** `change.specDependsOn` changes the emitted specs or metadata freshness changes emitted warnings
 - **THEN** the fingerprint changes
+
+#### Scenario: Delta edits invalidate cached unchanged status
+
+- **GIVEN** a prior call returned `status: "unchanged"` for fingerprint F over a change with deltas
+- **WHEN** a delta file of the change is edited so merged content differs
+- **AND** `CompileContext.execute` is called again passing fingerprint F
+- **THEN** the result status is `"changed"` and full context is returned
 
 #### Scenario: Fingerprint changes when result-shaping flags change emitted context
 
@@ -405,21 +457,26 @@
 
 ### Requirement: Optimization warning signal
 
-#### Scenario: Emits warning for missing spec optimization
+#### Scenario: Emits missing-optimization for never-optimized non-scoped spec
 
-- **GIVEN** `llmOptimizedContext` is enabled
-- **AND** a spec's materialized metadata reports a missing `optimizedContext` field
-- **WHEN** context is compiled
-- **THEN** it emits a `stale-optimization` warning
-- **AND** the message mentions `specd-spec-context-optimizer`
+- **GIVEN** `llmOptimizedContext: true`
+- **AND** a collected spec outside `change.specIds` whose lock records no optimization value for the field
+- **WHEN** `CompileContext` renders that spec
+- **THEN** a `missing-optimization` warning identifies the spec with remediation instructions
 
-#### Scenario: Emits warning for stale spec optimization
+#### Scenario: Emits stale-optimization for drifted non-scoped spec
 
-- **GIVEN** `llmOptimizedContext` is enabled
-- **AND** a spec's materialized metadata reports a stale `optimizedContext` field per the per-field freshness recorded on the spec's lock-owned optimization state
-- **WHEN** context is compiled
-- **THEN** it emits a `stale-optimization` warning
-- **AND** the message mentions `specd-spec-context-optimizer`
+- **GIVEN** `llmOptimizedContext: true`
+- **AND** a collected spec outside `change.specIds` whose lock records an optimization whose artifact baselines no longer match current persisted artifacts
+- **WHEN** `CompileContext` renders that spec
+- **THEN** a `stale-optimization` warning identifies the spec with remediation instructions
+
+#### Scenario: No optimization warnings for change-scoped specs
+
+- **GIVEN** `llmOptimizedContext: true`
+- **AND** a collected spec whose ID is in `change.specIds` regardless of its lock optimization state
+- **WHEN** `CompileContext.execute` compiles the context
+- **THEN** no `missing-optimization` or `stale-optimization` warning is emitted for that spec
 
 ### Requirement: Config-based factory delegates through resolveCompileContextDeps
 

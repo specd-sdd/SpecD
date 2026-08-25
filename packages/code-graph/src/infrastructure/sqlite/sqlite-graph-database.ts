@@ -2,6 +2,11 @@ import { mkdirSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { StoreNotOpenError } from '../../domain/errors/store-not-open-error.js'
 import { GraphSchemaIncompatibleError } from '../../domain/errors/graph-schema-incompatible-error.js'
+import {
+  GraphStorageRecoveryRequiredError,
+  type GraphStorageRecoveryReason,
+} from '../../domain/errors/graph-storage-recovery-required-error.js'
+import { GraphStoreRecreateRequiresClosedError } from '../../domain/errors/graph-store-recreate-requires-closed-error.js'
 import { expandSearchQuery } from '../../domain/services/expand-search-query.js'
 import { expandSymbolName } from '../../domain/services/expand-symbol-name.js'
 import { matchesExclude } from '../../domain/services/matches-exclude.js'
@@ -288,15 +293,24 @@ export class SQLiteGraphDatabase {
     ensureStorageGeneration(this.storagePath)
 
     const DatabaseModule = (await this.loadDatabaseModule(runtime)).default
-    const db = new DatabaseModule(this.dbPath) as SqliteDatabase
+    let db: SqliteDatabase | undefined
     try {
+      db = new DatabaseModule(this.dbPath) as SqliteDatabase
       this.assertExistingSchemaCompatible(db)
       this.configureDatabase(db)
       this.db = db
       this.ensureSchemaVersion()
-    } catch (error) {
-      if (db.open) db.close()
+    } catch (error: unknown) {
+      if (db?.open) db.close()
       this.db = undefined
+      this.preparedStatements.clear()
+      const recoveryReason = getStorageRecoveryReason(error)
+      if (recoveryReason !== undefined) {
+        throw new GraphStorageRecoveryRequiredError(
+          error instanceof Error ? error.message : String(error),
+          recoveryReason,
+        )
+      }
       throw error
     }
     this.loadMetadata()
@@ -330,19 +344,19 @@ export class SQLiteGraphDatabase {
 
   /**
    * Executes recreate operation.
-   *
+   * @returns A promise resolved after the closed database storage is removed.
+   * @throws {GraphStoreRecreateRequiresClosedError} When the database remains open.
    */
-  async recreate(): Promise<void> {
-    const wasOpen = this.db !== undefined
-    this.close()
+  recreate(): Promise<void> {
+    if (this.db !== undefined) {
+      throw new GraphStoreRecreateRequiresClosedError()
+    }
     rmSync(this.graphDir, { recursive: true, force: true })
     rotateStorageGeneration(this.storagePath)
     this._lastIndexedAt = undefined
     this._lastIndexedRef = null
     this._graphFingerprint = null
-    if (wasOpen) {
-      await this.open(this.storagePath, this.runtime)
-    }
+    return Promise.resolve()
   }
 
   /**
@@ -4152,4 +4166,26 @@ function relationEndpointsExist(relation: Relation, ids: RelationEndpointIds): b
     default:
       return false
   }
+}
+
+/**
+ * Limits destructive recovery eligibility to known derived-storage failures.
+ * @param error - Error raised while opening the SQLite database.
+ * @returns Recoverable classification, if the storage may be rebuilt safely.
+ */
+function getStorageRecoveryReason(error: unknown): GraphStorageRecoveryReason | undefined {
+  if (error instanceof GraphSchemaIncompatibleError) {
+    return 'SCHEMA_INCOMPATIBLE'
+  }
+  const record = error as { code?: unknown; message?: unknown }
+  const code = typeof record?.code === 'string' ? record.code : ''
+  const message = typeof record?.message === 'string' ? record.message : String(error)
+  if (
+    code === 'SQLITE_CORRUPT' ||
+    code === 'SQLITE_NOTADB' ||
+    /database disk image is malformed|file is not a database|database corrupt/i.test(message)
+  ) {
+    return 'CORRUPT'
+  }
+  return undefined
 }

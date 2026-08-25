@@ -6,40 +6,49 @@
 
 #### Scenario: Provider opened and closed around callback
 
-- **WHEN** `withOpenGraphProvider(ctx, fn)` runs successfully
-- **THEN** `provider.open()` is called before `fn`
-- **AND** `provider.close()` is called after `fn` completes
+- **WHEN** `withOpenGraphProvider` runs successfully
+- **THEN** it opens before the callback and closes after it
+
+#### Scenario: Recovery callback sees a closed provider and retries once
+
+- **GIVEN** initial `open()` fails and `recoverOpenFailure` returns true
+- **WHEN** the helper invokes the callback
+- **THEN** close was attempted before the callback
+- **AND** the helper performs exactly one second parameterless open
+
+#### Scenario: Declined recovery preserves the original failure
+
+- **WHEN** `recoverOpenFailure` returns false
+- **THEN** the original open error propagates and the callback is not retried
 
 ### Requirement: Error propagation
 
 #### Scenario: Original error preserved when close fails during cleanup
 
-- **GIVEN** fn throws error E
-- **AND** provider.close() also throws during cleanup
-- **WHEN** withOpenGraphProvider completes
-- **THEN** error E propagates to the caller
+- **GIVEN** the callback and close both throw
+- **WHEN** the helper completes
+- **THEN** the callback error propagates
 
 #### Scenario: Close attempted after fn throws
 
-- **GIVEN** fn throws
-- **WHEN** withOpenGraphProvider runs
-- **THEN** provider.close() is still invoked
+- **WHEN** the callback throws
+- **THEN** close is still attempted
 
 #### Scenario: Open failure cleans up without beforeOpen
 
-- **GIVEN** ctx.createGraphProvider() returns a provider
-- **AND** no beforeOpen hook is supplied
-- **AND** provider.open() rejects with error E
-- **WHEN** withOpenGraphProvider completes
-- **THEN** provider.close() is attempted
-- **AND** error E propagates to the caller
+- **WHEN** initial open rejects without a hook
+- **THEN** close is attempted and the error propagates
 
 #### Scenario: afterClose runs after open failure cleanup
 
-- **GIVEN** provider.open() rejects after provider creation
-- **AND** afterClose is supplied
-- **WHEN** withOpenGraphProvider completes
-- **THEN** afterClose(provider) runs after the close attempt
+- **WHEN** initial open fails and afterClose exists
+- **THEN** afterClose runs after close is attempted
+
+#### Scenario: Failed recovery or retry remains terminal
+
+- **GIVEN** recovery throws or retry-open fails
+- **WHEN** helper cleanup completes
+- **THEN** no further retry occurs and `afterClose` runs after final cleanup
 
 ### Requirement: No process exit side effects
 

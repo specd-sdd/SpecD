@@ -6,32 +6,51 @@
 
 #### Scenario: Full workspace index with transient provider and lifecycle hooks
 
-- **GIVEN** optional `beforeOpen` and `afterClose` hooks provided in `input`
-- **WHEN** `runIndexProjectGraph(ctx, { force: false, beforeOpen, afterClose })` is called without explicit provider
-- **THEN** `listWorkspaces` is invoked
-- **AND** `withOpenGraphProvider` receives `beforeOpen` and `afterClose`
-- **AND** `IndexProjectGraph` runs for all workspaces
-- **AND** the transient provider is closed upon completion
+- **GIVEN** `beforeOpen` and `afterClose` hooks
+- **WHEN** a non-forced transient index runs
+- **THEN** workspaces are listed, the helper receives the hooks, and the provider closes
 
 #### Scenario: Existing open provider bypasses withOpenGraphProvider
 
-- **GIVEN** an open `CodeGraphProvider` instance
-- **WHEN** `runIndexProjectGraph(ctx, { provider: openProvider })` is called
-- **THEN** `IndexProjectGraph` executes directly on `openProvider`
-- **AND** `openProvider.close()` is NOT called even if indexing succeeds or throws an error
+- **GIVEN** an open explicit provider
+- **WHEN** indexing runs
+- **THEN** it executes directly and the provider is not closed
 
 #### Scenario: Conflicting lifecycle hooks with existing provider throws error
 
-- **GIVEN** an open `CodeGraphProvider` instance
-- **AND** `input` includes `provider` and either `beforeOpen` or `afterClose`
-- **WHEN** `runIndexProjectGraph(ctx, input)` is called
+- **GIVEN** an explicit provider and a lifecycle hook
+- **WHEN** indexing is requested
 - **THEN** it throws `InvalidProviderLifecycleError`
-- **AND** the error is an instance of `SpecdError` with `code: 'INVALID_PROVIDER_LIFECYCLE'`
 
 #### Scenario: Subset workspace index
 
-- **WHEN** `runIndexProjectGraph(ctx, { workspaces: ['core'] })` is called
-- **THEN** only the specified workspaces are passed to `IndexProjectGraph`
+- **WHEN** selected workspaces are supplied
+- **THEN** only those workspaces are indexed
+
+#### Scenario: Prepared provider delegates through IndexProjectGraph
+
+- **GIVEN** an explicit open provider or a transient provider opened by the helper
+- **WHEN** project indexing runs
+- **THEN** the SDK invokes the prepared-provider `IndexProjectGraph` use-case seam
+- **AND** the use case receives the prepared workspace, VCS, force, and progress inputs
+
+#### Scenario: Force-only typed recovery retries once
+
+- **GIVEN** a transient provider whose first open raises `GraphStorageRecoveryRequiredError`
+- **WHEN** `runIndexProjectGraph` receives `force: true`
+- **THEN** it closes that provider, invokes `recreate()`, opens once more, and indexes
+- **AND** caller hooks and final cleanup occur exactly once
+
+#### Scenario: Non-forced or non-recoverable open failure is not retried
+
+- **WHEN** force is false or open raises a different error
+- **THEN** the original error propagates without recreation or retry
+
+#### Scenario: Explicit provider remains caller-owned
+
+- **GIVEN** an explicit already-open provider
+- **WHEN** force indexing runs
+- **THEN** the SDK does not close, recreate, or retry it
 
 ### Requirement: Lock acquisition out of scope
 
@@ -59,7 +78,11 @@
 
 #### Scenario: SDK can repair a store normal reads cannot open
 
-- **GIVEN** provider normal-open rejects an old schema
-- **WHEN** project indexing is requested
-- **THEN** the indexing-specific lifecycle reaches repair
-- **AND** hooks, cleanup, rebuild reason, and result fields occur exactly once
+- **GIVEN** a provider normal-open rejects an old schema
+- **WHEN** force indexing is requested
+- **THEN** the bounded repair lifecycle reaches a rebuild
+
+#### Scenario: Recovery result is preserved
+
+- **WHEN** force recovery succeeds
+- **THEN** the returned result retains the full-rebuild reason and index fields

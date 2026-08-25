@@ -33,36 +33,36 @@
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "Report provider-computed blast radius for files, symbols, specs, public exports, and covering specs with normalized paths and risk aggregates.",
+      "value": "Report provider-computed blast radius for files, logical symbols, specs, or public exports with deterministic exact selection.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:2f7bd0fd9041d9b98262dc6776de6819fbd6cce67a5bc9f259c313b9331681cb",
-          "lastModified": "2026-08-16T08:12:47.633Z"
+          "hash": "sha256:2a196f78d8fde3f482eddae71d109653ba545b755f7b39658c0c2882b2bf49de",
+          "lastModified": "2026-08-22T10:50:50.883Z"
         },
         "verify.md": {
-          "hash": "sha256:5d10484cb23dcfcceaace48bff12f4c2154d58785be26b197a80ed52d0286e4d",
-          "lastModified": "2026-08-16T08:12:47.638Z"
+          "hash": "sha256:b640284eb0ec4ea02c93071bfafa5669e5b871e62d1040ae4a4422bc6d30bc69",
+          "lastModified": "2026-08-22T10:50:50.885Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# Graph Impact\n\n## Rules\n\n- Signature: `specd graph impact [--file <paths...>] [--symbol <name>] [--spec <id>] [--direction dependents|dependencies|upstream|downstream|both] [--depth <n>] [--config <path> | --path <path>] [--format text|json|toon]`.\n- Require exactly 1 target (`--file`, `--symbol`, `--spec`). `--depth` positive, default `3`; `--config` and `--path` mutually exclusive.\n- Normalize `dependents`->`upstream`, `dependencies`->`downstream`; default `upstream`. Docs explain counts per direction.\n- Normalize file paths relative to project root. Single/multi-file delegate calculations to `CodeGraphProvider` via `withProvider`.\n- Symbol target: `resolveSymbolSelector` supports bare/qualified/full IDs. 0 matches prints `No symbol found matching \"<selector>\".` and exits 0; 1/many match calls `analyzeImpact`.\n- Spec target: load `getSpec(specId)`; missing throws `SpecNotFoundError`/exit 1/`SPEC_NOT_FOUND`. Uses `DEPENDS_ON`, `COVERS_FILE`, `COVERS_SYMBOL`.\n- Public export target: renders selected public binding, canonical target, ordered binding chain. Reports exact-binding consumers separately from canonical symbol dependents. Ambiguous exports list deterministic candidates.\n- Covering specs: single/multi-file impact renders provider `coveringSpecs`. Text groups depth-0 evidence under direct target coverage, min-depth > 0 under blast-radius. JSON/TOON emit `coveringSpecs` with evidence `{ kind, target, depth }`.\n- Provider availability: `GRAPH_BUSY`, `GRAPH_PROVIDER_STALE`, open failure exit 3.\n- Output: paths project-relative. Text shows target/depth, risk, counts, affected files with symbol depth `name:line (d=N)`. JSON/TOON emit full result + aggregate fields (`riskLevel`, `directDepsCount`, `indirectDepsCount`, `transitiveDepsCount`, `affectedFilesCount`).\n\n## Constraints\n\n- CLI never computes impact, risk, or multi-file aggregation.\n- Provider lifecycle uses `@specd/sdk`; CLI owns formatting.\n- Call `process.exit(0)` after provider closes.",
+      "value": "# Graph Impact\n\n## Rules\n\n- Signature: `specd graph impact [--file <paths...> | --symbol <reference> | --spec <id> | --export <public-name> --from <file-or-surface>] [--direction dependents|dependencies|upstream|downstream|both] [--depth <n>] [--config <path> | --path <path>] [--format text|json|toon]`.\n- Require exactly 1 target family. `--export` + `--from` required together; missing half fails before provider open. `--config` + `--path` mutually exclusive.\n- Normalize `dependents`→`upstream`, `dependencies`→`downstream`; default `upstream`; default depth `3`. CLI delegates all target resolution, traversal, risk, and aggregation to `CodeGraphProvider` via `withProvider`.\n- `--symbol`: canonical logical-symbol impact. Unqualified selectors prefer unique case-exact name; ambiguous case-exact returns bounded deterministic candidates without traversal; only absent case-exact permits case-insensitive exact-name. Reject prefix, component, textual matches. Preserve qualified/full occurrence exact semantics.\n- `--file`: resolve canonical graph files through `cli:graph-cli-context`; unresolved or ambiguous unprefixed paths fail. Single/multi-file provider aggregation includes changed symbols, affected files/symbols, counts, risk, covering specs.\n- `--spec`: `getSpec(specId)` then `analyzeSpecImpact`; missing node throws `SpecNotFoundError`, exit 1, `SPEC_NOT_FOUND`. Include `DEPENDS_ON`, `COVERS_FILE`, `COVERS_SYMBOL` reachability.\n- `--export`: select exact public binding through provider lookup after conservative resolution, never capped/ranked search. Render binding, canonical logical target, ordered binding chain; separate exact-binding consumers from complete canonical-symbol impact. Ambiguity returns deterministic candidates; never merge/select.\n- Validate availability/staleness exactly once after provider open. `GRAPH_BUSY`, `GRAPH_PROVIDER_STALE`, or open failure use infrastructure path, exit 3. No per-target/result availability checks.\n- Display paths: pure projection from project/workspace configuration; no graph reads. Multi-file output renders affected file once per contributing input. Formatting must avoid per-file/symbol store fan-out and `StoreOverloadError`.\n- Text: target/depth, risk, aggregate counts, changed symbols, affected files with `name:line (d=N)`, per-symbol/file breakdown. Explain counts as dependents for upstream and dependencies for downstream. Multiple matched symbols render sequential analyses.\n- File covering specs: render provider result only. Text groups depth-0 evidence as direct target coverage; minimum depth >0 as blast-radius coverage. Mixed spec appears once in direct group. JSON/TOON preserve ordered `coveringSpecs` and all `{ kind, target, depth }`; retain file coverage without symbol coverage and graph-health warnings.\n- JSON/TOON emit full result unchanged, `AffectedSymbol.depth`, and `riskLevel`, `directDepsCount`, `indirectDepsCount`, `transitiveDepsCount`, `affectedFilesCount`. All paths project-relative.\n\n## Constraints\n\n- Platform symbols and lifecycle helpers come from `@specd/sdk`; CLI owns display/path formatting only.\n- CLI MUST NOT implement symbol/export resolution, impact traversal, risk, coverage derivation, or multi-file aggregation.\n- Call `process.exit(0)` explicitly after provider closes.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:2f7bd0fd9041d9b98262dc6776de6819fbd6cce67a5bc9f259c313b9331681cb",
-          "lastModified": "2026-08-16T08:12:47.633Z"
+          "hash": "sha256:2a196f78d8fde3f482eddae71d109653ba545b755f7b39658c0c2882b2bf49de",
+          "lastModified": "2026-08-22T10:50:50.883Z"
         },
         "verify.md": {
-          "hash": "sha256:5d10484cb23dcfcceaace48bff12f4c2154d58785be26b197a80ed52d0286e4d",
-          "lastModified": "2026-08-16T08:12:47.638Z"
+          "hash": "sha256:b640284eb0ec4ea02c93071bfafa5669e5b871e62d1040ae4a4422bc6d30bc69",
+          "lastModified": "2026-08-22T10:50:50.885Z"
         }
       }
     }

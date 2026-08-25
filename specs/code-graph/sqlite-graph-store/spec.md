@@ -119,14 +119,18 @@ SQLite defines its own storage layout, query behavior, and output contract. If a
 
 ### Requirement: Destructive recreation
 
-`SQLiteGraphStore` SHALL implement the abstract `GraphStore.recreate()` capability using SQLite-specific destructive reset behavior.
+`SQLiteGraphStore.recreate()` SHALL implement physical recovery only after the
+SQLite worker and database are closed. It MUST reject while open, remove the graph
+persistence directory including SQLite companion files, rotate the storage
+generation, and return with no worker or database handle reopened.
 
-When `recreate()` is invoked, the adapter MUST ensure that the next indexing run starts from a clean SQLite storage generation:
+SQLite open validation SHALL translate only known corruption and non-migratable
+schema conditions to the abstract typed recoverable storage-open error after closing
+any partial database resources. Permission, configuration, native-runtime, and
+unrelated I/O errors MUST propagate without recreation authority.
 
-- all persisted SQLite graph data under `{configPath}/graph` is discarded
-- any backend-owned companion artifacts such as WAL or shared-memory files are also discarded when they belong to the same graph persistence root
-- the persisted storage-generation marker for that graph root is rotated
-- the backend is ready to be opened again and rebuilt from scratch
+A healthy forced reindex SHALL use the existing opened-store logical clear path and
+MUST NOT implement force by closing, deleting, reopening, or re-closing SQLite.
 
 ### Requirement: Storage generation sidecar
 

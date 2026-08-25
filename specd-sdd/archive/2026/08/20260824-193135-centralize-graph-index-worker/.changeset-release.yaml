@@ -1,0 +1,10 @@
+releases:
+  code-graph:isolated-index-worker: minor
+  code-graph:composition: minor
+  code-graph:index-project-graph: minor
+  code-graph:graph-store: minor
+  code-graph:sqlite-graph-store: minor
+  sdk:composition: minor
+  sdk:run-index-project-graph: minor
+  sdk:with-open-graph-provider: minor
+  cli:graph-index: minor

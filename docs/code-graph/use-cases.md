@@ -101,7 +101,7 @@ Application-layer use cases for CLI, SDK, and Studio hosts. Each receives an **a
 | Use case                | Factory                         | Purpose                                                              |
 | ----------------------- | ------------------------------- | -------------------------------------------------------------------- |
 | `GetGraphHealth`        | `createGetGraphHealth()`        | Statistics plus VCS staleness and derivation fingerprint diagnostics |
-| `IndexProjectGraph`     | `createIndexProjectGraph()`     | Project index execution with optional `force` recreate               |
+| `IndexProjectGraph`     | `createIndexProjectGraph()`     | Project index execution with optional logical `force` full rebuild   |
 | `GetSpecCoverage`       | `createGetSpecCoverage()`       | Covered files/symbols for one spec                                   |
 | `GetChangeSpecCoverage` | `createGetChangeSpecCoverage()` | Per-spec coverage for a change's `specIds`                           |
 
@@ -140,7 +140,12 @@ const result = await createIndexProjectGraph().execute({
 })
 ```
 
-**Consumers:** `specd graph index` worker body, future SDK `runIndexProjectGraph`. CLI retains lock acquisition and worker subprocess isolation.
+**Consumers:** an SDK-composed task running inside Code Graph's isolated graph-index
+worker. `runIndexProjectGraph` retains project orchestration (workspace assembly, VCS,
+provider lifecycle, and repair handling); Code Graph owns the worker process and its
+single-writer lock. The CLI selects its trusted packaged task and presents the returned
+progress, result, or typed failure—it does not acquire the lock or supervise a
+subprocess.
 
 ### GetSpecCoverage / GetChangeSpecCoverage
 

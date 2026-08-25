@@ -11,51 +11,44 @@
   "implementation": [
     {
       "file": "sdk:src/orchestration/run-index-project-graph.ts",
-      "symbols": ["runIndexProjectGraph", "RunIndexProjectGraphResult"]
+      "symbols": ["runIndexProjectGraph"]
     },
     {
       "file": "sdk:test/orchestration/run-index-project-graph.spec.ts"
-    },
-    {
-      "file": "sdk:src/composition/with-open-graph-provider.ts",
-      "symbols": ["withOpenGraphProvider"]
-    },
-    {
-      "file": "sdk:test/composition/with-open-graph-provider.spec.ts"
     }
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "Orchestrate project graph indexing by resolving config, workspace targets, VCS state, and provider lifecycle without host duplication.",
+      "value": "SDK orchestration indexes configured workspaces with provider ownership, progress/result passthrough, and force-only typed-open recovery.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:ca7f8f8625fca0b6891d4c6494aaaf92ea69783621ec8421960dd415713314d9",
-          "lastModified": "2026-08-16T08:12:48.482Z"
+          "hash": "sha256:44b1d4b62e120db612402dfe0cbfa428473a8e56a24a055ebf6d36b7b704fb9f",
+          "lastModified": "2026-08-25T14:41:04.312Z"
         },
         "verify.md": {
-          "hash": "sha256:b9b30a4a02b5ecc6b90ee705350c814203516bb1406efbb90fba6e001ae63faa",
-          "lastModified": "2026-08-16T08:12:48.484Z"
+          "hash": "sha256:73f425076fff3cf6632f1747f0d53922b83c54df38338738c9a782fba04865b9",
+          "lastModified": "2026-08-25T14:41:04.312Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# runIndexProjectGraph\n\n## Rules\n\n- `runIndexProjectGraph(ctx: SdkHostContext, input: RunIndexProjectGraphInput): Promise<RunIndexProjectGraphResult>` orchestrates SDK graph indexing.\n- Validate lifecycle first: if `input.provider` and either `input.beforeOpen` or `input.afterClose` exist, throw `InvalidProviderLifecycleError`, a `SpecdError` with `code: 'INVALID_PROVIDER_LIFECYCLE'`.\n- Resolve `SpecdConfig` through `ctx.kernel.project.getConfig.execute()`; call `ctx.kernel.project.listWorkspaces.execute()`; prepare `projectRoot`, `workspaces`, `graphConfig`, `codeGraphVersion`, `vcsRoot`, `vcsRef`, `force`, `onProgress`.\n- `input.workspaces` MAY restrict targets; omission indexes all configured workspaces.\n- Provided `input.provider`: require already-open `CodeGraphProvider`; invoke `createIndexProjectGraph()` directly with provider; MUST NOT close provider after success/failure.\n- Omitted provider: execute inside `withOpenGraphProvider(ctx, async (provider) => { ... }, { beforeOpen: input.beforeOpen, afterClose: input.afterClose })`; invoke `createIndexProjectGraph()` on transient opened provider; close transient provider on completion.\n- Repair lifecycle: when old schema cannot open for normal reads, carry incompatibility-repair intent and full-rebuild results without lossy mapping using indexing repair path. Preserve provider ownership of destructive recreation.\n- `acquireGraphIndexLock` MUST NOT run inside orchestration. CLI adapters MAY acquire subprocess lock through `beforeOpen` passed to `withOpenGraphProvider`.\n- Forward `input.onProgress` events from `IndexProjectGraph` unchanged.\n- `RunIndexProjectGraphResult` MUST preserve all `IndexProjectGraph` result fields, including indexed file/symbol counts, per-workspace breakdown, errors; no lossy mapping.\n\n## Constraints\n\n- External provider lifecycle belongs to caller; transient provider lifecycle belongs to `withOpenGraphProvider`.\n- Concurrent-index lock acquisition remains host/CLI concern.\n- Progress and result data pass through without transformation.",
+      "value": "# runIndexProjectGraph\n\n## Rules\n\n- `runIndexProjectGraph(ctx: SdkHostContext, input: RunIndexProjectGraphInput): Promise<RunIndexProjectGraphResult>` resolves config, target/all workspaces, project/graph/version/VCS inputs; invokes `IndexProjectGraph` on open provider.\n- Explicit `input.provider` plus `input.beforeOpen` or `input.afterClose`: throw `InvalidProviderLifecycleError`. Explicit provider MUST be open; caller-owned: SDK MUST NOT close, recreate, retry. Forward `force` to `IndexProjectGraph`.\n- No provider: use `withOpenGraphProvider(ctx, ..., { beforeOpen: input.beforeOpen, afterClose: input.afterClose })`.\n- Transient recovery only when `input.force` and initial `open()` raises typed recoverable storage-open error: helper closes provider, calls `provider.recreate()`, retries `open()` plus indexing exactly once. Preserve hooks; cleanup once/provider lifetime.\n- Rethrow non-recoverable/untyped open errors, recovery failure, second open failure; no deletion/retry.\n- `acquireGraphIndexLock` MUST NOT run in orchestration. CLI MAY acquire via `beforeOpen`.\n- Forward `input.onProgress` unchanged. `RunIndexProjectGraphResult` preserves `IndexProjectGraph` fields: counts, workspace breakdown, errors, full-rebuild result; no lossy mapping.\n\n## Constraints\n\n- SDK owns force-only typed-open recovery decision; Code Graph owns `recreate()` and closed-provider precondition.\n- Normal reads/non-forced indexing surface original typed open failure.\n- Caller owns explicit provider lifecycle; `withOpenGraphProvider` owns transient lifecycle.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:ca7f8f8625fca0b6891d4c6494aaaf92ea69783621ec8421960dd415713314d9",
-          "lastModified": "2026-08-16T08:12:48.482Z"
+          "hash": "sha256:44b1d4b62e120db612402dfe0cbfa428473a8e56a24a055ebf6d36b7b704fb9f",
+          "lastModified": "2026-08-25T14:41:04.312Z"
         },
         "verify.md": {
-          "hash": "sha256:b9b30a4a02b5ecc6b90ee705350c814203516bb1406efbb90fba6e001ae63faa",
-          "lastModified": "2026-08-16T08:12:48.484Z"
+          "hash": "sha256:73f425076fff3cf6632f1747f0d53922b83c54df38338738c9a782fba04865b9",
+          "lastModified": "2026-08-25T14:41:04.312Z"
         }
       }
     }

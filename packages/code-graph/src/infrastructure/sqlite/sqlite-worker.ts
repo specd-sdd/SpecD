@@ -20,6 +20,7 @@ import { type SearchOptions } from '../../domain/value-objects/search-options.js
 import { type SourceContentCandidateQuery } from '../../domain/value-objects/source-search.js'
 import { SpecNotFoundError } from '../../domain/errors/spec-not-found-error.js'
 import { BulkSessionStateError } from '../../domain/errors/bulk-session-state-error.js'
+import { GraphStorageRecoveryRequiredError } from '../../domain/errors/graph-storage-recovery-required-error.js'
 import {
   type IndexedInputObservation,
   type IndexedResourceKey,
@@ -45,6 +46,8 @@ export function serializeError(error: unknown): SerializedErrorPayload {
     const details: Record<string, unknown> = {}
     if (error instanceof SpecNotFoundError && typeof error.specId === 'string') {
       details.specId = error.specId
+    } else if (error instanceof GraphStorageRecoveryRequiredError) {
+      details.recoveryReason = error.reason
     }
     return {
       name: err.name || 'Error',
@@ -664,6 +667,16 @@ if (parentPort !== null) {
           parentPort?.postMessage(response)
         }),
       )
+      .then(() => {
+        // Closing the port releases the worker's final event-loop handle after
+        // the close acknowledgement has been queued. This lets native SQLite
+        // tear down cooperatively instead of being interrupted by terminate().
+        if (message.op === 'close') {
+          parentPort?.removeAllListeners('message')
+          parentPort?.close()
+          parentPort?.unref()
+        }
+      })
       .catch((error) => {
         parentPort?.postMessage({
           id: message.id,

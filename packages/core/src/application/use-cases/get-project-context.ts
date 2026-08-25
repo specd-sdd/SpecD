@@ -290,10 +290,15 @@ export class GetProjectContext {
       // Check for missing optimization if enabled
       if (config.llmOptimizedContext && metadata !== null) {
         if (metadata.optimizedContext === undefined || metadata.optimizedContext === '') {
+          const status = metadata.optimizationStatus?.optimizedContext ?? 'missing'
+          const warningType = status === 'stale' ? 'stale-optimization' : 'missing-optimization'
           warnings.push({
-            type: 'stale-optimization',
+            type: warningType,
             path: specId,
-            message: `Spec '${specId}' is missing LLM-optimized context. Launch specd-spec-context-optimizer agent to refresh.`,
+            message:
+              status === 'stale'
+                ? `Spec '${specId}' drifted since its last LLM-optimization. Launch specd-spec-context-optimizer agent to refresh.`
+                : `Spec '${specId}' has never been LLM-optimized. Launch specd-spec-context-optimizer agent to refresh.`,
           })
         }
       }

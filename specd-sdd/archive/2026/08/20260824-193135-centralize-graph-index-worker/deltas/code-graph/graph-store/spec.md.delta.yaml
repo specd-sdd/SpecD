@@ -1,0 +1,37 @@
+- op: modified
+  description: 'Separate logical clear from physical recreation and type recoverable open failures'
+  selector:
+    type: section
+    matches: '^Requirement: Connection lifecycle$'
+  content: |
+    `GraphStore.open()` SHALL remain an explicit parameterless lifecycle operation. It
+    MUST NOT clear or recreate storage implicitly. When the adapter detects corruption
+    or a schema incompatibility that cannot be opened safely, it MUST reject with a
+    typed recoverable storage-open error; all other failures retain their own error
+    identity.
+
+    Open prepares the concrete backend for reads and writes and MAY perform native
+    loading, binding resolution, schema preparation, or generation checks.
+
+    `close()` MUST be idempotent and leave the store observably closed, including after
+    a partial open failure. Callers can therefore decide whether a typed recovery is
+    authorized without retaining a live database handle.
+
+- op: modified
+  description: 'Constrain physical recreation to a closed store'
+  selector:
+    type: section
+    matches: '^Requirement: Store recreation$'
+  content: |
+    `recreate()` SHALL be a physical recovery operation for storage that is corrupt,
+    incompatible, or otherwise unusable. It MUST require the store to be closed and
+    reject an open-store invocation with a typed precondition error. On success it
+    removes/replaces backend persistence and rotates the storage generation while
+    leaving the store closed; a caller must later call `open()` explicitly.
+
+    `clear()` is distinct: it operates on an opened healthy store, removes only logical
+    indexed contents, preserves the physical database and storage generation, and is
+    the operation used by a forced full reindex.
+
+    Host-facing callers MUST NOT rely on backend filenames, WAL files, or direct store
+    mechanics; provider and SDK contracts determine when recovery is authorized.

@@ -1,48 +1,23 @@
-import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest'
-import { EventEmitter } from 'node:events'
-import { spawn } from 'node:child_process'
-import { acquireGraphIndexLock } from '@specd/code-graph/internal'
-import { captureStdout } from './helpers.js'
+import { readFileSync } from 'node:fs'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
-vi.mock('node:child_process', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('node:child_process')>()
-  return { ...actual, spawn: vi.fn() }
-})
-vi.mock('@specd/code-graph/internal', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@specd/code-graph/internal')>()
-  return { ...actual, acquireGraphIndexLock: vi.fn(() => vi.fn()) }
-})
-
-vi.mock('../../src/helpers/sdk-host.js', () => ({
-  resolveSdkHostContext: vi.fn(),
+vi.mock('@specd/sdk', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@specd/sdk')>()),
+  runIsolatedGraphIndex: vi.fn(),
 }))
 
-vi.mock('@specd/sdk', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@specd/sdk')>()
-  return {
-    ...actual,
-    createVcsAdapter: vi.fn().mockResolvedValue({
-      ref: vi.fn().mockResolvedValue('abc1234def'),
-      rootDir: vi.fn().mockResolvedValue('/project'),
-    }),
-    runIndexProjectGraph: vi.fn(),
-    createSdkContext: vi.fn(),
-  }
-})
-
+import { runIsolatedGraphIndex } from '@specd/sdk'
+import { registerGraphIndex } from '../../src/commands/graph/index-graph.js'
+import * as resolveContext from '../../src/commands/graph/resolve-graph-cli-context.js'
 import {
+  captureStdout,
+  ExitSentinel,
   makeMockConfig,
-  makeMockKernel,
   makeProgram,
   mockProcessExit,
-  ExitSentinel,
 } from './helpers.js'
-import * as resolveCtx from '../../src/commands/graph/resolve-graph-cli-context.js'
-import { registerGraphIndex } from '../../src/commands/graph/index-graph.js'
-import { runIndexProjectGraph } from '@specd/sdk'
-import { resolveSdkHostContext } from '../../src/helpers/sdk-host.js'
 
-const mockIndexResult = {
+const result = {
   filesIndexed: 10,
   filesDiscovered: 12,
   documentsIndexed: 3,
@@ -50,222 +25,118 @@ const mockIndexResult = {
   filesSkipped: 2,
   specsDiscovered: 3,
   specsIndexed: 3,
-  errors: [],
+  errors: [{ filePath: 'bad.ts', message: 'parse error' }],
   duration: 1234,
   vcsRef: 'abc1234',
   graphFingerprint: 'fp-test',
-  workspaces: [
-    {
-      name: 'default',
-      filesDiscovered: 12,
-      filesIndexed: 10,
-      documentsIndexed: 3,
-      filesSkipped: 2,
-      filesRemoved: 1,
-      specsDiscovered: 3,
-      specsIndexed: 3,
-    },
-  ],
+  workspaces: [],
   fullRebuild: false,
   fullRebuildReason: null,
-  phaseMetrics: {
-    importResolution: { count: 0, durationMs: 0 },
-    dependencyFacts: { count: 0, durationMs: 0 },
-    adapterRelations: { count: 0, durationMs: 0 },
-    reexports: { count: 0, durationMs: 0 },
-    hierarchyOverrides: { count: 0, durationMs: 0 },
-    persistence: { count: 0, durationMs: 0 },
-    searchIndexRebuild: { count: 0, durationMs: 0 },
-  },
+  phaseMetrics: { importResolution: { count: 0, durationMs: 0 } },
 }
 
-async function runIndex(
-  program: ReturnType<typeof makeIndexProgram>,
-  ...args: string[]
-): Promise<void> {
+function makeIndexProgram() {
+  const program = makeProgram()
+  registerGraphIndex(program.command('graph'))
+  return program
+}
+
+async function run(program: ReturnType<typeof makeIndexProgram>, ...args: string[]) {
   try {
-    await program.parseAsync(['node', 'specd', ...args])
+    await program.parseAsync(['node', 'specd', 'graph', 'index', ...args])
   } catch (error) {
     if (!(error instanceof ExitSentinel)) throw error
   }
 }
 
-function setup(mode: 'configured' | 'bootstrap') {
+function setup(mode: 'configured' | 'bootstrap' = 'configured') {
   const config = makeMockConfig()
-  const kernel = mode === 'configured' ? makeMockKernel() : null
-  if (kernel !== null) {
-    kernel.project.listWorkspaces.execute.mockResolvedValue([
-      {
-        name: 'default',
-        codeRoot: '/project',
-        isExternal: false,
-        ownership: 'owned' as const,
-        specRepo: {} as never,
-      },
-    ])
-  }
-
-  vi.mocked(runIndexProjectGraph).mockResolvedValue(mockIndexResult)
-  vi.mocked(resolveSdkHostContext).mockImplementation(async (config, kernel) => {
-    const hostKernel = kernel ?? makeMockKernel()
-    vi.mocked(hostKernel.project.getConfig.execute).mockReturnValue(config)
-    return {
-      kernel: hostKernel,
-      createGraphProvider: vi.fn(),
-    }
-  })
-
-  vi.spyOn(resolveCtx, 'resolveGraphCliContext').mockResolvedValue({
+  vi.spyOn(resolveContext, 'resolveGraphCliContext').mockResolvedValue({
     mode,
     config,
     configFilePath: mode === 'configured' ? '/project/specd.yaml' : null,
-    kernel,
+    kernel: null,
     projectRoot: '/project',
     vcsRoot: '/project',
   })
-
-  const getStdout = captureStdout()
+  vi.mocked(runIsolatedGraphIndex).mockResolvedValue(result)
   mockProcessExit()
-  return { config, kernel, getStdout }
-}
-
-function makeIndexProgram() {
-  const program = makeProgram()
-  const graph = program.command('graph')
-  registerGraphIndex(graph)
-  return program
+  return config
 }
 
 afterEach(() => {
   vi.clearAllMocks()
   vi.restoreAllMocks()
-  vi.unstubAllEnvs()
-})
-
-beforeEach(() => {
-  vi.stubEnv('SPECD_GRAPH_INDEX_NO_WORKER', 'true')
 })
 
 describe('graph index', () => {
-  it('delegates indexing to runIndexProjectGraph in configured mode', async () => {
-    const { config, kernel } = setup('configured')
-
-    const program = makeIndexProgram()
-    await runIndex(program, 'graph', 'index')
-
-    expect(resolveSdkHostContext).toHaveBeenCalledWith(config, kernel)
-    expect(runIndexProjectGraph).toHaveBeenCalled()
-  })
-
-  it('owns the shared lock in a parent process and propagates worker exit', async () => {
-    setup('configured')
-    vi.stubEnv('SPECD_GRAPH_INDEX_NO_WORKER', '')
-    const child = Object.assign(new EventEmitter(), { kill: vi.fn() })
-    vi.mocked(spawn).mockImplementation(() => {
-      setImmediate(() => child.emit('exit', 0, null))
-      return child as never
-    })
-
-    const program = makeIndexProgram()
-    await runIndex(program, 'graph', 'index')
-
-    expect(acquireGraphIndexLock).toHaveBeenCalledTimes(1)
-    expect(spawn).toHaveBeenCalledWith(
-      process.execPath,
-      process.argv.slice(1),
+  it('delegates one configured run to the SDK worker with its packaged task', async () => {
+    const config = setup()
+    await run(makeIndexProgram(), '--force', '--exclude-path', 'foo,bar')
+    expect(runIsolatedGraphIndex).toHaveBeenCalledTimes(1)
+    expect(runIsolatedGraphIndex).toHaveBeenCalledWith(
       expect.objectContaining({
-        stdio: 'inherit',
-        env: expect.objectContaining({
-          SPECD_GRAPH_INDEX_WORKER: 'true',
-          SPECD_GRAPH_INDEX_LOCK_HELD: 'true',
-        }),
+        storageRoot: config.configPath,
+        taskModule: expect.any(URL),
+        taskInput: {
+          context: { mode: 'configured', configFilePath: '/project/specd.yaml' },
+          index: { force: true, excludePaths: ['foo', 'bar'] },
+        },
+        onProgress: expect.any(Function),
       }),
     )
-    expect(runIndexProjectGraph).not.toHaveBeenCalled()
+    expect(
+      (vi.mocked(runIsolatedGraphIndex).mock.calls[0]?.[0].taskModule as URL).pathname,
+    ).toContain('graph-index-task.js')
   })
 
-  it('does not expose a --workspace option anymore', () => {
-    const program = makeIndexProgram()
-    const indexCommand = program.commands
-      .find((c) => c.name() === 'graph')
-      ?.commands.find((c) => c.name() === 'index')
-    expect(indexCommand?.options.some((option) => option.long === '--workspace')).toBe(false)
-  })
-
-  it('delegates indexing in bootstrap mode', async () => {
-    const { config } = setup('bootstrap')
-
-    const program = makeIndexProgram()
-    await runIndex(program, 'graph', 'index', '--path', '/tmp/repo')
-
-    expect(resolveSdkHostContext).toHaveBeenCalledWith(config, null)
-    expect(runIndexProjectGraph).toHaveBeenCalled()
-  })
-
-  it('uses no-config fallback path by passing no overrides', async () => {
+  it('uses an exact bootstrap descriptor and only supplies progress for text output', async () => {
     setup('bootstrap')
-
-    const program = makeIndexProgram()
-    await runIndex(program, 'graph', 'index')
-
-    expect(resolveCtx.resolveGraphCliContext).toHaveBeenCalledWith({
-      configPath: undefined,
-      repoPath: undefined,
-    })
-  })
-
-  it('forwards exclude-path to runIndexProjectGraph', async () => {
-    setup('configured')
-
-    const program = makeIndexProgram()
-    await runIndex(program, 'graph', 'index', '--exclude-path', 'foo,bar')
-
-    expect(runIndexProjectGraph).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({ excludePaths: ['foo', 'bar'] }),
+    await run(makeIndexProgram(), '--path', '/tmp/repo', '--format', 'json')
+    expect(runIsolatedGraphIndex).toHaveBeenCalledWith(
+      expect.objectContaining({
+        taskInput: {
+          context: { mode: 'bootstrap', projectRoot: '/project', vcsRoot: '/project' },
+          index: { force: false },
+        },
+      }),
     )
+    expect(vi.mocked(runIsolatedGraphIndex).mock.calls[0]?.[0].onProgress).toBeUndefined()
   })
 
-  it('forwards --force to runIndexProjectGraph', async () => {
-    setup('bootstrap')
-
-    const program = makeIndexProgram()
-    await runIndex(program, 'graph', 'index', '--path', '/tmp/repo', '--force')
-
-    expect(runIndexProjectGraph).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({ force: true }),
-    )
+  it('renders text progress and preserves the successful per-file-error result', async () => {
+    setup()
+    const stdout = captureStdout()
+    await run(makeIndexProgram())
+    const onProgress = vi.mocked(runIsolatedGraphIndex).mock.calls[0]?.[0].onProgress
+    onProgress?.({ percent: 12.5, phase: 'symbols' })
+    expect(stdout()).toContain('Indexed 10 file(s) in 1234ms')
+    expect(stdout()).toContain('bad.ts: parse error')
+    expect(stdout()).toContain('Indexing: 13% symbols')
   })
 
-  it('renders the text summary block required by the CLI contract', async () => {
-    const { getStdout } = setup('configured')
+  it('keeps validation failures local and maps worker errors to code 3', async () => {
+    setup()
+    await run(makeIndexProgram(), '--config', 'a', '--path', 'b')
+    expect(runIsolatedGraphIndex).not.toHaveBeenCalled()
+    expect(process.exit).toHaveBeenCalledWith(1)
 
-    const program = makeIndexProgram()
-    await runIndex(program, 'graph', 'index')
-
-    const stdout = getStdout()
-    expect(stdout).toContain('Indexed 10 file(s) in 1234ms')
-    expect(stdout).toContain('discovered: 12')
-    expect(stdout).toContain('documents:  3')
-    expect(stdout).toContain('skipped:    2')
-    expect(stdout).toContain('removed:    1')
-    expect(stdout).toContain('specs:      3')
-    expect(stdout).toContain('errors:     0')
-    expect(stdout).toContain('workspaces:')
-    expect(stdout).toContain('3 documents')
-  })
-
-  it('exits with code 3 when runIndexProjectGraph throws', async () => {
-    setup('configured')
-    vi.mocked(runIndexProjectGraph).mockRejectedValueOnce(new Error('indexing failed'))
-    mockProcessExit()
-
-    const program = makeIndexProgram()
-    await expect(program.parseAsync(['node', 'specd', 'graph', 'index'])).rejects.toThrow(
-      ExitSentinel,
-    )
-
+    vi.restoreAllMocks()
+    setup()
+    vi.mocked(runIsolatedGraphIndex).mockRejectedValueOnce(new Error('GRAPH_INDEX_WORKER_PROTOCOL'))
+    await run(makeIndexProgram())
     expect(process.exit).toHaveBeenCalledWith(3)
+  })
+
+  it('contains no CLI-owned isolation bypass or direct Code Graph dependency', () => {
+    const source = readFileSync(
+      new URL('../../src/commands/graph/index-graph.ts', import.meta.url),
+      'utf8',
+    )
+    const packageJson = readFileSync(new URL('../../package.json', import.meta.url), 'utf8')
+    expect(source).not.toMatch(
+      /child_process|SPECD_GRAPH_INDEX_(?:WORKER|NO_WORKER|LOCK_HELD)|acquireGraphIndexLock/,
+    )
+    expect(packageJson).not.toContain('"@specd/code-graph"')
   })
 })

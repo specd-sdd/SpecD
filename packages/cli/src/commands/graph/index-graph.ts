@@ -1,14 +1,16 @@
 import { Command, Option } from 'commander'
-import { spawn, type ChildProcess } from 'node:child_process'
-import { acquireGraphIndexLock } from '@specd/code-graph/internal'
 import {
-  runIndexProjectGraph,
+  runIsolatedGraphIndex,
   type IndexPhaseMetric,
   type RunIndexProjectGraphResult,
 } from '@specd/sdk'
+import type {
+  CliGraphIndexContextDescriptor,
+  CliGraphIndexProgress,
+  CliGraphIndexTaskInput,
+} from '../../graph-index-task.js'
 import { output, parseFormat } from '../../formatter.js'
 import { cliError } from '../../handle-error.js'
-import { resolveSdkHostContext } from '../../helpers/sdk-host.js'
 import { resolveGraphCliContext } from './resolve-graph-cli-context.js'
 
 /**
@@ -81,31 +83,47 @@ JSON/TOON output schema:
           return
         }
 
-        const { config, kernel } = context
-
-        if (
-          process.env['SPECD_GRAPH_INDEX_WORKER'] !== 'true' &&
-          process.env['SPECD_GRAPH_INDEX_NO_WORKER'] !== 'true'
-        ) {
-          try {
-            await runIndexWorker(config)
-          } catch (err) {
-            cliError(err instanceof Error ? err.message : 'index worker failed', opts.format, 3)
+        let taskContext: CliGraphIndexContextDescriptor
+        if (context.mode === 'configured') {
+          if (context.configFilePath === null) {
+            cliError('configured graph context is missing its config file path', opts.format, 1)
           }
-          return
+          taskContext = { mode: 'configured', configFilePath: context.configFilePath }
+        } else {
+          if (context.vcsRoot === null) {
+            cliError('bootstrap graph context is missing its VCS root', opts.format, 1)
+          }
+          taskContext = {
+            mode: 'bootstrap',
+            projectRoot: context.projectRoot,
+            vcsRoot: context.vcsRoot,
+          }
         }
 
         try {
-          const host = await resolveSdkHostContext(config, kernel)
-          const result = await runIndexProjectGraph(host, {
-            force: opts.force,
-            ...(opts.excludePath !== undefined ? { excludePaths: opts.excludePath } : {}),
-            onProgress: (percent, phase) => {
-              if (fmt === 'text') {
-                const pct = Math.round(percent)
-                process.stdout.write(`\rIndexing: ${pct}% ${phase}${' '.repeat(20)}`)
-              }
+          const taskInput: CliGraphIndexTaskInput = {
+            context: taskContext,
+            index: {
+              force: opts.force,
+              ...(opts.excludePath !== undefined ? { excludePaths: opts.excludePath } : {}),
             },
+          }
+          const result = await runIsolatedGraphIndex<
+            CliGraphIndexTaskInput,
+            CliGraphIndexProgress,
+            RunIndexProjectGraphResult
+          >({
+            storageRoot: context.config.configPath,
+            taskModule: new URL('./graph-index-task.js', import.meta.url),
+            taskInput,
+            ...(fmt === 'text'
+              ? {
+                  onProgress: ({ percent, phase }) => {
+                    const pct = Math.round(percent)
+                    process.stdout.write(`\rIndexing: ${pct}% ${phase}${' '.repeat(20)}`)
+                  },
+                }
+              : {}),
           })
 
           if (fmt === 'text') {
@@ -120,47 +138,6 @@ JSON/TOON output schema:
         }
       },
     )
-}
-
-/**
- * Runs indexing in a child process while this parent owns the shared graph lock.
- * @param config - Resolved project configuration owning graph storage.
- */
-async function runIndexWorker(config: Parameters<typeof acquireGraphIndexLock>[0]): Promise<void> {
-  let child: ChildProcess | undefined
-  const forwardSignal = (signal: NodeJS.Signals): void => {
-    child?.kill(signal)
-  }
-  const onSigint = (): void => forwardSignal('SIGINT')
-  const onSigterm = (): void => forwardSignal('SIGTERM')
-  process.prependListener('SIGINT', onSigint)
-  process.prependListener('SIGTERM', onSigterm)
-  const release = acquireGraphIndexLock(config)
-  try {
-    child = spawn(process.execPath, process.argv.slice(1), {
-      stdio: 'inherit',
-      env: {
-        ...process.env,
-        SPECD_GRAPH_INDEX_WORKER: 'true',
-        SPECD_GRAPH_INDEX_LOCK_HELD: 'true',
-      },
-    })
-    const exitCode = await new Promise<number>((resolve, reject) => {
-      child!.once('error', reject)
-      child!.once('exit', (code, signal) => {
-        if (code !== null) resolve(code)
-        else resolve(signal === 'SIGINT' ? 130 : signal === 'SIGTERM' ? 143 : 3)
-      })
-    })
-    release()
-    process.removeListener('SIGINT', onSigint)
-    process.removeListener('SIGTERM', onSigterm)
-    process.exit(exitCode)
-  } finally {
-    release()
-    process.removeListener('SIGINT', onSigint)
-    process.removeListener('SIGTERM', onSigterm)
-  }
 }
 
 /**

@@ -1,9 +1,10 @@
 import {
   buildProjectGraphConfig,
+  createIndexProjectGraph,
   type CodeGraphProvider,
+  GraphStorageRecoveryRequiredError,
   type IndexProgressCallback,
   type IndexResult,
-  type IndexingOpenResult,
 } from '@specd/code-graph'
 import { createVcsAdapter } from '@specd/core'
 import { type SdkHostContext } from '../composition/host-context.js'
@@ -33,11 +34,6 @@ export interface RunIndexProjectGraphInput {
 export type RunIndexProjectGraphResult = IndexResult & {
   readonly fullRebuild: boolean
   readonly fullRebuildReason: string | null
-}
-
-/** Provider surface required by the indexing-specific SDK lifecycle. */
-interface IndexingCodeGraphProvider extends CodeGraphProvider {
-  openForIndexing(): Promise<IndexingOpenResult>
 }
 
 /**
@@ -83,21 +79,23 @@ export async function runIndexProjectGraph(
   const graphConfig = buildProjectGraphConfig(config, {
     ...(input.excludePaths !== undefined ? { excludePaths: [...input.excludePaths] } : {}),
   })
+  const indexProjectGraph = createIndexProjectGraph()
 
   const executeIndex = async (
     provider: CodeGraphProvider,
     repair = { fullRebuild: false, fullRebuildReason: null as string | null },
   ): Promise<RunIndexProjectGraphResult> => {
-    const result = await provider.index({
+    const result = await indexProjectGraph.execute({
+      provider,
       projectRoot,
       workspaces,
       graphConfig,
       codeGraphVersion,
       vcsRoot,
-      getSpecMetadata: ctx.kernel.specs.getMetadata,
       ...(input.force !== undefined ? { force: input.force } : {}),
       ...(vcsRef !== undefined ? { vcsRef } : {}),
       ...(input.onProgress !== undefined ? { onProgress: input.onProgress } : {}),
+      getSpecMetadata: ctx.kernel.specs.getMetadata,
     })
     return {
       ...result,
@@ -110,13 +108,29 @@ export async function runIndexProjectGraph(
     return executeIndex(input.provider)
   }
 
-  return withOpenGraphProvider<RunIndexProjectGraphResult, IndexingOpenResult>(
+  let repair = { fullRebuild: false, fullRebuildReason: null as string | null }
+  return withOpenGraphProvider<RunIndexProjectGraphResult>(
     ctx,
-    (provider, repair) => executeIndex(provider, repair),
+    (provider) => executeIndex(provider, repair),
     {
       ...(input.beforeOpen === undefined ? {} : { beforeOpen: input.beforeOpen }),
       ...(input.afterClose === undefined ? {} : { afterClose: input.afterClose }),
-      open: (provider) => (provider as IndexingCodeGraphProvider).openForIndexing(),
+      ...(input.force === true
+        ? {
+            recoverOpenFailure: async (
+              error: unknown,
+              provider: CodeGraphProvider,
+            ): Promise<boolean> => {
+              if (!(error instanceof GraphStorageRecoveryRequiredError)) return false
+              await provider.recreate()
+              repair = {
+                fullRebuild: true,
+                fullRebuildReason: error.reason,
+              }
+              return true
+            },
+          }
+        : {}),
     },
   )
 }

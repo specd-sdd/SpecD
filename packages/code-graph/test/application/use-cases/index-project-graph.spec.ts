@@ -89,6 +89,19 @@ describe('IndexProjectGraph', () => {
     expect(provider.index).toHaveBeenCalledWith(expect.objectContaining({ onProgress }))
   })
 
+  it('forwards materialized spec metadata to provider.index', async () => {
+    const provider = makeProvider()
+    const getSpecMetadata = { execute: vi.fn() }
+
+    await new IndexProjectGraph().execute({
+      provider,
+      ...baseInput,
+      getSpecMetadata: getSpecMetadata as never,
+    })
+
+    expect(provider.index).toHaveBeenCalledWith(expect.objectContaining({ getSpecMetadata }))
+  })
+
   it('forwards a non-null vcsRoot to provider.index', async () => {
     const provider = makeProvider()
     const vcsRoot = '/repo'

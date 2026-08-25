@@ -1,4 +1,4 @@
-import { describe, expect, it, afterEach } from 'vitest'
+import { describe, expect, it, afterEach, vi } from 'vitest'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
@@ -14,6 +14,7 @@ import {
 import { StoreNotOpenError } from '../../../src/domain/errors/store-not-open-error.js'
 import { StoreWorkerError } from '../../../src/domain/errors/store-worker-error.js'
 import { BulkSessionStateError } from '../../../src/domain/errors/bulk-session-state-error.js'
+import { GraphStoreRecreateRequiresClosedError } from '../../../src/domain/errors/graph-store-recreate-requires-closed-error.js'
 
 let tempDir: string | undefined
 
@@ -73,6 +74,42 @@ describe('SQLiteWorkerClient & Store Lifecycle', () => {
     expect(client.currentState).toBe('closed')
   })
 
+  it('rejects raw worker recreation while the database is open and then shuts down cleanly', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-worker-recreate-shutdown-'))
+    const client = new SQLiteWorkerClient()
+    await client.open(tempDir)
+
+    await expect(client.sendRequest('recreate', {})).rejects.toBeInstanceOf(
+      GraphStoreRecreateRequiresClosedError,
+    )
+
+    const worker = (client as unknown as { worker: { terminate: () => Promise<number> } }).worker
+    const terminate = vi.spyOn(worker, 'terminate')
+
+    let timeout: NodeJS.Timeout | undefined
+    try {
+      await Promise.race([
+        client.close(250),
+        new Promise<never>((_, reject) => {
+          timeout = setTimeout(
+            () =>
+              reject(
+                new Error('Cooperative worker shutdown did not settle after rejected recreate'),
+              ),
+            1000,
+          )
+        }),
+      ])
+    } finally {
+      if (timeout !== undefined) {
+        clearTimeout(timeout)
+      }
+    }
+
+    expect(terminate).not.toHaveBeenCalled()
+    expect(client.currentState).toBe('closed')
+  })
+
   it('rejects invalid maxPendingOperations strictly on open', async () => {
     tempDir = mkdtempSync(join(tmpdir(), 'code-graph-worker-invalid-ops-'))
     const client = new SQLiteWorkerClient()
@@ -123,7 +160,7 @@ describe('SQLiteWorkerClient & Store Lifecycle', () => {
     expect(store.isOpen).toBe(false)
   })
 
-  it('serializes recreate() strictly with concurrent queries in FIFO order', async () => {
+  it('rejects store recreation while open without clearing healthy data', async () => {
     tempDir = mkdtempSync(join(tmpdir(), 'code-graph-worker-recreate-fifo-'))
     const store = new SQLiteGraphStore(tempDir)
     await store.open()
@@ -137,15 +174,8 @@ describe('SQLiteWorkerClient & Store Lifecycle', () => {
     })
     await store.upsertFile(file1, [], [])
 
-    // Dispatch a read, a recreate, and a subsequent write concurrently
-    const readBefore = store.getFile(file1.path)
-    const recreateOp = store.recreate()
-    const readAfter = recreateOp.then(() => store.getFile(file1.path))
-
-    const [resBefore, , resAfter] = await Promise.all([readBefore, recreateOp, readAfter])
-
-    expect(resBefore?.path).toBe(file1.path)
-    expect(resAfter).toBeUndefined() // Cleared after recreate
+    await expect(store.recreate()).rejects.toBeInstanceOf(GraphStoreRecreateRequiresClosedError)
+    expect((await store.getFile(file1.path))?.path).toBe(file1.path)
 
     await store.close()
   })
@@ -399,7 +429,7 @@ parentPort.on('message', (msg) => {
     await store.close()
   })
 
-  it('invalidates chunked bulk sessions on store close, worker crash, or recreate', async () => {
+  it('invalidates chunked bulk sessions on store close, worker crash, or closed recreation', async () => {
     tempDir = mkdtempSync(join(tmpdir(), 'code-graph-worker-session-invalidation-'))
     const store = new SQLiteGraphStore(tempDir)
     await store.open()
@@ -424,7 +454,8 @@ parentPort.on('message', (msg) => {
     await store.open()
     const session2 = store.beginBulkIndexSession()
 
-    // Recreate invalidates active session
+    // Closed recreation invalidates active sessions before physical deletion.
+    await store.close()
     await store.recreate()
 
     await expect(
