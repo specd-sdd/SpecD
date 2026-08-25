@@ -11,5 +11,41 @@
     "core:composition-resolver",
     "core:get-spec-metadata"
   ],
-  "implementation": []
+  "implementation": [],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Search spec content across workspaces via repositories, with filters, ranking, resilient errors, and optional materialized summaries.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:db32480e9ced3e980a84920133a6f48c8ed6383b90665160c26289ed8df358f5",
+          "lastModified": "2026-07-25T11:53:31.711Z"
+        },
+        "verify.md": {
+          "hash": "sha256:55342902fe7ffd141581582affe7f4bf150b29a9bb561147a972505b5fc8cade",
+          "lastModified": "2026-07-25T11:53:31.711Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# SearchSpecs\n\n## Rules\n\n- `SearchSpecs.execute()`: obtain project workspaces via `ListWorkspaces`; call each workspace `SpecRepository.search()` for substring matching; aggregate results.\n- Non-empty `options.workspaces`: search matching workspace names only; silently ignore unknown names. Omitted/empty: search all configured workspaces.\n- Sort results by descending relevance `score`.\n- Each result requires: `workspace`; capability `path`; `title` resolved identically to `ListSpecs`; repository relevance `score`; repository `SpecSearchMatch[]` as `matches`.\n- `options.includeSummary === true`: call `GetSpecMetadata.execute({ specId })` using default `if-needed` policy; project normalized `description` into `summary`. Never read repository metadata snapshot or `spec.md` directly. Omit `summary`, without failing search, when materialization yields no projection.\n- `options.includeSummary` false/omitted: omit `summary`; never materialize result metadata.\n- Per-workspace search error: silently omit that workspace results; continue others; never propagate individual repository I/O errors.\n- No matches: return `[]`, never error.\n- `createSearchSpecs(config, options?)`: derive `SearchSpecsDeps` only through `resolveSearchSpecsDeps(resolver)`; delegate to canonical `createSearchSpecs(deps)`; never reconstruct fs-shaped wiring inline.\n- `resolveSearchSpecsDeps(resolver)`: resolve `listWorkspaces: ListWorkspaces` and `getMetadata: GetSpecMetadata`; never resolve `hasher: ContentHasher` or `yaml: YamlSerializer`.\n\n## Constraints\n\n- Depend on `ListWorkspaces` for consistent fallback-search project traversal.\n- Metadata materialization exclusively owns deterministic summary extraction fallback.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:db32480e9ced3e980a84920133a6f48c8ed6383b90665160c26289ed8df358f5",
+          "lastModified": "2026-07-25T11:53:31.711Z"
+        },
+        "verify.md": {
+          "hash": "sha256:55342902fe7ffd141581582affe7f4bf150b29a9bb561147a972505b5fc8cade",
+          "lastModified": "2026-07-25T11:53:31.711Z"
+        }
+      }
+    }
+  }
 }

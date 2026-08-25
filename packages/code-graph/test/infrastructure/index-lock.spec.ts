@@ -1,13 +1,17 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { join } from 'node:path'
-import { existsSync, mkdtempSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { type SpecdConfig } from '@specd/core'
 import {
   acquireGraphIndexLock,
+  acquireGraphIndexLockLeaseByStoragePath,
   assertGraphIndexUnlocked,
+  createGraphIndexLockHandoffEnv,
   getGraphIndexLockPath,
+  getGraphIndexLockPathForStoragePath,
   GRAPH_INDEX_LOCK_MESSAGE,
+  isGraphIndexLockHandoffForStoragePath,
 } from '../../src/infrastructure/index-lock.js'
 
 describe('index-lock infrastructure', () => {
@@ -61,5 +65,59 @@ describe('index-lock infrastructure', () => {
 
     // 6. Assert should no longer throw
     expect(() => assertGraphIndexUnlocked(config)).not.toThrow()
+  })
+
+  it('writes a tokenized lease and releases idempotently', () => {
+    const lease = acquireGraphIndexLockLeaseByStoragePath(tmpPath)
+    const content = JSON.parse(readFileSync(lease.lockPath, 'utf-8')) as Record<string, unknown>
+    expect(lease.storageRoot).toBe(tmpPath)
+    expect(content).toMatchObject({ version: 1, pid: process.pid, token: lease.ownerToken })
+
+    lease.release()
+    lease.release()
+    expect(existsSync(lease.lockPath)).toBe(false)
+  })
+
+  it('does not accept a handoff for an unrelated storage root', () => {
+    const previousRoot = process.env['SPECD_GRAPH_INDEX_LOCK_ROOT']
+    const previousToken = process.env['SPECD_GRAPH_INDEX_LOCK_TOKEN']
+    const lease = acquireGraphIndexLockLeaseByStoragePath(tmpPath, { signalCleanup: 'exit-only' })
+    try {
+      Object.assign(process.env, createGraphIndexLockHandoffEnv(lease))
+      expect(isGraphIndexLockHandoffForStoragePath(join(tmpPath, 'other'))).toBe(false)
+      expect(getGraphIndexLockPathForStoragePath(tmpPath)).toBe(lease.lockPath)
+    } finally {
+      if (previousRoot === undefined) delete process.env['SPECD_GRAPH_INDEX_LOCK_ROOT']
+      else process.env['SPECD_GRAPH_INDEX_LOCK_ROOT'] = previousRoot
+      if (previousToken === undefined) delete process.env['SPECD_GRAPH_INDEX_LOCK_TOKEN']
+      else process.env['SPECD_GRAPH_INDEX_LOCK_TOKEN'] = previousToken
+      lease.release()
+    }
+  })
+
+  it('requires the exact live token for a lock handoff and never deletes a replacement lock', () => {
+    const previousRoot = process.env['SPECD_GRAPH_INDEX_LOCK_ROOT']
+    const previousToken = process.env['SPECD_GRAPH_INDEX_LOCK_TOKEN']
+    const lease = acquireGraphIndexLockLeaseByStoragePath(tmpPath, { signalCleanup: 'exit-only' })
+    try {
+      Object.assign(process.env, createGraphIndexLockHandoffEnv(lease))
+      expect(isGraphIndexLockHandoffForStoragePath(tmpPath)).toBe(false)
+      process.env['SPECD_GRAPH_INDEX_LOCK_TOKEN'] = 'wrong'
+      expect(isGraphIndexLockHandoffForStoragePath(tmpPath)).toBe(false)
+      process.env['SPECD_GRAPH_INDEX_LOCK_TOKEN'] = lease.ownerToken
+      writeFileSync(lease.lockPath, 'not-json')
+      expect(isGraphIndexLockHandoffForStoragePath(tmpPath)).toBe(false)
+      writeFileSync(
+        lease.lockPath,
+        JSON.stringify({ version: 1, pid: process.pid, token: 'replacement' }),
+      )
+      lease.release()
+      expect(existsSync(lease.lockPath)).toBe(true)
+    } finally {
+      if (previousRoot === undefined) delete process.env['SPECD_GRAPH_INDEX_LOCK_ROOT']
+      else process.env['SPECD_GRAPH_INDEX_LOCK_ROOT'] = previousRoot
+      if (previousToken === undefined) delete process.env['SPECD_GRAPH_INDEX_LOCK_TOKEN']
+      else process.env['SPECD_GRAPH_INDEX_LOCK_TOKEN'] = previousToken
+    }
   })
 })

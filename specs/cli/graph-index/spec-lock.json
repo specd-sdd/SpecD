@@ -8,21 +8,37 @@
     "core:config",
     "core:list-workspaces",
     "sdk:run-index-project-graph",
-    "sdk:host-context"
+    "sdk:host-context",
+    "code-graph:isolated-index-worker"
   ],
   "implementation": [
     {
-      "file": "cli:src/commands/graph/index-graph.ts",
-      "symbols": ["registerGraphIndex"]
-    },
-    {
-      "file": "cli:test/commands/graph-index.spec.ts"
+      "file": "cli:src/graph-index-task.ts",
+      "symbols": [
+        "CliGraphIndexContextDescriptor",
+        "CliGraphIndexTaskInput",
+        "CliGraphIndexProgress",
+        "runGraphIndexTask"
+      ]
     },
     {
       "file": "cli:package.json"
     },
     {
-      "file": "cli:test/commands/graph-index-integration.spec.ts"
+      "file": "cli:src/commands/graph/index-graph.ts",
+      "symbols": ["registerGraphIndex", "formatTextIndexResult"]
+    },
+    {
+      "file": "cli:test/graph-index-task.spec.ts",
+      "symbols": ["runGraphIndexTask"]
+    },
+    {
+      "file": "cli:test/commands/graph-index.spec.ts",
+      "symbols": ["graph index"]
+    },
+    {
+      "file": "cli:test/commands/graph-index-integration.spec.ts",
+      "symbols": ["graph index integration"]
     }
   ],
   "optimizations": {

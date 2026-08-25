@@ -13,3 +13,8 @@ export { StoreWorkerError } from './store-worker-error.js'
 export { BulkSessionStateError } from './bulk-session-state-error.js'
 export { InvalidGraphStoreConfigurationError } from './invalid-graph-store-configuration-error.js'
 export { GraphSchemaIncompatibleError } from './graph-schema-incompatible-error.js'
+export {
+  GraphStorageRecoveryRequiredError,
+  type GraphStorageRecoveryReason,
+} from './graph-storage-recovery-required-error.js'
+export { GraphStoreRecreateRequiresClosedError } from './graph-store-recreate-requires-closed-error.js'

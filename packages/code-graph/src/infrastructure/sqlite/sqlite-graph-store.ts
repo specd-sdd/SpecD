@@ -44,6 +44,7 @@ import { type InternalSQLiteGraphStoreOptions } from './sqlite-runtime-descripto
 import { rotateStorageGenerationAsync } from '../storage-generation.js'
 import { StoreNotOpenError } from '../../domain/errors/store-not-open-error.js'
 import { BulkSessionStateError } from '../../domain/errors/bulk-session-state-error.js'
+import { GraphStoreRecreateRequiresClosedError } from '../../domain/errors/graph-store-recreate-requires-closed-error.js'
 
 /** Default maximum number of entities staged per bulk staging RPC. */
 const BULK_RPC_CHUNK_SIZE = 1000
@@ -729,13 +730,12 @@ export class SQLiteGraphStore extends GraphStore {
    */
   override async recreate(): Promise<void> {
     this.invalidateBulkSession()
-    if (!this.client.isOpen) {
-      const graphDir = join(this.storagePath, 'graph')
-      await rm(graphDir, { recursive: true, force: true })
-      await rotateStorageGenerationAsync(this.storagePath)
-      return
+    if (this.client.isOpen) {
+      throw new GraphStoreRecreateRequiresClosedError()
     }
-    await this.client.sendRequest('recreate', {})
+    const graphDir = join(this.storagePath, 'graph')
+    await rm(graphDir, { recursive: true, force: true })
+    await rotateStorageGenerationAsync(this.storagePath)
   }
 
   /**

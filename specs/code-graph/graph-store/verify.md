@@ -12,22 +12,17 @@
 
 ### Requirement: Connection lifecycle
 
-#### Scenario: Operation before open throws
+#### Scenario: Recoverable open failure leaves the store closed
 
-- **WHEN** `getFile()` is called on a `GraphStore` that has not been opened
-- **THEN** `StoreNotOpenError` is thrown
+- **GIVEN** corrupt or non-migratable persisted storage
+- **WHEN** `open()` is attempted
+- **THEN** it rejects with the typed recoverable storage-open error
+- **AND** a subsequent `close()` is safe and the store is closed
 
-#### Scenario: Operation after close throws
+#### Scenario: Ordinary open failure does not authorize deletion
 
-- **GIVEN** a `GraphStore` that was opened and then closed
-- **WHEN** `upsertFile()` is called
-- **THEN** `StoreNotOpenError` is thrown
-
-#### Scenario: Open prepares the concrete backend before queries run
-
-- **WHEN** `open()` resolves for a concrete `GraphStore` implementation
-- **THEN** subsequent reads and writes can proceed through the abstract contract
-- **AND** any schema initialization, index preparation, or migration work remains hidden behind the backend
+- **WHEN** opening fails due to permission, configuration, or unrelated I/O
+- **THEN** that failure identity propagates without an implicit clear or recreate
 
 ### Requirement: Minimum graph semantics
 
@@ -68,18 +63,17 @@
 
 ### Requirement: Store recreation
 
-#### Scenario: Recreate drops prior persisted graph state
+#### Scenario: Closed recreation rotates physical storage
 
-- **GIVEN** a backend with previously indexed files, symbols, specs, and relations
-- **WHEN** `recreate()` is called through the abstract `GraphStore` contract
-- **THEN** the prior persisted graph state is discarded
-- **AND** the backend is ready for a fresh indexing run
+- **GIVEN** a closed store with recoverably unusable persistence
+- **WHEN** `recreate()` succeeds and the caller later opens it
+- **THEN** the new storage generation is empty and usable
 
-#### Scenario: Callers do not manage backend files directly
+#### Scenario: Clear preserves physical generation
 
-- **WHEN** a caller needs a destructive reset before indexing
-- **THEN** it uses `GraphStore.recreate()`
-- **AND** it does not need to know backend-specific database files, lock files, WAL files, or schema artifacts
+- **GIVEN** an opened healthy store
+- **WHEN** `clear()` is called for a forced reindex
+- **THEN** logical graph data is removed without physical recreation or generation rotation
 
 ### Requirement: Storage generation tracking
 

@@ -12,15 +12,18 @@ The `@specd/sdk` package SHALL live at `packages/sdk/` in the monorepo with work
 
 ### Requirement: Layer structure
 
-`@specd/sdk` SHALL follow hexagonal boundaries from `default:_global/architecture`:
+The SDK source tree MAY contain `src/composition/`, `src/orchestration/`,
+`src/presentation/`, `src/shared/`, and `src/domain/`. `src/domain/` is limited to
+SDK-specific error and value contracts and MUST NOT introduce entities, ports, or
+infrastructure adapters.
 
-- `src/composition/` — host bootstrap (`openSpecdHost`, `createSdkContext`) and graph lifecycle (`withOpenGraphProvider`)
-- `src/orchestration/` — cross-package workflows (`buildProjectStatusSnapshot`, `runIndexProjectGraph`)
-- `src/presentation/` — pure agent-facing formatters (`changeContextToMarkdown`, `projectContextToMarkdown`) over structured core results
-- `src/shared/` — internal cross-cutting helpers (e.g. package version constants) not exported from the public barrel
-- `src/index.ts` — public barrel only
+`src/shared/` is an internal implementation directory and MUST NOT have a public
+package subpath. The curated root barrel MAY explicitly re-export a named binding
+implemented in `src/shared/` when that binding is listed in the public-barrel
+requirement; this does not make the directory itself public.
 
-The package MUST NOT contain domain entities, application ports, or infrastructure adapters. Files under `src/shared/` MUST NOT be re-exported from `src/index.ts`. Presentation helpers MUST remain pure (no I/O); they MAY be exported from the public barrel.
+Package `exports["."]` SHALL publish `./dist/index.js` and `./dist/index.d.ts`,
+generated from the logical source barrel `src/index.ts`.
 
 ### Requirement: Public barrel exports
 
@@ -45,18 +48,29 @@ The `"."` barrel MUST NOT re-export `SaveSpecMetadata`, `UpdateSpecMetadata`, `I
 
 ### Requirement: Public barrel exports for host adapters
 
-`src/index.ts` SHALL re-export the following symbols from `@specd/code-graph` `"."` for CLI host adapters:
+`src/index.ts` SHALL re-export the following symbols from the curated
+`@specd/code-graph` `"."` entrypoint for delivery hosts:
 
-- `acquireGraphIndexLock`, `assertGraphIndexUnlocked`
-- `createGetGraphHealth`, `type GetGraphHealthInput`, `type GetGraphHealthResult`
-- `type IndexResult`, `type HotspotResult`, `type ImpactResult`, `type FileImpactResult`
-- `codeGraphVersion`, `getCodeGraphVersion` (SDK-owned aliases where applicable)
+- `runIsolatedGraphIndex` and its public input, progress, result, and typed worker
+  failure contracts
+- `createGetGraphHealth`, type `GetGraphHealthInput`, and type
+  `GetGraphHealthResult`
+- type `IndexResult`, type `HotspotResult`, type `ImpactResult`, and type
+  `FileImpactResult`
+- `codeGraphVersion` and `getCodeGraphVersion` (SDK-owned aliases where applicable)
 - `GraphSpecNotFoundError` (alias for graph `SpecNotFoundError`)
-- `SymbolKind`, `SearchOptions`, `HotspotOptions`, `RiskLevel`
-- `normalizeFileSelectorPath`, `createBootstrapGraphConfig`
-- Fingerprint helpers: `isGraphStale`, `detectFingerprintMismatch`, `parseFingerprintMap`, `buildProjectGraphConfig`
+- `SymbolKind`, `SearchOptions`, `HotspotOptions`, and `RiskLevel`
+- `normalizeFileSelectorPath` and `createBootstrapGraphConfig`
+- fingerprint helpers: `isGraphStale`, `detectFingerprintMismatch`,
+  `parseFingerprintMap`, and `buildProjectGraphConfig`
 
-Delivery hosts MUST import these symbols from `@specd/sdk`, not from `@specd/code-graph` directly.
+SDK MUST NOT export `acquireGraphIndexLock`, `assertGraphIndexUnlocked`, lock-path
+helpers, release callbacks, raw lock tokens, or raw worker IPC envelopes. Delivery
+hosts SHALL invoke the high-level isolated worker for graph writes and normal graph
+provider/use-case operations for reads.
+
+Delivery hosts MUST import the curated symbols from `@specd/sdk`, not from
+`@specd/code-graph` directly.
 
 ### Requirement: Import policy for integrators
 
@@ -84,3 +98,5 @@ CLI and other hosts using implementation review MUST import this orchestration t
 - `cli:host-context` — host consumer
 - `sdk:context-markdown` — presentation helpers
 - `sdk:build-implementation-review` — shared review orchestration
+- `code-graph:isolated-index-worker` — isolated graph-index execution re-exported
+  to delivery hosts

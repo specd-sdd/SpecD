@@ -12,80 +12,51 @@
   "implementation": [
     {
       "file": "code-graph:src/domain/ports/graph-store.ts",
-      "symbols": [
-        "GraphStore",
-        "getSymbolsByIds",
-        "getIncomingSymbolRelations",
-        "getOutgoingSymbolRelations"
-      ]
+      "symbols": ["GraphStore"]
     },
     {
-      "file": "code-graph:test/helpers/in-memory-graph-store.ts",
-      "symbols": [
-        "InMemoryGraphStore",
-        "getSymbolsByIds",
-        "getIncomingSymbolRelations",
-        "getOutgoingSymbolRelations"
-      ]
-    },
-    {
-      "file": "code-graph:src/infrastructure/sqlite/sqlite-graph-database.ts",
-      "symbols": [
-        "SQLiteGraphDatabase",
-        "getSymbolsByIds",
-        "getIncomingSymbolRelations",
-        "getOutgoingSymbolRelations"
-      ]
-    },
-    {
-      "file": "code-graph:src/infrastructure/sqlite/sqlite-graph-store.ts",
-      "symbols": [
-        "SQLiteGraphStore",
-        "getSymbolsByIds",
-        "getIncomingSymbolRelations",
-        "getOutgoingSymbolRelations"
-      ]
-    },
-    {
-      "file": "code-graph:src/domain/services/analyze-file-impact.ts",
-      "symbols": ["createMemoizedReadStore"]
+      "file": "code-graph:src/domain/errors/graph-store-recreate-requires-closed-error.ts",
+      "symbols": ["GraphStoreRecreateRequiresClosedError"]
     },
     {
       "file": "code-graph:test/domain/ports/graph-store.contract.ts"
+    },
+    {
+      "file": "code-graph:test/infrastructure/sqlite/sqlite-graph-store.spec.ts"
     }
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "GraphStore: persistencia gráfica atómica con búsquedas por identidad, referencias y frescura incremental.",
+      "value": "Contrato backend-neutral para persistencia gráfica atómica, búsqueda indexada, frescura incremental y bulk determinista.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:bd53a787d42ca7e7ab2cedad9a75f95e9b448b5d899dbcc4c058862343d09d9e",
-          "lastModified": "2026-08-16T08:12:47.708Z"
+          "hash": "sha256:eeede8366eb7eeb8d03e94d8df87b5f1bd8f8dc0db9c5c9cc71e2915985a53a7",
+          "lastModified": "2026-08-22T10:50:50.896Z"
         },
         "verify.md": {
-          "hash": "sha256:cb72e67639cd0c0edc6701e2f35d56ed8ca10ca68a15156b6bf4a2163e86ceb9",
-          "lastModified": "2026-08-16T10:48:01.520Z"
+          "hash": "sha256:a61ad0dc05738e4045ae6e8693735c5daf5fc79dda939204e92b53d37bae2349",
+          "lastModified": "2026-08-22T10:50:50.896Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# Graph Store\n\n## Rules\n\n- GraphStore abstract class in domain/ports/; storagePath constructor; adapters own physical schema.\n- Persist FileNode content, SymbolNode, SpecNode, DocumentNode, required relation families and graph metadata.\n- open() prepares; close() idempotent; unopened/closed ops throw StoreNotOpenError. Provider-owned recreate() resets backend and rotates generation; incompatible schemas reject ordinary reads.\n- upsertFile, removeFile, upsertSpec, removeSpec atomic; addRelations additive; incremental updates compare contentHash. Bulk commits once, dedupes, rebuilds FTS once.\n- Query files/symbols/import-call-type-hierarchy/spec-coverage, SymbolQuery, statistics, reference/binding/coverage snapshots and batched affected/coverage lookup.\n- searchSymbols, searchSpecs, searchDocuments: 1-based snippets; lexical expansion whitespace, :, /, _, ., -, Camel/Pascal; rank identity > exact > prefix > suffix > component > substring > BM25; filter before limit. Content candidate query indexed/bounded, never full-file scan.\n- Persist IndexedInputObservation plus stale latches; clear only successful index. COVERS_SYMBOL may carry metadata.stale.\n\n## Constraints\n\n- Backend-agnostic port; consumers no backend mechanics/direct deletion.\n- Deterministic batch order; no @specd/core; errors extend CodeGraphError.",
+      "value": "# Graph Store\n\n## Rules\n\n- `GraphStore`: abstract class en `domain/ports/`; constructor `storagePath`; adapters en `infrastructure/` controlan schema, archivos, backend. Consumidores usan semántica abstracta.\n- Persistir `FileNode` con paths canónico/config-relative y contenido completo, `SymbolNode`, `SpecNode`, `DocumentNode`, metadata (`lastIndexedAt`, `lastIndexedRef`, `graphFingerprint`) y relaciones `IMPORTS`, `DEFINES`, `CALLS`, `CONSTRUCTS`, `USES_TYPE`, `EXPORTS`, `DEPENDS_ON`, `COVERS_FILE`, `COVERS_SYMBOL`, `EXTENDS`, `IMPLEMENTS`, `OVERRIDES`. `COVERS_SYMBOL` MAY incluir `metadata.stale`.\n- `open()` prepara backend, bindings, schema y generación; `close()` idempotente. Operación sin store abierto lanza `StoreNotOpenError`.\n- `recreate()` elimina toda persistencia derivada, deja backend listo, rota marcador de generación; solo `CodeGraphProvider` decide recreación. Backends persisten generación para detectar reemplazo entre procesos.\n- `upsertFile(file, symbols, relations)` reemplaza atómicamente archivo, símbolos y relaciones; fallo conserva estado previo. `addRelations(relations)` solo añade. `removeFile(filePath)` elimina atómicamente archivo, símbolos y relaciones incidentes. Comparar `contentHash` antes de actualizar.\n- `upsertSpec(spec, relations)` reemplaza nodo y `DEPENDS_ON` salientes atómicamente; `removeSpec(specId)` elimina spec y `DEPENDS_ON` incidentes. Soportar upsert/remove/search de `DocumentNode`.\n- Consultas individuales: `getFile`, `findFilesByConfigRelativePath`, `getSymbol`, `getSpec`; callers/callees, importers/importees, extenders/extended targets, implementors/implemented targets, overriders/overridden targets; dependencias/dependientes spec; cobertura file/symbol directa e inversa; `findSymbols(SymbolQuery)`.\n- `SymbolQuery`: `name` glob/regex, `kinds`, `filePath`, `comment`, `caseSensitive=false` por defecto.\n- Traversal batch: `getSymbolsByIds`, `getIncomingSymbolRelations`, `getOutgoingSymbolRelations`; soportar `CALLS`, `CONSTRUCTS`, `USES_TYPE`, `EXTENDS`, `IMPLEMENTS`, `OVERRIDES`. Deduplicar; omitir desconocidos; vacío sin trabajo; símbolos en orden solicitado, relaciones por source/type/target; sin una llamada por símbolo/tipo.\n- Exact batch: `getFilesByPaths`, `getDocumentsByPaths`, `getSpecsByIds`; deduplicar preservando primera petición, omitir ausentes, vacío sin trabajo, sin llamada por identidad. Mantener APIs single y complete-collection; no derivar display paths mediante store.\n- `getStatistics()` devuelve counts file/symbol/spec, `relationCounts`, lenguajes, `lastIndexedAt`, `lastIndexedRef`, `graphFingerprint`.\n- Search: `searchSymbols`, `searchSpecs`, `searchDocuments`, `rebuildFtsIndexes`; snippets match-aware con líneas 1-based. Identidades primarias: spec `specId`; symbol `name`/`id`; document `path` y alternate path persistido.\n- Retrieval conserva texto genérico; ranking: identidad canónica exacta > nombre/identidad alterna exacta > prefix/suffix/component/substring de identidad > BM25/contenido. Component match real supera substring arbitrario; mayor cobertura de tokens mejora ranking. Filtros antes de `limit`.\n- Expansión léxica compartida preserva tokens normalizados y divide whitespace, `:`, `/`, `_`, `.`, `-`, CamelCase/PascalCase. Fuerza token: exact > prefix > suffix > substring. Expansión no clasifica intención.\n- `SearchOptions`: `query`, `limit=20`, `kind`, `filePattern`, `workspace`, `excludePaths`, `excludeWorkspaces`.\n- `clear()`, `getAllFiles()`, `getAllSpecs()` soportan reindex/diff incremental.\n- Persistir atómicamente identidad logical-symbol, declarations, symbol spaces, member forms, public/local bindings, provenance y coverage. Rutas/bindings distintos entre mismos endpoints permanecen distintos.\n- Lookup indexado por workspace, surface, simple name, symbol space, owner, member form, declaration, exported name, local scope y coverage. Canonical ids únicos pero nunca parseados, case-folded ni substring-searched para resolución/ranking semántico. Batch determinista, sin scan completo por referencia.\n- Exponer snapshot completo determinista de reference facts y affected-file batch sobre import/call/construct/type-use/extend/implement/override. Search indexa simple name, owner, symbol space, member form, public surface, exported name; agrupa public bindings con target pero devuelve cada binding y match provenance.\n- Reverse coverage batch acepta paths/ids, orden source/type/target, vacío sin trabajo; file impact obtiene cobertura de blast radius completo sin llamada por recurso.\n- Persistir rangos completos de construct/selection. Source-content candidate query recibe normalized query, raw/expanded terms, category limit, filtros/exclusiones y snippet preference; devuelve file, backend relevance y contenido/evidencia suficiente sin filesystem live.\n- Content index substring-capable para queries >=3 caracteres; fallback corto acotado; nunca scan/retorno de todos files. Store solo genera candidatos; merge, provenance, suppression, ranking, grouping y límites finales pertenecen al caso de uso.\n- Schema incompatible rechaza reads, nunca recrea silenciosamente. Repair por indexing hace rebuild destructivo, rota generación y reconstruye search indexes; sin migración incremental obligatoria.\n- Persistir `IndexedInputObservation` separado: workspace, resource kind/id, input kind, locator lógico no absoluto, content hash, mtime/size o revision opcional, stale monotónico. Specs agregadas registran cada input productor.\n- Batch/CAS permiten stale marking, refresh equal-content y latches workspace/global atómicos; assessment anterior a reindex no muta evidencia nueva. Solo indexing exitoso limpia stale/latches; unknown transitorio no persiste stale.\n- Bulk indexing session única: begin una vez, chunks acotados file/document/spec/symbol/semantic-fact/observation/relation, commit una vez, rebuild semantic/source indexes una vez. Validación endpoints y hierarchy/method lookup batch; deduplicar relaciones entre chunks; fallo no expone generación parcial.\n\n## Constraints\n\n- Backend-neutral; `GraphStore` abstract class, no interface; sin `@specd/core`; errores extienden `CodeGraphError`.\n- Mutaciones file-level atómicas; resultados batch deterministas; physical chunking permitido si transparente.\n- Backend/layout no prescrito; host nunca borra archivos backend ni usa reset mechanics directamente.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:bd53a787d42ca7e7ab2cedad9a75f95e9b448b5d899dbcc4c058862343d09d9e",
-          "lastModified": "2026-08-16T08:12:47.708Z"
+          "hash": "sha256:eeede8366eb7eeb8d03e94d8df87b5f1bd8f8dc0db9c5c9cc71e2915985a53a7",
+          "lastModified": "2026-08-22T10:50:50.896Z"
         },
         "verify.md": {
-          "hash": "sha256:cb72e67639cd0c0edc6701e2f35d56ed8ca10ca68a15156b6bf4a2163e86ceb9",
-          "lastModified": "2026-08-16T10:48:01.520Z"
+          "hash": "sha256:a61ad0dc05738e4045ae6e8693735c5daf5fc79dda939204e92b53d37bae2349",
+          "lastModified": "2026-08-22T10:50:50.896Z"
         }
       }
     }

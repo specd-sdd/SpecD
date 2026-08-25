@@ -2,13 +2,13 @@ import { type CodeGraphProvider } from '@specd/code-graph'
 import { type SdkHostContext } from './host-context.js'
 
 /** Options for {@link withOpenGraphProvider}. */
-export interface WithOpenGraphProviderOptions<TOpen = void> {
+export interface WithOpenGraphProviderOptions {
   /** Invoked after provider creation and before {@link CodeGraphProvider.open}. */
   readonly beforeOpen?: (provider: CodeGraphProvider) => Promise<void>
   /** Invoked after the helper finishes its close path. */
   readonly afterClose?: (provider: CodeGraphProvider) => Promise<void>
-  /** Optional specialized open operation. Defaults to {@link CodeGraphProvider.open}. */
-  readonly open?: (provider: CodeGraphProvider) => Promise<TOpen>
+  /** May repair the closed provider after its initial open operation fails. */
+  readonly recoverOpenFailure?: (error: unknown, provider: CodeGraphProvider) => Promise<boolean>
 }
 
 /**
@@ -19,48 +19,86 @@ export interface WithOpenGraphProviderOptions<TOpen = void> {
  * @param options - Optional lifecycle hooks
  * @returns The callback result
  */
-export async function withOpenGraphProvider<T, TOpen = void>(
+export async function withOpenGraphProvider<T>(
   ctx: SdkHostContext,
-  fn: (provider: CodeGraphProvider, openResult?: TOpen) => Promise<T>,
-  options?: WithOpenGraphProviderOptions<TOpen>,
+  fn: (provider: CodeGraphProvider) => Promise<T>,
+  options?: WithOpenGraphProviderOptions,
 ): Promise<T> {
   const provider = ctx.createGraphProvider()
-  let cleanupStarted = false
+  const notifyAfterClose = async (suppressErrors: boolean): Promise<void> => {
+    try {
+      await options?.afterClose?.(provider)
+    } catch (error) {
+      if (!suppressErrors) throw error
+    }
+  }
   const close = async (suppressErrors: boolean): Promise<void> => {
-    cleanupStarted = true
     let closeError: unknown
     try {
       await provider.close()
     } catch (error) {
       closeError = error
     }
-    try {
-      await options?.afterClose?.(provider)
-    } catch (error) {
-      if (!suppressErrors) throw error
-    }
+    await notifyAfterClose(suppressErrors)
     if (!suppressErrors && closeError !== undefined) {
       throw closeError instanceof Error
         ? closeError
         : new Error('Graph provider close failed with a non-Error value')
     }
   }
+  const closeBeforeRecovery = async (): Promise<boolean> => {
+    try {
+      await provider.close()
+      return true
+    } catch {
+      return false
+    }
+  }
+
   try {
     await options?.beforeOpen?.(provider)
-    let openResult: TOpen
-    if (options?.open !== undefined) {
-      openResult = await options.open(provider)
-    } else {
-      await provider.open()
-      openResult = undefined as TOpen
-    }
-    const result = await fn(provider, openResult)
-    await close(false)
-    return result
   } catch (error) {
-    if (!cleanupStarted) {
-      await close(true)
-    }
+    await close(true)
     throw error
   }
+
+  try {
+    await provider.open()
+  } catch (openError) {
+    if (options?.recoverOpenFailure === undefined || !(await closeBeforeRecovery())) {
+      await close(true)
+      throw openError
+    }
+
+    let recovered: boolean
+    try {
+      recovered = await options.recoverOpenFailure(openError, provider)
+    } catch (recoveryError) {
+      await closeBeforeRecovery()
+      await notifyAfterClose(true)
+      throw recoveryError
+    }
+    if (!recovered) {
+      await notifyAfterClose(true)
+      throw openError
+    }
+
+    try {
+      await provider.open()
+    } catch (retryError) {
+      await closeBeforeRecovery()
+      await notifyAfterClose(true)
+      throw retryError
+    }
+  }
+
+  let result: T
+  try {
+    result = await fn(provider)
+  } catch (error) {
+    await close(true)
+    throw error
+  }
+  await close(false)
+  return result
 }

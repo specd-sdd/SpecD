@@ -1,0 +1,94 @@
+- op: modified
+  description: 'Verify CLI delegation to the SDK worker without lock or process ownership'
+  selector:
+    type: section
+    matches: '^Requirement: Indexing behaviour$'
+  content: |
+    #### Scenario: Command delegates exactly once to the SDK isolated worker
+
+    - **WHEN** `specd graph index` executes after resolving its command context
+    - **THEN** it calls `runIsolatedGraphIndex` imported from `@specd/sdk` exactly once
+    - **AND** the call contains the resolved storage root, the packaged graph-index task
+      module URL, a serializable configured-or-bootstrap context descriptor, the index
+      input, and an optional progress callback
+
+    #### Scenario: CLI does not own lock or subprocess mechanics
+
+    - **WHEN** the graph-index command implementation and CLI package dependencies are
+      inspected
+    - **THEN** the command does not import or call raw lock acquisition, assertion,
+      lock-path, fork, IPC, signal-forwarding, or child-cleanup helpers
+    - **AND** the CLI has no direct dependency or import on `@specd/code-graph`
+
+    #### Scenario: Packaged task invokes SDK indexing once
+
+    - **GIVEN** the isolated child loads the trusted packaged CLI task module
+    - **WHEN** the task receives a valid configured-project descriptor
+    - **THEN** it reconstructs an equivalent configured SDK context from the explicit
+      configuration location and workspace selection
+    - **AND** it calls `runIndexProjectGraph(ctx, input)` exactly once
+    - **AND** it returns the resulting `IndexResult` without CLI presentation fields
+
+    #### Scenario: Bootstrap context remains explicit
+
+    - **GIVEN** graph index was resolved through `--path` or the no-config bootstrap
+      fallback
+    - **WHEN** the parent serializes and the child reconstructs the bootstrap descriptor
+    - **THEN** the descriptor retains the explicit bootstrap root and graph configuration
+    - **AND** the child does not discover or substitute a configured project implicitly
+
+    #### Scenario: Index options cross the process boundary unchanged
+
+    - **GIVEN** `--force` and one or more `--exclude-path` values were supplied
+    - **WHEN** the command constructs the worker task input
+    - **THEN** force and exclusion values reach `runIndexProjectGraph` unchanged
+
+    #### Scenario: Text progress is rendered by the parent
+
+    - **WHEN** `specd graph index` runs in text mode and the worker emits progress
+    - **THEN** the SDK worker forwards ordered progress events to the CLI callback
+    - **AND** the parent prints the progress percentage and phase to stdout
+
+    #### Scenario: Structured output remains progress-free
+
+    - **WHEN** `specd graph index` runs with a structured output format
+    - **THEN** the CLI omits the progress callback
+    - **AND** worker protocol traffic does not appear in stdout or the final result
+
+    #### Scenario: Built structured child output contains only one final result
+
+    - **GIVEN** a publish-shaped CLI run whose isolated child emits progress and a
+      successful result
+    - **WHEN** `graph index` is invoked with `--format json` or `--format toon`
+    - **THEN** stdout contains exactly one parseable final structured result
+    - **AND** stdout contains no progress line, IPC envelope, or child diagnostic
+
+    #### Scenario: Forced built index returns normally
+
+    - **GIVEN** a healthy graph requiring a forced logical reindex through the packaged child task
+    - **WHEN** the CLI command completes after receiving the worker result
+    - **THEN** it exits with code 0 rather than an abnormal-worker error
+    - **AND** the child and graph lock have been cleaned up
+
+    #### Scenario: Force recovers only typed storage-open failures
+
+    - **GIVEN** a typed recoverable storage-open error
+    - **WHEN** the command is invoked with `--force`
+    - **THEN** it completes after one SDK-owned recreation and retry
+    - **AND** a non-forced command reports the original error without deleting storage
+
+    #### Scenario: Worker failures preserve CLI error semantics
+
+    - **GIVEN** lock acquisition, task loading, protocol validation, child termination,
+      or task execution fails
+    - **WHEN** the SDK worker rejects with a typed failure
+    - **THEN** the command maps it to the existing fatal graph-index error path
+    - **AND** stderr is presentation-safe and the process exits with code 3
+
+    #### Scenario: Production indexing is always process-isolated
+
+    - **WHEN** production graph-index sources and tests are inspected
+    - **THEN** no `SPECD_GRAPH_INDEX_WORKER`, `SPECD_GRAPH_INDEX_NO_WORKER`, or equivalent
+      public environment branch selects parent-process indexing
+    - **AND** tests use an explicit injected process adapter or worker test seam instead
+      of disabling isolation in production code

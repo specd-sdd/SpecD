@@ -12,11 +12,19 @@
 
 ### Requirement: Layer structure
 
-#### Scenario: No infrastructure in SDK source tree
+#### Scenario: SDK source tree keeps infrastructure out and domain narrow
 
 - **WHEN** listing `packages/sdk/src/`
-- **THEN** directories are limited to `composition/`, `orchestration/`, `presentation/`, `shared/`, and `index.ts`
-- **AND** no `infrastructure/` or `domain/` directories exist
+- **THEN** `composition/`, `orchestration/`, `presentation/`, `shared/`, and a
+  narrow `domain/` for SDK-specific error/value contracts may exist
+- **AND** no `infrastructure/` directory exists
+- **AND** `domain/` contains no entities, ports, or infrastructure adapters
+
+#### Scenario: Internal shared directory has no package subpath
+
+- **WHEN** inspecting SDK package exports and its curated root barrel
+- **THEN** `src/shared/` has no public package subpath
+- **AND** explicitly curated root exports may reference named shared bindings
 
 ### Requirement: Public barrel exports
 
@@ -58,12 +66,45 @@
 
 ### Requirement: Public barrel exports for host adapters
 
-#### Scenario: Lock and health helpers available from SDK
+#### Scenario: Isolated graph worker is available from SDK
 
 - **WHEN** importing from `@specd/sdk`
-- **THEN** `acquireGraphIndexLock`, `assertGraphIndexUnlocked`, and `createGetGraphHealth` are available
-- **AND** `GetGraphHealthResult`, `IndexResult`, and `HotspotResult` types are available
-- **AND** `codeGraphVersion` and `getCodeGraphVersion` are available
+- **THEN** `runIsolatedGraphIndex` and its host-facing input, progress, result,
+  and typed worker failure contracts are available
+- **AND** `createGetGraphHealth`, `GetGraphHealthResult`, `IndexResult`,
+  `HotspotResult`, `codeGraphVersion`, and `getCodeGraphVersion` remain available
+
+#### Scenario: Raw graph index lock is absent from SDK
+
+- **WHEN** the SDK curated barrel and generated declarations are inspected
+- **THEN** `acquireGraphIndexLock` and `assertGraphIndexUnlocked` are not exported
+- **AND** no lock-path helper, release callback, raw lock token, or raw worker IPC
+  envelope is exported
+
+#### Scenario: Built declarations expose the complete curated worker contract
+
+- **WHEN** a publish-shaped TypeScript consumer imports from built `@specd/sdk`
+- **THEN** it can compile-import `RunIsolatedGraphIndexInput`, JSON value types,
+  task/progress contracts, `IsolatedGraphIndexRunner`, and every documented worker
+  failure class
+- **AND** generated declarations expose no lock-path helper, lease/release callback,
+  lock token, or raw IPC envelope
+
+#### Scenario: Host can index without direct Code Graph import
+
+- **GIVEN** a delivery host depends on `@specd/sdk` only
+- **WHEN** it imports the isolated worker and graph result types
+- **THEN** all required public contracts resolve from SDK
+- **AND** the host does not import `@specd/code-graph` or coordinate a lock file
+
+#### Scenario: SDK layer and package-entry rules match the published surface
+
+- **WHEN** SDK source and package metadata are inspected
+- **THEN** SDK-specific error/value contracts may reside in `src/domain/`
+- **AND** `src/shared/` has no public subpath while explicitly curated root-barrel
+  aliases remain importable
+- **AND** the package root publishes built `dist` declarations and JavaScript
+  generated from `src/index.ts`
 
 ### Requirement: Import policy for integrators
 

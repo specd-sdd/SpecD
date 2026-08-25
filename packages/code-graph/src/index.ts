@@ -1,5 +1,6 @@
 // Composition
 export { createCodeGraphProvider } from './composition/create-code-graph-provider.js'
+export { runIsolatedGraphIndex } from './composition/run-isolated-graph-index.js'
 export {
   createSqliteGraphStoreFactory,
   type SqliteGraphStoreFactoryOptions,
@@ -18,8 +19,15 @@ export type {
   CodeGraphProvider,
   ExactPublicBindingResult,
   ExactPublicBindingSelector,
-  IndexingOpenResult,
 } from './composition/code-graph-provider.js'
+export type {
+  GraphIndexJsonPrimitive,
+  GraphIndexJsonValue,
+  GraphIndexTaskProgressEmitter,
+  GraphIndexTask,
+  RunIsolatedGraphIndexInput,
+  IsolatedGraphIndexRunner,
+} from './application/ports/isolated-graph-index-runner.js'
 
 // Internal-only concrete store adapters
 export { SQLiteGraphStore } from './infrastructure/sqlite/sqlite-graph-store.js'
@@ -229,6 +237,20 @@ export { StoreWorkerError } from './domain/errors/store-worker-error.js'
 export { BulkSessionStateError } from './domain/errors/bulk-session-state-error.js'
 export { InvalidGraphStoreConfigurationError } from './domain/errors/invalid-graph-store-configuration-error.js'
 export { GraphSchemaIncompatibleError } from './domain/errors/graph-schema-incompatible-error.js'
+export {
+  GraphStorageRecoveryRequiredError,
+  type GraphStorageRecoveryReason,
+} from './domain/errors/graph-storage-recovery-required-error.js'
+export { GraphStoreRecreateRequiresClosedError } from './domain/errors/graph-store-recreate-requires-closed-error.js'
+export {
+  GraphIndexWorkerStartError,
+  GraphIndexTaskContractError,
+  GraphIndexTaskExecutionError,
+  GraphIndexWorkerProtocolError,
+  GraphIndexWorkerExitError,
+  GraphIndexWorkerSignalError,
+  GraphIndexProgressHandlerError,
+} from './domain/errors/isolated-graph-index-errors.js'
 export { acquireGraphIndexLock, getGraphIndexLockPath } from './infrastructure/index-lock.js'
 
 /** Installed version of `@specd/code-graph`. */

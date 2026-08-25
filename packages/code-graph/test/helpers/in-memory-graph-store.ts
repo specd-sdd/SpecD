@@ -17,6 +17,7 @@ import { type GraphStatistics } from '../../src/domain/value-objects/graph-stati
 import { RelationType } from '../../src/domain/value-objects/relation-type.js'
 import { type SearchOptions } from '../../src/domain/value-objects/search-options.js'
 import { StoreNotOpenError } from '../../src/domain/errors/store-not-open-error.js'
+import { GraphStoreRecreateRequiresClosedError } from '../../src/domain/errors/graph-store-recreate-requires-closed-error.js'
 import { expandSearchQuery } from '../../src/domain/services/expand-search-query.js'
 import { expandSymbolName } from '../../src/domain/services/expand-symbol-name.js'
 import { matchesExclude } from '../../src/domain/services/matches-exclude.js'
@@ -1020,6 +1021,9 @@ export class InMemoryGraphStore extends GraphStore {
   }
 
   async recreate(): Promise<void> {
+    if (this._isOpen) {
+      throw new GraphStoreRecreateRequiresClosedError()
+    }
     this.files.clear()
     this.documents.clear()
     this.symbols.clear()

@@ -1,0 +1,18 @@
+- op: modified
+  description: 'Apply closed-store physical recovery and typed open errors to SQLite'
+  selector:
+    type: section
+    matches: '^Requirement: Destructive recreation$'
+  content: |
+    `SQLiteGraphStore.recreate()` SHALL implement physical recovery only after the
+    SQLite worker and database are closed. It MUST reject while open, remove the graph
+    persistence directory including SQLite companion files, rotate the storage
+    generation, and return with no worker or database handle reopened.
+
+    SQLite open validation SHALL translate only known corruption and non-migratable
+    schema conditions to the abstract typed recoverable storage-open error after closing
+    any partial database resources. Permission, configuration, native-runtime, and
+    unrelated I/O errors MUST propagate without recreation authority.
+
+    A healthy forced reindex SHALL use the existing opened-store logical clear path and
+    MUST NOT implement force by closing, deleting, reopening, or re-closing SQLite.

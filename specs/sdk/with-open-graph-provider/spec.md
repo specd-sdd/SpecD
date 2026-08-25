@@ -8,31 +8,31 @@ Graph operations require an opened `CodeGraphProvider`, but hosts should not rei
 
 ### Requirement: withOpenGraphProvider signature
 
-`withOpenGraphProvider<T>(ctx: SdkHostContext, fn: (provider: CodeGraphProvider) => Promise<T>, options?: WithOpenGraphProviderOptions): Promise<T>` SHALL:
+`withOpenGraphProvider<T>(ctx: SdkHostContext, fn: (provider:
+CodeGraphProvider) => Promise<T>, options?: WithOpenGraphProviderOptions):
+Promise<T>` SHALL create a provider, run `beforeOpen` after creation, call
+parameterless `provider.open()`, invoke `fn`, close the provider, and then run
+`afterClose` under the existing ordering and error rules.
 
-1. Call `ctx.createGraphProvider()` to obtain a provider
-2. If `options.beforeOpen` is provided, await it after provider creation and before `provider.open()`
-3. Call `provider.open()`
-4. Invoke `fn(provider)` and return its result
-5. Call `provider.close()` after `fn` completes or throws
-6. If `options.afterClose` is provided, await it after the helper finishes its close path, including error cleanup paths
+`WithOpenGraphProviderOptions` retains `beforeOpen?: (provider:
+CodeGraphProvider) => Promise<void>` and `afterClose?: (provider:
+CodeGraphProvider) => Promise<void>`.
 
-`WithOpenGraphProviderOptions` SHALL support:
-
-```ts
-interface WithOpenGraphProviderOptions {
-  readonly beforeOpen?: (provider: CodeGraphProvider) => Promise<void>
-  readonly afterClose?: (provider: CodeGraphProvider) => Promise<void>
-}
-```
+`WithOpenGraphProviderOptions` SHALL additionally support an optional generic
+`recoverOpenFailure(error, provider): Promise<boolean>` callback. Following an
+initial open failure, the helper MUST first attempt `provider.close()`, then invoke
+the callback with that closed provider and the original error. If the callback
+resolves `true`, the helper SHALL retry `provider.open()` exactly once; it MUST NOT
+call the callback again for a failed retry. A false result preserves the original
+error. This option does not alter the `CodeGraphProvider.open()` contract.
 
 ### Requirement: Error propagation
 
-When `fn` throws, `withOpenGraphProvider` MUST still attempt `provider.close()`. Close failures during error cleanup MUST NOT mask the original error from `fn`. The original error MUST propagate to the caller.
-
-When `beforeOpen` succeeds but `provider.open()` later fails, the helper MUST still run the close/cleanup path and MUST still invoke `afterClose` after that cleanup attempt.
-
-When `fn` succeeds and the primary `close()` path fails, the close failure MAY propagate to the caller. When `afterClose` fails after a successful operation, that cleanup failure MAY propagate as the terminal helper failure.
+When `fn` throws, the helper MUST attempt close without masking the original error.
+When initial open fails, it MUST close before optional recovery. A recovery callback
+failure or a retry-open failure is terminal; `afterClose` still runs after final
+cleanup. The helper MUST never retry implicitly, swallow non-recoverable errors, or
+call `process.exit()`.
 
 ### Requirement: No process exit side effects
 

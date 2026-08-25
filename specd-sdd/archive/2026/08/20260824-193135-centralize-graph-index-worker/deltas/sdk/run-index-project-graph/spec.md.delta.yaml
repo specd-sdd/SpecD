@@ -1,0 +1,36 @@
+- op: modified
+  description: 'Make SDK orchestration own bounded force-only recovery after typed open failure'
+  selector:
+    type: section
+    matches: '^Requirement: runIndexProjectGraph orchestration$'
+  content: |
+    `runIndexProjectGraph(ctx: SdkHostContext, input: RunIndexProjectGraphInput):
+    Promise<RunIndexProjectGraphResult>` SHALL reject lifecycle hooks paired with an
+    explicit provider using `InvalidProviderLifecycleError`, resolve config and all or
+    selected workspaces, prepare project root, graph config, version, VCS, force, and
+    progress inputs, and invoke `IndexProjectGraph` on an opened provider.
+
+    An explicit `input.provider` MUST already be open. The SDK MUST NOT close,
+    recreate, or retry that caller-owned provider; force still reaches
+    `IndexProjectGraph` as a logical full-reindex intent.
+
+    For a transient provider, the SDK SHALL use `withOpenGraphProvider`. If, and only
+    if, `input.force` is true and initial `open()` rejects with the typed recoverable
+    storage-open error, the use case SHALL request exactly one recovery through the
+    helper: after that provider is closed, call `provider.recreate()`, then retry
+    `open()` and the index operation once. It MUST preserve caller hooks and run cleanup
+    exactly once per provider lifetime.
+
+    The SDK MUST rethrow non-recoverable errors, an untyped error, a recovery failure,
+    or a second open failure without deletion or further retry.
+
+- op: modified
+  description: 'Replace provider-owned repair passthrough with explicit SDK recovery ownership'
+  selector:
+    type: section
+    matches: '^Requirement: Repair lifecycle passthrough$'
+  content: |
+    The SDK SHALL report the final full-rebuild result without lossy mapping. It owns
+    the force-only decision to recover a typed failed open, while Code Graph owns the
+    `recreate()` primitive and its closed-provider precondition. Normal reads and
+    non-forced indexing surface the original typed open failure unchanged.

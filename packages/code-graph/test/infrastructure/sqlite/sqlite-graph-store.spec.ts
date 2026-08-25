@@ -1,5 +1,5 @@
 import { describe, afterEach, expect, it, vi } from 'vitest'
-import { existsSync, mkdtempSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import Database from 'better-sqlite3'
@@ -18,6 +18,8 @@ import {
 } from '../../../src/domain/value-objects/symbol-reference.js'
 import { SQLiteGraphStore } from '../../../src/infrastructure/sqlite/sqlite-graph-store.js'
 import { SQLiteWorkerClient } from '../../../src/infrastructure/sqlite/sqlite-worker-client.js'
+import { GraphStoreRecreateRequiresClosedError } from '../../../src/domain/errors/graph-store-recreate-requires-closed-error.js'
+import { GraphStorageRecoveryRequiredError } from '../../../src/domain/errors/graph-storage-recovery-required-error.js'
 import {
   SQLITE_SCHEMA_DDL,
   SQLITE_SCHEMA_VERSION,
@@ -593,12 +595,12 @@ describe('SQLiteGraphStore', () => {
     expect(existsSync(join(tempDir, 'graph', 'storage.epoch'))).toBe(true)
   })
 
-  it('recreate on an open store reopens the store for subsequent operations', async () => {
+  it('rejects recreation on an open store without closing or clearing it', async () => {
     tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-test-'))
 
     const store = new SQLiteGraphStore(tempDir)
     await store.open()
-    await store.recreate()
+    await expect(store.recreate()).rejects.toBeInstanceOf(GraphStoreRecreateRequiresClosedError)
 
     await expect(store.getStatistics()).resolves.toEqual(
       expect.objectContaining({
@@ -663,6 +665,61 @@ describe('SQLiteGraphStore', () => {
       'SQLite graph storage schema 8 is incompatible with expected 9',
     )
     expect(existsSync(databasePath)).toBe(true)
+  })
+
+  it('classifies invalid SQLite bytes as recoverable corruption without mutating the closed store', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-corrupt-open-'))
+    const graphDir = join(tempDir, 'graph')
+    const databasePath = join(graphDir, 'code-graph.sqlite')
+    const epochPath = join(graphDir, 'storage.epoch')
+    const initialStore = new SQLiteGraphStore(tempDir)
+    await initialStore.open()
+    await initialStore.close()
+
+    const invalidDatabaseBytes = Buffer.from('this is not a SQLite database')
+    writeFileSync(databasePath, invalidDatabaseBytes)
+    const epochBeforeFailure = readFileSync(epochPath)
+
+    const failedStore = new SQLiteGraphStore(tempDir)
+    const openError = await failedStore.open().catch((error: unknown) => error)
+    expect(openError).toBeInstanceOf(GraphStorageRecoveryRequiredError)
+    expect(openError).toMatchObject({
+      code: 'GRAPH_STORAGE_RECOVERY_REQUIRED',
+      reason: 'CORRUPT',
+    })
+    expect(failedStore.isOpen).toBe(false)
+    expect(readFileSync(databasePath)).toEqual(invalidDatabaseBytes)
+    expect(readFileSync(epochPath)).toEqual(epochBeforeFailure)
+
+    await failedStore.recreate()
+    expect(existsSync(databasePath)).toBe(false)
+    await failedStore.open()
+    await expect(failedStore.getStatistics()).resolves.toEqual(
+      expect.objectContaining({ fileCount: 0, symbolCount: 0 }),
+    )
+    await failedStore.close()
+  })
+
+  it('propagates ordinary runtime open failures without recreating or rotating storage', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'code-graph-sqlite-unrecoverable-open-'))
+    const graphDir = join(tempDir, 'graph')
+    const databasePath = join(graphDir, 'code-graph.sqlite')
+    const epochPath = join(graphDir, 'storage.epoch')
+    const initialStore = new SQLiteGraphStore(tempDir)
+    await initialStore.open()
+    await initialStore.close()
+
+    const databaseBeforeFailure = readFileSync(databasePath)
+    const epochBeforeFailure = readFileSync(epochPath)
+    const failedStore = new SQLiteGraphStore(tempDir, {
+      runtime: { modulePath: '/nonexistent/not-a-sqlite-module.js' },
+    })
+
+    await expect(failedStore.open()).rejects.not.toBeInstanceOf(GraphStorageRecoveryRequiredError)
+    expect(failedStore.isOpen).toBe(false)
+    expect(readFileSync(databasePath)).toEqual(databaseBeforeFailure)
+    expect(readFileSync(epochPath)).toEqual(epochBeforeFailure)
+    await failedStore.close()
   })
 
   it('rebuilds symbol FTS from logical and public binding identities', async () => {

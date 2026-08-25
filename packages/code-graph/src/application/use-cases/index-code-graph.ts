@@ -773,7 +773,7 @@ export class IndexCodeGraph {
       }
 
       let fullRebuildReason: string | null =
-        options.force === true ? 'Forced graph storage recreation requested by indexing' : null
+        options.force === true ? 'Forced logical graph reindex requested by indexing' : null
       let fullRebuild = options.force === true
       const newFiles: string[] = []
       const changedFiles: string[] = []

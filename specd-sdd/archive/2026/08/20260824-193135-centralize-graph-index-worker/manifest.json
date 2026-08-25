@@ -1,0 +1,2112 @@
+{
+  "name": "centralize-graph-index-worker",
+  "createdAt": "2026-08-24T19:31:35.710Z",
+  "updatedAt": "2026-08-25T14:41:04.145Z",
+  "description": "Centralizes graph-index isolation, locking, IPC validation, and child-process lifecycle inside Code Graph, with a curated SDK facade and a CLI delivery task. It separates forced logical reindexing from closed-store physical recovery, preserves typed recovery diagnostics and materialized spec metadata, and adds regression coverage for worker startup, protocol, backpressure, cleanup, and SQLite recovery paths.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "code-graph:isolated-index-worker",
+    "sdk:composition",
+    "cli:graph-index",
+    "code-graph:composition",
+    "code-graph:index-project-graph",
+    "code-graph:graph-store",
+    "code-graph:sqlite-graph-store",
+    "sdk:run-index-project-graph",
+    "sdk:with-open-graph-provider"
+  ],
+  "specDependsOn": {
+    "sdk:composition": [
+      "default:_global/architecture",
+      "core:composition",
+      "code-graph:composition",
+      "cli:host-context",
+      "sdk:context-markdown",
+      "sdk:build-implementation-review",
+      "code-graph:isolated-index-worker"
+    ],
+    "cli:graph-index": [
+      "cli:entrypoint",
+      "core:config",
+      "core:list-workspaces",
+      "sdk:run-index-project-graph",
+      "sdk:host-context",
+      "code-graph:isolated-index-worker"
+    ],
+    "code-graph:isolated-index-worker": [],
+    "code-graph:composition": [
+      "code-graph:symbol-model",
+      "code-graph:graph-store",
+      "code-graph:indexer",
+      "code-graph:traversal",
+      "default:_global/architecture",
+      "code-graph:get-graph-health",
+      "code-graph:index-project-graph",
+      "code-graph:get-spec-coverage",
+      "code-graph:get-change-spec-coverage",
+      "code-graph:resolve-symbol-reference",
+      "code-graph:isolated-index-worker"
+    ],
+    "code-graph:index-project-graph": [
+      "code-graph:composition",
+      "code-graph:indexer",
+      "code-graph:graph-store",
+      "core:config"
+    ],
+    "code-graph:graph-store": [
+      "code-graph:symbol-model",
+      "default:_global/architecture",
+      "code-graph:staleness-detection",
+      "code-graph:document-model"
+    ],
+    "code-graph:sqlite-graph-store": [
+      "code-graph:graph-store",
+      "core:config",
+      "code-graph:symbol-model",
+      "code-graph:workspace-integration"
+    ],
+    "sdk:run-index-project-graph": [
+      "sdk:with-open-graph-provider",
+      "code-graph:index-project-graph",
+      "core:list-workspaces"
+    ],
+    "sdk:with-open-graph-provider": ["sdk:host-context", "code-graph:composition"]
+  },
+  "invalidationPolicy": "downstream",
+  "trackedImplementationFiles": [
+    {
+      "file": "GRAPH_INDEX_LOCK_NOTES.md",
+      "state": "removed"
+    },
+    {
+      "file": "specs/cli/graph-impact/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/code-graph/composition/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/code-graph/graph-store/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/code-graph/traversal/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/compile-context/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/get-project-context/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/search-specs/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/index-lock.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/ports/isolated-graph-index-runner.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/composition/code-graph-provider.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/isolated-index-worker/json-value.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/errors/isolated-graph-index-errors.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/isolated-index-worker/protocol.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/index-lock.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/composition/code-graph-provider.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/code-graph/services.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/code-graph/use-cases.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/sdk/index.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/cli/cli-reference.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/adr/0027-code-graph-owned-index-worker.md",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/isolated-index-worker/supervisor.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/composition/run-isolated-graph-index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/isolated-index-worker/isolated-index-worker-child.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/package.json",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/public.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/barrel.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/isolated-index-worker/protocol.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/graph-index-task.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/package.json",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/fixtures/isolated-index-worker/invalid-contract-task.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/fixtures/isolated-index-worker/non-json-task.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/fixtures/isolated-index-worker/task-failure.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/fixtures/isolated-index-worker/valid-task.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/isolated-index-worker/supervisor.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/isolated-index-worker/signals.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/isolated-index-worker/dist.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/index-graph.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/test/barrel.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/graph-index-task.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/graph-index.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/graph-index-integration.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/test/fixtures/publish-shaped-worker-consumer.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/sqlite/sqlite-worker-client.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/sqlite/sqlite-worker.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/sqlite/sqlite-worker-lifecycle.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/fixtures/isolated-index-worker/built-force-recreate-clean-exit-task.mjs",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/fixtures/isolated-index-worker/built-invalid-contract-task.mjs",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/fixtures/isolated-index-worker/built-non-json-task.mjs",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/fixtures/isolated-index-worker/built-result-then-abnormal-exit-task.mjs",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/fixtures/isolated-index-worker/built-task-failure.mjs",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/fixtures/isolated-index-worker/built-valid-task.mjs",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/use-cases/index-code-graph.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/ports/graph-store.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/sqlite/sqlite-graph-store.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/sqlite/sqlite-graph-database.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/errors/graph-storage-recovery-required-error.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/errors/graph-store-recreate-requires-closed-error.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/index-project-graph-integration.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/sqlite/sqlite-worker-protocol.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/composition/with-open-graph-provider.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/orchestration/run-index-project-graph.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/test/composition/with-open-graph-provider.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/test/orchestration/run-index-project-graph.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/use-cases/index-project-graph.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/errors/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/value-objects/index-options.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/helpers/in-memory-graph-store.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/sqlite/sqlite-graph-store.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/domain/ports/graph-store.contract.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/index-project-graph.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/fixtures/isolated-index-worker/built-backpressure-task.mjs",
+      "state": "resolved"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "code-graph:isolated-index-worker",
+      "file": "packages/code-graph/src/infrastructure/index-lock.ts",
+      "fileLinkExplicit": false,
+      "symbols": [
+        "GraphIndexLockLease",
+        "acquireGraphIndexLockLeaseByStoragePath",
+        "GraphIndexLockLeaseOptions",
+        "createGraphIndexLockHandoffEnv",
+        "isGraphIndexLockHandoffForStoragePath",
+        "acquireGraphIndexLock",
+        "acquireGraphIndexLockByStoragePath",
+        "assertGraphIndexUnlockedByStoragePath",
+        "getGraphIndexLockPathForStoragePath"
+      ]
+    },
+    {
+      "specId": "code-graph:isolated-index-worker",
+      "file": "packages/code-graph/src/application/ports/isolated-graph-index-runner.ts",
+      "fileLinkExplicit": false,
+      "symbols": [
+        "GraphIndexJsonPrimitive",
+        "GraphIndexJsonValue",
+        "GraphIndexTaskProgressEmitter",
+        "GraphIndexTask",
+        "RunIsolatedGraphIndexInput",
+        "IsolatedGraphIndexRunner"
+      ]
+    },
+    {
+      "specId": "code-graph:isolated-index-worker",
+      "file": "packages/code-graph/src/composition/code-graph-provider.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["CodeGraphProviderImpl.withIndexLock", "CodeGraphProviderImpl.assertAvailable"]
+    },
+    {
+      "specId": "code-graph:isolated-index-worker",
+      "file": "packages/code-graph/src/infrastructure/isolated-index-worker/json-value.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["assertGraphIndexJsonValue", "isGraphIndexJsonValue"]
+    },
+    {
+      "specId": "code-graph:isolated-index-worker",
+      "file": "packages/code-graph/src/domain/errors/isolated-graph-index-errors.ts",
+      "fileLinkExplicit": false,
+      "symbols": [
+        "GraphIndexWorkerStartError",
+        "GraphIndexTaskContractError",
+        "GraphIndexTaskExecutionError",
+        "GraphIndexWorkerProtocolError",
+        "GraphIndexWorkerExitError",
+        "GraphIndexWorkerSignalError",
+        "GraphIndexProgressHandlerError"
+      ]
+    },
+    {
+      "specId": "code-graph:isolated-index-worker",
+      "file": "packages/code-graph/src/infrastructure/isolated-index-worker/protocol.ts",
+      "fileLinkExplicit": false,
+      "symbols": [
+        "GRAPH_INDEX_PROTOCOL",
+        "StartMessage",
+        "ChildMessage",
+        "SerializedTaskError",
+        "isStartMessage",
+        "isChildMessage",
+        "isSerializedTaskError",
+        "serializeTaskError"
+      ]
+    },
+    {
+      "specId": "code-graph:isolated-index-worker",
+      "file": "packages/code-graph/test/infrastructure/index-lock.spec.ts",
+      "fileLinkExplicit": true,
+      "symbols": ["index-lock infrastructure"]
+    },
+    {
+      "specId": "code-graph:isolated-index-worker",
+      "file": "packages/code-graph/test/composition/code-graph-provider.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:isolated-index-worker",
+      "file": "packages/code-graph/src/infrastructure/isolated-index-worker/supervisor.ts",
+      "fileLinkExplicit": false,
+      "symbols": [
+        "NodeIsolatedGraphIndexRunner",
+        "runIsolatedGraphIndexWithRuntime",
+        "createNodeIsolatedGraphIndexRunner"
+      ]
+    },
+    {
+      "specId": "code-graph:isolated-index-worker",
+      "file": "packages/code-graph/src/composition/run-isolated-graph-index.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["runIsolatedGraphIndex"]
+    },
+    {
+      "specId": "code-graph:isolated-index-worker",
+      "file": "packages/code-graph/src/infrastructure/isolated-index-worker/isolated-index-worker-child.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["onMessage", "runTask", "sendProgress", "sendTerminal"]
+    },
+    {
+      "specId": "code-graph:isolated-index-worker",
+      "file": "packages/code-graph/package.json",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:isolated-index-worker",
+      "file": "packages/code-graph/src/public.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:isolated-index-worker",
+      "file": "packages/code-graph/src/index.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "sdk:composition",
+      "file": "packages/sdk/src/index.ts",
+      "fileLinkExplicit": false,
+      "symbols": [
+        "runIsolatedGraphIndex",
+        "GraphIndexWorkerStartError",
+        "GraphIndexTaskContractError",
+        "GraphIndexTaskExecutionError",
+        "GraphIndexWorkerProtocolError",
+        "GraphIndexWorkerExitError",
+        "GraphIndexWorkerSignalError",
+        "GraphIndexProgressHandlerError"
+      ]
+    },
+    {
+      "specId": "cli:graph-index",
+      "file": "packages/cli/src/graph-index-task.ts",
+      "fileLinkExplicit": false,
+      "symbols": [
+        "CliGraphIndexContextDescriptor",
+        "CliGraphIndexTaskInput",
+        "CliGraphIndexProgress",
+        "runGraphIndexTask"
+      ]
+    },
+    {
+      "specId": "cli:graph-index",
+      "file": "packages/cli/package.json",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:isolated-index-worker",
+      "file": "packages/code-graph/test/infrastructure/isolated-index-worker/protocol.spec.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["isolated graph-index worker protocol"]
+    },
+    {
+      "specId": "code-graph:isolated-index-worker",
+      "file": "packages/code-graph/test/infrastructure/isolated-index-worker/supervisor.spec.ts",
+      "fileLinkExplicit": true,
+      "symbols": ["isolated graph-index supervisor"]
+    },
+    {
+      "specId": "code-graph:isolated-index-worker",
+      "file": "packages/code-graph/test/infrastructure/isolated-index-worker/signals.spec.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["isolated graph-index supervisor signals"]
+    },
+    {
+      "specId": "code-graph:isolated-index-worker",
+      "file": "packages/code-graph/test/infrastructure/isolated-index-worker/dist.spec.ts",
+      "fileLinkExplicit": true,
+      "symbols": ["published isolated graph-index worker"]
+    },
+    {
+      "specId": "code-graph:composition",
+      "file": "packages/code-graph/test/composition/code-graph-provider.spec.ts",
+      "fileLinkExplicit": true,
+      "symbols": ["CodeGraphProvider"]
+    },
+    {
+      "specId": "code-graph:composition",
+      "file": "packages/code-graph/test/barrel.spec.ts",
+      "fileLinkExplicit": true,
+      "symbols": ["@specd/code-graph barrel"]
+    },
+    {
+      "specId": "code-graph:isolated-index-worker",
+      "file": "packages/code-graph/test/fixtures/isolated-index-worker/valid-task.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:isolated-index-worker",
+      "file": "packages/code-graph/test/fixtures/isolated-index-worker/invalid-contract-task.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:isolated-index-worker",
+      "file": "packages/code-graph/test/fixtures/isolated-index-worker/non-json-task.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:isolated-index-worker",
+      "file": "packages/code-graph/test/fixtures/isolated-index-worker/task-failure.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:graph-index",
+      "file": "packages/cli/src/commands/graph/index-graph.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["registerGraphIndex", "formatTextIndexResult"]
+    },
+    {
+      "specId": "sdk:composition",
+      "file": "packages/sdk/test/barrel.spec.ts",
+      "fileLinkExplicit": true,
+      "symbols": ["@specd/sdk barrel"]
+    },
+    {
+      "specId": "cli:graph-index",
+      "file": "packages/cli/test/graph-index-task.spec.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["runGraphIndexTask"]
+    },
+    {
+      "specId": "cli:graph-index",
+      "file": "packages/cli/test/commands/graph-index.spec.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["graph index"]
+    },
+    {
+      "specId": "cli:graph-index",
+      "file": "packages/cli/test/commands/graph-index-integration.spec.ts",
+      "fileLinkExplicit": true,
+      "symbols": ["graph index integration"]
+    },
+    {
+      "specId": "sdk:composition",
+      "file": "packages/sdk/test/fixtures/publish-shaped-worker-consumer.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:isolated-index-worker",
+      "file": "packages/code-graph/src/infrastructure/sqlite/sqlite-worker-client.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["SQLiteWorkerClient.close", "SQLiteWorkerClient.waitForWorkerExit"]
+    },
+    {
+      "specId": "code-graph:isolated-index-worker",
+      "file": "packages/code-graph/src/infrastructure/sqlite/sqlite-worker.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["handleMessage"]
+    },
+    {
+      "specId": "code-graph:isolated-index-worker",
+      "file": "packages/code-graph/test/infrastructure/sqlite/sqlite-worker-lifecycle.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:isolated-index-worker",
+      "file": "packages/code-graph/test/fixtures/isolated-index-worker/built-force-recreate-clean-exit-task.mjs",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:isolated-index-worker",
+      "file": "packages/code-graph/test/fixtures/isolated-index-worker/built-invalid-contract-task.mjs",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:isolated-index-worker",
+      "file": "packages/code-graph/test/fixtures/isolated-index-worker/built-non-json-task.mjs",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:isolated-index-worker",
+      "file": "packages/code-graph/test/fixtures/isolated-index-worker/built-result-then-abnormal-exit-task.mjs",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:isolated-index-worker",
+      "file": "packages/code-graph/test/fixtures/isolated-index-worker/built-task-failure.mjs",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:isolated-index-worker",
+      "file": "packages/code-graph/test/fixtures/isolated-index-worker/built-valid-task.mjs",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:composition",
+      "file": "packages/code-graph/src/composition/code-graph-provider.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["CodeGraphProvider", "CodeGraphProviderImpl"]
+    },
+    {
+      "specId": "code-graph:index-project-graph",
+      "file": "packages/code-graph/src/application/use-cases/index-code-graph.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["IndexCodeGraph"]
+    },
+    {
+      "specId": "code-graph:graph-store",
+      "file": "packages/code-graph/src/domain/ports/graph-store.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["GraphStore"]
+    },
+    {
+      "specId": "code-graph:sqlite-graph-store",
+      "file": "packages/code-graph/src/infrastructure/sqlite/sqlite-graph-store.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["SQLiteGraphStore"]
+    },
+    {
+      "specId": "code-graph:sqlite-graph-store",
+      "file": "packages/code-graph/src/infrastructure/sqlite/sqlite-graph-database.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["SQLiteGraphDatabase"]
+    },
+    {
+      "specId": "code-graph:composition",
+      "file": "packages/code-graph/src/domain/errors/graph-storage-recovery-required-error.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["GraphStorageRecoveryRequiredError"]
+    },
+    {
+      "specId": "code-graph:graph-store",
+      "file": "packages/code-graph/src/domain/errors/graph-store-recreate-requires-closed-error.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["GraphStoreRecreateRequiresClosedError"]
+    },
+    {
+      "specId": "code-graph:index-project-graph",
+      "file": "packages/code-graph/test/application/use-cases/index-project-graph-integration.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:sqlite-graph-store",
+      "file": "packages/code-graph/test/infrastructure/sqlite/sqlite-worker-lifecycle.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:sqlite-graph-store",
+      "file": "packages/code-graph/test/infrastructure/sqlite/sqlite-worker-protocol.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "sdk:composition",
+      "file": "packages/sdk/src/composition/with-open-graph-provider.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["withOpenGraphProvider"]
+    },
+    {
+      "specId": "sdk:composition",
+      "file": "packages/sdk/src/orchestration/run-index-project-graph.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["runIndexProjectGraph"]
+    },
+    {
+      "specId": "sdk:composition",
+      "file": "packages/sdk/test/composition/with-open-graph-provider.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "sdk:composition",
+      "file": "packages/sdk/test/orchestration/run-index-project-graph.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:graph-store",
+      "file": "packages/code-graph/test/domain/ports/graph-store.contract.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "sdk:with-open-graph-provider",
+      "file": "packages/sdk/src/composition/with-open-graph-provider.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["WithOpenGraphProviderOptions", "withOpenGraphProvider"]
+    },
+    {
+      "specId": "code-graph:graph-store",
+      "file": "packages/code-graph/test/infrastructure/sqlite/sqlite-graph-store.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:sqlite-graph-store",
+      "file": "packages/code-graph/test/infrastructure/sqlite/sqlite-graph-store.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:sqlite-graph-store",
+      "file": "packages/code-graph/src/infrastructure/sqlite/sqlite-worker.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["serializeError"]
+    },
+    {
+      "specId": "sdk:run-index-project-graph",
+      "file": "packages/sdk/src/orchestration/run-index-project-graph.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["runIndexProjectGraph"]
+    },
+    {
+      "specId": "sdk:run-index-project-graph",
+      "file": "packages/sdk/test/orchestration/run-index-project-graph.spec.ts",
+      "fileLinkExplicit": true
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:5c77253b33bfbb67b9372448c0c19e2a25d5872cbd05ba2a823c137fb804bfe5"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "code-graph:isolated-index-worker",
+          "filename": "specs/code-graph/isolated-index-worker/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:247df625491e38495d709239819931f8b9dac6b1dd36b23cbbbf023bd323f016"
+        },
+        {
+          "key": "sdk:composition",
+          "filename": "deltas/sdk/composition/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:adc9041aa9031b027f6bd26e8593802a6d903747470e088364d2928705392a1c"
+        },
+        {
+          "key": "cli:graph-index",
+          "filename": "deltas/cli/graph-index/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:48d81a90a3d7490fecc511c4e475c73ae308de4ab439266b37a3934b5785d20f"
+        },
+        {
+          "key": "code-graph:composition",
+          "filename": "deltas/code-graph/composition/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:5205c27b58175dd6b067624571ec085c52ac5dbfcf7a3b2d65aa57a9afd0504f"
+        },
+        {
+          "key": "code-graph:index-project-graph",
+          "filename": "deltas/code-graph/index-project-graph/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:68175c0382b0756a6b9433fe7a9941965c398929358245d51a96cb277cd52c0c"
+        },
+        {
+          "key": "code-graph:graph-store",
+          "filename": "deltas/code-graph/graph-store/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:11ebae3e35aa09ccd4c8b1bfdb3832164d4ae4f69596b9debbc0a513e4db42a0"
+        },
+        {
+          "key": "code-graph:sqlite-graph-store",
+          "filename": "deltas/code-graph/sqlite-graph-store/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:4d7ee7c75207de2ac5549c83631812c0a4ed207cdf6f49948967bc6a64222199"
+        },
+        {
+          "key": "sdk:run-index-project-graph",
+          "filename": "deltas/sdk/run-index-project-graph/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:d76da44ef06a539999feb3007b6655bf1b8028deceaadeb0d86d47f4537c2ff5"
+        },
+        {
+          "key": "sdk:with-open-graph-provider",
+          "filename": "deltas/sdk/with-open-graph-provider/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:c47aa9d5f7fc4966469f4b8ebc4feb6627d7c3d4cee4fe41a8b263b2e8725d8b"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "code-graph:isolated-index-worker",
+          "filename": "specs/code-graph/isolated-index-worker/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:80321503e0176e908cd032ce6b5819bdc7a2c434046b7d593f5e41b8d0b78c05"
+        },
+        {
+          "key": "sdk:composition",
+          "filename": "deltas/sdk/composition/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:102f1f431fab77f15136165ae330219c3f8552522cd109f09000e126ce569245"
+        },
+        {
+          "key": "cli:graph-index",
+          "filename": "deltas/cli/graph-index/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:1452526b55530e3c7da03f4ed1175be94f22c79e3ab767f295cf47686d28234a"
+        },
+        {
+          "key": "code-graph:composition",
+          "filename": "deltas/code-graph/composition/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:538b67950bdda44f9968e8e8e80a5351c174bd5d12c114aaa55fb0f78bda5271"
+        },
+        {
+          "key": "code-graph:index-project-graph",
+          "filename": "deltas/code-graph/index-project-graph/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:f37e59c26d866be0842b88eed020d9f0867473747944dc20980deba0427dd724"
+        },
+        {
+          "key": "code-graph:graph-store",
+          "filename": "deltas/code-graph/graph-store/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:fb63884b5f6064b276f4aab746336b9be4dd86097d7bc732add335108504bc22"
+        },
+        {
+          "key": "code-graph:sqlite-graph-store",
+          "filename": "deltas/code-graph/sqlite-graph-store/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:5bae166ffd7cc9b490a761002a5541e1da3f446d9f43e436fcb23bb2ea4a57d7"
+        },
+        {
+          "key": "sdk:run-index-project-graph",
+          "filename": "deltas/sdk/run-index-project-graph/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:8427130b6ac8289bb2f9fc668a9803b2e1ec9014efe4d3b8be8e9bb9e0440653"
+        },
+        {
+          "key": "sdk:with-open-graph-provider",
+          "filename": "deltas/sdk/with-open-graph-provider/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:bc1e06fbf0d989afd01ae970c97c0d10fc1ad3ee166b2c20f2b2b02f56f955e3"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:b9509e570d27342ed58fbdf20e138f3d69b4376769c4618b11d8fe26fbaec32f"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:494aae384dca8aea6fea00dd2e611344df41f9773fdbd75c149e36959081d4c4"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-08-24T19:31:35.710Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": ["code-graph:isolated-index-worker", "sdk:composition", "cli:graph-index"],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-08-24T19:31:35.729Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "code-graph:isolated-index-worker"
+        },
+        {
+          "type": "specs",
+          "key": "sdk:composition"
+        },
+        {
+          "type": "specs",
+          "key": "cli:graph-index"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:isolated-index-worker"
+        },
+        {
+          "type": "verify",
+          "key": "sdk:composition"
+        },
+        {
+          "type": "verify",
+          "key": "cli:graph-index"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-24T19:37:58.095Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-24T19:41:32.286Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["code-graph:isolated-index-worker", "sdk:composition", "cli:graph-index"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:isolated-index-worker", "sdk:composition", "cli:graph-index"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-08-24T19:41:32.288Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "code-graph:composition"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:composition"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-24T19:49:01.234Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:isolated-index-worker",
+            "sdk:composition",
+            "cli:graph-index",
+            "code-graph:composition"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:isolated-index-worker",
+            "sdk:composition",
+            "cli:graph-index",
+            "code-graph:composition"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-24T19:55:30.060Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [code-graph:composition]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:composition"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:isolated-index-worker",
+            "sdk:composition",
+            "cli:graph-index",
+            "code-graph:composition"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-24T20:05:59.161Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-24T20:11:29.578Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]; specs [code-graph:isolated-index-worker]; design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["code-graph:isolated-index-worker"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:isolated-index-worker",
+            "sdk:composition",
+            "cli:graph-index",
+            "code-graph:composition"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-24T20:17:53.306Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-24T20:18:55.694Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-25T07:14:24.797Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-25T07:28:25.401Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-25T07:34:29.175Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:isolated-index-worker",
+            "sdk:composition",
+            "cli:graph-index",
+            "code-graph:composition"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:isolated-index-worker",
+            "sdk:composition",
+            "cli:graph-index",
+            "code-graph:composition"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-25T07:34:29.175Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-25T07:47:26.082Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-25T07:49:01.687Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-25T08:48:19.428Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:isolated-index-worker",
+            "sdk:composition",
+            "cli:graph-index",
+            "code-graph:composition"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:isolated-index-worker",
+            "sdk:composition",
+            "cli:graph-index",
+            "code-graph:composition"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-25T08:48:19.428Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-25T08:49:59.553Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-25T08:52:38.351Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:isolated-index-worker",
+            "sdk:composition",
+            "cli:graph-index",
+            "code-graph:composition"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:isolated-index-worker",
+            "sdk:composition",
+            "cli:graph-index",
+            "code-graph:composition"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-08-25T08:52:38.356Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "code-graph:index-project-graph"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:index-project-graph"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-25T08:52:39.058Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:isolated-index-worker",
+            "sdk:composition",
+            "cli:graph-index",
+            "code-graph:composition",
+            "code-graph:index-project-graph"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:isolated-index-worker",
+            "sdk:composition",
+            "cli:graph-index",
+            "code-graph:composition",
+            "code-graph:index-project-graph"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-08-25T08:52:39.063Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "code-graph:graph-store"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:graph-store"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-25T08:52:39.750Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:isolated-index-worker",
+            "sdk:composition",
+            "cli:graph-index",
+            "code-graph:composition",
+            "code-graph:index-project-graph",
+            "code-graph:graph-store"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:isolated-index-worker",
+            "sdk:composition",
+            "cli:graph-index",
+            "code-graph:composition",
+            "code-graph:index-project-graph",
+            "code-graph:graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-08-25T08:52:39.759Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "code-graph:sqlite-graph-store"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:sqlite-graph-store"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-25T08:52:40.468Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:isolated-index-worker",
+            "sdk:composition",
+            "cli:graph-index",
+            "code-graph:composition",
+            "code-graph:index-project-graph",
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:isolated-index-worker",
+            "sdk:composition",
+            "cli:graph-index",
+            "code-graph:composition",
+            "code-graph:index-project-graph",
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-08-25T08:52:40.470Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "sdk:run-index-project-graph"
+        },
+        {
+          "type": "verify",
+          "key": "sdk:run-index-project-graph"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-25T09:02:46.467Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:isolated-index-worker",
+            "sdk:composition",
+            "cli:graph-index",
+            "code-graph:composition",
+            "code-graph:index-project-graph",
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "sdk:run-index-project-graph"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:isolated-index-worker",
+            "sdk:composition",
+            "cli:graph-index",
+            "code-graph:composition",
+            "code-graph:index-project-graph",
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "sdk:run-index-project-graph"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-08-25T09:02:46.472Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "sdk:with-open-graph-provider"
+        },
+        {
+          "type": "verify",
+          "key": "sdk:with-open-graph-provider"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-25T09:05:55.395Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [code-graph:composition, code-graph:graph-store, code-graph:index-project-graph, sdk:run-index-project-graph, sdk:with-open-graph-provider]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:composition",
+            "code-graph:graph-store",
+            "code-graph:index-project-graph",
+            "sdk:run-index-project-graph",
+            "sdk:with-open-graph-provider"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:isolated-index-worker",
+            "sdk:composition",
+            "cli:graph-index",
+            "code-graph:composition",
+            "code-graph:index-project-graph",
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "sdk:run-index-project-graph",
+            "sdk:with-open-graph-provider"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-25T09:35:05.643Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-25T09:38:06.141Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-25T09:39:07.545Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-25T11:31:18.271Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-25T12:42:12.279Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:isolated-index-worker",
+            "sdk:composition",
+            "cli:graph-index",
+            "code-graph:composition",
+            "code-graph:index-project-graph",
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "sdk:run-index-project-graph",
+            "sdk:with-open-graph-provider"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:isolated-index-worker",
+            "sdk:composition",
+            "cli:graph-index",
+            "code-graph:composition",
+            "code-graph:index-project-graph",
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "sdk:run-index-project-graph",
+            "sdk:with-open-graph-provider"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-25T12:42:12.279Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-25T12:48:03.264Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-25T12:52:30.173Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-25T13:14:10.613Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-25T13:19:12.841Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "code-graph:isolated-index-worker",
+            "sdk:composition",
+            "cli:graph-index",
+            "code-graph:composition",
+            "code-graph:index-project-graph",
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "sdk:run-index-project-graph",
+            "sdk:with-open-graph-provider"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "code-graph:isolated-index-worker",
+            "sdk:composition",
+            "cli:graph-index",
+            "code-graph:composition",
+            "code-graph:index-project-graph",
+            "code-graph:graph-store",
+            "code-graph:sqlite-graph-store",
+            "sdk:run-index-project-graph",
+            "sdk:with-open-graph-provider"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-25T13:19:12.841Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-25T13:26:31.064Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-25T13:30:06.849Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-25T13:31:27.481Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-25T13:52:23.533Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-25T14:33:53.421Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-25T14:34:14.582Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "description-updated",
+      "at": "2026-08-25T14:38:01.191Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "description": "Centralizes graph-index isolation, locking, IPC validation, and child-process lifecycle inside Code Graph, with a curated SDK facade and a CLI delivery task. It separates forced logical reindexing from closed-store physical recovery, preserves typed recovery diagnostics and materialized spec metadata, and adds regression coverage for worker startup, protocol, backpressure, cleanup, and SQLite recovery paths."
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-08-25T14:40:12.662Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Implementation link \"code-graph:isolated-index-worker\" points outside workspace \"code-graph\" codeRoot.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-08-25T14:40:37.587Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Implementation link \"code-graph:composition\" points outside workspace \"code-graph\" codeRoot.",
+      "commitStarted": false
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-25T14:41:04.141Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-08-25T14:41:04.342Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

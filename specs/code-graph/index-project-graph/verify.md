@@ -17,35 +17,34 @@
 - **WHEN** indexing runs
 - **THEN** the callback is passed to `provider.index()`
 
-### Requirement: Supports force recreate
+### Requirement: Supports forced logical reindex
 
-#### Scenario: Force rebuild is forwarded to the provider
+#### Scenario: Force intent reaches provider indexing
 
-- **GIVEN** `force: true`
-- **WHEN** `IndexProjectGraph.execute()` runs
-- **THEN** `provider.index()` receives `force: true`
-- **AND** `IndexProjectGraph` does not call `provider.recreate()` directly
+- **WHEN** force indexing is requested
+- **THEN** the provider receives the force index option
 
-#### Scenario: Non-forced indexing does not request recreation
+#### Scenario: Force is forwarded as a logical full-reindex request
 
-- **GIVEN** `force` is omitted or `false`
-- **WHEN** `IndexProjectGraph.execute()` runs
-- **THEN** `provider.index()` receives the non-forced options
-- **AND** `IndexProjectGraph` does not call `provider.recreate()` directly
+- **GIVEN** an already-open provider with reusable graph contents
+- **WHEN** `IndexProjectGraph` executes with `force: true`
+- **THEN** provider indexing receives force and reprocesses every selected input
+- **AND** the use case never calls `recreate()`
 
 ### Requirement: Accepts open provider and prepared inputs
 
-#### Scenario: Does not resolve workspaces or acquire lock
+#### Scenario: Prepared inputs are forwarded unchanged
 
-- **GIVEN** a mock provider
-- **WHEN** `IndexProjectGraph.execute()` runs
-- **THEN** it does not call lock helpers or read `specd.yaml`
+- **GIVEN** an already-open provider and prepared project inputs
+- **WHEN** the use case executes
+- **THEN** it invokes provider indexing with those inputs
 
-#### Scenario: VCS root is forwarded to provider indexing
+#### Scenario: Prepared provider lifecycle remains untouched
 
-- **GIVEN** an `IndexProjectGraphInput` containing `vcsRoot`
-- **WHEN** `IndexProjectGraph.execute()` runs
-- **THEN** `provider.index()` receives the same `vcsRoot` value
+- **GIVEN** an already-open provider and complete prepared inputs
+- **WHEN** the use case executes
+- **THEN** it forwards VCS and progress fields unchanged
+- **AND** it does not open, close, clear directly, recreate, lock, or spawn
 
 ### Requirement: Factory wires dependencies
 
@@ -53,12 +52,3 @@
 
 - **WHEN** `createIndexProjectGraph()` is called
 - **THEN** it returns an `IndexProjectGraph` with no captured config
-
-### Requirement: Incompatibility repair execution
-
-#### Scenario: Index result records completed repair
-
-- **GIVEN** provider indexing detects schema incompatibility
-- **WHEN** `IndexProjectGraph` executes
-- **THEN** provider-owned recreation and search rebuild complete before readiness
-- **AND** the result reports full rebuild and schema reason

@@ -6,6 +6,8 @@ import {
   BulkSessionStateError,
   CODE_GRAPH_VERSION,
   GraphSchemaIncompatibleError,
+  GraphStorageRecoveryRequiredError,
+  GraphStoreRecreateRequiresClosedError,
   InvalidGraphStoreConfigurationError,
   LanguageAdapter,
   RelationType,
@@ -26,6 +28,7 @@ import {
   type LogicalSymbol,
   type SQLiteGraphStoreOptions,
   type SqliteRuntimeDescriptor,
+  type RunIsolatedGraphIndexInput,
 } from '../src/public.js'
 import { InMemoryIndexSession } from '../src/index.js'
 
@@ -165,7 +168,34 @@ describe('@specd/code-graph barrel', () => {
       'INVALID_GRAPH_STORE_CONFIGURATION',
     )
     expect(new GraphSchemaIncompatibleError('msg').code).toBe('GRAPH_SCHEMA_INCOMPATIBLE')
+    expect(new GraphStorageRecoveryRequiredError('msg', 'CORRUPT').code).toBe(
+      'GRAPH_STORAGE_RECOVERY_REQUIRED',
+    )
+    expect(new GraphStoreRecreateRequiresClosedError().code).toBe(
+      'GRAPH_STORE_RECREATE_REQUIRES_CLOSED',
+    )
     expect(new SpecNotFoundError('ws:cap').code).toBe('SPEC_NOT_FOUND')
     expect(new SpecNotFoundError('ws:cap').specId).toBe('ws:cap')
+  })
+
+  it('exposes only the curated isolated-worker surface', async () => {
+    const publicModule = await import('../src/public.js')
+    expect('runIsolatedGraphIndex' in publicModule).toBe(true)
+    for (const name of [
+      'acquireGraphIndexLockLeaseByStoragePath',
+      'createGraphIndexLockHandoffEnv',
+      'isGraphIndexLockHandoffForStoragePath',
+      'NodeIsolatedGraphIndexRunner',
+      'isChildMessage',
+      'GRAPH_INDEX_PROTOCOL',
+    ]) {
+      expect(name in publicModule).toBe(false)
+    }
+    const input: RunIsolatedGraphIndexInput<{ readonly value: string }, never> = {
+      storageRoot: '/tmp/graph',
+      taskModule: new URL('file:///tmp/task.js'),
+      taskInput: { value: 'ok' },
+    }
+    expect(input.taskInput.value).toBe('ok')
   })
 })

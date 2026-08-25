@@ -50,9 +50,11 @@ import { computeHotspots } from '../domain/services/compute-hotspots.js'
 import { analyzeFilesImpact } from '../domain/services/analyze-files-impact.js'
 import { StoreNotOpenError } from '../domain/errors/store-not-open-error.js'
 import { GraphProviderStaleError } from '../domain/errors/graph-provider-stale-error.js'
+import { GraphStoreRecreateRequiresClosedError } from '../domain/errors/graph-store-recreate-requires-closed-error.js'
 import {
   assertGraphIndexUnlockedByStoragePath,
   acquireGraphIndexLockByStoragePath,
+  isGraphIndexLockHandoffForStoragePath,
 } from '../infrastructure/index-lock.js'
 import {
   type DeclarationOccurrence,
@@ -74,12 +76,6 @@ import {
   type SearchCodeGraphInput,
   type SearchCodeGraphResult,
 } from '../application/use-cases/search-code-graph.js'
-
-/** Result of opening a provider through its indexing-specific repair lifecycle. */
-export interface IndexingOpenResult {
-  readonly fullRebuild: boolean
-  readonly fullRebuildReason: string | null
-}
 
 /** Complete identity used to retrieve one already-resolved public binding. */
 export interface ExactPublicBindingSelector {
@@ -103,8 +99,8 @@ export interface ExactPublicBindingResult {
  */
 export interface CodeGraphProvider {
   open(): Promise<void>
-  openForIndexing(): Promise<IndexingOpenResult>
   close(): Promise<void>
+  recreate(): Promise<void>
   [Symbol.asyncDispose](): Promise<void>
   index(options: IndexOptions): Promise<IndexResult>
   getSymbol(id: string): Promise<SymbolNode | undefined>
@@ -245,26 +241,6 @@ export class CodeGraphProviderImpl implements CodeGraphProvider {
   }
 
   /**
-   * Opens the store for indexing, recreating incompatible derived storage when necessary.
-   * Ordinary {@link open} never performs this destructive repair.
-   * @returns Repair diagnostics for this open operation.
-   */
-  async openForIndexing(): Promise<IndexingOpenResult> {
-    if (this._isOpen) {
-      return { fullRebuild: false, fullRebuildReason: null }
-    }
-    try {
-      await this.open()
-      return { fullRebuild: false, fullRebuildReason: null }
-    } catch (error: unknown) {
-      if (!isIncompatibleSchemaError(error)) throw error
-      await this.store.recreate()
-      await this.open()
-      return { fullRebuild: true, fullRebuildReason: 'SCHEMA_INCOMPATIBLE' }
-    }
-  }
-
-  /**
    * Closes the underlying graph store and releases resources.
    */
   async close(): Promise<void> {
@@ -274,6 +250,18 @@ export class CodeGraphProviderImpl implements CodeGraphProvider {
 
     await this.store.close()
     this._isOpen = false
+    this._storageGeneration = null
+  }
+
+  /**
+   * Physically recreates the closed derived graph storage.
+   * @throws {GraphStoreRecreateRequiresClosedError} When the provider is open.
+   */
+  async recreate(): Promise<void> {
+    if (this._isOpen) {
+      throw new GraphStoreRecreateRequiresClosedError()
+    }
+    await this.withIndexLock(async () => this.store.recreate())
     this._storageGeneration = null
   }
 
@@ -293,7 +281,7 @@ export class CodeGraphProviderImpl implements CodeGraphProvider {
     this.assertProviderOpen()
     return this.withIndexLock(async () => {
       if (options.force === true) {
-        await this.store.recreate()
+        await this.store.clear()
       }
       const result = await this.indexer.execute(options)
       this._storageGeneration = await this.store.getStorageGeneration()
@@ -990,7 +978,7 @@ export class CodeGraphProviderImpl implements CodeGraphProvider {
    * @returns The operation result.
    */
   private async withIndexLock<T>(fn: () => Promise<T>): Promise<T> {
-    if (process.env['SPECD_GRAPH_INDEX_LOCK_HELD'] === 'true') {
+    if (isGraphIndexLockHandoffForStoragePath(this.store.storagePath)) {
       return fn()
     }
     const release = acquireGraphIndexLockByStoragePath(this.store.storagePath)
@@ -1056,17 +1044,6 @@ export class CodeGraphProviderImpl implements CodeGraphProvider {
       }),
     )
   }
-}
-
-/**
- * Identifies backend schema incompatibility without coupling composition to concrete stores.
- * @param error - Store-open failure.
- * @returns Whether indexing may repair the failure by recreating derived storage.
- */
-function isIncompatibleSchemaError(error: unknown): boolean {
-  return (
-    error instanceof Error && /schema .* incompatible|incompatible .* schema/i.test(error.message)
-  )
 }
 
 /**

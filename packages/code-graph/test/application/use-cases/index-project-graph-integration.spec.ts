@@ -20,6 +20,7 @@ import { readStorageGeneration } from '../../../src/infrastructure/storage-gener
 import { readInstalledCodeGraphVersion } from '../../../src/application/use-cases/_shared/installed-code-graph-version.js'
 import { buildProjectGraphConfig } from '../../../src/application/services/build-project-graph-config.js'
 import { makeMockSpecRepository } from '../../helpers/make-mock-spec-repository.js'
+import { GraphStorageRecoveryRequiredError } from '../../../src/domain/errors/graph-storage-recovery-required-error.js'
 
 const makeMockRepo = makeMockSpecRepository
 
@@ -63,7 +64,7 @@ describe('IndexProjectGraph integration', () => {
     }
   })
 
-  it('indexes after force recreate without leaving the store closed', async () => {
+  it('indexes after a forced logical rebuild without recreating healthy storage', async () => {
     tempDir = mkdtempSync(join(tmpdir(), 'index-project-graph-force-'))
     const codeRoot = join(tempDir, 'workspace')
     mkdirSync(codeRoot, { recursive: true })
@@ -104,9 +105,9 @@ describe('IndexProjectGraph integration', () => {
 
     expect(result.filesIndexed).toBe(0)
     expect(result.fullRebuild).toBe(true)
-    expect(result.fullRebuildReason).toBe('Forced graph storage recreation requested by indexing')
+    expect(result.fullRebuildReason).toBe('Forced logical graph reindex requested by indexing')
     const generationAfter = readStorageGeneration(tempDir)
-    expect(generationAfter.token).not.toBe(generationBefore.token)
+    expect(generationAfter.token).toBe(generationBefore.token)
     await expect(provider.getStatistics()).resolves.toEqual(
       expect.objectContaining({ fileCount: 0 }),
     )
@@ -592,7 +593,7 @@ describe('IndexProjectGraph integration', () => {
     await provider.close()
   })
 
-  it('rejects incompatible SQLite reads and repairs only through indexing', async () => {
+  it('surfaces incompatible SQLite reads until closed storage is explicitly recreated', async () => {
     tempDir = mkdtempSync(join(tmpdir(), 'index-project-graph-incompatible-'))
     const codeRoot = join(tempDir, 'workspace')
     const graphRoot = join(tempDir, 'graph')
@@ -616,20 +617,22 @@ describe('IndexProjectGraph integration', () => {
     oldDatabase.close()
 
     const readProvider = createCodeGraphProvider(makeConfig(tempDir, codeRoot))
-    await expect(readProvider.open()).rejects.toThrow(
-      'SQLite graph storage schema 5 is incompatible with expected 9',
+    const openError = await readProvider.open().catch((error: unknown) => error)
+    expect(openError).toBeInstanceOf(GraphStorageRecoveryRequiredError)
+    expect(openError).toMatchObject(
+      expect.objectContaining({
+        message: expect.stringContaining('SQLite graph storage schema 5 is incompatible'),
+      }),
     )
+    expect((openError as GraphStorageRecoveryRequiredError).reason).toBe('SCHEMA_INCOMPATIBLE')
     const generationBefore = readStorageGeneration(tempDir)
 
-    const indexingProvider = createCodeGraphProvider(makeConfig(tempDir, codeRoot))
-    await expect(indexingProvider.openForIndexing()).resolves.toEqual({
-      fullRebuild: true,
-      fullRebuildReason: 'SCHEMA_INCOMPATIBLE',
-    })
+    await readProvider.recreate()
     const generationAfter = readStorageGeneration(tempDir)
     expect(generationAfter.token).not.toBe(generationBefore.token)
+    await readProvider.open()
 
-    const indexResult = await indexingProvider.index({
+    const indexResult = await readProvider.index({
       projectRoot: tempDir,
       vcsRoot: tempDir,
       vcsRef: indexedRef.slice(0, 7),
@@ -652,20 +655,20 @@ describe('IndexProjectGraph integration', () => {
     })
     expect(indexResult.filesIndexed).toBe(1)
     expect(indexResult.errors).toEqual([])
-    const rebuiltSearch = await indexingProvider.searchReferenceSymbols({
+    const rebuiltSearch = await readProvider.searchReferenceSymbols({
       query: 'rebuiltSearchTarget',
     })
     expect(rebuiltSearch[0]?.logicalTarget?.name).toBe('rebuiltSearchTarget')
-    await expect(indexingProvider.getStatistics()).resolves.toEqual(
+    await expect(readProvider.getStatistics()).resolves.toEqual(
       expect.objectContaining({ fileCount: 1 }),
     )
-    await expect(indexingProvider.getGraphHealth()).resolves.toEqual(
+    await expect(readProvider.getGraphHealth()).resolves.toEqual(
       expect.objectContaining({
         stale: false,
         contentFresh: true,
         coverageComplete: true,
       }),
     )
-    await indexingProvider.close()
+    await readProvider.close()
   })
 })

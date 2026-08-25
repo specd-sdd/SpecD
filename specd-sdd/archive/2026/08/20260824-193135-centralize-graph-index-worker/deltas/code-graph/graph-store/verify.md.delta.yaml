@@ -1,0 +1,33 @@
+- op: modified
+  selector:
+    type: section
+    matches: '^Requirement: Connection lifecycle$'
+  content: |
+    #### Scenario: Recoverable open failure leaves the store closed
+
+    - **GIVEN** corrupt or non-migratable persisted storage
+    - **WHEN** `open()` is attempted
+    - **THEN** it rejects with the typed recoverable storage-open error
+    - **AND** a subsequent `close()` is safe and the store is closed
+
+    #### Scenario: Ordinary open failure does not authorize deletion
+
+    - **WHEN** opening fails due to permission, configuration, or unrelated I/O
+    - **THEN** that failure identity propagates without an implicit clear or recreate
+
+- op: modified
+  selector:
+    type: section
+    matches: '^Requirement: Store recreation$'
+  content: |
+    #### Scenario: Closed recreation rotates physical storage
+
+    - **GIVEN** a closed store with recoverably unusable persistence
+    - **WHEN** `recreate()` succeeds and the caller later opens it
+    - **THEN** the new storage generation is empty and usable
+
+    #### Scenario: Clear preserves physical generation
+
+    - **GIVEN** an opened healthy store
+    - **WHEN** `clear()` is called for a forced reindex
+    - **THEN** logical graph data is removed without physical recreation or generation rotation

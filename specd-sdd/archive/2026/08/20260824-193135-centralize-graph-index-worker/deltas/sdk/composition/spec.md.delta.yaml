@@ -1,0 +1,63 @@
+- op: modified
+  description: 'Replace raw graph index lock exports with the isolated worker facade'
+  selector:
+    type: section
+    matches: '^Requirement: Public barrel exports for host adapters$'
+  content: |
+    `src/index.ts` SHALL re-export the following symbols from the curated
+    `@specd/code-graph` `"."` entrypoint for delivery hosts:
+
+    - `runIsolatedGraphIndex` and its public input, progress, result, and typed worker
+      failure contracts
+    - `createGetGraphHealth`, type `GetGraphHealthInput`, and type
+      `GetGraphHealthResult`
+    - type `IndexResult`, type `HotspotResult`, type `ImpactResult`, and type
+      `FileImpactResult`
+    - `codeGraphVersion` and `getCodeGraphVersion` (SDK-owned aliases where applicable)
+    - `GraphSpecNotFoundError` (alias for graph `SpecNotFoundError`)
+    - `SymbolKind`, `SearchOptions`, `HotspotOptions`, and `RiskLevel`
+    - `normalizeFileSelectorPath` and `createBootstrapGraphConfig`
+    - fingerprint helpers: `isGraphStale`, `detectFingerprintMismatch`,
+      `parseFingerprintMap`, and `buildProjectGraphConfig`
+
+    SDK MUST NOT export `acquireGraphIndexLock`, `assertGraphIndexUnlocked`, lock-path
+    helpers, release callbacks, raw lock tokens, or raw worker IPC envelopes. Delivery
+    hosts SHALL invoke the high-level isolated worker for graph writes and normal graph
+    provider/use-case operations for reads.
+
+    Delivery hosts MUST import the curated symbols from `@specd/sdk`, not from
+    `@specd/code-graph` directly.
+
+- op: modified
+  description: 'Register the isolated worker capability as an SDK composition dependency'
+  selector:
+    type: section
+    matches: '^Spec Dependencies$'
+  content: |
+    - `default:_global/architecture` — SDK layering
+    - `core:composition` — Core public composition
+    - `code-graph:composition` — Code Graph public composition
+    - `cli:host-context` — host consumer
+    - `sdk:context-markdown` — presentation helpers
+    - `sdk:build-implementation-review` — shared review orchestration
+    - `code-graph:isolated-index-worker` — isolated graph-index execution re-exported
+      to delivery hosts
+
+- op: modified
+  description: 'Clarify SDK internal directories and published entrypoint'
+  selector:
+    type: section
+    matches: '^Requirement: Layer structure$'
+  content: |
+    The SDK source tree MAY contain `src/composition/`, `src/orchestration/`,
+    `src/presentation/`, `src/shared/`, and `src/domain/`. `src/domain/` is limited to
+    SDK-specific error and value contracts and MUST NOT introduce entities, ports, or
+    infrastructure adapters.
+
+    `src/shared/` is an internal implementation directory and MUST NOT have a public
+    package subpath. The curated root barrel MAY explicitly re-export a named binding
+    implemented in `src/shared/` when that binding is listed in the public-barrel
+    requirement; this does not make the directory itself public.
+
+    Package `exports["."]` SHALL publish `./dist/index.js` and `./dist/index.d.ts`,
+    generated from the logical source barrel `src/index.ts`.

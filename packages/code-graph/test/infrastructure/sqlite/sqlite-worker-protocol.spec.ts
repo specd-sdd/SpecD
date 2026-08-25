@@ -10,6 +10,7 @@ import { SpecdCodeGraphError } from '../../../src/domain/errors/specd-code-graph
 import { BulkSessionStateError } from '../../../src/domain/errors/bulk-session-state-error.js'
 import { InvalidGraphStoreConfigurationError } from '../../../src/domain/errors/invalid-graph-store-configuration-error.js'
 import { GraphSchemaIncompatibleError } from '../../../src/domain/errors/graph-schema-incompatible-error.js'
+import { GraphStorageRecoveryRequiredError } from '../../../src/domain/errors/graph-storage-recovery-required-error.js'
 import { RelationType } from '../../../src/domain/value-objects/relation-type.js'
 import { type SQLiteWorkerRequest } from '../../../src/infrastructure/sqlite/sqlite-worker-protocol.js'
 
@@ -99,6 +100,14 @@ describe('SQLiteWorkerProtocol serialization', () => {
     const deserializedSchema = deserializeWorkerError(serializedSchema)
     expect(deserializedSchema).toBeInstanceOf(GraphSchemaIncompatibleError)
     expect(deserializedSchema.message).toBe('schema 8 is incompatible with expected 9')
+
+    const recovery = new GraphStorageRecoveryRequiredError('database is malformed', 'CORRUPT')
+    const serializedRecovery = serializeWorkerError(recovery)
+    expect(serializedRecovery.code).toBe('GRAPH_STORAGE_RECOVERY_REQUIRED')
+    expect(serializedRecovery.details?.recoveryReason).toBe('CORRUPT')
+    const deserializedRecovery = deserializeWorkerError(serializedRecovery)
+    expect(deserializedRecovery).toBeInstanceOf(GraphStorageRecoveryRequiredError)
+    expect((deserializedRecovery as GraphStorageRecoveryRequiredError).reason).toBe('CORRUPT')
   })
 
   it('attaches sqliteCode if available', () => {

@@ -1,4 +1,5 @@
-import { readFileSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
+import { existsSync, readFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
@@ -9,7 +10,12 @@ import * as sdkExtensions from '../src/extensions.js'
 const packageRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
 const packageJson = JSON.parse(readFileSync(join(packageRoot, 'package.json'), 'utf8')) as {
   version: string
+  exports: Record<string, unknown>
 }
+const publishShapedWorkerConsumer = join(
+  packageRoot,
+  'test/fixtures/publish-shaped-worker-consumer.ts',
+)
 
 describe('@specd/sdk barrel', () => {
   it('exports SDK_VERSION matching package.json', () => {
@@ -60,6 +66,89 @@ describe('@specd/sdk barrel', () => {
     expect(typeof sdk.CODE_GRAPH_VERSION).toBe('string')
     expect(sdk.codeGraphVersion).toBe(sdk.CODE_GRAPH_VERSION)
     expect(sdk.codeGraphVersion).not.toBe('0.0.0')
+  })
+
+  it('re-exports the isolated worker without raw lock or IPC internals', () => {
+    expect(typeof sdk.runIsolatedGraphIndex).toBe('function')
+    for (const name of [
+      'acquireGraphIndexLock',
+      'assertGraphIndexUnlocked',
+      'getGraphIndexLockPath',
+      'getGraphIndexLockPathForStoragePath',
+      'GraphIndexLockLease',
+      'GraphIndexLockLeaseOptions',
+      'createGraphIndexLockHandoffEnv',
+      'isGraphIndexLockHandoffForStoragePath',
+      'StartMessage',
+      'ChildMessage',
+      'NodeIsolatedGraphIndexRunner',
+    ]) {
+      expect(name in sdk).toBe(false)
+    }
+    const source = readFileSync(join(packageRoot, 'src/index.ts'), 'utf8')
+    expect(source).toContain('runIsolatedGraphIndex')
+    expect(source).not.toMatch(
+      /acquireGraphIndexLock|GraphIndexLockLease|StartMessage|ChildMessage/,
+    )
+  })
+
+  it('compiles every documented worker contract and failure from the built package entrypoint', () => {
+    execFileSync('pnpm', ['--filter', '@specd/sdk', 'build'], {
+      cwd: join(packageRoot, '../..'),
+      stdio: 'pipe',
+    })
+    expect(existsSync(join(packageRoot, 'dist/index.js'))).toBe(true)
+    expect(existsSync(join(packageRoot, 'dist/index.d.ts'))).toBe(true)
+
+    execFileSync(
+      'pnpm',
+      [
+        'exec',
+        'tsc',
+        '--noEmit',
+        '--target',
+        'ES2022',
+        '--module',
+        'NodeNext',
+        '--moduleResolution',
+        'NodeNext',
+        '--strict',
+        '--skipLibCheck',
+        publishShapedWorkerConsumer,
+      ],
+      { cwd: packageRoot, stdio: 'pipe' },
+    )
+  }, 15_000)
+
+  it('keeps lock, lease, release, token, and raw IPC declarations out of built SDK declarations', () => {
+    const declaration = readFileSync(join(packageRoot, 'dist/index.d.ts'), 'utf8')
+    for (const declarationName of [
+      'acquireGraphIndexLock',
+      'assertGraphIndexUnlocked',
+      'getGraphIndexLockPath',
+      'GraphIndexLockLease',
+      'GraphIndexLockLeaseOptions',
+      'createGraphIndexLockHandoffEnv',
+      'isGraphIndexLockHandoffForStoragePath',
+      'StartMessage',
+      'ChildMessage',
+    ]) {
+      expect(declaration).not.toMatch(new RegExp(`\\b${declarationName}\\b`))
+    }
+    expect(declaration).not.toMatch(/GRAPH_INDEX_LOCK_(?:PATH|TOKEN|HANDOFF)/)
+  })
+
+  it('permits the SDK domain and curated shared aliases without public internal subpaths', () => {
+    expect(existsSync(join(packageRoot, 'src/domain'))).toBe(true)
+    expect(existsSync(join(packageRoot, 'src/shared'))).toBe(true)
+    expect(packageJson.exports['./domain']).toBeUndefined()
+    expect(packageJson.exports['./shared']).toBeUndefined()
+    expect(packageJson.exports['.']).toEqual({
+      import: './dist/index.js',
+      types: './dist/index.d.ts',
+    })
+    expect(typeof sdk.codeGraphVersion).toBe('string')
+    expect(typeof sdk.getCodeGraphVersion).toBe('function')
   })
 
   it('exports codeGraphVersion matching @specd/code-graph package.json', () => {

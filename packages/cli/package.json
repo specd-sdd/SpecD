@@ -13,10 +13,10 @@
     "specd": "./dist/index.js"
   },
   "scripts": {
-    "build": "tsup src/index.ts --format esm --clean",
-    "build:dev": "tsup src/index.ts --format esm --sourcemap --clean",
-    "build:debug": "tsup src/index.ts --format esm --sourcemap --clean",
-    "dev": "tsup src/index.ts --format esm --sourcemap --watch",
+    "build": "tsup src/index.ts src/graph-index-task.ts --format esm --clean",
+    "build:dev": "tsup src/index.ts src/graph-index-task.ts --format esm --sourcemap --clean",
+    "build:debug": "tsup src/index.ts src/graph-index-task.ts --format esm --sourcemap --clean",
+    "dev": "tsup src/index.ts src/graph-index-task.ts --format esm --sourcemap --watch",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "release:publish": "pnpm publish --access public",
@@ -24,7 +24,6 @@
   },
   "dependencies": {
     "@clack/prompts": "^0.9.1",
-    "@specd/code-graph": "workspace:*",
     "@specd/sdk": "workspace:*",
     "@specd/plugin-agent-claude": "workspace:*",
     "@specd/plugin-agent-codex": "workspace:*",
