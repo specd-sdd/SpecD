@@ -11,8 +11,8 @@ Implementation tracking needs an application-level mutation primitive so deliver
 `UpdateImplementationTracking.execute` SHALL accept:
 
 - `name` — change name
-- `action` — one of `add`, `remove`, `ignore`, `resolve`, or `unresolve`
-- `file` — raw project-relative file path
+- `action` — one of `add`, `remove`, `ignore`, `resolve`, `unresolve`, or `start`
+- `file` — optional raw project-relative file path (required for `add`, `remove`, `ignore`, `resolve`, and `unresolve`; optional for `start`)
 - `specId` — optional canonical spec ID for link mutations
 - `symbols` — optional symbol refinements for link mutations
 
@@ -45,6 +45,16 @@ It MUST move `resolved` or `ignored` tracked files back to `open`. It MUST NOT r
 When `action = ignore`, the use case SHALL mark the tracked file as `ignored`.
 
 It MAY ignore a missing file only when that file is already tracked. For an untracked file, physical existence MUST be validated before adding it as `ignored`. Confirmed implementation links for the file MUST be preserved.
+
+### Requirement: Start mutation activates implementation tracking
+
+When `action = start`, the use case SHALL activate implementation tracking for the change.
+
+It MUST:
+
+- invoke `Change.startImplementationTracking()` within the mutation boundary
+- succeed idempotently if implementation tracking is already active
+- not require a `file` path or `specId`
 
 ### Requirement: Change must exist
 

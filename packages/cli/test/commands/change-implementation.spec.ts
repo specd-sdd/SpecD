@@ -244,4 +244,31 @@ describe('change implementation', () => {
       expect.objectContaining({ action: 'unresolve', file: 'src/foo.ts' }),
     )
   })
+
+  it('start calls updateImplementationTracking with start action and formats text', async () => {
+    const kernel = makeMockKernel()
+    vi.mocked(resolveCliContext).mockResolvedValue({
+      config: makeMockConfig(),
+      configFilePath: null,
+      kernel,
+    })
+    kernel.changes.updateImplementationTracking.execute.mockResolvedValue({
+      implementationTracking: {
+        trackedFiles: [],
+        links: [],
+      },
+    })
+    const stdout = captureStdout()
+
+    const program = makeProgram()
+    registerChangeImplementation(program.command('change'))
+    await program.parseAsync(['node', 'specd', 'change', 'implementation', 'start', 'my-change'])
+
+    expect(kernel.changes.updateImplementationTracking.execute).toHaveBeenCalledWith({
+      name: 'my-change',
+      action: 'start',
+    })
+    const out = stdout()
+    expect(out).toContain("✓ Implementation tracking is active for 'my-change'.")
+  })
 })

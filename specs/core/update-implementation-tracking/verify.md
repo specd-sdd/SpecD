@@ -58,6 +58,16 @@
 - **THEN** the file moves to `ignored`
 - **AND** the confirmed links remain present
 
+### Requirement: Start mutation activates implementation tracking
+
+#### Scenario: Start mutation activates tracking on change without requiring file
+
+- **GIVEN** an existing change where implementation tracking is inactive
+- **WHEN** calling `UpdateImplementationTracking.execute({ name, action: 'start' })`
+- **THEN** `isImplementationTrackingActive` becomes `true` on the change
+- **AND** the updated implementation tracking projection is returned
+- **AND** subsequent `start` calls succeed idempotently
+
 ### Requirement: Change must exist
 
 #### Scenario: Unknown change throws ChangeNotFoundError
@@ -88,9 +98,7 @@
 - **THEN** it creates a composition resolver for that composition session
 - **AND** it derives `UpdateImplementationTrackingDeps` through `resolveUpdateImplementationTrackingDeps(resolver)`
 - **AND** `resolveUpdateImplementationTrackingDeps(resolver)` resolves:
-
 - `changes: ChangeRepository`
 - `files: FileReader`
 - `projectRoot: string`
-
 - **AND** the factory delegates to canonical `createUpdateImplementationTracking(deps)`

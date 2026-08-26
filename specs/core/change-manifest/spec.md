@@ -18,6 +18,7 @@ Each change is persisted as a manifest.json file inside its change directory. It
   "schema": { "name": "schema-std", "version": 1 },
   "specIds": ["core:change"],
   "invalidationPolicy": "downstream",
+  "implementationTrackingStartedAt": "2026-05-15T11:00:00.000Z",
   "trackedImplementationFiles": [
     { "file": "packages/core/src/domain/entities/change.ts", "state": "open" },
     { "file": "packages/core/src/domain/entities/removed-file.ts", "state": "removed" },
@@ -60,6 +61,7 @@ Field definitions:
 - `workspaces` — optional; accepted on load for backward compatibility with older manifests but no longer written on save. Active workspaces are derived at runtime from specIds via parseSpecId()
 - `specIds` — current snapshot of spec IDs; mutable
 - `invalidationPolicy` — the change's persisted invalidation policy (`none`, `surgical`, `downstream`, `global`)
+- `implementationTrackingStartedAt` — optional ISO 8601 timestamp string representing when implementation tracking started. On hydration, if missing, it defaults to the change's first historical `implementing` transition timestamp if present, or `null`.
 - `trackedImplementationFiles` — optional array of tracked implementation file entries; each entry requires `file` and `state`, where `file` is a raw project-relative path and `state` is one of `open`, `resolved`, `ignored`, or `removed`
 - `implementationLinks` — optional array of confirmed implementation links; each entry requires `specId`, `file`, and `fileLinkExplicit`, and may include `symbols`
 - `fileLinkExplicit: false` is valid only when `symbols` is present and non-empty, because that shape means the file-level presence exists only as the container for symbol-level links

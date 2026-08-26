@@ -16,11 +16,11 @@
   "implementation": [
     {
       "file": "core:src/domain/entities/change.ts",
-      "symbols": ["Change", "touchUpdatedAt"]
-    },
-    {
-      "file": "core:src/application/use-cases/save-change-artifact.ts",
-      "symbols": ["SaveChangeArtifact", "SaveChangeArtifactResult"]
+      "symbols": [
+        "Change.startImplementationTracking",
+        "Change.implementationTrackingStartedAt",
+        "Change.isImplementationTrackingActive"
+      ]
     }
   ],
   "optimizations": {

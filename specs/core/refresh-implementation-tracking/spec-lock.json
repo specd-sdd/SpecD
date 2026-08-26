@@ -12,7 +12,10 @@
   ],
   "implementation": [
     {
-      "file": "core:src/composition/use-cases/refresh-implementation-tracking.ts"
+      "file": "core:src/application/use-cases/refresh-implementation-tracking.ts"
+    },
+    {
+      "file": "core:src/infrastructure/vcs/vcs-implementation-detector.ts"
     }
   ],
   "optimizations": {

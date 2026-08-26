@@ -1,0 +1,19 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Historical implementation detection guard'
+  content: |
+    ### Requirement: Explicit implementation tracking activation
+
+    A `Change` SHALL expose explicit implementation tracking activation state and baseline timing.
+
+    The `Change` entity MUST:
+
+    - maintain an `implementationTrackingStartedAt: Date | null` property
+    - expose `isImplementationTrackingActive: boolean` returning `true` when `implementationTrackingStartedAt` is not `null`
+    - provide `startImplementationTracking(at?: Date): void` to record tracking commencement
+    - ensure `startImplementationTracking` is idempotent: calling it when tracking is already active MUST preserve the initial `implementationTrackingStartedAt` timestamp

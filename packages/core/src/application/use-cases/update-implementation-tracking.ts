@@ -16,6 +16,7 @@ export type UpdateImplementationTrackingAction =
   | 'ignore'
   | 'resolve'
   | 'unresolve'
+  | 'start'
 
 /** Input for the {@link UpdateImplementationTracking} use case. */
 export interface UpdateImplementationTrackingInput {
@@ -23,8 +24,8 @@ export interface UpdateImplementationTrackingInput {
   readonly name: string
   /** Requested mutation kind. */
   readonly action: UpdateImplementationTrackingAction
-  /** Raw project-relative file path. */
-  readonly file: string
+  /** Raw project-relative file path. Required for file-based actions; optional for 'start'. */
+  readonly file?: string
   /** Optional complete file batch applied atomically; `file` remains the compatibility primary. */
   readonly files?: readonly string[]
   /** Canonical spec ID for link mutations. */
@@ -45,6 +46,7 @@ export interface UpdateImplementationTrackingResult {
  * File-existence validation is enforced here in the core use case rather than
  * in the CLI delivery layer. The rules are:
  *
+ * - `start` activates implementation tracking without requiring a file path.
  * - `add` requires the target file to exist on disk.
  * - `resolve` requires the target file to exist on disk and already be tracked.
  * - `unresolve` requires the target file to exist on disk, already be tracked,
@@ -84,15 +86,30 @@ export class UpdateImplementationTracking {
     input: UpdateImplementationTrackingInput,
   ): Promise<UpdateImplementationTrackingResult> {
     const { result } = await this._changes.mutate(input.name, async (change) => {
-      const files = input.files === undefined ? [input.file] : [...new Set(input.files)]
+      if (input.action === 'start') {
+        change.startImplementationTracking()
+        return { implementationTracking: projectImplementationTracking(change) }
+      }
+
+      const files =
+        input.files === undefined
+          ? input.file !== undefined
+            ? [input.file]
+            : []
+          : [...new Set(input.files)]
+
+      if (files.length === 0) {
+        throw new ImplementationFileNotFoundError('')
+      }
+
       await Promise.all(files.map(async (file) => this._validateMutation(change, input, file)))
 
       switch (input.action) {
         case 'add':
-          this._applyAdd(change, input)
+          for (const file of files) this._applyAdd(change, input, file)
           break
         case 'remove':
-          this._applyRemove(change, input)
+          for (const file of files) this._applyRemove(change, input, file)
           break
         case 'ignore':
           for (const file of files) this._applyIgnore(change, file)
@@ -140,18 +157,7 @@ export class UpdateImplementationTracking {
   }
 
   /**
-   * Checks whether a project-relative file exists on disk.
-   *
-   * @param file - Raw project-relative file path
-   * @returns `true` when the file exists, `false` otherwise
-   */
-  private async _fileExists(file: string): Promise<boolean> {
-    const absolutePath = path.resolve(this._projectRoot, file)
-    return (await this._files.read(absolutePath)) !== null
-  }
-
-  /**
-   * Throws {@link ImplementationFileNotFoundError} when the file does not exist.
+   * Asserts on-disk existence for a target file.
    *
    * @param file - Raw project-relative file path
    * @param exists - Whether the file exists on disk
@@ -164,11 +170,22 @@ export class UpdateImplementationTracking {
   }
 
   /**
-   * Returns the tracked entry for the given file, if any.
+   * Checks on-disk existence for one raw project-relative file path.
    *
-   * @param change - The persisted change under mutation
    * @param file - Raw project-relative file path
-   * @returns The tracked entry, or `undefined` when the file is untracked
+   * @returns Whether the file exists on disk
+   */
+  private async _fileExists(file: string): Promise<boolean> {
+    const absolutePath = path.resolve(this._projectRoot, file)
+    return (await this._files.read(absolutePath)) !== null
+  }
+
+  /**
+   * Finds the existing tracked entry for a file on a change.
+   *
+   * @param change - The persisted change
+   * @param file - Raw project-relative file path
+   * @returns The tracked entry, or `undefined` if untracked
    */
   private _trackedEntry(
     change: Change,
@@ -182,10 +199,11 @@ export class UpdateImplementationTracking {
    *
    * @param change - The persisted change under mutation
    * @param input - Mutation parameters
+   * @param file - Raw project-relative file path to link
    * @throws {ChangeNotFoundError} When `specId` is absent from the mutation input
    * @throws {ImplementationFileNotFoundError} When the file does not exist on disk
    */
-  private _applyAdd(change: Change, input: UpdateImplementationTrackingInput): void {
+  private _applyAdd(change: Change, input: UpdateImplementationTrackingInput, file: string): void {
     if (input.specId === undefined) {
       throw new ChangeNotFoundError(change.name)
     }
@@ -193,13 +211,13 @@ export class UpdateImplementationTracking {
     const hasSymbols = input.symbols !== undefined && input.symbols.length > 0
     change.addImplementationLink({
       specId: input.specId,
-      file: input.file,
+      file,
       fileLinkExplicit: !hasSymbols,
       ...(hasSymbols ? { symbols: input.symbols } : {}),
     })
 
-    if (!change.trackedImplementationFiles.some((entry) => entry.file === input.file)) {
-      change.trackImplementationFile(input.file, 'open')
+    if (!change.trackedImplementationFiles.some((entry) => entry.file === file)) {
+      change.trackImplementationFile(file, 'open')
     }
   }
 
@@ -208,21 +226,26 @@ export class UpdateImplementationTracking {
    *
    * @param change - The persisted change under mutation
    * @param input - Mutation parameters
+   * @param file - Raw project-relative file path to unlink
    * @throws {ChangeNotFoundError} When `specId` is absent from the mutation input
    */
-  private _applyRemove(change: Change, input: UpdateImplementationTrackingInput): void {
+  private _applyRemove(
+    change: Change,
+    input: UpdateImplementationTrackingInput,
+    file: string,
+  ): void {
     if (input.specId === undefined) {
       throw new ChangeNotFoundError(change.name)
     }
 
     if (input.symbols !== undefined && input.symbols.length > 0) {
       for (const symbol of input.symbols) {
-        change.removeImplementationSymbol(input.specId, input.file, symbol)
+        change.removeImplementationSymbol(input.specId, file, symbol)
       }
       return
     }
 
-    change.removeImplementationLink(input.specId, input.file)
+    change.removeImplementationLink(input.specId, file)
   }
 
   /**

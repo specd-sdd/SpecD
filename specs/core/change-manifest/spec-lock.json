@@ -13,11 +13,10 @@
   ],
   "implementation": [
     {
-      "file": "core:src/infrastructure/fs/manifest.ts",
-      "symbols": ["changeManifestSchema", "ChangeManifest"]
+      "file": "core:src/infrastructure/fs/manifest.ts"
     },
     {
-      "file": "core:test/infrastructure/fs/change-repository.spec.ts"
+      "file": "core:src/infrastructure/fs/change-repository.ts"
     }
   ],
   "optimizations": {

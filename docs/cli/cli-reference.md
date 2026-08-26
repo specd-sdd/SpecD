@@ -360,6 +360,7 @@ Review or mutate implementation tracking for an active change. Paths are always 
 
 Available subcommands:
 
+- `start` — explicitly activate implementation tracking for a change
 - `list` — show tracked files and confirmed links
 - `review` — show tracked files, confirmed links, stale symbol diagnostics, and out-of-scope sidecar preview
 - `add` — create or enrich a confirmed implementation link
@@ -400,6 +401,7 @@ The `ignore` action is an exception: files that are already tracked (including t
 Examples:
 
 ```bash
+specd changes implementation start my-change
 specd changes implementation list my-change
 specd changes implementation add my-change --spec core:change --file packages/core/src/domain/entities/change.ts
 specd changes implementation add my-change --spec core:change --file packages/core/src/domain/entities/change.ts --symbol Change.transition

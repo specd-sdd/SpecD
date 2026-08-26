@@ -312,4 +312,33 @@ describe('UpdateImplementationTracking', () => {
 
     expect(result.implementationTracking.links).toEqual([])
   })
+
+  it('start activates implementation tracking on change without requiring file', async () => {
+    const change = makeChange('start-tracking')
+    const repo = makeChangeRepository([change])
+    const uc = makeUpdate(repo, {})
+
+    expect(change.isImplementationTrackingActive).toBe(false)
+
+    const result = await uc.execute({
+      name: 'start-tracking',
+      action: 'start',
+    })
+
+    expect(change.isImplementationTrackingActive).toBe(true)
+    expect(change.implementationTrackingStartedAt).not.toBeNull()
+    expect(result.implementationTracking).toBeDefined()
+  })
+
+  it('start is idempotent and preserves initial timestamp on repeated execution', async () => {
+    const change = makeChange('start-idempotent')
+    const repo = makeChangeRepository([change])
+    const uc = makeUpdate(repo, {})
+
+    await uc.execute({ name: 'start-idempotent', action: 'start' })
+    const initialTimestamp = change.implementationTrackingStartedAt
+
+    await uc.execute({ name: 'start-idempotent', action: 'start' })
+    expect(change.implementationTrackingStartedAt).toEqual(initialTimestamp)
+  })
 })

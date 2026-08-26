@@ -361,6 +361,15 @@
 - **WHEN** a state transition succeeds
 - **THEN** a `transitioned` progress event is emitted with the source and target states
 
+### Requirement: Automatic implementation tracking activation on transition to implementing
+
+#### Scenario: Transition to implementing activates tracking if inactive
+
+- **GIVEN** a change with `isImplementationTrackingActive = false`
+- **WHEN** transitioning to `implementing`
+- **THEN** `isImplementationTrackingActive` becomes `true`
+- **AND** `implementationTrackingStartedAt` is set to the transition timestamp
+
 ### Requirement: Result type
 
 #### Scenario: Successful execution returns the updated change

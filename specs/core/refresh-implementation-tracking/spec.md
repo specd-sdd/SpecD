@@ -20,11 +20,11 @@ Delivery adapters need a single application-layer operation to refresh a change'
 
 `RefreshImplementationTracking` remains the standalone primitive for explicit refresh operations (for example `specd change implementation refresh`).
 
-### Requirement: Historical implementing guard
+### Requirement: Implementation tracking active guard
 
-When `Change.getHistoricalImplementationAt()` is `null`, the use case MUST NOT invoke `ImplementationDetector` and MUST NOT mutate tracked implementation files.
+When `Change.isImplementationTrackingActive` is `false`, the use case MUST NOT invoke `ImplementationDetector` and MUST NOT mutate tracked implementation files.
 
-When the guard is satisfied, the use case MUST run targeted detection and MAY persist tracking updates.
+When `Change.isImplementationTrackingActive` is `true`, the use case MUST run targeted detection and MAY persist tracking updates.
 
 ### Requirement: Detection merge semantics
 

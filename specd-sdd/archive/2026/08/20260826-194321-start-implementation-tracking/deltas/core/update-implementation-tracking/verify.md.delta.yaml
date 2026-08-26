@@ -1,0 +1,18 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Ignore mutation preserves tracked history'
+  content: |
+    ### Requirement: Start mutation activates implementation tracking
+
+    #### Scenario: Start mutation activates tracking on change without requiring file
+
+    - **GIVEN** an existing change where implementation tracking is inactive
+    - **WHEN** calling `UpdateImplementationTracking.execute({ name, action: 'start' })`
+    - **THEN** `isImplementationTrackingActive` becomes `true` on the change
+    - **AND** the updated implementation tracking projection is returned
+    - **AND** subsequent `start` calls succeed idempotently

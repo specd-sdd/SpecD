@@ -82,7 +82,7 @@ export class RefreshImplementationTracking {
     input: RefreshImplementationTrackingInput,
   ): Promise<RefreshImplementationTrackingResult> {
     const { result } = await this._changes.mutate(input.name, async (freshChange) => {
-      if (freshChange.getHistoricalImplementationAt() !== null) {
+      if (freshChange.isImplementationTrackingActive) {
         const excludePaths = this._collectExclusions()
         const detected = await this._implementationDetector.detectModifiedFiles(freshChange, {
           excludePaths,

@@ -23,17 +23,17 @@
 - **WHEN** `TransitionChange` performs a default active-change transition
 - **THEN** it calls `RefreshImplementationTracking.execute({ name })` rather than `ImplementationDetector` directly
 
-### Requirement: Historical implementing guard
+### Requirement: Implementation tracking active guard
 
 #### Scenario: Guard satisfied triggers detector
 
-- **GIVEN** a change has entered `implementing` at least once in its history
+- **GIVEN** a change has `isImplementationTrackingActive = true`
 - **WHEN** `RefreshImplementationTracking.execute()` runs
 - **THEN** it invokes `ImplementationDetector.detectModifiedFiles`
 
 #### Scenario: Guard not satisfied skips detector
 
-- **GIVEN** a change has never entered `implementing`
+- **GIVEN** a change has `isImplementationTrackingActive = false`
 - **WHEN** `RefreshImplementationTracking.execute()` runs
 - **THEN** it does not invoke `ImplementationDetector`
 - **AND** it does not add tracked implementation files

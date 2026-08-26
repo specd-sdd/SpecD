@@ -160,3 +160,13 @@
 - **WHEN** implementation review runs
 - **THEN** the first is missing and the second unresolved
 - **AND** neither stored link is mutated
+
+### Requirement: Start subcommand
+
+#### Scenario: Start explicitly activates implementation tracking
+
+- **GIVEN** an active change where implementation tracking is inactive
+- **WHEN** running `specd changes implementation start <name>`
+- **THEN** it executes `UpdateImplementationTracking` with action `'start'`
+- **AND** tracking becomes active
+- **AND** re-running `start` succeeds idempotently
