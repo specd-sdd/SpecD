@@ -1,0 +1,15 @@
+- op: added
+  description: 'Add scenario for lock-less specs and standalone sidecar prevention'
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Lock-less specs and explicit initialization'
+    after:
+      type: section
+      matches: 'Scenario: Semantic no-op mutation does not create persisted state'
+  content: |
+    #### Scenario: Persisted lock sidecars cannot be created without canonical artifacts
+
+    - **GIVEN** an operation targeting a path with no canonical spec artifacts
+    - **WHEN** attempting to persist a standalone lock sidecar
+    - **THEN** the creation is rejected

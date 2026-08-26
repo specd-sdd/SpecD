@@ -1,0 +1,34 @@
+- op: added
+  description: 'Add spec sweep requirement'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Deletion and removal semantics'
+  content: |
+    ### Requirement: Spec sweep prunes dangling implementation links
+
+    When refresh runs, the use case MUST perform a spec sweep over `change.implementationLinks`.
+
+    For each confirmed implementation link, if the link's `specId` is NOT present in `change.specIds` and NOT found in the workspace's canonical `SpecRepository`, the link MUST be pruned from the change's implementation links.
+
+- op: modified
+  description: 'Update dependencies and factory resolver'
+  selector:
+    type: section
+    matches: 'Requirement: Config-based factory delegates through resolveRefreshImplementationTrackingDeps'
+  content: |
+    The config-based `createRefreshImplementationTracking(config, options?)` form MUST derive `RefreshImplementationTrackingDeps` through `resolveRefreshImplementationTrackingDeps(resolver)` and then delegate to canonical `createRefreshImplementationTracking(deps)`.
+
+    `resolveRefreshImplementationTrackingDeps(resolver)` MUST resolve:
+
+    - `changes: ChangeRepository`
+    - `archives: ArchiveRepository`
+    - `implementationDetector: ImplementationDetector`
+    - `files: FileReader`
+    - `projectRoot: string`
+    - `specRepositories?: ReadonlyMap<string, SpecRepository>`
+
+    The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.

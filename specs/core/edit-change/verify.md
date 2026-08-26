@@ -167,6 +167,14 @@
 - **WHEN** `execute` is called with `addSpecIds: ['core:change-repository-port']`
 - **THEN** `ChangeRepository.unscaffold` is NOT called
 
+### Requirement: Implementation tracking refresh on spec change
+
+#### Scenario: Spec removal triggers implementation tracking refresh
+
+- **GIVEN** a change with confirmed implementation links and configured `refreshImplementationTracking`
+- **WHEN** `EditChange.execute` is called removing a spec from `specIds`
+- **THEN** `refreshImplementationTracking.execute({ name })` is invoked to sweep dangling links
+
 ### Requirement: Input contract
 
 #### Scenario: execute accepts EditChangeInput
@@ -220,8 +228,9 @@
 - **THEN** it creates a composition resolver for that composition session
 - **AND** it derives `EditChangeDeps` through `resolveEditChangeDeps(resolver)`
 - **AND** `resolveEditChangeDeps(resolver)` resolves:
-- `changes: ChangeRepository`
-- `listWorkspaces: ListWorkspaces`
-- `actor: ActorResolver`
-- `schemaProvider: SchemaProvider`
+  - `changes: ChangeRepository`
+  - `listWorkspaces: ListWorkspaces`
+  - `actor: ActorResolver`
+  - `schemaProvider: SchemaProvider`
+  - `refreshImplementationTracking?: RefreshImplementationTracking`
 - **AND** the factory delegates to canonical `createEditChange(deps)`

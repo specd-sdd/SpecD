@@ -1,9 +1,12 @@
 import * as path from 'node:path'
 import { type Change } from '../../domain/entities/change.js'
+import { parseSpecId } from '../../domain/services/parse-spec-id.js'
+import { SpecPath } from '../../domain/value-objects/spec-path.js'
 import { type ChangeRepository } from '../ports/change-repository.js'
 import { type ArchiveRepository } from '../ports/archive-repository.js'
 import { type ImplementationDetector } from '../ports/implementation-detector.js'
 import { type FileReader } from '../ports/file-reader.js'
+import { type SpecRepository } from '../ports/spec-repository.js'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
 import {
   type ImplementationTrackingProjection,
@@ -40,6 +43,7 @@ export interface RefreshImplementationTrackingResult {
  *
  * **Phase D — transition and cleanup**: missing files become `removed` with
  * their links cleared; re-appeared `removed` files are resurrected to `open`.
+ * Any implementation links pointing to nonexistent specs are automatically purged.
  */
 export class RefreshImplementationTracking {
   private readonly _changes: ChangeRepository
@@ -47,6 +51,7 @@ export class RefreshImplementationTracking {
   private readonly _implementationDetector: ImplementationDetector
   private readonly _files: FileReader
   private readonly _projectRoot: string
+  private readonly _specRepositories?: ReadonlyMap<string, SpecRepository> | undefined
 
   /**
    * Creates a new `RefreshImplementationTracking` use case instance.
@@ -56,6 +61,7 @@ export class RefreshImplementationTracking {
    * @param implementationDetector - Detector for targeted candidate discovery
    * @param files - File reader for existence checks during the sweep phase
    * @param projectRoot - Absolute path to the project root directory
+   * @param specRepositories - Optional spec repositories keyed by workspace name
    */
   constructor(
     changes: ChangeRepository,
@@ -63,12 +69,14 @@ export class RefreshImplementationTracking {
     implementationDetector: ImplementationDetector,
     files: FileReader,
     projectRoot: string,
+    specRepositories?: ReadonlyMap<string, SpecRepository>,
   ) {
     this._changes = changes
     this._archives = archives
     this._implementationDetector = implementationDetector
     this._files = files
     this._projectRoot = projectRoot
+    this._specRepositories = specRepositories
   }
 
   /**
@@ -89,6 +97,7 @@ export class RefreshImplementationTracking {
         })
         this._mergeCandidates(freshChange, detected)
         await this._existenceSweep(freshChange)
+        await this._specSweep(freshChange)
       }
       return { implementationTracking: projectImplementationTracking(freshChange) }
     })
@@ -171,6 +180,29 @@ export class RefreshImplementationTracking {
     const links = change.implementationLinks.filter((link) => link.file === file)
     for (const link of links) {
       change.removeImplementationLink(link.specId, file)
+    }
+  }
+
+  /**
+   * Sweeps implementation links for references to specs that no longer exist.
+   *
+   * @param change - The change under mutation
+   */
+  private async _specSweep(change: Change): Promise<void> {
+    if (this._specRepositories === undefined) return
+    const links = [...change.implementationLinks]
+    for (const link of links) {
+      if (change.specIds.includes(link.specId)) continue
+      const { workspace, capPath } = parseSpecId(link.specId)
+      const repo = this._specRepositories.get(workspace)
+      if (repo === undefined) {
+        change.removeImplementationLink(link.specId, link.file)
+        continue
+      }
+      const spec = await repo.get(SpecPath.parse(capPath))
+      if (spec === null) {
+        change.removeImplementationLink(link.specId, link.file)
+      }
     }
   }
 

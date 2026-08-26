@@ -19,6 +19,25 @@
 - **THEN** a confirmed implementation link is created or enriched
 - **AND** the file becomes tracked with review state `open`
 
+#### Scenario: Add allows specId declared in change or existing in canonical repository
+
+- **GIVEN** a change exists with declared specIds and access to workspace spec repositories
+- **WHEN** `action = add` is executed with a `specId` present in `change.specIds` or present in `SpecRepository`
+- **THEN** the implementation link is created successfully
+
+#### Scenario: Add throws SpecNotFoundError when specId is absent from change and repository
+
+- **GIVEN** a change exists with a declared specId list
+- **WHEN** `action = add` is executed with a `specId` that is not in `change.specIds` and not found in `SpecRepository`
+- **THEN** the use case throws `SpecNotFoundError`
+
+#### Scenario: Batch add with invalid specId fails atomically and leaves change untouched
+
+- **GIVEN** an atomic batch add request with multiple files and an invalid `specId`
+- **WHEN** `action = add` is executed
+- **THEN** `SpecNotFoundError` is thrown
+- **AND** no files from the batch are added to `trackedImplementationFiles` or `implementationLinks`
+
 ### Requirement: Remove mutation removes implementation links
 
 #### Scenario: Remove with symbols deletes only those refinements
@@ -98,7 +117,8 @@
 - **THEN** it creates a composition resolver for that composition session
 - **AND** it derives `UpdateImplementationTrackingDeps` through `resolveUpdateImplementationTrackingDeps(resolver)`
 - **AND** `resolveUpdateImplementationTrackingDeps(resolver)` resolves:
-- `changes: ChangeRepository`
-- `files: FileReader`
-- `projectRoot: string`
+  - `changes: ChangeRepository`
+  - `files: FileReader`
+  - `projectRoot: string`
+  - `specRepositories?: ReadonlyMap<string, SpecRepository>`
 - **AND** the factory delegates to canonical `createUpdateImplementationTracking(deps)`

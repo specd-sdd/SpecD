@@ -1,9 +1,13 @@
 import * as path from 'node:path'
 import { type Change } from '../../domain/entities/change.js'
+import { parseSpecId } from '../../domain/services/parse-spec-id.js'
+import { SpecPath } from '../../domain/value-objects/spec-path.js'
 import { type ChangeRepository } from '../ports/change-repository.js'
 import { type FileReader } from '../ports/file-reader.js'
+import { type SpecRepository } from '../ports/spec-repository.js'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
 import { ImplementationFileNotFoundError } from '../errors/implementation-file-not-found-error.js'
+import { SpecNotFoundError } from '../errors/spec-not-found-error.js'
 import {
   type ImplementationTrackingProjection,
   projectImplementationTracking,
@@ -47,7 +51,8 @@ export interface UpdateImplementationTrackingResult {
  * in the CLI delivery layer. The rules are:
  *
  * - `start` activates implementation tracking without requiring a file path.
- * - `add` requires the target file to exist on disk.
+ * - `add` requires the target file to exist on disk and validates that `specId`
+ *   is declared on the change or exists in the canonical spec repository.
  * - `resolve` requires the target file to exist on disk and already be tracked.
  * - `unresolve` requires the target file to exist on disk, already be tracked,
  *   and refuses to reopen files in the `removed` state (only refresh-driven
@@ -60,6 +65,7 @@ export class UpdateImplementationTracking {
   private readonly _changes: ChangeRepository
   private readonly _files: FileReader
   private readonly _projectRoot: string
+  private readonly _specRepositories?: ReadonlyMap<string, SpecRepository> | undefined
 
   /**
    * Creates a new `UpdateImplementationTracking` use case instance.
@@ -67,11 +73,18 @@ export class UpdateImplementationTracking {
    * @param changes - Repository for persisted change mutations
    * @param files - File reader for existence validation
    * @param projectRoot - Absolute path to the project root directory
+   * @param specRepositories - Optional spec repositories keyed by workspace name
    */
-  constructor(changes: ChangeRepository, files: FileReader, projectRoot: string) {
+  constructor(
+    changes: ChangeRepository,
+    files: FileReader,
+    projectRoot: string,
+    specRepositories?: ReadonlyMap<string, SpecRepository>,
+  ) {
     this._changes = changes
     this._files = files
     this._projectRoot = projectRoot
+    this._specRepositories = specRepositories
   }
 
   /**
@@ -141,8 +154,22 @@ export class UpdateImplementationTracking {
     file: string,
   ): Promise<void> {
     if (input.action === 'remove') return
-    if (input.action === 'add' && input.specId === undefined) {
-      throw new ChangeNotFoundError(change.name)
+    if (input.action === 'add') {
+      if (input.specId === undefined) {
+        throw new ChangeNotFoundError(change.name)
+      }
+
+      if (this._specRepositories !== undefined && !change.specIds.includes(input.specId)) {
+        const { workspace, capPath } = parseSpecId(input.specId)
+        const repo = this._specRepositories.get(workspace)
+        if (repo === undefined) {
+          throw new SpecNotFoundError(input.specId)
+        }
+        const spec = await repo.get(SpecPath.parse(capPath))
+        if (spec === null) {
+          throw new SpecNotFoundError(input.specId)
+        }
+      }
     }
 
     const entry = this._trackedEntry(change, file)

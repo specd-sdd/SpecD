@@ -6,7 +6,12 @@
   "dependsOn": ["core:change", "core:composition", "core:composition-resolver"],
   "implementation": [
     {
-      "file": "core:src/composition/use-cases/edit-change.ts"
+      "file": "core:src/application/use-cases/edit-change.ts",
+      "symbols": ["EditChange.execute"]
+    },
+    {
+      "file": "core:src/composition/use-cases/edit-change.ts",
+      "symbols": ["resolveEditChangeDeps"]
     }
   ]
 }

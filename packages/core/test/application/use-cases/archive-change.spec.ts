@@ -2898,5 +2898,77 @@ describe('ArchiveChange', () => {
         implementation: [{ file: 'default:auth/shared/spec.md' }],
       })
     })
+
+    it('discards out-of-scope implementation links for nonexistent specs without creating orphan sidecars', async () => {
+      const change = makeArchivableChange('my-change', {
+        specIds: ['default:auth/oauth'],
+      })
+      change.trackImplementationFile('specs/default/auth/archive-entry.md', 'resolved')
+      change.addImplementationLink({
+        specId: 'default:core/archive-list-entry',
+        file: 'specs/default/auth/archive-entry.md',
+        fileLinkExplicit: true,
+      })
+
+      const specRepo = makeSpecRepository({
+        specs: [makeSpec({ workspace: 'default', name: 'auth/oauth', filenames: ['spec.md'] })],
+      })
+      const uc = new ArchiveChange(
+        makeChangeRepository([change]),
+        makeListWorkspaces(
+          new Map([['default', specRepo]]),
+          new Map(),
+          new Map([['default', '/project/specs/default']]),
+        ),
+        makeArchiveRepository(),
+        makeRunStepHooks(),
+        makeActorResolver(),
+        makeParsers(),
+        makeSchemaProvider(makeSchema()),
+        makeMaterializeMetadata(),
+        new Map(),
+        [],
+        '/project',
+      )
+
+      await uc.execute({ name: 'my-change', allowOutOfScope: true })
+      expect(specRepo.saved.has('core/archive-list-entry/spec-lock.json')).toBe(false)
+    })
+
+    it('discards implementation links for new specs with no specification artifacts without creating orphan sidecars', async () => {
+      const change = makeArchivableChange('my-change', {
+        specIds: ['default:auth/brand-new-spec'],
+      })
+      change.trackImplementationFile('specs/default/auth/brand-new-spec/spec.md', 'resolved')
+      change.addImplementationLink({
+        specId: 'default:auth/brand-new-spec',
+        file: 'specs/default/auth/brand-new-spec/spec.md',
+        fileLinkExplicit: true,
+      })
+
+      const specRepo = makeSpecRepository({
+        specs: [],
+      })
+      const uc = new ArchiveChange(
+        makeChangeRepository([change]),
+        makeListWorkspaces(
+          new Map([['default', specRepo]]),
+          new Map(),
+          new Map([['default', '/project/specs/default']]),
+        ),
+        makeArchiveRepository(),
+        makeRunStepHooks(),
+        makeActorResolver(),
+        makeParsers(),
+        makeSchemaProvider(makeSchema()),
+        makeMaterializeMetadata(),
+        new Map(),
+        [],
+        '/project',
+      )
+
+      await uc.execute({ name: 'my-change' })
+      expect(specRepo.saved.has('auth/brand-new-spec/spec-lock.json')).toBe(false)
+    })
   })
 })

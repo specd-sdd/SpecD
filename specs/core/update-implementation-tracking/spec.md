@@ -20,6 +20,8 @@ Implementation tracking needs an application-level mutation primitive so deliver
 
 When `action = add`, the use case MUST require the target file to exist on disk.
 
+The use case MUST require `input.specId` to be provided. If `input.specId` is not present in `change.specIds`, the use case MUST verify that the spec exists in the canonical `SpecRepository` for the spec's workspace. If the spec is not found in `change.specIds` and not found in `SpecRepository`, the use case MUST throw `SpecNotFoundError(input.specId)`.
+
 It MUST create or enrich a confirmed implementation link for the given `specId + file` pair, using symbol refinements when provided. When the file is not already tracked, it MUST add a tracked implementation file entry with state `open`.
 
 ### Requirement: Remove mutation removes implementation links
@@ -79,6 +81,7 @@ The config-based `createUpdateImplementationTracking(config, options?)` form MUS
 - `changes: ChangeRepository`
 - `files: FileReader`
 - `projectRoot: string`
+- `specRepositories?: ReadonlyMap<string, SpecRepository>`
 
 The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
 

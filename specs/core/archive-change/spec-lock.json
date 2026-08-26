@@ -26,7 +26,12 @@
     "core:spec-optimization",
     "core:initialize-persisted-spec-state"
   ],
-  "implementation": [],
+  "implementation": [
+    {
+      "file": "core:src/application/use-cases/archive-change.ts",
+      "symbols": ["ArchiveChange._prepareArchivePlan"]
+    }
+  ],
   "optimizations": {
     "optimizedDescription": {
       "value": "ArchiveChange merges deltas, publishes specs atomically, moves change to archive, runs hooks; gated on archivable.",

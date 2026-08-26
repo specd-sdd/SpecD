@@ -12,10 +12,12 @@
   ],
   "implementation": [
     {
-      "file": "core:src/application/use-cases/refresh-implementation-tracking.ts"
+      "file": "core:src/application/use-cases/refresh-implementation-tracking.ts",
+      "symbols": ["RefreshImplementationTracking._specSweep"]
     },
     {
-      "file": "core:src/infrastructure/vcs/vcs-implementation-detector.ts"
+      "file": "core:src/composition/use-cases/refresh-implementation-tracking.ts",
+      "symbols": ["resolveRefreshImplementationTrackingDeps"]
     }
   ],
   "optimizations": {

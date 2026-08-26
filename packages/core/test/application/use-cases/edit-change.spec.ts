@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { makeSpec } from '../../helpers/make-spec.js'
 import { EditChange } from '../../../src/application/use-cases/edit-change.js'
 import { ChangeNotFoundError } from '../../../src/application/errors/change-not-found-error.js'
@@ -246,6 +246,45 @@ describe('EditChange', () => {
 
       expect(result.change.activeSpecApproval).toBeUndefined()
       expect(result.invalidated).toBe(true)
+    })
+
+    it('triggers refresh implementation tracking when specIds change', async () => {
+      const change = makeChange('c', { specIds: ['auth/login', 'auth/logout'] })
+      change.transition('designing', testActor)
+      change.transition('ready', testActor)
+      change.transition('implementing', testActor)
+      change.trackImplementationFile('src/logout.ts', 'open')
+      change.addImplementationLink({
+        specId: 'default:auth/logout',
+        file: 'src/logout.ts',
+        fileLinkExplicit: true,
+      })
+
+      const repo = makeChangeRepository([change])
+      const refresh = {
+        execute: vi.fn(async ({ name }: { name: string }) => {
+          await repo.mutate(name, async (c) => {
+            c.removeImplementationLink('default:auth/logout', 'src/logout.ts')
+          })
+          return { implementationTracking: {} as never }
+        }),
+      }
+
+      const uc = new EditChange(
+        repo,
+        makeListWorkspaces(),
+        makeActorResolver(),
+        makeSchemaProvider(makeSchema()),
+        refresh as never,
+      )
+
+      const result = await uc.execute({
+        name: 'c',
+        removeSpecIds: ['auth/logout'],
+      })
+
+      expect(refresh.execute).toHaveBeenCalledWith({ name: 'c' })
+      expect(result.change.implementationLinks).toEqual([])
     })
   })
 })

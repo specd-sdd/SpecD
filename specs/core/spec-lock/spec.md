@@ -106,11 +106,13 @@ state is valid and MUST NOT be silently upgraded by an ordinary read.
 
 Persisted state for a lock-less spec MUST be created only by:
 
-- archive publication of a change targeting that spec, or
+- archive publication of a change targeting that spec alongside canonical spec artifacts, or
 - an explicit initialization operation that adopts existing artifacts into
   persisted state, or
 - an explicit persisted-state mutation (dependency, implementation, or
-  optimization) that is itself a create-worthy operation for that spec
+  optimization) that is itself a create-worthy operation for an existing spec
+
+Persisted lock sidecars MUST NOT be published or created in isolation without canonical spec artifacts.
 
 Explicit initialization is a one-time adoption: it MUST fail when persisted
 state already exists for the target spec, regardless of whether the requested

@@ -45,6 +45,12 @@ For every file in `trackedImplementationFiles` that is not in the `ignored` stat
 1. Call `Change.trackImplementationFile(file, 'removed')` to update its review state.
 2. Remove all `implementationLinks` (both file-level and symbol-level) that reference the missing file.
 
+### Requirement: Spec sweep prunes dangling implementation links
+
+When refresh runs, the use case MUST perform a spec sweep over `change.implementationLinks`.
+
+For each confirmed implementation link, if the link's `specId` is NOT present in `change.specIds` and NOT found in the workspace's canonical `SpecRepository`, the link MUST be pruned from the change's implementation links.
+
 ### Requirement: Resurrections and re-appearances
 
 When detection runs, the use case MUST handle files that were previously marked as `removed` but are found to exist again on disk.
@@ -110,6 +116,7 @@ The config-based `createRefreshImplementationTracking(config, options?)` form MU
 - `implementationDetector: ImplementationDetector`
 - `files: FileReader`
 - `projectRoot: string`
+- `specRepositories?: ReadonlyMap<string, SpecRepository>`
 
 The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
 

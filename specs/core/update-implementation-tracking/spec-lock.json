@@ -7,7 +7,11 @@
   "implementation": [
     {
       "file": "core:src/application/use-cases/update-implementation-tracking.ts",
-      "symbols": ["UpdateImplementationTracking.execute"]
+      "symbols": ["UpdateImplementationTracking._validateMutation"]
+    },
+    {
+      "file": "core:src/composition/use-cases/update-implementation-tracking.ts",
+      "symbols": ["resolveUpdateImplementationTrackingDeps"]
     }
   ],
   "optimizations": {

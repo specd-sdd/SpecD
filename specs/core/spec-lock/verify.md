@@ -145,6 +145,12 @@
 - **WHEN** a mutation removes a dependency, implementation link, or optimization field that is not present or set
 - **THEN** persisted state is not created for that spec
 
+#### Scenario: Persisted lock sidecars cannot be created without canonical artifacts
+
+- **GIVEN** an operation targeting a path with no canonical spec artifacts
+- **WHEN** attempting to persist a standalone lock sidecar
+- **THEN** the creation is rejected
+
 ### Requirement: Archive-time materialization
 
 #### Scenario: Excluded path is ignored during materialization

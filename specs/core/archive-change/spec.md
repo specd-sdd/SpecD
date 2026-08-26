@@ -381,6 +381,7 @@ Materialization MUST:
 - persist symbol-level links when a confirmed link has one or more `symbols`
 - ignore links whose raw file path falls under the target workspace `graph.excludePaths`
 - discard links that cannot be normalized into a valid `workspace:path`
+- discard implementation links whose target `specId` does not exist in the canonical repository and is not being created in the change, ensuring nonexistent spec IDs never trigger sidecar publication
 - fail archive when a confirmed link points outside the `codeRoot` of the workspace implied by `specId`
 
 ### Requirement: Out-of-scope sidecar update guard

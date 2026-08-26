@@ -1,0 +1,31 @@
+- op: added
+  description: 'Trigger refresh on specIds change'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Directory cleanup on removal'
+  content: |
+    ### Requirement: Implementation tracking refresh on spec change
+
+    When `specIds` effectively change (`invalidated: true`), if an optional `refreshImplementationTracking` dependency is provided, `EditChange` MUST invoke `refreshImplementationTracking.execute({ name })` to immediately sweep dangling implementation links referencing removed specs.
+
+- op: modified
+  description: 'Update dependencies and factory resolver'
+  selector:
+    type: section
+    matches: 'Requirement: Config-based factory delegates through resolveEditChangeDeps'
+  content: |
+    The config-based `createEditChange(config, options?)` form MUST derive `EditChangeDeps` through `resolveEditChangeDeps(resolver)` and then delegate to canonical `createEditChange(deps)`.
+
+    `resolveEditChangeDeps(resolver)` MUST resolve:
+
+    - `changes: ChangeRepository`
+    - `listWorkspaces: ListWorkspaces`
+    - `actor: ActorResolver`
+    - `schemaProvider: SchemaProvider`
+    - `refreshImplementationTracking?: RefreshImplementationTracking`
+
+    The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.

@@ -70,6 +70,21 @@
 - **WHEN** refresh runs
 - **THEN** the link is removed from `implementationLinks`
 
+### Requirement: Spec sweep prunes dangling implementation links
+
+#### Scenario: Dangling links to nonexistent specs are pruned
+
+- **GIVEN** a change has confirmed implementation links for a `specId` not present in `change.specIds` and not found in `SpecRepository`
+- **WHEN** `RefreshImplementationTracking.execute()` runs
+- **THEN** those dangling implementation links are removed from `change.implementationLinks`
+
+#### Scenario: Spec sweep selectively preserves in-scope and valid out-of-scope links while pruning invalid links
+
+- **GIVEN** a change has confirmed implementation links pointing to in-scope specs, valid out-of-scope specs, and nonexistent specs
+- **WHEN** `RefreshImplementationTracking.execute()` runs
+- **THEN** links to in-scope and valid workspace specs are preserved
+- **AND** links to nonexistent specs or unknown workspaces are pruned
+
 ### Requirement: Resurrections and re-appearances
 
 #### Scenario: Removed file reappearing via detector becomes open
@@ -140,9 +155,10 @@
 - **THEN** it creates a composition resolver for that composition session
 - **AND** it derives `RefreshImplementationTrackingDeps` through `resolveRefreshImplementationTrackingDeps(resolver)`
 - **AND** `resolveRefreshImplementationTrackingDeps(resolver)` resolves:
-- `changes: ChangeRepository`
-- `archives: ArchiveRepository`
-- `implementationDetector: ImplementationDetector`
-- `files: FileReader`
-- `projectRoot: string`
+  - `changes: ChangeRepository`
+  - `archives: ArchiveRepository`
+  - `implementationDetector: ImplementationDetector`
+  - `files: FileReader`
+  - `projectRoot: string`
+  - `specRepositories?: ReadonlyMap<string, SpecRepository>`
 - **AND** the factory delegates to canonical `createRefreshImplementationTracking(deps)`
