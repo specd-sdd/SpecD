@@ -11,21 +11,24 @@ Without a quick inventory of all specs, users and agents cannot orient themselve
 ### Requirement: Command signature
 
 ```
-specd specs list [--workspace <name>] [--summary] [--limit <n|all>] [--page <p>] [--after-key <path>] [--format text|json|toon]
+specd specs list [--count] [--workspace <name>] [--summary] [--limit <n|all>] [--page <p>] [--after-key <path>] [--format text|json|toon]
 ```
 
 Alias:
 
 ```
-specd spec list [--workspace <name>] [--summary] [--limit <n|all>] [--page <p>] [--after-key <path>] [--format text|json|toon]
+specd spec list [--count] [--workspace <name>] [--summary] [--limit <n|all>] [--page <p>] [--after-key <path>] [--format text|json|toon]
 ```
 
+- `--count` — optional flag; when present, displays total spec count and per-workspace breakdown instead of listing individual spec rows. Mutually exclusive with `--summary`
 - `--workspace <name>` — optional, repeatable; include only specs belonging to the named workspace(s). When omitted, all workspaces are included
-- `--summary` — optional flag; when present, a short summary is included for each spec alongside the title (`includeSummary`)
-- `--limit <n|all>` — optional; when a positive integer is given, caps entries **per workspace query**. When omitted or set to `all`, the host MUST NOT pass `limit` to `ListSpecs` (full catalog per workspace). There is **no** CLI default numeric limit.
+- `--summary` — optional flag; when present, a short summary is included for each spec alongside the title (`includeSummary`). Mutually exclusive with `--count`
+- `--limit <n|all>` — optional; when a positive integer is given, caps entries **per workspace query**. When omitted or set to `all`, the host MUST NOT pass `limit` to `ListSpecs` (full catalog per workspace). There is **no** CLI default numeric limit. Ignored when `--count` is present
 - `--page <p>` — optional; 1-based page number; MUST be paired with a numeric `--limit` (not `all`)
 - `--after-key <path>` — optional; exclusive keyset cursor — capability path (with `/` separators) of the last seen spec in the workspace being paginated
 - `--format text|json|toon` — optional; output format, defaults to `text`
+
+`--count` and `--summary` are mutually exclusive; providing both MUST be rejected with a `CliValidationError` (`CLI_VALIDATION_ERROR`) and exit code 1.
 
 `--page` is mutually exclusive with `--after-key`. `--page` with `--limit all` or without a numeric `--limit` MUST be rejected. Spec list keyset cursors omit `after-id` (path alone is the sort key). `--after-key` with `--limit all` (or omitted limit) is allowed and returns the remainder after the cursor.
 
@@ -72,6 +75,17 @@ When `--summary` is passed, a short summary is included for each spec, resolved 
 Summary extraction from `spec.md` is performed by `@specd/core` as a pure function — the CLI does not contain Markdown parsing logic.
 
 ### Requirement: Output format
+
+When `--count` is passed:
+
+- In `text` mode:
+  - If multiple workspaces are visible (or no `--workspace` filter is applied):
+  - If filtered to a single workspace via `--workspace <name>`: `<ws>: <count>`.
+  - If no workspaces are configured, prints `no workspaces configured`.
+- In `json` or `toon` mode:
+  Outputs a structured object containing `total` and `workspaces` array: When `--workspace` filters are applied, `workspaces` contains only the matching workspace entries and `total` represents the sum of matching workspace counts.
+
+When `--count` is not passed:
 
 In `text` mode (default), specs are grouped by workspace. Each group is rendered as a table:
 

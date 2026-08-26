@@ -418,3 +418,214 @@ describe('spec list pagination', () => {
     expect(kernel.specs.list.execute).not.toHaveBeenCalled()
   })
 })
+
+describe('spec list --count', () => {
+  it('outputs total and per-workspace breakdown in text mode for single workspace', async () => {
+    const { kernel, stdout } = setup()
+    kernel.specs.list.execute.mockResolvedValue(makeListSpecsResult(entries))
+
+    const program = makeProgram()
+    registerSpecList(program.command('spec'))
+    await program.parseAsync(['node', 'specd', 'spec', 'list', '--count'])
+
+    const out = stdout()
+    expect(out).toContain('Total: 3')
+    expect(out).toContain('Workspaces:')
+    expect(out).toContain('default: 3')
+    expect(kernel.specs.list.execute).toHaveBeenCalledWith({
+      includeSummary: false,
+    })
+  })
+
+  it('outputs total and per-workspace breakdown in text mode for multiple workspaces', async () => {
+    const config = makeMultiWorkspaceConfig()
+    const kernel = makeMockKernel()
+    kernel.project.listWorkspaces.execute.mockResolvedValue([
+      {
+        name: 'alpha',
+        codeRoot: '/project',
+        isExternal: false,
+        ownership: 'owned',
+        specRepo: { count: vi.fn().mockResolvedValue(1) },
+      },
+      {
+        name: 'beta',
+        codeRoot: '/project',
+        isExternal: false,
+        ownership: 'owned',
+        specRepo: { count: vi.fn().mockResolvedValue(1) },
+      },
+    ])
+    vi.mocked(resolveCliContext).mockResolvedValue({
+      config: config,
+      configFilePath: null,
+      kernel: kernel,
+    })
+    kernel.specs.list.execute.mockResolvedValue(makeListSpecsResult(multiEntries))
+
+    const stdout = captureStdout()
+    const program = makeProgram()
+    registerSpecList(program.command('spec'))
+    await program.parseAsync(['node', 'specd', 'spec', 'list', '--count'])
+
+    const out = stdout()
+    expect(out).toContain('Total: 2')
+    expect(out).toContain('Workspaces:')
+    expect(out).toContain('alpha: 1')
+    expect(out).toContain('beta: 1')
+  })
+
+  it('outputs single workspace count when filtered via --workspace in text mode', async () => {
+    const config = makeMultiWorkspaceConfig()
+    const kernel = makeMockKernel()
+    kernel.project.listWorkspaces.execute.mockResolvedValue([
+      {
+        name: 'alpha',
+        codeRoot: '/project',
+        isExternal: false,
+        ownership: 'owned',
+        specRepo: { count: vi.fn().mockResolvedValue(1) },
+      },
+      {
+        name: 'beta',
+        codeRoot: '/project',
+        isExternal: false,
+        ownership: 'owned',
+        specRepo: { count: vi.fn().mockResolvedValue(1) },
+      },
+    ])
+    vi.mocked(resolveCliContext).mockResolvedValue({
+      config: config,
+      configFilePath: null,
+      kernel: kernel,
+    })
+    kernel.specs.list.execute.mockResolvedValue(makeListSpecsResult([multiEntries[0]!]))
+
+    const stdout = captureStdout()
+    const program = makeProgram()
+    registerSpecList(program.command('spec'))
+    await program.parseAsync(['node', 'specd', 'spec', 'list', '--count', '--workspace', 'alpha'])
+
+    const out = stdout()
+    expect(out.trim()).toBe('alpha: 1')
+  })
+
+  it('outputs structured JSON with total and workspaces array', async () => {
+    const config = makeMultiWorkspaceConfig()
+    const kernel = makeMockKernel()
+    kernel.project.listWorkspaces.execute.mockResolvedValue([
+      {
+        name: 'alpha',
+        codeRoot: '/project',
+        isExternal: false,
+        ownership: 'owned',
+        specRepo: { count: vi.fn().mockResolvedValue(1) },
+      },
+      {
+        name: 'beta',
+        codeRoot: '/project',
+        isExternal: false,
+        ownership: 'owned',
+        specRepo: { count: vi.fn().mockResolvedValue(1) },
+      },
+    ])
+    vi.mocked(resolveCliContext).mockResolvedValue({
+      config: config,
+      configFilePath: null,
+      kernel: kernel,
+    })
+    kernel.specs.list.execute.mockResolvedValue(makeListSpecsResult(multiEntries))
+
+    const stdout = captureStdout()
+    const program = makeProgram()
+    registerSpecList(program.command('spec'))
+    await program.parseAsync(['node', 'specd', 'spec', 'list', '--count', '--format', 'json'])
+
+    const json = JSON.parse(stdout())
+    expect(json).toEqual({
+      total: 2,
+      workspaces: [
+        { name: 'alpha', count: 1 },
+        { name: 'beta', count: 1 },
+      ],
+    })
+  })
+
+  it('outputs filtered structured JSON when --workspace is specified', async () => {
+    const config = makeMultiWorkspaceConfig()
+    const kernel = makeMockKernel()
+    kernel.project.listWorkspaces.execute.mockResolvedValue([
+      {
+        name: 'alpha',
+        codeRoot: '/project',
+        isExternal: false,
+        ownership: 'owned',
+        specRepo: { count: vi.fn().mockResolvedValue(1) },
+      },
+      {
+        name: 'beta',
+        codeRoot: '/project',
+        isExternal: false,
+        ownership: 'owned',
+        specRepo: { count: vi.fn().mockResolvedValue(1) },
+      },
+    ])
+    vi.mocked(resolveCliContext).mockResolvedValue({
+      config: config,
+      configFilePath: null,
+      kernel: kernel,
+    })
+    kernel.specs.list.execute.mockResolvedValue(makeListSpecsResult([multiEntries[0]!]))
+
+    const stdout = captureStdout()
+    const program = makeProgram()
+    registerSpecList(program.command('spec'))
+    await program.parseAsync([
+      'node',
+      'specd',
+      'spec',
+      'list',
+      '--count',
+      '--workspace',
+      'alpha',
+      '--format',
+      'json',
+    ])
+
+    const json = JSON.parse(stdout())
+    expect(json).toEqual({
+      total: 1,
+      workspaces: [{ name: 'alpha', count: 1 }],
+    })
+  })
+
+  it('outputs TOON format when --format toon is specified', async () => {
+    const { kernel, stdout } = setup()
+    kernel.specs.list.execute.mockResolvedValue(makeListSpecsResult(entries))
+
+    const program = makeProgram()
+    registerSpecList(program.command('spec'))
+    await program.parseAsync(['node', 'specd', 'spec', 'list', '--count', '--format', 'toon'])
+
+    const out = stdout()
+    expect(out).toContain('total: 3')
+    expect(out).toContain('workspaces')
+    expect(out).toContain('default')
+  })
+
+  it('rejects using --count with --summary', async () => {
+    mockProcessExit()
+    const stderr = captureStderr()
+    const { kernel } = setup()
+
+    const program = makeProgram()
+    registerSpecList(program.command('spec'))
+    await program
+      .parseAsync(['node', 'specd', 'spec', 'list', '--count', '--summary'])
+      .catch(() => {})
+
+    expect(process.exit).toHaveBeenCalledWith(1)
+    expect(stderr()).toMatch(/--count is mutually exclusive with --summary/)
+    expect(kernel.specs.list.execute).not.toHaveBeenCalled()
+  })
+})
