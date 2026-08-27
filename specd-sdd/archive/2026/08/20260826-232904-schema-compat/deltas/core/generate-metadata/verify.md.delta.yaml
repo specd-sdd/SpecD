@@ -1,0 +1,18 @@
+- op: modified
+  description: 'Update Assembled result scenarios in generate-metadata verify'
+  selector:
+    type: section
+    matches: 'Requirement: Assembled result'
+  content: |
+    #### Scenario: Result includes generatedBy marker
+    - **WHEN** `GenerateSpecMetadata.execute` produces a result
+    - **THEN** `result.metadata.generatedBy` is `'core'`
+
+    #### Scenario: Result merges extracted fields and hashes
+    - **WHEN** `GenerateSpecMetadata.execute` runs for a spec
+    - **THEN** the returned metadata includes all extracted fields, hashes, and canonical dependsOn
+
+    #### Scenario: Result includes fresh optimization fields and provenance
+    - **GIVEN** a spec with or without a persisted lockfile
+    - **WHEN** `GenerateSpecMetadata.execute` produces metadata
+    - **THEN** `provenance.schema` reflects the persisted schema identity or falls back to `schema.canonicalSpecSchema()`

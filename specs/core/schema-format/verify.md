@@ -66,6 +66,28 @@
 - **WHEN** a schema declares `extends: '#nonexistent'` and no such schema exists
 - **THEN** `SchemaRegistry.resolve()` must throw a `SchemaNotFoundError`
 
+### Requirement: Schema compat field
+
+#### Scenario: Schema with string compat format
+
+- **GIVEN** a schema declaring `compat: '@specd/schema-std@1'`
+- **WHEN** the schema YAML is parsed and built into a `Schema` entity
+- **THEN** `schema.compat()` returns `{ name: '@specd/schema-std', version: 1 }`
+- **AND** `schema.canonicalSpecSchema()` returns `{ name: '@specd/schema-std', version: 1 }`
+
+#### Scenario: Schema with object compat format
+
+- **GIVEN** a schema declaring `compat: { name: 'schema-std', version: 2 }`
+- **WHEN** the schema is parsed and built into a `Schema` entity
+- **THEN** `schema.compat()` returns `{ name: 'schema-std', version: 2 }`
+- **AND** `schema.canonicalSpecSchema()` returns `{ name: 'schema-std', version: 2 }`
+
+#### Scenario: Schema plugin with compat field is rejected
+
+- **GIVEN** a schema document declaring `kind: schema-plugin` and `compat: '@specd/schema-std@1'`
+- **WHEN** `parseSchemaYaml` parses the document
+- **THEN** it throws `SchemaValidationError`
+
 ### Requirement: Array entry identity
 
 #### Scenario: Same id in different arrays is valid

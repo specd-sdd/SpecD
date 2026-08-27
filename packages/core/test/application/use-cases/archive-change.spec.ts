@@ -483,6 +483,72 @@ describe('ArchiveChange', () => {
       })
     })
 
+    it('uses compat schema identity in spec-lock.json when schema declares compat', async () => {
+      const artifactType = makeArtifactType('spec', { delta: false, scope: 'spec' })
+      const schema = makeSchema({
+        name: 'custom-hotfix',
+        version: 2,
+        compat: { name: 'schema-std', version: 1 },
+        artifacts: [artifactType],
+      })
+      const specRepo = makeSpecRepository({
+        specs: [makeSpec({ workspace: 'default', name: 'auth/oauth', filenames: ['spec.md'] })],
+        artifacts: {
+          'auth/oauth/spec.md': '# Spec',
+        },
+      })
+      const materializeMetadata = makeMaterializeMetadataMock({
+        title: 'OAuth',
+        description: 'desc',
+        contentHashes: { 'spec.md': 'sha256:' + 'a'.repeat(64) },
+      })
+      const change = makeArchivableChange('my-change', {
+        schemaName: 'custom-hotfix',
+        specIds: ['default:auth/oauth'],
+      })
+      change.setSpecDependsOn('default:auth/oauth', ['core:new'])
+      change.setArtifact(
+        new ChangeArtifact({
+          type: 'spec',
+          files: new Map([
+            [
+              'default:auth/oauth',
+              new ArtifactFile({
+                key: 'default:auth/oauth',
+                filename: 'specs/default/auth/oauth/spec.md',
+                status: 'complete',
+                validatedHash: 'abc123',
+              }),
+            ],
+          ]),
+        }),
+      )
+      const changeRepo = Object.assign(makeChangeRepository([change]), {
+        async artifact() {
+          return new SpecArtifact('spec.md', '# Spec')
+        },
+      })
+
+      const uc = new ArchiveChange(
+        changeRepo,
+        makeListWorkspaces(new Map([['default', specRepo]])),
+        makeArchiveRepository(),
+        makeRunStepHooks(),
+        makeActorResolver(),
+        makeParsers(),
+        makeSchemaProvider(schema),
+        makeMaterializeMetadata(),
+      )
+
+      await uc.execute({ name: 'my-change' })
+
+      expect(JSON.parse(specRepo.saved.get('spec-lock.json') ?? '')).toEqual({
+        schema: { name: 'schema-std', version: 1 },
+        dependsOn: ['core:new'],
+        implementation: [],
+      })
+    })
+
     it('fails archive when extracted dependsOn mismatches final persisted deps', async () => {
       const artifactType = makeArtifactType('spec', { delta: false, scope: 'spec' })
       const schema = makeSchema({

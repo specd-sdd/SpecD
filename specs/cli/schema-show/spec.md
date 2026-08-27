@@ -32,7 +32,7 @@ In `json` or `toon` mode, the output SHALL be a faithful serialization of the re
 
 ```json
 {
-  "schema": {"name": "...", "version": N, "kind": "...", "extends": "..."},
+  "schema": {"name": "...", "version": N, "kind": "...", "extends": "...", "compat": {"name": "...", "version": N}},
   "mode": "project" | "ref" | "file",
   "plugins": ["..."],
   ...all schema fields (artifacts, workflow, metadataExtraction)
@@ -41,12 +41,13 @@ In `json` or `toon` mode, the output SHALL be a faithful serialization of the re
 
 - `mode` (string) — indicates how the schema was resolved: `"project"` for the active schema, `"ref"` when `[ref]` was provided, `"file"` when `--file` was provided.
 - `plugins` (string array) — list of applied schema plugins; empty array when mode is `ref` or `file` (plugins are not applied).
+- `schema.compat` (object) — when declared, exposes `{ name, version }` representing the compatible canonical spec schema identity.
 
 Every field present on the `Schema` entity, its artifacts, and its workflow steps SHALL be included in the output. The command SHALL NOT filter, rename, or summarize schema fields — if the schema format adds or removes fields, the output follows automatically.
 
 The `template` field SHALL always be shown. By default it displays the template reference as declared in the schema (e.g. `templates/proposal.md`). When `--templates` is passed, the reference is resolved and replaced with the full template file content.
 
-In `text` mode (default), the command prints the schema metadata followed by sections for artifacts, workflow, and metadata extraction. Each artifact shows all its fields in a readable format. Workflow steps include their hooks. The exact text layout is not prescribed — it SHALL be human-readable and include all the same information as the JSON format.
+In `text` mode (default), the command prints the schema metadata (`schema: <name> version: <version> kind: <kind>`, along with `extends: <ref>` and `compat: <name>@<version>` when declared), followed by sections for artifacts, workflow, and metadata extraction. Each artifact shows all its fields in a readable format. Workflow steps include their hooks. The exact text layout is not prescribed — it SHALL be human-readable and include all the same information as the JSON format.
 
 The `plugins` line is only shown when the project's active schema is displayed (no `[ref]` or `--file`), because plugins and overrides are not applied when resolving by ref or file.
 

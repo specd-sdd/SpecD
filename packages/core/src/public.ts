@@ -488,6 +488,8 @@ export {
   artifactDagFromChangeArtifacts,
   Schema,
   type SchemaKind,
+  type SchemaCompatIdentity,
+  parseSchemaCompat,
   OverlapEntry,
   type OverlapChange,
   OverlapReport,

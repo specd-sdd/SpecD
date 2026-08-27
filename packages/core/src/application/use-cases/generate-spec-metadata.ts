@@ -116,9 +116,10 @@ export class GenerateSpecMetadata {
     }
 
     const persistedState = await specRepo.readPersistedState(spec)
+    const canonical = schema.canonicalSpecSchema()
     const schemaIdentity: PersistedSchemaIdentity = persistedState?.schema ?? {
-      name: schema.name(),
-      version: schema.version(),
+      name: canonical.name,
+      version: canonical.version,
     }
 
     const artifacts: MetadataArtifactInput[] = []

@@ -308,6 +308,14 @@ const OperationsZodSchema = z
   })
   .strict()
 
+const SchemaCompatZodSchema = z.union([
+  z.string().min(1),
+  z.object({
+    name: z.string().min(1),
+    version: z.number().int().nonnegative().optional(),
+  }),
+])
+
 const SchemaYamlZodSchema = z
   .object({
     kind: z.enum(['schema', 'schema-plugin']),
@@ -315,6 +323,7 @@ const SchemaYamlZodSchema = z
     version: z.number().int(),
     description: z.string().optional(),
     extends: z.string().optional(),
+    compat: SchemaCompatZodSchema.optional(),
     artifacts: z.array(ArtifactZodSchema).optional(),
     crossArtifactValidations: z.array(CrossArtifactValidationRuleZodSchema).optional(),
     metadataExtraction: MetadataExtractionZodSchema.optional(),
@@ -328,14 +337,15 @@ const SchemaYamlZodSchema = z
           s.artifacts === undefined &&
           s.workflow === undefined &&
           s.metadataExtraction === undefined &&
-          s.extends === undefined
+          s.extends === undefined &&
+          s.compat === undefined
         )
       }
       return true
     },
     {
       message:
-        "'kind: schema-plugin' must not declare 'artifacts', 'workflow', 'metadataExtraction', or 'extends'",
+        "'kind: schema-plugin' must not declare 'artifacts', 'workflow', 'metadataExtraction', 'extends', or 'compat'",
     },
   )
   .refine(
@@ -385,6 +395,10 @@ export interface SchemaYamlData {
   readonly version: number
   readonly description?: string | undefined
   readonly extends?: string | undefined
+  readonly compat?:
+    | string
+    | { readonly name: string; readonly version?: number | undefined }
+    | undefined
   readonly artifacts?: readonly ArtifactYaml[] | undefined
   readonly crossArtifactValidations?: readonly CrossArtifactValidationRuleRaw[] | undefined
   readonly workflow?: readonly WorkflowStepRaw[] | undefined
@@ -439,4 +453,36 @@ export function parseSchemaYaml(ref: string, yamlContent: string): SchemaYamlDat
   }
 
   return parseResult.data
+}
+
+/**
+ * Parses a schema compat declaration (string or object) into a canonical {@link SchemaCompatIdentity}.
+ *
+ * @param raw - The raw string or object declared under `compat`
+ * @returns Parsed name and version
+ */
+export function parseSchemaCompat(
+  raw: string | { readonly name: string; readonly version?: number | undefined },
+): { readonly name: string; readonly version: number } {
+  if (typeof raw === 'string') {
+    const atIdx = raw.lastIndexOf('@')
+    if (atIdx > 0 && atIdx < raw.length - 1) {
+      const versionStr = raw.slice(atIdx + 1)
+      const versionNum = parseInt(versionStr, 10)
+      if (!isNaN(versionNum) && String(versionNum) === versionStr) {
+        return {
+          name: raw.slice(0, atIdx),
+          version: versionNum,
+        }
+      }
+    }
+    return {
+      name: raw,
+      version: 1,
+    }
+  }
+  return {
+    name: raw.name,
+    version: raw.version ?? 1,
+  }
 }

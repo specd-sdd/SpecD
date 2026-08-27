@@ -183,20 +183,19 @@
 
 #### Scenario: Result includes generatedBy marker
 
-- **WHEN** `GenerateSpecMetadata` completes successfully with extraction
-- **THEN** `metadata.generatedBy` is `'core'`
+- **WHEN** `GenerateSpecMetadata.execute` produces a result
+- **THEN** `result.metadata.generatedBy` is `'core'`
 
 #### Scenario: Result merges extracted fields and hashes
 
-- **WHEN** `GenerateSpecMetadata` completes successfully
-- **THEN** the returned metadata contains both the `extractMetadata()` output fields and `contentHashes`
-- **AND** `hasExtraction` is `true`
+- **WHEN** `GenerateSpecMetadata.execute` runs for a spec
+- **THEN** the returned metadata includes all extracted fields, hashes, and canonical dependsOn
 
 #### Scenario: Result includes fresh optimization fields and provenance
 
-- **GIVEN** a generation attempt with a fresh optimizations baseline present
-- **WHEN** `GenerateSpecMetadata` completes successfully
-- **THEN** the returned metadata includes the fresh optimization fields, `contentHashes`, and a `provenance` record for this generation attempt
+- **GIVEN** a spec with or without a persisted lockfile
+- **WHEN** `GenerateSpecMetadata.execute` produces metadata
+- **THEN** `provenance.schema` reflects the persisted schema identity or falls back to `schema.canonicalSpecSchema()`
 
 ### Requirement: Input and output
 

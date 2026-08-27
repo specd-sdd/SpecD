@@ -89,7 +89,7 @@ append:
 
 Operations mirror the schema's hierarchical structure. Each operation key maps to the schema field it targets:
 
-- **Top-level scalars** — `set` can target `name`, `version`, `description`
+- **Top-level scalars** — `set` can target `name`, `version`, `description`, `compat`
 - **`artifacts`** — operations target the `artifacts[]` array; each entry is identified by `id`
 - **`workflow`** — operations target the `workflow[]` array; each entry is identified by `step`
 - **Nested arrays** — when an operation entry includes a parent identity and nested arrays (e.g. a workflow step entry with `hooks.post`), the merge engine locates the parent entry first, then applies the nested operation to the sub-array
@@ -100,7 +100,7 @@ Operations mirror the schema's hierarchical structure. Each operation key maps t
 
 - **Array entry removal** — specify the identity value to remove. The entry is deleted from the array. If the identity does not exist, throw `SchemaValidationError`.
 - **Nested removal** — specify a parent identity and nested removals (e.g. remove a specific hook from a specific workflow step). The parent must exist.
-- **Scalar removal** — set a scalar field to `null` in `remove` to clear it (e.g. remove `description` from an artifact). Only optional fields may be removed; removing a required field MUST throw `SchemaValidationError`.
+- **Scalar removal** — set a scalar field to `null` in `remove` to clear it (e.g. remove `description` from an artifact or `compat` from top-level schema). Only optional fields may be removed; removing a required field MUST throw `SchemaValidationError`.
 
 ### Requirement: Post-merge validation
 

@@ -29,17 +29,15 @@
 
 #### Scenario: Schema is resolved once, not per spec, for a batch
 
-- **GIVEN** a batch target with multiple eligible specs
-- **WHEN** `execute()` runs
-- **THEN** the schema is resolved once through Core composition and reused across every target
-- **AND** it is not re-resolved independently for each spec
+- **GIVEN** a batch initialization request for multiple specs
+- **WHEN** `InitializePersistedSpecState` executes
+- **THEN** it resolves the schema once and applies `schema.canonicalSpecSchema()` across all initialized specs
 
 #### Scenario: Unparseable canonical artifacts fail that target before any write
 
-- **GIVEN** a target spec whose schema-declared canonical `scope: spec` artifacts cannot be parsed under the selected schema
-- **WHEN** initialization reaches the parse-verification step
-- **THEN** that target fails
-- **AND** `applyPersistedSpecStatePatch()` is never called and no write is attempted for that target
+- **GIVEN** a spec has unparseable canonical artifacts under the selected schema
+- **WHEN** `InitializePersistedSpecState` attempts to initialize that spec
+- **THEN** it records a failure for that target without writing `spec-lock.json`
 
 ### Requirement: No import from generated metadata
 

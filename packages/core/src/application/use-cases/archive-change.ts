@@ -865,8 +865,9 @@ export class ArchiveChange {
       )
     }
 
+    const canonicalSchema = args.schema.canonicalSpecSchema()
     const publicationPersistedSchema = sidecarActive
-      ? (persistedSchema ?? { name: args.schema.name(), version: args.schema.version() })
+      ? (persistedSchema ?? { name: canonicalSchema.name, version: canonicalSchema.version })
       : undefined
     const publicationPersistedDependsOn = sidecarActive ? [...finalDependsOn] : undefined
     const implementationLinks = args.implementationBySpecId.get(args.publication.specId) ?? []

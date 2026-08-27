@@ -4,5 +4,10 @@
     "version": 1
   },
   "dependsOn": ["cli:entrypoint", "core:schema-format"],
-  "implementation": []
+  "implementation": [
+    {
+      "file": "cli:src/commands/schema/show.ts",
+      "symbols": ["formatSchemaText", "serializeSchema"]
+    }
+  ]
 }

@@ -548,7 +548,7 @@
 - **GIVEN** a spec has no existing `spec-lock.json`
 - **AND** archive has determined `change.specDependsOn` for that spec
 - **WHEN** `ArchiveChange.execute` archives the spec
-- **THEN** `spec-lock.json` is persisted with `schema.name` and `schema.version` from the active schema
+- **THEN** `spec-lock.json` is persisted with `schema` derived from `schema.canonicalSpecSchema()` (supporting `compat` and `extends` fallbacks)
 - **AND** `dependsOn` is set to the final `change.specDependsOn` value
 
 #### Scenario: Re-archive preserves immutable schema and refreshes dependsOn

@@ -38,61 +38,64 @@
 
 #### Scenario: Base schema with no extends, no plugins, no overrides
 
-- **GIVEN** a base schema with `kind: schema` and no `extends`
-- **AND** `schemaPlugins` is empty and `schemaOverrides` is undefined
-- **WHEN** `execute()` is called
-- **THEN** the resolved schema is identical to the base schema (no merge layers applied)
+- **GIVEN** a registry with `#base` containing a valid schema YAML with no extends
+- **WHEN** `ResolveSchema` executes for `#base`
+- **THEN** it returns the `Schema` entity matching the base schema directly
 
 #### Scenario: Base schema with extends chain
 
-- **GIVEN** schema A declares `extends: '#b'`, schema B declares `extends: '#c'`, schema C has no `extends`
-- **WHEN** `execute()` is called with `schemaRef` pointing to A
-- **THEN** merge layers are applied in order: C → B → A (root to leaf)
-- **AND** the final schema reflects all merged changes
+- **GIVEN** `#child` extending `#parent`
+- **WHEN** `ResolveSchema` executes for `#child`
+- **THEN** artifacts from `#parent` are inherited and child artifacts override parent artifacts by id
+
+#### Scenario: Cascades compat across multi-level extends chain
+
+- **GIVEN** `#root` with no compat, `#intermediate` extending `#root` with `compat: '@specd/rfc-std@2'`, and `#leaf` extending `#intermediate`
+- **WHEN** `ResolveSchema` executes for `#leaf`
+- **THEN** `leaf.compat()` returns `{ name: '@specd/rfc-std', version: 2 }`
+- **AND** `leaf.canonicalSpecSchema()` returns `{ name: '@specd/rfc-std', version: 2 }`
 
 #### Scenario: Base schema with plugins
 
-- **GIVEN** a base schema and `schemaPlugins: ['@specd/plugin-rfc']`
-- **AND** the plugin has `kind: schema-plugin` with append operations
-- **WHEN** `execute()` is called
-- **THEN** the plugin's operations are applied after the base schema
+- **GIVEN** a base schema and one plugin reference in `schemaPlugins`
+- **WHEN** `ResolveSchema` executes
+- **THEN** plugin operations are applied to the base schema
 
 #### Scenario: Base schema with overrides
 
-- **GIVEN** a base schema and `schemaOverrides` with `set.description: 'Custom'`
-- **WHEN** `execute()` is called
-- **THEN** the resolved schema's description is `'Custom'`
+- **GIVEN** a base schema and `schemaOverrides` defined
+- **WHEN** `ResolveSchema` executes
+- **THEN** override operations are applied after plugins
 
 #### Scenario: Override workflow hooks are normalized from YAML format
 
-- **GIVEN** a base schema with workflow step `implementing` and `schemaOverrides` appending a hook `{ id: 'test', run: 'echo ok' }` in YAML format
-- **WHEN** `execute()` is called
-- **THEN** the resolved schema's `implementing` workflow step contains a hook with `{ id: 'test', type: 'run', command: 'echo ok' }`
-- **AND** the hook is usable by `RunStepHooks` (matches `h.type === 'run'`)
+- **GIVEN** `schemaOverrides` with workflow hook entries in YAML format
+- **WHEN** `ResolveSchema` executes
+- **THEN** hook entries are converted to domain format before layer construction
 
 #### Scenario: Full pipeline — extends + plugins + overrides
 
-- **GIVEN** schema A extends schema B, one plugin, and overrides
-- **WHEN** `execute()` is called
-- **THEN** layers are applied in order: B (extends) → plugin → overrides
+- **GIVEN** a schema that extends a parent, has plugins, and has overrides
+- **WHEN** `ResolveSchema` executes
+- **THEN** layers are applied in order: extends → plugins → overrides
 
 #### Scenario: Extends cycle detected
 
-- **GIVEN** schema A extends B, B extends A
-- **WHEN** `execute()` is called
-- **THEN** `SchemaValidationError` is thrown identifying the cycle
+- **GIVEN** `#a` extends `#b` and `#b` extends `#a`
+- **WHEN** `ResolveSchema` executes for `#a`
+- **THEN** it throws `SchemaValidationError`
 
 #### Scenario: Plugin not found
 
-- **GIVEN** `schemaPlugins: ['@specd/nonexistent']` and the package is not installed
-- **WHEN** `execute()` is called
-- **THEN** `SchemaNotFoundError` is thrown
+- **GIVEN** a plugin reference that does not exist in the registry
+- **WHEN** `ResolveSchema` executes
+- **THEN** it throws `SchemaNotFoundError`
 
 #### Scenario: Plugin has wrong kind
 
-- **GIVEN** `schemaPlugins` references a file with `kind: schema`
-- **WHEN** `execute()` is called
-- **THEN** `SchemaValidationError` is thrown
+- **GIVEN** a plugin reference that resolves to a file with `kind: schema`
+- **WHEN** `ResolveSchema` executes
+- **THEN** it throws `SchemaValidationError`
 
 ### Requirement: Template merging across extends chain
 

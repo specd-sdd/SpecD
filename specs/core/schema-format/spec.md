@@ -38,6 +38,16 @@ Cycles in the extends chain must be detected and produce a `SchemaValidationErro
 
 `kind: schema-plugin` must not declare `extends` — it is a validation error.
 
+### Requirement: Schema compat field
+
+A schema YAML MAY declare an optional `compat` field indicating compatibility with a canonical spec schema format for durable `spec-lock.json` persistence.
+
+- `compat` MAY be specified as a reference string (e.g. `'@specd/schema-std@1'`, `'schema-std@1'`, or `'schema-std'`).
+- `compat` MAY be specified as an object with `{ name: string, version?: number }`.
+- If version is omitted from string or object format, it defaults to `1`.
+- `Schema.compat()` SHALL return `SchemaCompatIdentity` (`{ name: string, version: number }`) or `undefined`.
+- `Schema.canonicalSpecSchema()` SHALL return `compat` if declared, else parse `extends` if declared, else return `{ name, version }`.
+
 ### Requirement: Array entry identity
 
 Every entry in the following schema arrays must carry an `id` field:
@@ -398,16 +408,14 @@ Unknown external hook types MUST be rejected when resolved against the merged bu
 
 ### Requirement: Schema plugin kind
 
-A schema file with `kind: schema-plugin` is a partial schema that provides only merge operations for composing with a base schema. A plugin must declare:
+A schema document MAY declare `kind: schema-plugin`.
 
-- `kind: schema-plugin` (required)
-- `name` (string, required) — plugin identifier
-- `version` (integer, required) — plugin version
-- `description` (string, optional) — human-readable summary
-
-A plugin must not declare `artifacts`, `workflow`, `metadataExtraction`, or `extends` — these are validation errors. The plugin's customisation intent is expressed via `schemaOverrides`-style operations when referenced in `specd.yaml`'s `schemaPlugins`. The plugin file itself contains the operations inline under top-level operation keys (`create`, `remove`, `set`, `append`, `prepend`).
-
-Plugins are resolved using the same reference conventions as schemas (npm, workspace-qualified, bare name, path).
+- A schema-plugin MUST NOT declare `artifacts`
+- A schema-plugin MUST NOT declare `workflow`
+- A schema-plugin MUST NOT declare `extends`
+- A schema-plugin MUST NOT declare `compat`
+- A schema-plugin MAY declare `validations`, `deltaValidations`, `preHashCleanup`, `taskCompletionCheck`, `crossArtifactValidations`, and `metadataExtraction`
+- Parsers MUST reject schema-plugin documents that declare forbidden fields with `SchemaValidationError`
 
 ### Requirement: Schema resolution
 

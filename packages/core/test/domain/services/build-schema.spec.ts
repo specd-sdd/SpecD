@@ -45,6 +45,53 @@ describe('buildSchema', () => {
     expect(schema.workflowStep('archiving')).not.toBeNull()
   })
 
+  it('populates compat and canonicalSpecSchema from string compat', () => {
+    const data = {
+      ...minimalData([]),
+      compat: '@specd/schema-std@2',
+    }
+    const schema = buildSchema('#test', data, new Map())
+    expect(schema.compat()).toEqual({ name: '@specd/schema-std', version: 2 })
+    expect(schema.canonicalSpecSchema()).toEqual({ name: '@specd/schema-std', version: 2 })
+  })
+
+  it('populates compat and canonicalSpecSchema from object compat', () => {
+    const data = {
+      ...minimalData([]),
+      compat: { name: 'schema-std', version: 3 },
+    }
+    const schema = buildSchema('#test', data, new Map())
+    expect(schema.compat()).toEqual({ name: 'schema-std', version: 3 })
+    expect(schema.canonicalSpecSchema()).toEqual({ name: 'schema-std', version: 3 })
+  })
+
+  it('falls back to extends parent in canonicalSpecSchema when compat is omitted', () => {
+    const data = {
+      ...minimalData([]),
+      extends: '@specd/schema-std@1',
+    }
+    const schema = buildSchema('#test', data, new Map())
+    expect(schema.compat()).toBeUndefined()
+    expect(schema.canonicalSpecSchema()).toEqual({ name: '@specd/schema-std', version: 1 })
+  })
+
+  it('prefers compat over extends in canonicalSpecSchema', () => {
+    const data = {
+      ...minimalData([]),
+      extends: '@specd/other-base',
+      compat: '@specd/schema-std@2',
+    }
+    const schema = buildSchema('#test', data, new Map())
+    expect(schema.compat()).toEqual({ name: '@specd/schema-std', version: 2 })
+    expect(schema.canonicalSpecSchema()).toEqual({ name: '@specd/schema-std', version: 2 })
+  })
+
+  it('falls back to own identity in canonicalSpecSchema when compat and extends are omitted', () => {
+    const schema = buildSchema('#test', minimalData([]), new Map())
+    expect(schema.compat()).toBeUndefined()
+    expect(schema.canonicalSpecSchema()).toEqual({ name: 'test', version: 1 })
+  })
+
   it('rejects duplicate hook IDs across different workflow steps', () => {
     const data = {
       kind: 'schema' as const,
