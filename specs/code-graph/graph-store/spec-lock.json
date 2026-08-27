@@ -15,14 +15,7 @@
       "symbols": ["GraphStore"]
     },
     {
-      "file": "code-graph:src/domain/errors/graph-store-recreate-requires-closed-error.ts",
-      "symbols": ["GraphStoreRecreateRequiresClosedError"]
-    },
-    {
       "file": "code-graph:test/domain/ports/graph-store.contract.ts"
-    },
-    {
-      "file": "code-graph:test/infrastructure/sqlite/sqlite-graph-store.spec.ts"
     }
   ],
   "optimizations": {

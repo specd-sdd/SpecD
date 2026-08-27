@@ -366,20 +366,7 @@ export class SQLiteGraphDatabase {
   clear(): void {
     const db = this.ensureOpen()
     db.transaction(() => {
-      db.prepare('DELETE FROM relations').run()
-      db.prepare('DELETE FROM symbols').run()
-      db.prepare('DELETE FROM specs').run()
-      db.prepare('DELETE FROM documents').run()
-      db.prepare('DELETE FROM files').run()
-      db.prepare('DELETE FROM indexed_input_observations').run()
-      db.prepare('DELETE FROM freshness_latches').run()
-      db.prepare(
-        "DELETE FROM meta WHERE key IN ('lastIndexedAt', 'lastIndexedRef', 'graphFingerprint')",
-      ).run()
-      db.prepare('DELETE FROM symbol_fts').run()
-      db.prepare('DELETE FROM spec_fts').run()
-      db.prepare('DELETE FROM document_fts').run()
-      db.prepare('DELETE FROM file_content_fts').run()
+      this.clearLogicalGeneration(db)
     })()
 
     this._lastIndexedAt = undefined
@@ -2310,14 +2297,7 @@ export class SQLiteGraphDatabase {
     db.transaction(() => {
       onProgress?.('cleanup')
       if (payload.replaceCodeGraph === true) {
-        db.prepare('DELETE FROM relations WHERE type NOT IN (?, ?, ?)').run(
-          RelationType.DependsOn,
-          RelationType.CoversFile,
-          RelationType.CoversSymbol,
-        )
-        db.prepare('DELETE FROM symbols').run()
-        db.prepare('DELETE FROM files').run()
-        db.prepare('DELETE FROM documents').run()
+        this.clearLogicalGeneration(db)
       }
       for (const path of payload.removedFilePaths ?? []) {
         this.deleteFileLocalState(db, path)
@@ -2819,6 +2799,7 @@ export class SQLiteGraphDatabase {
     return {
       files: loadExistingIds(db, 'files', 'path', candidates),
       symbols: loadExistingIds(db, 'symbols', 'id', candidates),
+      logicalSymbols: loadExistingIds(db, 'logical_symbols', 'id', candidates),
       publicBindings: loadExistingIds(db, 'public_bindings', 'id', candidates),
       specs: loadExistingIds(db, 'specs', 'spec_id', candidates),
     }
@@ -2875,6 +2856,33 @@ export class SQLiteGraphDatabase {
   private deleteSpecLocalState(db: SqliteDatabase, specId: string): void {
     db.prepare('DELETE FROM relations WHERE source = ? OR target = ?').run(specId, specId)
     db.prepare('DELETE FROM specs WHERE spec_id = ?').run(specId)
+  }
+
+  /**
+   * Removes every row that can influence or expose a logical graph generation.
+   * @param db - Open SQLite database participating in the clear transaction.
+   */
+  private clearLogicalGeneration(db: SqliteDatabase): void {
+    db.prepare('DELETE FROM relations').run()
+    db.prepare('DELETE FROM resolution_steps').run()
+    db.prepare('DELETE FROM local_bindings').run()
+    db.prepare('DELETE FROM public_bindings').run()
+    db.prepare('DELETE FROM logical_declarations').run()
+    db.prepare('DELETE FROM logical_symbols').run()
+    db.prepare('DELETE FROM index_coverage').run()
+    db.prepare('DELETE FROM indexed_input_observations').run()
+    db.prepare('DELETE FROM freshness_latches').run()
+    db.prepare('DELETE FROM symbols').run()
+    db.prepare('DELETE FROM specs').run()
+    db.prepare('DELETE FROM documents').run()
+    db.prepare('DELETE FROM files').run()
+    db.prepare(
+      "DELETE FROM meta WHERE key IN ('lastIndexedAt', 'lastIndexedRef', 'graphFingerprint')",
+    ).run()
+    db.prepare('DELETE FROM symbol_fts').run()
+    db.prepare('DELETE FROM spec_fts').run()
+    db.prepare('DELETE FROM document_fts').run()
+    db.prepare('DELETE FROM file_content_fts').run()
   }
 
   /**
@@ -3007,6 +3015,10 @@ export class SQLiteGraphDatabase {
    * @param facts - Facts parameter.
    */
   private replaceReferenceFactsInTransaction(db: SqliteDatabase, facts: ReferenceFactsWrite): void {
+    db.prepare('DELETE FROM relations WHERE type IN (?, ?)').run(
+      RelationType.CoversFile,
+      RelationType.CoversSymbol,
+    )
     db.prepare('DELETE FROM resolution_steps').run()
     db.prepare('DELETE FROM local_bindings').run()
     db.prepare('DELETE FROM public_bindings').run()
@@ -4067,6 +4079,7 @@ function compareRelations(left: Relation, right: Relation): number {
 interface RelationEndpointIds {
   readonly files: ReadonlySet<string>
   readonly symbols: ReadonlySet<string>
+  readonly logicalSymbols: ReadonlySet<string>
   readonly publicBindings: ReadonlySet<string>
   readonly specs: ReadonlySet<string>
 }
@@ -4107,7 +4120,7 @@ function executeBatchedInsert(
  */
 function loadExistingIds(
   db: SqliteDatabase,
-  table: 'files' | 'symbols' | 'public_bindings' | 'specs',
+  table: 'files' | 'symbols' | 'logical_symbols' | 'public_bindings' | 'specs',
   column: 'path' | 'id' | 'spec_id',
   candidates: ReadonlySet<string>,
 ): Set<string> {
@@ -4155,7 +4168,7 @@ function relationEndpointsExist(relation: Relation, ids: RelationEndpointIds): b
     case RelationType.CoversFile:
       return ids.specs.has(relation.source) && ids.files.has(relation.target)
     case RelationType.CoversSymbol:
-      return ids.specs.has(relation.source) && ids.symbols.has(relation.target)
+      return ids.specs.has(relation.source) && ids.logicalSymbols.has(relation.target)
     default:
       return false
   }

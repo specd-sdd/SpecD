@@ -105,8 +105,11 @@ describe('SQLite wide traversal', () => {
         files: [...inputFiles, callerFile, dependencyFile],
         symbols: [...inputSymbols, ...callers, ...dependencies],
         specs: [coverageSpec],
-        relations: [
-          ...callRelations,
+        relations: [...callRelations],
+      }
+      await Promise.all([sqlite.bulkLoad(data), memory.bulkLoad(data)])
+      await Promise.all([
+        sqlite.addRelations([
           createRelation({
             source: coverageSpec.specId,
             target: callerFile.path,
@@ -114,12 +117,23 @@ describe('SQLite wide traversal', () => {
           }),
           createRelation({
             source: coverageSpec.specId,
-            target: dependencies[0]!.id,
-            type: RelationType.CoversSymbol,
+            target: dependencyFile.path,
+            type: RelationType.CoversFile,
           }),
-        ],
-      }
-      await Promise.all([sqlite.bulkLoad(data), memory.bulkLoad(data)])
+        ]),
+        memory.addRelations([
+          createRelation({
+            source: coverageSpec.specId,
+            target: callerFile.path,
+            type: RelationType.CoversFile,
+          }),
+          createRelation({
+            source: coverageSpec.specId,
+            target: dependencyFile.path,
+            type: RelationType.CoversFile,
+          }),
+        ]),
+      ])
       const filePaths = inputFiles.map((inputFile) => inputFile.path)
 
       const [sqliteUpstream, memoryUpstream] = await Promise.all([

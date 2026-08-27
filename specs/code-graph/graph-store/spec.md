@@ -65,6 +65,14 @@ the operation used by a forced full reindex.
 Host-facing callers MUST NOT rely on backend filenames, WAL files, or direct store
 mechanics; provider and SDK contracts determine when recovery is authorized.
 
+### Requirement: Complete logical clear
+
+`GraphStore.clear()` SHALL leave the opened physical store ready for a complete logical reindex without rotating its storage generation. It MUST remove every persisted artifact whose presence or content can influence whether a discovered input is skipped or how the next graph generation is derived.
+
+The cleared state MUST contain no file, document, physical symbol, logical symbol, declaration, binding, reference fact, spec node, graph relation, indexed-input observation, index-coverage record, freshness latch, derivation fingerprint, VCS ref, or search-index entry from the prior logical generation.
+
+Concrete backends MAY retain physical schema objects and backend metadata that cannot affect indexing decisions or graph queries. All `GraphStore` implementations MUST expose equivalent post-clear behavior.
+
 ### Requirement: Storage generation tracking
 
 Every persisted `GraphStore` backend SHALL maintain a storage-generation marker that lets already-open providers detect when another process has destructively replaced the underlying graph storage.
@@ -280,6 +288,14 @@ The Store SHALL expose one deterministic complete reference-fact snapshot for in
 Search SHALL index structured simple name, owner, symbol space, member form, public surface, and exported name fields. It SHALL group public bindings with their logical target while returning every binding independently and identifying which bindings matched the request.
 
 Reverse coverage queries SHALL accept batches of canonical file paths and symbol ids and return all matching `COVERS_FILE` or `COVERS_SYMBOL` relations in deterministic source/type/target order. Empty batches SHALL return empty results without backend work. File-impact traversal MUST be able to retrieve coverage for its complete deduplicated blast radius without one call per resource.
+
+### Requirement: Logical-symbol coverage endpoints
+
+`COVERS_SYMBOL` SHALL link a canonical spec ID to a current logical symbol ID. A declaration-occurrence `SymbolNode.id` MUST NOT be the canonical target of newly projected symbol coverage.
+
+Relation endpoint validation, bulk persistence, reverse-coverage indexes, statistics, and coverage query methods MUST recognize an existing logical symbol as a valid `COVERS_SYMBOL` target. They MUST reject a relation whose spec source or logical-symbol target does not exist in the committed generation.
+
+Coverage queries SHALL preserve the logical target ID without requiring callers to know the declaration occurrence or backend schema used to represent it.
 
 ### Requirement: Source-content search candidates
 

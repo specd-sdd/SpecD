@@ -36,6 +36,30 @@
 - **WHEN** `specd graph index --format json` is run
 - **THEN** stdout is valid JSON containing `filesDiscovered`, `filesIndexed`, `documentsIndexed`, `filesSkipped`, `filesRemoved`, `specsIndexed`, `errors`, and `duration`
 
+### Requirement: Forced indexing result completeness
+
+#### Scenario: Forced structured output reports complete reconsideration
+
+- **GIVEN** a populated healthy graph and unchanged source content
+- **WHEN** `graph index --force --format toon` completes
+- **THEN** output identifies a forced full logical reindex and its stable reason
+- **AND** selected unchanged source inputs are not counted as hash-matched skips
+- **AND** indexed, unsupported, excluded, partial, coverage, and error classifications remain visible
+
+#### Scenario: Forced text output does not hide skipped inputs
+
+- **GIVEN** the SDK returns a forced result containing nonzero skipped or unsupported counts
+- **WHEN** the CLI renders text output
+- **THEN** the full-reindex indication and the returned classification counts are visible
+- **AND** exit success is not presented as evidence that every input produced a graph node
+
+#### Scenario: CLI preserves SDK reconstruction diagnostics
+
+- **GIVEN** SDK orchestration returns a successful result with full-rebuild metadata and per-input diagnostics
+- **WHEN** the command renders text, JSON, or TOON
+- **THEN** it does not recompute or discard those fields
+- **AND** structured output round-trips the fields unchanged
+
 ### Requirement: Error cases
 
 #### Scenario: Mutually exclusive context flags fail fast

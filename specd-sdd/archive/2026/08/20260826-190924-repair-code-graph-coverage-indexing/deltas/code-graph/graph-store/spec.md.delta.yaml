@@ -1,0 +1,35 @@
+- op: added
+  description: 'Define logical clear as removal of every reusable indexing authority'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Store recreation'
+  content: |
+    ### Requirement: Complete logical clear
+
+    `GraphStore.clear()` SHALL leave the opened physical store ready for a complete logical reindex without rotating its storage generation. It MUST remove every persisted artifact whose presence or content can influence whether a discovered input is skipped or how the next graph generation is derived.
+
+    The cleared state MUST contain no file, document, physical symbol, logical symbol, declaration, binding, reference fact, spec node, graph relation, indexed-input observation, index-coverage record, freshness latch, derivation fingerprint, VCS ref, or search-index entry from the prior logical generation.
+
+    Concrete backends MAY retain physical schema objects and backend metadata that cannot affect indexing decisions or graph queries. All `GraphStore` implementations MUST expose equivalent post-clear behavior.
+
+- op: added
+  description: 'Make logical symbols the canonical endpoint for symbol coverage'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Reference and coverage persistence'
+  content: |
+    ### Requirement: Logical-symbol coverage endpoints
+
+    `COVERS_SYMBOL` SHALL link a canonical spec ID to a current logical symbol ID. A declaration-occurrence `SymbolNode.id` MUST NOT be the canonical target of newly projected symbol coverage.
+
+    Relation endpoint validation, bulk persistence, reverse-coverage indexes, statistics, and coverage query methods MUST recognize an existing logical symbol as a valid `COVERS_SYMBOL` target. They MUST reject a relation whose spec source or logical-symbol target does not exist in the committed generation.
+
+    Coverage queries SHALL preserve the logical target ID without requiring callers to know the declaration occurrence or backend schema used to represent it.

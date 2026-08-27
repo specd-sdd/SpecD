@@ -20,7 +20,7 @@ Source files change constantly and the code graph must be kept in sync without r
 
 Extraction and storage include hierarchy relations (`EXTENDS`, `IMPLEMENTS`, `OVERRIDES`) alongside existing file, symbol, and dependency relations.
 
-The indexer SHALL directly consume `SpecRepository` methods (`list`, `artifact`, `readPersistedImplementation`) and Core's `GetSpecMetadata` use case (for title, description, and the semantic `metadataFingerprint`) to build `SpecNode` and coverage relations. It MUST NOT parse raw sidecar files and MUST NOT read a raw metadata snapshot directly when a materialized, self-healing projection is available through `GetSpecMetadata`.
+The indexer SHALL directly consume `SpecRepository` methods (`list`, `artifact`, `readPersistedState`) and Core's `GetSpecMetadata` use case (for title, description, and the semantic `metadataFingerprint`) to build `SpecNode` and coverage relations. The aggregate persisted state SHALL supply both dependency and implementation data. It MUST NOT parse raw sidecar files and MUST NOT read a raw metadata snapshot directly when a materialized, self-healing projection is available through `GetSpecMetadata`.
 
 ### Requirement: Incremental indexing
 
@@ -37,13 +37,25 @@ Only three categories of files are processed during a normal incremental run whe
 - **Changed** — file exists in both but hashes differ → extract and upsert (replaces previous data)
 - **Deleted** — file exists in the store but not on disk → remove from store. Only files belonging to workspaces being indexed are considered for deletion — files from other workspaces are left untouched. This allows `--workspace <name>` to index a single workspace without destroying data from others.
 
-Files whose hash matches the stored hash are skipped entirely — no parsing, no I/O beyond the hash comparison — only when the persisted graph fingerprint also matches the current fingerprint.
+Files whose hash matches the stored hash are skipped entirely — no parsing, no I/O beyond the hash comparison — only during a non-forced run when the persisted graph fingerprint matches the current fingerprint and the persisted indexed resource needed by downstream phases still exists.
 
 When the persisted graph fingerprint differs from the current fingerprint, the indexer SHALL treat the run as a full rebuild of the active graph store rather than a normal incremental skip. The preferred behavior is to recreate the store and re-index every discovered file while surfacing a visible explanation that the code-graph version or resolved workspace configuration changed. If a backend cannot safely recreate in-place, the caller MAY fail fast and require an explicit force-reindex command instead.
 
 Changed files are removed from the store before bulk load, because CSV `COPY FROM` cannot upsert — it can only insert. Removing changed files first ensures the bulk load inserts fresh data without conflicts.
 
-To force a full re-index, callers MUST invoke the graph-store recreation path before `execute()`. This removes all stored data, causing every file to be treated as new.
+A forced run SHALL reconsider every discovered input selected for that run. Persisted file nodes, document nodes, index-coverage hashes, observations, semantic lookup state, or any other reusable artifact MUST NOT authorize an unchanged-file or unchanged-spec skip during that run. The resulting committed generation SHALL contain the nodes, semantic state, coverage relations, coverage records, and derivation metadata produced from that complete reconsideration.
+
+### Requirement: Deterministic implementation coverage projection
+
+Spec indexing SHALL read implementation links through the canonical `SpecRepository` persisted-state API and project coverage against the semantic generation that will be committed by the same indexing run.
+
+A file-only implementation link SHALL produce `COVERS_FILE` when its canonical workspace-prefixed file target exists in that generation. A symbol-qualified implementation link SHALL produce `COVERS_SYMBOL` only when the named target resolves deterministically to exactly one current logical symbol declared by the linked file. The relation target MUST be that logical symbol identity rather than a declaration-occurrence ID.
+
+Coverage projection SHALL have access to the current or persisted semantic state required for resolution even when no code file was analyzed in the current run. A persisted implementation-only change MUST therefore be able to add, remove, or replace coverage during an otherwise incremental run.
+
+When a code file or its declarations change, coverage for affected specs SHALL be reprojected from canonical persisted implementation state against the refreshed logical-symbol generation. The indexer MUST NOT preserve an obsolete physical-symbol relation as a substitute for reprojection.
+
+An unresolved or ambiguous symbol-qualified link MUST NOT create a guessed `COVERS_SYMBOL` relation and MUST NOT be silently converted into `COVERS_FILE`. The index result SHALL expose a stable per-link diagnostic identifying the spec, linked file, symbol name, and unresolved or ambiguous reason while allowing unrelated inputs to complete.
 
 ### Requirement: Discovery fingerprint uses effective config
 
@@ -228,12 +240,9 @@ The indexer SHALL build `SpecNode` entries and relations by directly consuming t
 2. Use `repo.list()` to enumerate spec identities
 3. For each spec, call `GetSpecMetadata.execute({ specId })` and compare the returned `metadataFingerprint` against the value stored on the corresponding `SpecNode` to enable incremental skipping — a spec is reprocessed only when its semantic fingerprint changed, not merely because a cache file's raw bytes or timestamp changed
 4. Load `title` and `description` from the materialized `GetSpecMetadata` result rather than a raw `repo.metadata()` read
-5. Load `COVERS_FILE` and `COVERS_SYMBOL` relations via `repo.readPersistedImplementation()`
-6. Load `DEPENDS_ON` relations via `repo.readPersistedDependsOn()`
+5. Load `COVERS_FILE`, `COVERS_SYMBOL`, and `DEPENDS_ON` relations from one `repo.readPersistedState()` result
 
 The indexer SHALL NOT rely on the CLI to pre-extract spec data. It owns the semantic mapping from repository data to graph nodes.
-
-Spec indexing runs as an additional phase after source file indexing.
 
 ### Requirement: Prefer LLM-optimized description
 

@@ -13,32 +13,11 @@
   ],
   "implementation": [
     {
-      "file": "cli:src/graph-index-task.ts",
-      "symbols": [
-        "CliGraphIndexContextDescriptor",
-        "CliGraphIndexTaskInput",
-        "CliGraphIndexProgress",
-        "runGraphIndexTask"
-      ]
-    },
-    {
-      "file": "cli:package.json"
-    },
-    {
       "file": "cli:src/commands/graph/index-graph.ts",
       "symbols": ["registerGraphIndex", "formatTextIndexResult"]
     },
     {
-      "file": "cli:test/graph-index-task.spec.ts",
-      "symbols": ["runGraphIndexTask"]
-    },
-    {
-      "file": "cli:test/commands/graph-index.spec.ts",
-      "symbols": ["graph index"]
-    },
-    {
-      "file": "cli:test/commands/graph-index-integration.spec.ts",
-      "symbols": ["graph index integration"]
+      "file": "cli:test/commands/graph-index.spec.ts"
     }
   ],
   "optimizations": {

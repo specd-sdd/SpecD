@@ -52,6 +52,8 @@ JSON/TOON output schema:
     fullRebuild: boolean
     fullRebuildReason: string | null
     phaseMetrics: Record<string, { count: number, durationMs: number }>
+    coverage: { total: number, byStatus: Record<string, number>, reasons: string[] }
+    coverageDiagnostics: Array<{ specId, filePath, symbolName?, reason }>
   }
 `,
     )
@@ -178,6 +180,22 @@ function formatTextIndexResult(result: RunIndexProjectGraphResult): string {
     lines.push(`  full rebuild: yes (${result.fullRebuildReason ?? 'FORCED'})`)
   } else {
     lines.push('  full rebuild: no')
+  }
+
+  lines.push(`  coverage:   ${String(result.coverage.total)} input(s)`)
+  for (const status of ['indexed', 'excluded', 'unsupported', 'parse-failed', 'partial'] as const) {
+    lines.push(`    ${status}: ${String(result.coverage.byStatus[status] ?? 0)}`)
+  }
+  for (const reason of result.coverage.reasons) {
+    lines.push(`    reason: ${reason}`)
+  }
+  if (result.coverageDiagnostics.length > 0) {
+    lines.push('  coverage diagnostics:')
+    for (const diagnostic of result.coverageDiagnostics) {
+      lines.push(
+        `    ${diagnostic.specId}: ${diagnostic.filePath}${diagnostic.symbolName === undefined ? '' : `#${diagnostic.symbolName}`} (${diagnostic.reason})`,
+      )
+    }
   }
 
   for (const error of result.errors) {

@@ -1205,6 +1205,13 @@ recreating SQLite. If the first open reports the typed recoverable storage condi
 the isolated SDK task closes that transient provider, recreates closed storage, and
 retries once. Non-forced indexes and unrelated failures never delete storage. No change
 manifest, spec, or implementation link is modified by this recovery.
+
+Text output includes a coverage total, counts for `indexed`, `excluded`, `unsupported`,
+`parse-failed`, and `partial`, followed by any stable coverage reasons and per-link
+diagnostics. JSON and TOON preserve the same `coverage` and `coverageDiagnostics` fields
+from SDK orchestration. A forced result must show `fullRebuild: true` and must not classify
+hash-matched selected inputs as skipped; inspect the returned classifications rather than
+using a successful exit code as proof that every input became a graph node.
 Completed results also include counts and elapsed milliseconds for import resolution,
 dependency facts, adapter relations, re-exports, hierarchy/overrides, persistence,
 and search-index rebuilding in text and structured output.

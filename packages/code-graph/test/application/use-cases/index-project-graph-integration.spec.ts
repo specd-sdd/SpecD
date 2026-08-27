@@ -3,8 +3,8 @@ import { execFileSync } from 'node:child_process'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { performance } from 'node:perf_hooks'
-import { afterEach, describe, expect, it } from 'vitest'
-import { type SpecdConfig, type SpecRepository } from '@specd/core'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { createSpecRepository, type SpecdConfig, type SpecRepository } from '@specd/core'
 import Database from 'better-sqlite3'
 import { IndexProjectGraph } from '../../../src/application/use-cases/index-project-graph.js'
 import { createCodeGraphProvider } from '../../../src/composition/create-code-graph-provider.js'
@@ -21,6 +21,9 @@ import { readInstalledCodeGraphVersion } from '../../../src/application/use-case
 import { buildProjectGraphConfig } from '../../../src/application/services/build-project-graph-config.js'
 import { makeMockSpecRepository } from '../../helpers/make-mock-spec-repository.js'
 import { GraphStorageRecoveryRequiredError } from '../../../src/domain/errors/graph-storage-recovery-required-error.js'
+import { IndexCodeGraph } from '../../../src/application/use-cases/index-code-graph.js'
+import { AdapterRegistry } from '../../../src/infrastructure/tree-sitter/adapter-registry.js'
+import { TypeScriptLanguageAdapter } from '../../../src/infrastructure/tree-sitter/typescript-language-adapter.js'
 
 const makeMockRepo = makeMockSpecRepository
 
@@ -113,6 +116,109 @@ describe('IndexProjectGraph integration', () => {
     )
 
     await provider.close()
+  })
+
+  it('reprojects SQLite coverage when only a real spec-lock implementation changes', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'index-project-graph-sidecar-coverage-'))
+    const codeRoot = join(tempDir, 'workspace')
+    const specsPath = join(tempDir, 'specs')
+    const metadataPath = join(tempDir, '.specd', 'metadata')
+    const specPath = join(specsPath, 'coverage')
+    mkdirSync(codeRoot, { recursive: true })
+    mkdirSync(metadataPath, { recursive: true })
+    mkdirSync(specPath, { recursive: true })
+    writeFileSync(join(codeRoot, 'first.ts'), 'export function first(): void {}\n')
+    writeFileSync(join(codeRoot, 'second.ts'), 'export function second(): void {}\n')
+    writeFileSync(join(specPath, 'spec.md'), '# Coverage fixture\n')
+    writeFileSync(
+      join(specPath, 'spec-lock.json'),
+      JSON.stringify(
+        {
+          schema: { name: 'schema-std', version: 1 },
+          dependsOn: [],
+          implementation: [
+            { file: 'fixture:first.ts' },
+            { file: 'fixture:first.ts', symbols: ['first'] },
+          ],
+        },
+        null,
+        2,
+      ),
+    )
+
+    const specRepo = createSpecRepository(
+      'fs',
+      {
+        workspace: 'fixture',
+        ownership: 'owned',
+        isExternal: false,
+        configPath: tempDir,
+      },
+      { path: specsPath, metadataPath },
+    )
+    const store = new SQLiteGraphStore(tempDir)
+    await store.open()
+    const adapter = new TypeScriptLanguageAdapter()
+    const registry = new AdapterRegistry()
+    registry.register(adapter)
+    const analyzeFile = vi.spyOn(adapter, 'analyzeFile')
+    const indexer = new IndexCodeGraph(store, registry)
+    const options = {
+      projectRoot: tempDir,
+      vcsRoot: null,
+      workspaces: [
+        {
+          name: 'fixture',
+          prefix: null,
+          codeRoot,
+          specRepo,
+          ownership: 'owned' as const,
+          isExternal: false,
+        },
+      ],
+      graphConfig: { includePaths: [], excludePaths: [], workspaces: new Map() },
+      codeGraphVersion: readInstalledCodeGraphVersion(),
+    }
+
+    await indexer.execute(options)
+    await expect(store.getCoveredFiles('fixture:coverage')).resolves.toEqual([
+      expect.objectContaining({ target: 'fixture:first.ts' }),
+    ])
+    await expect(store.getCoveredSymbols('fixture:coverage')).resolves.toEqual([
+      expect.objectContaining({ target: expect.stringMatching(/^logical\\|/) }),
+    ])
+
+    analyzeFile.mockClear()
+    writeFileSync(
+      join(specPath, 'spec-lock.json'),
+      JSON.stringify(
+        {
+          schema: { name: 'schema-std', version: 1 },
+          dependsOn: [],
+          implementation: [
+            { file: 'fixture:second.ts' },
+            { file: 'fixture:second.ts', symbols: ['second'] },
+          ],
+        },
+        null,
+        2,
+      ),
+    )
+
+    const incremental = await indexer.execute(options)
+
+    expect(incremental.filesIndexed).toBe(0)
+    expect(analyzeFile).not.toHaveBeenCalled()
+    await expect(store.getCoveredFiles('fixture:coverage')).resolves.toEqual([
+      expect.objectContaining({ target: 'fixture:second.ts' }),
+    ])
+    await expect(store.getCoveredSymbols('fixture:coverage')).resolves.toEqual([
+      expect.objectContaining({ target: expect.stringMatching(/^logical\\|/) }),
+    ])
+    await expect(store.getCoveredFiles('fixture:coverage')).resolves.not.toEqual([
+      expect.objectContaining({ target: 'fixture:first.ts' }),
+    ])
+    await store.close()
   })
 
   it('indexes and searches conservative reference facts across supported languages', async () => {

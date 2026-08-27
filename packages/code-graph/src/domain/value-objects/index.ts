@@ -23,6 +23,9 @@ export {
   type WorkspaceIndexBreakdown,
   type IndexPhaseMetric,
   type IndexPhaseMetrics,
+  type IndexCoverageDiagnosticReason,
+  type IndexCoverageDiagnostic,
+  type IndexRunCoverageSummary,
 } from './index-result.js'
 export {
   type LanguageAdapter,

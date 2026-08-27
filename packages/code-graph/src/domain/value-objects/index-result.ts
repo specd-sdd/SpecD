@@ -1,3 +1,5 @@
+import type { IndexCoverageStatus } from './index-session.js'
+
 /**
  * Describes an error encountered while indexing a specific file.
  */
@@ -37,6 +39,27 @@ export interface IndexPhaseMetrics {
   readonly searchIndexRebuild: IndexPhaseMetric
 }
 
+/** Stable reason why one persisted implementation link could not become coverage. */
+export type IndexCoverageDiagnosticReason =
+  | 'FILE_NOT_INDEXED'
+  | 'SYMBOL_NOT_FOUND'
+  | 'SYMBOL_AMBIGUOUS'
+
+/** Diagnostic evidence for one unresolved persisted implementation link. */
+export interface IndexCoverageDiagnostic {
+  readonly specId: string
+  readonly filePath: string
+  readonly symbolName?: string
+  readonly reason: IndexCoverageDiagnosticReason
+}
+
+/** Complete coverage evidence produced by one indexing run. */
+export interface IndexRunCoverageSummary {
+  readonly total: number
+  readonly byStatus: Readonly<Record<IndexCoverageStatus, number>>
+  readonly reasons: readonly string[]
+}
+
 /**
  * Summary of an indexing operation including counts and errors.
  */
@@ -56,4 +79,6 @@ export interface IndexResult {
   readonly fullRebuild: boolean
   readonly fullRebuildReason: string | null
   readonly phaseMetrics: IndexPhaseMetrics
+  readonly coverage: IndexRunCoverageSummary
+  readonly coverageDiagnostics: readonly IndexCoverageDiagnostic[]
 }

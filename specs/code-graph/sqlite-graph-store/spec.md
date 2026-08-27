@@ -132,6 +132,12 @@ unrelated I/O errors MUST propagate without recreation authority.
 A healthy forced reindex SHALL use the existing opened-store logical clear path and
 MUST NOT implement force by closing, deleting, reopening, or re-closing SQLite.
 
+### Requirement: SQLite logical clear parity
+
+The SQLite implementation of `clear()` SHALL execute one atomic logical-generation reset while the worker remains open. The transaction MUST remove physical graph rows, specs, relations, indexed-input observations, index-coverage rows, logical symbols and declarations, public and local bindings, reference and resolution facts, freshness latches, derivation metadata, and full-text index contents that belong to the cleared generation.
+
+After commit, an indexing run MUST NOT observe a content hash, semantic row, or coverage record from the cleared generation as authority to skip a discovered input. Failure during clear MUST roll back to the previously committed logical generation.
+
 ### Requirement: Storage generation sidecar
 
 The SQLite-backed graph persistence under `{configPath}/graph` SHALL persist a storage-generation sidecar compatible with the shared `code-graph:graph-store` stale-detection contract.
@@ -191,6 +197,14 @@ graph model:
 The adapter MAY choose a SQLite-appropriate physical layout, provided all
 observable `GraphStore` semantics remain preserved. `COVERS_SYMBOL` entries
 MUST preserve relation metadata so stale symbol-level links survive reload.
+
+### Requirement: SQLite logical coverage integrity
+
+SQLite bulk relation validation SHALL treat a logical-symbol row as the required target endpoint for `COVERS_SYMBOL`. A physical declaration-occurrence symbol row alone MUST NOT satisfy that endpoint contract for newly projected coverage.
+
+The same committed transaction SHALL persist logical symbols before validating and inserting their coverage relations. Valid logical coverage MUST survive relation deduplication, reverse-coverage indexing, statistics, worker serialization, and subsequent abstract `GraphStore` reads with its target ID and metadata unchanged.
+
+A `COVERS_SYMBOL` relation with a missing spec source or missing logical-symbol target SHALL be rejected from the committed relation set and reported through the indexing diagnostic contract rather than being silently accepted or retargeted.
 
 ### Requirement: SQLite full-text search
 
