@@ -14,11 +14,46 @@
   ],
   "implementation": [
     {
-      "file": "plugin-agent-opencode:src/domain/frontmatter/index.ts",
-      "symbols": ["skillFrontmatter"]
+      "file": "plugin-agent-opencode:src/domain/frontmatter/index.ts"
     },
     {
       "file": "plugin-agent-opencode:test/install-skills.spec.ts"
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "OpenCode agent adapter: render supported skill metadata, install managed skills/agents, manage AGENTS.md, remove only owned assets.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:485988e3685ec287afab20d77f76f42f29b7dc85566d29436992731d782e1e88",
+          "lastModified": "2026-08-27T16:46:08.169Z"
+        },
+        "verify.md": {
+          "hash": "sha256:fd4bff5ac13b1f1cb0184ac89c3fcfe530145dcba94c8b5f4b10d02c8150d62d",
+          "lastModified": "2026-08-27T16:46:08.170Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Open Code Plugin\n\n## Rules\n\n- Named export `create(options: PluginLoaderOptions): AgentPlugin`.\n- Factory read `specd-plugin.json`: own dir, then parent; pass `name`, `version`; hardcode `type` as `agent`.\n- Domain: runtime `AgentPlugin`, constructor `name`, `version`; `type` getter `agent`; Open Code frontmatter type; skill-name frontmatter map.\n- Structured frontmatter only: required `name`, `description`; optional `license`, `compatibility`, `metadata: Record<string, string>`; exclude unknown fields.\n- `InstallSkills`: get skills from `@specd/skills`; resolve per-skill frontmatter; capabilities exactly `['mcp', 'agents', 'frontmatter']`; resolve bundles via `ResolveBundle`; pass `variables.sharedFolder` only override.\n- Install non-shared: skills `.opencode/skills/<skill-name>/`, agents `.opencode/agents/<agent-name>/`, relative to `projectRoot`; shared: rendered `sharedFolder` below project root. No `agents` capability: agents beside shared context.\n- Agent install: YAML `mode: \"subagent\"`; transform `allowedTools` (`Bash`, `Read`) to permissions (`- bash: allow`, `- read: allow`); prepend rendered system prompt with YAML. Never prepend YAML to resolved standard skills.\n- Never call `SkillRepository.getBundle(...)` when `ResolveBundle` exists; never use `buildCapabilities`.\n- Rendered local skill markdown: only configured supported fields; shared files no Open Code frontmatter.\n- Default `sharedFolder`: relative path from runtime config dir; no `SKILL.md` there.\n- `install()`: `injectSpecdBlock(agentsMdPath, prompt)` base prompt into project-root `AGENTS.md`; `removeSpecdBlock(agentsMdPath, \"opencode\")`; no plugin marker injection.\n- `uninstall()`: remove plugin marker then base block; delete only managed skill dirs, agent files, and—unfiltered—sharedFolder. Filters remove only selected assets; retain sharedFolder for filtered skill uninstall; preserve unrelated `.opencode/skills/` and `.opencode/agents/` assets.\n- `specd project init` includes `@specd/plugin-agent-opencode`; `@specd/specd` depends on it.\n- Default standard skill install includes `specd-fasttrack`; resolve via `ResolveBundle`, supported capabilities, structured frontmatter, existing skill-dir contract; preserve capability workflow branches, supported fields only.\n\n## Constraints\n\n- Depend on `@specd/skills`; implement `AgentPlugin` from `@specd/plugin-manager`.\n- Adapter only: no domain logic outside orchestration.\n- Factory reads and passes manifest `name`/`version`; never hardcode. `type` remains hardcoded `agent`.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:485988e3685ec287afab20d77f76f42f29b7dc85566d29436992731d782e1e88",
+          "lastModified": "2026-08-27T16:46:08.169Z"
+        },
+        "verify.md": {
+          "hash": "sha256:fd4bff5ac13b1f1cb0184ac89c3fcfe530145dcba94c8b5f4b10d02c8150d62d",
+          "lastModified": "2026-08-27T16:46:08.170Z"
+        }
+      }
+    }
+  }
 }

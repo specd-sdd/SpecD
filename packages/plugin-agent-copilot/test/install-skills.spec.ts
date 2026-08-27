@@ -160,7 +160,8 @@ describe('plugin-agent-copilot create()', () => {
             frontmatter: {
               name: 'specd-fasttrack',
               description:
-                'Fast-track code-first development, bugfix, or spike session with live decision journaling and post-facto consolidation into specd.',
+                'Manual-only: use only when the user explicitly invokes /specd-fasttrack. Fast-track code-first development, bugfix, or spike session with live decision journaling and post-facto consolidation into specd.',
+              'disable-model-invocation': true,
             },
           }),
         }),

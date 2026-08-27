@@ -12,12 +12,20 @@ The durable record is `<changePath>/.specd-exploration.md`. It must make an inte
 session resumable without reconstructing work from memory, `git diff`, commits, resets,
 or discarded work.
 
+## Activation boundary
+
+This is a manual-only workflow. Use `/specd-fasttrack` only when the user explicitly
+invokes it. Never select or invoke this skill for normal specd work; use `/specd` and its
+normal lifecycle skills instead.
+
 ## 0. Bootstrap
 
-Read @{{sharedFolder}}/shared.md before doing anything. Then load project context:
+Read @{{sharedFolder}}/shared.md before doing anything. Then load project context and
+the configured project/workspace context-spec scope:
 
 ```bash
-specd project context --format text
+specd project status --context --format toon
+specd project context-specs --format toon
 ```
 
 {{#if capabilities.mcp}}
@@ -70,13 +78,23 @@ and perform the downstream impact analysis.
 
 ## 3. Discover governing contracts continuously
 
-Before modifying or investigating code, discover the governing specs and dependencies:
+Before modifying or investigating code, discover the governing specs and dependencies.
+First run file impact and inspect its `coveringSpecs` result. It is the evidence-backed
+answer for which specs currently cover the target file; it may be empty, so never assume
+that a workspace has applicable specs. Use the workspace roots in `project status` to
+identify the workspace that owns a target file. Then use `project context-specs` to add
+project and workspace candidates that are relevant to the planned change; each candidate
+ID encodes its workspace as `<workspace>:<spec-id>`. Load every applicable covering or
+context candidate with compiled spec context—do not use `specs resolve-path` solely for
+this discovery. `specs context` is the only allowed spec-reading surface in this workflow;
+never use `specs show`.
 
 ```bash
 specd graph impact --file "<workspace:path>" --direction dependents --format toon
+specd project context-specs --workspace <workspace> --format toon
+specd specs context <workspace:spec-id> --follow-deps --format text
 specd graph impact --symbol "<name>" --direction dependents --format toon
 specd graph search "<keyword>" --specs --format toon
-specd specs show <workspace:spec-id> --format text
 ```
 
 Append each scope or contract finding to the journal immediately. For an intentional

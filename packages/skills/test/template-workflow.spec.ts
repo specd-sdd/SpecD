@@ -18,12 +18,26 @@ describe('workflow skill templates', () => {
 
     expect(content.startsWith('---\n')).toBe(false)
     expect(content).toContain('@{{sharedFolder}}/shared.md')
+    expect(content).toContain('## Activation boundary')
+    expect(content).toContain('Use `/specd-fasttrack` only when the user explicitly\ninvokes it.')
+    expect(content).toContain('Never select or invoke this skill for normal specd work')
     expect(content).toContain('Mandatory live journal rule')
     expect(content).toContain('after **every** decision, scope or contract finding,')
     expect(content).toContain(
       'source edit, implementation-link update, test or debugging action/result',
     )
     expect(content).toContain('A final audit or\nconsolidation summary supplements')
+    expect(content).toContain('specd project status --context --format toon')
+    expect(content).toContain('specd project context-specs --format toon')
+    expect(content).toContain('specd project context-specs --workspace <workspace> --format toon')
+    expect(content).toContain('specd specs context <workspace:spec-id> --follow-deps --format text')
+    expect(content).toContain('First run file impact and inspect its `coveringSpecs` result.')
+    expect(content).toContain(
+      'it may be empty, so never assume\nthat a workspace has applicable specs',
+    )
+    expect(content).not.toContain('specd specs show')
+    expect(content).toContain('`specs context` is the only allowed spec-reading surface')
+    expect(content).toMatch(/do not use `specs resolve-path` solely for\s+this discovery/)
     expect(metadata).toEqual({
       kind: 'skill',
       supportedCapabilities: ['mcp', 'agents', 'frontmatter'],

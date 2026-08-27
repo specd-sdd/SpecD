@@ -41,7 +41,7 @@ export const skillFrontmatter: Readonly<Record<string, Frontmatter>> = {
   'specd-fasttrack': {
     name: 'specd-fasttrack',
     description:
-      'Fast-track code-first development, bugfix, or spike session with live decision journaling and post-facto consolidation into specd.',
+      'Manual-only: use only when the user explicitly invokes /specd-fasttrack. Fast-track code-first development, bugfix, or spike session with live decision journaling and post-facto consolidation into specd.',
     'allowed-tools': 'Bash(node:*) Bash(specd:*) Bash(pnpm:*) Read Write Edit Grep Glob Agent',
   },
 }

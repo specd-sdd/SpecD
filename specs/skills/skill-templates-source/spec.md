@@ -173,6 +173,14 @@ The metadata MUST declare `kind: "skill"`, declare `shared.md` in `requiredShare
 
 The rendered fast-track workflow MUST require `.specd-exploration.md` to be updated immediately after every meaningful decision, scope or contract finding, source edit, implementation-link update, test or debug action, and audit result. Each update MUST preserve what changed, why, and affected files or symbols when applicable. A final consolidation MUST summarize, not replace, these incremental entries so an interrupted session can be resumed without reconstructing state from memory or a partial diff.
 
+### Requirement: Fast-track governing context and activation
+
+The fast-track workflow template MUST run `specd graph impact --file <workspace:path> --direction dependents --format toon` before modifying or investigating a target file and MUST inspect `coveringSpecs` as the evidence-backed set of governing specs. The template MUST handle an empty `coveringSpecs` result without assuming that workspace membership alone makes a spec applicable.
+
+The template MUST use `specd project context-specs` to discover configured project and workspace candidates, MUST load applicable covering and configured candidates through `specd specs context`, and MUST NOT instruct use of `specd specs show` or `specs resolve-path` for this discovery.
+
+The template MUST declare that fast-track is manual-only: it MUST be used only when the user explicitly invokes `/specd-fasttrack`, and MUST NOT be selected or invoked for normal specd work.
+
 ## Constraints
 
 - Templates in the skills package MUST NOT contain static frontmatter YAML blocks.

@@ -1,0 +1,13 @@
+- op: added
+  description: Require manual-only fast-track routing for Claude.
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Fast-track skill installation$'
+  content: |
+    ### Requirement: Manual-only fast-track routing
+
+    The Claude fast-track frontmatter description MUST state that the skill is manual-only and may be used only when the user explicitly invokes `/specd-fasttrack`. Its frontmatter MUST set `disable_model_invocation: true`.

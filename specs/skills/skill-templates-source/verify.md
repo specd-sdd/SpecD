@@ -255,3 +255,21 @@
 - **GIVEN** fast-track work has been interrupted after an implementation edit
 - **WHEN** a subsequent agent reads the journal
 - **THEN** it can identify the completed action, rationale, and affected implementation scope without relying on an uncommitted diff
+
+### Requirement: Fast-track governing context and activation
+
+#### Scenario: A target file has graph coverage
+
+- **WHEN** fast-track investigates a target file with covering specs
+- **THEN** it runs file impact before context-pattern discovery
+- **AND** it loads applicable covering and configured candidates through `specs context`
+
+#### Scenario: A target file has no covering specs
+
+- **WHEN** file impact returns an empty `coveringSpecs` collection
+- **THEN** fast-track does not infer applicability from workspace membership alone
+
+#### Scenario: Normal work does not invoke fast-track
+
+- **WHEN** the user has not explicitly invoked `/specd-fasttrack`
+- **THEN** the workflow directs work to normal specd lifecycle skills

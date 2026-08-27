@@ -169,3 +169,10 @@
 - **THEN** `.agents/skills/specd-fasttrack/SKILL.md` is written from `ResolveBundle`
 - **AND** its frontmatter declares the required `allowed-tools` value
 - **AND** instructions needing unsupported capabilities are absent
+
+### Requirement: Manual-only fast-track routing
+
+#### Scenario: Installing fast-track for an Agent Skills standard client
+
+- **WHEN** the standard plugin renders fast-track frontmatter
+- **THEN** the description states that explicit `/specd-fasttrack` invocation is required

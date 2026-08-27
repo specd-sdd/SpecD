@@ -108,6 +108,10 @@ Open Code installation MUST include `specd-fasttrack` when standard skills are i
 
 The rendered output MUST preserve capability-aware workflow branches and MUST include only Open Code-supported frontmatter fields.
 
+### Requirement: Manual-only fast-track routing
+
+The OpenCode fast-track frontmatter description MUST state that the skill is manual-only and may be used only when the user explicitly invokes `/specd-fasttrack`.
+
 ## Constraints
 
 - The plugin MUST depend on `@specd/skills` for skill repository access.

@@ -181,3 +181,10 @@
 - **THEN** its fast-track skill is rendered and installed through `ResolveBundle`
 - **AND** the rendered frontmatter contains only Open Code-supported fields
 - **AND** capability-aware workflow content is retained for supplied capabilities
+
+### Requirement: Manual-only fast-track routing
+
+#### Scenario: Installing fast-track for OpenCode
+
+- **WHEN** the OpenCode plugin renders fast-track frontmatter
+- **THEN** the description states that explicit `/specd-fasttrack` invocation is required

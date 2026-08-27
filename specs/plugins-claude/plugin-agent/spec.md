@@ -110,6 +110,10 @@ Claude installation MUST include `specd-fasttrack` when standard skills are inst
 
 The installed output MUST preserve the fast-track journal-resumability instructions and MUST include no static or unsupported frontmatter fields.
 
+### Requirement: Manual-only fast-track routing
+
+The Claude fast-track frontmatter description MUST state that the skill is manual-only and may be used only when the user explicitly invokes `/specd-fasttrack`. Its frontmatter MUST set `disable_model_invocation: true`.
+
 ## Constraints
 
 - This plugin depends on `@specd/skills` for skill operations.

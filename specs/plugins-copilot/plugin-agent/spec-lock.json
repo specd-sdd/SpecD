@@ -14,8 +14,7 @@
   ],
   "implementation": [
     {
-      "file": "plugin-agent-copilot:src/domain/frontmatter/index.ts",
-      "symbols": ["skillFrontmatter"]
+      "file": "plugin-agent-copilot:src/domain/frontmatter/index.ts"
     },
     {
       "file": "plugin-agent-copilot:test/install-skills.spec.ts"

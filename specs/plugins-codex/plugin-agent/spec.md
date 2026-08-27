@@ -96,6 +96,10 @@ Codex installation MUST include `specd-fasttrack` when standard skills are insta
 
 The rendered skill MUST retain the incremental journal-resumability contract and MUST emit only the Codex-supported `name` and `description` frontmatter fields.
 
+### Requirement: Manual-only fast-track routing
+
+The Codex fast-track frontmatter description MUST state that the skill is manual-only and may be used only when the user explicitly invokes `/specd-fasttrack`.
+
 ## Constraints
 
 - The plugin MUST depend on `@specd/skills` for skill operations.
