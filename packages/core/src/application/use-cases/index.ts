@@ -55,6 +55,11 @@ export {
   type GetProjectContextInput,
   type GetProjectContextResult,
 } from './get-project-context.js'
+export {
+  ResolveContextSpecs,
+  type ResolveContextSpecsInput,
+  type ResolveContextSpecsResult,
+} from './resolve-context-specs.js'
 export { GetConfig } from './get-config.js'
 export { type CreateChange, type CreateChangeInput } from './create-change.js'
 export {

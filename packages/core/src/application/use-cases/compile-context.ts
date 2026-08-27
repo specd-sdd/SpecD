@@ -16,7 +16,8 @@ import { checkProjectMetadataFreshness } from './_shared/project-metadata-freshn
 import { type ContentHasher } from '../ports/content-hasher.js'
 import { type PreviewSpec } from './preview-spec.js'
 import { type ContextWarning } from './_shared/context-warning.js'
-import { listMatchingSpecs, type ResolvedSpec } from './_shared/spec-pattern-matching.js'
+import { type ResolvedSpec } from './_shared/spec-pattern-matching.js'
+import { resolveConfiguredContextSpecs } from './_shared/resolve-configured-context-specs.js'
 import { traverseDependsOn, type DependsOnFallback } from './_shared/depends-on-traversal.js'
 import { compileContextFingerprint } from './_shared/compile-context-fingerprint.js'
 import { type SpecWorkspaceRoute } from './_shared/spec-reference-resolver.js'
@@ -357,53 +358,24 @@ export class CompileContext {
       }
     }
 
-    // --- 5-step context spec collection ---
-    if (!useOptimizedProjectContext) {
-      // Step 1: Project-level include patterns (all workspaces, bare * = all)
-      for (const pattern of config.contextIncludeSpecs ?? []) {
-        const matches = await listMatchingSpecs(pattern, 'default', true, workspaceMap, warnings)
-        for (const spec of matches) {
-          registerCollectedSpec(spec, 'includePattern')
-        }
-      }
-
-      // Step 2: Project-level exclude patterns
-      const projectExcludedKeys = new Set<string>()
-      for (const pattern of config.contextExcludeSpecs ?? []) {
-        const matches = await listMatchingSpecs(pattern, 'default', true, workspaceMap, warnings)
-        for (const spec of matches) {
-          projectExcludedKeys.add(`${spec.workspace}:${spec.capPath}`)
-        }
-      }
-      for (const key of projectExcludedKeys) {
-        if (!protectedKeys.has(key)) collectedSpecs.delete(key)
-      }
-    }
-
-    // Step 3: Workspace-level include patterns (active workspaces only)
     const activeWorkspaces = new Set(change.workspaces)
 
-    for (const [wsName, wsConfig] of Object.entries(config.workspaces ?? {})) {
-      if (!activeWorkspaces.has(wsName)) continue
-      for (const pattern of wsConfig.contextIncludeSpecs ?? []) {
-        const matches = await listMatchingSpecs(pattern, wsName, false, workspaceMap, warnings)
-        for (const spec of matches) {
-          registerCollectedSpec(spec, 'includePattern')
-        }
-      }
-    }
-
-    // Step 4: Workspace-level exclude patterns (active workspaces only)
-    for (const [wsName, wsConfig] of Object.entries(config.workspaces ?? {})) {
-      if (!activeWorkspaces.has(wsName)) continue
-      for (const pattern of wsConfig.contextExcludeSpecs ?? []) {
-        const matches = await listMatchingSpecs(pattern, wsName, false, workspaceMap, warnings)
-        for (const spec of matches) {
+    // --- 5-step context spec collection ---
+    await resolveConfiguredContextSpecs({
+      config: useOptimizedProjectContext
+        ? { ...config, contextIncludeSpecs: [], contextExcludeSpecs: [] }
+        : config,
+      activeWorkspaces,
+      workspaceMap,
+      warnings,
+      collector: {
+        include: (spec) => registerCollectedSpec(spec, 'includePattern'),
+        exclude: (spec) => {
           const key = `${spec.workspace}:${spec.capPath}`
           if (!protectedKeys.has(key)) collectedSpecs.delete(key)
-        }
-      }
-    }
+        },
+      },
+    })
 
     // Step 5: dependsOn traversal from change.specIds (only when followDeps is true)
     const dependsOnAdded = new Map<string, ResolvedSpec>()

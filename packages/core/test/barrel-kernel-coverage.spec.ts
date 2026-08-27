@@ -68,6 +68,7 @@ const KERNEL_ASSEMBLY_EXPORTS: Record<string, string> = {
   'project.listWorkspaces': 'createListWorkspaces',
   'project.getProjectSummary': 'createGetProjectSummary',
   'project.getProjectContext': 'createGetProjectContext',
+  'project.resolveContextSpecs': 'createResolveContextSpecs',
   'project.getConfig': 'createGetConfig',
   'project.getMetadata': 'createGetProjectMetadata',
   'project.updateMetadata': 'createUpdateProjectMetadata',

@@ -922,4 +922,53 @@ describe('GetProjectContext', () => {
     expect(result.specs[0]?.content).toBeUndefined()
     expect(getMetadata.execute).not.toHaveBeenCalled()
   })
+
+  it('uses shared helper semantics: project patterns apply, workspace patterns do not', async () => {
+    const login = makeSpec({
+      workspace: 'default',
+      name: 'auth/login',
+      filenames: ['spec.md'],
+    })
+    const billing = makeSpec({
+      workspace: 'billing',
+      name: 'payments',
+      filenames: ['spec.md'],
+    })
+    const excluded = makeSpec({
+      workspace: 'default',
+      name: 'drafts/old',
+      filenames: ['spec.md'],
+    })
+    const specRepos = new Map([
+      ['default', makeSpecRepository({ specs: [login, excluded] })],
+      ['billing', makeSpecRepository({ specs: [billing] })],
+    ])
+    const schema = makeSchema({ artifacts: [makeArtifactType('spec')] })
+
+    const uc = makeGetProjectContext(
+      makeListWorkspaces(specRepos),
+      makeSchemaProvider(schema),
+      makeFileReader(),
+      makeParsers(),
+      makeContentHasher(),
+      createBuiltinExtractorTransforms(),
+      [],
+      {
+        contextMode: 'list',
+        contextIncludeSpecs: ['default:*'],
+        contextExcludeSpecs: ['default:drafts/*'],
+        workspaces: {
+          billing: { contextIncludeSpecs: ['*'] },
+        },
+      },
+      specRepos,
+    )
+
+    const result = await uc.execute({})
+    const ids = result.specs.map((s) => s.specId)
+
+    expect(ids).toContain('default:auth/login')
+    expect(ids).not.toContain('default:drafts/old')
+    expect(ids).not.toContain('billing:payments')
+  })
 })

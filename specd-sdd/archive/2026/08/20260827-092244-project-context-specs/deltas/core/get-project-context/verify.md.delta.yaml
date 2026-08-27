@@ -1,0 +1,47 @@
+- op: modified
+  description: 'Keep include/exclude scenarios and require shared-helper usage'
+  selector:
+    type: section
+    matches: 'Requirement: Applies project-level include/exclude patterns'
+  content: |
+    #### Scenario: Include pattern matches specs
+
+    - **GIVEN** `config.contextIncludeSpecs` is `["default:*"]` and the default workspace has specs
+    - **WHEN** `execute` is called
+    - **THEN** `specs` contains entries for all specs in the default workspace
+
+    #### Scenario: Exclude pattern removes specs
+
+    - **GIVEN** `config.contextIncludeSpecs` is `["default:*"]` and `config.contextExcludeSpecs` is `["default:drafts/*"]`
+    - **WHEN** `execute` is called
+    - **THEN** `specs` does not contain any spec under `drafts/`
+
+    #### Scenario: Specs deduplicated across patterns
+
+    - **GIVEN** `config.contextIncludeSpecs` is `["default:architecture", "default:*"]`
+    - **WHEN** `execute` is called
+    - **THEN** the `architecture` spec appears exactly once in `specs`
+
+    #### Scenario: Project include/exclude uses shared helper
+
+    - **WHEN** `GetProjectContext` collects specs from project-level patterns
+    - **THEN** it invokes `resolveConfiguredContextSpecs` with an empty `activeWorkspaces` set
+    - **AND** does not run a separate inline `listMatchingSpecs` include/exclude loop for those steps
+
+- op: modified
+  description: 'Keep workspace-skip scenario; tie enforcement to empty activeWorkspaces'
+  selector:
+    type: section
+    matches: 'Requirement: Does not apply workspace-level patterns'
+  content: |
+    #### Scenario: Workspace-level patterns ignored
+
+    - **GIVEN** a workspace declares `contextIncludeSpecs: ["extra/*"]` at workspace level
+    - **WHEN** `execute` is called
+    - **THEN** specs matched only by the workspace-level pattern are not included
+
+    #### Scenario: Empty activeWorkspaces prevents workspace helper steps
+
+    - **WHEN** `GetProjectContext` calls `resolveConfiguredContextSpecs`
+    - **THEN** `activeWorkspaces` is empty
+    - **AND** helper workspace include/exclude steps do not run

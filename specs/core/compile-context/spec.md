@@ -101,6 +101,12 @@ After seeding, `CompileContext` applies the five-step resolution:
 4. **Workspace-level exclude patterns** — applied only for active workspaces; removes further specs from the set, except mandatory `change.specIds` seed entries from this call.
 5. **`dependsOn` traversal** — only performed when `followDeps: true` is passed. Starting from `change.specIds`, `CompileContext` resolves each spec's dependency information using the resolution order defined in `Requirement: dependsOn resolution order`, then follows links transitively until no new specs are discovered or the `depth` limit is reached. Manifest-declared dependencies MUST be consulted before any repository access, so dependencies declared for change-scoped specs that are not yet persisted traverse transitively instead of being dropped. Specs added in this step are **not** subject to the exclude rules from steps 2 or 4. When `followDeps` is `false` or absent, this step is skipped entirely. This works in all change states (designing, ready, implementing, etc.) — it is not gated on reaching `ready`.
 
+Steps 1–4 MUST be performed by invoking the shared configured-context helper defined by [`core:resolve-context-specs`](../resolve-context-specs/spec.md) (`resolveConfiguredContextSpecs`), using an effective-set `collector.include` / `collector.exclude` path. `CompileContext` MUST NOT re-implement project/workspace glob ordering inline. The helper MUST NOT own change seeding, protected `specIds`, or step 5.
+
+When optimized project context is preferred for the call (`useOptimizedProjectContext`), `CompileContext` MUST still invoke the helper for workspace-level patterns, but MUST pass empty project-level include/exclude arrays so steps 1–2 are effectively skipped while steps 3–4 still run.
+
+Exclude callbacks wired by `CompileContext` MUST refuse to remove protected mandatory `change.specIds` seed entries.
+
 During traversal, a discovered spec MUST pass an existence check against the corresponding workspace `SpecRepository` BEFORE it is registered into the collected set: unresolvable discoveries are neither registered nor warned — they are skipped silently. Warnings for genuinely unresolvable references surface later through seeding or rendering paths.
 
 When a persisted spec's metadata cannot be materialized at all during traversal, `CompileContext` emits a `missing-metadata` warning identifying the spec and continues with any dependency information available from the change manifest's `specDependsOn` or from schema extraction fallback when the schema declares `metadataExtraction.dependsOn`. Non-persisted specs never produce this warning merely for lacking persisted state.
@@ -347,3 +353,4 @@ const result = await compileContext.execute({
 - [`core:get-spec-metadata`](../get-spec-metadata/spec.md) — self-healing metadata read (`if-needed`) used instead of direct repository freshness checks
 - [`core:spec-optimization`](../spec-optimization/spec.md) — per-field optimization freshness backing the optimization warning signals
 - [`core:composition-resolver`](../composition-resolver/spec.md)
+- [`core:resolve-context-specs`](../resolve-context-specs/spec.md) — shared content-free configured include/exclude helper for steps 1–4

@@ -1241,6 +1241,55 @@ interface GetProjectContextResult {
 
 ---
 
+### ResolveContextSpecs
+
+Resolves the configured context pattern set to spec IDs **partitioned by include source**, without rendering content, metadata, dependency traversal, or warnings. Shares project/workspace include/exclude ordering with `CompileContext` via the internal `resolveConfiguredContextSpecs` helper: the helper's `collector.include/exclude(spec)` path is identical to the pre-extraction CompileContext callbacks; optional `onOperation(op, spec, source)` supplies `{ kind: 'project' }` or `{ kind: 'workspace', workspace }` provenance without changing collector semantics.
+
+Unlike `GetProjectContext`, this use case does not assemble `context:` entries or load optimized project metadata. Unlike `CompileContext`, it does not seed change `specIds` / `specDependsOn` or run `followDeps` traversal.
+
+**Constructor:**
+
+Yaml-derived defaults are baked at construction time via `defaultConfig: CompileContextConfig`.
+
+```typescript
+new ResolveContextSpecs(
+  listWorkspaces: ListWorkspaces,
+  defaultConfig: CompileContextConfig,
+)
+```
+
+**Input:**
+
+| Field             | Type                | Required | Description                                                                                                      |
+| ----------------- | ------------------- | -------- | ---------------------------------------------------------------------------------------------------------------- |
+| `workspaces`      | `readonly string[]` | no       | Workspace names whose workspace-level patterns are active. Omitted or empty means all configured workspaces.     |
+| `workspacesOnly`  | `boolean`           | no       | When `true`, skip project-level include/exclude patterns; `project` in the result is always empty.               |
+
+**Returns:** `Promise<ResolveContextSpecsResult>`
+
+```typescript
+interface ResolveContextSpecsResult {
+  /** Specs included by project-level patterns that remain after all excludes. */
+  project: readonly string[]
+  /** Specs included by each workspace's patterns that remain after all excludes. */
+  workspaces: Readonly<Record<string, readonly string[]>>
+}
+```
+
+A given ID may appear under both `project` and one or more `workspaces` entries when multiple layers included it and it survived subsequent excludes. That preserves provenance (e.g. a `core:*` spec included by project patterns vs by the `core` workspace patterns).
+
+When `workspaces` is filtered on the input, only those workspace keys appear under `workspaces` (possibly empty). `project` is unaffected unless `workspacesOnly: true`.
+
+**Throws:**
+
+| Error   | Condition                                                                 |
+| ------- | ------------------------------------------------------------------------- |
+| `Error` | One or more requested workspace names are not present in `ListWorkspaces`. |
+
+**Kernel:** `kernel.project.resolveContextSpecs`
+
+---
+
 ### GetArtifactInstruction
 
 Returns artifact-specific instructions: the schema `instruction:` text, composition rules (`rules.pre`/`rules.post`), and delta guidance with existing artifact outlines. Rule entries use `instruction:` text too. Read-only — never modifies state or executes commands.

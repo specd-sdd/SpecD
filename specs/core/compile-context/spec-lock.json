@@ -20,32 +20,45 @@
     "core:project-metadata",
     "core:spec-optimization",
     "core:get-spec-metadata",
-    "core:content-extraction"
+    "core:content-extraction",
+    "core:resolve-context-specs"
   ],
   "implementation": [
     {
-      "file": "core:src/application/use-cases/_shared/materialize-context-spec-metadata.ts",
-      "symbols": ["appendMaterializationDiagnostics"]
-    },
-    {
-      "file": "core:src/application/use-cases/_shared/context-warning.ts",
-      "symbols": ["ContextWarning"]
-    },
-    {
-      "file": "core:src/domain/services/parse-metadata.ts",
-      "symbols": ["SpecMetadata", "specMetadataSchema", "strictSpecMetadataSchema"]
-    },
-    {
-      "file": "core:src/application/use-cases/generate-spec-metadata.ts",
-      "symbols": ["buildFreshOptimizationProjections"]
+      "file": "core:src/application/use-cases/_shared/resolve-configured-context-specs.ts",
+      "symbols": [
+        "resolveConfiguredContextSpecs",
+        "ConfiguredContextSpecCollector",
+        "ResolveConfiguredContextSpecsInput",
+        "ConfiguredContextSpecSource",
+        "ConfiguredContextSpecOperationListener"
+      ]
     },
     {
       "file": "core:src/application/use-cases/compile-context.ts",
       "symbols": ["CompileContext"]
     },
     {
-      "file": "core:src/application/use-cases/_shared/depends-on-traversal.ts",
-      "symbols": ["traverseDependsOn", "TraverseDependsOnOptions"]
+      "file": "core:src/application/use-cases/resolve-context-specs.ts",
+      "symbols": ["ResolveContextSpecs", "ResolveContextSpecsInput", "ResolveContextSpecsResult"]
+    },
+    {
+      "file": "core:src/composition/use-cases/resolve-context-specs.ts",
+      "symbols": [
+        "createResolveContextSpecs",
+        "resolveResolveContextSpecsDeps",
+        "ResolveContextSpecsDeps"
+      ]
+    },
+    {
+      "file": "core:src/composition/kernel.ts",
+      "symbols": ["createKernel", "resolveContextSpecs"]
+    },
+    {
+      "file": "core:test/application/use-cases/resolve-context-specs.spec.ts"
+    },
+    {
+      "file": "core:test/application/use-cases/configured-context-parity.spec.ts"
     }
   ],
   "optimizations": {
