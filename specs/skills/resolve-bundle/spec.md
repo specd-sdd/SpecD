@@ -51,6 +51,12 @@ interface ResolveBundleInput {
 
 `context` defaults to an empty render context. `context.variables` MUST support recursive template values.
 
+### Requirement: Fast-track bundle resolution
+
+`ResolveBundle` MUST resolve `specd-fasttrack` through the generic skill-repository path and MUST apply the existing project-relative built-in variables, supplied capability identifiers, structured frontmatter values, and shared-file routing without a fast-track-specific resolver branch.
+
+The resolved bundle MUST retain conditional workflow content only for capabilities supplied by the target runtime and MUST keep shared files free of runtime skill frontmatter.
+
 ## Constraints
 
 - Install-time rendering context is passed at invocation time.

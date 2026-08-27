@@ -20,11 +20,23 @@ const repositoryMock = {
           requiredSharedTemplates: [],
         },
       },
+      {
+        name: 'specd-fasttrack',
+        description: 'specd-fasttrack',
+        templates: [],
+        kind: 'skill',
+        metadata: {
+          kind: 'skill',
+          supportedCapabilities: ['mcp', 'agents', 'frontmatter'],
+          requiredCapabilities: [],
+          requiredSharedTemplates: [],
+        },
+      },
     ],
   ),
   get: vi.fn(
     async (name: string): Promise<Skill | undefined> =>
-      name === 'specd'
+      name === 'specd' || name === 'specd-fasttrack'
         ? {
             name,
             description: name,
@@ -40,11 +52,20 @@ const repositoryMock = {
         : undefined,
   ),
   getBundle: vi.fn(
-    async (name: string, _context?: unknown): Promise<SkillBundle> => ({
+    async (name: string, context?: { capabilities?: readonly string[] }): Promise<SkillBundle> => ({
       name,
       description: name,
       files: [
-        { filename: 'SKILL.md', content: '---\nname: "specd"\n---\n\n# ' + name },
+        {
+          filename: 'SKILL.md',
+          content:
+            name === 'specd-fasttrack'
+              ? '---\nname: "specd-fasttrack"\ndescription: "Fast-track code-first development"\n---\n\n# specd-fasttrack\n\nCore workflow guidance' +
+                (context?.capabilities?.includes('mcp')
+                  ? '\n\nMCP-backed project workflow guidance'
+                  : '')
+              : '---\nname: "specd"\n---\n\n# ' + name,
+        },
         { filename: 'shared.md', content: 'shared-content', shared: true },
       ],
       install: async () => {},
@@ -102,9 +123,9 @@ describe('plugin-agent-copilot create()', () => {
     try {
       const { create } = await import('../src/index.js')
       const plugin = await create({ config })
-      const result = await plugin.install(config, { skills: ['specd'] })
+      const result = await plugin.install(config)
 
-      expect(result.installed.length).toBe(1)
+      expect(result.installed.length).toBe(2)
       expect(repositoryMock.getBundle).toHaveBeenCalledWith(
         'specd',
         expect.objectContaining({
@@ -119,6 +140,31 @@ describe('plugin-agent-copilot create()', () => {
       const skillContent = await readFile(skillFilePath, 'utf8')
       expect(skillContent).toContain('---')
       expect(skillContent).toContain('name: "specd"')
+
+      const fasttrackFilePath = path.join(
+        projectRoot,
+        '.github',
+        'skills',
+        'specd-fasttrack',
+        'SKILL.md',
+      )
+      const fasttrackContent = await readFile(fasttrackFilePath, 'utf8')
+      expect(fasttrackContent).toContain('name: "specd-fasttrack"')
+      expect(fasttrackContent).not.toContain('MCP-backed project workflow guidance')
+      expect(fasttrackContent).not.toContain('allowed-tools:')
+      expect(repositoryMock.getBundle).toHaveBeenCalledWith(
+        'specd-fasttrack',
+        expect.objectContaining({
+          capabilities: expect.arrayContaining(['frontmatter', 'agents']),
+          variables: expect.objectContaining({
+            frontmatter: {
+              name: 'specd-fasttrack',
+              description:
+                'Fast-track code-first development, bugfix, or spike session with live decision journaling and post-facto consolidation into specd.',
+            },
+          }),
+        }),
+      )
 
       const sharedFilePath = path.join(
         projectRoot,

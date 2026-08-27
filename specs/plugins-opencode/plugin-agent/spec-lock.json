@@ -14,12 +14,11 @@
   ],
   "implementation": [
     {
-      "file": "plugin-agent-opencode:src/application/use-cases/install-skills.ts",
-      "symbols": ["InstallSkills"]
+      "file": "plugin-agent-opencode:src/domain/frontmatter/index.ts",
+      "symbols": ["skillFrontmatter"]
     },
     {
-      "file": "plugin-agent-opencode:src/application/use-cases/uninstall-skills.ts",
-      "symbols": ["UninstallSkills"]
+      "file": "plugin-agent-opencode:test/install-skills.spec.ts"
     }
   ]
 }

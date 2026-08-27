@@ -16,6 +16,11 @@ export const skillFrontmatter: Readonly<Record<string, Frontmatter>> = {
     allowed_tools: 'Bash(node *), Bash(specd *), Read, TaskCreate, TaskUpdate',
     argument_hint: '<change-name>',
   },
+  'specd-fasttrack': {
+    name: 'specd-fasttrack',
+    description:
+      'Fast-track code-first development, bugfix, or spike session with live decision journaling and post-facto consolidation into specd.',
+  },
   'specd-design': {
     name: 'specd-design',
     description: 'Write or revise specd design artifacts for an active change.',

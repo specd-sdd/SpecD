@@ -6,7 +6,7 @@
   "dependsOn": ["skills:skill", "skills:skill-bundle", "skills:skill-templates-source"],
   "implementation": [
     {
-      "file": "skills:src/infrastructure/repository/skill-repository.ts"
+      "file": "skills:test/infrastructure/skill-repository.spec.ts"
     }
   ]
 }

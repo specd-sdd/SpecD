@@ -20,11 +20,23 @@ const repositoryMock = {
           requiredSharedTemplates: [],
         },
       },
+      {
+        name: 'specd-fasttrack',
+        description: 'specd-fasttrack',
+        templates: [],
+        kind: 'skill',
+        metadata: {
+          kind: 'skill',
+          supportedCapabilities: ['mcp', 'agents', 'frontmatter'],
+          requiredCapabilities: [],
+          requiredSharedTemplates: [],
+        },
+      },
     ],
   ),
   get: vi.fn(
     async (name: string): Promise<Skill | undefined> =>
-      name === 'specd'
+      name === 'specd' || name === 'specd-fasttrack'
         ? {
             name,
             description: name,
@@ -46,7 +58,10 @@ const repositoryMock = {
       files: [
         {
           filename: 'SKILL.md',
-          content: '---\nname: "specd"\ndescription: "specd"\n---\n\n# ' + name,
+          content:
+            name === 'specd-fasttrack'
+              ? '---\nname: "specd-fasttrack"\ndescription: "Fast-track code-first development"\n---\n\n# specd-fasttrack\n\n**Mandatory live journal rule:** before moving to the next meaningful action, append an entry to `.specd-exploration.md`.'
+              : '---\nname: "specd"\ndescription: "specd"\n---\n\n# ' + name,
         },
         { filename: 'shared.md', content: 'shared-content', shared: true },
       ],
@@ -105,9 +120,9 @@ describe('plugin-agent-codex create()', () => {
     try {
       const { create } = await import('../src/index.js')
       const plugin = await create({ config })
-      const result = await plugin.install(config, { skills: ['specd'] })
+      const result = await plugin.install(config)
 
-      expect(result.installed.length).toBe(1)
+      expect(result.installed.length).toBe(2)
       expect(repositoryMock.getBundle).toHaveBeenCalledWith(
         'specd',
         expect.objectContaining({
@@ -122,6 +137,34 @@ describe('plugin-agent-codex create()', () => {
       const skillContent = await readFile(skillFilePath, 'utf8')
       expect(skillContent).toContain('---')
       expect(skillContent).toContain('name: "specd"')
+
+      const fasttrackFilePath = path.join(
+        projectRoot,
+        '.codex',
+        'skills',
+        'specd-fasttrack',
+        'SKILL.md',
+      )
+      const fasttrackContent = await readFile(fasttrackFilePath, 'utf8')
+      const frontmatter = fasttrackContent.match(/^---\n([\s\S]*?)\n---/)?.[1]
+      expect(frontmatter?.trim().split('\n')).toEqual([
+        'name: "specd-fasttrack"',
+        'description: "Fast-track code-first development"',
+      ])
+      expect(fasttrackContent).toContain('**Mandatory live journal rule:**')
+      expect(fasttrackContent).toContain('append an entry to `.specd-exploration.md`')
+      expect(repositoryMock.getBundle).toHaveBeenCalledWith(
+        'specd-fasttrack',
+        expect.objectContaining({
+          variables: expect.objectContaining({
+            frontmatter: {
+              name: 'specd-fasttrack',
+              description:
+                'Fast-track code-first development, bugfix, or spike session with live decision journaling and post-facto consolidation into specd.',
+            },
+          }),
+        }),
+      )
 
       const sharedFilePath = path.join(
         projectRoot,

@@ -102,6 +102,12 @@ When no filters are provided, uninstall MUST remove all specd-managed skill dire
 
 Uninstall MUST NOT remove unrelated directories or files under `.opencode/skills/` or `.opencode/agents/` that are not part of the specd-managed skill or agent set.
 
+### Requirement: Fast-track skill installation
+
+Open Code installation MUST include `specd-fasttrack` when standard skills are installed without an explicit skill filter. It MUST resolve the skill through `ResolveBundle`, provide Open Code's supported capabilities and structured frontmatter values, and write the rendered skill under the existing Open Code skill-directory contract.
+
+The rendered output MUST preserve capability-aware workflow branches and MUST include only Open Code-supported frontmatter fields.
+
 ## Constraints
 
 - The plugin MUST depend on `@specd/skills` for skill repository access.

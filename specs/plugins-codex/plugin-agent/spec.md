@@ -90,6 +90,12 @@ When no filters are provided, uninstall MUST remove all specd-managed skill dire
 
 Uninstall MUST NOT remove unrelated directories or files under `.codex/skills/` or `.codex/agents/` that are not part of the specd-managed skill or agent set.
 
+### Requirement: Fast-track skill installation
+
+Codex installation MUST include `specd-fasttrack` when standard skills are installed without an explicit skill filter. It MUST resolve the skill through `ResolveBundle`, provide Codex's supported capabilities and structured frontmatter values, and write the rendered `SKILL.md` under `.codex/skills/specd-fasttrack/`.
+
+The rendered skill MUST retain the incremental journal-resumability contract and MUST emit only the Codex-supported `name` and `description` frontmatter fields.
+
 ## Constraints
 
 - The plugin MUST depend on `@specd/skills` for skill operations.

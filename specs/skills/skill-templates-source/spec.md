@@ -165,6 +165,14 @@ Archive-oriented templates MAY use `specs metadata` to inspect `source`, `regene
 
 Template contract tests MUST assert the exact commands and output fields required by these roles, not only the presence of command-group or configuration keywords.
 
+### Requirement: Fast-track workflow template
+
+`templates/skills/` MUST contain a `specd-fasttrack/` standard-skill directory with `SKILL.md.tpl` and `skill.meta.json`.
+
+The metadata MUST declare `kind: "skill"`, declare `shared.md` in `requiredSharedTemplates`, and declare every capability referenced by the template. The template MUST contain no static frontmatter and MUST reference shared context as `@{{sharedFolder}}/shared.md`.
+
+The rendered fast-track workflow MUST require `.specd-exploration.md` to be updated immediately after every meaningful decision, scope or contract finding, source edit, implementation-link update, test or debug action, and audit result. Each update MUST preserve what changed, why, and affected files or symbols when applicable. A final consolidation MUST summarize, not replace, these incremental entries so an interrupted session can be resumed without reconstructing state from memory or a partial diff.
+
 ## Constraints
 
 - Templates in the skills package MUST NOT contain static frontmatter YAML blocks.

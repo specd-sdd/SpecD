@@ -171,3 +171,13 @@
 - **WHEN** the Open Code install flow is reviewed
 - **THEN** bundle resolution goes through `ResolveBundle`
 - **AND** the plugin does not call `SkillRepository.getBundle(...)` directly from `InstallSkills`
+
+### Requirement: Fast-track skill installation
+
+#### Scenario: Default Open Code installation includes fast-track
+
+- **GIVEN** no explicit skill filter
+- **WHEN** Open Code installs available standard skills
+- **THEN** its fast-track skill is rendered and installed through `ResolveBundle`
+- **AND** the rendered frontmatter contains only Open Code-supported fields
+- **AND** capability-aware workflow content is retained for supplied capabilities

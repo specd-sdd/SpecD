@@ -239,3 +239,19 @@
 - **WHEN** template contract tests verify command roles and optimization gating
 - **THEN** they assert the exact commands and output fields
 - **AND** keyword-only assertions are insufficient
+
+### Requirement: Fast-track workflow template
+
+#### Scenario: Template renders a resumable fast-track workflow
+
+- **GIVEN** the `specd-fasttrack` template directory and metadata are present
+- **WHEN** a frontmatter-capable runtime resolves the skill
+- **THEN** the emitted `SKILL.md` contains no static source frontmatter
+- **AND** it references the rendered relative shared context
+- **AND** it directs the agent to update `.specd-exploration.md` immediately after each decision, code action, link update, test action, and audit finding
+
+#### Scenario: Interrupted work retains journal state
+
+- **GIVEN** fast-track work has been interrupted after an implementation edit
+- **WHEN** a subsequent agent reads the journal
+- **THEN** it can identify the completed action, rationale, and affected implementation scope without relying on an uncommitted diff

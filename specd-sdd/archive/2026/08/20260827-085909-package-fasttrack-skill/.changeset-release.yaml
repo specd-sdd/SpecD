@@ -1,0 +1,9 @@
+releases:
+  skills:skill-templates-source: minor
+  skills:skill-repository: minor
+  skills:resolve-bundle: minor
+  plugin-agent-claude:plugin-agent: minor
+  plugin-agent-copilot:plugin-agent: minor
+  plugin-agent-codex:plugin-agent: minor
+  plugin-agent-opencode:plugin-agent: minor
+  plugin-agent-standard:plugin-agent: minor

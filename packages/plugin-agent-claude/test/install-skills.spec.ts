@@ -20,11 +20,23 @@ const repositoryMock = {
           requiredSharedTemplates: [],
         },
       },
+      {
+        name: 'specd-fasttrack',
+        description: 'specd-fasttrack',
+        templates: [],
+        kind: 'skill',
+        metadata: {
+          kind: 'skill',
+          supportedCapabilities: ['mcp', 'agents', 'frontmatter'],
+          requiredCapabilities: [],
+          requiredSharedTemplates: [],
+        },
+      },
     ],
   ),
   get: vi.fn(
     async (name: string): Promise<Skill | undefined> =>
-      name === 'specd' || name === 'specd-verify'
+      name === 'specd' || name === 'specd-verify' || name === 'specd-fasttrack'
         ? {
             name,
             description: name,
@@ -44,7 +56,13 @@ const repositoryMock = {
       name,
       description: name,
       files: [
-        { filename: 'SKILL.md', content: '---\ndescription: "specd"\n---\n\n# ' + name },
+        {
+          filename: 'SKILL.md',
+          content:
+            name === 'specd-fasttrack'
+              ? '---\nname: "specd-fasttrack"\ndescription: "Fast-track code-first development"\n---\n\n# specd-fasttrack\n\n**Mandatory live journal rule:** before moving to the next meaningful action, append an entry to `.specd-exploration.md`.\n\nMCP-backed project workflow guidance'
+              : '---\ndescription: "specd"\n---\n\n# ' + name,
+        },
         { filename: 'shared.md', content: 'shared-content', shared: true },
       ],
       install: async () => {},
@@ -102,9 +120,9 @@ describe('plugin-agent-claude create()', () => {
     try {
       const { create } = await import('../src/index.js')
       const plugin = await create({ config })
-      const result = await plugin.install(config, { skills: ['specd'] })
+      const result = await plugin.install(config)
 
-      expect(result.installed.length).toBe(1)
+      expect(result.installed.length).toBe(2)
       expect(repositoryMock.getBundle).toHaveBeenCalledWith(
         'specd',
         expect.objectContaining({
@@ -119,6 +137,36 @@ describe('plugin-agent-claude create()', () => {
       const skillContent = await readFile(skillFilePath, 'utf8')
       expect(skillContent).toContain('---')
       expect(skillContent).toContain('description:')
+
+      const fasttrackFilePath = path.join(
+        projectRoot,
+        '.claude',
+        'skills',
+        'specd-fasttrack',
+        'SKILL.md',
+      )
+      const fasttrackContent = await readFile(fasttrackFilePath, 'utf8')
+      expect(fasttrackContent).toContain('name: "specd-fasttrack"')
+      expect(fasttrackContent).toContain('**Mandatory live journal rule:**')
+      expect(fasttrackContent).toContain('append an entry to `.specd-exploration.md`')
+      expect(repositoryMock.getBundle).toHaveBeenCalledWith(
+        'specd-fasttrack',
+        expect.objectContaining({
+          capabilities: expect.arrayContaining(['mcp', 'agents', 'frontmatter']),
+          variables: expect.objectContaining({
+            frontmatter: {
+              name: 'specd-fasttrack',
+              description:
+                'Fast-track code-first development, bugfix, or spike session with live decision journaling and post-facto consolidation into specd.',
+            },
+          }),
+        }),
+      )
+
+      await plugin.uninstall(config, { skills: ['specd-fasttrack'] })
+      await expect(readFile(fasttrackFilePath, 'utf8')).rejects.toThrow()
+      await plugin.install(config, { skills: ['specd-fasttrack'] })
+      await expect(readFile(fasttrackFilePath, 'utf8')).resolves.toContain('specd-fasttrack')
 
       const sharedFilePath = path.join(
         projectRoot,

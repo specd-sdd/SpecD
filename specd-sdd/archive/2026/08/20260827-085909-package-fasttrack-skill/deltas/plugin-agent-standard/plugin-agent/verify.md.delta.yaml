@@ -1,0 +1,16 @@
+- op: added
+  description: 'Verify Agent Skills Standard installs a safe fast-track skill'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    ### Requirement: Fast-track skill installation
+
+    #### Scenario: Default Standard installation declares fast-track tools
+
+    - **GIVEN** no explicit skill filter
+    - **WHEN** the Agent Skills Standard plugin installs available standard skills
+    - **THEN** `.agents/skills/specd-fasttrack/SKILL.md` is written from `ResolveBundle`
+    - **AND** its frontmatter declares the required `allowed-tools` value
+    - **AND** instructions needing unsupported capabilities are absent

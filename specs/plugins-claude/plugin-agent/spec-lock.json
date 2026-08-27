@@ -14,12 +14,11 @@
   ],
   "implementation": [
     {
-      "file": "plugin-agent-claude:src/application/use-cases/install-skills.ts",
-      "symbols": ["InstallSkills"]
+      "file": "plugin-agent-claude:src/domain/frontmatter/index.ts",
+      "symbols": ["skillFrontmatter"]
     },
     {
-      "file": "plugin-agent-claude:src/application/use-cases/uninstall-skills.ts",
-      "symbols": ["UninstallSkills"]
+      "file": "plugin-agent-claude:test/install-skills.spec.ts"
     }
   ]
 }

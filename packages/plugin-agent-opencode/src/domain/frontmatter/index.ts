@@ -33,6 +33,11 @@ export const skillFrontmatter: Readonly<Record<string, Frontmatter>> = {
     name: 'specd-verify',
     description: 'Verify implementation against spec scenarios for a change.',
   },
+  'specd-fasttrack': {
+    name: 'specd-fasttrack',
+    description:
+      'Fast-track code-first development, bugfix, or spike session with live decision journaling and post-facto consolidation into specd.',
+  },
 }
 
 /**

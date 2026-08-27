@@ -12,6 +12,11 @@ export const skillFrontmatter: Readonly<Record<string, Frontmatter>> = {
     name: 'specd-archive',
     description: 'Archive a specd change by merging validated deltas into workspace specs.',
   },
+  'specd-fasttrack': {
+    name: 'specd-fasttrack',
+    description:
+      'Fast-track code-first development, bugfix, or spike session with live decision journaling and post-facto consolidation into specd.',
+  },
   'specd-design': {
     name: 'specd-design',
     description: 'Write or revise specd design artifacts for an active change.',

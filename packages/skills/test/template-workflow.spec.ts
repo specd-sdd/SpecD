@@ -10,6 +10,28 @@ function readTemplate(...parts: string[]): string {
 }
 
 describe('workflow skill templates', () => {
+  it('defines fast-track as a frontmatter-free, resumable standard template', () => {
+    const content = readTemplate('skills', 'specd-fasttrack', 'SKILL.md.tpl')
+    const metadata = JSON.parse(
+      readTemplate('skills', 'specd-fasttrack', 'skill.meta.json'),
+    ) as Record<string, unknown>
+
+    expect(content.startsWith('---\n')).toBe(false)
+    expect(content).toContain('@{{sharedFolder}}/shared.md')
+    expect(content).toContain('Mandatory live journal rule')
+    expect(content).toContain('after **every** decision, scope or contract finding,')
+    expect(content).toContain(
+      'source edit, implementation-link update, test or debugging action/result',
+    )
+    expect(content).toContain('A final audit or\nconsolidation summary supplements')
+    expect(metadata).toEqual({
+      kind: 'skill',
+      supportedCapabilities: ['mcp', 'agents', 'frontmatter'],
+      requiredCapabilities: [],
+      requiredSharedTemplates: ['shared.md'],
+    })
+  })
+
   it('does not instruct removed metadata-status scans or write-metadata flows', () => {
     const content = readTemplate('skills', 'specd-archive', 'SKILL.md.tpl')
     expect(content).not.toMatch(/specd specs list --metadata-status/)

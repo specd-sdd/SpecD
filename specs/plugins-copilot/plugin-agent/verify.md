@@ -133,3 +133,13 @@
 - **WHEN** `uninstall(config)` is executed without filters
 - **THEN** all specd-managed agent files are removed
 - **AND** unrelated user agent files remain
+
+### Requirement: Fast-track skill installation
+
+#### Scenario: Copilot omits unsupported fast-track branches
+
+- **GIVEN** no explicit skill filter
+- **WHEN** Copilot installs available standard skills
+- **THEN** its fast-track skill is rendered and installed through `ResolveBundle`
+- **AND** runtime-specific frontmatter contains no unsupported fields
+- **AND** instructions requiring unavailable capabilities are absent

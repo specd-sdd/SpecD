@@ -1,0 +1,16 @@
+- op: added
+  description: 'Verify Open Code installs capability-aware fast-track'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    ### Requirement: Fast-track skill installation
+
+    #### Scenario: Default Open Code installation includes fast-track
+
+    - **GIVEN** no explicit skill filter
+    - **WHEN** Open Code installs available standard skills
+    - **THEN** its fast-track skill is rendered and installed through `ResolveBundle`
+    - **AND** the rendered frontmatter contains only Open Code-supported fields
+    - **AND** capability-aware workflow content is retained for supplied capabilities

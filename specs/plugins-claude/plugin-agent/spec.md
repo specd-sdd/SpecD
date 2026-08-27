@@ -104,6 +104,12 @@ When no filters are provided, uninstall MUST remove all specd-managed skill dire
 
 Uninstall MUST NOT remove unrelated directories or files under `.claude/skills/` or `.claude/agents/` that are not part of the specd-managed skill or agent set.
 
+### Requirement: Fast-track skill installation
+
+Claude installation MUST include `specd-fasttrack` when standard skills are installed without an explicit skill filter. It MUST resolve the skill through `ResolveBundle`, provide Claude's supported capabilities and structured frontmatter values, and write the rendered skill under the existing Claude skill-directory contract.
+
+The installed output MUST preserve the fast-track journal-resumability instructions and MUST include no static or unsupported frontmatter fields.
+
 ## Constraints
 
 - This plugin depends on `@specd/skills` for skill operations.
