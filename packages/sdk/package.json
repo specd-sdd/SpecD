@@ -12,6 +12,7 @@
   "dependencies": {
     "@specd/code-graph": "workspace:*",
     "@specd/core": "workspace:*",
+    "mdast-util-from-markdown": "^2.0.3",
     "zod": "^3.25.76"
   },
   "exports": {
@@ -37,5 +38,8 @@
     "lint": "eslint src test",
     "build:dev": "tsup src/index.ts src/ports.ts src/extensions.ts --format esm --dts --sourcemap --clean",
     "build:debug": "tsup src/index.ts src/ports.ts src/extensions.ts --format esm --dts --sourcemap --clean"
+  },
+  "devDependencies": {
+    "@types/mdast": "^4.0.4"
   }
 }

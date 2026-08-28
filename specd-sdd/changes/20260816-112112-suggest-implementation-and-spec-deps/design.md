@@ -86,17 +86,34 @@ Spec authors currently manually discover and correlate implementation files, exp
 - **New CLI Commands**: `suggest` subcommands under `specd specs implementation` and `specd specs deps`.
 - **System Cache**: Persistent suggestion cache stored under `join(projectDir, config.configPath, 'tmp', 'fs-cache', 'implementation-suggestions/suggestions.json')`.
 - **Non-Existent Spec Validation**: Commands and SDK use cases throw `SpecNotFoundError` if specified target spec IDs do not exist in the repository.
-- **AST Symbol & Dynamic Multi-Language Correlator**: Queries supported source extensions dynamically from an injected `AdapterRegistryPort`, whose composition factory is `createBuiltinAdapterRegistry()`. Supports camelCase & PascalCase symbols, backticked file path parsing, prose keyword filtering, injected file observation, and lifecycle `open()`/`close()` management on `codeGraphProvider`.
+- **Structured Markdown & Dynamic Multi-Language Correlator**: Parses `spec.md` with MDAST, classifies fenced-code, inline-code, heading, and prose evidence, and queries supported source extensions dynamically from an injected `AdapterRegistryPort`, whose composition factory is `createBuiltinAdapterRegistry()`. It validates weak prose candidates against `code-graph`, supports injected file observation, and preserves lifecycle `open()`/`close()` management on `codeGraphProvider`.
+- **Deterministic Candidate-Spec Resolution**: When dependency analysis must map an imported file or symbol back to a spec, it ranks every eligible spec from the implementation-suggestion cache. Confirmed links are authoritative; structured evidence, workspace affinity, capability/symbol affinity, and suggestion score disambiguate unconfirmed candidates. A semantic tie remains ambiguous instead of depending on iteration order.
+- **Interactive Apply & Batch Confidence Filtering**: Interactive terminal execution of `--apply` uses `@clack/prompts` `multiselect` per spec so users review and select candidates with checkboxes (pre-selecting `HIGH` confidence by default, with convenient select-all / deselect-all controls). The `--yes` / `-y` flag bypasses prompts and defaults to `--confidence HIGH` unless an explicit threshold (`MEDIUM`, `LOW`) is provided. Machine-readable formats (`json`, `toon`) and non-TTY environments never block on interactive stdin.
+
+## Non-goals
+
+- No recursive SDK-owned source index: `code-graph` remains the only codebase index.
+- No public “spec owner” API and no persisted ownership claim. Candidate-spec resolution is an internal dependency-suggestion heuristic.
+- No constructor, method-signature, parameter-order, or general spec/code completeness comparison. Those belong to a separate completeness capability.
+- No iteration-order tie breaker. Equal semantic ownership ranks remain explicitly ambiguous.
 
 ## Affected areas & Code Graph Impact Analysis
 
 Impact findings computed via `specd graph impact --direction dependents`:
 
-- `packages/sdk/src/application/use-cases/suggest-implementation-links.ts` (MOVED/RENAMED)
-  - Risk: LOW · Additive Use Case in `@specd/sdk`.
+- `packages/sdk/src/application/use-cases/suggest-implementation-links.ts` (MODIFIED)
+  - Target symbol: `SuggestImplementationLinks`.
+  - Graph impact: 21 direct dependents, 25 indirect dependents, 6 affected files.
+  - Risk: CRITICAL. Its results feed `SuggestSpecDependencies`, both SDK composition factories, and both SDK suggestion test suites. The public input/result shapes remain backward compatible; the change is confined to evidence extraction and deterministic scoring.
 
 - `packages/sdk/src/application/use-cases/suggest-spec-dependencies.ts` (MOVED/RENAMED)
-  - Risk: LOW · Additive Use Case in `@specd/sdk`.
+  - Risk: HIGH for this revision because it consumes candidate-spec resolution and must preserve dependency ordering, additive mutation, and post-apply validation.
+
+- `packages/sdk/src/application/services/extract-markdown-symbol-evidence.ts` (NEW)
+  - Risk: LOW · Pure MDAST traversal with no filesystem access and no codebase indexing.
+
+- `packages/sdk/package.json` and `pnpm-lock.yaml` (MODIFIED)
+  - Add `mdast-util-from-markdown` as an SDK runtime dependency; the version MUST follow the existing workspace lock resolution.
 
 - `packages/sdk/src/domain/value-objects/implementation-suggestion-cache.ts` (NEW)
   - Risk: LOW · Domain value objects, types, stamp contracts, and constants for implementation suggestion cache.
@@ -202,7 +219,7 @@ export abstract class ImplementationSuggestionCachePort {
     specId: string,
     currentStamp: ImplementationSuggestionSpecStamp,
   ): Promise<boolean>
-  abstract findSpecByFile(filePath: string): Promise<string | null>
+  abstract findSpecByFile(filePath: string, symbolName?: string): Promise<string | null>
   abstract getFileToSpecMap(): Promise<ReadonlyMap<string, string>>
   abstract flush(): Promise<void>
   abstract invalidate(): Promise<void>
@@ -268,6 +285,7 @@ export interface SuggestImplementationLinksDeps {
     readText(filePath: string): Promise<string>
   }
   readonly codeGraphProvider?: import('@specd/code-graph').CodeGraphProvider
+  readonly adapterRegistry: import('@specd/code-graph').AdapterRegistryPort
   readonly projectDir?: string
   readonly configPath?: string
 }
@@ -392,6 +410,61 @@ export function resolveSuggestSpecDependenciesDeps(
 
 ## Detailed Step-by-Step Execution Algorithms
 
+### Structured Markdown evidence service
+
+`packages/sdk/src/application/services/extract-markdown-symbol-evidence.ts` exports a
+pure, named API:
+
+```typescript
+export type MarkdownEvidenceSource = 'fenced-code' | 'inline-code' | 'prose'
+
+export interface MarkdownSymbolEvidence {
+  readonly candidate: string
+  readonly kind: 'symbol' | 'file-path'
+  readonly source: MarkdownEvidenceSource
+  readonly sectionPath: readonly string[]
+}
+
+export interface ExtractMarkdownSymbolEvidenceInput {
+  readonly markdown: string
+  readonly supportedExtensions: ReadonlySet<string>
+  readonly supportedLanguages: ReadonlySet<string>
+  readonly reservedKeywords: ReadonlySet<string>
+}
+
+export function extractMarkdownSymbolEvidence(
+  input: ExtractMarkdownSymbolEvidenceInput,
+): readonly MarkdownSymbolEvidence[]
+```
+
+The service calls `fromMarkdown(markdown)` once and walks the returned tree in source
+order. Heading nodes maintain `sectionPath`. Code nodes are eligible only when their
+language is in `supportedLanguages`; inline-code nodes may yield identifiers or paths
+whose extension is in `supportedExtensions`; heading and text nodes yield PascalCase,
+camelCase, and member-root candidates. Universal prose stop words and registry-provided
+language keywords are rejected before output. The result is deduplicated by
+`kind + candidate`; duplicate evidence keeps the strongest source
+(`fenced-code > inline-code > prose`) and, for equal strength, the first source location.
+The service performs no I/O and never queries or indexes source code.
+
+`SuggestImplementationLinks` resolves prose symbols through
+`CodeGraphProvider.findSymbols({ name, workspace })` before they enter candidate path
+derivation or scoring. Unresolved prose is discarded. Evidence contributes exactly one
+source bonus per symbol/file pair and exposes the corresponding stable reason:
+
+| Source                | Score bonus | Reason                  |
+| --------------------- | ----------: | ----------------------- |
+| fenced code           |         +30 | `fenced-code-evidence`  |
+| inline code           |         +20 | `inline-code-evidence`  |
+| graph-validated prose |          +5 | `prose-symbol-evidence` |
+
+These bonuses supplement existing primary-symbol, derivative, filename, and token-affinity
+scores; they do not independently qualify a candidate as `HIGH` confidence.
+Composition injects `AdapterRegistryPort`; the use case derives `supportedExtensions` from
+`getSupportedExtensions()`, `supportedLanguages` from the union of
+`getAdapters().flatMap(adapter => adapter.languages())`, and reserved words from
+`getReservedKeywords()`.
+
 ### Algorithm A: `SuggestImplementationLinks`
 
 1. **Target Spec Resolution & Validation**:
@@ -410,10 +483,11 @@ export function resolveSuggestSpecDependenciesDeps(
      - If hashes equal: update `lastModified` in cache and preserve suggestions (**Cache HIT preserved**).
      - If hashes differ: ❌ **Cache MISS** (re-calculate Pass 1 & Pass 2).
 
-3. **Tier 1: AST Symbol & Path Derivatives**:
+3. **Tier 1: Structured Markdown Symbol Evidence & Path Derivatives**:
    - Read `spec.md` for cache miss specs via `SpecRepository.get(...)`.
-   - Extract code block identifiers matching camelCase & PascalCase names (skipping language reserved keywords queried dynamically from `createBuiltinAdapterRegistry().getReservedKeywords()` and `SPEC_PROSE_KEYWORDS` prose terms).
-   - Parse inline backticked `.ts` filenames (e.g. `` `domain/services/merge-schema-layers.ts` ``) to register derived candidate paths.
+   - Call `extractMarkdownSymbolEvidence` once. Do not run document-wide fenced-code or inline-code regular expressions in parallel with the MDAST traversal.
+   - Resolve prose evidence against `CodeGraphProvider.findSymbols` in the target workspace before it can create a candidate. Fenced-code and inline-code evidence still require the existing candidate-file and declared-symbol checks before output.
+   - Parse inline-code filenames for any extension declared by `AdapterRegistryPort`, not only `.ts`, to register derived candidate paths.
    - Derive candidate paths from capability name (e.g., `cli:spec-deps` -> `packages/cli/src/commands/spec/deps.ts`).
    - Filter candidate paths through the required injected file-observation port. Composition supplies the filesystem implementation; the use case does not call `existsSync`.
    - **Path & Token Affinity (`computePathSpecAffinity`)**:
@@ -443,8 +517,10 @@ export function resolveSuggestSpecDependenciesDeps(
 6. **Cache Inversion & Disambiguation (`FsImplementationSuggestionCache`)**:
    - When building the inverse `file -> specId` map across all specs:
      - If a file is confirmed in `spec-lock.json` (`isExisting === true`), that spec wins authoritatively.
-     - If multiple specs propose the same file with `HIGH` confidence, the spec with strictly higher `score` (computed via path token coverage and symbol affinity) wins the mapping.
-     - Only if a strict score tie exists is the file retained as ambiguous.
+     - `findSpecByFile(filePath, symbolName?)` first collects every spec that confirms or suggests the canonical file. When `symbolName` is provided and at least one candidate suggestion lists that resolved symbol, candidates not listing it are removed.
+     - Rank the remaining candidates lexicographically by the semantic tuple `(confirmed, evidenceStrength, workspaceAffinity, capabilitySymbolAffinity, score)`, where booleans are `1|0`, evidence strength is fenced `3`, inline `2`, prose `1`, and naming-only `0`, workspace affinity means the spec and file share a workspace, and capability/symbol affinity means the normalized capability basename equals the symbol's kebab-case name.
+     - A unique highest tuple wins. `specId` sorting is used only for deterministic diagnostics and MUST NOT break a semantic tie; equal highest tuples return `null` and remain ambiguous.
+     - `getFileToSpecMap()` applies the same algorithm without `symbolName`. It never selects the first insertion-order match.
 
 7. **Pass 3: Mutation & Persistence**:
    - Persist calculated entries in `configPath/tmp/fs-cache/implementation-suggestions/suggestions.json` with `IMPLEMENTATION_SUGGESTION_CACHE_VERSION = '1.1.0'`.
@@ -467,7 +543,8 @@ export function resolveSuggestSpecDependenciesDeps(
    - For each target spec, obtain its implementation source files.
    - Parse TypeScript `import` declarations in those source files.
    - Execute `analyzeFileImpact` (`maxDepth = 1`) via `code-graph` to resolve direct imports and barrel re-export files.
-   - Look up imported target files in the global inverse map `file -> specId`.
+   - When traversal resolves an imported symbol and file, call `findSpecByFile(filePath, symbolName)` so explicit symbol evidence can disambiguate multiple candidate specs. When only a file is resolved, call `findSpecByFile(filePath)`.
+   - Treat `null` as ambiguous/no owner and emit no dependency for that edge. Never select a spec by cache, map, or repository insertion order.
    - Deduce initial candidate inter-spec dependencies.
 
 3. **Pass 2.5: Directional Code Import Validation**:
@@ -522,22 +599,28 @@ export function resolveSuggestSpecDependenciesDeps(
    - `@specd/core`: Remains pure and independent of `code-graph`.
    - `@specd/cli`: Houses subcommands in `packages/cli/src/commands/spec/`.
 2. **Execution Order**:
-   - Implement cache infrastructure first -> Implement `SuggestImplementationLinks` -> Implement `SuggestSpecDependencies` -> Implement CLI subcommands -> Unit & Integration Tests -> Documentation.
+   - Add the SDK MDAST dependency and pure evidence service -> replace regex-only Markdown extraction in `SuggestImplementationLinks` -> add evidence bonuses and inverse-cache ranking -> pass resolved symbol names from `SuggestSpecDependencies` -> update unit/integration tests -> run existing CLI and documentation verification.
 
 ## Key decisions
 
 - **Decisions**: Use Cases live in `@specd/sdk` → `@specd/core` stays independent of `@specd/code-graph`.
 - **Decisions**: 2-stage staleness evaluation (`lastModified` -> `hash`) → sub-millisecond cache hit, zero unnecessary hash recalculations.
-- **Decisions**: Additive set union mutation (`apply: true`) → existing confirmed links are never deleted or overridden.
-- **Decisions**: Conditional change creation → alignment change created ONLY when `ValidateSpecs` reports invalid specs.
+- **Decision**: Interactive multiselect per spec using `@clack/prompts` for `--apply` -> provides user control over every proposed implementation link and dependency link before mutating `spec-lock.json`. **Alternative rejected**: blindly applying all lower-confidence links without confirmation.
+- **Decision**: `--yes` / `-y` flag defaults to `HIGH` confidence threshold when `--confidence` is omitted -> enables safe, unattended automation while requiring explicit `--confidence MEDIUM` or `LOW` to auto-accept lower-confidence candidates.
 - **Decision**: Interpret `ValidateSpecsResult.entries` directly and propagate validator failures → invalid specs cannot be mislabeled as valid. **Alternative rejected**: reading a synthetic `issues` list or failing open.
 - **Decision**: Composition returns ports and hides concrete infrastructure from package roots → callers remain insulated from adapter choice. **Alternative rejected**: public factories typed as `AdapterRegistry` or SDK root exports of FS caches.
+- **Decision**: Reuse the PoC's evidence hierarchy, not its filesystem index → MDAST supplies structural evidence while `code-graph` remains ground truth. **Alternative rejected**: recursively scanning `packages/` and building a TypeScript-only symbol map inside SDK.
+- **Decision**: Resolve candidate specs with a complete semantic ranking tuple and explicit ambiguity → deterministic across repository/list order. **Alternative rejected**: the PoC's first matching contract/domain/reference candidate and lexical `endsWith` ownership choice.
+- **Decision**: Keep ownership inference internal to dependency suggestions → improves file/symbol-to-spec disambiguation without creating a new public contract. **Alternative rejected**: exposing primary ownership or completeness results from `SuggestImplementationLinks`.
 
 ## Trade-offs
 
 - [Risk] Large monorepo initial cache generation latency → Mitigation: 2-stage cache staleness stamp check preserves cache HIT in < 1 ms after initial run.
 - [Risk] Moving use cases from `orchestration/` changes import paths → Mitigation: update internal imports/tests atomically and preserve only intentional curated root exports; do not keep a second implementation.
 - [Risk] `ChangeRepository`, `CreateChange`, and `Change` are CRITICAL fan-in hotspots → Mitigation: keep exploration fields optional, preserve existing call signatures, update every repository double, and exercise cleanup/no-hydration integration tests.
+- [Risk] `SuggestImplementationLinks` is CRITICAL (21 direct dependents, 6 affected files) → Mitigation: preserve public DTOs, make `symbolName` optional on cache lookup, keep existing confidence thresholds, and run both suggestion test suites.
+- [Risk] Prose harvesting increases false positives → Mitigation: prose candidates must resolve in the target workspace and receive only +5; they cannot independently establish `HIGH` confidence.
+- [Risk] A shared implementation file legitimately belongs to multiple specs → Mitigation: confirmed links dominate, symbol evidence narrows candidates when available, and a tied semantic tuple yields no inferred dependency.
 
 ## Spec impact
 
@@ -551,8 +634,11 @@ graph LR
     CLI_IMPL["cli:spec-implementation"] --> SDK_IMPL["sdk:suggest-implementation-links"]
     CLI_DEPS["cli:spec-deps"] --> SDK_DEPS["sdk:suggest-spec-dependencies"]
     SDK_DEPS --> SDK_IMPL
+    SDK_IMPL --> MDAST["MDAST evidence extractor"]
     SDK_IMPL --> REPO["core:spec-repository"]
     SDK_IMPL --> GRAPH["code-graph:symbol-model"]
+    SDK_DEPS --> OWNER["candidate-spec ranker"]
+    OWNER --> SDK_IMPL
     SDK_DEPS --> IMPACT["code-graph:traversal"]
     SDK_DEPS --> VALIDATE["core:validate-specs"]
 ```
@@ -561,12 +647,24 @@ graph LR
 ┌────────────────────────────────┐       ┌──────────────────────────────┐
 │ cli:spec-implementation        │──────▶│ sdk:suggest-                 │
 └────────────────────────────────┘       │ implementation-links         │
-                                         └──────────────┬───────────────┘
+                                         └──────┬───────┬───────────────┘
+                                                │       │
+                                                │       ▼
+                                                │  ┌────────────────────┐
+                                                │  │ MDAST evidence     │
+                                                │  │ extractor          │
+                                                │  └────────────────────┘
                                                         │
 ┌────────────────────────────────┐       ┌──────────────▼───────────────┐
 │ cli:spec-deps                  │──────▶│ sdk:suggest-spec-            │
 └────────────────────────────────┘       │ dependencies                 │
-                                         └──────────────┬───────────────┘
+                                         └──────┬───────┬───────────────┘
+                                                │       │
+                                                │       ▼
+                                                │  ┌────────────────────┐
+                                                │  │ candidate-spec     │
+                                                │  │ semantic ranking   │
+                                                │  └────────────────────┘
                                                         │
                                                         ▼
                                          ┌──────────────────────────────┐
@@ -583,9 +681,12 @@ graph LR
   - Assert 2-stage cache HIT on unchanged `lastModified` stamp.
   - Assert additive set union when `apply: true`.
   - Assert Tier 2 retains Tier 1, Tier 3 runs only for an empty combined set, and a missing observer fails construction.
+  - Assert MDAST source precedence (`fenced-code > inline-code > prose`), stable reason tokens, graph rejection of unmatched prose, and absence of recursive source indexing or completeness output.
 - Unit tests in `packages/sdk/test/application/use-cases/suggest-spec-dependencies.spec.ts`:
   - Assert import graph tracing and barrel re-export resolution (depth `1` plus a conditional barrel re-export hop).
   - Assert canonical `{ entries, totalSpecs, passed, failed }` interpretation, conditional alignment creation, and validator/update failure propagation.
+  - Assert candidate-spec ranking prefers a confirmed link, then symbol-matched structured evidence; repository order does not affect the winner; equal semantic tuples return `null` and produce no dependency.
+- Pure service tests in `packages/sdk/test/application/services/extract-markdown-symbol-evidence.spec.ts` cover heading paths, supported/unsupported fenced languages, inline file paths across registered extensions, keyword filtering, strongest-source deduplication, and stable source order.
 - CLI integration tests in `packages/cli/test/commands/spec-implementation.spec.ts` and `spec-deps.spec.ts`.
 - SDK composition/export tests assert FS cache construction is confined to composition and concrete FS caches are absent from the root API.
 - Code Graph composition tests assert `createBuiltinAdapterRegistry` is exported and publicly returns `AdapterRegistryPort`.
@@ -599,7 +700,8 @@ graph LR
 ## Documentation
 
 - `docs/cli/spec-implementation.md`: Document `specd specs implementation suggest [<spec-id>] [--spec <id>...] [--all] [--workspace <name>] [--apply] [--confidence <HIGH|MED>] [--rebuild-cache]`.
-- `docs/cli/spec-deps.md`: Document `specd specs deps suggest [<spec-id>] [--spec <id>...] [--all] [--workspace <name>] [--apply] [--create-change] [--rebuild-cache]`.
+- `docs/cli/spec-implementation.md`: Also describe fenced/inline/prose evidence reasons and that prose must resolve in code graph.
+- `docs/cli/spec-deps.md`: Document `specd specs deps suggest [<spec-id>] [--spec <id>...] [--all] [--workspace <name>] [--apply] [--create-change] [--rebuild-cache]`, including explicit ambiguity when no unique candidate spec exists.
 - `docs/cli/cli-reference.md`: Update main CLI reference index for `spec implementation suggest` and `spec deps suggest`.
 
 ## Architecture conformance

@@ -17,9 +17,22 @@ specd specs implementation suggest [<specPath>] [--spec <id>...] [--all] [--work
 - `add` merges `symbols` additively when the file entry already exists.
 - `remove` with `symbols` drops only those names; without `symbols`, removes the whole entry.
 - `suggest` performs static analysis and Code Graph symbol correlation to deduce candidate implementation files and AST symbols.
+- `suggest` extracts symbol and file candidates from Markdown AST using syntax-aware classifiers:
+  - **Fenced code blocks**: (`+30` score, reason `fenced-code-evidence`) identifier candidates in supported language code blocks.
+  - **Inline code**: (`+20` score, reason `inline-code-evidence`) identifier candidates and file paths with supported extensions.
+  - **Graph-validated prose**: (`+5` score, reason `prose-symbol-evidence`) prose terms matching symbol naming conventions that resolve to indexed symbols within the target workspace. Unmatched prose terms are discarded.
+- Evidence bonuses supplement primary symbol (`+200`), derivative (`+50`), filename (`+150`), and token affinity (`+100`) scores without independently qualifying a candidate as `HIGH` confidence.
 - `suggest --apply` performs an additive set union, updating `spec-lock.json` without overriding or deleting existing confirmed links.
 - `suggest` marks every candidate with `alreadyIncluded` and emits `result`, `specs`, `existing`, and ranked `suggestions` in JSON/TOON formats; machine formats never prompt.
 - Missing lock: `add` creates incidental state; `remove` is a no-op.
+
+### Evidence Scoring
+
+| Source                       | Score Bonus | Reason                  |
+| ---------------------------- | ----------: | ----------------------- |
+| Fenced code block            |         +30 | `fenced-code-evidence`  |
+| Inline code snippet          |         +20 | `inline-code-evidence`  |
+| Graph-validated prose symbol |          +5 | `prose-symbol-evidence` |
 
 ## Errors
 

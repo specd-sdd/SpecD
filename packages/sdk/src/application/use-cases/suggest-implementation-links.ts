@@ -13,7 +13,7 @@ import {
 } from '@specd/core'
 import {
   type CodeGraphProvider,
-  createBuiltinAdapterRegistry,
+  type AdapterRegistryPort,
   SymbolKind,
   type SymbolNode,
 } from '@specd/code-graph'
@@ -24,6 +24,11 @@ import {
   type ImplementationSuggestionSpecStamp,
 } from '../../domain/value-objects/implementation-suggestion-cache.js'
 import { type ImplementationSuggestionCachePort } from '../ports/implementation-suggestion-cache-port.js'
+import {
+  extractMarkdownSymbolEvidence,
+  type MarkdownEvidenceSource,
+  SPEC_PROSE_KEYWORDS,
+} from '../services/extract-markdown-symbol-evidence.js'
 
 /**
  * Checks whether a file exists at the given path.
@@ -135,119 +140,12 @@ export interface SuggestImplementationLinksDeps {
   readonly getSpecMetadata?: GetSpecMetadata
   readonly symbolModelPort?: unknown
   readonly codeGraphProvider?: CodeGraphProvider
+  readonly adapterRegistry: AdapterRegistryPort
   readonly cache?: ImplementationSuggestionCachePort
   readonly fileObserver: SuggestionFileObserver
   readonly projectDir?: string
   readonly workspaces?: readonly { readonly name: string; readonly codeRoot: string }[]
 }
-
-/** Fixed lookups derived from the built-in adapter registry. */
-interface BuiltinRegistryData {
-  sourceExtensions: string[]
-  languageKeywords: Set<string>
-}
-
-let cachedBuiltinRegistryData: BuiltinRegistryData | undefined
-
-/**
- * Lazily builds the built-in adapter registry once and caches its fixed lookups.
- *
- * @returns Supported extensions and reserved keywords for the built-in adapters.
- */
-function getBuiltinRegistryData(): BuiltinRegistryData {
-  if (!cachedBuiltinRegistryData) {
-    const registry = createBuiltinAdapterRegistry()
-    cachedBuiltinRegistryData = {
-      sourceExtensions: registry.getSupportedExtensions(),
-      languageKeywords: registry.getReservedKeywords(),
-    }
-  }
-  return cachedBuiltinRegistryData
-}
-
-const SPEC_PROSE_KEYWORDS = new Set([
-  'given',
-  'when',
-  'then',
-  'must',
-  'shall',
-  'should',
-  'each',
-  'all',
-  'more',
-  'some',
-  'only',
-  'can',
-  'may',
-  'result',
-  'status',
-  'error',
-  'message',
-  'input',
-  'output',
-  'options',
-  'target',
-  'index',
-  'array',
-  'object',
-  'set',
-  'get',
-  'after',
-  'before',
-  'first',
-  'second',
-  'third',
-  'next',
-  'last',
-  'will',
-  'into',
-  'onto',
-  'over',
-  'under',
-  'above',
-  'below',
-  'have',
-  'has',
-  'had',
-  'been',
-  'being',
-  'does',
-  'done',
-  'did',
-  'same',
-  'such',
-  'than',
-  'that',
-  'this',
-  'they',
-  'them',
-  'their',
-  'there',
-  'here',
-  'were',
-  'what',
-  'where',
-  'which',
-  'while',
-  'who',
-  'whom',
-  'whose',
-  'why',
-  'name',
-  'key',
-  'value',
-  'base',
-  'source',
-  'mode',
-  'data',
-  'item',
-  'list',
-  'path',
-  'file',
-  'the',
-  'and',
-  'with',
-])
 
 /**
  * Evaluates token alignment between a spec capability path and a candidate file path.
@@ -468,6 +366,7 @@ export class SuggestImplementationLinks {
             suggestions,
             ...(analysis.realContentHash ? { specContentHash: analysis.realContentHash } : {}),
           })
+          await cache.flush()
           if (analysis.lastModified || analysis.realContentHash) {
             specStamp = {
               lastModified: analysis.lastModified,
@@ -490,6 +389,7 @@ export class SuggestImplementationLinks {
             const canonicalSugPath = await this.toCanonicalWorkspacePath(sug.file)
             return {
               ...sug,
+              file: canonicalSugPath,
               alreadyIncluded: existingFileSet.has(canonicalSugPath),
             }
           }),
@@ -675,13 +575,19 @@ export class SuggestImplementationLinks {
     }
 
     const extractedSymbols = new Set<string>()
-    const codeBlockRegex = /```[a-zA-Z0-9_-]*\r?\n([\s\S]*?)\r?\n```/g
-    let match: RegExpExecArray | null
-
-    const { sourceExtensions, languageKeywords } = getBuiltinRegistryData()
+    const sourceExtensions = this.deps.adapterRegistry.getSupportedExtensions()
+    const supportedExtensions = new Set(sourceExtensions)
+    const supportedLanguages = new Set(
+      this.deps.adapterRegistry
+        .getAdapters()
+        .flatMap((a) => a.languages().map((l) => l.toLowerCase())),
+    )
+    const languageKeywords = new Set(
+      Array.from(this.deps.adapterRegistry.getReservedKeywords()).map((k) => k.toLowerCase()),
+    )
 
     const isReservedKeyword = (word: string): boolean =>
-      SPEC_PROSE_KEYWORDS.has(word) || languageKeywords.has(word)
+      SPEC_PROSE_KEYWORDS.has(word.toLowerCase()) || languageKeywords.has(word.toLowerCase())
 
     let specTitle = initialTitle ?? ''
     if (!specTitle && this.deps.getSpecMetadata) {
@@ -800,17 +706,17 @@ export class SuggestImplementationLinks {
       primaryTargetSymbols.add(`New${slugPascal}`)
     }
 
-    while ((match = codeBlockRegex.exec(content)) !== null) {
-      const code = match[1] ?? ''
-      const identRegex = /\b[A-Za-z_][A-Za-z0-9_]*\b/g
-      let idMatch: RegExpExecArray | null
-      while ((idMatch = identRegex.exec(code)) !== null) {
-        const word = idMatch[0]
-        if (word.length >= 3 && !isReservedKeyword(word) && isCodeIdentifierCandidate(word)) {
-          extractedSymbols.add(word)
-        }
-      }
-    }
+    const mdastEvidence = extractMarkdownSymbolEvidence({
+      markdown: content,
+      supportedExtensions,
+      supportedLanguages,
+      reservedKeywords: languageKeywords,
+    })
+
+    const symbolEvidenceMap = new Map<
+      string,
+      { source: MarkdownEvidenceSource; reason: string; bonus: number }
+    >()
 
     const derivedPaths: string[] = []
     const wsConfig = this.deps.workspaces?.find((w) => w.name === workspace)
@@ -820,27 +726,57 @@ export class SuggestImplementationLinks {
         ? `packages/${workspace}`
         : ''
 
-    const inlineRegex = /`([A-Za-z0-9_\-\.\/\(\)]+)`/g
-    while ((match = inlineRegex.exec(content)) !== null) {
-      const word = match[1] ?? ''
-      if (sourceExtensions.some((ext: string) => word.endsWith(ext))) {
-        const cleanFileName = word.split('/').pop() ?? word
-        derivedPaths.push(`${workspace}:${word}`)
+    for (const ev of mdastEvidence) {
+      if (ev.kind === 'file-path') {
+        const cleanWord = ev.candidate
+        const cleanFileName = cleanWord.split('/').pop() ?? cleanWord
+        derivedPaths.push(`${workspace}:${cleanWord}`)
         if (wsCodeRoot) {
-          derivedPaths.push(`${workspace}:${wsCodeRoot}/${word}`)
+          derivedPaths.push(`${workspace}:${wsCodeRoot}/${cleanWord}`)
           derivedPaths.push(`${workspace}:${wsCodeRoot}/src/${cleanFileName}`)
         } else {
           derivedPaths.push(`${workspace}:src/${cleanFileName}`)
         }
-      }
-
-      if (isCodeIdentifierCandidate(word)) {
-        const cleanSym = word
-          .replace(/\(.*\)$/, '')
-          .replace(/.*\./, '')
-          .trim()
-        if (cleanSym.length >= 3 && !isReservedKeyword(cleanSym)) {
-          extractedSymbols.add(cleanSym)
+      } else if (ev.kind === 'symbol') {
+        if (ev.source === 'fenced-code') {
+          extractedSymbols.add(ev.candidate)
+          symbolEvidenceMap.set(ev.candidate, {
+            source: 'fenced-code',
+            reason: 'fenced-code-evidence',
+            bonus: 30,
+          })
+        } else if (ev.source === 'inline-code') {
+          extractedSymbols.add(ev.candidate)
+          symbolEvidenceMap.set(ev.candidate, {
+            source: 'inline-code',
+            reason: 'inline-code-evidence',
+            bonus: 20,
+          })
+        } else if (ev.source === 'prose') {
+          // Gate prose evidence through code graph in the target workspace
+          let isResolvedInWorkspace = false
+          if (this.deps.codeGraphProvider) {
+            try {
+              const query: { name: string; workspace?: string } = { name: ev.candidate }
+              if (workspace !== 'default') {
+                query.workspace = workspace
+              }
+              const found = await this.deps.codeGraphProvider.findSymbols(query)
+              if (found && found.length > 0) {
+                isResolvedInWorkspace = true
+              }
+            } catch {
+              // ignore
+            }
+          }
+          if (isResolvedInWorkspace) {
+            extractedSymbols.add(ev.candidate)
+            symbolEvidenceMap.set(ev.candidate, {
+              source: 'prose',
+              reason: 'prose-symbol-evidence',
+              bonus: 5,
+            })
+          }
         }
       }
     }
@@ -1496,6 +1432,18 @@ export class SuggestImplementationLinks {
       if (data.symbols.size === 0) {
         continue
       }
+      let maxEvidence: { reason: string; bonus: number } | null = null
+      for (const sym of data.symbols) {
+        const ev = symbolEvidenceMap.get(sym)
+        if (ev && (!maxEvidence || ev.bonus > maxEvidence.bonus)) {
+          maxEvidence = ev
+        }
+      }
+      if (maxEvidence && !data.reasons.has(maxEvidence.reason)) {
+        data.score += maxEvidence.bonus
+        data.reasons.add(maxEvidence.reason)
+      }
+
       let confidence: 'HIGH' | 'MEDIUM' | 'LOW' = 'LOW'
       const hasExactTokenOrSlug =
         data.reasons.has('exact-token-affinity') || data.reasons.has('filename-slug-match')
@@ -1566,6 +1514,9 @@ export class SuggestImplementationLinks {
 export function createSuggestImplementationLinks(
   deps: SuggestImplementationLinksDeps,
 ): SuggestImplementationLinks {
+  if (deps.adapterRegistry === undefined) {
+    throw new InvalidInputError('SuggestImplementationLinks requires an injected adapter registry')
+  }
   if (deps.fileObserver === undefined) {
     throw new InvalidInputError(
       'SuggestImplementationLinks requires an injected file-observation port',

@@ -29,6 +29,32 @@ The input interface MUST support:
 - If `confidenceThreshold` is specified with an invalid string outside `['HIGH', 'MEDIUM', 'MED', 'LOW']`, `execute()` MUST throw `InvalidInputError`.
 - When `specId` or `specIds` are specified in input, `SuggestImplementationLinks` MUST verify that each requested spec exists in the target repositories. If any requested spec ID is not found, `execute()` MUST throw a `SpecNotFoundError`.
 
+### Requirement: Structured Markdown Symbol Evidence
+
+`SuggestImplementationLinks` MUST parse each target `spec.md` as a Markdown AST so that
+fenced code, inline code, headings, and prose are distinguished structurally rather than
+discovered through a document-wide regular-expression scan.
+
+The extractor MUST produce deterministic symbol evidence from three ordered sources:
+
+1. **Fenced-code evidence** — identifier candidates found inside supported code blocks.
+2. **Inline-code evidence** — identifier and file-path candidates found in Markdown
+   `inlineCode` nodes.
+3. **Prose evidence** — PascalCase, camelCase, and member-access candidates found in
+   headings and text nodes.
+
+When the same candidate is found through more than one source, the extractor MUST retain
+the strongest evidence in the order above. Prose evidence MUST be accepted only when the
+candidate resolves to an indexed symbol in the target workspace; prose tokens alone MUST
+NOT create implementation suggestions. Evidence source MUST contribute a stable reason to
+candidate scoring and diagnostics so consumers can distinguish explicit contract/code
+mentions from weaker textual correlations.
+
+The Markdown extractor MUST NOT recursively index source files, construct a second
+codebase symbol index, infer primary spec ownership, or compare code signatures against
+spec contracts. `code-graph` remains the authoritative source for indexed code symbols and
+files; ownership and contract-completeness analysis are outside this capability.
+
 ### Requirement: 3-Tier Analysis Algorithm
 
 `SuggestImplementationLinks` MUST execute a 3-tier cascade analysis algorithm with early short-circuiting:
@@ -40,8 +66,9 @@ The input interface MUST support:
      2. **Content-hash precedence**: when the pre-filter cannot decide (mtime drifted with equal size) or no `size` is available, both usable hashes are compared — mismatch is stale, match is fresh, regardless of `lastModified`.
      3. **Timestamp fallback**: only when neither side provides a usable hash does `lastModified` decide, as before.
    - Uses domain-specific cache interfaces (`ImplementationSuggestionCacheHeader`, `ImplementationSuggestionSpecStamp`, `ImplementationSuggestionSpecEntry`).
+   - Flushes cache entries incrementally to disk via atomic writes (`cache.flush()`) upon completing analysis of each specification, guaranteeing progress persistence and resilience against process interruptions during batch or workspace runs.
    - Reads `spec.md` artifacts via `SpecRepository` for cache misses.
-   - Extracts explicit symbol identifiers from spec metadata (`GetSpecMetadata` title with fallbacks to `readMetadataSnapshot` and Markdown H1 title), AST code blocks, and backticked terms matching generic code identifier patterns (PascalCase, camelCase with internal uppercase, function invocation syntax `fn()`, dot notation `Obj.method`), ignoring reserved language keywords and universal grammar stop-words (`SPEC_PROSE_KEYWORDS`).
+   - Extracts explicit symbol and path evidence according to **Structured Markdown Symbol Evidence**, combining spec metadata (`GetSpecMetadata` title with fallbacks to `readMetadataSnapshot` and Markdown H1 title) with structurally classified fenced-code, inline-code, heading, and prose nodes while ignoring reserved language keywords and universal grammar stop-words (`SPEC_PROSE_KEYWORDS`).
    - Derives naming convention file path candidates from capability names.
    - Validates candidate file existence through an injected file-observation dependency before outputting suggestions.
    - Evaluates **Path & Spec Token Affinity (`computePathSpecAffinity`)**:

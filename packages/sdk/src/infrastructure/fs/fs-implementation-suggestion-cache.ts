@@ -20,8 +20,74 @@ import {
   IMPLEMENTATION_SUGGESTION_CACHE_VERSION,
 } from '../../domain/value-objects/implementation-suggestion-cache.js'
 
-/** Maximum spec fan-in threshold before a file is considered an ambiguous shared hub. */
-const SHARED_HUB_SPEC_THRESHOLD = 3
+/**
+ * Candidate spec match for a file key, with ownership, evidence, and score.
+ */
+interface CandidateSpecMatch {
+  readonly specId: string
+  readonly isConfirmed: boolean
+  readonly symbols: readonly string[]
+  readonly evidenceStrength: number
+  readonly score: number
+}
+
+/**
+ * Compares two candidate spec matches lexicographically by semantic ownership tuple:
+ * (confirmed, evidenceStrength, workspaceAffinity, capabilitySymbolAffinity, score).
+ *
+ * @param a - First candidate
+ * @param b - Second candidate
+ * @param targetPath - Target file path
+ * @param targetSymbol - Optional target symbol name
+ * @returns Positive if a > b, negative if a < b, 0 if equal
+ */
+function compareCandidateTuples(
+  a: CandidateSpecMatch,
+  b: CandidateSpecMatch,
+  targetPath: string,
+  targetSymbol?: string,
+): number {
+  const getFileWorkspace = (p: string): string => {
+    if (p.includes(':')) return p.split(':')[0]!
+    const clean = p.replace(/^\.\//, '')
+    if (clean.startsWith('packages/') || clean.startsWith('apps/')) {
+      return clean.split('/')[1] ?? ''
+    }
+    return ''
+  }
+
+  const fileWs = getFileWorkspace(targetPath)
+  const getSpecWs = (id: string): string => (id.includes(':') ? id.split(':')[0]! : 'default')
+
+  const aConfirmed = a.isConfirmed ? 1 : 0
+  const bConfirmed = b.isConfirmed ? 1 : 0
+  if (aConfirmed !== bConfirmed) return aConfirmed - bConfirmed
+
+  if (a.evidenceStrength !== b.evidenceStrength) {
+    return a.evidenceStrength - b.evidenceStrength
+  }
+
+  const aWsAff = fileWs && getSpecWs(a.specId) === fileWs ? 1 : 0
+  const bWsAff = fileWs && getSpecWs(b.specId) === fileWs ? 1 : 0
+  if (aWsAff !== bWsAff) return aWsAff - bWsAff
+
+  if (targetSymbol) {
+    const symbolKebab = targetSymbol
+      .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
+      .toLowerCase()
+      .replace(/_/g, '-')
+    const getCapBase = (id: string) => id.split(':').pop()?.split('/').pop()?.toLowerCase() ?? ''
+    const aCapAff = getCapBase(a.specId) === symbolKebab ? 1 : 0
+    const bCapAff = getCapBase(b.specId) === symbolKebab ? 1 : 0
+    if (aCapAff !== bCapAff) return aCapAff - bCapAff
+  }
+
+  if (a.score !== b.score) {
+    return a.score - b.score
+  }
+
+  return 0
+}
 
 /** Options for configuring {@link FsImplementationSuggestionCache}. */
 export interface FsImplementationSuggestionCacheOptions extends ImplementationSuggestionCachePortDeps {
@@ -290,82 +356,32 @@ export class FsImplementationSuggestionCache extends ImplementationSuggestionCac
       return this._fileToSpecMap
     }
 
-    /**
-     * Candidate spec match for a file key, with ownership and score.
-     */
-    interface CandidateSpecMatch {
-      specId: string
-      isExisting: boolean
-      score: number
-    }
-
-    const fileToCandidates = new Map<string, Map<string, CandidateSpecMatch>>()
-
-    const registerCandidate = (
-      fileKey: string,
-      specId: string,
-      isExisting: boolean,
-      score: number,
-    ): void => {
-      if (!fileKey) return
-      const keysToRegister = new Set<string>()
-      keysToRegister.add(fileKey)
-
-      const rawPath = fileKey.replace(/^[^:]+:/, '')
-      keysToRegister.add(rawPath)
-
-      const shortRelPath = rawPath.replace(/^(?:packages|apps)\/[^/]+\//, '')
-      keysToRegister.add(shortRelPath)
-
-      for (const k of keysToRegister) {
-        let candidateMap = fileToCandidates.get(k)
-        if (!candidateMap) {
-          candidateMap = new Map()
-          fileToCandidates.set(k, candidateMap)
-        }
-        const existingCandidate = candidateMap.get(specId)
-        if (!existingCandidate || isExisting || score > existingCandidate.score) {
-          candidateMap.set(specId, {
-            specId,
-            isExisting: isExisting || (existingCandidate?.isExisting ?? false),
-            score: isExisting ? 9999 : Math.max(score, existingCandidate?.score ?? 0),
-          })
-        }
-      }
-    }
-
-    for (const [specId, entry] of this._data?.entries() ?? []) {
+    const allFileKeys = new Set<string>()
+    for (const entry of this._data?.values() ?? []) {
       for (const f of entry.existing?.files ?? []) {
-        registerCandidate(f, specId, true, 9999)
+        if (f) {
+          allFileKeys.add(f)
+          const raw = f.replace(/^[^:]+:/, '')
+          allFileKeys.add(raw)
+          allFileKeys.add(raw.replace(/^(?:packages|apps)\/[^/]+\//, ''))
+        }
       }
       for (const s of entry.suggestions ?? []) {
-        if (s.confidence === 'HIGH') {
-          registerCandidate(s.file, specId, false, s.score ?? 150)
+        if (s.file) {
+          allFileKeys.add(s.file)
+          const raw = s.file.replace(/^[^:]+:/, '')
+          allFileKeys.add(raw)
+          allFileKeys.add(raw.replace(/^(?:packages|apps)\/[^/]+\//, ''))
         }
       }
     }
 
     const result = new Map<string, string>()
-    for (const [fileKey, candidateMap] of fileToCandidates.entries()) {
-      if (candidateMap.size === 1) {
-        result.set(fileKey, Array.from(candidateMap.keys())[0]!)
-      } else if (candidateMap.size > 1) {
-        const existingCandidates = Array.from(candidateMap.values()).filter((c) => c.isExisting)
-        if (existingCandidates.length === 1) {
-          // A unique spec-lock owner is authoritative even when extra high-confidence
-          // suggestions push shared-hub files past SHARED_HUB_SPEC_THRESHOLD.
-          result.set(fileKey, existingCandidates[0]!.specId)
-        } else if (
-          candidateMap.size < SHARED_HUB_SPEC_THRESHOLD &&
-          existingCandidates.length === 0
-        ) {
-          const sorted = Array.from(candidateMap.values()).sort((a, b) => b.score - a.score)
-          const top = sorted[0]!
-          const runnerUp = sorted[1]!
-          if (top.score > runnerUp.score) {
-            result.set(fileKey, top.specId)
-          }
-        }
+    for (const fileKey of allFileKeys) {
+      if (!fileKey) continue
+      const winner = await this.findSpecByFile(fileKey)
+      if (winner) {
+        result.set(fileKey, winner)
       }
     }
 
@@ -374,19 +390,92 @@ export class FsImplementationSuggestionCache extends ImplementationSuggestionCac
   }
 
   /** @inheritdoc */
-  async findSpecByFile(filePath: string): Promise<string | null> {
-    const map = await this.getFileToSpecMap()
-    if (map.has(filePath)) {
-      return map.get(filePath) ?? null
+  async findSpecByFile(filePath: string, symbolName?: string): Promise<string | null> {
+    await this.ensureLoaded()
+    if (!this._data || this._data.size === 0) {
+      return null
     }
-    const rawPath = filePath.replace(/^[^:]+:/, '')
-    if (map.has(rawPath)) {
-      return map.get(rawPath) ?? null
+
+    const matchesFile = (specFile: string, target: string): boolean => {
+      if (specFile === target) return true
+      const rawSpec = specFile.replace(/^[^:]+:/, '')
+      const rawTarget = target.replace(/^[^:]+:/, '')
+      if (rawSpec === rawTarget) return true
+      const shortSpec = rawSpec.replace(/^(?:packages|apps)\/[^/]+\//, '')
+      const shortTarget = rawTarget.replace(/^(?:packages|apps)\/[^/]+\//, '')
+      return shortSpec === shortTarget
     }
-    const shortRelPath = rawPath.replace(/^(?:packages|apps)\/[^/]+\//, '')
-    if (map.has(shortRelPath)) {
-      return map.get(shortRelPath) ?? null
+
+    const candidateMap = new Map<string, CandidateSpecMatch>()
+
+    for (const [specId, entry] of this._data.entries()) {
+      let isConfirmed = false
+      for (const f of entry.existing?.files ?? []) {
+        if (matchesFile(f, filePath)) {
+          isConfirmed = true
+          break
+        }
+      }
+      if (isConfirmed) {
+        candidateMap.set(specId, {
+          specId,
+          isConfirmed: true,
+          symbols: entry.existing?.symbols ?? [],
+          evidenceStrength: 0,
+          score: 9999,
+        })
+        continue
+      }
+
+      for (const s of entry.suggestions ?? []) {
+        if (matchesFile(s.file, filePath)) {
+          let evidenceStrength = 0
+          if (s.reasons.includes('fenced-code-evidence')) evidenceStrength = 3
+          else if (s.reasons.includes('inline-code-evidence')) evidenceStrength = 2
+          else if (s.reasons.includes('prose-symbol-evidence')) evidenceStrength = 1
+
+          const existing = candidateMap.get(specId)
+          if (!existing || (s.score ?? 0) > existing.score) {
+            candidateMap.set(specId, {
+              specId,
+              isConfirmed: false,
+              symbols: s.symbols ?? [],
+              evidenceStrength: Math.max(evidenceStrength, existing?.evidenceStrength ?? 0),
+              score: Math.max(s.score ?? 0, existing?.score ?? 0),
+            })
+          }
+        }
+      }
     }
+
+    let candidates = Array.from(candidateMap.values())
+    if (candidates.length === 0) {
+      return null
+    }
+
+    if (symbolName) {
+      const symLower = symbolName.toLowerCase()
+      const symbolMatched = candidates.filter((c) =>
+        c.symbols.some((s) => s.toLowerCase() === symLower),
+      )
+      if (symbolMatched.length > 0) {
+        candidates = symbolMatched
+      }
+    }
+
+    if (candidates.length === 1) {
+      return candidates[0]!.specId
+    }
+
+    candidates.sort((a, b) => compareCandidateTuples(b, a, filePath, symbolName))
+
+    const top = candidates[0]!
+    const runnerUp = candidates[1]!
+    const diff = compareCandidateTuples(top, runnerUp, filePath, symbolName)
+    if (diff > 0) {
+      return top.specId
+    }
+
     return null
   }
 

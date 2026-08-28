@@ -46,6 +46,13 @@
 - **WHEN** `SuggestSpecDependencies.execute({ specId: "core:fs-spec-repository" })` is called
 - **THEN** `core:repository-port` is pruned from `suggestedDependsOn` because `core:spec-repository-port` is the primary spec in the recommendation chain
 
+#### Scenario: Incremental dependency cache persistence
+
+- **GIVEN** a multi-spec dependency deduction across multiple spec IDs or a workspace
+- **WHEN** dependency suggestions for each target specification complete
+- **THEN** `specDepsCache.flush()` is invoked incrementally so deduced dependencies are persisted immediately to disk
+- **AND** aborted or interrupted runs retain the already-persisted dependencies
+
 #### Scenario: Cache version mismatch triggers automatic regeneration
 
 - **GIVEN** a persisted cache file with header `cacheVersion: "1.0.0"`

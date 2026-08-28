@@ -9,7 +9,7 @@ import {
   type CompositionResolver,
   type SpecdConfig,
 } from '@specd/core'
-import { createCodeGraphProvider } from '@specd/code-graph'
+import { createCodeGraphProvider, createBuiltinAdapterRegistry } from '@specd/code-graph'
 import { FsImplementationSuggestionCache } from '../infrastructure/fs/fs-implementation-suggestion-cache.js'
 import {
   createSuggestImplementationLinks as createSuggestImplementationLinksFromDeps,
@@ -49,6 +49,7 @@ export function resolveSuggestImplementationLinksDeps(
     updatePersistedImplementation: createUpdatePersistedSpecImplementation(resolver.config),
     getSpecMetadata: createGetSpecMetadata(resolver.config),
     codeGraphProvider,
+    adapterRegistry: createBuiltinAdapterRegistry(resolver.config),
     cache: new FsImplementationSuggestionCache({
       projectDir,
       configPath: resolver.config.configPath,

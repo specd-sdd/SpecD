@@ -479,15 +479,24 @@ export class SuggestSpecDependencies {
                         : typeof affObj.file === 'string'
                           ? affObj.file
                           : ''
+                  const affSymbol =
+                    typeof affObj.symbol === 'string'
+                      ? affObj.symbol
+                      : typeof affObj.symbolName === 'string'
+                        ? affObj.symbolName
+                        : typeof affObj.importedSymbol === 'string'
+                          ? affObj.importedSymbol
+                          : undefined
 
                   if (affPath) {
                     targetOutboundFiles.add(affPath)
                     targetOutboundFiles.add(affPath.replace(/^[^:]+:/, ''))
                   }
 
-                  const mappedSpecId = await implCache.findSpecByFile(affPath)
+                  const mappedSpecId = await implCache.findSpecByFile(affPath, affSymbol)
                   Logger.debug('[SuggestSpecDependencies] Mapped affected file to spec', {
                     affPath,
+                    affSymbol,
                     mappedSpecId,
                   })
                   const isBarrelFile =
@@ -511,7 +520,15 @@ export class SuggestSpecDependencies {
                               : typeof bObj.file === 'string'
                                 ? bObj.file
                                 : ''
-                        const bMappedSpecId = await implCache.findSpecByFile(bPath)
+                        const bSymbol =
+                          typeof bObj.symbol === 'string'
+                            ? bObj.symbol
+                            : typeof bObj.symbolName === 'string'
+                              ? bObj.symbolName
+                              : typeof bObj.importedSymbol === 'string'
+                                ? bObj.importedSymbol
+                                : undefined
+                        const bMappedSpecId = await implCache.findSpecByFile(bPath, bSymbol)
                         if (bMappedSpecId && bMappedSpecId !== target.specId) {
                           if (!suggestedMap.has(bMappedSpecId)) {
                             const isAlreadyIncluded = existingDependsOn.includes(bMappedSpecId)
@@ -741,6 +758,7 @@ export class SuggestSpecDependencies {
               ? { fileToSpecFingerprint: expectedMapFingerprint }
               : {}),
           })
+          await specDepsCache.flush()
         }
 
         resultSpecs.push({

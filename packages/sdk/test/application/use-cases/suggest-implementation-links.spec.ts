@@ -192,6 +192,28 @@ function setupTest() {
     }),
   } as any
 
+  const adapterRegistry = {
+    getSupportedExtensions: vi.fn().mockReturnValue(['.ts', '.js', '.py', '.go', '.php', '.rs']),
+    getAdapters: vi.fn().mockReturnValue([
+      {
+        languages: () => [
+          'typescript',
+          'ts',
+          'javascript',
+          'js',
+          'python',
+          'py',
+          'go',
+          'golang',
+          'php',
+          'rust',
+          'rs',
+        ],
+      },
+    ]),
+    getReservedKeywords: vi.fn().mockReturnValue(new Set(['const', 'let', 'class', 'interface'])),
+  } as any
+
   const cache = new InMemoryImplementationSuggestionCache()
 
   const useCase = new SuggestImplementationLinks({
@@ -199,6 +221,7 @@ function setupTest() {
     getPersistedImplementation: getPersistedImplementation as any,
     updatePersistedImplementation: updatePersistedImplementation as any,
     codeGraphProvider,
+    adapterRegistry,
     cache,
     fileObserver,
     projectDir: FIXTURE_ROOT,
@@ -210,6 +233,7 @@ function setupTest() {
     getPersistedImplementation,
     updatePersistedImplementation,
     codeGraphProvider,
+    adapterRegistry,
     cache,
   }
 }
@@ -475,13 +499,19 @@ describe('SuggestImplementationLinks', () => {
   })
 
   it('supports factory constructor overloads', () => {
-    const { specRepositories, getPersistedImplementation, updatePersistedImplementation, cache } =
-      setupTest()
+    const {
+      specRepositories,
+      getPersistedImplementation,
+      updatePersistedImplementation,
+      adapterRegistry,
+      cache,
+    } = setupTest()
 
     const instance = createSuggestImplementationLinks({
       specRepositories,
       getPersistedImplementation: getPersistedImplementation as any,
       updatePersistedImplementation: updatePersistedImplementation as any,
+      adapterRegistry,
       cache,
       fileObserver,
     })
@@ -489,7 +519,7 @@ describe('SuggestImplementationLinks', () => {
     expect(instance).toBeInstanceOf(SuggestImplementationLinks)
   })
 
-  it('rejects factory construction without a file observer', () => {
+  it('rejects factory construction without an adapter registry', () => {
     const { specRepositories, getPersistedImplementation, updatePersistedImplementation, cache } =
       setupTest()
 
@@ -499,8 +529,97 @@ describe('SuggestImplementationLinks', () => {
         getPersistedImplementation: getPersistedImplementation as any,
         updatePersistedImplementation: updatePersistedImplementation as any,
         cache,
+        fileObserver,
       } as unknown as SuggestImplementationLinksDeps),
     ).toThrow(InvalidInputError)
+  })
+
+  it('rejects factory construction without a file observer', () => {
+    const {
+      specRepositories,
+      getPersistedImplementation,
+      updatePersistedImplementation,
+      adapterRegistry,
+      cache,
+    } = setupTest()
+
+    expect(() =>
+      createSuggestImplementationLinks({
+        specRepositories,
+        getPersistedImplementation: getPersistedImplementation as any,
+        updatePersistedImplementation: updatePersistedImplementation as any,
+        adapterRegistry,
+        cache,
+      } as unknown as SuggestImplementationLinksDeps),
+    ).toThrow(InvalidInputError)
+  })
+
+  it('gates prose evidence through code-graph and rejects unmatched prose tokens', async () => {
+    const { useCase, codeGraphProvider, specRepositories } = setupTest()
+    const repo = specRepositories.get('sdk')!
+    ;(repo.artifact as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      content:
+        '# sdk:suggest-implementation-links\n\nMentions ValidProseSymbol and UnmatchedProseSymbol in text.\n',
+    })
+
+    codeGraphProvider.findSymbols.mockImplementation(async (query: { name?: string }) => {
+      if (query.name === 'ValidProseSymbol') {
+        return [
+          {
+            name: 'ValidProseSymbol',
+            kind: 'class',
+            location: {
+              filePath: 'packages/sdk/src/application/use-cases/suggest-implementation-links.ts',
+            },
+          },
+        ]
+      }
+      return []
+    })
+
+    const result = await useCase.execute({
+      specId: 'sdk:suggest-implementation-links',
+      rebuildCache: true,
+    })
+
+    const suggestions = result.specs[0]?.suggestions ?? []
+    const reasons = suggestions.flatMap((s) => s.reasons)
+    expect(reasons).toContain('prose-symbol-evidence')
+    // UnmatchedProseSymbol was not found in codeGraphProvider, so findSymbols was not called with it for scoring
+    expect(suggestions.some((s) => s.symbols.includes('UnmatchedProseSymbol'))).toBe(false)
+  })
+
+  it('attaches fenced-code and inline-code evidence reasons', async () => {
+    const { useCase, codeGraphProvider, specRepositories } = setupTest()
+    const repo = specRepositories.get('sdk')!
+    ;(repo.artifact as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      content:
+        '# sdk:suggest-implementation-links\n\n```typescript\nclass FencedSymbol {}\n```\n\nAnd inline `InlineSymbol`.\n',
+    })
+
+    codeGraphProvider.findSymbols.mockImplementation(async (query: { name?: string }) => {
+      if (query.name === 'FencedSymbol') {
+        return [
+          {
+            name: 'FencedSymbol',
+            kind: 'class',
+            location: {
+              filePath: 'packages/sdk/src/application/use-cases/suggest-implementation-links.ts',
+            },
+          },
+        ]
+      }
+      return []
+    })
+
+    const result = await useCase.execute({
+      specId: 'sdk:suggest-implementation-links',
+      rebuildCache: true,
+    })
+
+    const suggestions = result.specs[0]?.suggestions ?? []
+    const reasons = suggestions.flatMap((s) => s.reasons)
+    expect(reasons).toContain('fenced-code-evidence')
   })
 
   it('propagates implementation mutation failures', async () => {

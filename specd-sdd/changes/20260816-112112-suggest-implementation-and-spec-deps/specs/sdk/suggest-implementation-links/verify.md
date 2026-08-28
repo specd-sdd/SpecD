@@ -44,7 +44,38 @@
 - **WHEN** `SuggestImplementationLinks.execute({ specId: "default:non-existent-spec" })` is called
 - **THEN** it throws a `SpecNotFoundError` for `default:non-existent-spec` (instance of `SpecdError`)
 
+### Requirement: Structured Markdown Symbol Evidence
+
+#### Scenario: Strongest structural evidence wins
+
+- **GIVEN** the same symbol appears in a fenced code block, inline code, and prose
+- **WHEN** `SuggestImplementationLinks` extracts evidence from the Markdown AST
+- **THEN** the candidate retains fenced-code evidence as its strongest source
+- **AND** the scoring reasons identify that evidence deterministically
+
+#### Scenario: Prose candidate requires indexed ground truth
+
+- **GIVEN** prose contains one PascalCase token that resolves in the target workspace and one that does not
+- **WHEN** Markdown symbol evidence is extracted
+- **THEN** only the token resolving to an indexed code-graph symbol is eligible for a suggestion
+- **AND** the unmatched prose token creates no candidate
+
+#### Scenario: Structured extraction does not duplicate code indexing or completeness analysis
+
+- **GIVEN** a spec containing fenced code, inline code, and prose references
+- **WHEN** `SuggestImplementationLinks` analyzes the spec
+- **THEN** Markdown structure is parsed without recursively scanning source directories
+- **AND** indexed symbol and file resolution is delegated to `code-graph`
+- **AND** no ownership inference or code-signature conformance result is produced
+
 ### Requirement: 3-Tier Analysis Algorithm
+
+#### Scenario: Incremental cache persistence across multi-spec runs
+
+- **GIVEN** a multi-spec analysis across a workspace or multiple spec IDs
+- **WHEN** each specification completes analysis
+- **THEN** `cache.flush()` is invoked incrementally so analyzed entries are persisted to disk immediately
+- **AND** subsequent or resumed runs read previously completed specs from cache without re-analysis
 
 #### Scenario: Cache staleness fast-path and rebuild
 

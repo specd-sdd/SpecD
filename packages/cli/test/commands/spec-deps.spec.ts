@@ -183,10 +183,11 @@ describe('spec deps', () => {
     await program.parseAsync(['node', 'specd', 'spec', 'deps', 'suggest', 'auth/login'])
 
     const out = getOutput()
+    expect(out).toContain('[default:auth/login]')
     expect(out).toContain('existing dependsOn:')
     expect(out).toContain('default:auth/core')
-    expect(out).toContain('default:auth/shared [new]')
-    expect(out).toContain('default:auth/core [already included]')
+    expect(out).toContain('[new] default:auth/shared')
+    expect(out).toContain('[already included] default:auth/core')
     expect(out).toContain('applied mutations: updated 1 specs (1 dependencies added)')
     expect(out).toContain('post-apply validation: all specs valid')
   })
@@ -401,5 +402,30 @@ describe('spec deps', () => {
 
     expect(process.exit).not.toHaveBeenCalled()
     expect(getOutput().length).toBeGreaterThan(0)
+  })
+
+  it('suggest passes apply: true directly when --apply --yes is used', async () => {
+    setup()
+    mockExecuteSuggestSpecDependencies.mockClear()
+    const program = makeProgram()
+    registerSpecDeps(program.command('spec'))
+
+    await program.parseAsync([
+      'node',
+      'specd',
+      'spec',
+      'deps',
+      'suggest',
+      'auth/login',
+      '--apply',
+      '--yes',
+    ])
+
+    expect(mockExecuteSuggestSpecDependencies).toHaveBeenCalledWith(
+      expect.objectContaining({
+        specId: 'default:auth/login',
+        apply: true,
+      }),
+    )
   })
 })

@@ -6,13 +6,26 @@
   content: |
     ### Requirement: Suggest subcommand
 
-    `specd specs implementation suggest [<spec-id>] [--spec <id>...] [--all] [--workspace <name>] [--apply] [--confidence <HIGH|MEDIUM|MED|LOW>] [--rebuild-cache]` MUST invoke `SuggestImplementationLinks` in `@specd/sdk`.
+    `specd specs implementation suggest [<spec-id>] [--spec <id>...] [--all] [--workspace <name>] [--apply] [--yes|-y] [--confidence <HIGH|MEDIUM|MED|LOW>] [--rebuild-cache]` MUST invoke `SuggestImplementationLinks` in `@specd/sdk`.
 
-    When `--apply` is passed, the command MUST delegate additive mutation to the SDK use case, which merges new discovered files and symbols into `spec-lock.json` via `UpdatePersistedSpecImplementation`.
+    When `--apply` is passed:
+    - In interactive text format (TTY) without `--yes`/`-y`, the CLI MUST iterate sequentially spec-by-spec across target specifications. For each specification:
+      - Any candidate links already present in `spec-lock.json` MUST be displayed informatively above the prompt with the spec ID emphasized in brackets (`[specId]`) and excluded from interactive choices.
+      - Discovered new candidates MUST be presented via an interactive checkbox prompt (`multiselect`), with `HIGH` confidence items pre-selected by default and the target spec ID formatted as `[specId]`.
+      - Clear navigation hints (`space: toggle`, `enter: confirm and next spec` or `enter: confirm` for the last/only spec, `ctrl+c: abort`) MUST be rendered in the prompt.
+      - If the user aborts (`Ctrl+C`), prompt iteration halts gracefully and previously confirmed mutations remain saved.
+    - When `--yes` or `-y` is provided (or in non-interactive execution / machine formats `json` and `toon`), candidates MUST be applied automatically without interactive prompts. When `--confidence` is not explicitly specified, `--yes` MUST default to the `HIGH` confidence threshold to prevent applying ambiguous lower-confidence links without human review. If `--confidence <level>` is explicitly provided, that threshold governs auto-application.
+    - Mutating `spec-lock.json` MUST perform an additive set union via `UpdatePersistedSpecImplementation`, preserving existing confirmed links.
+
+    In interactive text format, execution MUST be framed with unified Clack components:
+    - Session start MUST display `SpecD — Suggest implementation links`.
+    - Cache warming and discovery phases MUST show progress using inline spinners.
+    - Text summary output MUST be formatted inside a bordered note with long lines wrapped preserving hierarchical indentation and continuation ellipsis markers (`...`), and closed with an outro summary.
+    - The target specification identifier MUST be enclosed in brackets and bolded in prompt headers and result output.
 
     Each suggestion in the text output MUST display its inclusion status: `[already included]` for files already present in `spec-lock.json`, `[new]` for newly discovered candidates.
 
-    The subcommand MUST support `--format text|json|toon`.
+    The subcommand MUST support `--format text|json|toon`. Machine formats `json` and `toon` MUST NEVER prompt or block stdin.
 
 - op: added
   position:

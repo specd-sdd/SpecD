@@ -50,7 +50,7 @@ The input interface MUST support:
      - For each candidate recommendation $B$, checks whether another candidate recommendation $A$ directly depends on $B$ ($B \in \text{directDeps}(A)$).
      - If $A$ directly depends on $B$, $B$ is pruned so only the first / most specific spec in the recommendation chain is suggested directly for the target spec.
    - Retains all non-pruned detected code import relationships in `suggestedDependsOn`, tagging each item with `status: 'already-configured' | 'new'` and `alreadyIncluded: boolean` so dependencies already present in `existingDependsOn` are explicitly rendered with `[already included]` tags in CLI output.
-   - Persists computed spec dependency suggestions to `SpecDepsSuggestionCachePort` with header `cacheVersion: '1.1.0'`, storing the file-to-spec map fingerprint as `fileToSpecFingerprint` on each entry.
+   - Persists computed spec dependency suggestions incrementally to `SpecDepsSuggestionCachePort` (`specDepsCache.flush()`) upon completing analysis of each specification, storing the file-to-spec map fingerprint as `fileToSpecFingerprint` on each entry and guaranteeing progress preservation against interruptions.
 3. **Pass 3 (Mutation, Post-Apply Validation & Conditional Change Creation)**:
    - Before any mutation, requires a `ValidateSpecs` dependency and, when `createAlignmentChange: true`, a `CreateChange` dependency. Missing required dependencies MUST raise `InvalidInputError` before `UpdatePersistedSpecDeps` is called.
    - When `apply: true` is set, unions ONLY NEW dependency spec IDs (`alreadyIncluded === false`) into `spec-lock.json` via `UpdatePersistedSpecDeps`.

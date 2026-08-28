@@ -301,6 +301,205 @@ describe('FsImplementationSuggestionCache', () => {
 
     expect(await cache.get('cli:spec-deps')).not.toBeNull()
   })
+
+  it('ranks candidate specs by (confirmed, evidenceStrength, workspaceAffinity, capabilitySymbolAffinity, score)', async () => {
+    const cache = new FsImplementationSuggestionCache({
+      projectDir: testDir,
+      configPath: '.specd',
+    })
+
+    // Spec A: fenced-code evidence (strength 3)
+    await cache.set('sdk:parser', {
+      title: 'Parser',
+      existing: { files: [], symbols: [], dependsOn: [] },
+      suggestions: [
+        {
+          file: 'packages/sdk/src/parser.ts',
+          symbols: ['parseSpec'],
+          confidence: 'HIGH',
+          reasons: ['fenced-code-evidence'],
+          score: 180,
+          alreadyIncluded: false,
+        },
+      ],
+    })
+
+    // Spec B: inline-code evidence (strength 2) with higher score
+    await cache.set('sdk:parser-v2', {
+      title: 'ParserV2',
+      existing: { files: [], symbols: [], dependsOn: [] },
+      suggestions: [
+        {
+          file: 'packages/sdk/src/parser.ts',
+          symbols: ['parseSpec'],
+          confidence: 'HIGH',
+          reasons: ['inline-code-evidence'],
+          score: 220,
+          alreadyIncluded: false,
+        },
+      ],
+    })
+
+    // Spec A wins because evidence strength 3 > 2, despite Spec B having higher score
+    expect(await cache.findSpecByFile('packages/sdk/src/parser.ts')).toBe('sdk:parser')
+  })
+
+  it('narrows candidates by symbol name when provided', async () => {
+    const cache = new FsImplementationSuggestionCache({
+      projectDir: testDir,
+      configPath: '.specd',
+    })
+
+    await cache.set('sdk:alpha', {
+      title: 'Alpha',
+      existing: { files: [], symbols: [], dependsOn: [] },
+      suggestions: [
+        {
+          file: 'packages/sdk/src/shared.ts',
+          symbols: ['AlphaSymbol'],
+          confidence: 'HIGH',
+          reasons: ['inline-code-evidence'],
+          score: 200,
+          alreadyIncluded: false,
+        },
+      ],
+    })
+
+    await cache.set('sdk:beta', {
+      title: 'Beta',
+      existing: { files: [], symbols: [], dependsOn: [] },
+      suggestions: [
+        {
+          file: 'packages/sdk/src/shared.ts',
+          symbols: ['BetaSymbol'],
+          confidence: 'HIGH',
+          reasons: ['inline-code-evidence'],
+          score: 200,
+          alreadyIncluded: false,
+        },
+      ],
+    })
+
+    // Symbol narrowing picks alpha or beta based on symbolName
+    expect(await cache.findSpecByFile('packages/sdk/src/shared.ts', 'AlphaSymbol')).toBe(
+      'sdk:alpha',
+    )
+    expect(await cache.findSpecByFile('packages/sdk/src/shared.ts', 'BetaSymbol')).toBe('sdk:beta')
+  })
+
+  it('returns null on semantic ties and never uses insertion order as tie-breaker', async () => {
+    const cache1 = new FsImplementationSuggestionCache({
+      projectDir: testDir,
+      configPath: '.specd',
+    })
+
+    // Equal tuples for Spec 1 and Spec 2
+    await cache1.set('sdk:spec-one', {
+      title: 'SpecOne',
+      existing: { files: [], symbols: [], dependsOn: [] },
+      suggestions: [
+        {
+          file: 'packages/sdk/src/tied.ts',
+          symbols: ['SharedSym'],
+          confidence: 'HIGH',
+          reasons: ['inline-code-evidence'],
+          score: 200,
+          alreadyIncluded: false,
+        },
+      ],
+    })
+
+    await cache1.set('sdk:spec-two', {
+      title: 'SpecTwo',
+      existing: { files: [], symbols: [], dependsOn: [] },
+      suggestions: [
+        {
+          file: 'packages/sdk/src/tied.ts',
+          symbols: ['SharedSym'],
+          confidence: 'HIGH',
+          reasons: ['inline-code-evidence'],
+          score: 200,
+          alreadyIncluded: false,
+        },
+      ],
+    })
+
+    expect(await cache1.findSpecByFile('packages/sdk/src/tied.ts')).toBeNull()
+
+    // Permuted insertion order: still null
+    const cache2 = new FsImplementationSuggestionCache({
+      projectDir: testDir,
+      configPath: '.specd',
+    })
+
+    await cache2.set('sdk:spec-two', {
+      title: 'SpecTwo',
+      existing: { files: [], symbols: [], dependsOn: [] },
+      suggestions: [
+        {
+          file: 'packages/sdk/src/tied.ts',
+          symbols: ['SharedSym'],
+          confidence: 'HIGH',
+          reasons: ['inline-code-evidence'],
+          score: 200,
+          alreadyIncluded: false,
+        },
+      ],
+    })
+
+    await cache2.set('sdk:spec-one', {
+      title: 'SpecOne',
+      existing: { files: [], symbols: [], dependsOn: [] },
+      suggestions: [
+        {
+          file: 'packages/sdk/src/tied.ts',
+          symbols: ['SharedSym'],
+          confidence: 'HIGH',
+          reasons: ['inline-code-evidence'],
+          score: 200,
+          alreadyIncluded: false,
+        },
+      ],
+    })
+
+    expect(await cache2.findSpecByFile('packages/sdk/src/tied.ts')).toBeNull()
+  })
+
+  it('confirmed links authoritatively beat unconfirmed suggestions', async () => {
+    const cache = new FsImplementationSuggestionCache({
+      projectDir: testDir,
+      configPath: '.specd',
+    })
+
+    await cache.set('sdk:confirmed-owner', {
+      title: 'ConfirmedOwner',
+      existing: {
+        files: ['packages/sdk/src/authoritative.ts'],
+        symbols: ['ConfirmedSym'],
+        dependsOn: [],
+      },
+      suggestions: [],
+    })
+
+    await cache.set('sdk:suggested-owner', {
+      title: 'SuggestedOwner',
+      existing: { files: [], symbols: [], dependsOn: [] },
+      suggestions: [
+        {
+          file: 'packages/sdk/src/authoritative.ts',
+          symbols: ['ConfirmedSym'],
+          confidence: 'HIGH',
+          reasons: ['fenced-code-evidence'],
+          score: 500,
+          alreadyIncluded: false,
+        },
+      ],
+    })
+
+    expect(await cache.findSpecByFile('packages/sdk/src/authoritative.ts')).toBe(
+      'sdk:confirmed-owner',
+    )
+  })
 })
 
 describe('FsSpecDepsSuggestionCache', () => {

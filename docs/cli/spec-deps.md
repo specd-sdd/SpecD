@@ -22,6 +22,13 @@ Each subcommand accepts `--format text|json|toon` (default `text`) and `--config
 - `remove` on an uninitialized spec reports a no-op instead of an error.
 - `suggest` traces AST import graphs and barrel re-exports to deduce inter-spec dependencies.
 - A cold dependency-suggestion run warms implementation suggestions for every configured spec before analyzing the requested target. On large workspaces this initial dry run can take substantially longer than cached runs; JSON/TOON output is emitted only after analysis completes.
+- Inverted `file -> specId` reverse-lookups rank candidate specs deterministically using the tuple `(confirmed, evidenceStrength, workspaceAffinity, capabilitySymbolAffinity, score)`:
+  - Confirmed `spec-lock.json` links always win over suggestions.
+  - When an imported symbol is known, candidates listing that symbol are narrowed first.
+  - Evidence strength ranks fenced (`3`) > inline (`2`) > prose (`1`) > naming-only (`0`).
+  - Spec and file sharing a workspace adds workspace affinity.
+  - Basename match between capability and symbol kebab-name adds capability affinity.
+  - Semantic ties return `null` and drop the candidate edge rather than inventing an arbitrary dependency.
 - `suggest --apply` unions suggested dependencies into `spec-lock.json` and runs post-apply validation against the canonical per-spec validation entries.
 - If invalid specs exist and `--create-change` is set, the SDK supplies diagnostic exploration content to `CreateChange`; the active change repository decides how to persist it (`FsChangeRepository` uses `.specd-exploration.md`).
 - JSON/TOON results expose `postApplyValidation.status`, `invalidSpecs`, the suggested alignment command, and optional created-change metadata without prompting. Validator and mutation failures remain errors and are never reported as `all-valid`.

@@ -337,4 +337,58 @@ describe('spec implementation', () => {
     expect(out).toContain('[new] [HIGH] src/auth.ts [login]')
     expect(out).toContain('applied mutations: updated 1 specs (2 files, 3 symbols added)')
   })
+
+  it('suggest defaults to HIGH confidence threshold when --apply --yes is used without explicit confidence', async () => {
+    setup()
+    mockExecuteSuggestImplementationLinks.mockClear()
+    const program = makeProgram()
+    registerSpecImplementation(program.command('spec'))
+
+    await program.parseAsync([
+      'node',
+      'specd',
+      'spec',
+      'implementation',
+      'suggest',
+      'auth/login',
+      '--apply',
+      '--yes',
+    ])
+
+    expect(mockExecuteSuggestImplementationLinks).toHaveBeenCalledWith(
+      expect.objectContaining({
+        specId: 'default:auth/login',
+        apply: true,
+        confidenceThreshold: 'HIGH',
+      }),
+    )
+  })
+
+  it('suggest respects explicit --confidence threshold when passed with --apply --yes', async () => {
+    setup()
+    mockExecuteSuggestImplementationLinks.mockClear()
+    const program = makeProgram()
+    registerSpecImplementation(program.command('spec'))
+
+    await program.parseAsync([
+      'node',
+      'specd',
+      'spec',
+      'implementation',
+      'suggest',
+      'auth/login',
+      '--apply',
+      '--yes',
+      '--confidence',
+      'MEDIUM',
+    ])
+
+    expect(mockExecuteSuggestImplementationLinks).toHaveBeenCalledWith(
+      expect.objectContaining({
+        specId: 'default:auth/login',
+        apply: true,
+        confidenceThreshold: 'MEDIUM',
+      }),
+    )
+  })
 })

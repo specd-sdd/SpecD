@@ -6,9 +6,21 @@
   content: |
     ### Requirement: Suggest subcommand
 
-    `specd specs deps suggest [<spec-id>] [--spec <id>...] [--all] [--workspace <name>] [--apply] [--create-change] [--rebuild-cache]` MUST invoke `SuggestSpecDependencies` in `@specd/sdk`.
+    `specd specs deps suggest [<spec-id>] [--spec <id>...] [--all] [--workspace <name>] [--apply] [--yes|-y] [--create-change] [--rebuild-cache]` MUST invoke `SuggestSpecDependencies` in `@specd/sdk`.
 
-    When `--apply` is passed, the command MUST delegate additive mutation to the SDK use case, which merges new discovered dependency IDs into `spec-lock.json` via `UpdatePersistedSpecDeps`.
+    When `--apply` is passed:
+    - In interactive text format (TTY) without `--yes`/`-y`, the CLI MUST iterate sequentially spec-by-spec across target specifications. For each specification:
+      - Any deduced dependencies already configured in `spec-lock.json` MUST be displayed informatively above the prompt with the spec ID emphasized in brackets (`[specId]`) and excluded from interactive choices.
+      - Discovered new dependencies MUST be presented via an interactive checkbox prompt (`multiselect`) unselected by default, with the target spec ID formatted as `[specId]` and clear navigation hints (`space: toggle`, `enter: confirm and next spec` or `enter: confirm` for the last/only spec, `ctrl+c: abort`).
+      - If the user aborts (`Ctrl+C`), prompt iteration halts gracefully and previously confirmed mutations remain saved.
+    - When `--yes` or `-y` is provided (or in non-interactive execution / machine formats `json` and `toon`), all discovered dependency suggestions MUST be applied automatically without interactive prompts.
+    - Mutating `spec-lock.json` MUST delegate additive mutation to `UpdatePersistedSpecDeps`.
+
+    In interactive text format, execution MUST be framed with unified Clack components:
+    - Session start MUST display `SpecD — Suggest spec dependencies`.
+    - Cache warming and discovery phases MUST show progress using inline spinners.
+    - Text summary output MUST be formatted inside a bordered note with long lines wrapped preserving hierarchical indentation and continuation ellipsis markers (`...`), and closed with an outro summary.
+    - The target specification identifier MUST be enclosed in brackets and bolded in prompt headers and result output.
 
     When `--apply` is passed and post-apply validation detects invalid specs:
     - If `--create-change` is passed, the SDK use case MUST create a single alignment change gathering ALL invalid specs and supply its exploration content through `CreateChange`.

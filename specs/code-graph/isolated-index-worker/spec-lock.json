@@ -152,5 +152,41 @@
     {
       "file": "code-graph:test/fixtures/isolated-index-worker/built-valid-task.mjs"
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Runs trusted graph-index tasks in a lock-owning child process with validated IPC, typed failures, signal forwarding, and complete cleanup.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:247df625491e38495d709239819931f8b9dac6b1dd36b23cbbbf023bd323f016",
+          "lastModified": "2026-08-25T15:17:25.388Z"
+        },
+        "verify.md": {
+          "hash": "sha256:80321503e0176e908cd032ce6b5819bdc7a2c434046b7d593f5e41b8d0b78c05",
+          "lastModified": "2026-08-25T15:17:25.388Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Isolated Index Worker\n\n## Rules\n\n- `@specd/code-graph` public entrypoint SHALL expose `runIsolatedGraphIndex` plus host-facing input, progress, result, typed-error contracts. Input MUST contain graph storage root, trusted installed task-module URL/absolute path, JSON-serializable task input; MAY contain progress callback. Resolve task result after successful terminal child message. MUST NOT call `process.exit()`, render output, interpret CLI formats, or mutate host-global exit state.\n- Acquire shared graph index lock for storage root before child creation. Concurrent same-root run MUST fail with typed busy error before second fork. Supervisor owns lock through full child lifetime; releases exactly once after every terminal path: success, task failure, startup/send/IPC failure, invalid/duplicate terminal IPC, premature/non-zero exit, signal, native crash.\n- Startup, IPC setup, or initial `send` failure MUST terminate boundedly even without `exit`: detach listeners, tear down IPC, release lease exactly once, settle typed startup failure after best-effort child termination. Lock acquisition/release/path and unlocked assertions remain internal; callers MUST NOT manage lock tokens.\n- Production SHALL use `node:child_process.fork` with dedicated worker entrypoint from same installed `@specd/code-graph`. Child contains task execution, parsers, provider native code, synchronous graph-store work; native crash MUST NOT terminate host.\n- After successful terminal result, child SHALL finish task resource cleanup and exit code 0. Crash/signal after apparent result remains abnormal. Cleanup MUST address lifecycle faults; MUST NOT use `process.exit()` as mask. Production MUST NOT offer worker-thread/in-process isolation; tests MAY inject launcher or use dedicated protocol seam.\n- Worker SHALL dynamically load exactly host-supplied task-module URL/absolute path exposing documented async graph-index entrypoint. Entrypoint receives task input plus JSON-serializable progress emitter; returns one JSON-serializable result or throws one failure. Missing/non-callable entrypoint or non-serializable input/progress/result MUST become typed task/protocol failure.\n- Task selection MUST NOT be end-user CLI argument. Host selects trusted, installed, version-affine module; capability is not untrusted-code sandbox.\n- Parent/child SHALL use tagged, runtime-validated IPC distinguishing progress, successful terminal result, task-reported terminal failure, malformed/unsupported messages, termination without valid terminal message. Accept at most one terminal message. Duplicate/late terminal message SHALL be protocol failure; MUST NOT cause second settlement, signal action, or lock release.\n- Raw IPC envelopes/bootstrap commands remain internal. Public surface MAY expose presentation-neutral progress/failure values; hosts MUST NOT send/parse/validate child messages.\n- Forward valid progress values to optional callback in arrival order, without rendering/lossy transformation. Missing callback MUST NOT alter execution. Child/supervisor MUST NOT emit normal progress/result in CLI text, JSON, or TOON; hosts own presentation.\n- Preserve distinct typed failures for busy lock; fork/IPC startup; invalid task module/contract; task failure; malformed/unsupported/late/duplicate IPC; non-zero/premature exit; signal termination. Errors MUST extend `SpecdCodeGraphError`, expose stable upper-snake-case codes, actionable messages, structured exit-code/signal details where applicable. Hosts MUST NOT parse stderr/message text for classification.\n- During active child, install parent `SIGINT`/`SIGTERM` handlers forwarding same signal; remove only installed handlers after termination. Then wait for child, release lock, report typed signal-derived failure. MUST NOT exit/re-signal host.\n- Child SHALL receive internal code-graph indication that supervisor owns shared lock; child provider indexing MUST avoid reacquisition. Indication MUST NOT be caller-managed/public, MUST stay forked-child scoped, MUST NOT disable locking for unrelated process/storage root.\n- Build SHALL emit stable ESM child entrypoint under published `dist/`. `runIsolatedGraphIndex` SHALL resolve relative to installed module, not repository root, current working directory, or TypeScript source. Package verification MUST fork emitted worker from built/publish-shaped output and dynamically import built task module. Built integration verification MUST force project index, receive terminal result, complete cleanup, exit code 0.\n- Listener removal, child-reference cleanup, IPC teardown, lock release SHALL be idempotent and complete before returned promise settles. Remove no foreign listener; leave no lock file, live child, or open IPC channel.\n\n## Constraints\n\n- Only child process satisfies native-crash containment.\n- MUST NOT implement queueing, lock waiting, automatic retry, stale-lock PID recovery, scheduled indexing, or background indexing.\n- MUST NOT depend on `@specd/sdk`, `@specd/cli`, Commander, or delivery formatter.\n- Inputs, progress, results, IPC payloads MUST be JSON-serializable and runtime-validated at process boundary.\n- Direct lock helpers and raw IPC DTOs remain internal.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:247df625491e38495d709239819931f8b9dac6b1dd36b23cbbbf023bd323f016",
+          "lastModified": "2026-08-25T15:17:25.388Z"
+        },
+        "verify.md": {
+          "hash": "sha256:80321503e0176e908cd032ce6b5819bdc7a2c434046b7d593f5e41b8d0b78c05",
+          "lastModified": "2026-08-25T15:17:25.388Z"
+        }
+      }
+    }
+  }
 }

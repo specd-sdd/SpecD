@@ -235,3 +235,108 @@
       `deltas/sdk/composition/verify.md.delta.yaml`: `Requirement: Layer structure` — remove the no-infrastructure assertion and add topology and forbidden-application-import scenarios.
       Approach: assert separate use-case files under `application/use-cases/`, permitted internal infrastructure, and no `node:fs`, concrete adapter, or config-path imports from application modules.
       (Req: sdk:composition — Layer structure)
+
+## 12. Follow-up: structured Markdown evidence and candidate-spec resolution (2026-08-28)
+
+- [x] 12.1 Add the SDK Markdown parser dependency
+      `packages/sdk/package.json` and `pnpm-lock.yaml`: add `mdast-util-from-markdown` as a runtime dependency using the version already resolved in the workspace.
+      Approach: update only the SDK importer and regenerate the lockfile through pnpm; do not import Core's installed copy by filesystem path.
+      (Req: Structured Markdown Symbol Evidence)
+
+- [x] 12.2 Implement the pure Markdown evidence extractor
+      `packages/sdk/src/application/services/extract-markdown-symbol-evidence.ts`: add `MarkdownEvidenceSource`, `MarkdownSymbolEvidence`, `ExtractMarkdownSymbolEvidenceInput`, and `extractMarkdownSymbolEvidence`.
+      Approach: parse once with `fromMarkdown`, maintain heading paths, visit supported fenced code, inline code, headings, and text in source order, filter keywords, and deduplicate by `kind + candidate` with `fenced-code > inline-code > prose` precedence.
+      (Req: Structured Markdown Symbol Evidence; scenario: strongest structural evidence wins)
+
+- [x] 12.3 Inject the adapter registry into implementation suggestions
+      `packages/sdk/src/application/use-cases/suggest-implementation-links.ts` and `packages/sdk/src/composition/suggest-implementation-links.ts`: add required `adapterRegistry: AdapterRegistryPort` to `SuggestImplementationLinksDeps` and resolve it in composition.
+      Approach: composition calls the port-typed `createBuiltinAdapterRegistry`; the use case derives extensions, language IDs, and reserved keywords only through the injected port.
+      (Req: Structured Markdown Symbol Evidence; Req: Dependency-injected factory)
+
+- [x] 12.4 Replace regex-only Markdown structure discovery
+      `packages/sdk/src/application/use-cases/suggest-implementation-links.ts`: `analyzeSpec` — replace document-wide fenced and inline parsing with `extractMarkdownSymbolEvidence`.
+      Approach: preserve metadata/title and capability derivatives, but use MDAST evidence for spec-content candidates and allow inline file paths for every registered source extension.
+      (Req: Structured Markdown Symbol Evidence; Req: 3-Tier Analysis Algorithm)
+
+- [x] 12.5 Gate prose evidence through code graph
+      `packages/sdk/src/application/use-cases/suggest-implementation-links.ts`: evidence-to-candidate correlation — resolve prose candidates with `findSymbols({ name, workspace })` before path derivation or scoring.
+      Approach: discard unresolved prose; never let textual tokens create suggestions without indexed workspace ground truth.
+      (Req: Structured Markdown Symbol Evidence; scenario: prose candidate requires indexed ground truth)
+
+- [x] 12.6 Add stable evidence reasons and bonuses
+      `packages/sdk/src/application/use-cases/suggest-implementation-links.ts`: candidate scoring — add `fenced-code-evidence` (+30), `inline-code-evidence` (+20), or `prose-symbol-evidence` (+5) once per symbol/file pair.
+      Approach: evidence bonuses supplement existing primary/derivative/token scores and cannot independently qualify `HIGH` confidence.
+      (Req: Structured Markdown Symbol Evidence; scenario: strongest structural evidence wins)
+
+- [x] 12.7 Implement semantic candidate-spec ranking
+      `packages/sdk/src/application/ports/implementation-suggestion-cache-port.ts` and `packages/sdk/src/infrastructure/fs/fs-implementation-suggestion-cache.ts`: extend `findSpecByFile(filePath, symbolName?)` and inverse-map construction.
+      Approach: rank all candidates by `(confirmed, evidenceStrength, workspaceAffinity, capabilitySymbolAffinity, score)`; filter by resolved symbol when possible; return `null` for equal highest tuples; use `specId` order only in diagnostics.
+      (Req: Cache Warm-up & 2-Pass Dependency Deduction)
+
+- [x] 12.8 Consume symbol-aware ownership resolution
+      `packages/sdk/src/application/use-cases/suggest-spec-dependencies.ts`: Pass 2 file/symbol-to-spec lookup — pass the resolved imported symbol to `findSpecByFile` when available.
+      Approach: fall back to file-only ranking when traversal has no symbol and drop ambiguous `null` edges without emitting a dependency.
+      (Req: Cache Warm-up & 2-Pass Dependency Deduction)
+
+- [x] 12.9 Add pure evidence extractor tests
+      `packages/sdk/test/application/services/extract-markdown-symbol-evidence.spec.ts`: cover heading paths, supported and unsupported fenced languages, inline multi-language paths, keyword filtering, source precedence, and stable traversal order.
+      Approach: use Markdown strings only; assert the service performs no filesystem or code-graph work.
+      (Req: Structured Markdown Symbol Evidence; scenarios: strongest evidence, no duplicate indexing)
+
+- [x] 12.10 Add implementation-suggestion evidence regressions
+      `packages/sdk/test/application/use-cases/suggest-implementation-links.spec.ts`: cover evidence reason scores, prose graph rejection, adapter-registry injection, and unchanged public result shapes.
+      Approach: mock `AdapterRegistryPort` and `CodeGraphProvider`; assert unmatched prose is absent and existing Tier 1/Tier 2 confidence behavior remains compatible.
+      (Req: Structured Markdown Symbol Evidence; Req: 3-Tier Analysis Algorithm)
+
+- [x] 12.11 Add candidate-spec resolution regressions
+      `packages/sdk/test/application/use-cases/suggest-spec-dependencies.spec.ts` and FS cache tests: cover confirmed-link priority, symbol narrowing, evidence/workspace/slug ranking, repository-order independence, and semantic ties.
+      Approach: permute candidate insertion order and assert the same unique winner; assert a tied tuple returns `null` and creates no dependency.
+      (Req: Cache Warm-up & 2-Pass Dependency Deduction)
+
+- [x] 12.12 Refresh CLI documentation for evidence and ambiguity
+      `docs/cli/spec-implementation.md` and `docs/cli/spec-deps.md`: document evidence reason categories, code-graph validation of prose, and omitted dependency suggestions when candidate ownership is ambiguous.
+      Approach: describe observable behavior without presenting internal ranking weights as a stable CLI API unless they are emitted in structured results.
+
+- [x] 12.13 Run automated and manual verification
+      SDK tests, typecheck, lint, build, and CLI dry-run smoke commands: verify structured evidence, candidate-spec resolution, existing suggestion behavior, and documentation examples.
+      Approach: run focused SDK service/use-case/cache suites first, then SDK package checks and repository verification; execute `node packages/cli/dist/index.js specs implementation suggest --all` and a non-applying `specs deps suggest` smoke check.
+
+## 13. Follow-up: Interactive apply prompting and batch threshold filtering (2026-08-28)
+
+- [x] 13.1 Implement CLI interactive candidate selection helper
+      `packages/cli/src/helpers/prompt-apply.ts`: create reusable multiselect prompt helpers using `@clack/prompts` with candidate checkbox options, pre-selected `HIGH` confidence items, and graceful cancellation handling (`isCancel`).
+      Approach: render candidates per spec with confidence and symbol hints; return confirmed items for mutation.
+      (Req: cli:spec-implementation — Suggest subcommand; Req: cli:spec-deps — Suggest subcommand)
+
+- [x] 13.2 Wire interactive apply and `--yes` default threshold in `specs implementation suggest`
+      `packages/cli/src/commands/spec/implementation.ts`: register `--yes` / `-y` option; when `--apply` is set in TTY without `--yes`, prompt user with candidate multiselect; when `--yes` is set without `--confidence`, default threshold to `HIGH`; apply only confirmed candidate links via `updatePersistedImplementation`.
+      Approach: bypass prompts in non-interactive / machine format runs; apply confirmed set union.
+      (Req: cli:spec-implementation — Suggest subcommand)
+
+- [x] 13.3 Wire interactive apply and `--yes` flag in `specs deps suggest`
+      `packages/cli/src/commands/spec/deps.ts`: register `--yes` / `-y` option; when `--apply` is set in TTY without `--yes`, prompt user with suggested dependency multiselect; when `--yes` is set, apply all deduced dependencies without prompts.
+      Approach: bypass prompts in machine format runs; mutate only confirmed dependencies via `updatePersistedDeps`.
+      (Req: cli:spec-deps — Suggest subcommand)
+
+- [x] 13.4 Add CLI integration tests for interactive and unattended apply
+      `packages/cli/test/commands/spec-implementation.spec.ts` and `spec-deps.spec.ts`: cover `--yes` default `HIGH` confidence filtering, explicit `--confidence` overrides, and non-TTY unattended apply.
+      Approach: mock `@clack/prompts` and assert partial selection applies only confirmed links.
+      (Req: cli:spec-implementation — Suggest subcommand; Req: cli:spec-deps — Suggest subcommand)
+
+- [x] 13.5 Run automated verification and manual smoke tests
+      Run `pnpm test`, `pnpm lint`, `pnpm typecheck`, `pnpm build`, and manual CLI smoke tests for interactive selection and `--yes` automation.
+      Approach: verify zero regressions across all 349 test files and confirm clean CLI execution.
+
+## 14. Follow-up: Clack UI Framing, Text Wrapping, and Visual Polish (2026-08-28)
+
+- [x] 14.1 Integrate native Clack framing and spinners
+      `packages/cli/src/commands/spec/implementation.ts` & `deps.ts`: unified session branding (`intro('SpecD — Suggest implementation links')` / `intro('SpecD — Suggest spec dependencies')`), inline `spinner()` progress for cache warming and discovery, and `clack.note()` for framed text results.
+      (Req: cli:spec-implementation, Req: cli:spec-deps)
+
+- [x] 14.2 Hierarchical text wrapping with ellipsis indicators
+      `packages/cli/src/helpers/prompt-apply.ts`: `wrapForClack(text, maxWidth)` calculating visible string length (`stripAnsi`), indenting continuation lines with `leadingSpaces + 4`, and appending/prepending `...` ellipsis markers across line breaks to protect terminal column borders.
+      (Req: cli:spec-implementation, Req: cli:spec-deps)
+
+- [x] 14.3 Contextual action hints, unselected dependencies, and bracketed spec highlighting
+      `packages/cli/src/helpers/prompt-apply.ts`, `implementation.ts`, `deps.ts`: contextual navigation hints (`enter: confirm and next spec` vs `enter: confirm`), all candidate dependencies starting unselected (`◻`), and primary specification target emphasized with bold and brackets `[specId]` while keeping secondary items clean.
+      (Req: cli:spec-implementation, Req: cli:spec-deps)

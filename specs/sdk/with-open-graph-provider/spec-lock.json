@@ -12,36 +12,36 @@
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "`withOpenGraphProvider` safely wraps provider creation, hooks, open, callback, close, cleanup, and error propagation.",
+      "value": "`withOpenGraphProvider` owns provider lifecycle, optional open recovery, final cleanup, hooks, and primary-error propagation without process exit.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:c96df715aec44c340d432ef80975cef0aceed18bcac9dfcf7c88d856d404cc20",
-          "lastModified": "2026-07-20T16:47:44.296Z"
+          "hash": "sha256:790aa05f3ae5cb73229a483e808f9cfc6964a8b34b1a4ccbd70dba30543d2d16",
+          "lastModified": "2026-08-25T15:17:25.411Z"
         },
         "verify.md": {
-          "hash": "sha256:45d9709c63dbaa3b423d0dce874ff77155ba0b0c5bafc6f0ad2eff88712c4637",
-          "lastModified": "2026-07-20T16:47:44.296Z"
+          "hash": "sha256:9bb7b05dd21e3ba5e61faae490a7c7638e9ef55459e1538d293f66e4afa303a1",
+          "lastModified": "2026-08-25T15:17:25.411Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# SDK With Open Graph Provider\n## Rules\n- `withOpenGraphProvider<T>(ctx: SdkHostContext, fn: (provider: CodeGraphProvider) => Promise<T>, options?: WithOpenGraphProviderOptions): Promise<T>`:\n  1. `ctx.createGraphProvider()`\n  2. await optional `beforeOpen(provider)`\n  3. `provider.open()`\n  4. await `fn(provider)`; return result\n  5. attempt `provider.close()` after success, callback failure, or `open()` failure\n  6. await optional `afterClose(provider)` after close attempt on every completion/error path\n- `WithOpenGraphProviderOptions`: `readonly beforeOpen?: (provider: CodeGraphProvider) => Promise<void>`; `readonly afterClose?: (provider: CodeGraphProvider) => Promise<void>`.\n- If `fn` throws, preserve original error even if `close()` fails.\n- If `open()` fails, attempt close and run `afterClose`, whether or not `beforeOpen` exists; propagate open error.\n- After successful operation, primary `close()` failure MAY propagate; subsequent `afterClose` failure MAY be terminal.\n- Hooks MAY provide host setup/teardown but MUST NOT alter `CodeGraphProvider` contract.\n## Constraints\n- MUST NOT call `process.exit()`.\n- Signal handling/forced exit remain host-adapter responsibilities.\n- Long-lived hosts may use `CodeGraphProvider` directly.",
+      "value": "# SDK With Open Graph Provider\n\n## Rules\n\n- `withOpenGraphProvider<T>(ctx: SdkHostContext, fn: (provider: CodeGraphProvider) => Promise<T>, options?: WithOpenGraphProviderOptions): Promise<T>`: create provider; await `beforeOpen`; call parameterless `open()`; invoke `fn`; close; await `afterClose`.\n- Options retain `beforeOpen?: (provider: CodeGraphProvider) => Promise<void>`, `afterClose?: (provider: CodeGraphProvider) => Promise<void>`; add generic `recoverOpenFailure(error, provider): Promise<boolean>`.\n- Initial open failure: attempt close first; invoke recovery with closed provider + original error. `true` retries `open()` exactly once; never invoke recovery again. `false` preserves original error.\n- Callback failure: attempt close; preserve callback error despite close failure.\n- Recovery-callback failure or retry-open failure terminal. After final cleanup, `afterClose` runs on success, callback error, initial open failure, recovery failure, or retry failure.\n- Never retry implicitly or swallow non-recoverable errors.\n- Hooks support host-local setup/teardown only; never change `CodeGraphProvider` contract. Long-lived hosts MAY use provider directly.\n\n## Constraints\n\n- MUST NOT call `process.exit()`.\n- Signal handling/forced exit belong to host adapter.\n- Recovery does not alter parameterless `CodeGraphProvider.open()`.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:c96df715aec44c340d432ef80975cef0aceed18bcac9dfcf7c88d856d404cc20",
-          "lastModified": "2026-07-20T16:47:44.296Z"
+          "hash": "sha256:790aa05f3ae5cb73229a483e808f9cfc6964a8b34b1a4ccbd70dba30543d2d16",
+          "lastModified": "2026-08-25T15:17:25.411Z"
         },
         "verify.md": {
-          "hash": "sha256:45d9709c63dbaa3b423d0dce874ff77155ba0b0c5bafc6f0ad2eff88712c4637",
-          "lastModified": "2026-07-20T16:47:44.296Z"
+          "hash": "sha256:9bb7b05dd21e3ba5e61faae490a7c7638e9ef55459e1538d293f66e4afa303a1",
+          "lastModified": "2026-08-25T15:17:25.411Z"
         }
       }
     }

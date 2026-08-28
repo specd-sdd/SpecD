@@ -68,13 +68,14 @@ export abstract class ImplementationSuggestionCachePort {
   abstract getAll(): Promise<ReadonlyMap<string, ImplementationSuggestionSpecEntry>>
 
   /**
-   * Reverse-lookup: finds the owner spec for a given code file path.
-   * Resolves paths relative to workspaces, ignoring ambiguous shared hub files (fan-in >= 3).
+   * Reverse-lookup: finds the owner spec for a given code file path and optional symbol name.
+   * Resolves paths relative to workspaces, ranking candidates by semantic ownership tuple.
    *
    * @param filePath - File path (workspace-prefixed or repo-relative)
+   * @param symbolName - Optional imported symbol name for disambiguation
    * @returns Canonical specId or null if unassigned or ambiguous
    */
-  abstract findSpecByFile(filePath: string): Promise<string | null>
+  abstract findSpecByFile(filePath: string, symbolName?: string): Promise<string | null>
 
   /**
    * Returns the complete inverted lookup map from file path to canonical specId.

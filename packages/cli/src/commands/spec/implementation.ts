@@ -153,6 +153,10 @@ export function registerSpecImplementation(parent: Command): void {
     .option('--all', 'suggest for all specs')
     .option('--workspace <name>', 'target workspace')
     .option('--apply', 'apply suggested links to spec-lock.json')
+    .option(
+      '-y, --yes',
+      'automatically apply suggestions meeting confidence threshold without prompting',
+    )
     .option('--confidence <level>', 'confidence threshold: HIGH|MEDIUM|MED|LOW')
     .option('--rebuild-cache', 'force cache invalidation')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
@@ -192,6 +196,7 @@ Example:
           all?: boolean
           workspace?: string
           apply?: boolean
+          yes?: boolean
           confidence?: string
           rebuildCache?: boolean
           format: string
@@ -199,7 +204,7 @@ Example:
         },
       ) => {
         try {
-          const { config } = await resolveCliContext({ configPath: opts.config })
+          const { config, kernel } = await resolveCliContext({ configPath: opts.config })
           const { createSuggestImplementationLinks } = await import('@specd/sdk')
           const useCase = createSuggestImplementationLinks(config)
           const targetSpecId = specPath ? parseSpecId(specPath, config).specId : undefined
@@ -209,11 +214,24 @@ Example:
 
           const isInteractiveText =
             fmt === 'text' && Boolean(process.stderr?.isTTY || process.stdout?.isTTY)
-          const spinner = isInteractiveText
-            ? (await import('nanospinner'))
-                .createSpinner('Analyzing implementation links...')
-                .start()
-            : null
+          const isInteractiveApply = opts.apply === true && !opts.yes && isInteractiveText
+
+          // When auto-applying via --yes, default confidence threshold to HIGH unless specified
+          const effectiveConfidence = opts.confidence
+            ? (opts.confidence as 'HIGH' | 'MEDIUM' | 'MED' | 'LOW')
+            : opts.yes && opts.apply
+              ? 'HIGH'
+              : undefined
+
+          const clack = isInteractiveText ? await import('@clack/prompts') : null
+          if (clack) {
+            clack.intro('SpecD — Suggest implementation links')
+          }
+
+          const s = clack ? clack.spinner() : null
+          if (s) {
+            s.start('Analyzing implementation links...')
+          }
 
           let result
           try {
@@ -222,65 +240,153 @@ Example:
               ...(specIds !== undefined ? { specIds } : {}),
               ...(opts.workspace !== undefined ? { workspace: opts.workspace } : {}),
               ...(opts.all !== undefined ? { all: opts.all } : {}),
-              ...(opts.apply !== undefined ? { apply: opts.apply } : {}),
-              ...(opts.confidence !== undefined
-                ? { confidenceThreshold: opts.confidence as 'HIGH' | 'MEDIUM' | 'MED' | 'LOW' }
+              // In interactive apply, run dry-run first so user can confirm selection
+              ...(isInteractiveApply
+                ? { apply: false }
+                : opts.apply !== undefined
+                  ? { apply: opts.apply }
+                  : {}),
+              ...(effectiveConfidence !== undefined
+                ? { confidenceThreshold: effectiveConfidence }
                 : {}),
               ...(opts.rebuildCache !== undefined ? { rebuildCache: opts.rebuildCache } : {}),
-              ...(spinner
+              ...(s
                 ? {
                     onProgress: (evt) => {
                       if (evt.type === 'discovery-start') {
-                        spinner.update({ text: 'Discovering specifications across workspaces...' })
+                        s.message('Discovering specifications across workspaces...')
                       } else if (evt.type === 'start') {
-                        spinner.update({
-                          text: `Analyzing implementation links for ${evt.totalSpecs} specification(s)...`,
-                        })
+                        s.message(
+                          `Analyzing implementation links for ${evt.totalSpecs} specification(s)...`,
+                        )
                       } else if (evt.type === 'spec-start') {
-                        spinner.update({
-                          text: `[${evt.index}/${evt.totalSpecs}] Analyzing ${evt.specId}...`,
-                        })
+                        s.message(`[${evt.index}/${evt.totalSpecs}] Analyzing ${evt.specId}...`)
                       }
                     },
                   }
                 : {}),
             })
-            if (spinner) {
-              spinner.stop()
+            if (s) {
+              s.stop('Implementation link analysis complete')
             }
           } catch (err) {
-            if (spinner) {
-              spinner.error({ text: 'Implementation link analysis failed' })
+            if (s) {
+              s.stop('Implementation link analysis failed', 1)
             }
             throw err
           }
 
-          if (fmt === 'text') {
-            output('suggested implementation links:', 'text')
-            for (const spec of result.specs) {
-              output(`  ${spec.specId}`, 'text')
-              if (spec.existing.files.length > 0) {
-                output(`    existing:`, 'text')
-                for (const f of spec.existing.files) {
-                  output(`      ${f}`, 'text')
-                }
+          // Handle interactive apply prompting
+          if (isInteractiveApply && clack) {
+            const { promptSelectImplementationLinks } =
+              await import('../../helpers/prompt-apply.js')
+
+            const specsWithSuggestions = result.specs.filter((s) => s.suggestions.length > 0)
+
+            let updatedSpecsCount = 0
+            let filesAddedCount = 0
+            let symbolsAddedCount = 0
+            let wasCancelled = false
+
+            for (let i = 0; i < specsWithSuggestions.length; i++) {
+              const spec = specsWithSuggestions[i]!
+              const hasNext = i < specsWithSuggestions.length - 1
+              const selected = await promptSelectImplementationLinks(
+                spec.specId,
+                spec.suggestions,
+                { hasNext, existingFiles: spec.existing.files },
+              )
+
+              if (selected === null) {
+                clack.outro('Apply cancelled.')
+                wasCancelled = true
+                break
               }
-              if (spec.suggestions.length === 0) {
-                output(`    suggestions: (none)`, 'text')
-              } else {
-                output(`    suggestions:`, 'text')
-                for (const sug of spec.suggestions) {
-                  const tag = sug.alreadyIncluded ? '[already included]' : '[new]'
-                  const symsStr = sug.symbols.length > 0 ? ` [${sug.symbols.join(', ')}]` : ''
-                  output(`      ${tag} [${sug.confidence}] ${sug.file}${symsStr}`, 'text')
+
+              if (selected.length > 0) {
+                updatedSpecsCount++
+                for (const item of selected) {
+                  filesAddedCount++
+                  symbolsAddedCount += item.symbols.length
+                  await kernel.specs.updatePersistedImplementation.execute({
+                    specId: spec.specId,
+                    action: 'add',
+                    file: item.file,
+                    ...(item.symbols.length > 0 ? { symbols: item.symbols } : {}),
+                  })
                 }
               }
             }
+
+            if (wasCancelled) {
+              return
+            }
+
+            if (updatedSpecsCount > 0) {
+              result = {
+                ...result,
+                appliedMutations: {
+                  updatedSpecsCount,
+                  filesAddedCount,
+                  symbolsAddedCount,
+                },
+              }
+            }
+          }
+
+          if (fmt === 'text') {
+            const chalk = (await import('chalk')).default
+            const lines: string[] = []
+            for (const spec of result.specs) {
+              lines.push(`[${chalk.bold(spec.specId)}]`)
+              if (spec.existing.files.length > 0) {
+                lines.push('  existing:')
+                for (const f of spec.existing.files) {
+                  lines.push(`    ${f}`)
+                }
+              }
+              if (spec.suggestions.length === 0) {
+                lines.push('  suggestions: (none)')
+              } else {
+                lines.push('  suggestions:')
+                for (const sug of spec.suggestions) {
+                  const tag = sug.alreadyIncluded ? '[already included]' : '[new]'
+                  const symsStr = sug.symbols.length > 0 ? ` [${sug.symbols.join(', ')}]` : ''
+                  lines.push(`    ${tag} [${sug.confidence}] ${sug.file}${symsStr}`)
+                }
+              }
+              lines.push('')
+            }
             if (result.appliedMutations) {
-              output(
+              lines.push(
                 `applied mutations: updated ${result.appliedMutations.updatedSpecsCount} specs (${result.appliedMutations.filesAddedCount} files, ${result.appliedMutations.symbolsAddedCount} symbols added)`,
-                'text',
               )
+            }
+
+            if (clack) {
+              const { wrapForClack } = await import('../../helpers/prompt-apply.js')
+              clack.note(wrapForClack(lines.join('\n').trim()), 'Suggested implementation links')
+              if (isInteractiveApply) {
+                const applied = result.appliedMutations
+                clack.outro(
+                  applied && applied.updatedSpecsCount > 0
+                    ? `Applied ${applied.filesAddedCount} link(s) across ${applied.updatedSpecsCount} spec(s).`
+                    : 'No new implementation links were applied.',
+                )
+              } else {
+                const totalSuggestions = result.specs.reduce(
+                  (acc, s) => acc + s.suggestions.length,
+                  0,
+                )
+                clack.outro(
+                  `Found ${totalSuggestions} suggestion(s) across ${result.specs.length} spec(s).`,
+                )
+              }
+            } else {
+              output('suggested implementation links:', 'text')
+              for (const line of lines) {
+                if (line) output(`  ${line}`, 'text')
+              }
             }
           } else {
             output(result, fmt)

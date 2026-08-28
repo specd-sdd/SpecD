@@ -1015,4 +1015,71 @@ describe('SuggestSpecDependencies', () => {
     expect(events.some((e) => e.type === 'spec-done')).toBe(true)
     expect(events.some((e) => e.type === 'done')).toBe(true)
   })
+
+  it('passes resolved imported symbol to findSpecByFile and drops ambiguous null returns', async () => {
+    const { suggestImplementationLinks, specRepositories } = setupTest()
+    const implCache = new InMemoryImplementationSuggestionCache()
+    const findSpecByFileSpy = vi
+      .spyOn(implCache, 'findSpecByFile')
+      .mockImplementation(async (filePath: string, symbolName?: string) => {
+        if (symbolName === 'ResolvedSymbol') {
+          return 'code-graph:traversal'
+        }
+        if (filePath.includes('ambiguous.ts')) {
+          return null // Ambiguous match returns null
+        }
+        return null
+      })
+
+    const codeGraphProvider = {
+      analyzeFileImpact: vi.fn().mockImplementation(async (filePath: string) => {
+        if (filePath.includes('suggest-spec-dependencies.ts')) {
+          return {
+            affectedFiles: [
+              { filePath: 'packages/code-graph/src/resolved.ts', symbol: 'ResolvedSymbol' },
+              { filePath: 'packages/code-graph/src/ambiguous.ts' },
+            ],
+          }
+        }
+        return { affectedFiles: [] }
+      }),
+    } as unknown as CodeGraphProvider
+
+    const useCase = new SuggestSpecDependencies({
+      suggestImplementationLinks:
+        suggestImplementationLinks as unknown as SuggestImplementationLinks,
+      specRepositories,
+      getPersistedDeps: {
+        execute: vi.fn().mockResolvedValue({
+          specId: 'sdk:suggest-spec-dependencies',
+          dependsOn: [],
+          initialized: true,
+        }),
+      } as unknown as GetPersistedSpecDeps,
+      updatePersistedDeps: vi.fn() as unknown as UpdatePersistedSpecDeps,
+      validateSpecs: vi.fn() as unknown as ValidateSpecs,
+      codeGraphProvider,
+      cache: implCache,
+      specDepsCache: new InMemorySpecDepsSuggestionCache(),
+      projectDir: '/tmp/test-symbol-disambiguation',
+    })
+
+    const result = await useCase.execute({
+      specId: 'sdk:suggest-spec-dependencies',
+      rebuildCache: true,
+    })
+
+    expect(findSpecByFileSpy).toHaveBeenCalledWith(
+      'packages/code-graph/src/resolved.ts',
+      'ResolvedSymbol',
+    )
+    expect(findSpecByFileSpy).toHaveBeenCalledWith(
+      'packages/code-graph/src/ambiguous.ts',
+      undefined,
+    )
+    expect(result.result).toBe('ok')
+    // Resolved symbol was mapped to code-graph:traversal, ambiguous was dropped
+    expect(result.specs[0]?.suggestedDependsOn).toHaveLength(1)
+    expect(result.specs[0]?.suggestedDependsOn[0]?.specId).toBe('code-graph:traversal')
+  })
 })
