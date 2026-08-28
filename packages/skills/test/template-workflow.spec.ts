@@ -37,7 +37,13 @@ describe('workflow skill templates', () => {
     )
     expect(content).not.toContain('specd specs show')
     expect(content).toContain('`specs context` is the only allowed spec-reading surface')
-    expect(content).toMatch(/do not use `specs resolve-path` solely for\s+this discovery/)
+    expect(content).toContain('VERBATIM (EXACTLY AS-IS)')
+    expect(content).toContain('> **MANDATORY DIRECTIVES FOR `/specd-design`**:')
+    expect(content).toContain('8. **Codebase-Wide Adoption & Affected Areas (MUST)**:')
+    expect(content).toContain('already marked as completed (`- [x]`)')
+    expect(content).toContain('## Consolidation & Audit Summary')
+    expect(content).toContain('MANDATORY STOP RULES')
+    expect(content).toContain('Do NOT autonomously invoke, launch, or execute `/specd-design`.')
     expect(metadata).toEqual({
       kind: 'skill',
       supportedCapabilities: ['mcp', 'agents', 'frontmatter'],

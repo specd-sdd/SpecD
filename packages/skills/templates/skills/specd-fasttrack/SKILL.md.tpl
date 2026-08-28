@@ -49,32 +49,89 @@ next meaningful action.
 
 ## 2. Select or create an unscoped change
 
-If no change was named, list active changes and ask whether to use one or create a new
-one. Create a new fast-track change without pre-assigning specs:
+If the user DID NOT specify a change name:
+1. List active changes:
+```bash
+specd changes list --format toon
+```
+2. Ask the user:
+> Would you like to use an existing active change or create a new one for this fast-track session?
 
+3. If creating a new change, create it without pre-assigning specs and start tracking:
 ```bash
 specd changes create <name>
 specd changes implementation start <name>
 ```
 
-For an existing named change, inspect its status and start implementation tracking:
-
+4. If selecting an existing named change, inspect its status and start tracking:
 ```bash
 specd changes status <name> --format text
 specd changes implementation start <name>
 ```
 
-Create `<changePath>/.specd-exploration.md` if it does not exist. It must include the
-following sections: Motivation & Problem; Approaches Explored & Agreed Strategy;
-Suggested Specs for Design; Spec Contracts & Impact Analysis (including inspected and
-modified contracts); Codebase Adoption & Affected Areas; Decisions & Code Actions; and
-Consolidation & Audit.
+Create `<changePath>/.specd-exploration.md` if it does not exist using the following exact structure.
 
-At the top, direct `/specd-design` to use `specd changes implementation list <name>` and
-`specd changes implementation review <name> --format toon` as the authority for completed
-work, rather than relying only on a Git diff. It must evaluate suggested specs, preserve
-completed and pending work in formal tasks, investigate omitted edge cases and adoption,
-and perform the downstream impact analysis.
+**CRITICAL RULE:** You MUST copy the `> **MANDATORY DIRECTIVES FOR \`/specd-design\`**:` block below **VERBATIM (EXACTLY AS-IS)** into the header of `<changePath>/.specd-exploration.md`. Do NOT summarize, alter, or omit any of the 9 numbered directives.
+
+```markdown
+# Fast-track Journal: <name>
+
+> **MANDATORY DIRECTIVES FOR `/specd-design`**:
+> When generating change artifacts during the design phase:
+> 1. **Primary Implementation Scope (Tracked Links)**:
+>    - Do NOT rely solely on `git diff` (intermediate commits might have occurred during the session).
+>    - You MUST inspect the tracked implementation files and confirmed links via `specd changes implementation list <name>` and `specd changes implementation review <name> --format toon` as the authoritative scope of code modifications.
+> 2. **Spec Evaluation & Selection**: Critically evaluate the suggested specs under `## Suggested Specs for Design` or search the workspace specs to find better-fitting alternatives (or determine if a brand-new capability spec is required). Register the final, optimal set of specs via `specd changes edit <name> --add-spec <spec-id>`.
+> 3. **Proposal artifact**: Transcribe the motivation, root cause, and agreed solution into the formal proposal document.
+> 4. **Specification & Verification artifacts (or deltas)**: Formalize the behavior into normative requirements and verification scenarios according to the schema instructions. Incorporate any broken/modified contracts identified below.
+> 5. **Design / Architecture artifact**: Document the concrete architecture, touched files/symbols from the tracked implementation links, and technical choices.
+> 6. **Task-bearing artifact (`[hasTasks]`)**:
+>    - **DO NOT start tasks from scratch.** The fast-track journal explicitly lists all tasks that have already been implemented and verified during this session under `## Completed Work`.
+>    - You MUST carry over all items from **Completed Work** below and generate them in the task-bearing artifact **already marked as completed (`- [x]`)**, following the artifact's instructions and template.
+>    - Carry over all items from **Pending Work & Gaps** into the task-bearing artifact **marked as open/pending (`- [ ]`)**, following the artifact's instructions and template.
+>    - Preserve the task metadata and structure required by the schema (e.g. file, symbol, approach, and requirement mapping).
+>    - This ensures the task artifact accurately preserves the full audit trail of what was built during the fast-track session alongside any remaining polish/tests.
+> 7. **Completeness, Edge Cases & Omissions (Capture what was left out)**:
+>    - The fast-track session focused on the primary solution. The design skill MUST critically identify any omitted edge cases, boundary conditions, error handling paths, or missing unit/integration tests.
+>    - Add new verification scenarios for these edge cases into the verification artifact.
+>    - Add concrete follow-up tasks into the task-bearing artifact marked as pending/open tasks.
+> 8. **Codebase-Wide Adoption & Affected Areas (MUST)**:
+>    - You MUST investigate if other parts of the codebase should adopt, reuse, or be updated to use this new feature, capability, refactor, or fix (e.g. eliminating duplicated logic, replacing legacy call patterns, or standardizing behavior across packages/workspaces).
+>    - Search the codebase (`specd graph search`, grep) for adoption candidates.
+>    - Include concrete adoption/migration tasks in the task-bearing artifact and document them in the design artifact.
+> 9. **Blast Radius & Downstream Regression Search (MUST)**:
+>    - You MUST run code graph impact analysis (`specd graph impact`) on all tracked files and symbols to identify callers or modules across the codebase that could suffer side effects or regressions.
+>    - Ensure any affected downstream areas have corresponding regression test tasks and design mitigations documented.
+
+## Motivation & Problem
+- Summary of the problem or spike goal explored in Step 1.
+
+## Approaches Explored & Agreed Strategy
+- Approach chosen and reasons why alternatives were discarded.
+
+## Suggested Specs for Design
+<!-- Discovered during exploration; the design skill must critically evaluate these suggestions or search for better-fitting specs before registering via specd changes edit <name> --add-spec -->
+- `<workspace:spec-id>` (suggested: modified / new)
+
+## Spec Contracts & Impact Analysis
+<!-- Record specs read and any contracts modified or broken -->
+### Active Specs Inspected
+- `<workspace:spec-id>`
+
+### Broken or Modified Contracts (if any)
+<!-- e.g. `<workspace:spec-id>`: Requirement: <name> — previous behavior vs new behavior and why -->
+- None yet.
+
+## Codebase Adoption & Affected Areas (Initial Findings)
+<!-- Other places in the codebase noted during exploration that might need or adopt this change -->
+- Areas identified to adopt this change:
+- Downstream affected modules:
+
+## Decisions & Code Actions
+<!-- Append in real-time as code is modified (files touched, symbols modified, rationale) -->
+
+## Consolidation & Audit (Pending)
+```
 
 ## 3. Discover governing contracts continuously
 
@@ -138,15 +195,66 @@ specd changes implementation list <name> --format text
 git status --short
 ```
 
-Append each audit finding immediately under the live journal rule. Then add a
-`Consolidation & Audit Summary` that covers: root cause and solution; tracked files and
-symbols; final suggested specs; contract impact; adoption candidates; completed work with
-file/symbol/requirement mapping; pending gaps; and specification and verification guidance.
+Append each audit finding immediately under the live journal rule. Then append the final
+`Consolidation & Audit Summary` section into `<changePath>/.specd-exploration.md`:
+
+```markdown
+## Consolidation & Audit Summary
+
+### 1. Root Cause & Solution Summary
+- Summary of the problem, root cause, and how it was resolved in code.
+
+### 2. Tracked Implementation Summary
+- Files and symbols confirmed tracked in implementation links.
+
+### 3. Suggested Specs for Design (Final Review)
+- `<workspace:spec-id>`: <reason why it is affected or if it is a new spec to create>
+
+### 4. Spec Contract Impact Summary
+- Specs confirmed compliant vs. specs requiring delta modifications.
+
+### 5. Codebase Adoption & Propagation Candidates (MUST Check in Design)
+- Other files/modules identified that should adopt this change or feature.
+
+### 6. Completed Work (Tasks already implemented & verified)
+- Detail each concrete task that was already implemented, debugged, and verified during this fast-track session (with file, symbol, applied approach, and requirement mapping).
+- These tasks MUST be generated directly as marked completed (`- [x]`) by `/specd-design` in the task-bearing artifact.
+
+### 7. Pending Work & Gaps (Tasks remaining to be done)
+- Pending task description with file, symbol, suggested approach, and requirement mapping (to be generated as pending in the task artifact according to its instructions).
+- Additional unit/integration tests or refactors required.
+- Tasks for propagating adoption to other modules if applicable.
+
+### 8. Spec & Verification Guidance
+- Normative requirements for specification artifacts (or deltas).
+- Verification scenarios for verification artifacts (or deltas).
+```
 
 ## 6. Hand-off and explicit stop
 
-Do not create, write, or populate formal schema artifacts in this skill. Do not invoke
-`/specd-design` autonomously. Summarize the consolidated implementation, tracked links,
-suggested specs and contract impact, adoption candidates, completed work, and pending gaps.
-Ask whether the user wants to proceed with `/specd-design <name>` or continue coding or
-reviewing, then stop and wait for the explicit response.
+**MANDATORY STOP RULES**:
+- **Do NOT create, write, or populate formal schema artifacts in this skill.**
+- **Do NOT autonomously invoke, launch, or execute `/specd-design`.**
+- **You MUST ask the user and wait for their explicit response.**
+
+Present a concise summary to the user:
+- What was implemented.
+- Tracked implementation files and symbols confirmed.
+- Suggested specs identified during exploration.
+- Specs inspected and contract impact (whether any contracts were broken/modified).
+- Potential adoption candidates or affected areas noted.
+- Summary of completed work vs. pending gaps found in the audit.
+- Ask the confirmation question:
+
+> **Fast-track exploration consolidated in `.specd-exploration.md`!**
+> 
+> - **Implemented**: <summary of code changes>
+> - **Tracked Links**: <summary of files/symbols tracked>
+> - **Suggested Specs**: <list of suggested specs for design>
+> - **Specs & Contracts**: <specs checked / contract changes noted>
+> - **Codebase Adoption**: <adoption candidates or affected areas identified>
+> - **Audit findings**: <completed items vs. pending gaps>
+> 
+> Would you like to proceed with `/specd-design <name>` now to generate the formal change artifacts, or would you like to continue coding/reviewing?
+
+**STOP — End your turn here. Wait for the user's explicit decision before continuing.**

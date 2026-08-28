@@ -171,7 +171,18 @@ Template contract tests MUST assert the exact commands and output fields require
 
 The metadata MUST declare `kind: "skill"`, declare `shared.md` in `requiredSharedTemplates`, and declare every capability referenced by the template. The template MUST contain no static frontmatter and MUST reference shared context as `@{{sharedFolder}}/shared.md`.
 
-The rendered fast-track workflow MUST require `.specd-exploration.md` to be updated immediately after every meaningful decision, scope or contract finding, source edit, implementation-link update, test or debug action, and audit result. Each update MUST preserve what changed, why, and affected files or symbols when applicable. A final consolidation MUST summarize, not replace, these incremental entries so an interrupted session can be resumed without reconstructing state from memory or a partial diff.
+The template MUST provide literal Markdown scaffolding for `<changePath>/.specd-exploration.md` in Step 2 and `<changePath>/.specd-exploration.md` Consolidation in Step 5.
+
+The template MUST include an explicit critical rule instructing agents to copy the `> **MANDATORY DIRECTIVES FOR \`/specd-design\`\*\*:`block into the header of`.specd-exploration.md\` VERBATIM (EXACTLY AS-IS), preserving all numbered directives.
+
+The rendered fast-track workflow MUST require:
+
+- `.specd-exploration.md` to be updated immediately after every meaningful decision, scope or contract finding, source edit, implementation-link update, test or debug action, and audit result.
+- Tracked implementation links (`specd changes implementation add`) to be updated continuously as the primary authority of modified code scope.
+- Directives for `/specd-design` to mandate evaluating codebase-wide adoption (`specd graph search`, grep) to eliminate duplicate logic, transferring tasks from completed work directly as marked completed (`- [x]`) without starting from scratch, and running downstream regression searches.
+- Explicit stop gates with interactive confirmation questions in Step 2 and Step 6, forbidding autonomous execution of `/specd-design`.
+
+A final consolidation MUST summarize, not replace, incremental journal entries so an interrupted session can be resumed without reconstructing state from memory or a partial diff.
 
 ### Requirement: Fast-track governing context and activation
 
