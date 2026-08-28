@@ -19,7 +19,7 @@ artifacts:
       Sections to include:
       - **Motivation**: 1–2 sentences on the problem or opportunity. What is broken or missing? Why now?
       - **Current behaviour**: What happens today. What is missing or broken.
-      - **Proposed solution**: High-level description of what we want to build or change.
+      - **Proposed solution**: High-level description of what we want to build or change, outlining the concrete approach and minimal changes required.
       - **Specs affected**: List every spec that will be created or modified, split into
         two subsections:
         - **New specs**: each becomes `specs/<workspace>/<capability-path>/spec.md`.
@@ -34,6 +34,9 @@ artifacts:
           `Depends on (added): <specId>, ...` or `Depends on (added): none`.
           `Depends on (removed): <specId>, ...` or `Depends on (removed): none`.
       - **Impact**: Affected code areas, APIs, data models, or external dependencies.
+        Identify the real parts of the codebase that need to be touched and the minimum necessary
+        changes, leveraging SpecD tooling (such as impact and blast-radius analysis, symbol/code
+        search, and hotspots inspection) rather than guessing or staying overly abstract.
       - **Technical context**: Technical insights, constraints, and decisions discussed
         during the proposal conversation. Record what was actually discussed — if concrete
         structures, file paths, or interfaces came up, include them. Covers constraints
@@ -43,6 +46,7 @@ artifacts:
         explored with the user. This section may be left empty if no technical discussion
         took place.
       - **Open questions**: Unresolved decisions that must be settled before spec work begins.
+        MUST be resolved before next artifact, if something open STOP and ask.
 
       The "Specs affected" section is the contract between proposal and specs — every spec
       listed there will need a corresponding file or delta. Research existing specs before
@@ -54,8 +58,10 @@ artifacts:
       compilation. To identify dependencies, examine what each spec will need from other
       specs: shared types, APIs it calls, concepts it references.
 
-      Keep it concise (1–2 pages). Focus on the "why", not the "how" — implementation
-      details belong in design.md.
+      While `design.md` will serve as the exhaustive, self-contained
+      implementation contract, `proposal.md` must remain technically grounded: identify the real
+      code areas to touch, the core architectural direction, and the minimum changes required,
+      avoiding vague generalities.
     rules:
       post:
         - id: resolve-open-questions
@@ -363,52 +369,29 @@ artifacts:
       Every piece of information required to implement the change must be explicitly present in this artifact. No implementation-critical information may exist only in another artifact.
       Materialize, consolidate, and restate all relevant information from prior artifacts instead of referencing them. Do not use indirect references such as "see previous artifact", "as described earlier", "according to the specification", "see requirements", "refer to the tasks", or similar wording.
       The design must contain every technical detail required to implement, test, validate, integrate, deploy, operate, maintain, troubleshoot, and evolve the solution.
-      The design must explicitly define, where applicable:
 
-      - Objectives and expected outcomes.
-      - Scope and non-scope.
-      - Functional requirements.
-      - Non-functional requirements.
-      - Constraints and rules.
-      - Assumptions.
-      - Architecture decisions.
-      - System boundaries.
-      - Component responsibilities.
-      - Interfaces and contracts.
-      - Public APIs.
-      - Internal APIs.
-      - Request and response formats.
-      - Events and messaging contracts.
-      - Data models.
-      - Schemas.
-      - Field definitions.
-      - Validation rules.
-      - State models and state transitions.
-      - Workflows and execution flows.
-      - Business rules.
-      - Permission and authorization requirements.
-      - Security requirements.
-      - Error handling behavior.
-      - Edge cases.
-      - Failure scenarios.
-      - Retry behavior.
-      - Concurrency considerations.
-      - Consistency requirements.
-      - Performance requirements.
-      - Scalability considerations.
-      - Configuration requirements.
-      - Feature flags.
-      - Migration requirements.
-      - Backward compatibility requirements.
-      - Dependency requirements.
-      - Integration requirements.
-      - Observability requirements.
-      - Logging requirements.
-      - Metrics requirements.
-      - Monitoring requirements.
-      - Testing requirements.
-      - Acceptance criteria.
-      - Operational considerations.
+      Sections and contract details to include:
+      - **Affected areas**: Every existing file, module, symbol, or document to modify, discovered exhaustively
+        via SpecD tooling so nothing is overlooked. Include exact symbol names, before/after type signatures,
+        behavioral/logic modifications, callers and risk assessment (via SpecD impact tools), and backwards-compatibility handling.
+      - **New constructs**: Every new file, class, interface, type, function, or service. Must provide complete,
+        compilable language type definitions, full signatures, parameter optionality, return types, business invariants,
+        and wiring/injection points — implementers must never invent missing types.
+      - **Data models & Contracts**: Explicit data schemas, payload contracts, request/response formats, state
+        structures, field definitions, validation constraints, and defaults.
+      - **Approach & Execution flow**: Step-by-step algorithmic sequence of operations (step 1, step 2, step 3),
+        state transitions, data transformations, control flow, and branch conditions.
+      - **Error handling & Edge cases**: Explicit error classes, codes, message formats, validation failure modes,
+        edge cases (empty collections, missing resources, concurrency, stale data), and recovery/fallback behaviors.
+      - **Key decisions**: Concrete technical choices with their rationale and specifically rejected alternatives.
+      - **Trade-offs**: Known limitations and operational risks with mitigations.
+      - **Spec impact**: Ripple effect analysis on dependent specs (direct/transitive) when existing specs change,
+        traced via SpecD tools to ensure no downstream spec requirement is broken.
+      - **Dependency map**: Visualise affected symbols, callers, specs, and cross-workspace edges (Mermaid and ASCII).
+      - **Migration / Rollback**: State/schema migrations, deployment steps, and rollback procedures.
+      - **Testing**: Detailed plan for automated tests (unit, integration, edge cases with exact files/assertions)
+        and step-by-step manual/E2E verification commands with expected outputs.
+      - **Open questions**: Any remaining unknowns to resolve (MUST be resolved before tasks/implementation, if something open STOP and ask).
 
       Do not leave implementation decisions to the implementer when those decisions can affect behavior, compatibility, correctness, security, performance, maintainability, or user experience.
 
@@ -422,15 +405,15 @@ artifacts:
 
       The design is not a summary. The design is the complete implementation contract.
 
-      Before writing, analyse the codebase to understand impact:
-      - **Affected files discovery**: use the impact analysis to find every existing
-        file, module, symbol, document, or resource that will also need modification
-        or removal because of this change — not just the initially obvious target.
+      Before writing, rigorously analyse the codebase using SpecD tooling to ensure nothing is missed or left untracked:
+      - **Affected files discovery**: use impact and blast-radius analysis, code/symbol search, and hotspots inspection
+        from SpecD tools to find every existing file, module, symbol, document, or resource that will also need modification
+        or removal because of this change — ensuring no ripple effects or dependencies are overlooked.
       - **Symbol-level impact**: for each symbol being modified, identify its direct and
-        transitive callers/dependents. Assess risk — symbols with many cross-workspace
+        transitive callers/dependents using SpecD tools. Assess risk — symbols with many cross-workspace
         callers are high-risk and need careful handling.
       - **Spec ripple effect**: when the change modifies existing specs, trace their
-        dependents (direct and transitive). Assess whether dependent specs' requirements
+        dependents (direct and transitive) via SpecD tools. Assess whether dependent specs' requirements
         are still satisfied or need updating. If this analysis reveals additional specs
         that also need requirement changes, treat them as part of the change's scope:
         add them to the affected specs set before proceeding so they get the required

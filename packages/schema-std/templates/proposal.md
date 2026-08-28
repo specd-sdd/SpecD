@@ -1,5 +1,7 @@
-<!-- AI guidance: explain WHY this change is needed. Cover motivation, current pain,
-     proposed solution, and scope. Do not write requirements here. -->
+<!-- AI guidance: explain WHY this change is needed and establish the technical scope.
+     Cover motivation, current pain, proposed solution, affected areas (grounded in the real
+     codebase with minimum changes required), and technical context. Do not write normative
+     requirements or exhaustive implementation contracts here — those belong in specs and design. -->
 
 # Proposal: {{change.name}}
 
@@ -13,7 +15,7 @@
 
 ## Proposed solution
 
-<!-- High-level description of what we want to build or change. -->
+<!-- High-level description of what we want to build or change, outlining the concrete approach and the minimal necessary changes required. -->
 
 ## Specs affected
 
@@ -35,7 +37,11 @@
 
 ## Impact
 
-<!-- Affected code areas, APIs, data models, or external dependencies. -->
+<!-- Affected code areas, APIs, data models, or external dependencies.
+     Identify the real areas to touch and the minimum necessary changes, leveraging SpecD tools:
+     - Impact / blast-radius analysis (callers, dependents, dependencies, risk assessment)
+     - Symbol and codebase search / discovery
+     - High-coupling hotspots inspection -->
 
 ## Technical context
 
