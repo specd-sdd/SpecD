@@ -219,6 +219,13 @@
 - **AND** no post-result signal or native crash is reported
 - **AND** no graph lock remains after the operation resolves
 
+#### Scenario: Subprocess native parser teardown exits cleanly after terminal result
+
+- **GIVEN** a built task fixture that parses and retains many native AST roots before release
+- **WHEN** the isolated worker executes the task and returns its terminal result
+- **THEN** the child process exits with code 0
+- **AND** no native finalizer crash or abnormal signal termination occurs during process teardown
+
 #### Scenario: Worker entry is not a public task-selection subpath
 
 - **WHEN** package exports are inspected

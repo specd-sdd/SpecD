@@ -8,15 +8,19 @@ import { runIsolatedGraphIndex } from '../../../dist/public.js'
 const packageRoot = join(dirname(fileURLToPath(import.meta.url)), '../../..')
 const fixtureRoot = new URL('../../fixtures/isolated-index-worker/', import.meta.url)
 
-async function settlesWithin<T>(operation: Promise<T>, description: string): Promise<T> {
+async function settlesWithin<T>(
+  operation: Promise<T>,
+  description: string,
+  timeoutMs = 3_000,
+): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined
   try {
     return await Promise.race([
       operation,
       new Promise<never>((_, reject) => {
         timer = setTimeout(
-          () => reject(new Error(`${description} did not settle within 3 seconds.`)),
-          3_000,
+          () => reject(new Error(`${description} did not settle within ${String(timeoutMs)}ms.`)),
+          timeoutMs,
         )
       }),
     ])
@@ -137,5 +141,15 @@ describe('published isolated graph-index worker', () => {
         'The post-force worker',
       ),
     ).resolves.toMatchObject({ marker: 'lease-released' })
+  })
+
+  it('exits cleanly after releasing a full-run native parser workload', async () => {
+    await expect(
+      settlesWithin(
+        runBuiltFixture('built-napi-teardown-task.mjs', { count: 1_200 }),
+        'The native-parser teardown fixture',
+        10_000,
+      ),
+    ).resolves.toEqual({ parsed: 1_200 })
   })
 })

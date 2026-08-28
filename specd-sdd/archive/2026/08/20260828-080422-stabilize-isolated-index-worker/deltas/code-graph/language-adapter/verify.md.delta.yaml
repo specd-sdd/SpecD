@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'Existing verification scenarios for language adapter remain valid — no delta required.'

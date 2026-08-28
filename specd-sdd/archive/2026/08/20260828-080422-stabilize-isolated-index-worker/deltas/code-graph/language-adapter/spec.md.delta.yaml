@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'Language adapter requirements and interface remain unchanged.'

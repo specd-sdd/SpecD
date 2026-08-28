@@ -1,0 +1,537 @@
+{
+  "name": "stabilize-isolated-index-worker",
+  "createdAt": "2026-08-28T08:04:22.318Z",
+  "updatedAt": "2026-08-28T12:13:42.826Z",
+  "description": "Stabilize isolated index worker lifecycle by upgrading native ast-grep parser to 0.42.3 and adding subprocess teardown regression tests.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": ["code-graph:isolated-index-worker", "code-graph:language-adapter"],
+  "specDependsOn": {
+    "code-graph:isolated-index-worker": [],
+    "code-graph:language-adapter": ["code-graph:symbol-model"]
+  },
+  "invalidationPolicy": "downstream",
+  "implementationTrackingStartedAt": "2026-08-28T09:38:27.879Z",
+  "trackedImplementationFiles": [
+    {
+      "file": "AGENTS.md",
+      "state": "ignored"
+    },
+    {
+      "file": "CLAUDE.md",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/schema-std/schema.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/schema-std/templates/design.md",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/schema-std/templates/proposal.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/project-context/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/spec-optimizations/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/get-graph-health/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/graph-store/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/indexer/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/change/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/schema-format/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/spec-lock/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/update-persisted-spec-optimizations/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/plugins-manager/agent-plugin-type/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/plugins-manager/specd-plugin-type/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/skills/agent-instruction-template/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/skills/agents/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/skills/resolve-bundle/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/skills/skill-bundle/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/skills/skill-repository-port/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/skills/skill-repository/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/skills/workflow-automation/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/package.json",
+      "state": "resolved"
+    },
+    {
+      "file": "pnpm-lock.yaml",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/isolated-index-worker/dist.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/fixtures/isolated-index-worker/built-napi-teardown-task.mjs",
+      "state": "resolved"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "code-graph:language-adapter",
+      "file": "packages/code-graph/package.json",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:isolated-index-worker",
+      "file": "packages/code-graph/test/infrastructure/isolated-index-worker/dist.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "code-graph:isolated-index-worker",
+      "file": "packages/code-graph/test/fixtures/isolated-index-worker/built-napi-teardown-task.mjs",
+      "fileLinkExplicit": true
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:2baec7b87de4dd0056f7eb09725cef08d38a67996e0554dc639eda36abe1b73f"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "code-graph:isolated-index-worker",
+          "filename": "deltas/code-graph/isolated-index-worker/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:47d14e439feb400db93e12da5416a127440fb7b74701edcf3929a07c67990bba"
+        },
+        {
+          "key": "code-graph:language-adapter",
+          "filename": "deltas/code-graph/language-adapter/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:63d6d72f9a8aa79ac0685c6bc845642c6b63a58e35b47f3bca5ba6a700a1ce7c"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "code-graph:isolated-index-worker",
+          "filename": "deltas/code-graph/isolated-index-worker/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:e48f4837d62c529fe2ecc834a013795797b81ce3ec66ea12cee210be46c1e49c"
+        },
+        {
+          "key": "code-graph:language-adapter",
+          "filename": "deltas/code-graph/language-adapter/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:d12bf5c31929c35ea50c3c3a75876bfe79c8729456683e9acd13d2259335501b"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:d53a923c1b391acbdfc02195b6bee2806f4211680d964118e504954c37316a1f"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:e40d1de95bed85e4117eebd10343f61b974ce39ee4e05826833317df7e9dd3ae"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-08-28T08:04:22.318Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": [],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-08-28T08:04:22.328Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-28T08:50:58.790Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-28T09:30:24.961Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": []
+        },
+        {
+          "type": "verify",
+          "files": []
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-08-28T09:30:24.964Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "code-graph:isolated-index-worker"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:isolated-index-worker"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-28T09:30:26.555Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["code-graph:isolated-index-worker"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:isolated-index-worker"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-08-28T09:30:26.557Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "code-graph:language-adapter"
+        },
+        {
+          "type": "verify",
+          "key": "code-graph:language-adapter"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-28T09:36:16.759Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-28T09:36:33.786Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "artifact-review-required",
+      "message": "Invalidated because the change returned to designing and all artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["code-graph:isolated-index-worker", "code-graph:language-adapter"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:isolated-index-worker", "code-graph:language-adapter"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-28T09:36:33.786Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-28T09:37:16.630Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-28T09:38:27.879Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-28T10:18:52.174Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-28T11:48:59.837Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-28T11:49:15.942Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "description-updated",
+      "at": "2026-08-28T12:02:05.126Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "description": "Stabilize isolated index worker lifecycle by upgrading native ast-grep parser to 0.42.3 and adding subprocess teardown regression tests."
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-08-28T12:13:27.687Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Implementation link \"code-graph:language-adapter\" points outside workspace \"code-graph\" codeRoot.",
+      "commitStarted": false
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-28T12:13:42.825Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-08-28T12:13:42.892Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}
