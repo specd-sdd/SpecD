@@ -9,22 +9,7 @@
     "code-graph:staleness-detection",
     "code-graph:document-model"
   ],
-  "implementation": [
-    {
-      "file": "code-graph:src/domain/ports/graph-store.ts",
-      "symbols": ["GraphStore"]
-    },
-    {
-      "file": "code-graph:src/domain/errors/graph-store-recreate-requires-closed-error.ts",
-      "symbols": ["GraphStoreRecreateRequiresClosedError"]
-    },
-    {
-      "file": "code-graph:test/domain/ports/graph-store.contract.ts"
-    },
-    {
-      "file": "code-graph:test/infrastructure/sqlite/sqlite-graph-store.spec.ts"
-    }
-  ],
+  "implementation": [],
   "optimizations": {
     "optimizedDescription": {
       "value": "Backend-neutral `GraphStore` contract for atomic persistence, indexed search, freshness, recovery, and deterministic bulk access.",

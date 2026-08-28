@@ -175,3 +175,19 @@
 - **WHEN** `saveArtifact` overwrites the file
 - **THEN** disk content changes
 - **AND** the supplied `Change` object's file status is unchanged by `saveArtifact`
+
+### Requirement: Filesystem exploration persistence
+
+#### Scenario: Repository materializes optional initial exploration
+
+- **GIVEN** a new change and non-empty `explorationContent`
+- **WHEN** `FsChangeRepository.create` succeeds
+- **THEN** `.specd-exploration.md` contains that content
+- **AND** `get` stats but does not read the file
+
+#### Scenario: Exploration failure leaves no partial change
+
+- **GIVEN** exploration persistence fails during first create
+- **WHEN** `FsChangeRepository.create` rejects
+- **THEN** the newly created directory is cleaned up
+- **AND** `get(name)` returns `null`

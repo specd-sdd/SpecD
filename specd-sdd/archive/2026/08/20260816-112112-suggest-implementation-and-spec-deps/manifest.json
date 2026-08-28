@@ -1,7 +1,7 @@
 {
   "name": "suggest-implementation-and-spec-deps",
   "createdAt": "2026-08-16T11:21:12.000Z",
-  "updatedAt": "2026-08-28T23:06:39.615Z",
+  "updatedAt": "2026-08-28T23:34:42.890Z",
   "description": "Add SDK use cases and CLI commands to suggest implementation links and spec dependencies with post-apply validation",
   "schema": {
     "name": "schema-std",
@@ -81,8 +81,7 @@
       "default:_global/architecture",
       "core:get-active-schema",
       "core:spec-overlap",
-      "core:composition-resolver",
-      "core:change-repository-port"
+      "core:composition-resolver"
     ],
     "core:change-repository-port": [
       "core:repository-port",
@@ -112,7 +111,8 @@
       "sdk:context-markdown",
       "sdk:build-implementation-review",
       "sdk:suggest-implementation-links",
-      "sdk:suggest-spec-dependencies"
+      "sdk:suggest-spec-dependencies",
+      "code-graph:isolated-index-worker"
     ]
   },
   "invalidationPolicy": "downstream",
@@ -163,15 +163,15 @@
     },
     {
       "file": "docs/cli/cli-reference.md",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "docs/cli/spec-deps.md",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "docs/cli/spec-implementation.md",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/cli/test/commands/spec-deps.spec.ts",
@@ -199,23 +199,23 @@
     },
     {
       "file": "packages/code-graph/src/composition/create-code-graph-provider.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/src/domain/ports/adapter-registry-port.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/src/index.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/src/infrastructure/tree-sitter/adapter-registry.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/src/public.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/sdk/src/orchestration/cache/fs-implementation-suggestion-cache.ts",
@@ -227,39 +227,39 @@
     },
     {
       "file": "packages/code-graph/src/composition/use-cases/create-builtin-adapter-registry.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/test/composition/create-builtin-adapter-registry.spec.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/src/domain/value-objects/language-adapter.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/src/infrastructure/tree-sitter/go-language-adapter.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/src/infrastructure/tree-sitter/php-language-adapter.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/src/infrastructure/tree-sitter/python-language-adapter.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/src/infrastructure/tree-sitter/typescript-language-adapter.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/src/infrastructure/sqlite/sqlite-graph-store.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/src/domain/value-objects/symbol-query.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/src/infrastructure/ladybug/ladybug-graph-store.ts",
@@ -279,271 +279,271 @@
     },
     {
       "file": "packages/code-graph/test/domain/ports/graph-store.contract.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/test/helpers/in-memory-graph-store.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/src/composition/code-graph-provider.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/src/domain/services/analyze-file-impact.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "AGENTS.md",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "CLAUDE.md",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/sdk/package.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/sdk/src/application/ports/implementation-suggestion-cache-port.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/sdk/src/application/ports/spec-deps-suggestion-cache-port.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/sdk/src/domain/value-objects/implementation-suggestion-cache.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/sdk/src/domain/value-objects/spec-deps-suggestion-cache.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/sdk/src/infrastructure/fs/fs-implementation-suggestion-cache.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/sdk/src/infrastructure/fs/fs-spec-deps-suggestion-cache.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/sdk/src/ports.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/sdk/test/infrastructure/fs/fs-suggestion-cache.spec.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "pnpm-lock.yaml",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": ".changeset/20260820-deprecate-ladybug-store-specd.md",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": ".changeset/20260820-deprecate-ladybug-store.md",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": ".changeset/20260820-fix-graph-cli-context-explicit-config-specd.md",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": ".changeset/20260820-fix-graph-cli-context-explicit-config.md",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": ".changeset/20260822-nonblocking-sqlite-graph-store-specd.md",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": ".changeset/20260822-nonblocking-sqlite-graph-store.md",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "docs/adr/0024-logical-symbol-resolution.md",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "docs/adr/0025-nonblocking-worker-sqlite-graph-store.md",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "docs/code-graph/index.md",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "package.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/cli/src/commands/graph/hotspots.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/cli/src/commands/graph/impact.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/cli/src/commands/graph/resolve-graph-cli-context.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/cli/src/commands/graph/resolve-impact-file-selectors.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/cli/src/commands/graph/search.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/cli/src/commands/graph/stats.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/cli/src/commands/graph/with-provider.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/cli/test/commands/change-run-hooks.spec.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/cli/test/commands/change-transition.spec.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/cli/test/commands/graph-cli-context.spec.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/cli/test/commands/graph-impact.spec.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/cli/test/commands/graph-index.spec.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/cli/test/commands/graph-search.spec.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/cli/test/commands/graph-stats.spec.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/cli/test/commands/graph/resolve-impact-file-selectors.spec.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/cli/test/commands/helpers.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/cli/test/commands/plugins-update.spec.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/cli/test/commands/plugins.spec.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/cli/test/commands/project-init.spec.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/cli/test/commands/spec-optimizations.spec.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/cli/vitest.config.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/README.md",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/package.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/src/application/services/resolve-graph-selector.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/src/application/use-cases/index-code-graph.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/src/composition/create-sqlite-graph-store-factory.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/src/composition/graph-store-factory.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/src/domain/errors/bulk-session-state-error.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/src/domain/errors/graph-schema-incompatible-error.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/src/domain/errors/index.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/src/domain/errors/invalid-graph-selector-error.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/src/domain/errors/invalid-graph-store-configuration-error.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/src/domain/errors/spec-not-found-error.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/src/domain/errors/store-overload-error.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/src/domain/errors/store-worker-error.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/src/domain/ports/graph-store.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/src/domain/services/analyze-files-impact.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/src/domain/services/compute-hotspots.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/src/domain/services/get-downstream.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/src/domain/services/get-upstream.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/src/domain/services/map-with-concurrency.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/src/infrastructure/ladybug/index.ts",
@@ -555,71 +555,71 @@
     },
     {
       "file": "packages/code-graph/src/infrastructure/sqlite/index.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/src/infrastructure/sqlite/resolve-worker-path.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/src/infrastructure/sqlite/sqlite-graph-database.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/src/infrastructure/sqlite/sqlite-runtime-descriptor.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/src/infrastructure/sqlite/sqlite-worker-client.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/src/infrastructure/sqlite/sqlite-worker-protocol.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/src/infrastructure/sqlite/sqlite-worker.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/src/infrastructure/storage-generation.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/test/application/use-cases/get-change-spec-coverage.spec.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/test/barrel.spec.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/test/composition/code-graph-provider.spec.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/test/composition/create-sqlite-graph-store-factory.spec.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/test/composition/host-use-case-factories.spec.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/test/domain/errors/specd-code-graph-error.spec.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/test/domain/services/analyze-files-impact.spec.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/test/domain/services/compute-hotspots.spec.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/test/domain/services/traversal.spec.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/test/helpers/stub-change-repository.ts",
@@ -635,31 +635,31 @@
     },
     {
       "file": "packages/code-graph/test/infrastructure/sqlite/sqlite-graph-store.spec.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/test/infrastructure/sqlite/sqlite-worker-backpressure.spec.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/test/infrastructure/sqlite/sqlite-worker-dist.spec.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/test/infrastructure/sqlite/sqlite-worker-lifecycle.spec.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/test/infrastructure/sqlite/sqlite-worker-protocol.spec.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/test/infrastructure/sqlite/sqlite-worker-responsiveness.spec.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/test/integration/sqlite-wide-traversal.spec.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/test/run-vitest.sh",
@@ -667,283 +667,283 @@
     },
     {
       "file": "packages/code-graph/vitest.config.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/core/test/application/use-cases/get-active-schema.spec.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/core/test/application/use-cases/validate-schema.spec.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/core/vitest.config.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/sdk/test/composition/host-context.spec.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/sdk/test/composition/with-open-graph-provider.spec.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "pnpm-workspace.yaml",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/cli/change-archive/spec-lock.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/cli/graph-cli-context/spec-lock.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/cli/graph-cli-context/spec.md",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/cli/graph-cli-context/verify.md",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/cli/graph-hotspots/spec-lock.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/cli/graph-hotspots/spec.md",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/cli/graph-hotspots/verify.md",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/cli/graph-impact/spec-lock.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/cli/graph-impact/spec.md",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/cli/graph-impact/verify.md",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/cli/graph-search/spec-lock.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/cli/graph-stats/spec-lock.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/cli/graph-stats/spec.md",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/cli/graph-stats/verify.md",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/code-graph/composition/spec-lock.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/code-graph/composition/spec.md",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/code-graph/composition/verify.md",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/code-graph/graph-store/spec-lock.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/code-graph/graph-store/spec.md",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/code-graph/graph-store/verify.md",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/code-graph/indexer/spec-lock.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/code-graph/ladybug-graph-store/spec-lock.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/code-graph/ladybug-graph-store/spec.md",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/code-graph/ladybug-graph-store/verify.md",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/code-graph/sqlite-graph-store/spec-lock.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/code-graph/sqlite-graph-store/spec.md",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/code-graph/sqlite-graph-store/verify.md",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/code-graph/symbol-model/spec-lock.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/code-graph/traversal/spec-lock.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/code-graph/traversal/spec.md",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/code-graph/traversal/verify.md",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/core/content-extraction/spec-lock.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/core/delta-format/spec-lock.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/core/external-hook-runner-port/spec-lock.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/core/generate-metadata/spec-lock.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/core/get-project-summary/spec-lock.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/core/hook-execution-model/spec-lock.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/core/hook-runner-port/spec-lock.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/core/regenerate-spec-metadata/spec-lock.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/core/run-step-hooks/spec-lock.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/core/schema-merge/spec-lock.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/core/selector-model/spec-lock.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/core/spec-lock/spec-lock.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/core/template-variables/spec-lock.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/core/validate-artifacts/spec-lock.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/sdk/composition/spec-lock.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/sdk/src/infrastructure/fs/index.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/sdk/test/infrastructure/fs/fs-cache-concurrent-load.spec.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/cli/spec-deps/spec-lock.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/cli/spec-implementation/spec-lock.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/core/get-persisted-spec-deps/spec-lock.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/core/get-persisted-spec-implementation/spec-lock.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/core/update-persisted-spec-deps/spec-lock.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/core/update-persisted-spec-implementation/spec-lock.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/core/update-spec-deps/spec-lock.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/cli/src/commands/graph/index-graph.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/core/src/application/use-cases/update-persisted-spec-deps.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/core/src/application/use-cases/update-persisted-spec-implementation.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/core/src/domain/errors/artifact-conflict-error.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/cli/package.json",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/core/src/application/ports/spec-repository.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/core/src/domain/entities/spec.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/core/src/infrastructure/fs/spec-repository.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/core/test/application/use-cases/helpers.ts",
@@ -951,35 +951,35 @@
     },
     {
       "file": "packages/core/test/infrastructure/fs/spec-repository.spec.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "docs/core/ports.md",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/sdk/src/infrastructure/fs/spec-stamp-source.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/sdk/src/infrastructure/fs/write-json-atomic.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/core/fs-spec-repository/spec-lock.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/core/list-specs/spec-lock.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/core/search-specs/spec-lock.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/core/create-change/spec-lock.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/core/src/application/use-cases/create-change.ts",
@@ -1027,391 +1027,391 @@
     },
     {
       "file": "specs/core/fs-change-repository/spec-lock.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/sdk/src/application/use-cases/suggest-implementation-links.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/sdk/src/application/use-cases/suggest-spec-dependencies.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/code-graph/src/composition/index.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/sdk/test/application/use-cases/suggest-implementation-links.spec.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/sdk/test/application/use-cases/suggest-spec-dependencies.spec.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": ".changeset/20260824-context-extracted-first-specd.md",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": ".changeset/20260824-context-extracted-first.md",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": ".changeset/20260825-centralize-graph-index-worker-specd.md",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": ".changeset/20260825-centralize-graph-index-worker.md",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "docs/adr/0026-extracted-first-context-sourcing.md",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "docs/adr/0027-code-graph-owned-index-worker.md",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "docs/code-graph/services.md",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "docs/code-graph/use-cases.md",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "docs/sdk/index.md",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/cli/src/graph-index-task.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/cli/test/commands/graph-index-integration.spec.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/cli/test/graph-index-task.spec.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/src/application/ports/isolated-graph-index-runner.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/src/application/use-cases/index-project-graph.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/src/composition/run-isolated-graph-index.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/src/domain/errors/graph-storage-recovery-required-error.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/src/domain/errors/graph-store-recreate-requires-closed-error.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/src/domain/errors/isolated-graph-index-errors.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/src/domain/value-objects/index-options.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/src/infrastructure/index-lock.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/src/infrastructure/isolated-index-worker/isolated-index-worker-child.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/src/infrastructure/isolated-index-worker/json-value.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/src/infrastructure/isolated-index-worker/protocol.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/src/infrastructure/isolated-index-worker/supervisor.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/test/application/use-cases/index-project-graph-integration.spec.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/test/application/use-cases/index-project-graph.spec.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/test/fixtures/isolated-index-worker/built-backpressure-task.mjs",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/test/fixtures/isolated-index-worker/built-force-recreate-clean-exit-task.mjs",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/test/fixtures/isolated-index-worker/built-invalid-contract-task.mjs",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/test/fixtures/isolated-index-worker/built-non-json-task.mjs",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/test/fixtures/isolated-index-worker/built-result-then-abnormal-exit-task.mjs",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/test/fixtures/isolated-index-worker/built-task-failure.mjs",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/test/fixtures/isolated-index-worker/built-valid-task.mjs",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/test/fixtures/isolated-index-worker/invalid-contract-task.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/test/fixtures/isolated-index-worker/non-json-task.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/test/fixtures/isolated-index-worker/task-failure.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/test/fixtures/isolated-index-worker/valid-task.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/test/infrastructure/index-lock.spec.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/test/infrastructure/isolated-index-worker/dist.spec.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/test/infrastructure/isolated-index-worker/protocol.spec.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/test/infrastructure/isolated-index-worker/signals.spec.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/code-graph/test/infrastructure/isolated-index-worker/supervisor.spec.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/core/src/application/use-cases/_shared/context-warning.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/core/src/application/use-cases/_shared/depends-on-traversal.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/core/src/application/use-cases/_shared/materialize-context-spec-metadata.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/core/src/application/use-cases/compile-context.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/core/src/application/use-cases/generate-spec-metadata.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/core/src/application/use-cases/get-project-context.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/core/src/application/use-cases/get-spec-context.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/core/src/domain/services/parse-metadata.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/core/test/application/use-cases/_shared/depends-on-traversal.spec.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/core/test/application/use-cases/compile-context.spec.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/core/test/application/use-cases/get-project-context.spec.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/core/test/application/use-cases/get-spec-context.spec.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/sdk/src/composition/with-open-graph-provider.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/sdk/src/orchestration/run-index-project-graph.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/sdk/test/barrel.spec.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/sdk/test/fixtures/publish-shaped-worker-consumer.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/sdk/test/orchestration/run-index-project-graph.spec.ts",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/cli/graph-index/spec-lock.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/cli/graph-index/spec.md",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/cli/graph-index/verify.md",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/code-graph/index-project-graph/spec-lock.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/code-graph/index-project-graph/spec.md",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/code-graph/index-project-graph/verify.md",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/code-graph/isolated-index-worker/spec-lock.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/code-graph/isolated-index-worker/spec.md",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/code-graph/isolated-index-worker/verify.md",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/core/compile-context/spec-lock.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/core/compile-context/spec.md",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/core/compile-context/verify.md",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/core/get-project-context/spec-lock.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/core/get-project-context/spec.md",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/core/get-project-context/verify.md",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/core/get-spec-context/spec-lock.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/core/get-spec-context/spec.md",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/core/get-spec-context/verify.md",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/sdk/composition/spec.md",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/sdk/composition/verify.md",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/sdk/run-index-project-graph/spec-lock.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/sdk/run-index-project-graph/spec.md",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/sdk/run-index-project-graph/verify.md",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/sdk/with-open-graph-provider/spec.md",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/sdk/with-open-graph-provider/verify.md",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/sdk/with-open-graph-provider/spec-lock.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "packages/sdk/src/application/services/extract-markdown-symbol-evidence.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/sdk/test/application/services/extract-markdown-symbol-evidence.spec.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/cli/src/helpers/prompt-apply.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/cli/test/helpers/prompt-apply.spec.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/core/actor-provider/spec-lock.json",
-      "state": "open"
+      "state": "ignored"
     },
     {
       "file": "specs/core/actor-resolver/spec-lock.json",
-      "state": "open"
+      "state": "ignored"
     }
   ],
   "implementationLinks": [
@@ -1505,12 +1505,6 @@
       "fileLinkExplicit": true
     },
     {
-      "specId": "core:change-repository-port",
-      "file": "packages/code-graph/test/helpers/stub-change-repository.ts",
-      "fileLinkExplicit": false,
-      "symbols": ["StubChangeRepository"]
-    },
-    {
       "specId": "sdk:suggest-implementation-links",
       "file": "packages/sdk/src/application/use-cases/suggest-implementation-links.ts",
       "fileLinkExplicit": false,
@@ -1561,16 +1555,6 @@
     {
       "specId": "core:fs-spec-repository",
       "file": "packages/core/test/infrastructure/fs/spec-repository.spec.ts",
-      "fileLinkExplicit": true
-    },
-    {
-      "specId": "cli:spec-implementation",
-      "file": "docs/cli/spec-implementation.md",
-      "fileLinkExplicit": true
-    },
-    {
-      "specId": "cli:spec-deps",
-      "file": "docs/cli/spec-deps.md",
       "fileLinkExplicit": true
     }
   ],
@@ -1759,7 +1743,7 @@
           "key": "design",
           "filename": "design.md",
           "state": "complete",
-          "validatedHash": "sha256:4ecd3aca5fbb5a78228c9b7b784cc4b4efac15e553f14ad69283f96f188937ad"
+          "validatedHash": "sha256:88ddb45d642fde3a95618cae9b0861c534d8af90f83853a1e396960bde63c132"
         }
       ]
     },
@@ -1773,7 +1757,7 @@
           "key": "tasks",
           "filename": "tasks.md",
           "state": "complete",
-          "validatedHash": "sha256:4bb8d71c5a4d851a744bd9e37b8066f2832032c9adf3b74391c451d63a2a0e31"
+          "validatedHash": "sha256:1a061f983e31a65a9c0fa7043246916ea8393c58396c4657acf610d31fd47b32"
         }
       ]
     }
@@ -5632,6 +5616,154 @@
           "files": ["tasks"]
         }
       ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-28T23:10:49.266Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-28T23:10:59.025Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-28T23:11:05.401Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-28T23:14:35.274Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-28T23:16:00.704Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-28T23:16:19.466Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-08-28T23:25:51.268Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Tracked implementation files remain open for change \"suggest-implementation-and-spec-deps\". Resolve or ignore them first.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-08-28T23:34:10.839Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Implementation link \"core:change-repository-port\" points outside workspace \"core\" codeRoot.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-08-28T23:34:17.245Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Implementation link \"cli:spec-implementation\" points outside workspace \"cli\" codeRoot.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-08-28T23:34:25.349Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'core:create-change': extracted dependencies [core:change, default:_global/architecture, core:get-active-schema, core:spec-overlap, core:composition-resolver] do not match persisted dependencies [core:change, default:_global/architecture, core:get-active-schema, core:spec-overlap, core:composition-resolver, core:change-repository-port]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-08-28T23:34:37.919Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed for 'sdk:composition': extracted dependencies [default:_global/architecture, core:composition, code-graph:composition, cli:host-context, sdk:context-markdown, sdk:build-implementation-review, code-graph:isolated-index-worker, sdk:suggest-implementation-links, sdk:suggest-spec-dependencies] do not match persisted dependencies [default:_global/architecture, core:composition, code-graph:composition, cli:host-context, sdk:context-markdown, sdk:build-implementation-review, sdk:suggest-implementation-links, sdk:suggest-spec-dependencies]. Re-run dependency extraction or update the change dependencies.",
+      "commitStarted": false
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-28T23:34:42.888Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
     }
-  ]
+  ],
+  "archivedAt": "2026-08-28T23:34:43.196Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
 }

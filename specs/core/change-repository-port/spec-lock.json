@@ -19,11 +19,15 @@
   "implementation": [
     {
       "file": "core:src/application/ports/change-repository.ts",
-      "symbols": ["MutateResult", "ChangeRepository"]
+      "symbols": ["ChangeRepository", "ExplorationMeta", "CreateChangeStorageOptions"]
     },
     {
-      "file": "core:src/domain/errors/change-mutation-required-error.ts",
-      "symbols": ["ChangeMutationRequiredError"]
+      "file": "core:src/domain/entities/change.ts",
+      "symbols": ["Change", "ExplorationMeta"]
+    },
+    {
+      "file": "core:test/application/use-cases/helpers.ts",
+      "symbols": ["StubChangeRepository"]
     }
   ],
   "optimizations": {

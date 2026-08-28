@@ -6,9 +6,18 @@
   "dependsOn": [
     "core:update-persisted-spec-implementation",
     "cli:entrypoint",
-    "core:get-persisted-spec-implementation"
+    "core:get-persisted-spec-implementation",
+    "sdk:suggest-implementation-links"
   ],
-  "implementation": [],
+  "implementation": [
+    {
+      "file": "cli:src/commands/spec/implementation.ts",
+      "symbols": ["registerSpecImplementation"]
+    },
+    {
+      "file": "cli:test/commands/spec-implementation.spec.ts"
+    }
+  ],
   "optimizations": {
     "optimizedDescription": {
       "value": "`specd specs implementation` CLI: list/add/remove persisted implementation links via Kernel.specs; no CLI-owned mutation logic.",

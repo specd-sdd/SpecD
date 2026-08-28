@@ -10,42 +10,27 @@
     "cli:host-context",
     "sdk:context-markdown",
     "sdk:build-implementation-review",
+    "sdk:suggest-implementation-links",
+    "sdk:suggest-spec-dependencies",
     "code-graph:isolated-index-worker"
   ],
   "implementation": [
     {
-      "file": "sdk:src/index.ts",
-      "symbols": [
-        "runIsolatedGraphIndex",
-        "GraphIndexWorkerStartError",
-        "GraphIndexTaskContractError",
-        "GraphIndexTaskExecutionError",
-        "GraphIndexWorkerProtocolError",
-        "GraphIndexWorkerExitError",
-        "GraphIndexWorkerSignalError",
-        "GraphIndexProgressHandlerError"
-      ]
+      "file": "sdk:src/composition/index.ts"
     },
     {
-      "file": "sdk:test/barrel.spec.ts",
-      "symbols": ["@specd/sdk barrel"]
+      "file": "sdk:src/index.ts"
     },
     {
-      "file": "sdk:test/fixtures/publish-shaped-worker-consumer.ts"
+      "file": "sdk:src/composition/suggest-implementation-links.ts",
+      "symbols": ["createSuggestImplementationLinks", "resolveSuggestImplementationLinksDeps"]
     },
     {
-      "file": "sdk:src/composition/with-open-graph-provider.ts",
-      "symbols": ["withOpenGraphProvider"]
+      "file": "sdk:src/composition/suggest-spec-dependencies.ts",
+      "symbols": ["createSuggestSpecDependencies", "resolveSuggestSpecDependenciesDeps"]
     },
     {
-      "file": "sdk:src/orchestration/run-index-project-graph.ts",
-      "symbols": ["runIndexProjectGraph"]
-    },
-    {
-      "file": "sdk:test/composition/with-open-graph-provider.spec.ts"
-    },
-    {
-      "file": "sdk:test/orchestration/run-index-project-graph.spec.ts"
+      "file": "sdk:test/composition/package-boundary.spec.ts"
     }
   ],
   "optimizations": {

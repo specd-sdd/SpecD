@@ -73,8 +73,9 @@ fields MUST refresh via upsert or bucket invalidation according to helper rules.
 filesystem metadata without reading artifact contents:
 
 - For each allowed schema artifact file present in the spec directory, emit a
-  `SpecArtifactEntry` with `filename` and `lastModified` from `stat` (ISO-8601 from
-  `mtime`, consistent within the FS adapter family).
+  `SpecArtifactEntry` with `filename`, `lastModified` (ISO-8601 from `mtime`,
+  consistent within the FS adapter family) and `size` (byte length) — all three
+  observed from the same single `stat` call.
 - Set `persistedStateStamp` from the lock sidecar path: `present` / `lastModified` via
   `stat`, or `present: false` and `lastModified: null` when absent.
 - Set `generatedMetadataStamp` from the configured metadata file path the same way.
@@ -155,7 +156,8 @@ routine.
 - `artifactMeta(spec, filename, options?)` by reusing the existing artifact
   stat/hash path that populates `SpecArtifactEntry.lastModified` and artifact
   content hashes elsewhere on this adapter — it MUST NOT be a second hashing
-  implementation. `hash` only when `includeHash === true`.
+  implementation. It returns `lastModified` and `size` from the same `stat`
+  observation, and `hash` only when `includeHash === true`.
 - `specFingerprint(spec)` per
   [`core:spec-repository-port`](../spec-repository-port/spec.md): per-artifact
   content hashes bound to filenames, ordered by filename alphabetically,

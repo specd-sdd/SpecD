@@ -448,3 +448,19 @@
 - **GIVEN** a third-party parser cannot provide a valid construct or selection range
 - **WHEN** the adapter translates the declaration
 - **THEN** it omits the symbol instead of fabricating coordinates
+
+### Requirement: Built-in Adapter Registry Composition Factory & Keyword Discovery
+
+#### Scenario: Built-in adapter registry factory creation and extension/keyword lookup
+
+- **GIVEN** built-in language adapters registered in `@specd/code-graph`
+- **WHEN** `createBuiltinAdapterRegistry()` is called
+- **THEN** its public type is `AdapterRegistryPort` and it contains all built-in language adapters
+- **AND** `registry.getSupportedExtensions()` returns extensions including `.ts`, `.py`, `.go`, and `.php`
+- **AND** `registry.getReservedKeywords()` returns aggregated reserved keywords from all registered adapters (including `class`, `def`, `func`, `interface`, `async`)
+
+#### Scenario: Factory is available from composition
+
+- **WHEN** a caller imports from the code-graph composition entrypoint
+- **THEN** `createBuiltinAdapterRegistry` is exported
+- **AND** no caller must import the concrete registry implementation

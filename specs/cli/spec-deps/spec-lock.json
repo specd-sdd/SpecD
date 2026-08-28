@@ -6,9 +6,18 @@
   "dependsOn": [
     "core:get-persisted-spec-deps",
     "core:update-persisted-spec-deps",
-    "cli:entrypoint"
+    "cli:entrypoint",
+    "sdk:suggest-spec-dependencies"
   ],
-  "implementation": [],
+  "implementation": [
+    {
+      "file": "cli:src/commands/spec/deps.ts",
+      "symbols": ["registerSpecDeps"]
+    },
+    {
+      "file": "cli:test/commands/spec-deps.spec.ts"
+    }
+  ],
   "optimizations": {
     "optimizedDescription": {
       "value": "`specd specs deps` CLI: list/add/remove/set/clear canonical persisted dependsOn via Kernel.specs; no CLI-owned merge logic.",

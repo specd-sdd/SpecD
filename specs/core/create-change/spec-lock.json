@@ -13,7 +13,10 @@
   "implementation": [
     {
       "file": "core:src/application/use-cases/create-change.ts",
-      "symbols": ["CreateChange"]
+      "symbols": ["CreateChange", "CreateChangeInput"]
+    },
+    {
+      "file": "core:test/application/use-cases/create-change.spec.ts"
     }
   ],
   "optimizations": {

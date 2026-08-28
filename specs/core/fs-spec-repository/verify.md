@@ -102,6 +102,14 @@
 - **THEN** `Spec.filenames` includes `spec.md`
 - **AND** `Spec.hasArtifact('spec.md')` is `true`
 
+#### Scenario: get stamps include byte-size from the same stat
+
+- **GIVEN** a spec directory with `spec.md` and sidecar files
+- **WHEN** `FsSpecRepository.get()` is called
+- **THEN** every `SpecArtifactEntry` includes `size` equal to the file byte length
+- **AND** `lastModified` and `size` come from the same single `stat` observation
+- **AND** no artifact content is read to build the stamps
+
 ### Requirement: Aggregate persisted-state operations and canonical lock serialization
 
 #### Scenario: readPersistedState returns null for a lock-less spec without a placeholder schema
@@ -164,7 +172,16 @@
 
 - **WHEN** `artifactMeta(spec, filename, { includeHash: true })` is called
 - **THEN** it reuses the same stat/hash path used elsewhere on this adapter rather than a second hashing routine
-- **AND** without `includeHash` it returns `lastModified` only
+- **AND** without `includeHash` it returns `lastModified` and `size`
+
+#### Scenario: artifactMeta exposes size from stat without hashing
+
+- **GIVEN** an existing `spec.md` artifact
+- **WHEN** `artifactMeta(spec, 'spec.md')` is called without options
+- **THEN** it returns `lastModified` and `size`
+- **AND** it does not include `hash`
+- **WHEN** `artifactMeta(spec, 'spec.md', { includeHash: true })` is called
+- **THEN** it additionally returns the SHA-256 content `hash`
 
 ### Requirement: Meta observations and specFingerprint on FS
 

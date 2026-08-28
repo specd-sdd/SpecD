@@ -90,3 +90,57 @@
 - **WHEN** `specd specs implementation add core:auth/login --file src/login.ts` is run
 - **THEN** the command exits with code 1
 - **AND** stderr does not suggest a configuration workaround
+
+### Requirement: Suggest subcommand
+
+#### Scenario: Suggest implementation subcommand
+
+- **GIVEN** a spec ID `cli:change-implementation`
+- **WHEN** `specd specs implementation suggest cli:change-implementation` is executed
+- **THEN** it prints suggested implementation links with confidence indicators.
+
+#### Scenario: Interactive apply prompts spec-by-spec with HIGH preselected
+
+- **GIVEN** suggested implementation links in an interactive terminal (TTY)
+- **WHEN** `specd specs implementation suggest --all --apply` is executed without `--yes`
+- **THEN** it iterates spec-by-spec, prompting for each specification with `HIGH` confidence items pre-selected
+- **AND** the active target spec ID is displayed in brackets `[specId]` in prompt headers
+- **AND** any already-included candidate links are displayed informatively and excluded from checkbox choices
+- **AND** prompt hints dynamically adapt between `enter: confirm and next spec` and `enter: confirm`
+- **AND** only confirmed items are added to `spec-lock.json`
+
+#### Scenario: Interactive text output formatting
+
+- **GIVEN** suggestion results in an interactive terminal
+- **WHEN** `specd specs implementation suggest` is executed
+- **THEN** it opens with `SpecD — Suggest implementation links` intro
+- **AND** cache warming and search progress are displayed with spinners
+- **AND** final results are presented inside a note with long lines softly wrapped and continuation ellipsis markers
+
+#### Scenario: Automatic apply with --yes defaults to HIGH confidence
+
+- **GIVEN** suggestions containing `HIGH`, `MEDIUM`, and `LOW` confidence links
+- **WHEN** `specd specs implementation suggest <spec-id> --apply --yes` is executed without `--confidence`
+- **THEN** it applies all `HIGH` confidence links without interactive prompts
+- **AND** leaves `MEDIUM` and `LOW` candidates unapplied
+
+#### Scenario: Automatic apply with explicit confidence threshold
+
+- **GIVEN** suggestions containing `HIGH`, `MEDIUM`, and `LOW` confidence links
+- **WHEN** `specd specs implementation suggest <spec-id> --apply --yes --confidence MEDIUM` is executed
+- **THEN** it applies all `HIGH` and `MEDIUM` confidence links without interactive prompts
+
+#### Scenario: Already-included marking in suggestions
+
+- **GIVEN** a spec with existing implementation links in `spec-lock.json`
+- **WHEN** `specd specs implementation suggest <spec-id>` is executed and the algorithm re-discovers files already in spec-lock
+- **THEN** each suggestion displays `[already included]` or `[new]` to indicate its inclusion status.
+
+### Requirement: Suggest structured-output help schema
+
+#### Scenario: JSON and TOON help documents the leaf response
+
+- **GIVEN** the `specs implementation suggest` leaf command
+- **WHEN** its help is rendered for structured output
+- **THEN** JSON and TOON examples and the implementation-suggestion response shape are present
+- **AND** the suggestion use case is not executed

@@ -15,15 +15,10 @@
   "implementation": [
     {
       "file": "core:src/infrastructure/fs/spec-repository.ts",
-      "symbols": ["FsSpecRepository", "projectListMetaFromSourceFiles"]
+      "symbols": ["FsSpecRepository"]
     },
     {
-      "file": "core:src/infrastructure/fs/project-list-meta.ts",
-      "symbols": ["projectListMetaFromSourceFiles"]
-    },
-    {
-      "file": "core:src/infrastructure/fs/fs-spec-index-cache.ts",
-      "symbols": ["FsSpecIndexCache"]
+      "file": "core:test/infrastructure/fs/spec-repository.spec.ts"
     }
   ],
   "optimizations": {

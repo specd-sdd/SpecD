@@ -1,0 +1,26 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "code-graph:symbol-model",
+    "code-graph:traversal",
+    "code-graph:language-adapter",
+    "core:get-persisted-spec-implementation",
+    "core:update-persisted-spec-implementation"
+  ],
+  "implementation": [
+    {
+      "file": "sdk:src/application/use-cases/suggest-implementation-links.ts",
+      "symbols": [
+        "SuggestImplementationLinks",
+        "createSuggestImplementationLinks",
+        "computePathSpecAffinity"
+      ]
+    },
+    {
+      "file": "sdk:test/application/use-cases/suggest-implementation-links.spec.ts"
+    }
+  ]
+}

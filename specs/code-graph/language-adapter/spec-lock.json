@@ -6,66 +6,14 @@
   "dependsOn": ["code-graph:symbol-model"],
   "implementation": [
     {
-      "file": "code-graph:src/domain/value-objects/language-adapter.ts",
-      "symbols": ["LanguageAdapter"]
+      "file": "code-graph:src/composition/use-cases/create-builtin-adapter-registry.ts",
+      "symbols": ["createBuiltinAdapterRegistry"]
     },
     {
-      "file": "code-graph:src/domain/value-objects/file-analysis.ts",
-      "symbols": ["FileAnalysisDraft"]
+      "file": "code-graph:src/composition/index.ts"
     },
     {
-      "file": "code-graph:test/domain/value-objects/symbol-reference.spec.ts"
-    },
-    {
-      "file": "code-graph:src/infrastructure/tree-sitter/adapter-registry.ts",
-      "symbols": ["AdapterRegistry"]
-    },
-    {
-      "file": "code-graph:src/infrastructure/tree-sitter/typescript-language-adapter.ts",
-      "symbols": ["TypeScriptLanguageAdapter"]
-    },
-    {
-      "file": "code-graph:src/infrastructure/tree-sitter/python-language-adapter.ts",
-      "symbols": ["PythonLanguageAdapter"]
-    },
-    {
-      "file": "code-graph:src/infrastructure/tree-sitter/go-language-adapter.ts",
-      "symbols": ["GoLanguageAdapter"]
-    },
-    {
-      "file": "code-graph:src/infrastructure/tree-sitter/php-language-adapter.ts",
-      "symbols": ["PhpLanguageAdapter"]
-    },
-    {
-      "file": "code-graph:test/infrastructure/tree-sitter/typescript-language-adapter.spec.ts"
-    },
-    {
-      "file": "code-graph:test/infrastructure/tree-sitter/python-language-adapter.spec.ts"
-    },
-    {
-      "file": "code-graph:test/infrastructure/tree-sitter/go-language-adapter.spec.ts"
-    },
-    {
-      "file": "code-graph:test/infrastructure/tree-sitter/php-language-adapter.spec.ts"
-    },
-    {
-      "file": "code-graph:src/infrastructure/tree-sitter/reference-fact-helpers.ts",
-      "symbols": [
-        "buildLogicalDeclarationFacts",
-        "buildHierarchyReferenceFacts",
-        "containsSymbolRange",
-        "createAdapterDeclarationDescriptor"
-      ]
-    },
-    {
-      "file": "code-graph:test/infrastructure/tree-sitter/reference-fact-helpers.spec.ts"
-    },
-    {
-      "file": "code-graph:src/application/use-cases/in-memory-index-session.ts",
-      "symbols": ["InMemoryIndexSession"]
-    },
-    {
-      "file": "code-graph:test/application/use-cases/symbol-index.spec.ts"
+      "file": "code-graph:test/composition/create-builtin-adapter-registry.spec.ts"
     }
   ],
   "optimizations": {

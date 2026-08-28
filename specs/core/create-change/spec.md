@@ -127,6 +127,14 @@ The config-based `createCreateChange(config, options?)` form MUST derive `Create
 
 The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
 
+### Requirement: Optional initial exploration content
+
+`CreateChangeInput` MAY include `explorationContent?: string`. Absence, `undefined`, or empty content means that no exploration exists initially.
+
+When non-empty exploration content is supplied, `CreateChange` MUST pass it to `ChangeRepository.create` as semantic creation data. `CreateChange` MUST NOT derive a filesystem path, write `.specd-exploration.md`, or otherwise perform exploration I/O itself.
+
+Persistence of the change manifest and its optional initial exploration MUST have first-create failure semantics: when the repository cannot persist the supplied exploration, creation MUST fail and MUST NOT leave a partially created change observable through `get`.
+
 ## Constraints
 
 - The use case MUST NOT perform any state transitions — the change starts in `drafting` state (the default when no `transitioned` event exists)

@@ -98,6 +98,14 @@ After the successful internal manifest write inside `mutate` or `mutateDraft`, `
 
 On success it MUST write file bytes only (honouring `originalHash` / `force`). It MUST NOT call `setFileStatus`, MUST NOT alter validated hashes or history on the supplied `Change`, and MUST NOT write `manifest.json`.
 
+### Requirement: Filesystem exploration persistence
+
+`FsChangeRepository` SHALL implement the semantic exploration contract using `.specd-exploration.md` inside the change directory as an adapter-private storage detail.
+
+On `create(change, { explorationContent })`, non-empty content MUST be written by the repository as part of first persistence. If that write fails, creation MUST fail and the adapter MUST clean up the newly created change so it is not observable as a partial change. Absent or empty content MUST NOT create the file.
+
+`_manifestToChange` / `get` MAY stat the exploration file to populate `{ lastModified, size }`, but MUST NOT read its content. `readExploration` SHALL load the file lazily and return `null` when absent. `writeExploration` SHALL persist non-empty content atomically. No application or orchestration caller may need to know the filename.
+
 ## Constraints
 
 - `FsChangeRepository` is infrastructure-level and lives in `infrastructure/fs/`

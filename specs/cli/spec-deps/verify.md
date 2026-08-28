@@ -100,3 +100,51 @@
 - **WHEN** `specd specs deps add core:auth/login --dep core:c` is run
 - **THEN** the command exits with code 1
 - **AND** stderr does not suggest a configuration workaround
+
+### Requirement: Suggest subcommand
+
+#### Scenario: Suggest spec dependencies subcommand
+
+- **GIVEN** a spec ID `cli:change-implementation`
+- **WHEN** `specd specs deps suggest cli:change-implementation` is executed
+- **THEN** it prints suggested inter-spec dependencies with code import reasons
+
+#### Scenario: Interactive apply prompts spec-by-spec
+
+- **GIVEN** suggested spec dependencies in an interactive terminal (TTY)
+- **WHEN** `specd specs deps suggest --all --apply` is executed without `--yes`
+- **THEN** it iterates spec-by-spec, prompting for each specification
+- **AND** the active target spec ID is displayed in brackets `[specId]` in prompt headers
+- **AND** any already-configured dependencies are displayed informatively and excluded from checkbox choices
+- **AND** discovered new dependencies start unselected by default
+- **AND** prompt hints dynamically adapt between `enter: confirm and next spec` and `enter: confirm`
+- **AND** only confirmed dependencies are added to `spec-lock.json`
+
+#### Scenario: Interactive text output formatting
+
+- **GIVEN** dependency suggestion results in an interactive terminal
+- **WHEN** `specd specs deps suggest` is executed
+- **THEN** it opens with `SpecD — Suggest spec dependencies` intro
+- **AND** cache warming and analysis progress are displayed with spinners
+- **AND** final results are presented inside a note with long lines softly wrapped and continuation ellipsis markers
+
+#### Scenario: Automatic apply with --yes flag
+
+- **GIVEN** suggested spec dependencies
+- **WHEN** `specd specs deps suggest <spec-id> --apply --yes` is executed
+- **THEN** it applies all deduced dependencies without interactive prompts
+
+#### Scenario: Alignment change creation via CLI flag
+
+- **GIVEN** invalid specs detected after `--apply`
+- **WHEN** `specd specs deps suggest cli:change-implementation --apply --create-change` is executed
+- **THEN** an alignment change is created without interactive prompt
+
+### Requirement: Suggest structured-output help schema
+
+#### Scenario: JSON and TOON help documents the leaf response
+
+- **GIVEN** the `specs deps suggest` leaf command
+- **WHEN** its help is rendered for structured output
+- **THEN** JSON and TOON examples and the dependency-suggestion/post-validation response shape are present
+- **AND** the suggestion use case is not executed

@@ -16,19 +16,7 @@
     "default:_global/logging",
     "core:spec-lock"
   ],
-  "implementation": [
-    {
-      "file": "core:src/application/ports/spec-repository.ts",
-      "symbols": [
-        "ArtifactMeta",
-        "PersistedStateMeta",
-        "GeneratedMetadataMeta",
-        "SpecListArtifactMeta",
-        "SpecMetaOptions",
-        "SpecRepository"
-      ]
-    }
-  ],
+  "implementation": [],
   "optimizations": {
     "optimizedDescription": {
       "value": "Per-workspace SpecRepository port: get/list/artifact/save + metadata/persisted-state snapshots without storage coupling.",

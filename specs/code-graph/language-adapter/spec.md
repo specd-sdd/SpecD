@@ -204,6 +204,18 @@ Every built-in adapter SHALL emit, for each symbol, the complete syntactic const
 
 Adapters SHALL derive these ranges from parsed syntax before parser artifacts are released. They MUST NOT approximate a construct end from the next symbol or from line-oriented regular expressions when the parser exposes the authoritative node range. A candidate without trustworthy complete and selection ranges SHALL be omitted and its capability gap reported rather than emitted with misleading coordinates.
 
+### Requirement: Built-in Adapter Registry Composition Factory & Keyword Discovery
+
+`createBuiltinAdapterRegistry` SHALL be a standalone composition factory in `@specd/code-graph` exposed at `create-builtin-adapter-registry.ts` and re-exported from `src/composition/index.ts` and the curated package entrypoint.
+
+It SHALL instantiate an `AdapterRegistry` pre-populated with built-in language adapters (`TypeScriptLanguageAdapter`, `PythonLanguageAdapter`, `GoLanguageAdapter`, `PhpLanguageAdapter`) and register any optional custom `LanguageAdapter` instances provided, but every public overload MUST return `AdapterRegistryPort` rather than the concrete `AdapterRegistry` implementation.
+
+The composition factory MUST support standard overload signatures (`extraAdapters?: readonly LanguageAdapter[]` and `config: SpecdConfig`).
+
+`LanguageAdapter` SHALL support an optional `keywords?(): readonly string[]` method returning language-specific reserved keywords and built-in type names.
+
+`AdapterRegistryPort` and `AdapterRegistry` SHALL expose `getReservedKeywords(): Set<string>` returning the aggregated set of all reserved keywords across all registered language adapters.
+
 ## Constraints
 
 - LanguageAdapter is an interface, not an abstract class — adapters are stateless
