@@ -455,6 +455,7 @@ artifacts:
     template: templates/tasks.md
     requires:
       - specs
+      - verify
       - design
     instruction: |
       Create the task list that breaks down the implementation into discrete,

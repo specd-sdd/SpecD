@@ -1,0 +1,473 @@
+{
+  "name": "init-schema-std-and-metapackage-specs",
+  "createdAt": "2026-08-28T12:21:19.280Z",
+  "updatedAt": "2026-08-28T12:48:42.122Z",
+  "description": "Initialize specification suites for schema-std and specd metapackage, aligning the canonical schema DAG tasks prerequisites",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "schema-std:standard-schema",
+    "schema-std:templates",
+    "specd-metapackage:metapackage"
+  ],
+  "specDependsOn": {
+    "schema-std:templates": ["schema-std:standard-schema"]
+  },
+  "invalidationPolicy": "downstream",
+  "implementationTrackingStartedAt": "2026-08-28T12:40:51.894Z",
+  "trackedImplementationFiles": [
+    {
+      "file": "AGENTS.md",
+      "state": "ignored"
+    },
+    {
+      "file": "CLAUDE.md",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/project-context/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/spec-optimizations/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/get-graph-health/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/graph-store/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/indexer/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/language-adapter/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/change/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/schema-format/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/spec-lock/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/update-persisted-spec-optimizations/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/plugins-manager/agent-plugin-type/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/plugins-manager/specd-plugin-type/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/skills/agent-instruction-template/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/skills/agents/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/skills/resolve-bundle/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/skills/skill-bundle/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/skills/skill-repository-port/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/skills/skill-repository/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/skills/workflow-automation/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/schema-std/schema.yaml",
+      "state": "resolved"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "schema-std:standard-schema",
+      "file": "packages/schema-std/schema.yaml",
+      "fileLinkExplicit": true
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:b85f6fd1d8ab7b41b8b717005ed14ad6b69ca668a5659da1fa5ac1b4498e48c4"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "schema-std:standard-schema",
+          "filename": "specs/schema-std/standard-schema/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:5ad39a4eee786fc0a4ead4955674a677bbdaec1ce068b5d92306ed8cffe7d7d9"
+        },
+        {
+          "key": "schema-std:templates",
+          "filename": "specs/schema-std/templates/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:ee2a459015c753ed9069dd14b0a447f3397cd2c98a605edfc1dd92919c6d4a6d"
+        },
+        {
+          "key": "specd-metapackage:metapackage",
+          "filename": "specs/specd-metapackage/metapackage/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:da13769a7a239b595713204b1192853c0786233b5d457ed4cf3a70e71d1f37e2"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "schema-std:standard-schema",
+          "filename": "specs/schema-std/standard-schema/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:92272519043ea4c809c1c58b4309789de7b1a77e8b4e4510d4101bedea5d59e4"
+        },
+        {
+          "key": "schema-std:templates",
+          "filename": "specs/schema-std/templates/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:5174cb8a758319604b026622359d63c9e939dce34f060232efa2c27f910f8b09"
+        },
+        {
+          "key": "specd-metapackage:metapackage",
+          "filename": "specs/specd-metapackage/metapackage/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:a25dee0823a3ffca870bc68f5aabaa4898a74ed0a35d40406829165e3d41e4a1"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:d1c67c5b382f0e2d9767462cc57396f1b7242f0286103c309317f11d24cf0309"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:3c45cc50d9bff368393f49e17cce7aa39b5914cdbf24b710148698cba684b37b"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-08-28T12:21:19.280Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": [
+        "schema-std:standard-schema",
+        "schema-std:templates",
+        "specd-metapackage:metapackage"
+      ],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-08-28T12:21:19.291Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "schema-std:standard-schema"
+        },
+        {
+          "type": "specs",
+          "key": "schema-std:templates"
+        },
+        {
+          "type": "specs",
+          "key": "specd-metapackage:metapackage"
+        },
+        {
+          "type": "verify",
+          "key": "schema-std:standard-schema"
+        },
+        {
+          "type": "verify",
+          "key": "schema-std:templates"
+        },
+        {
+          "type": "verify",
+          "key": "specd-metapackage:metapackage"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-28T12:27:22.996Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-28T12:31:37.445Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [schema-std:standard-schema]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["schema-std:standard-schema"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "schema-std:standard-schema",
+            "schema-std:templates",
+            "specd-metapackage:metapackage"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-28T12:33:42.245Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [schema-std:standard-schema]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["schema-std:standard-schema"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "schema-std:standard-schema",
+            "schema-std:templates",
+            "specd-metapackage:metapackage"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-28T12:37:00.941Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [schema-std:templates]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["schema-std:templates"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "schema-std:standard-schema",
+            "schema-std:templates",
+            "specd-metapackage:metapackage"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-28T12:40:17.322Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-28T12:40:51.894Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-28T12:45:53.832Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-28T12:46:19.572Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-28T12:46:35.500Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "description-updated",
+      "at": "2026-08-28T12:47:51.111Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "description": "Initialize specification suites for schema-std and specd metapackage, aligning the canonical schema DAG tasks prerequisites"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-28T12:48:42.121Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-08-28T12:48:42.180Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}
