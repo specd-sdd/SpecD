@@ -10,29 +10,26 @@
   ],
   "implementation": [
     {
-      "file": "code-graph:src/domain/services/map-with-concurrency.ts",
-      "symbols": ["mapWithConcurrency"]
-    },
-    {
-      "file": "code-graph:src/domain/services/get-upstream.ts",
-      "symbols": ["getUpstream", "getIncomingRelationsBatch"]
-    },
-    {
-      "file": "code-graph:src/domain/services/get-downstream.ts",
-      "symbols": ["getDownstream", "getOutgoingRelationsBatch"]
-    },
-    {
-      "file": "code-graph:src/domain/services/analyze-file-impact.ts",
+      "file": "code-graph:src/domain/value-objects/impact-result.ts",
       "symbols": [
-        "ImpactExecutionContext",
-        "IMPACT_CONCURRENCY",
-        "analyzeFileImpactDetails",
-        "createMemoizedReadStore"
+        "IMPACT_RESULT_TYPES",
+        "ImpactResultType",
+        "ImpactResultFilter",
+        "ImpactResult",
+        "SpecImpactResult"
       ]
     },
     {
+      "file": "code-graph:src/domain/services/analyze-file-impact.ts",
+      "symbols": ["analyzeFileImpact", "analyzeFileImpactDetails", "collectFilteredCoveringSpecs"]
+    },
+    {
+      "file": "code-graph:src/domain/services/analyze-spec-impact.ts",
+      "symbols": ["analyzeSpecImpact", "analyzeFilteredSpecImpact"]
+    },
+    {
       "file": "code-graph:src/domain/services/analyze-files-impact.ts",
-      "symbols": ["analyzeFilesImpact"]
+      "symbols": ["analyzeFilesImpact", "materializesImpactType"]
     },
     {
       "file": "code-graph:test/domain/services/traversal.spec.ts"
@@ -41,19 +38,12 @@
       "file": "code-graph:test/domain/services/analyze-files-impact.spec.ts"
     },
     {
-      "file": "code-graph:test/integration/sqlite-wide-traversal.spec.ts"
+      "file": "code-graph:src/domain/services/analyze-impact.ts",
+      "symbols": ["analyzeImpact", "analyzePublicBindingImpact"]
     },
     {
-      "file": "code-graph:src/application/services/resolve-graph-selector.ts"
-    },
-    {
-      "file": "code-graph:src/application/use-cases/index-code-graph.ts"
-    },
-    {
-      "file": "code-graph:src/domain/services/compute-hotspots.ts"
-    },
-    {
-      "file": "code-graph:test/domain/services/compute-hotspots.spec.ts"
+      "file": "code-graph:src/domain/services/collect-impact-specs.ts",
+      "symbols": ["collectImpactSpecIds"]
     }
   ],
   "optimizations": {

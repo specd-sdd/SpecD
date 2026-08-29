@@ -27,6 +27,35 @@
 - **WHEN** `resolveFileSelector()` is called with a project-relative path
 - **THEN** it resolves correctly to the canonical graph identity
 
+### Requirement: Filtered-impact provider surface
+
+#### Scenario: Facade delegates one complete filtered request
+
+- **GIVEN** an opened provider and a typed impact filter
+- **WHEN** each symbol, file, multi-file, spec, and public-binding impact operation is invoked
+- **THEN** the facade performs its single availability validation and delegates the complete filter once
+- **AND** it returns the deterministic filtered result without facade-side projection
+
+#### Scenario: Symbol and public-binding results expose specs
+
+- **GIVEN** admitted impact evidence with covering specs
+- **WHEN** symbol and public-binding impact request the `specs` category
+- **THEN** each provider result contains the coverage-derived `affectedSpecs`
+- **AND** the facade does not synthesize the collection
+
+#### Scenario: SQLite composition preserves predicates
+
+- **GIVEN** the built-in SQLite provider composition
+- **WHEN** a host invokes filtered impact
+- **THEN** traversal and the active store receive the same normalized predicates
+- **AND** the provider does not first request an unrestricted impact result
+
+#### Scenario: Hosts can import filtered-impact contracts
+
+- **WHEN** a delivery adapter imports from `@specd/code-graph`
+- **THEN** the public impact filter, result-type, and request types are available
+- **AND** SQLite predicate builders, worker DTOs, and backend candidate types are not available from the curated entrypoint
+
 ### Requirement: Factory function
 
 #### Scenario: Primary factory with SpecdConfig

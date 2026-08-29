@@ -1,9 +1,15 @@
 import { type GraphStore } from '../ports/graph-store.js'
-import { type AffectedSymbol, type FileImpactResult } from '../value-objects/impact-result.js'
+import {
+  type AffectedSymbol,
+  type CoveringSpecImpact,
+  type FileImpactResult,
+  type ImpactResultFilter,
+} from '../value-objects/impact-result.js'
 import { maxRisk, type RiskLevel } from '../value-objects/risk-level.js'
 import {
   analyzeFileImpactDetails,
   collectCoveringSpecs,
+  collectFilteredCoveringSpecs,
   createMemoizedReadStore,
   IMPACT_CONCURRENCY,
 } from './analyze-file-impact.js'
@@ -22,6 +28,7 @@ import { mapWithConcurrency } from './map-with-concurrency.js'
  * @param direction - Traversal direction: upstream, downstream, or both.
  * @param maxDepth - Maximum traversal depth (default: 3).
  * @param resolve - Optional provider of pre-resolved logical selectors.
+ * @param filter - Optional provider-owned membership and materialization constraints.
  * @returns The aggregated multi-file impact result.
  */
 export async function analyzeFilesImpact(
@@ -30,12 +37,13 @@ export async function analyzeFilesImpact(
   direction: 'upstream' | 'downstream' | 'both',
   maxDepth = 3,
   resolve?: ImpactResolutionProvider,
+  filter?: ImpactResultFilter,
 ): Promise<FileImpactResult> {
   const sharedStore = createMemoizedReadStore(store)
   const context = { store: sharedStore, concurrency: IMPACT_CONCURRENCY } as const
   const uniqueFilePaths = [...new Set(filePaths)]
   const details = await mapWithConcurrency(uniqueFilePaths, context.concurrency, (filePath) =>
-    analyzeFileImpactDetails(store, filePath, direction, maxDepth, resolve, context),
+    analyzeFileImpactDetails(store, filePath, direction, maxDepth, resolve, context, filter),
   )
   const results = details.map((detail) => detail.result)
 
@@ -77,24 +85,94 @@ export async function analyzeFilesImpact(
     }
   }
 
+  const materializesFiles = materializesImpactType(filter, 'files')
+  const materializesSymbols = materializesImpactType(filter, 'symbols')
+  const materializesSpecs = materializesImpactType(filter, 'specs')
+  const fileCoveringSpecs = materializesSpecs
+    ? filter === undefined
+      ? await collectCoveringSpecs(store, fileDepths, symbolDepths)
+      : await collectFilteredCoveringSpecs(store, fileDepths, symbolDepths, filter)
+    : []
+
+  const coveringSpecMap = new Map<string, CoveringSpecImpact>()
+  for (const spec of fileCoveringSpecs) {
+    coveringSpecMap.set(spec.specId, spec)
+  }
+  if (materializesSpecs) {
+    for (const detail of details) {
+      for (const specId of detail.result.affectedSpecs) {
+        if (!coveringSpecMap.has(specId)) {
+          coveringSpecMap.set(specId, {
+            specId,
+            minDepth: 1,
+            evidence: [],
+          })
+        }
+      }
+    }
+  }
+  const coveringSpecs = [...coveringSpecMap.values()].sort(
+    (left, right) => left.minDepth - right.minDepth || left.specId.localeCompare(right.specId),
+  )
+
+  const perFileResults = results.map((result, index) => {
+    const detail = details[index]!
+    const perFileSpecIds = new Set(detail.result.affectedSpecs)
+    const perFileCoveringSpecs = coveringSpecs.filter(
+      (spec) =>
+        perFileSpecIds.has(spec.specId) ||
+        spec.evidence.some(
+          (evidence) =>
+            (evidence.kind === 'file' && detail.fileDepths.has(evidence.target)) ||
+            (evidence.kind === 'symbol' && detail.symbolDepths.has(evidence.target)),
+        ),
+    )
+    return {
+      ...result,
+      affectedSpecs: materializesSpecs
+        ? perFileCoveringSpecs.map((spec) => spec.specId).sort()
+        : [],
+      coveringSpecs: perFileCoveringSpecs,
+    }
+  })
+
   return {
     target: filePaths.join(', '),
     directDependents,
     indirectDependents,
     transitiveDependents,
     riskLevel: overallRisk,
-    affectedFiles: [...affectedFileSet].sort(),
-    affectedSymbols: [...symbolMap.values()].sort(
-      (left, right) =>
-        left.depth - right.depth ||
-        left.filePath.localeCompare(right.filePath) ||
-        left.line - right.line ||
-        left.id.localeCompare(right.id),
-    ),
+    affectedFiles: materializesFiles ? [...affectedFileSet].sort() : [],
+    affectedSymbols: materializesSymbols
+      ? [...symbolMap.values()].sort(
+          (left, right) =>
+            left.depth - right.depth ||
+            left.filePath.localeCompare(right.filePath) ||
+            left.line - right.line ||
+            left.id.localeCompare(right.id),
+        )
+      : [],
+    affectedSpecs: coveringSpecs.map((spec) => spec.specId).sort(),
     affectedProcesses: [],
-    symbols: results,
-    coveringSpecs: await collectCoveringSpecs(store, fileDepths, symbolDepths),
+    // `symbols` carries the per-file breakdown consumed by the multi-file CLI
+    // renderer. It is not the materialized `affectedSymbols` collection, which
+    // remains governed by the result-type filter above.
+    symbols: perFileResults,
+    coveringSpecs,
   }
+}
+
+/**
+ * Treats omitted or empty result-type filters as fully materialized.
+ * @param filter - Optional provider-owned result filter.
+ * @param type - Result category whose materialization is being checked.
+ * @returns Whether the category must remain materialized.
+ */
+function materializesImpactType(
+  filter: ImpactResultFilter | undefined,
+  type: 'files' | 'symbols' | 'specs',
+): boolean {
+  return filter?.types === undefined || filter.types.length === 0 || filter.types.includes(type)
 }
 
 /**

@@ -1,0 +1,59 @@
+- op: added
+  description: 'Verify filtered traversal projection, aggregation, and compatibility'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Impact analysis$'
+  content: |
+    ### Requirement: Filtered impact results
+
+    #### Scenario: Omitted filter preserves legacy impact
+
+    - **GIVEN** the same graph and impact target
+    - **WHEN** impact analysis runs once without a filter and once with an omitted optional filter
+    - **THEN** both results have identical traversal evidence, aggregates, risk, and deterministic ordering
+
+    #### Scenario: Kind and workspace eligibility shape aggregates
+
+    - **GIVEN** reachable symbols of several kinds across included and excluded workspaces
+    - **WHEN** impact analysis receives symbol-kind, workspace-inclusion, and workspace-exclusion predicates
+    - **THEN** returned symbols contain only admitted kinds and workspaces
+    - **AND** depth counts, risk, affected files, and covering-spec evidence are derived from the admitted traversal evidence
+
+    #### Scenario: Result types control materialized categories
+
+    - **GIVEN** admitted reachability can produce file, symbol, and spec results
+    - **WHEN** the filter requests only `files` and `specs`
+    - **THEN** Code Graph materializes those categories without returning a symbol collection for CLI-side removal
+    - **AND** it may use admitted symbol reachability internally to derive the requested categories
+
+    #### Scenario: Symbol specs are derived from admitted coverage
+
+    - **GIVEN** an impacted symbol or its admitted file is covered by indexed specs
+    - **WHEN** symbol impact requests only the `specs` result type
+    - **THEN** `affectedSpecs` contains the deterministic covering spec identifiers
+    - **AND** `affectedFiles` and `affectedSymbols` remain present as empty arrays
+
+    #### Scenario: Spec impact derives files from symbol coverage under files-only filter
+
+    - **GIVEN** a spec covers only symbols whose owning files are in the graph
+    - **WHEN** spec impact requests only the `files` result type
+    - **THEN** `affectedFiles` contains the owning files of those covered symbols
+    - **AND** `affectedSymbols` remains an empty array
+
+    #### Scenario: File impact derives specs from call-affected symbols under specs-only filter
+
+    - **GIVEN** a file's root symbols have call-affected dependents that have spec coverage
+    - **WHEN** file impact requests only the `specs` result type
+    - **THEN** `affectedSpecs` and `coveringSpecs` contain the covering specs discovered through the full blast-radius traversal
+    - **AND** `affectedFiles` and `affectedSymbols` remain empty arrays while impact counts and risk reflect the full admitted traversal
+
+    #### Scenario: Filtering precedes result limits
+
+    - **GIVEN** excluded candidates would otherwise occupy the available result limit
+    - **WHEN** filtered impact analysis executes
+    - **THEN** the store predicates exclude those candidates before the final limit
+    - **AND** admitted candidates fill the deterministic result up to that limit

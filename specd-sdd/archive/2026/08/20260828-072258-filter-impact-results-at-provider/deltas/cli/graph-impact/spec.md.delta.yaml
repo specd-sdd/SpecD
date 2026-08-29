@@ -1,0 +1,43 @@
+- op: added
+  description: 'Add CLI syntax and the delivery-boundary contract for provider-owned impact result filters'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Command signature$'
+  content: |
+    ### Requirement: Provider-owned impact result filters
+
+    `specd graph impact` SHALL accept `--type <types>`, `--kind <kinds>`, repeatable `--workspace <workspace>`, and repeatable `--exclude-workspace <workspace>` options for every impact target family.
+
+    `--type` and `--kind` SHALL accept comma-separated values. The supported result types SHALL be `files`, `symbols`, and `specs`; documents are not an impact-result category. `--kind` SHALL accept the shared Code Graph symbol-kind vocabulary and SHALL be a usage error when `--type` is present without `symbols`.
+
+    Repeated `--workspace` values SHALL form an inclusion set and repeated `--exclude-workspace` values SHALL form an exclusion set with the same normalization and matching semantics as `graph search`. Exclusions SHALL take precedence when a workspace occurs in both sets.
+
+    The CLI SHALL validate and normalize the options into one typed impact-filter request and pass that request through the existing provider operation for the selected target. The CLI MUST NOT remove files, symbols, specs, or symbol kinds from a returned impact result. Text, JSON, and TOON rendering SHALL consume the provider-filtered result while retaining pure display-path projection.
+
+    `--type specs` SHALL be valid for symbol and public-binding targets and SHALL render the provider's `affectedSpecs` collection. The CLI MUST NOT treat specs as available only to file or spec targets.
+
+- op: modified
+  description: 'Align selector error requirement with public export flags'
+  selector:
+    type: section
+    matches: '^Requirement: Error cases$'
+  content: |
+    ### Requirement: Error cases
+
+    Exactly one selector family (`--file`, `--symbol`, `--spec`, or `--export` with `--from`) must be provided. If none or more than one are passed, the command SHALL fail with a CLI error and exit code 1.
+
+    If both `--config` and `--path` are passed, the command SHALL fail with a CLI error and exit code 1.
+
+    If a `--file` input without a workspace prefix does not resolve by config-relative path or project-relative path, the command SHALL fail with a user-facing resolution error.
+
+    If a `--file` input without a workspace prefix resolves to more than one canonical graph file, the command SHALL fail with a user-facing ambiguity error.
+
+    If `--spec` references no indexed spec node, the command SHALL fail with a not-found error for that spec id.
+
+    If the provider reports `GRAPH_BUSY` or `GRAPH_PROVIDER_STALE`, the command SHALL exit with code 3 through the standard infrastructure error path.
+
+    If the provider cannot be opened, the command exits with code 3.

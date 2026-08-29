@@ -1,5 +1,7 @@
 import {
   GraphStore,
+  type ImpactFrontierQuery,
+  type ImpactFrontierResult,
   type LocalBindingLookup,
   type LogicalDeclaration,
   type LogicalSymbolLookup,
@@ -514,6 +516,123 @@ export class InMemoryGraphStore extends GraphStore {
       if (symbol !== undefined) results.push(symbol)
     }
     return results
+  }
+
+  /**
+   * Selects one filtered, deterministic impact frontier from the in-memory graph.
+   *
+   * This test-double implementation mirrors the graph-store contract in memory:
+   * relation admission is constrained by the neighboring resource, while result
+   * types control only which admitted resource rows are materialized.
+   * @param input - The current traversal frontier and optional impact filter.
+   * @returns Admitted relations and the requested, hydrated neighboring resources.
+   */
+  async queryImpactFrontier(input: ImpactFrontierQuery): Promise<ImpactFrontierResult> {
+    this.ensureOpen()
+    if (input.frontier.length === 0 || input.relationTypes.length === 0) {
+      return { relations: [], symbols: [], files: [], specs: [] }
+    }
+
+    const frontier = new Set(input.frontier)
+    const relationTypes = new Set(input.relationTypes)
+    const admittedRelations = new Map<string, Relation>()
+    const neighboringIds = new Set<string>()
+
+    for (const relation of this.relations) {
+      if (!relationTypes.has(relation.type)) continue
+
+      const neighbors: string[] = []
+      if (
+        (input.direction === 'upstream' || input.direction === 'both') &&
+        frontier.has(relation.target)
+      ) {
+        neighbors.push(relation.source)
+      }
+      if (
+        (input.direction === 'downstream' || input.direction === 'both') &&
+        frontier.has(relation.source)
+      ) {
+        neighbors.push(relation.target)
+      }
+
+      for (const neighbor of neighbors) {
+        if (!this.matchesImpactResource(input, neighbor)) continue
+        admittedRelations.set(
+          `${relation.source}\u0000${relation.type}\u0000${relation.target}`,
+          relation,
+        )
+        neighboringIds.add(neighbor)
+      }
+    }
+
+    const types = input.filter?.types
+    const materializes = (type: 'files' | 'symbols' | 'specs'): boolean =>
+      types === undefined || types.length === 0 || types.includes(type)
+
+    return {
+      relations: [...admittedRelations.values()].sort(compareRelations),
+      symbols: materializes('symbols')
+        ? [...neighboringIds]
+            .map((id) => this.symbols.get(id))
+            .filter((symbol): symbol is SymbolNode => symbol !== undefined)
+            .sort((left, right) => left.id.localeCompare(right.id))
+        : [],
+      files: materializes('files')
+        ? [...neighboringIds]
+            .map((id) => this.files.get(id))
+            .filter((file): file is FileNode => file !== undefined)
+            .sort((left, right) => left.path.localeCompare(right.path))
+        : [],
+      specs: materializes('specs')
+        ? [...neighboringIds]
+            .map((id) => this.specs.get(id))
+            .filter((spec): spec is SpecNode => spec !== undefined)
+            .sort((left, right) => left.specId.localeCompare(right.specId))
+        : [],
+    }
+  }
+
+  /**
+   * Checks whether one neighboring identifier belongs to the requested resource
+   * category and satisfies the filter predicates that admit traversal.
+   * @param input - The frontier request carrying category and filter constraints.
+   * @param id - Canonical neighboring resource identifier.
+   * @returns Whether the resource admits its relation into the frontier result.
+   */
+  private matchesImpactResource(input: ImpactFrontierQuery, id: string): boolean {
+    const filter = input.filter
+    let workspace: string | undefined
+
+    if (input.resource === 'symbol') {
+      const symbol = this.symbols.get(id)
+      if (symbol === undefined) return false
+      if (
+        filter?.kinds !== undefined &&
+        filter.kinds.length > 0 &&
+        !filter.kinds.includes(symbol.kind)
+      ) {
+        return false
+      }
+      workspace = this.files.get(symbol.filePath)?.workspace
+    } else if (input.resource === 'file') {
+      const file = this.files.get(id)
+      if (file === undefined) return false
+      workspace = file.workspace
+    } else {
+      const spec = this.specs.get(id)
+      if (spec === undefined) return false
+      workspace = spec.workspace
+    }
+
+    const excluded = new Set(filter?.excludeWorkspaces ?? [])
+    if (workspace !== undefined && excluded.has(workspace)) return false
+
+    const included = filter?.workspaces
+    return (
+      included === undefined ||
+      included.length === 0 ||
+      (workspace !== undefined && included.includes(workspace))
+    )
   }
 
   async getIncomingSymbolRelations(

@@ -1,4 +1,29 @@
 import { type RiskLevel } from './risk-level.js'
+import { type SymbolKind } from './symbol-kind.js'
+
+/** Supported result categories for an impact query. */
+export const IMPACT_RESULT_TYPES = ['files', 'symbols', 'specs'] as const
+
+/** A supported category of results to materialize for an impact query. */
+export type ImpactResultType = (typeof IMPACT_RESULT_TYPES)[number]
+
+/**
+ * Optional, immutable constraints for an impact query.
+ *
+ * Omitted fields do not constrain the query. When both workspace lists contain
+ * the same workspace, `excludeWorkspaces` takes precedence over `workspaces`.
+ * Consumers must treat every supplied array as immutable.
+ */
+export interface ImpactResultFilter {
+  /** Result categories to materialize; omission preserves all categories. */
+  readonly types?: readonly ImpactResultType[]
+  /** Symbol kinds eligible for materialization and traversal. */
+  readonly kinds?: readonly SymbolKind[]
+  /** Workspaces eligible for materialization and traversal. */
+  readonly workspaces?: readonly string[]
+  /** Workspaces to exclude, taking precedence over `workspaces`. */
+  readonly excludeWorkspaces?: readonly string[]
+}
 
 /**
  * Result of analyzing the impact of modifying a single symbol.
@@ -22,6 +47,7 @@ export interface ImpactResult {
   readonly riskLevel: RiskLevel
   readonly affectedFiles: readonly string[]
   readonly affectedSymbols: readonly AffectedSymbol[]
+  readonly affectedSpecs: readonly string[]
   readonly affectedProcesses: readonly string[]
 }
 
@@ -48,6 +74,4 @@ export interface FileImpactResult extends ImpactResult {
 }
 
 /** Impact result for a spec requirement. */
-export interface SpecImpactResult extends ImpactResult {
-  readonly affectedSpecs: readonly string[]
-}
+export type SpecImpactResult = ImpactResult

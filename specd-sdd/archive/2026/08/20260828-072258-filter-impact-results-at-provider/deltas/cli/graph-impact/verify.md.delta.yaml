@@ -1,0 +1,81 @@
+- op: added
+  description: 'Verify CLI validation and exact delegation of impact result filters'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Command signature$'
+  content: |
+    ### Requirement: Provider-owned impact result filters
+
+    #### Scenario: Repeated filters are delegated in one request
+
+    - **GIVEN** a provider spy for a valid impact target
+    - **WHEN** `graph impact` receives comma-separated types and kinds plus repeated `--workspace` and `--exclude-workspace` options
+    - **THEN** the CLI calls the selected provider impact operation once with the normalized ordered filter sets
+    - **AND** it renders the provider result without removing any returned category entry
+
+    #### Scenario: Unsupported result type fails before provider open
+
+    - **WHEN** `graph impact` receives `--type documents`
+    - **THEN** it reports a usage error naming `files`, `symbols`, and `specs` as the supported values
+    - **AND** it does not open the provider
+
+    #### Scenario: Symbol kind requires symbol results
+
+    - **WHEN** `graph impact` receives `--type files,specs --kind function`
+    - **THEN** it reports a usage error before provider open
+
+    #### Scenario: Workspace exclusion takes precedence
+
+    - **WHEN** the same canonical workspace is present in both repeated inclusion and exclusion options
+    - **THEN** the delegated filter retains exclusion precedence using the same normalization as `graph search`
+
+    #### Scenario: Symbol target renders affected specs
+
+    - **GIVEN** `SpecRepository` has admitted impacted symbols or files with indexed spec coverage
+    - **WHEN** `graph impact --symbol SpecRepository --type specs` executes
+    - **THEN** the command renders the provider's non-empty `affectedSpecs` collection
+    - **AND** it does not reconstruct spec coverage in the CLI
+
+- op: modified
+  description: 'Align selector error scenarios with public export error message'
+  selector:
+    type: section
+    matches: '^Requirement: Error cases$'
+  content: |
+    ### Requirement: Error cases
+
+    #### Scenario: No selector provided
+
+    - **WHEN** `specd graph impact` is run without `--file`, `--symbol`, `--spec`, or `--export`
+    - **THEN** stderr contains `error: provide exactly one of --file, --symbol, --spec, or --export with --from`
+    - **AND** the process exits with code 1
+
+    #### Scenario: Multiple selectors provided
+
+    - **WHEN** `specd graph impact --file core:src/auth.ts --spec core:change` is run
+    - **THEN** stderr contains `error: provide exactly one of --file, --symbol, --spec, or --export with --from`
+    - **AND** the process exits with code 1
+
+    #### Scenario: Missing unprefixed selector reports normalized lookup
+
+    - **WHEN** `specd graph impact --file packages/core/src/missing.ts` is run
+    - **THEN** the command exits with code 1
+    - **AND** stderr includes the normalized config-relative path that was searched
+
+    #### Scenario: Mutually exclusive context flags fail fast
+
+    - **WHEN** `specd graph impact --file core:src/auth.ts --config ./specd.yaml --path .` is run
+    - **THEN** the command exits with code 1 before any graph provider is opened
+
+    #### Scenario: Infrastructure error exits with code 3
+
+    - **GIVEN** the provider cannot be opened
+    - **OR** the provider reports `GRAPH_BUSY`
+    - **OR** the provider reports `GRAPH_PROVIDER_STALE`
+    - **WHEN** `specd graph impact --file core:src/auth.ts` is run
+    - **THEN** stderr contains a `fatal:` prefixed error message
+    - **AND** the process exits with code 3

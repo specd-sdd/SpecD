@@ -27,6 +27,8 @@ import {
 import { type IndexCoverage } from '../../domain/value-objects/index-session.js'
 import {
   type IndexWriteSessionMetadata,
+  type ImpactFrontierQuery,
+  type ImpactFrontierResult,
   type LocalBindingLookup,
   type LogicalDeclaration,
   type LogicalSymbolLookup,
@@ -96,6 +98,11 @@ export interface SQLiteWorkerOperationMap {
   recreate: { payload: Record<string, never>; result: void }
   /** Clears all data while retaining tables. */
   clear: { payload: Record<string, never>; result: void }
+  /** Queries one filtered impact frontier using structured-clone-safe data. */
+  queryImpactFrontier: {
+    payload: { input: ImpactFrontierQuery }
+    result: ImpactFrontierResult
+  }
   /** Retrieves a file node. */
   getFile: { payload: { filePath: string }; result: FileNode | undefined }
   /** Finds files by config relative path. */

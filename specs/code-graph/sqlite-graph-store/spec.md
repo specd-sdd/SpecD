@@ -76,6 +76,16 @@ inside the worker so SQLite parameter limits cannot make a valid graph traversal
 fail. Results MUST preserve the deterministic ordering and empty-input semantics
 of the abstract contract.
 
+### Requirement: Query-time filtered impact reads
+
+The SQLite graph database SHALL implement the backend-neutral filtered-impact query contract using parameterized SQL predicates for requested result types, symbol kinds, included workspaces, and excluded workspaces. Workspace predicates SHALL use the persisted canonical workspace columns for files, specs, and logical symbols, or the owning file join for declaration symbols. Exclusions SHALL be applied in SQL after inclusion normalization and SHALL take precedence.
+
+SQLite SHALL constrain each impact frontier before materializing candidate rows. Result-type selection SHALL avoid hydrating unrequested file, symbol, or spec collections; symbol-kind predicates SHALL be part of the symbol query; and workspace predicates SHALL be part of every requested category query. Excluded rows MUST NOT cross from `SQLiteGraphDatabase` to `SQLiteGraphStore` for TypeScript post-filtering.
+
+The worker operation map SHALL define a serializable filtered-impact payload and result. `SQLiteGraphStore` SHALL send the normalized filter unchanged, the worker dispatcher SHALL pass it unchanged to `SQLiteGraphDatabase`, and database results SHALL be returned without widening. The generic worker client SHALL retain its existing typed request, overload, lifecycle, and error behavior.
+
+Filtered reads SHALL remain bounded and deterministic. Empty inclusion lists SHALL omit the inclusion predicate, empty exclusion or kind lists SHALL omit their predicates, duplicate filter values SHALL be normalized before the worker request, and all dynamic values SHALL use bound parameters rather than SQL interpolation.
+
 ### Requirement: Worker-backed exact batch node lookups
 
 SQLite SHALL implement the exact batch node lookups defined by `GraphStore`

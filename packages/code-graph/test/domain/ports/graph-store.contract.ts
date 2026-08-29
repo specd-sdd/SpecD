@@ -257,6 +257,200 @@ export function graphStoreContractTests(
         expect(await store.getSymbol(symbol.id)).toEqual(symbol)
       })
 
+      it('queries filtered impact frontiers deterministically without mutating its input', async () => {
+        const coreFile = createFileNode({
+          path: 'core:src/root.ts',
+          configRelativePath: 'src/root.ts',
+          language: 'typescript',
+          contentHash: 'sha256:impact-root',
+          workspace: 'core',
+        })
+        const coreNeighborFile = createFileNode({
+          path: 'core:src/neighbor.ts',
+          configRelativePath: 'src/neighbor.ts',
+          language: 'typescript',
+          contentHash: 'sha256:impact-core-neighbor',
+          workspace: 'core',
+        })
+        const webNeighborFile = createFileNode({
+          path: 'web:src/neighbor.ts',
+          configRelativePath: 'src/neighbor.ts',
+          language: 'typescript',
+          contentHash: 'sha256:impact-web-neighbor',
+          workspace: 'web',
+        })
+        const rootSymbol = createSymbolNode({
+          name: 'root',
+          kind: SymbolKind.Function,
+          filePath: coreFile.path,
+          line: 1,
+          column: 0,
+        })
+        const coreSymbol = createSymbolNode({
+          name: 'coreNeighbor',
+          kind: SymbolKind.Function,
+          filePath: coreNeighborFile.path,
+          line: 1,
+          column: 0,
+        })
+        const webSymbol = createSymbolNode({
+          name: 'webNeighbor',
+          kind: SymbolKind.Class,
+          filePath: webNeighborFile.path,
+          line: 1,
+          column: 0,
+        })
+        const rootSpec = createSpecNode({
+          specId: 'core:root',
+          path: 'specs/root',
+          title: 'Root',
+          contentHash: 'sha256:impact-root-spec',
+          workspace: 'core',
+        })
+        const coreSpec = createSpecNode({
+          specId: 'core:neighbor',
+          path: 'specs/neighbor',
+          title: 'Core neighbor',
+          contentHash: 'sha256:impact-core-spec',
+          workspace: 'core',
+        })
+        const webSpec = createSpecNode({
+          specId: 'web:neighbor',
+          path: 'specs/neighbor',
+          title: 'Web neighbor',
+          contentHash: 'sha256:impact-web-spec',
+          workspace: 'web',
+        })
+        const symbolRelations = [
+          createRelation({
+            source: coreSymbol.id,
+            target: rootSymbol.id,
+            type: RelationType.Calls,
+          }),
+          createRelation({ source: webSymbol.id, target: rootSymbol.id, type: RelationType.Calls }),
+        ]
+        const fileRelations = [
+          createRelation({
+            source: coreNeighborFile.path,
+            target: coreFile.path,
+            type: RelationType.Imports,
+          }),
+          createRelation({
+            source: webNeighborFile.path,
+            target: coreFile.path,
+            type: RelationType.Imports,
+          }),
+        ]
+        const specRelations = [
+          createRelation({
+            source: coreSpec.specId,
+            target: rootSpec.specId,
+            type: RelationType.DependsOn,
+          }),
+          createRelation({
+            source: webSpec.specId,
+            target: rootSpec.specId,
+            type: RelationType.DependsOn,
+          }),
+        ]
+
+        await store.bulkLoad({
+          files: [coreFile, coreNeighborFile, webNeighborFile],
+          symbols: [rootSymbol, coreSymbol, webSymbol],
+          specs: [rootSpec, coreSpec, webSpec],
+          relations: [...symbolRelations, ...fileRelations, ...specRelations],
+        })
+
+        const symbolInput = {
+          resource: 'symbol' as const,
+          frontier: [rootSymbol.id, rootSymbol.id],
+          direction: 'upstream' as const,
+          depth: 0,
+          maxDepth: 3,
+          relationTypes: [RelationType.Calls, RelationType.Calls],
+        }
+        const symbolInputBefore = structuredClone(symbolInput)
+        const unfilteredSymbols = await store.queryImpactFrontier(symbolInput)
+        expect(unfilteredSymbols).toEqual({
+          relations: [...symbolRelations].sort(
+            (left, right) =>
+              left.source.localeCompare(right.source) ||
+              left.type.localeCompare(right.type) ||
+              left.target.localeCompare(right.target),
+          ),
+          symbols: [coreSymbol, webSymbol].sort((left, right) => left.id.localeCompare(right.id)),
+          files: [],
+          specs: [],
+        })
+        expect(symbolInput).toEqual(symbolInputBefore)
+
+        const classOnly = await store.queryImpactFrontier({
+          ...symbolInput,
+          filter: { kinds: [SymbolKind.Class] },
+        })
+        expect(classOnly.relations).toEqual([symbolRelations[1]])
+        expect(classOnly.symbols).toEqual([webSymbol])
+
+        const coreOnly = await store.queryImpactFrontier({
+          ...symbolInput,
+          filter: { workspaces: ['core', 'web'], excludeWorkspaces: ['web'] },
+        })
+        expect(coreOnly.relations).toEqual([symbolRelations[0]])
+        expect(coreOnly.symbols).toEqual([coreSymbol])
+
+        const excludedWins = await store.queryImpactFrontier({
+          ...symbolInput,
+          filter: { workspaces: ['web'], excludeWorkspaces: ['web'] },
+        })
+        expect(excludedWins).toEqual({ relations: [], symbols: [], files: [], specs: [] })
+
+        const fileResult = await store.queryImpactFrontier({
+          resource: 'file',
+          frontier: [coreFile.path],
+          direction: 'upstream',
+          depth: 0,
+          maxDepth: 3,
+          relationTypes: [RelationType.Imports],
+          filter: { types: ['files'] },
+        })
+        expect(fileResult.files).toEqual(
+          [coreNeighborFile, webNeighborFile].sort((left, right) =>
+            left.path.localeCompare(right.path),
+          ),
+        )
+        expect(fileResult.symbols).toEqual([])
+        expect(fileResult.specs).toEqual([])
+
+        const specResult = await store.queryImpactFrontier({
+          resource: 'spec',
+          frontier: [rootSpec.specId],
+          direction: 'upstream',
+          depth: 0,
+          maxDepth: 3,
+          relationTypes: [RelationType.DependsOn],
+          filter: { types: ['specs'] },
+        })
+        expect(specResult.specs).toEqual(
+          [coreSpec, webSpec].sort((left, right) => left.specId.localeCompare(right.specId)),
+        )
+        expect(specResult.symbols).toEqual([])
+        expect(specResult.files).toEqual([])
+
+        const unmaterializedSymbols = await store.queryImpactFrontier({
+          ...symbolInput,
+          filter: { types: ['files'] },
+        })
+        expect(unmaterializedSymbols.relations).toEqual(unfilteredSymbols.relations)
+        expect(unmaterializedSymbols.symbols).toEqual([])
+
+        expect(
+          await store.queryImpactFrontier({
+            ...symbolInput,
+            frontier: [],
+          }),
+        ).toEqual({ relations: [], symbols: [], files: [], specs: [] })
+      })
+
       it('batches symbols and traversal relations deterministically', async () => {
         const file = createFileNode({
           path: 'core:src/batch.ts',

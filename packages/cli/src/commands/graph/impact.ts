@@ -12,9 +12,112 @@ import { resolveGraphCliContext } from './resolve-graph-cli-context.js'
 import { withProvider } from './with-provider.js'
 import { warnGraphStale } from './warn-graph-staleness.js'
 import { resolveImpactFileSelectors, toGraphDisplayPath } from './resolve-impact-file-selectors.js'
+import { parseGraphKinds } from './parse-graph-kinds.js'
 
 /** Provider-supported graph impact traversal directions. */
 type ImpactDirection = 'upstream' | 'downstream' | 'both'
+
+/** Open code graph provider used by the impact command. */
+type GraphImpactProvider = Awaited<ReturnType<typeof createCodeGraphProvider>>
+
+/** Provider-owned filter payload accepted by all impact operations. */
+type ImpactResultFilter = NonNullable<Parameters<GraphImpactProvider['analyzeImpact']>[3]>
+
+/** Valid impact result categories accepted by the CLI. */
+const IMPACT_RESULT_TYPES = ['files', 'symbols', 'specs'] as const
+
+/** One supported category of graph impact result. */
+type ImpactResultType = (typeof IMPACT_RESULT_TYPES)[number]
+
+const VALID_IMPACT_RESULT_TYPES = new Set<ImpactResultType>(IMPACT_RESULT_TYPES)
+
+/**
+ * Collects a repeatable option value without changing its ordering.
+ * @param value - The new option value.
+ * @param previous - Previously collected option values.
+ * @returns The accumulated values.
+ */
+function collect(value: string, previous: string[]): string[] {
+  return [...previous, value]
+}
+
+/**
+ * Trims values and removes later duplicates while preserving first occurrence order.
+ * @param values - Raw option values.
+ * @returns Non-empty, stable-deduplicated values.
+ */
+function normalizeRepeatedValues(values: readonly string[]): string[] {
+  const normalized: string[] = []
+  const seen = new Set<string>()
+  for (const raw of values) {
+    const value = raw.trim()
+    if (value.length === 0 || seen.has(value)) continue
+    seen.add(value)
+    normalized.push(value)
+  }
+  return normalized
+}
+
+/**
+ * Normalizes graph impact filter flags before graph context or provider access.
+ * @param opts - Raw impact filter option values.
+ * @param opts.type - Comma-separated impact result categories.
+ * @param opts.kind - Comma-separated symbol kinds.
+ * @param opts.workspace - Repeated included workspace names.
+ * @param opts.excludeWorkspace - Repeated excluded workspace names.
+ * @param format - Raw output format used for CLI errors.
+ * @returns One provider filter, or undefined when no filter flags were supplied.
+ */
+function normalizeImpactResultFilter(
+  opts: {
+    readonly type?: string
+    readonly kind?: string
+    readonly workspace: readonly string[]
+    readonly excludeWorkspace: readonly string[]
+  },
+  format: string,
+): ImpactResultFilter | undefined {
+  const types =
+    opts.type === undefined
+      ? undefined
+      : normalizeRepeatedValues(opts.type.toLowerCase().split(',')).map((type) => {
+          if (!VALID_IMPACT_RESULT_TYPES.has(type as ImpactResultType)) {
+            cliError(
+              `invalid impact type "${type}". Expected one or more of: files, symbols, specs`,
+              format,
+              1,
+            )
+          }
+          return type as ImpactResultType
+        })
+  const kinds = (() => {
+    try {
+      return parseGraphKinds(opts.kind)
+    } catch (err) {
+      cliError(err instanceof Error ? err.message : 'invalid --kind value', format, 1)
+    }
+  })()
+  if (kinds !== undefined && types !== undefined && !types.includes('symbols')) {
+    cliError('--kind requires --type to include symbols', format, 1)
+  }
+
+  const workspaces = normalizeRepeatedValues(opts.workspace)
+  const excludeWorkspaces = normalizeRepeatedValues(opts.excludeWorkspace)
+  if (
+    types === undefined &&
+    kinds === undefined &&
+    workspaces.length === 0 &&
+    excludeWorkspaces.length === 0
+  ) {
+    return undefined
+  }
+  return {
+    ...(types === undefined ? {} : { types }),
+    ...(kinds === undefined ? {} : { kinds }),
+    workspaces,
+    excludeWorkspaces,
+  }
+}
 
 /** Shared impact payload shape used by text formatters in this command. */
 type FormattedImpactResult = {
@@ -24,6 +127,7 @@ type FormattedImpactResult = {
   transitiveDependents: number
   affectedFiles: readonly string[]
   affectedSymbols?: readonly { name: string; filePath: string; line: number; depth: number }[]
+  affectedSpecs?: readonly string[]
 }
 
 /** Spec impact payload shape used by text formatters in this command. */
@@ -66,6 +170,7 @@ function formatCoveringSpecs(coveringSpecs: readonly CoveringSpecImpact[] | unde
  * @param result.transitiveDependents - Count of transitive dependents.
  * @param result.affectedFiles - List of affected file paths.
  * @param result.affectedSymbols - Optional list of affected symbols with name and file path.
+ * @param result.affectedSpecs - Optional list of affected spec IDs.
  * @param maxDepth - Maximum traversal depth used (default: 3). Non-default values shown in header.
  * @returns An array of formatted lines.
  */
@@ -79,6 +184,10 @@ function formatImpact(label: string, result: FormattedImpactResult, maxDepth = 3
     `  Transitive deps:  ${String(result.transitiveDependents)}`,
     `  Affected files:   ${String(result.affectedFiles.length)}`,
   ]
+
+  if (result.affectedSpecs !== undefined && result.affectedSpecs.length > 0) {
+    lines.push(`  Affected specs:   ${String(result.affectedSpecs.length)}`)
+  }
 
   if (result.affectedSymbols && result.affectedSymbols.length > 0) {
     // Group symbols by file, preserving line and depth info for display
@@ -113,6 +222,14 @@ function formatImpact(label: string, result: FormattedImpactResult, maxDepth = 3
     }
   }
 
+  if (result.affectedSpecs !== undefined && result.affectedSpecs.length > 0) {
+    lines.push('')
+    lines.push('Affected specs:')
+    for (const affectedSpec of result.affectedSpecs) {
+      lines.push(`  ${affectedSpec}`)
+    }
+  }
+
   return lines
 }
 
@@ -129,18 +246,7 @@ function formatSpecImpact(
   result: FormattedSpecImpactResult,
   maxDepth = 3,
 ): string[] {
-  const lines = formatImpact(`spec ${specId}`, result, maxDepth)
-  lines.splice(6, 0, `  Affected specs:   ${String(result.affectedSpecs.length)}`)
-
-  if (result.affectedSpecs.length > 0) {
-    lines.push('')
-    lines.push('Affected specs:')
-    for (const affectedSpec of result.affectedSpecs) {
-      lines.push(`  ${affectedSpec}`)
-    }
-  }
-
-  return lines
+  return formatImpact(`spec ${specId}`, result, maxDepth)
 }
 
 /**
@@ -191,6 +297,15 @@ export function registerGraphImpact(parent: Command): void {
         'impact direction: dependents|dependencies|upstream|downstream|both',
       ).default('dependents'),
     )
+    .addOption(new Option('--type <types>', 'filter result categories: files,symbols,specs'))
+    .addOption(new Option('--kind <kinds>', 'filter impacted symbols by kind (comma-separated)'))
+    .option('--workspace <name>', 'include results from workspace (repeatable)', collect, [])
+    .option(
+      '--exclude-workspace <name>',
+      'exclude results from workspace (repeatable)',
+      collect,
+      [],
+    )
     .option('--depth <n>', 'max traversal depth (positive integer)', '3')
     .option('--config <path>', 'path to specd.yaml')
     .option('--path <path>', 'repository root for bootstrap mode')
@@ -220,7 +335,8 @@ JSON/TOON output schema:
 
   ImpactResult: { target, directDependents, indirectDependents, transitiveDependents,
     riskLevel: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL", affectedFiles: string[],
-    affectedSymbols: Array<{ id, name, filePath }>, affectedProcesses: string[] }
+    affectedSymbols: Array<{ id, name, filePath }>, affectedSpecs: string[],
+    affectedProcesses: string[] }
 `,
     )
     .action(
@@ -231,6 +347,10 @@ JSON/TOON output schema:
         export?: string
         from?: string
         direction: string
+        type?: string
+        kind?: string
+        workspace: string[]
+        excludeWorkspace: string[]
         depth: string
         config?: string
         path?: string
@@ -258,6 +378,7 @@ JSON/TOON output schema:
         if (opts.config !== undefined && opts.path !== undefined) {
           cliError('--config and --path are mutually exclusive', opts.format, 1)
         }
+        const filter = normalizeImpactResultFilter(opts, opts.format)
 
         const { config, kernel } = await resolveGraphCliContext({
           configPath: opts.config,
@@ -282,13 +403,22 @@ JSON/TOON output schema:
                 direction,
                 maxDepth,
                 fmt,
+                filter,
               )
             } else if (opts.symbol) {
-              await handleSymbolImpact(provider, opts.symbol, direction, maxDepth, fmt, config)
+              await handleSymbolImpact(
+                provider,
+                opts.symbol,
+                direction,
+                maxDepth,
+                fmt,
+                config,
+                filter,
+              )
             } else if (opts.spec) {
-              await handleSpecImpact(provider, opts.spec, direction, maxDepth, fmt, config)
+              await handleSpecImpact(provider, opts.spec, direction, maxDepth, fmt, config, filter)
             } else if (opts.file) {
-              await handleFilesImpact(provider, opts.file, direction, maxDepth, fmt, config)
+              await handleFilesImpact(provider, opts.file, direction, maxDepth, fmt, config, filter)
             }
           },
           { kernel },
@@ -306,6 +436,7 @@ JSON/TOON output schema:
  * @param direction - Traversal direction
  * @param maxDepth - Maximum traversal depth
  * @param fmt - Output format
+ * @param filter - Optional normalized provider-side impact filter.
  * @returns When rendering completes
  */
 async function handlePublicExportImpact(
@@ -315,6 +446,7 @@ async function handlePublicExportImpact(
   direction: ImpactDirection,
   maxDepth: number,
   fmt: 'text' | 'json' | 'toon',
+  filter: ImpactResultFilter | undefined,
 ): Promise<void> {
   let canonicalSurface = surface
   if (!surface.includes(':')) {
@@ -379,16 +511,16 @@ async function handlePublicExportImpact(
     return
   }
 
-  const result = await provider.analyzePublicBindingImpact(
-    {
-      binding: selected.binding,
-      target: resolution.target,
-      declarations: selected.declarations,
-      path: resolution.path,
-    },
-    direction,
-    maxDepth,
-  )
+  const input = {
+    binding: selected.binding,
+    target: resolution.target,
+    declarations: selected.declarations,
+    path: resolution.path,
+  }
+  const result =
+    filter === undefined
+      ? await provider.analyzePublicBindingImpact(input, direction, maxDepth)
+      : await provider.analyzePublicBindingImpact(input, direction, maxDepth, filter)
 
   if (fmt === 'text') {
     const lines = [
@@ -419,6 +551,7 @@ async function handlePublicExportImpact(
  * @param maxDepth - Maximum traversal depth.
  * @param fmt - The output format.
  * @param config - Resolved project configuration used for pure display-path projection.
+ * @param filter - Optional normalized provider-side impact filter.
  */
 async function handleFilesImpact(
   provider: Awaited<ReturnType<typeof createCodeGraphProvider>>,
@@ -427,6 +560,7 @@ async function handleFilesImpact(
   maxDepth: number,
   fmt: 'text' | 'json' | 'toon',
   config: SpecdConfig,
+  filter: ImpactResultFilter | undefined,
 ): Promise<void> {
   const resolvedFiles = await resolveImpactFileSelectors(provider, rawSelectors)
   const resolved = resolvedFiles.map((file) => ({
@@ -439,7 +573,10 @@ async function handleFilesImpact(
 
   if (resolved.length === 1) {
     const file = resolved[0]!
-    const result = await provider.analyzeFileImpact(file.canonicalPath, direction, maxDepth)
+    const result =
+      filter === undefined
+        ? await provider.analyzeFileImpact(file.canonicalPath, direction, maxDepth)
+        : await provider.analyzeFileImpact(file.canonicalPath, direction, maxDepth, filter)
     const displayResult = {
       ...result,
       affectedFiles: result.affectedFiles.map((path) => toDisplayPath(path)),
@@ -494,11 +631,11 @@ async function handleFilesImpact(
     return
   }
 
-  const result = await provider.analyzeFilesImpact(
-    resolved.map((f) => f.canonicalPath),
-    direction,
-    maxDepth,
-  )
+  const filePaths = resolved.map((file) => file.canonicalPath)
+  const result =
+    filter === undefined
+      ? await provider.analyzeFilesImpact(filePaths, direction, maxDepth)
+      : await provider.analyzeFilesImpact(filePaths, direction, maxDepth, filter)
 
   const individualResults = result.symbols as unknown as FileImpactResult[]
   const perFile = resolved.map((f, i) => ({
@@ -586,6 +723,7 @@ async function handleFilesImpact(
  * @param maxDepth - Maximum traversal depth.
  * @param fmt - The output format.
  * @param config - Resolved project configuration used for pure display-path projection.
+ * @param filter - Optional normalized provider-side impact filter.
  */
 async function handleSymbolImpact(
   provider: Awaited<ReturnType<typeof createCodeGraphProvider>>,
@@ -594,6 +732,7 @@ async function handleSymbolImpact(
   maxDepth: number,
   fmt: 'text' | 'json' | 'toon',
   config: SpecdConfig,
+  filter: ImpactResultFilter | undefined,
 ): Promise<void> {
   const toDisplayPath = (canonicalPath: string): string => toGraphDisplayPath(config, canonicalPath)
   const resolved = await provider.resolveSymbolSelector(symbolSelector)
@@ -655,7 +794,10 @@ async function handleSymbolImpact(
     return
   }
 
-  const result = await provider.analyzeImpact(sym.id, direction, maxDepth)
+  const result =
+    filter === undefined
+      ? await provider.analyzeImpact(sym.id, direction, maxDepth)
+      : await provider.analyzeImpact(sym.id, direction, maxDepth, filter)
   const displayPath = toDisplayPath(sym.filePath)
   const displayResult = {
     ...result,
@@ -698,6 +840,7 @@ async function handleSymbolImpact(
  * @param maxDepth - Maximum traversal depth.
  * @param fmt - The output format.
  * @param config - Resolved project configuration used for pure display-path projection.
+ * @param filter - Optional normalized provider-side impact filter.
  */
 async function handleSpecImpact(
   provider: Awaited<ReturnType<typeof createCodeGraphProvider>>,
@@ -706,13 +849,17 @@ async function handleSpecImpact(
   maxDepth: number,
   fmt: 'text' | 'json' | 'toon',
   config: SpecdConfig,
+  filter: ImpactResultFilter | undefined,
 ): Promise<void> {
   const spec = await provider.getSpec(specId)
   if (spec === undefined) {
     throw new SpecNotFoundError(specId)
   }
 
-  const result = await provider.analyzeSpecImpact(specId, direction, maxDepth)
+  const result =
+    filter === undefined
+      ? await provider.analyzeSpecImpact(specId, direction, maxDepth)
+      : await provider.analyzeSpecImpact(specId, direction, maxDepth, filter)
   const toDisplayPath = (canonicalPath: string): string => toGraphDisplayPath(config, canonicalPath)
   const displayResult = {
     ...result,

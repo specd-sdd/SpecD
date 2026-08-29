@@ -206,14 +206,14 @@
 
 #### Scenario: No selector provided
 
-- **WHEN** `specd graph impact` is run without `--file`, `--symbol`, or `--spec`
-- **THEN** stderr contains `error: provide exactly one of --file, --symbol, or --spec`
+- **WHEN** `specd graph impact` is run without `--file`, `--symbol`, `--spec`, or `--export`
+- **THEN** stderr contains `error: provide exactly one of --file, --symbol, --spec, or --export with --from`
 - **AND** the process exits with code 1
 
 #### Scenario: Multiple selectors provided
 
 - **WHEN** `specd graph impact --file core:src/auth.ts --spec core:change` is run
-- **THEN** stderr contains `error: provide exactly one of --file, --symbol, or --spec`
+- **THEN** stderr contains `error: provide exactly one of --file, --symbol, --spec, or --export with --from`
 - **AND** the process exits with code 1
 
 #### Scenario: Missing unprefixed selector reports normalized lookup
@@ -260,6 +260,38 @@
 - **WHEN** impact receives that name
 - **THEN** it returns a bounded deterministic ambiguity list and performs no traversal
 - **AND** prefix or textual candidates are never accepted as targets
+
+### Requirement: Provider-owned impact result filters
+
+#### Scenario: Repeated filters are delegated in one request
+
+- **GIVEN** a provider spy for a valid impact target
+- **WHEN** `graph impact` receives comma-separated types and kinds plus repeated `--workspace` and `--exclude-workspace` options
+- **THEN** the CLI calls the selected provider impact operation once with the normalized ordered filter sets
+- **AND** it renders the provider result without removing any returned category entry
+
+#### Scenario: Unsupported result type fails before provider open
+
+- **WHEN** `graph impact` receives `--type documents`
+- **THEN** it reports a usage error naming `files`, `symbols`, and `specs` as the supported values
+- **AND** it does not open the provider
+
+#### Scenario: Symbol kind requires symbol results
+
+- **WHEN** `graph impact` receives `--type files,specs --kind function`
+- **THEN** it reports a usage error before provider open
+
+#### Scenario: Workspace exclusion takes precedence
+
+- **WHEN** the same canonical workspace is present in both repeated inclusion and exclusion options
+- **THEN** the delegated filter retains exclusion precedence using the same normalization as `graph search`
+
+#### Scenario: Symbol target renders affected specs
+
+- **GIVEN** `SpecRepository` has admitted impacted symbols or files with indexed spec coverage
+- **WHEN** `graph impact --symbol SpecRepository --type specs` executes
+- **THEN** the command renders the provider's non-empty `affectedSpecs` collection
+- **AND** it does not reconstruct spec coverage in the CLI
 
 ### Requirement: Public export impact analysis
 

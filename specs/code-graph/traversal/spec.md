@@ -105,6 +105,18 @@ Risk level thresholds:
 | `HIGH`     | 6+ direct dependents, or 10+ total dependents            |
 | `CRITICAL` | 20+ total dependents, or target is in 3+ execution flows |
 
+### Requirement: Filtered impact results
+
+Symbol, file, multi-file, spec, and public-binding impact operations SHALL accept one optional typed filter containing requested result types, symbol kinds, included workspaces, and excluded workspaces. Result types SHALL use the closed vocabulary `files | symbols | specs`; omitted filters SHALL preserve the existing unfiltered result contract.
+
+Workspace inclusion and exclusion SHALL use canonical graph workspace identities. An empty inclusion set SHALL admit every workspace, and exclusions SHALL take precedence over inclusions. Symbol-kind predicates SHALL apply only to symbol results. A filter that requests no symbol result category MAY still use admitted symbol reachability to compute requested file or spec results.
+
+Code Graph SHALL apply kind and workspace eligibility before it builds returned category collections and aggregate dependent counts. Risk, depth counts, affected-file aggregation, covering-spec evidence, and deterministic ordering SHALL be derived from the admitted traversal evidence. A result-type selection SHALL control which of the `files`, `symbols`, and `specs` collections are materialized without causing the CLI to reconstruct or post-filter another category.
+
+Every `ImpactResult`, including symbol and public-binding impact, SHALL contain a required deterministic `affectedSpecs` collection. When `specs` is requested, Code Graph SHALL populate it from specs covering admitted impacted symbols and files through `COVERS_SYMBOL` and `COVERS_FILE` evidence. When `specs` is not requested, `affectedSpecs` SHALL be an empty array. A specs-only filter MUST still traverse admitted symbol and file evidence needed to discover coverage.
+
+Filtering MUST occur before any final result limit. Traversal services MUST express eligible node and relation reads through the `GraphStore` filtered-impact query contract and MUST NOT fetch an unrestricted backend result set solely to discard excluded nodes in the service or delivery layer.
+
 ### Requirement: Static type dependency impact
 
 Impact traversal SHALL treat all persisted symbol dependency relations as first-class blast-radius inputs, not only ordinary call edges.

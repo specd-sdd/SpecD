@@ -1,4 +1,4 @@
-export const SQLITE_SCHEMA_VERSION = 9
+export const SQLITE_SCHEMA_VERSION = 10
 
 export const SQLITE_SCHEMA_DDL = `
 PRAGMA foreign_keys = ON;
@@ -140,9 +140,11 @@ CREATE TABLE IF NOT EXISTS freshness_latches (
 );
 
 CREATE INDEX IF NOT EXISTS idx_files_config_relative_path ON files(config_relative_path);
+CREATE INDEX IF NOT EXISTS idx_files_workspace ON files(workspace);
 CREATE INDEX IF NOT EXISTS idx_documents_config_relative_path ON documents(config_relative_path);
 CREATE INDEX IF NOT EXISTS idx_symbols_file_path ON symbols(file_path);
 CREATE INDEX IF NOT EXISTS idx_symbols_kind ON symbols(kind);
+CREATE INDEX IF NOT EXISTS idx_symbols_kind_file_path ON symbols(kind, file_path);
 CREATE INDEX IF NOT EXISTS idx_symbols_name ON symbols(name);
 CREATE INDEX IF NOT EXISTS idx_symbols_name_nocase ON symbols(name COLLATE NOCASE);
 CREATE INDEX IF NOT EXISTS idx_specs_workspace ON specs(workspace);

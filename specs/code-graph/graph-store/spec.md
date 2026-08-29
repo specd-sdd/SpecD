@@ -127,6 +127,16 @@ Unlike `upsertFile` which replaces all data for a file, `addRelations` is purely
 
 `SymbolQuery` is a value object with optional fields: `name` (glob or regex), `kinds` (array of `SymbolKind` for filtering by one or more kinds), `filePath` (exact match or glob), `comment` (substring match for full-text search within symbol comments), `caseSensitive` (boolean, defaults to `false` — when `false`, `name` and `comment` matching is case insensitive).
 
+### Requirement: Filtered impact query contract
+
+`GraphStore` SHALL expose backend-neutral impact-query inputs that carry requested result types, symbol kinds, included workspaces, and excluded workspaces together with the target, relation direction, candidate resource category, and traversal depth needed by impact analysis.
+
+Filtered impact reads SHALL return only nodes and relations admitted by the normalized predicates. The query `resource` field SHALL identify the candidate or neighbor resource category to expand towards or hydrate. Traversal reads SHALL support depth-zero queries for direct coverage lookups. Workspace matching SHALL use canonical workspace identity, an empty inclusion set SHALL admit every workspace, and exclusions SHALL take precedence. Symbol-kind predicates SHALL be applied to symbol candidates before those candidates are returned from the store.
+
+Store implementations SHALL apply supported type, kind, inclusion, and exclusion predicates in their physical query execution. An implementation MUST NOT load an unrestricted impact candidate set across the adapter boundary and then remove excluded rows in TypeScript. Batch and worker-backed implementations SHALL preserve the filters through their request protocol without widening the query.
+
+The contract SHALL remain backend-neutral: it defines predicate and result semantics but MUST NOT expose SQLite statements, worker messages, table names, or storage-specific pagination details.
+
 ### Requirement: Batched symbol traversal reads
 
 `GraphStore` SHALL expose storage-neutral batch queries for traversal:

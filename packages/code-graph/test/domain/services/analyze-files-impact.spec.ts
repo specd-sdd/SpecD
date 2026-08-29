@@ -113,6 +113,13 @@ describe('analyzeFilesImpact service', () => {
     expect(result.affectedFiles).toContain('i.ts')
     expect(result.affectedFiles).toContain('f.ts')
     expect(result.symbols).toHaveLength(2) // results breakdown for both target files
+
+    const specsOnly = await analyzeFilesImpact(store, ['a.ts', 'b.ts'], 'upstream', 3, undefined, {
+      types: ['specs'],
+    })
+    expect(specsOnly.affectedFiles).toEqual([])
+    expect(specsOnly.affectedSymbols).toEqual([])
+    expect(specsOnly.symbols).toHaveLength(2)
   })
 
   it('traverses every declaration once under one resolved logical target', async () => {
@@ -336,6 +343,68 @@ describe('analyzeFilesImpact service', () => {
     ])
   })
 
+  it('aggregates only admitted multi-file rows and keeps their shallowest symbol depth', async () => {
+    const first = sym('first', 'a.ts', 1)
+    const second = sym('second', 'b.ts', 1)
+    const bridge = sym('bridge', 'bridge.ts', 1)
+    const shared = sym('shared', 'shared.ts', 1)
+    const excluded = sym('excluded', 'excluded.ts', 1)
+    const inWorkspace = (path: string, workspace: string) =>
+      createFileNode({
+        path,
+        configRelativePath: '',
+        language: 'typescript',
+        contentHash: 'sha256:x',
+        workspace,
+      })
+
+    await store.upsertFile(inWorkspace('a.ts', 'root'), [first], [])
+    await store.upsertFile(inWorkspace('b.ts', 'root'), [second], [])
+    await store.upsertFile(
+      inWorkspace('bridge.ts', 'included'),
+      [bridge],
+      [createRelation({ source: bridge.id, target: second.id, type: RelationType.Calls })],
+    )
+    await store.upsertFile(
+      inWorkspace('shared.ts', 'included'),
+      [shared],
+      [
+        createRelation({ source: shared.id, target: first.id, type: RelationType.Calls }),
+        createRelation({ source: shared.id, target: bridge.id, type: RelationType.Calls }),
+      ],
+    )
+    await store.upsertFile(
+      inWorkspace('excluded.ts', 'excluded'),
+      [excluded],
+      [createRelation({ source: excluded.id, target: first.id, type: RelationType.Calls })],
+    )
+
+    const result = await analyzeFilesImpact(
+      store,
+      ['a.ts', 'b.ts', 'a.ts'],
+      'upstream',
+      3,
+      undefined,
+      {
+        types: ['files', 'symbols'],
+        workspaces: ['included', 'excluded'],
+        excludeWorkspaces: ['excluded'],
+      },
+    )
+
+    expect(result.affectedFiles).toEqual(['bridge.ts', 'shared.ts'])
+    expect(result.affectedSymbols.map((symbol) => [symbol.id, symbol.depth])).toEqual([
+      [bridge.id, 1],
+      [shared.id, 1],
+    ])
+    expect(result.affectedSymbols).not.toContainEqual(expect.objectContaining({ id: excluded.id }))
+    expect(result.coveringSpecs).toEqual([])
+    expect(result.symbols).toHaveLength(2)
+    expect(result.directDependents).toBe(2)
+    expect(result.indirectDependents).toBe(1)
+    expect(result.riskLevel).toBe('MEDIUM')
+  })
+
   it('shares a maximum concurrency of four across multi-file impact work', async () => {
     const filePaths = Array.from({ length: 12 }, (_, index) => `input-${String(index)}.ts`)
     for (const filePath of filePaths) await store.upsertFile(file(filePath), [], [])
@@ -358,5 +427,38 @@ describe('analyzeFilesImpact service', () => {
 
     expect(result.symbols).toHaveLength(filePaths.length)
     expect(maximumActive).toBe(4)
+  })
+
+  it('retains call-affected symbol spec coverage in specs-only file and multi-file impact (D-3)', async () => {
+    const targetA = sym('targetA', 'a.ts', 1)
+    const callerB = sym('callerB', 'b.ts', 1)
+    const spec = createSpecNode({
+      specId: 'core:caller-spec',
+      workspace: '/p',
+      path: 'caller-spec',
+      title: 'Caller Spec',
+      description: '',
+      contentHash: 'sha256:caller-spec',
+      content: '',
+      dependsOn: [],
+    })
+
+    await store.upsertFile(file('a.ts'), [targetA], [])
+    await store.upsertFile(
+      file('b.ts'),
+      [callerB],
+      [createRelation({ source: callerB.id, target: targetA.id, type: RelationType.Calls })],
+    )
+    await store.upsertSpec(spec, [
+      createRelation({ source: spec.specId, target: callerB.id, type: RelationType.CoversSymbol }),
+    ])
+
+    const result = await analyzeFilesImpact(store, ['a.ts'], 'upstream', 3, undefined, {
+      types: ['specs'],
+    })
+
+    expect(result.affectedSpecs).toEqual(['core:caller-spec'])
+    expect(result.affectedFiles).toEqual([])
+    expect(result.affectedSymbols).toEqual([])
   })
 })

@@ -8,6 +8,7 @@ import {
   GraphSchemaIncompatibleError,
   GraphStorageRecoveryRequiredError,
   GraphStoreRecreateRequiresClosedError,
+  IMPACT_RESULT_TYPES,
   InvalidGraphStoreConfigurationError,
   LanguageAdapter,
   RelationType,
@@ -25,6 +26,8 @@ import {
   type CodeGraphProvider,
   type GraphStoreFactory,
   type GraphStoreFactoryOptions,
+  type ImpactResultFilter,
+  type ImpactResultType,
   type LogicalSymbol,
   type SQLiteGraphStoreOptions,
   type SqliteRuntimeDescriptor,
@@ -141,6 +144,25 @@ describe('@specd/code-graph barrel', () => {
     expect(SymbolKind).toBeDefined()
     expect(RelationType).toBeDefined()
     expect(typeof SymbolKind.Function).toBe('string')
+  })
+
+  it('exports the public impact filter vocabulary without SQLite internals', async () => {
+    expect(IMPACT_RESULT_TYPES).toEqual(['files', 'symbols', 'specs'])
+
+    const type: ImpactResultType = 'symbols'
+    const filter: ImpactResultFilter = {
+      types: [type],
+      kinds: [SymbolKind.Function],
+      workspaces: ['code-graph'],
+      excludeWorkspaces: ['external'],
+    }
+    expect(filter.types).toEqual(['symbols'])
+
+    const publicModule = await import('../src/public.js')
+    expect('IMPACT_RESULT_TYPES' in publicModule).toBe(true)
+    expect('ImpactResultFilter' in publicModule).toBe(false)
+    expect('ImpactResultType' in publicModule).toBe(false)
+    expect('SQLiteGraphStore' in publicModule).toBe(false)
   })
 
   it('exports host use-case factories from the public barrel', async () => {

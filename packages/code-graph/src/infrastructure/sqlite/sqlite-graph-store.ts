@@ -2,6 +2,8 @@ import {
   GraphStore,
   type IndexWriteSession,
   type IndexWriteSessionMetadata,
+  type ImpactFrontierQuery,
+  type ImpactFrontierResult,
   type LocalBindingLookup,
   type LogicalDeclaration,
   type LogicalSymbolLookup,
@@ -393,6 +395,22 @@ export class SQLiteGraphStore extends GraphStore {
    */
   async getCallees(symbolId: string): Promise<Relation[]> {
     return this.client.sendRequest('getCallees', { symbolId })
+  }
+
+  /**
+   * Reads one filtered impact frontier through the SQLite worker.
+   *
+   * An empty frontier cannot have adjacent relations, so it avoids a worker
+   * round-trip while retaining the complete deterministic result shape.
+   *
+   * @param input - Frontier resource, traversal orientation, and optional filters.
+   * @returns Admitted relations and the requested hydrated resource categories.
+   */
+  async queryImpactFrontier(input: ImpactFrontierQuery): Promise<ImpactFrontierResult> {
+    if (input.frontier.length === 0) {
+      return { relations: [], symbols: [], files: [], specs: [] }
+    }
+    return this.client.sendRequest('queryImpactFrontier', { input })
   }
 
   /**

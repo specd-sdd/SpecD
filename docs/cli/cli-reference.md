@@ -1588,6 +1588,17 @@ depth and every ordered, deduplicated file/symbol evidence item, including file-
 `COVERS_FILE` evidence when no covered symbol exists. This projection comes from the
 provider; the CLI issues no independent coverage queries.
 
+Every impact target also exposes `affectedSpecs`. With `--type specs`, symbol and
+public-export queries return deterministic spec IDs covering the resolved root symbol
+or its owning file, plus admitted impacted evidence; they keep `affectedFiles` and
+`affectedSymbols` as empty arrays. For example:
+
+```bash
+specd graph impact --symbol SpecRepository --type specs --format json
+```
+
+This is provider-derived coverage, not a CLI reconstruction.
+
 Public export selectors use both parts of the public-binding identity:
 
 ```bash
@@ -1609,24 +1620,37 @@ traversal does not run. Bare names first require an exact case-sensitive declara
 name, fall back to case-insensitive exact lookup only when none exists, and never
 widen prefixes or partial search hits into impact targets.
 
-| Option                                                             | Description                                                                           |
-| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------- |
-| `--spec <id>`                                                      | Spec ID to analyze.                                                                   |
-| `--symbol <name>`                                                  | Symbol selector to analyze. Supports bare names, qualified selectors, and full ids.   |
-| `--file <path...>`                                                 | One or more file paths to analyze (config-relative, workspace-prefixed, or absolute). |
-| `--export <name>`                                                  | Exact public export name; requires `--from`.                                          |
-| `--from <surface>`                                                 | File or public surface containing `--export`.                                         |
-| `--direction dependents\|dependencies\|upstream\|downstream\|both` | Impact direction (default: `dependents`).                                             |
-| `--depth <n>`                                                      | Maximum traversal depth (default: `3`).                                               |
-| `--config <path>`                                                  | Config file path. Mutually exclusive with `--path`.                                   |
-| `--path <path>`                                                    | Repository root bootstrap path. Ignores any discovered config.                        |
-| `--format text\|json\|toon`                                        | Output format.                                                                        |
+| Option                                                             | Description                                                                                       |
+| ------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
+| `--spec <id>`                                                      | Spec ID to analyze.                                                                               |
+| `--symbol <name>`                                                  | Symbol selector to analyze. Supports bare names, qualified selectors, and full ids.               |
+| `--file <path...>`                                                 | One or more file paths to analyze (config-relative, workspace-prefixed, or absolute).             |
+| `--export <name>`                                                  | Exact public export name; requires `--from`.                                                      |
+| `--from <surface>`                                                 | File or public surface containing `--export`.                                                     |
+| `--direction dependents\|dependencies\|upstream\|downstream\|both` | Impact direction (default: `dependents`).                                                         |
+| `--type <types>`                                                   | Comma-separated result categories: `files`, `symbols`, and/or `specs`.                            |
+| `--kind <kinds>`                                                   | Comma-separated impacted symbol kinds; requires omitted `--type` or `--type` including `symbols`. |
+| `--workspace <name>`                                               | Include result rows from a workspace. Repeat this option for multiple workspaces.                 |
+| `--exclude-workspace <name>`                                       | Exclude result rows from a workspace. Repeat this option; exclusions take precedence.             |
+| `--depth <n>`                                                      | Maximum traversal depth (default: `3`).                                                           |
+| `--config <path>`                                                  | Config file path. Mutually exclusive with `--path`.                                               |
+| `--path <path>`                                                    | Repository root bootstrap path. Ignores any discovered config.                                    |
+| `--format text\|json\|toon`                                        | Output format.                                                                                    |
 
 `dependents` is the preferred name for blast-radius analysis: it reports code that
 depends on the target. `dependencies` reports code the target depends on. The legacy
 values `upstream` and `downstream` remain accepted aliases for compatibility.
 
 Text output renders file paths relative to `projectRoot`.
+
+Impact filters are applied by the Code Graph provider and its SQLite query path, before
+traversal aggregates (depth, counts, and risk) are calculated. The CLI only maps paths
+for display; it does not post-filter returned membership. `--type` controls which
+result categories are materialized. Required but unrequested result arrays remain
+present as empty arrays in structured output. `--kind` may be used when `--type` is
+omitted or includes `symbols`; it is rejected otherwise. Workspace names may be
+repeated, are trimmed and deduplicated, and an `--exclude-workspace` value wins when it
+also appears in `--workspace`.
 
 Examples:
 
@@ -1636,6 +1660,8 @@ specd graph impact --symbol "mergeSpecs" --direction both
 specd graph impact --symbol "packages/core/src/domain/entities/change.ts:method:invalidate" --direction dependents
 specd graph impact --file packages/core/src/model.ts --direction dependents
 specd graph impact --export createKernel --from packages/core/src/public.ts --direction dependents
+specd graph impact --symbol mergeSpecs --type files,symbols --kind function,method
+specd graph impact --symbol mergeSpecs --type files --workspace core --workspace cli --exclude-workspace cli
 ```
 
 ---

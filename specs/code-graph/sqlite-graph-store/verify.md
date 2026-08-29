@@ -193,6 +193,41 @@
 - **WHEN** a batch symbol query has no symbol ids or a relation query has no ids or relation types
 - **THEN** it returns an empty array without dispatching a worker RPC or executing SQL
 
+### Requirement: Query-time filtered impact reads
+
+#### Scenario: Category predicates prevent unrequested hydration
+
+- **GIVEN** one impact frontier has matching file, symbol, and spec rows
+- **WHEN** the query requests only `files` and `specs`
+- **THEN** SQLite does not execute or hydrate the symbol-result collection
+- **AND** the returned file and spec rows remain deterministically ordered
+
+#### Scenario: SQL applies kind and workspace predicates
+
+- **GIVEN** symbols of several kinds whose owning files span included and excluded workspaces
+- **WHEN** SQLite executes the filtered symbol frontier
+- **THEN** bound SQL parameters constrain symbol kind and owning workspace before materialization
+- **AND** a workspace present in both sets is excluded
+
+#### Scenario: Empty filters do not generate invalid SQL
+
+- **WHEN** normalized inclusion, exclusion, or kind lists are empty
+- **THEN** SQLite omits the corresponding `IN` or `NOT IN` clause
+- **AND** the query remains valid and preserves unfiltered compatibility
+
+#### Scenario: Worker transports the normalized request losslessly
+
+- **GIVEN** a typed filtered-impact payload containing all filter fields
+- **WHEN** `SQLiteGraphStore` sends it through the worker operation map
+- **THEN** the dispatcher invokes `SQLiteGraphDatabase` with the same values and ordering
+- **AND** the generic worker client's lifecycle, overload, and typed error behavior remain unchanged
+
+#### Scenario: Dynamic filter values are parameterized
+
+- **WHEN** workspace or kind values contain SQL metacharacters
+- **THEN** they are passed only as bound values
+- **AND** they cannot alter the generated statement structure
+
 ### Requirement: Worker-backed exact batch node lookups
 
 #### Scenario: Exact batch node lookup crosses the worker boundary once

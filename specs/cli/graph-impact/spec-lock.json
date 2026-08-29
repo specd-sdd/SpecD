@@ -13,22 +13,11 @@
   ],
   "implementation": [
     {
-      "file": "cli:src/commands/graph/impact.ts"
-    },
-    {
-      "file": "cli:src/commands/graph/resolve-impact-file-selectors.ts"
-    },
-    {
-      "file": "cli:src/commands/graph/search.ts"
+      "file": "cli:src/commands/graph/impact.ts",
+      "symbols": ["registerGraphImpact", "normalizeImpactResultFilter", "formatImpact"]
     },
     {
       "file": "cli:test/commands/graph-impact.spec.ts"
-    },
-    {
-      "file": "cli:test/commands/graph-search.spec.ts"
-    },
-    {
-      "file": "cli:test/commands/graph/resolve-impact-file-selectors.spec.ts"
     }
   ],
   "optimizations": {

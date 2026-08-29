@@ -18,20 +18,33 @@
   ],
   "implementation": [
     {
-      "file": "code-graph:test/composition/code-graph-provider.spec.ts",
-      "symbols": ["CodeGraphProvider"]
+      "file": "code-graph:src/domain/value-objects/impact-result.ts",
+      "symbols": [
+        "IMPACT_RESULT_TYPES",
+        "ImpactResultType",
+        "ImpactResultFilter",
+        "ImpactResult",
+        "SpecImpactResult"
+      ]
     },
     {
-      "file": "code-graph:test/barrel.spec.ts",
-      "symbols": ["@specd/code-graph barrel"]
+      "file": "code-graph:src/domain/value-objects/index.ts"
+    },
+    {
+      "file": "code-graph:src/public.ts"
+    },
+    {
+      "file": "code-graph:src/index.ts"
     },
     {
       "file": "code-graph:src/composition/code-graph-provider.ts",
       "symbols": ["CodeGraphProvider", "CodeGraphProviderImpl"]
     },
     {
-      "file": "code-graph:src/domain/errors/graph-storage-recovery-required-error.ts",
-      "symbols": ["GraphStorageRecoveryRequiredError"]
+      "file": "code-graph:test/composition/code-graph-provider.spec.ts"
+    },
+    {
+      "file": "code-graph:test/barrel.spec.ts"
     }
   ],
   "optimizations": {

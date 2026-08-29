@@ -13,6 +13,10 @@ import { makeMockSpecRepository } from '../helpers/make-mock-spec-repository.js'
 import { SQLiteWorkerClient } from '../../src/infrastructure/sqlite/sqlite-worker-client.js'
 import { createFileNode } from '../../src/domain/value-objects/file-node.js'
 import { createSymbolNode } from '../../src/domain/value-objects/symbol-node.js'
+import { createRelation } from '../../src/domain/value-objects/relation.js'
+import { RelationType } from '../../src/domain/value-objects/relation-type.js'
+import { createSpecNode } from '../../src/domain/value-objects/spec-node.js'
+import { type ImpactResultFilter } from '../../src/domain/value-objects/impact-result.js'
 import {
   createLogicalSymbol,
   createPublicBinding,
@@ -700,6 +704,182 @@ describe('CodeGraphProvider', () => {
       sendRequest.mockRestore()
       await provider.close()
     }
+  })
+
+  it('forwards one exact filter through every impact facade under one availability check', async () => {
+    tempDir = mkdtempSync(join(tmpdir(), 'specd-graph-provider-impact-filter-'))
+    const store = new InMemoryGraphStore()
+    const provider = createCodeGraphProvider({
+      storagePath: tempDir,
+      projectRoot: tempDir,
+      graphStoreFactories: { custom: { create: () => store } },
+      graphStoreId: 'custom',
+    })
+    await provider.open()
+
+    const target = createSymbolNode({
+      name: 'target',
+      kind: SymbolKind.Function,
+      filePath: 'fixture:src/target.ts',
+      line: 1,
+      column: 0,
+    })
+    const consumer = createSymbolNode({
+      name: 'consumer',
+      kind: SymbolKind.Function,
+      filePath: 'fixture:src/consumer.ts',
+      line: 1,
+      column: 0,
+    })
+    await store.upsertFile(
+      createFileNode({
+        path: target.filePath,
+        configRelativePath: 'src/target.ts',
+        language: 'typescript',
+        contentHash: 'target',
+        workspace: 'fixture',
+      }),
+      [target],
+      [],
+    )
+    await store.upsertFile(
+      createFileNode({
+        path: consumer.filePath,
+        configRelativePath: 'src/consumer.ts',
+        language: 'typescript',
+        contentHash: 'consumer',
+        workspace: 'fixture',
+      }),
+      [consumer],
+      [createRelation({ source: consumer.id, target: target.id, type: RelationType.Calls })],
+    )
+    await store.upsertSpec(
+      createSpecNode({
+        specId: 'fixture:target',
+        path: 'specs/target',
+        title: 'Target',
+        contentHash: 'target',
+        workspace: 'fixture',
+      }),
+      [
+        createRelation({
+          source: 'fixture:target',
+          target: 'fixture:dependent',
+          type: RelationType.DependsOn,
+        }),
+        createRelation({
+          source: 'fixture:target',
+          target: target.filePath,
+          type: RelationType.CoversFile,
+        }),
+      ],
+    )
+    await store.upsertSpec(
+      createSpecNode({
+        specId: 'fixture:dependent',
+        path: 'specs/dependent',
+        title: 'Dependent',
+        contentHash: 'dependent',
+        workspace: 'fixture',
+      }),
+      [],
+    )
+
+    const logical = createLogicalSymbol({
+      workspace: 'fixture',
+      surface: 'fixture:src/target.ts',
+      name: 'target',
+      space: SymbolSpace.Value,
+      ownerId: undefined,
+      memberForm: undefined,
+    })
+    const binding = createPublicBinding({
+      surface: logical.surface,
+      exportedName: logical.name,
+      space: logical.space,
+      targetId: logical.id,
+    })
+    const filter: ImpactResultFilter = {
+      types: ['files'],
+      kinds: [SymbolKind.Function],
+      workspaces: ['fixture'],
+      excludeWorkspaces: ['excluded'],
+    }
+    const frontier = vi.spyOn(store, 'queryImpactFrontier')
+    const generation = vi.spyOn(store, 'getStorageGeneration')
+    const assertDelegation = (): void => {
+      expect(generation).toHaveBeenCalledOnce()
+      expect(frontier).toHaveBeenCalled()
+      expect(frontier.mock.calls.every(([input]) => input.filter === filter)).toBe(true)
+      frontier.mockClear()
+      generation.mockClear()
+    }
+
+    await provider.analyzeImpact(target.id, 'upstream', 2, filter)
+    assertDelegation()
+    await provider.analyzePublicBindingImpact(
+      {
+        binding,
+        target: logical,
+        declarations: [
+          {
+            logicalId: logical.id,
+            symbolId: target.id,
+            location: {
+              filePath: target.filePath,
+              line: target.line,
+              column: target.column,
+              endLine: target.endLine,
+              endColumn: target.endColumn,
+            },
+            kind: target.kind,
+          },
+        ],
+        path: [],
+      },
+      'upstream',
+      2,
+      filter,
+    )
+    assertDelegation()
+    await provider.analyzeFileImpact(target.filePath, 'upstream', 2, filter)
+    assertDelegation()
+    await provider.analyzeFilesImpact([target.filePath], 'upstream', 2, filter)
+    assertDelegation()
+    await provider.analyzeSpecImpact('fixture:target', 'downstream', 2, filter)
+    assertDelegation()
+
+    const specFilter: ImpactResultFilter = { types: ['specs'] }
+    const symbolSpecs = await provider.analyzeImpact(target.id, 'upstream', 2, specFilter)
+    expect(symbolSpecs.affectedSpecs).toEqual(['fixture:target'])
+
+    const bindingSpecs = await provider.analyzePublicBindingImpact(
+      {
+        binding,
+        target: logical,
+        declarations: [
+          {
+            logicalId: logical.id,
+            symbolId: target.id,
+            location: {
+              filePath: target.filePath,
+              line: target.line,
+              column: target.column,
+              endLine: target.endLine,
+              endColumn: target.endColumn,
+            },
+            kind: target.kind,
+          },
+        ],
+        path: [],
+      },
+      'upstream',
+      2,
+      specFilter,
+    )
+    expect(bindingSpecs.canonicalImpact.affectedSpecs).toEqual(['fixture:target'])
+
+    await provider.close()
   })
 
   it('rejects empty selectors with the typed graph selector error', async () => {

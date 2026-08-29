@@ -20,6 +20,18 @@ The CLI SHALL normalize direction aliases before delegation and MUST NOT impleme
 
 For an unqualified `--symbol`, Code Graph SHALL select a unique case-exact name match when one exists. If several case-exact candidates exist it SHALL return a bounded deterministic ambiguity result and perform no traversal. Only when no case-exact candidate exists SHALL it consider case-insensitive exact-name candidates. Prefix, component, and textual matches MUST NOT be accepted as impact targets. Qualified and full occurrence selectors retain their existing exact semantics.
 
+### Requirement: Provider-owned impact result filters
+
+`specd graph impact` SHALL accept `--type <types>`, `--kind <kinds>`, repeatable `--workspace <workspace>`, and repeatable `--exclude-workspace <workspace>` options for every impact target family.
+
+`--type` and `--kind` SHALL accept comma-separated values. The supported result types SHALL be `files`, `symbols`, and `specs`; documents are not an impact-result category. `--kind` SHALL accept the shared Code Graph symbol-kind vocabulary and SHALL be a usage error when `--type` is present without `symbols`.
+
+Repeated `--workspace` values SHALL form an inclusion set and repeated `--exclude-workspace` values SHALL form an exclusion set with the same normalization and matching semantics as `graph search`. Exclusions SHALL take precedence when a workspace occurs in both sets.
+
+The CLI SHALL validate and normalize the options into one typed impact-filter request and pass that request through the existing provider operation for the selected target. The CLI MUST NOT remove files, symbols, specs, or symbol kinds from a returned impact result. Text, JSON, and TOON rendering SHALL consume the provider-filtered result while retaining pure display-path projection.
+
+`--type specs` SHALL be valid for symbol and public-binding targets and SHALL render the provider's `affectedSpecs` collection. The CLI MUST NOT treat specs as available only to file or spec targets.
+
 ### Requirement: File impact analysis
 
 Single-file and multi-file impact analyses resolve selectors via `cli:graph-cli-context`, open the provider through `withProvider`, and delegate all aggregation calculations (changed symbols, affected files/symbols, transitive counts, risk level aggregation) to the `CodeGraphProvider`.
@@ -170,7 +182,7 @@ merely because its input or result contains many distinct files or symbols.
 
 ### Requirement: Error cases
 
-Exactly one of `--file`, `--symbol`, or `--spec` must be provided. If none or more than one are passed, the command SHALL fail with a CLI error and exit code 1.
+Exactly one selector family (`--file`, `--symbol`, `--spec`, or `--export` with `--from`) must be provided. If none or more than one are passed, the command SHALL fail with a CLI error and exit code 1.
 
 If both `--config` and `--path` are passed, the command SHALL fail with a CLI error and exit code 1.
 

@@ -41,6 +41,8 @@ import {
   type UpdateIndexedInputObservationInput,
 } from '../../domain/value-objects/indexed-input-freshness.js'
 import {
+  type ImpactFrontierQuery,
+  type ImpactFrontierResult,
   type LocalBindingLookup,
   type LogicalDeclaration,
   type LogicalSymbolLookup,
@@ -536,6 +538,58 @@ export class SQLiteGraphDatabase {
     relationTypes: readonly RelationTypeValue[],
   ): Relation[] {
     return this.getSymbolRelationsBatch('source', symbolIds, relationTypes)
+  }
+
+  /**
+   * Selects one filtered, deterministic impact frontier entirely in SQLite.
+   *
+   * Each relation is admitted only when its neighboring endpoint belongs to
+   * the requested resource category and satisfies the optional kind and
+   * workspace constraints. Result types control hydration, not relation
+   * admission, so callers can still traverse and aggregate from the returned
+   * relation evidence without receiving unrequested resource rows.
+   *
+   * @param input - Current traversal frontier, orientation, and filters.
+   * @returns Admitted relations and only the requested hydrated resources.
+   */
+  queryImpactFrontier(input: ImpactFrontierQuery): ImpactFrontierResult {
+    const frontier = [...new Set(input.frontier)].sort()
+    const relationTypes = [...new Set(input.relationTypes)].sort()
+    if (frontier.length === 0 || relationTypes.length === 0) {
+      return { relations: [], symbols: [], files: [], specs: [] }
+    }
+
+    const relationRows = new Map<string, RelationRow>()
+    const neighborIds = new Set<string>()
+    const directions =
+      input.direction === 'both'
+        ? (['upstream', 'downstream'] as const)
+        : ([input.direction] as const)
+    for (const direction of directions) {
+      for (const row of this.queryImpactFrontierDirection(
+        input,
+        direction,
+        frontier,
+        relationTypes,
+      )) {
+        relationRows.set(`${row.source}\u0000${row.type}\u0000${row.target}`, row)
+        neighborIds.add(direction === 'upstream' ? row.source : row.target)
+      }
+    }
+
+    const relations = this.readRelations([...relationRows.values()]).sort(compareRelations)
+    const ids = [...neighborIds].sort()
+    const types = input.filter?.types
+    const materializes = (type: 'files' | 'symbols' | 'specs'): boolean =>
+      types === undefined || types.length === 0 || types.includes(type)
+
+    return {
+      relations,
+      symbols:
+        input.resource === 'symbol' && materializes('symbols') ? this.getSymbolsByIds(ids) : [],
+      files: input.resource === 'file' && materializes('files') ? this.getFilesByPaths(ids) : [],
+      specs: input.resource === 'spec' && materializes('specs') ? this.getSpecsByIds(ids) : [],
+    }
   }
 
   /**
@@ -2886,6 +2940,89 @@ export class SQLiteGraphDatabase {
   }
 
   /**
+   * Reads one oriented, resource-filtered set of impact relations.
+   *
+   * SQL identifiers below are selected exclusively from the closed resource and
+   * direction unions. Every value derived from the request is supplied through
+   * a bound parameter.
+   *
+   * @param input - Full frontier request.
+   * @param direction - One concrete relation orientation.
+   * @param frontier - Canonical, non-empty frontier identifiers.
+   * @param relationTypes - Canonical, non-empty relation types.
+   * @returns Rows admitted by the resource and filter predicates.
+   * @throws {RangeError} If fixed filter values exhaust SQLite's parameter budget.
+   */
+  private queryImpactFrontierDirection(
+    input: ImpactFrontierQuery,
+    direction: 'upstream' | 'downstream',
+    frontier: readonly string[],
+    relationTypes: readonly RelationTypeValue[],
+  ): RelationRow[] {
+    const endpoint = direction === 'upstream' ? 'r.source' : 'r.target'
+    const frontierEndpoint = direction === 'upstream' ? 'r.target' : 'r.source'
+    const joins: string[] = []
+    const conditions: string[] = []
+    const filterParams: unknown[] = []
+    const filter = input.filter
+
+    let workspaceColumn: string
+    if (input.resource === 'symbol') {
+      joins.push(`JOIN symbols n ON n.id = ${endpoint}`, 'JOIN files f ON f.path = n.file_path')
+      workspaceColumn = 'f.workspace'
+      const kinds = [...new Set(filter?.kinds ?? [])].sort()
+      if (kinds.length > 0) {
+        conditions.push(`n.kind IN (${kinds.map(() => '?').join(', ')})`)
+        filterParams.push(...kinds)
+      }
+    } else if (input.resource === 'file') {
+      joins.push(`JOIN files n ON n.path = ${endpoint}`)
+      workspaceColumn = 'n.workspace'
+    } else {
+      joins.push(`JOIN specs n ON n.spec_id = ${endpoint}`)
+      workspaceColumn = 'n.workspace'
+    }
+
+    const includedWorkspaces = [...new Set(filter?.workspaces ?? [])].sort()
+    if (includedWorkspaces.length > 0) {
+      conditions.push(`${workspaceColumn} IN (${includedWorkspaces.map(() => '?').join(', ')})`)
+      filterParams.push(...includedWorkspaces)
+    }
+    const excludedWorkspaces = [...new Set(filter?.excludeWorkspaces ?? [])].sort()
+    if (excludedWorkspaces.length > 0) {
+      conditions.push(`${workspaceColumn} NOT IN (${excludedWorkspaces.map(() => '?').join(', ')})`)
+      filterParams.push(...excludedWorkspaces)
+    }
+
+    const fixedParameterCount = relationTypes.length + filterParams.length
+    const frontierChunkSize = SQLITE_BATCH_PARAMETER_LIMIT - fixedParameterCount
+    if (frontierChunkSize < 1) {
+      throw new RangeError('impact frontier filters exceed the SQLite batch parameter limit')
+    }
+
+    const rows: RelationRow[] = []
+    const relationTypePlaceholders = relationTypes.map(() => '?').join(', ')
+    for (const frontierChunk of chunksOf(frontier, frontierChunkSize)) {
+      const frontierPlaceholders = frontierChunk.map(() => '?').join(', ')
+      const predicateSql = [
+        `${frontierEndpoint} IN (${frontierPlaceholders})`,
+        `r.type IN (${relationTypePlaceholders})`,
+        ...conditions,
+      ].join(' AND ')
+      rows.push(
+        ...(this.statement(
+          `SELECT r.source, r.target, r.type, r.metadata_json
+           FROM relations r
+           ${joins.join('\n')}
+           WHERE ${predicateSql}
+           ORDER BY r.source, r.type, r.target`,
+        ).all(...frontierChunk, ...relationTypes, ...filterParams) as RelationRow[]),
+      )
+    }
+    return rows
+  }
+
+  /**
    * Retrieves relations by source.
    *
    * @param type - Type parameter.
@@ -4168,7 +4305,10 @@ function relationEndpointsExist(relation: Relation, ids: RelationEndpointIds): b
     case RelationType.CoversFile:
       return ids.specs.has(relation.source) && ids.files.has(relation.target)
     case RelationType.CoversSymbol:
-      return ids.specs.has(relation.source) && ids.logicalSymbols.has(relation.target)
+      return (
+        ids.specs.has(relation.source) &&
+        (ids.symbols.has(relation.target) || ids.logicalSymbols.has(relation.target))
+      )
     default:
       return false
   }

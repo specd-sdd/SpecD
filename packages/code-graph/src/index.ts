@@ -152,6 +152,9 @@ export { InMemoryIndexSession } from './application/use-cases/in-memory-index-se
 export { type TraversalOptions } from './domain/value-objects/traversal-options.js'
 export { type TraversalResult } from './domain/value-objects/traversal-result.js'
 export {
+  IMPACT_RESULT_TYPES,
+  type ImpactResultType,
+  type ImpactResultFilter,
   type CoveringSpecEvidence,
   type CoveringSpecImpact,
   type ImpactResult,
