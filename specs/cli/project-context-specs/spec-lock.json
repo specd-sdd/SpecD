@@ -1,0 +1,23 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["core:resolve-context-specs", "cli:host-context", "cli:project-context"],
+  "implementation": [
+    {
+      "file": "cli:src/commands/project/context-specs.ts",
+      "symbols": ["registerProjectContextSpecs", "formatContextSpecsText"]
+    },
+    {
+      "file": "cli:test/commands/helpers.ts",
+      "symbols": ["makeMockKernel"]
+    },
+    {
+      "file": "cli:test/commands/project-context-specs.spec.ts"
+    },
+    {
+      "file": "cli:src/index.ts"
+    }
+  ]
+}

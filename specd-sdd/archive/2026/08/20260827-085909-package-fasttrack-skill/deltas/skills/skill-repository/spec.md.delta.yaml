@@ -1,0 +1,12 @@
+- op: added
+  description: 'Require repository discovery of the fast-track template'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    ### Requirement: Fast-track skill discovery
+
+    The skill repository MUST discover `specd-fasttrack` as a standard skill from its template directory and expose its metadata, local `SKILL.md` output, and declared shared files through the same list, get, and bundle contracts used by other standard workflow skills.
+
+    Discovery MUST NOT require a local `.agents/skills` source file, a hard-coded skill-name registry, or a plugin-specific distribution path.

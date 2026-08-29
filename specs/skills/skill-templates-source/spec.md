@@ -165,6 +165,33 @@ Archive-oriented templates MAY use `specs metadata` to inspect `source`, `regene
 
 Template contract tests MUST assert the exact commands and output fields required by these roles, not only the presence of command-group or configuration keywords.
 
+### Requirement: Fast-track workflow template
+
+`templates/skills/` MUST contain a `specd-fasttrack/` standard-skill directory with `SKILL.md.tpl` and `skill.meta.json`.
+
+The metadata MUST declare `kind: "skill"`, declare `shared.md` in `requiredSharedTemplates`, and declare every capability referenced by the template. The template MUST contain no static frontmatter and MUST reference shared context as `@{{sharedFolder}}/shared.md`.
+
+The template MUST provide literal Markdown scaffolding for `<changePath>/.specd-exploration.md` in Step 2 and `<changePath>/.specd-exploration.md` Consolidation in Step 5.
+
+The template MUST include an explicit critical rule instructing agents to copy the `> **MANDATORY DIRECTIVES FOR \`/specd-design\`\*\*:`block into the header of`.specd-exploration.md\` VERBATIM (EXACTLY AS-IS), preserving all numbered directives.
+
+The rendered fast-track workflow MUST require:
+
+- `.specd-exploration.md` to be updated immediately after every meaningful decision, scope or contract finding, source edit, implementation-link update, test or debug action, and audit result.
+- Tracked implementation links (`specd changes implementation add`) to be updated continuously as the primary authority of modified code scope.
+- Directives for `/specd-design` to mandate evaluating codebase-wide adoption (`specd graph search`, grep) to eliminate duplicate logic, transferring tasks from completed work directly as marked completed (`- [x]`) without starting from scratch, and running downstream regression searches.
+- Explicit stop gates with interactive confirmation questions in Step 2 and Step 6, forbidding autonomous execution of `/specd-design`.
+
+A final consolidation MUST summarize, not replace, incremental journal entries so an interrupted session can be resumed without reconstructing state from memory or a partial diff.
+
+### Requirement: Fast-track governing context and activation
+
+The fast-track workflow template MUST run `specd graph impact --file <workspace:path> --direction dependents --format toon` before modifying or investigating a target file and MUST inspect `coveringSpecs` as the evidence-backed set of governing specs. The template MUST handle an empty `coveringSpecs` result without assuming that workspace membership alone makes a spec applicable.
+
+The template MUST use `specd project context-specs` to discover configured project and workspace candidates, MUST load applicable covering and configured candidates through `specd specs context`, and MUST NOT instruct use of `specd specs show` or `specs resolve-path` for this discovery.
+
+The template MUST declare that fast-track is manual-only: it MUST be used only when the user explicitly invokes `/specd-fasttrack`, and MUST NOT be selected or invoked for normal specd work.
+
 ## Constraints
 
 - Templates in the skills package MUST NOT contain static frontmatter YAML blocks.

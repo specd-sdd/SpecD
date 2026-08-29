@@ -70,3 +70,13 @@
 
 - **WHEN** shared template discovery is reviewed
 - **THEN** it does not depend on a shared-side inverse consumer index to determine which skills consume a shared template
+
+### Requirement: Fast-track skill discovery
+
+#### Scenario: Repository discovers fast-track from template metadata
+
+- **GIVEN** `templates/skills/specd-fasttrack/` contains valid template metadata
+- **WHEN** the repository lists or gets standard skills
+- **THEN** `specd-fasttrack` is returned as a standard skill
+- **AND** resolving its bundle emits its local skill file and declared shared file
+- **AND** no `.agents/skills` source or hard-coded registry entry is required

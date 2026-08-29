@@ -1,0 +1,69 @@
+- op: modified
+  description: 'Add shared-helper scenarios under Context spec collection'
+  selector:
+    type: section
+    matches: 'Requirement: Context spec collection'
+  content: |
+    #### Scenario: includeChangeSpecs false skips direct change spec seed
+
+    - **GIVEN** a change with `specIds: ["core:config"]`
+    - **AND** `core:config` is not matched by include patterns and not discovered via traversal
+    - **WHEN** `CompileContext.execute` is called with `includeChangeSpecs: false`
+    - **THEN** `core:config` is not included solely because it is in `change.specIds`
+
+    #### Scenario: includeChangeSpecs true keeps direct change spec even if excluded
+
+    - **GIVEN** a change with `specIds: ["core:config"]`
+    - **AND** an exclude pattern matches `core:config`
+    - **WHEN** `CompileContext.execute` is called with `includeChangeSpecs: true`
+    - **THEN** `core:config` remains in the collected set as a mandatory direct seed
+
+    #### Scenario: includeChangeSpecs false allows reinjection through include patterns
+
+    - **GIVEN** a change with `specIds: ["core:config"]`
+    - **AND** project include patterns match `core:config`
+    - **WHEN** `CompileContext.execute` is called with `includeChangeSpecs: false`
+    - **THEN** `core:config` is still included through include-pattern collection
+
+    #### Scenario: includeChangeSpecs false allows reinjection through traversal
+
+    - **GIVEN** a change with `specIds: ["core:config"]`
+    - **AND** another spec in traversal depends on `core:config`
+    - **WHEN** `CompileContext.execute` is called with `includeChangeSpecs: false` and `followDeps: true`
+    - **THEN** `core:config` is included through `dependsOn` traversal
+
+    #### Scenario: Manifest-declared deps traverse for non-persisted change specs
+
+    - **GIVEN** `change.specIds` includes `core:new-facade`, which is not persisted
+    - **AND** the change manifest declares `specDependsOn["core:new-facade"] = ["core:existing"]`
+    - **WHEN** `CompileContext.execute` runs with `followDeps: true`
+    - **THEN** `core:existing` is discovered and included through traversal
+    - **AND** no `missing-metadata` warning is emitted for `core:new-facade`
+
+    #### Scenario: Traversal discoveries that resolve nowhere are skipped silently
+
+    - **GIVEN** a persisted spec's dependency graph references `ws:ghost`, which exists neither in any repository nor in the change
+    - **WHEN** traversal reaches `ws:ghost` with `followDeps: true`
+    - **THEN** `ws:ghost` is not registered into the collected set
+    - **AND** no warning is emitted during traversal registration
+
+    #### Scenario: Steps 1–4 use shared configured-context helper
+
+    - **WHEN** `CompileContext` applies project and active-workspace include/exclude patterns
+    - **THEN** it invokes `resolveConfiguredContextSpecs` for those steps
+    - **AND** does not inline a separate project/workspace glob loop for steps 1–4
+
+    #### Scenario: Optimized project context still runs workspace patterns via helper
+
+    - **GIVEN** optimized project context is preferred for the call
+    - **AND** an active workspace declares include patterns
+    - **WHEN** `CompileContext.execute` runs
+    - **THEN** the helper is invoked with empty project include/exclude arrays
+    - **AND** workspace-level matches from active workspaces are still collected
+
+    #### Scenario: Protected change seeds survive helper excludes
+
+    - **GIVEN** `includeChangeSpecs: true` seeded `core:config` as protected
+    - **AND** a project or workspace exclude pattern matches `core:config`
+    - **WHEN** the shared helper runs exclude callbacks owned by `CompileContext`
+    - **THEN** `core:config` remains in the collected set

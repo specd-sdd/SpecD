@@ -1,18 +1,12 @@
-<!-- AI guidance: analyse what needs to change and how. Identify affected files, symbols,
-     and modules. Document the implementation approach so tasks can be derived from it
-     without ambiguity. Be concrete — specify file paths, class names, method signatures.
-     Reference spec requirements — do not repeat them.
-     Always write this artifact, even for non-code changes.
-
-     Adapt the depth to the change:
-     - Code changes: analyse the codebase — identify affected symbols, layers, and
-       modules. Define new constructs with full signatures. Analyse symbol-level impact
-       (callers, dependents, risk) and spec-level ripple effects before writing.
-     - Non-code changes (documentation, configuration): focus on which files are
-       affected, what content changes, and how it relates to existing material.
-
-     Omit sections that genuinely do not apply (e.g. Trade-offs for a typo fix), but
-     Affected areas, Approach, and New constructs (when applicable) are always required. -->
+<!-- AI guidance: this artifact is the authoritative implementation contract and single
+     source of truth for implementation. It must be fully self-contained, self-sufficient,
+     and independently consumable.
+     Do NOT use vague descriptions, TODOs, placeholders, or indirect references (like
+     "as specified in spec" or "see previous artifact"). Materialize and restate all
+     required technical information directly.
+     A developer or agent reading ONLY this document must be able to implement the complete
+     solution without guessing signatures, data shapes, error handling, or algorithms.
+     Always write this artifact, even for non-code changes. -->
 
 # Design: {{change.name}}
 
@@ -25,102 +19,117 @@
 ## Affected areas
 
 <!-- List every EXISTING file, module, symbol, document, or resource that will be
-     modified or removed. Use the codebase and tooling to discover these — do not
-     guess. This analysis is how you find additional files that must be touched
-     beyond the initially obvious target. For each area, explain what changes and why.
+     modified or removed. Rigorously use SpecD tools (impact & blast-radius analysis,
+     code/symbol search, hotspots inspection) to discover all affected targets so nothing
+     is missed or left untracked — do not guess or rely on manual assumptions.
 
-     For code changes, go beyond file-level analysis. Identify specific symbols
-     (functions, classes, types, interfaces) being modified and assess their impact:
-     - **Callers / dependents**: how many direct and transitive callers does each
-       symbol have? Which files import it?
-     - **Risk level**: symbols with many cross-workspace callers are high-risk.
-       Flag symbols that are critical integration points.
-     - **Hotspots**: symbols with high fan-in that require careful change management.
+     For each existing area, provide exact technical details:
+     - **File path**: full path from workspace root.
+     - **Symbol / construct**: function, class, interface, method, or export modified.
+     - **Changes**: exact modification (arguments added/removed, return type changes,
+       internal logic updates, behavioral changes). Include before/after signatures.
+     - **Impact & Risk**: callers, importers, dependents, risk level, and backwards-compatibility
+       handling.
 
-     Format each entry with the symbol, its location, what changes, and its impact
-     assessment. Example:
+     Example:
        - `resolveConfig()` in `packages/core/src/application/resolve-config.ts`
-         Change: add optional `overrides` parameter
-         Callers: 12 direct (8 same-workspace, 4 cross-workspace) · Risk: HIGH
-         Note: CLI and MCP both call this — signature change must be backwards-compatible -->
+         - Signature change:
+           ```ts
+           // Before:
+           function resolveConfig(path: string): Promise<Config>;
+           // After:
+           function resolveConfig(path: string, options?: ResolveOptions): Promise<Config>;
+           ```
+         - Behavioral change: when `options.overrides` is provided, merges overrides into loaded config before schema resolution.
+         - Callers & Risk: 12 direct callers (8 same-workspace, 4 cross-workspace) · Risk: HIGH.
+         - Backwards compatibility: `options` is optional; existing call sites remain functional without changes. -->
 
 ## New constructs
 
-<!-- List every new file, class, interface, value object, factory, service, function,
-     or type that will be created. For each one, specify:
-     - **Location**: full file path where it will live.
-     - **Shape**: interface signatures, constructor parameters, method signatures,
-       key properties, and return types. Use TypeScript notation. This is the
-       contract — implementers should not need to invent signatures.
-     - **Responsibility**: one sentence on what it does and what it does not do.
-     - **Relationships**: what it depends on, what depends on it, and where it fits
-       in the dependency graph (layer, module, injection point).
+<!-- List every NEW file, class, interface, type, function, service, or value object
+     to create. Provide complete, compilable TypeScript / language definitions — do not
+     leave signatures or fields to be invented during implementation.
 
-     Delete this section only when the change creates no new symbols. -->
+     For each construct specify:
+     - **Location**: full file path.
+     - **Complete Type / Signature**: full interface, type alias, or function signature
+       with all properties, parameters, optionality, and return types.
+     - **Responsibility & Invariants**: exact business rules and invariants enforced.
+     - **Wiring & Dependencies**: where it is instantiated, injected, or called.
 
-## Approach
+     Example:
+       ```ts
+       // packages/core/src/domain/entities/impact-report.ts
+       export interface ImpactTarget {
+         readonly file: string;
+         readonly symbol?: string;
+         readonly riskLevel: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+       }
 
-<!-- The chosen strategy and why. How do the pieces fit together? What is the order
-     of operations? Reference spec requirements to ensure full coverage — any
-     requirement without a clear path to implementation should be flagged. -->
+       export interface ImpactReport {
+         readonly targets: readonly ImpactTarget[];
+         readonly totalAffectedFiles: number;
+         readonly hasCrossWorkspaceImpact: boolean;
+       }
+       ``` -->
+
+## Data models & Contracts
+
+<!-- Explicit data schemas, input/output interfaces, payload contracts, state structures,
+     or configuration formats involved in this change.
+     Define field names, exact types, validation constraints, default values, and optionality.
+     Delete this section only if no data structures or contracts are created or modified. -->
+
+## Approach & Execution flow
+
+<!-- Concrete, step-by-step algorithmic flow and architecture strategy:
+     - Sequence of operations: step 1, step 2, step 3 from invocation to return.
+     - State transitions and lifecycle mutations.
+     - Data transformations: how inputs are parsed, converted, and returned.
+     - Control flow, branching logic, and condition checks.
+     Be explicit and granular: the implementer should follow this flow directly
+     without needing to design the algorithm on the fly. -->
+
+## Error handling & Edge cases
+
+<!-- Explicitly specify all failure modes, validation errors, and edge cases:
+     - Exact error classes, error codes, and message formats.
+     - Validation failure behaviors (e.g. return failure result vs throw exception).
+     - Edge cases: empty collections, missing files, concurrency collisions, undefined inputs,
+       stale data, boundary values.
+     - Recovery / fallback strategies for each failure mode. -->
 
 ## Key decisions
 
-<!-- Each significant technical choice with its rationale. For each decision, state
-     what alternatives were considered and why they were rejected.
-     Format: **Decision** → rationale. **Alternatives rejected** → why. -->
+<!-- Significant technical choices with their rationale:
+     - **Decision**: what was chosen and why.
+     - **Alternatives rejected**: other approaches considered and specific reasons they were ruled out. -->
 
 ## Trade-offs
 
-<!-- Known limitations or things that could go wrong, with mitigations.
-     Format: [Risk] → Mitigation.
-     Omit this section if genuinely not applicable. -->
+<!-- Known limitations, compromises, or operational risks with mitigations.
+     Format: [Risk / Limitation] → Mitigation.
+     Omit only if genuinely not applicable. -->
 
 ## Spec impact
 
 <!-- When this change modifies existing specs, analyse the ripple effect on other
-     specs that depend on them. For each modified spec:
-     - List specs that declare a dependency on it (direct dependents)
-     - Identify transitive dependents — specs that depend on the direct dependents
-     - For each dependent, assess whether its requirements are still satisfied or
-       need updating. Flag any requirement in a dependent spec that references
-       concepts, types, or behaviours being changed.
-     - If this reveals additional specs that need requirement changes, they must be
-       added to the change scope and handled with their own delta or artifact files;
-       do not leave them as untracked ripple effects.
-
-     This section prevents silent breakage: modifying a spec without understanding
-     its dependents can invalidate downstream requirements. If no existing specs
-     are modified, delete this section.
-
-     Example:
-       ### `core:change-manifest`
-       - Direct dependents: `core:change-layout`, `core:change`
-       - Transitive: `core:change` → `core:schema-format`
-       - `core:change-layout` Req "Manifest location" references manifest field names
-         → needs delta if fields are renamed
-       - `core:change` Req "Event sourcing" reads manifest → unaffected (reads only
-         state, not the fields being changed) -->
+     specs that depend on them using SpecD tools (such as spec impact analysis and dependency tracing):
+     - Direct dependents: specs that declare a dependency on the modified specs.
+     - Transitive dependents: specs that depend on the direct dependents.
+     - Requirement assessment: whether dependent specs' requirements remain valid or
+       require updates.
+     - If updates are needed, ensure the affected specs are added to the change scope.
+     Delete this section if no existing specs are modified. -->
 
 ## Dependency map
 
-<!-- Visualise the key relationships this change touches. Provide BOTH representations
-     so the map is useful regardless of rendering support:
+<!-- Visualise the key relationships touched by this change:
+     1. Mermaid diagram (rendered markdown)
+     2. ASCII box diagram (raw text readers)
 
-     1. A mermaid diagram for rendered markdown viewers
-     2. An ASCII box diagram for raw markdown readers. Use boxes (┌─┐│└─┘),
-        arrows (───▶, ◀───, ─ ─ ▶), and connectors to draw a real visual diagram,
-        not just an indented tree. It should read as a diagram, not a list.
-
-     Focus on what matters for THIS change. Do not map the entire codebase. Show:
-     - Symbols being changed and their callers/dependents
-     - Specs being modified and their dependent specs
-     - Cross-workspace boundaries when relevant
-
-     Keep it focused: 5~15 nodes is usually enough. A diagram with 30 nodes helps
-     no one. Delete this section for trivial changes.
-
-     Replace the examples below with the actual diagrams for this change. -->
+     Show affected symbols, calling modules, modified specs, and cross-workspace edges.
+     Delete this section for trivial changes. -->
 
 ```mermaid
 graph LR
@@ -132,53 +141,38 @@ graph LR
 ```
 ┌─────────────┐       ┌───────────┐
 │ cli:run     │◀──────│ resolve   │
-└─────────────┘       │ Config()  │
-┌─────────────┐       │           │
-│ mcp:handler │◀──────│  [HIGH]   │
+│             │       │ Config()  │
+│             │       │  [HIGH]   │
 └─────────────┘       └─────┬─────┘
                             │
                             ▼
                       ┌─────────────┐
                       │ loadWork    │
                       │ space()     │
-                      └─────┬───────┘
-                            │
-                            ▼
-                      ┌──────────────┐
-                      │ validate     │
-                      │ Schema()     │
-                      └──────────────┘
-
-┌──────────┐  depends on  ┌──────────┐
-│ specX    │─ ─ ─ ─ ─ ─ ─▶│ specY    │
-└──────────┘              └──────────┘
+                      └─────────────┘
 ```
 
 ## Migration / Rollback
 
-<!-- Steps to deploy and roll back safely. Include this section when the change
-     affects runtime state, APIs, data models, or external dependencies.
-     Delete this section for purely additive internal changes. -->
+<!-- Steps to deploy, migrate state/data, and roll back safely.
+     Include when changing runtime state, APIs, schemas, storage, or external dependencies.
+     Delete for purely additive, non-breaking internal changes. -->
 
 ## Testing
 
-<!-- Plan how the implementation will be verified. Two layers:
+<!-- Plan how the implementation will be verified:
 
-     **Automated tests** (when a test suite exists):
-     List every new test file or describe block to create. Each scenario in verify.md
-     must map to at least one test. Beyond verify coverage, add tests for edge cases,
-     error paths, and anything that could reasonably break. Specify file paths and
-     describe what each test asserts.
+     **Automated tests**:
+     - Unit tests: specific files, describe blocks, mocked dependencies, and assertions.
+     - Integration tests: temporary filesystem, real adapter wiring, expected outputs.
+     - Edge-case tests: error conditions, boundary inputs, malformed data.
 
-     **Manual / E2E verification** (always):
-     Describe the manual steps to confirm the change works end-to-end in a real
-     environment. Even when automated tests exist, manual verification catches
-     integration issues that unit tests miss. Include the commands to run, the
-     expected output, and how to tell if something is wrong.
-
-     Also note which linting rules or documentation sources apply, and flag gaps. -->
+     **Manual / E2E verification**:
+     - Step-by-step commands to run in a real environment.
+     - Expected outputs and assertions.
+     - Failure indicators to watch for. -->
 
 ## Open questions
 
-<!-- Outstanding unknowns to resolve during implementation.
-     Delete this section if there are none. -->
+<!-- Outstanding unknowns to resolve before or during implementation.
+     Delete this section if all questions have been resolved. -->

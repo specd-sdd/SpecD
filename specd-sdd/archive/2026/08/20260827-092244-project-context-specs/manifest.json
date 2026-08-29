@@ -1,0 +1,1001 @@
+{
+  "name": "project-context-specs",
+  "createdAt": "2026-08-27T09:22:44.197Z",
+  "updatedAt": "2026-08-27T13:02:37.236Z",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "core:resolve-context-specs",
+    "cli:project-context-specs",
+    "core:compile-context",
+    "core:get-project-context"
+  ],
+  "specDependsOn": {
+    "core:resolve-context-specs": [
+      "core:list-workspaces",
+      "core:config",
+      "default:_global/error-handling-conventions"
+    ],
+    "cli:project-context-specs": [
+      "core:resolve-context-specs",
+      "cli:host-context",
+      "cli:project-context"
+    ],
+    "core:compile-context": [
+      "core:change",
+      "core:config",
+      "core:spec-metadata",
+      "core:schema-format",
+      "core:delta-format",
+      "core:selector-model",
+      "core:spec-id-format",
+      "core:workspace",
+      "core:get-artifact-instruction",
+      "core:get-hook-instructions",
+      "core:preview-spec",
+      "core:refresh-implementation-tracking",
+      "core:composition-resolver",
+      "core:project-metadata",
+      "core:spec-optimization",
+      "core:get-spec-metadata",
+      "core:content-extraction",
+      "core:resolve-context-specs"
+    ],
+    "core:get-project-context": [
+      "core:config",
+      "core:compile-context",
+      "core:spec-metadata",
+      "core:schema-format",
+      "default:_global/architecture",
+      "core:composition-resolver",
+      "core:project-metadata",
+      "core:spec-optimization",
+      "core:get-spec-metadata",
+      "core:resolve-context-specs"
+    ]
+  },
+  "invalidationPolicy": "downstream",
+  "implementationTrackingStartedAt": "2026-08-27T09:22:44.704Z",
+  "trackedImplementationFiles": [
+    {
+      "file": "specs/cli/spec-optimizations/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/change/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/spec-lock/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/update-persisted-spec-optimizations/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/plugins-manager/agent-plugin-type/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/plugins-manager/specd-plugin-type/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/skills/agent-instruction-template/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/skills/agents/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/skills/skill-bundle/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/skills/skill-repository-port/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/skills/workflow-automation/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/_shared/resolve-configured-context-specs.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/compile-context.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/resolve-context-specs.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/orchestration/resolve-project-context-specs.ts",
+      "state": "removed"
+    },
+    {
+      "file": "packages/cli/src/commands/project/context-specs.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/resolve-context-specs.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/kernel.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/public.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/core-reexports.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/sdk/src/index.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/sdk/src/orchestration/index.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/cli/cli-reference.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/cli/project-context-specs.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/core/use-cases.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/sdk/index.md",
+      "state": "ignored"
+    },
+    {
+      "file": "docs/guide/_sections/getting-started/context-compilation.md",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/resolve-context-specs.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/cli/project-context/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/schema-format/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/get-project-context.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/get-project-context.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/configured-context-parity.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/barrel-kernel-coverage.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/helpers.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/project-context-specs.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/resolve-configured-context-specs.spec.ts",
+      "state": "resolved"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "core:compile-context",
+      "file": "packages/core/src/application/use-cases/_shared/resolve-configured-context-specs.ts",
+      "fileLinkExplicit": false,
+      "symbols": [
+        "resolveConfiguredContextSpecs",
+        "ConfiguredContextSpecCollector",
+        "ResolveConfiguredContextSpecsInput",
+        "ConfiguredContextSpecSource",
+        "ConfiguredContextSpecOperationListener"
+      ]
+    },
+    {
+      "specId": "core:compile-context",
+      "file": "packages/core/src/application/use-cases/compile-context.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["CompileContext"]
+    },
+    {
+      "specId": "core:compile-context",
+      "file": "packages/core/src/application/use-cases/resolve-context-specs.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["ResolveContextSpecs", "ResolveContextSpecsInput", "ResolveContextSpecsResult"]
+    },
+    {
+      "specId": "core:compile-context",
+      "file": "packages/core/src/composition/use-cases/resolve-context-specs.ts",
+      "fileLinkExplicit": false,
+      "symbols": [
+        "createResolveContextSpecs",
+        "resolveResolveContextSpecsDeps",
+        "ResolveContextSpecsDeps"
+      ]
+    },
+    {
+      "specId": "core:compile-context",
+      "file": "packages/core/src/composition/kernel.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["createKernel", "resolveContextSpecs"]
+    },
+    {
+      "specId": "core:compile-context",
+      "file": "packages/core/test/application/use-cases/resolve-context-specs.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:project-context-specs",
+      "file": "packages/cli/src/commands/project/context-specs.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["registerProjectContextSpecs", "formatContextSpecsText"]
+    },
+    {
+      "specId": "core:resolve-context-specs",
+      "file": "packages/core/src/application/use-cases/resolve-context-specs.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["ResolveContextSpecs", "ResolveContextSpecsInput", "ResolveContextSpecsResult"]
+    },
+    {
+      "specId": "core:resolve-context-specs",
+      "file": "packages/core/src/composition/use-cases/resolve-context-specs.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["createResolveContextSpecs"]
+    },
+    {
+      "specId": "core:get-project-context",
+      "file": "packages/core/src/application/use-cases/get-project-context.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["GetProjectContext"]
+    },
+    {
+      "specId": "core:get-project-context",
+      "file": "packages/core/test/application/use-cases/get-project-context.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:resolve-context-specs",
+      "file": "packages/core/test/application/use-cases/resolve-context-specs.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:resolve-context-specs",
+      "file": "packages/core/test/application/use-cases/configured-context-parity.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:compile-context",
+      "file": "packages/core/test/application/use-cases/configured-context-parity.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:resolve-context-specs",
+      "file": "packages/core/test/barrel-kernel-coverage.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:project-context-specs",
+      "file": "packages/cli/test/commands/helpers.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["makeMockKernel"]
+    },
+    {
+      "specId": "cli:project-context-specs",
+      "file": "packages/cli/test/commands/project-context-specs.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:resolve-context-specs",
+      "file": "packages/core/test/application/use-cases/resolve-configured-context-specs.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:resolve-context-specs",
+      "file": "packages/core/src/application/use-cases/_shared/resolve-configured-context-specs.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["resolveConfiguredContextSpecs"]
+    },
+    {
+      "specId": "core:resolve-context-specs",
+      "file": "packages/core/src/application/use-cases/index.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:resolve-context-specs",
+      "file": "packages/core/src/composition/use-cases/index.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:resolve-context-specs",
+      "file": "packages/core/src/public.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:project-context-specs",
+      "file": "packages/cli/src/index.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "core:get-project-context",
+      "file": "packages/core/src/application/use-cases/_shared/resolve-configured-context-specs.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["resolveConfiguredContextSpecs"]
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:296b9aab189fb1650a6493825310161286397c0c08d321e2ae9fa688a63c35ca"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:resolve-context-specs",
+          "filename": "specs/core/resolve-context-specs/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:714d2a0ffb6e6640a2bed9fe1d2f6c15b93491e1ad708477e1df07f45438aa93"
+        },
+        {
+          "key": "cli:project-context-specs",
+          "filename": "specs/cli/project-context-specs/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:281cb40bfb77630afe62c5fabb897db1f2344641b27e7b7e83f8e98bd64fe54c"
+        },
+        {
+          "key": "core:compile-context",
+          "filename": "deltas/core/compile-context/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:a8e3399d04d453abc8110637bc5fcc0b76a7bfeaa9d551f02ad805e7e6c43f4b"
+        },
+        {
+          "key": "core:get-project-context",
+          "filename": "deltas/core/get-project-context/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:363be2ba029615956b1788367b0ed5f0cd1217e987773cd7820212f888e14c8f"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:resolve-context-specs",
+          "filename": "specs/core/resolve-context-specs/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:1c6eb1f8e91ac4ca21b6ea38405316e38fcb393443d6927453fa1d1aee482264"
+        },
+        {
+          "key": "cli:project-context-specs",
+          "filename": "specs/cli/project-context-specs/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:998b3405e7eb97fb18037c550ca2d8bc1ebc781bb293f3b17d1cea1ed2068b99"
+        },
+        {
+          "key": "core:compile-context",
+          "filename": "deltas/core/compile-context/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:478481d7ceecb6b44b2f1231afbec9e587c6d3cdd68faf54406c87398f2f4232"
+        },
+        {
+          "key": "core:get-project-context",
+          "filename": "deltas/core/get-project-context/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:ce606b8e75ff2ac56fb79028470dabfb13bb6c43aed28a49cb55854b8455fe7c"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:c9c845ef896f98657140e29b6b4bd2c15b5d109a324c5790fc5986f421780416"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:3b4948c93a05d06c2c58a3bd4418340a82603204f21a9fe27548c1c657c9bfd0"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-08-27T09:22:44.197Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": [],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-08-27T09:22:44.207Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-27T10:30:24.270Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-27T10:31:51.608Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": []
+        },
+        {
+          "type": "verify",
+          "files": []
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-08-27T10:31:51.614Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:resolve-context-specs"
+        },
+        {
+          "type": "specs",
+          "key": "cli:project-context-specs"
+        },
+        {
+          "type": "specs",
+          "key": "sdk:resolve-project-context-specs"
+        },
+        {
+          "type": "specs",
+          "key": "core:compile-context"
+        },
+        {
+          "type": "verify",
+          "key": "core:resolve-context-specs"
+        },
+        {
+          "type": "verify",
+          "key": "cli:project-context-specs"
+        },
+        {
+          "type": "verify",
+          "key": "sdk:resolve-project-context-specs"
+        },
+        {
+          "type": "verify",
+          "key": "core:compile-context"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-27T10:43:17.424Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:resolve-context-specs",
+            "cli:project-context-specs",
+            "sdk:resolve-project-context-specs",
+            "core:compile-context"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:resolve-context-specs",
+            "cli:project-context-specs",
+            "sdk:resolve-project-context-specs",
+            "core:compile-context"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-27T10:43:17.476Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:resolve-context-specs",
+            "cli:project-context-specs",
+            "sdk:resolve-project-context-specs",
+            "core:compile-context"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:resolve-context-specs",
+            "cli:project-context-specs",
+            "sdk:resolve-project-context-specs",
+            "core:compile-context"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-08-27T10:43:17.477Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [],
+      "filesRemoved": [
+        {
+          "type": "specs",
+          "key": "sdk:resolve-project-context-specs"
+        },
+        {
+          "type": "verify",
+          "key": "sdk:resolve-project-context-specs"
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-27T10:57:07.539Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:resolve-context-specs",
+            "cli:project-context-specs",
+            "core:compile-context"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:resolve-context-specs",
+            "cli:project-context-specs",
+            "core:compile-context"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-27T11:08:55.400Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:resolve-context-specs",
+            "cli:project-context-specs",
+            "core:compile-context"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:resolve-context-specs",
+            "cli:project-context-specs",
+            "core:compile-context"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-08-27T11:08:55.404Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:get-project-context"
+        },
+        {
+          "type": "verify",
+          "key": "core:get-project-context"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-27T11:21:46.043Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-27T11:22:31.524Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-27T11:46:52.424Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-27T11:47:13.543Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-27T11:47:13.543Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "verifying",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-27T12:12:45.882Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:project-context-specs, core:resolve-context-specs]; verify [cli:project-context-specs, core:resolve-context-specs]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["cli:project-context-specs", "core:resolve-context-specs"]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:project-context-specs", "core:resolve-context-specs"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-27T12:18:03.214Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-27T12:18:09.379Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-27T12:43:53.461Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-27T12:58:35.253Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-27T12:58:57.141Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-08-27T13:02:00.342Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Implementation link \"core:compile-context\" points outside workspace \"core\" codeRoot.",
+      "commitStarted": false
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-08-27T13:02:17.111Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Implementation link \"core:resolve-context-specs\" points outside workspace \"core\" codeRoot.",
+      "commitStarted": false
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-27T13:02:37.235Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-08-27T13:02:37.384Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

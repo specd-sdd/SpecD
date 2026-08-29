@@ -74,3 +74,13 @@
 - **WHEN** it resolves a skill bundle for installation
 - **THEN** the install flow uses `ResolveBundle`
 - **AND** bundle resolution does not depend on a direct `SkillRepository.getBundle(...)` call from the plugin adapter
+
+### Requirement: Fast-track bundle resolution
+
+#### Scenario: Capability-aware resolution uses built-in variables
+
+- **GIVEN** a project configuration and runtime render context for `specd-fasttrack`
+- **WHEN** `ResolveBundle` resolves the skill
+- **THEN** the bundle uses project-relative built-in variables and the supplied capability set
+- **AND** unsupported conditional content is absent
+- **AND** the shared file has no runtime frontmatter

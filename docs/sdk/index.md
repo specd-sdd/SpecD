@@ -231,6 +231,7 @@ them in the SDK or CLI.
 | -------------------------------------- | ---------------------------------------------------------------- |
 | `resolveCliContext`                    | `openSpecdHost` + `buildCliKernelOptions`                        |
 | `project status`                       | `buildProjectStatusSnapshot`                                     |
+| `project context-specs`                | `kernel.project.resolveContextSpecs` (core re-export types)      |
 | `graph stats`                          | `withOpenGraphProvider` + `createGetGraphHealth`                 |
 | `graph index`                          | `runIsolatedGraphIndex` → packaged task → `runIndexProjectGraph` |
 | `graph search` / `hotspots` / `impact` | `withOpenGraphProvider` via `withProvider`                       |

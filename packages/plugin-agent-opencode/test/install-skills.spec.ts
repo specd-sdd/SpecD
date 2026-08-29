@@ -153,6 +153,88 @@ describe('plugin-agent-opencode create()', () => {
     }
   })
 
+  it('given the default skill selection, when install is called, then renders fast-track with OpenCode capabilities and frontmatter', async () => {
+    const projectRoot = await createTempProjectRoot()
+    const config = makeMockConfig(projectRoot)
+    try {
+      repositoryMock.list.mockImplementation(async () => [
+        {
+          name: 'specd-fasttrack',
+          description: 'Fast-track',
+          templates: [],
+          kind: 'skill',
+          metadata: {
+            kind: 'skill',
+            supportedCapabilities: ['mcp', 'agents', 'frontmatter'],
+            requiredCapabilities: [],
+            requiredSharedTemplates: [],
+          },
+        },
+      ])
+      repositoryMock.get.mockImplementation(async (name: string) =>
+        name === 'specd-fasttrack'
+          ? {
+              name,
+              description: 'Fast-track',
+              templates: [],
+              kind: 'skill' as const,
+              metadata: {
+                kind: 'skill' as const,
+                supportedCapabilities: ['mcp', 'agents', 'frontmatter'],
+                requiredCapabilities: [],
+                requiredSharedTemplates: [],
+              },
+            }
+          : undefined,
+      )
+      repositoryMock.getBundle.mockImplementation(
+        async (name: string, context?: unknown): Promise<SkillBundle> => {
+          const capabilities = (context as { capabilities?: readonly string[] } | undefined)
+            ?.capabilities
+
+          return {
+            name,
+            description: 'Fast-track',
+            files: [
+              {
+                filename: 'SKILL.md',
+                content: `---\nname: \"specd-fasttrack\"\n---\n\n# ${name}\n${capabilities?.includes('mcp') ? 'mcp-instructions' : ''}\n${capabilities?.includes('agents') ? 'agent-instructions' : ''}`,
+              },
+            ],
+            install: async () => {},
+            uninstall: async () => {},
+          }
+        },
+      )
+
+      const { create } = await import('../src/index.js')
+      const plugin = await create({ config })
+      await plugin.install(config)
+
+      expect(repositoryMock.getBundle).toHaveBeenCalledWith(
+        'specd-fasttrack',
+        expect.objectContaining({
+          capabilities: ['mcp', 'agents', 'frontmatter'],
+          variables: expect.objectContaining({
+            frontmatter: {
+              name: 'specd-fasttrack',
+              description:
+                'Manual-only: use only when the user explicitly invokes /specd-fasttrack. Fast-track code-first development, bugfix, or spike session with live decision journaling and post-facto consolidation into specd.',
+            },
+          }),
+        }),
+      )
+      const content = await readFile(
+        path.join(projectRoot, '.opencode', 'skills', 'specd-fasttrack', 'SKILL.md'),
+        'utf8',
+      )
+      expect(content).toContain('mcp-instructions')
+      expect(content).toContain('agent-instructions')
+    } finally {
+      await rm(projectRoot, { recursive: true, force: true })
+    }
+  })
+
   it('given an agent, when install is called, then generates OpenCode-specific YAML frontmatter', async () => {
     const projectRoot = await createTempProjectRoot()
     const config = makeMockConfig(projectRoot)

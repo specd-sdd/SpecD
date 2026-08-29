@@ -1,0 +1,17 @@
+- op: added
+  description: Require evidence-based governing-spec discovery and explicit activation for fast-track.
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Fast-track workflow template$'
+  content: |
+    ### Requirement: Fast-track governing context and activation
+
+    The fast-track workflow template MUST run `specd graph impact --file <workspace:path> --direction dependents --format toon` before modifying or investigating a target file and MUST inspect `coveringSpecs` as the evidence-backed set of governing specs. The template MUST handle an empty `coveringSpecs` result without assuming that workspace membership alone makes a spec applicable.
+
+    The template MUST use `specd project context-specs` to discover configured project and workspace candidates, MUST load applicable covering and configured candidates through `specd specs context`, and MUST NOT instruct use of `specd specs show` or `specs resolve-path` for this discovery.
+
+    The template MUST declare that fast-track is manual-only: it MUST be used only when the user explicitly invokes `/specd-fasttrack`, and MUST NOT be selected or invoked for normal specd work.

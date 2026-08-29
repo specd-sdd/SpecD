@@ -19,6 +19,7 @@ import { type GetDraft } from '../application/use-cases/get-draft.js'
 import { type GetHookInstructions } from '../application/use-cases/get-hook-instructions.js'
 import { type GetImplementationReview } from '../application/use-cases/get-implementation-review.js'
 import { type GetProjectContext } from '../application/use-cases/get-project-context.js'
+import { type ResolveContextSpecs } from '../application/use-cases/resolve-context-specs.js'
 import { type GetProjectMetadata } from '../application/use-cases/get-project-metadata.js'
 import { type GetProjectSummary } from '../application/use-cases/get-project-summary.js'
 import { type GetSpec } from '../application/use-cases/get-spec.js'
@@ -108,6 +109,10 @@ import {
   createGetProjectContext,
   resolveGetProjectContextDeps,
 } from './use-cases/get-project-context.js'
+import {
+  createResolveContextSpecs,
+  resolveResolveContextSpecsDeps,
+} from './use-cases/resolve-context-specs.js'
 import { createGetProjectMetadata } from './use-cases/get-project-metadata.js'
 import {
   createGetProjectSummary,
@@ -241,6 +246,7 @@ export interface Kernel {
     listWorkspaces: ListWorkspaces
     getProjectSummary: GetProjectSummary
     getProjectContext: GetProjectContext
+    resolveContextSpecs: ResolveContextSpecs
     getConfig: GetConfig
     getMetadata: GetProjectMetadata
     updateMetadata: UpdateProjectMetadata
@@ -383,6 +389,7 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
 
   const getProjectSummary = createGetProjectSummary(resolveGetProjectSummaryDeps(resolver))
   const getProjectContext = createGetProjectContext(resolveGetProjectContextDeps(resolver))
+  const resolveContextSpecs = createResolveContextSpecs(resolveResolveContextSpecsDeps(resolver))
   const getConfig = createGetConfig({ config: resolver.config })
   const getMetadata = createGetProjectMetadata({
     config: resolver.config,
@@ -460,6 +467,7 @@ export async function createKernel(config: SpecdConfig, options?: KernelOptions)
       listWorkspaces,
       getProjectSummary,
       getProjectContext,
+      resolveContextSpecs,
       getConfig,
       getMetadata,
       updateMetadata: updateProjectMetadata,

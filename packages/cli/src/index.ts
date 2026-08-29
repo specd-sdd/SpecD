@@ -64,6 +64,7 @@ import { registerSpecSuggest } from './commands/spec/suggest.js'
 // project
 import { registerProjectInit } from './commands/project/init.js'
 import { registerProjectContext } from './commands/project/context.js'
+import { registerProjectContextSpecs } from './commands/project/context-specs.js'
 import { registerProjectUpdate } from './commands/project/update.js'
 import { registerProjectUpdateMetadata } from './commands/project/update-metadata.js'
 import { registerProjectMetadata } from './commands/project/metadata.js'
@@ -203,6 +204,7 @@ const projectCmd = program
   )
 registerProjectInit(projectCmd)
 registerProjectContext(projectCmd)
+registerProjectContextSpecs(projectCmd)
 registerProjectUpdate(projectCmd)
 registerProjectUpdateMetadata(projectCmd)
 registerProjectMetadata(projectCmd)

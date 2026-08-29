@@ -14,15 +14,46 @@
   ],
   "implementation": [
     {
-      "file": "plugin-agent-standard:src/application/use-cases/install-skills.ts",
-      "symbols": ["InstallSkills"]
-    },
-    {
-      "file": "plugin-agent-standard:src/application/use-cases/uninstall-skills.ts",
-      "symbols": ["UninstallSkills"]
+      "file": "plugin-agent-standard:src/domain/frontmatter/index.ts"
     },
     {
       "file": "plugin-agent-standard:test/install-skills.spec.ts"
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Vendor-neutral Agent Skills standard adapter: render and install specd skills through @specd/skills.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:602ba1b9e9cb38b3e9f6eeefea263e4c7fdf3a0d3e01c0e1269df3351f6fd85d",
+          "lastModified": "2026-08-27T16:46:08.160Z"
+        },
+        "verify.md": {
+          "hash": "sha256:cfdc8d66f06e7a9c8ce0acee8af5dc9b86dd43b1bb0e22b4414487e85023babf",
+          "lastModified": "2026-08-27T16:46:08.160Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Plugin Agent Standard\n## Rules\n- Export named `create(options: PluginLoaderOptions): AgentPlugin`; read `name`/`version` from own `specd-plugin.json`, parent fallback; hardcode `type` as `'agent'`.\n- Domain: runtime `AgentPlugin` class receives `name`, `version`; `type` getter `'agent'`; standard frontmatter type; per-skill map keyed name.\n- Frontmatter allow only: required `name`, `description`; optional `license`, `compatibility`, `metadata: Record<string, string>`, `allowed-tools` (space-separated). Exclude unknown fields.\n- `InstallSkills`: get via `@specd/skills`; resolve standard frontmatter; capability literal `['frontmatter']`; resolve through `ResolveBundle`; pass `variables.sharedFolder` only override default. Never prepend YAML, call `SkillRepository.getBundle(...)`, or use `buildCapabilities`.\n- Non-shared: skills `.agents/skills/<skill-name>/`; agents alongside shared context (no `agents` capability). Shared: rendered `sharedFolder` under `projectRoot`; no `SKILL.md` in resolved shared location.\n- Pass structured frontmatter to `@specd/skills`; output only configured supported fields. Shared files no frontmatter.\n- `install()`: inject base prompt to `<projectRoot>/AGENTS.md` via `injectSpecdBlock(agentsMdPath, prompt)`; purge legacy with `removeSpecdBlock(agentsMdPath, \"standard\")`; inject no `<!-- <specd-plugin:standard> -->`. `uninstall()`: same legacy removal then `removeSpecdBlock(agentsMdPath)`.\n- Per-skill `allowed-tools`: needed Read/Write/Edit/Grep/Glob; `Bash(node *)`, `Bash(specd *)`, `Bash(pnpm *)`; `Agent` where applicable.\n- `specd project init` includes `@specd/plugin-agent-standard`; `@specd/specd` depends on it.\n- Uninstall selected managed skill dirs only if `options.skills`; retain shared. No filter: remove all managed dirs and resolved shared. Never remove unrelated `.agents/skills/` content.\n- Default standard installation includes `specd-fasttrack`: `ResolveBundle`, `frontmatter`, structured values, output `.agents/skills/specd-fasttrack/`; `allowed-tools` supports file ops/SpecD/Node/PNPM/delegation where supported; omit unsupported capability instructions.\n## Constraints\n- Depend on `@specd/skills`; implement `AgentPlugin` from `@specd/plugin-manager`; stay orchestration-only adapter.\n- Factory reads manifest name/version and passes constructor; never hardcode. `type` always `'agent'`.\n- Tool field is `allowed-tools`, never `allowed_tools`.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:602ba1b9e9cb38b3e9f6eeefea263e4c7fdf3a0d3e01c0e1269df3351f6fd85d",
+          "lastModified": "2026-08-27T16:46:08.160Z"
+        },
+        "verify.md": {
+          "hash": "sha256:cfdc8d66f06e7a9c8ce0acee8af5dc9b86dd43b1bb0e22b4414487e85023babf",
+          "lastModified": "2026-08-27T16:46:08.160Z"
+        }
+      }
+    }
+  }
 }

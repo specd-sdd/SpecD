@@ -10,6 +10,48 @@ function readTemplate(...parts: string[]): string {
 }
 
 describe('workflow skill templates', () => {
+  it('defines fast-track as a frontmatter-free, resumable standard template', () => {
+    const content = readTemplate('skills', 'specd-fasttrack', 'SKILL.md.tpl')
+    const metadata = JSON.parse(
+      readTemplate('skills', 'specd-fasttrack', 'skill.meta.json'),
+    ) as Record<string, unknown>
+
+    expect(content.startsWith('---\n')).toBe(false)
+    expect(content).toContain('@{{sharedFolder}}/shared.md')
+    expect(content).toContain('## Activation boundary')
+    expect(content).toContain('Use `/specd-fasttrack` only when the user explicitly\ninvokes it.')
+    expect(content).toContain('Never select or invoke this skill for normal specd work')
+    expect(content).toContain('Mandatory live journal rule')
+    expect(content).toContain('after **every** decision, scope or contract finding,')
+    expect(content).toContain(
+      'source edit, implementation-link update, test or debugging action/result',
+    )
+    expect(content).toContain('A final audit or\nconsolidation summary supplements')
+    expect(content).toContain('specd project status --context --format toon')
+    expect(content).toContain('specd project context-specs --format toon')
+    expect(content).toContain('specd project context-specs --workspace <workspace> --format toon')
+    expect(content).toContain('specd specs context <workspace:spec-id> --follow-deps --format text')
+    expect(content).toContain('First run file impact and inspect its `coveringSpecs` result.')
+    expect(content).toContain(
+      'it may be empty, so never assume\nthat a workspace has applicable specs',
+    )
+    expect(content).not.toContain('specd specs show')
+    expect(content).toContain('`specs context` is the only allowed spec-reading surface')
+    expect(content).toContain('VERBATIM (EXACTLY AS-IS)')
+    expect(content).toContain('> **MANDATORY DIRECTIVES FOR `/specd-design`**:')
+    expect(content).toContain('8. **Codebase-Wide Adoption & Affected Areas (MUST)**:')
+    expect(content).toContain('already marked as completed (`- [x]`)')
+    expect(content).toContain('## Consolidation & Audit Summary')
+    expect(content).toContain('MANDATORY STOP RULES')
+    expect(content).toContain('Do NOT autonomously invoke, launch, or execute `/specd-design`.')
+    expect(metadata).toEqual({
+      kind: 'skill',
+      supportedCapabilities: ['mcp', 'agents', 'frontmatter'],
+      requiredCapabilities: [],
+      requiredSharedTemplates: ['shared.md'],
+    })
+  })
+
   it('does not instruct removed metadata-status scans or write-metadata flows', () => {
     const content = readTemplate('skills', 'specd-archive', 'SKILL.md.tpl')
     expect(content).not.toMatch(/specd specs list --metadata-status/)

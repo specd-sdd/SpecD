@@ -1,0 +1,16 @@
+- op: added
+  description: Verify OpenCode emits a manual-only fast-track description.
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Fast-track skill installation$'
+  content: |
+    ### Requirement: Manual-only fast-track routing
+
+    #### Scenario: Installing fast-track for OpenCode
+
+    - **WHEN** the OpenCode plugin renders fast-track frontmatter
+    - **THEN** the description states that explicit `/specd-fasttrack` invocation is required

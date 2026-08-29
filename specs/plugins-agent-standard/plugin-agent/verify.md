@@ -159,3 +159,20 @@
 - **WHEN** the Agent Skills standard install flow is reviewed
 - **THEN** bundle resolution goes through `ResolveBundle`
 - **AND** the plugin does not call `SkillRepository.getBundle(...)` directly from `InstallSkills`
+
+### Requirement: Fast-track skill installation
+
+#### Scenario: Default Standard installation declares fast-track tools
+
+- **GIVEN** no explicit skill filter
+- **WHEN** the Agent Skills Standard plugin installs available standard skills
+- **THEN** `.agents/skills/specd-fasttrack/SKILL.md` is written from `ResolveBundle`
+- **AND** its frontmatter declares the required `allowed-tools` value
+- **AND** instructions needing unsupported capabilities are absent
+
+### Requirement: Manual-only fast-track routing
+
+#### Scenario: Installing fast-track for an Agent Skills standard client
+
+- **WHEN** the standard plugin renders fast-track frontmatter
+- **THEN** the description states that explicit `/specd-fasttrack` invocation is required

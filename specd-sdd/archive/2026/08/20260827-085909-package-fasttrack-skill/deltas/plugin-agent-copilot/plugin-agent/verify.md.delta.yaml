@@ -1,0 +1,16 @@
+- op: added
+  description: 'Verify Copilot installs a capability-limited fast-track skill'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    ### Requirement: Fast-track skill installation
+
+    #### Scenario: Copilot omits unsupported fast-track branches
+
+    - **GIVEN** no explicit skill filter
+    - **WHEN** Copilot installs available standard skills
+    - **THEN** its fast-track skill is rendered and installed through `ResolveBundle`
+    - **AND** runtime-specific frontmatter contains no unsupported fields
+    - **AND** instructions requiring unavailable capabilities are absent

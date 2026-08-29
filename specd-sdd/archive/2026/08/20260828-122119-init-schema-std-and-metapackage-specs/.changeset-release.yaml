@@ -1,0 +1,4 @@
+releases:
+  schema-std:standard-schema: minor
+  schema-std:templates: minor
+  specd-metapackage:metapackage: minor

@@ -1,0 +1,46 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "core:list-workspaces",
+    "core:config",
+    "default:_global/error-handling-conventions"
+  ],
+  "implementation": [
+    {
+      "file": "core:src/application/use-cases/resolve-context-specs.ts",
+      "symbols": ["ResolveContextSpecs", "ResolveContextSpecsInput", "ResolveContextSpecsResult"]
+    },
+    {
+      "file": "core:src/composition/use-cases/resolve-context-specs.ts",
+      "symbols": ["createResolveContextSpecs"]
+    },
+    {
+      "file": "core:test/application/use-cases/resolve-context-specs.spec.ts"
+    },
+    {
+      "file": "core:test/application/use-cases/configured-context-parity.spec.ts"
+    },
+    {
+      "file": "core:test/barrel-kernel-coverage.spec.ts"
+    },
+    {
+      "file": "core:test/application/use-cases/resolve-configured-context-specs.spec.ts"
+    },
+    {
+      "file": "core:src/application/use-cases/_shared/resolve-configured-context-specs.ts",
+      "symbols": ["resolveConfiguredContextSpecs"]
+    },
+    {
+      "file": "core:src/application/use-cases/index.ts"
+    },
+    {
+      "file": "core:src/composition/use-cases/index.ts"
+    },
+    {
+      "file": "core:src/public.ts"
+    }
+  ]
+}

@@ -373,6 +373,9 @@ export function makeMockKernel(overrides: Record<string, unknown> = {}): Kernel 
     getProjectContext: {
       execute: vi.fn().mockResolvedValue({ contextEntries: [], specs: [], warnings: [] }),
     },
+    resolveContextSpecs: {
+      execute: vi.fn().mockResolvedValue({ project: [], workspaces: {} }),
+    },
     getConfig: { execute: vi.fn() },
     getMetadata: { execute: vi.fn() },
     updateMetadata: { execute: vi.fn() },

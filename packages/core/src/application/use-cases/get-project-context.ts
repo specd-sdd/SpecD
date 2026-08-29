@@ -17,7 +17,8 @@ import {
 } from './compile-context.js'
 import { shiftHeadings } from '../../domain/services/shift-headings.js'
 import { type ContentHasher } from '../ports/content-hasher.js'
-import { listMatchingSpecs, type ResolvedSpec } from './_shared/spec-pattern-matching.js'
+import { type ResolvedSpec } from './_shared/spec-pattern-matching.js'
+import { resolveConfiguredContextSpecs } from './_shared/resolve-configured-context-specs.js'
 import { traverseDependsOn, type DependsOnFallback } from './_shared/depends-on-traversal.js'
 import { type SpecWorkspaceRoute } from './_shared/spec-reference-resolver.js'
 import {
@@ -189,25 +190,23 @@ export class GetProjectContext {
       }
     }
 
-    // Steps 1–2: collect included specs using project-level patterns only.
+    // Steps 1–2: project-level include/exclude via shared helper (empty activeWorkspaces).
     const includedSpecs = new Map<string, ResolvedSpec>()
-
-    // Step 1: Project-level include patterns (all workspaces, bare * = all)
-    for (const pattern of config.contextIncludeSpecs ?? []) {
-      const matches = await listMatchingSpecs(pattern, 'default', true, workspaceMap, warnings)
-      for (const spec of matches) {
-        const key = `${spec.workspace}:${spec.capPath}`
-        if (!includedSpecs.has(key)) includedSpecs.set(key, spec)
-      }
-    }
-
-    // Step 2: Project-level exclude patterns
-    const excludedKeys = new Set<string>()
-    for (const pattern of config.contextExcludeSpecs ?? []) {
-      const matches = await listMatchingSpecs(pattern, 'default', true, workspaceMap, warnings)
-      for (const spec of matches) excludedKeys.add(`${spec.workspace}:${spec.capPath}`)
-    }
-    for (const key of projectExcludedKeysFrom(excludedKeys)) includedSpecs.delete(key)
+    await resolveConfiguredContextSpecs({
+      config,
+      activeWorkspaces: new Set(),
+      workspaceMap,
+      warnings,
+      collector: {
+        include: (spec) => {
+          const key = `${spec.workspace}:${spec.capPath}`
+          if (!includedSpecs.has(key)) includedSpecs.set(key, spec)
+        },
+        exclude: (spec) => {
+          includedSpecs.delete(`${spec.workspace}:${spec.capPath}`)
+        },
+      },
+    })
 
     // Step 3 (optional): dependsOn traversal from included specs (only when followDeps is true)
     if (input.followDeps === true) {
@@ -467,14 +466,4 @@ export class GetProjectContext {
 
     return metaParts.join('\n\n')
   }
-}
-
-/**
- * Helper to convert a Set of project-level excluded keys to an array.
- *
- * @param keys - The set of keys to convert
- * @returns Array of key strings
- */
-function projectExcludedKeysFrom(keys: Set<string>): string[] {
-  return [...keys]
 }

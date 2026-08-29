@@ -1,0 +1,33 @@
+- op: modified
+  description: Update verification scenarios for fast-track workflow template
+  selector:
+    type: section
+    matches: 'Requirement: Fast-track workflow template'
+  content: |
+    #### Scenario: Template renders literal scaffolding and verbatim design directives
+
+    - **GIVEN** the `specd-fasttrack` template directory and metadata are present
+    - **WHEN** a frontmatter-capable runtime resolves the skill
+    - **THEN** the emitted `SKILL.md` contains no static source frontmatter
+    - **AND** it references the rendered relative shared context
+    - **AND** it contains literal Markdown scaffolding for `.specd-exploration.md` and consolidation
+    - **AND** it requires the mandatory directives block for `/specd-design` to be copied verbatim into the journal header
+
+    #### Scenario: Interrupted work retains journal state and implementation links
+
+    - **GIVEN** fast-track work has been interrupted after an implementation edit
+    - **WHEN** a subsequent agent reads the journal and implementation tracking
+    - **THEN** it can identify the completed action, rationale, and affected implementation scope without relying on an uncommitted diff
+
+    #### Scenario: Fast-track mandates codebase-wide adoption search and regression checks
+
+    - **WHEN** `/specd-design` consumes the fast-track exploration journal
+    - **THEN** it must evaluate codebase-wide adoption opportunities for the new feature or fix
+    - **AND** it must run graph impact analysis for downstream regression risks
+
+    #### Scenario: Fast-track enforces explicit stop gates and task transfer rules
+
+    - **WHEN** the fast-track implementation and audit are consolidated
+    - **THEN** the workflow mandates presenting a structured audit summary and asking for confirmation
+    - **AND** it strictly forbids autonomous invocation of `/specd-design`
+    - **AND** it directs design to transfer completed tasks directly as marked completed (`- [x]`) without starting tasks from scratch
