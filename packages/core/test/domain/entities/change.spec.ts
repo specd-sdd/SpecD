@@ -816,6 +816,15 @@ describe('Change', () => {
       )
       expect(c.activeSignoff).toBeUndefined()
     })
+
+    it('returns undefined after invalidateSignoff without clearing spec approval', () => {
+      const c = makeChange()
+      c.recordSpecApproval('LGTM', {}, actor)
+      c.recordSignoff('Ship it', {}, actor)
+      c.invalidateSignoff(actor)
+      expect(c.activeSignoff).toBeUndefined()
+      expect(c.activeSpecApproval).toBeDefined()
+    })
   })
 
   describe('isDrafted', () => {
@@ -1064,7 +1073,7 @@ describe('Change', () => {
   })
 
   describe('isArchivable', () => {
-    it('returns true only in archivable state', () => {
+    it('returns true in archivable and archiving states', () => {
       const c = makeChange()
       c.transition('designing', actor)
       c.transition('ready', actor)
@@ -1072,6 +1081,8 @@ describe('Change', () => {
       c.transition('verifying', actor)
       c.transition('done', actor)
       c.transition('archivable', actor)
+      expect(c.isArchivable).toBe(true)
+      c.transition('archiving', actor)
       expect(c.isArchivable).toBe(true)
     })
 
@@ -1095,7 +1106,7 @@ describe('Change', () => {
   })
 
   describe('assertArchivable', () => {
-    it('does not throw when in archivable state', () => {
+    it('does not throw when in archivable or archiving state', () => {
       const c = makeChange()
       c.transition('designing', actor)
       c.transition('ready', actor)
@@ -1103,6 +1114,8 @@ describe('Change', () => {
       c.transition('verifying', actor)
       c.transition('done', actor)
       c.transition('archivable', actor)
+      expect(() => c.assertArchivable()).not.toThrow()
+      c.transition('archiving', actor)
       expect(() => c.assertArchivable()).not.toThrow()
     })
 

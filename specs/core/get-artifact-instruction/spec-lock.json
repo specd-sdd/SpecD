@@ -10,12 +10,16 @@
     "core:template-variables",
     "core:lifecycle-engine",
     "core:schema-format",
-    "core:composition-resolver"
+    "core:composition-resolver",
+    "core:transition-checks"
   ],
   "implementation": [
     {
       "file": "core:src/application/use-cases/get-artifact-instruction.ts",
       "symbols": ["GetArtifactInstruction"]
+    },
+    {
+      "file": "core:test/application/use-cases/get-artifact-instruction.spec.ts"
     }
   ]
 }

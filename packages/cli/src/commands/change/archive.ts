@@ -1,12 +1,48 @@
 import { type Command } from 'commander'
 import * as path from 'node:path'
-import { type ArchiveHookPhaseSelector, SpecOverlapError } from '@specd/sdk'
+import {
+  type ArchiveHookPhaseSelector,
+  type CheckProgressEvent,
+  SpecOverlapError,
+} from '@specd/sdk'
 import { resolveCliContext } from '../../helpers/cli-context.js'
-import { output, parseFormat } from '../../formatter.js'
+import { output, parseFormat, serializeOutput, type OutputFormat } from '../../formatter.js'
 import { handleError, cliError } from '../../handle-error.js'
 import { parseCommaSeparatedValues } from '../../helpers/parse-comma-values.js'
+import { createCheckProgressPresenter } from './_check-progress-presenter.js'
 
 const VALID_ARCHIVE_HOOK_PHASES = new Set<ArchiveHookPhaseSelector>(['pre', 'post', 'all'])
+
+/**
+ * Writes one structured stream record for machine-readable archive output.
+ *
+ * @param format - Structured output format
+ * @param record - Stream record payload
+ */
+function writeStructuredRecord(format: Exclude<OutputFormat, 'text'>, record: unknown): void {
+  process.stdout.write(`${serializeOutput(record, format)}\n`)
+}
+
+/**
+ * Builds an archive progress callback for the generic check bus.
+ *
+ * @param format - CLI output format
+ * @returns Progress sink
+ */
+function makeArchiveProgressRenderer(format: OutputFormat): {
+  onProgress: (event: CheckProgressEvent) => void
+} {
+  const checkPresenter = createCheckProgressPresenter({
+    format,
+    streamName: 'change-archive',
+    stream: format === 'text' ? process.stderr : process.stdout,
+  })
+  return {
+    onProgress: (event) => {
+      checkPresenter.onEvent(event)
+    },
+  }
+}
 
 /**
  * Registers the `change archive` subcommand on the given parent command.
@@ -17,12 +53,14 @@ export function registerChangeArchive(parent: Command): void {
   parent
     .command('archive <name>')
     .allowExcessArguments(false)
-    .description('Move a completed change to the archive, removing it from the active change list.')
+    .description(
+      'Move an archivable change to the archive (or retry from archiving after a failed commit).',
+    )
     .option('--skip-hooks <phases>', 'skip archive hook phases (pre,post,all)')
     .option('--allow-overlap', 'permit archiving despite spec overlap with other active changes')
     .option(
       '--allow-out-of-scope',
-      'allow archive-time implementation sidecar updates outside the current change scope',
+      'permit archiving when implementation links resolve outside the change scope (impl.linksInScope)',
     )
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
     .option('--config <path>', 'path to specd.yaml')
@@ -30,7 +68,10 @@ export function registerChangeArchive(parent: Command): void {
       'after',
       `
 JSON/TOON output schema:
-  { result: "ok", name: string, archivePath: string }
+  Stream records on stdout:
+    { stream: "change-archive", event: { type: "check-start"|"check-progress"|"check-done" } }
+  Terminal record:
+    { stream: "change-archive", event: { type: "complete", result: { result: "ok", name: string, archivePath: string, invalidatedChanges: unknown[] } } }
 `,
     )
     .action(
@@ -51,13 +92,18 @@ JSON/TOON output schema:
               : new Set<ArchiveHookPhaseSelector>()
 
           const { config, kernel } = await resolveCliContext({ configPath: opts.config })
+          const fmt = parseFormat(opts.format)
+          const progressRenderer = makeArchiveProgressRenderer(fmt)
 
-          const result = await kernel.changes.archive.execute({
-            name,
-            skipHookPhases,
-            ...(opts.allowOverlap === true ? { allowOverlap: true } : {}),
-            ...(opts.allowOutOfScope === true ? { allowOutOfScope: true } : {}),
-          })
+          const result = await kernel.changes.archive.execute(
+            {
+              name,
+              skipHookPhases,
+              ...(opts.allowOverlap === true ? { allowOverlap: true } : {}),
+              ...(opts.allowOutOfScope === true ? { allowOutOfScope: true } : {}),
+            },
+            progressRenderer.onProgress,
+          )
 
           const archivePath = path.relative(config.projectRoot, result.archiveDirPath)
 
@@ -66,7 +112,6 @@ JSON/TOON output schema:
             cliError(`post-archive hook(s) failed: ${cmds}`, opts.format, 2)
           }
 
-          const fmt = parseFormat(opts.format)
           if (fmt === 'text') {
             output(`archived change ${name} → ${archivePath}`, 'text')
             if (result.invalidatedChanges.length > 0) {
@@ -77,15 +122,18 @@ JSON/TOON output schema:
               output(lines.join('\n'), 'text')
             }
           } else {
-            output(
-              {
-                result: 'ok',
-                name,
-                archivePath,
-                invalidatedChanges: result.invalidatedChanges,
+            writeStructuredRecord(fmt, {
+              stream: 'change-archive',
+              event: {
+                type: 'complete',
+                result: {
+                  result: 'ok',
+                  name,
+                  archivePath,
+                  invalidatedChanges: result.invalidatedChanges,
+                },
               },
-              fmt,
-            )
+            })
           }
         } catch (err) {
           if (err instanceof SpecOverlapError) {

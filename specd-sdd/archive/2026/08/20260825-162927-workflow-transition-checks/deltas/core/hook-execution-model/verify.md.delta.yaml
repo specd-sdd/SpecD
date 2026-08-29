@@ -1,0 +1,126 @@
+- op: added
+  description: 'Post run only on forward; skip-hooks is effects only'
+  position:
+    parent:
+      type: section
+      matches: '^Requirement: Default hook execution for transitions and archives$'
+    after:
+      type: section
+      matches: '^Scenario: Hook execution delegated to RunStepHooks$'
+  content: |
+    #### Scenario: Transition source.post skipped on redesign
+
+    - **GIVEN** a change in `implementing` with `implementing.hooks.post`
+    - **WHEN** `TransitionChange` targets `designing`
+    - **THEN** those post hooks are not executed
+    - **AND** predicates still ran
+
+- op: added
+  description: 'skipHooks does not skip predicates'
+  position:
+    parent:
+      type: section
+      matches: '^Requirement: Manual hook control with skipHooks$'
+    after:
+      type: section
+      matches: '^Scenario: Phase selector skips specific phases$'
+  content: |
+    #### Scenario: skip source.pre is a no-op on this table
+
+    - **GIVEN** `skipHookPhases` contains `source.pre`
+    - **WHEN** `TransitionChange.execute` runs a forward hop
+    - **THEN** matching `hook.pre` / `hook.post` still execute unless another selector skips them
+
+    #### Scenario: skip target.post is a no-op on this table
+
+    - **GIVEN** `skipHookPhases` contains `target.post`
+    - **WHEN** `TransitionChange.execute` runs a forward hop
+    - **THEN** matching `hook.pre` / `hook.post` still execute unless another selector skips them
+
+- op: added
+  description: 'Transition source.post fail-fast before persist'
+  position:
+    parent:
+      type: section
+      matches: '^Requirement: Post-hook failure semantics$'
+    after:
+      type: section
+      matches: '^Scenario: Agent-driven post-hook failure continues execution$'
+  content: |
+    #### Scenario: Transition source.post failure does not persist
+
+    - **GIVEN** `implementing.hooks.post` exits non-zero on `implementing → verifying`
+    - **WHEN** `TransitionChange` executes
+    - **THEN** `HookFailedError` is thrown
+    - **AND** the change remains in `implementing`
+
+- op: added
+  description: 'Failure policy comes from binding onFailure'
+  position:
+    parent:
+      type: section
+      matches: '^Requirement: Post-hook failure semantics$'
+    after:
+      type: section
+      matches: '^Scenario: Transition source.post failure does not persist$'
+  content: |
+    #### Scenario: Archive post collect is binding policy
+
+    - **GIVEN** archive `hook.post` is bound with `onFailure = collect`
+    - **WHEN** that effect exits non-zero after persist
+    - **THEN** `ArchiveChange` continues
+    - **AND** the same check id on a transition binding with `onFailure = abort` still throws
+
+- op: modified
+  description: 'Entity does not run hooks; TransitionChange does'
+  selector:
+    type: section
+    matches: '^Requirement: change transition does not execute hooks$'
+  rename: 'Requirement: Change entity does not execute hooks'
+  content: |
+    ### Requirement: Change entity does not execute hooks
+
+    #### Scenario: TransitionChange auto-runs matching run effects
+
+    - **GIVEN** the implementing step has `run:` pre-hooks defined
+    - **AND** `skipHookPhases` is empty
+    - **WHEN** the agent runs `specd change transition <name> implementing`
+    - **THEN** matching pre effects execute before persist
+    - **AND** the `Change` entity itself does not invoke `HookRunner`
+
+- op: modified
+  description: 'Transition post effects before persist not after'
+  selector:
+    type: section
+    matches: '^Scenario: TransitionChange executes post-hooks after state change$'
+  rename: 'Scenario: TransitionChange executes post-hooks before persist'
+  content: |
+    #### Scenario: TransitionChange executes post-hooks before persist
+
+    - **GIVEN** a forward transition from a step with post-hooks
+    - **WHEN** `TransitionChange.execute` is called
+    - **THEN** those post effects execute after predicates pass and before persist
+    - **AND** post-hook failure with `onFailure = abort` does not persist the state change
+
+- op: added
+  description: 'Backward and recovery omit hook.post'
+  position:
+    parent:
+      type: section
+      matches: '^Requirement: Default hook execution for transitions and archives$'
+    after:
+      type: section
+      matches: '^Scenario: Transition source.post skipped on redesign$'
+  content: |
+    #### Scenario: Transition source.post skipped on backward
+
+    - **GIVEN** a change in `verifying` with `verifying.hooks.post`
+    - **WHEN** `TransitionChange` targets `implementing`
+    - **THEN** those post hooks are not executed
+    - **AND** `along` is `backward`
+
+    #### Scenario: Recovery omits hook.pre and hook.post
+
+    - **WHEN** the attempt is `archiving → archivable`
+    - **THEN** `hook.post` does not match
+    - **AND** `hook.pre` does not match (`exceptAlong` includes `recovery`)

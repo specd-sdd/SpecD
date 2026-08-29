@@ -158,6 +158,7 @@ export {
   type ArchiveChange,
   type ArchiveChangeInput,
   type ArchiveChangeResult,
+  type OnArchiveProgress,
   type InvalidatedChangesEntry,
   type ValidateArtifacts,
   type ValidateArtifactsInput,
@@ -424,6 +425,7 @@ export {
   type TransitionedEvent,
   type SpecApprovedEvent,
   type SignedOffEvent,
+  type SignoffInvalidatedEvent,
   type InvalidatedEvent,
   type DraftedEvent,
   type RestoredEvent,
@@ -450,6 +452,7 @@ export {
   SpecArtifact,
   type ChangeState,
   VALID_TRANSITIONS,
+  HAPPY_PATH_NEXT,
   isValidTransition,
   type ArtifactStatus,
   type ArtifactDisplayStatus,
@@ -498,6 +501,7 @@ export {
   SpecdError,
   InvalidStateTransitionError,
   type TransitionFailureReason,
+  HappyPathNextUnavailableError,
   ApprovalRequiredError,
   InvalidSpecPathError,
   ArtifactConflictError,
@@ -646,19 +650,32 @@ export {
 } from './domain/services/rule-evaluator.js'
 export { detectSpecOverlap } from './domain/services/detect-spec-overlap.js'
 export {
-  LifecycleEngine,
-  type LifecycleEngineOptions,
+  type LifecycleVerdictInput,
   type LifecycleAffectedFile,
   type LifecycleAffectedArtifact,
   type LifecycleBlocker,
   type LifecycleReviewOverlapEntry,
   type LifecycleReviewSummary,
-  type LifecycleNextAction,
   type LifecycleArtifactVerdict,
   type LifecycleTransitionBlocker,
   type LifecycleStepVerdict,
-  type LifecycleVerdict,
 } from './domain/services/lifecycle-engine.js'
+export {
+  evaluateLifecycle,
+  type LifecycleVerdict,
+  type LifecycleNextAction,
+} from './application/services/lifecycle-evaluation.js'
+export {
+  classifyAlong,
+  checkMatches,
+  CHECK_LABELS,
+  checkLabel,
+  type CheckId,
+  type CheckKind,
+  type CheckResult,
+  type CheckProgressEvent,
+  type OnCheckProgress,
+} from './domain/services/transition-checks.js'
 
 const _require = createRequire(import.meta.url)
 /** Installed version of `@specd/core`. */

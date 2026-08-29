@@ -15,5 +15,41 @@
     {
       "file": "core:src/composition/use-cases/update-spec-deps.ts"
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "UpdateSpecDeps mutates change.specDependsOn via set/add/remove (remove then add); typed SpecdError; no approval invalidation.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:84b8cedb91fa046e993b4f1bae67aa3214c70585ae681256a2ac653759c18098",
+          "lastModified": "2026-08-25T15:37:19.357Z"
+        },
+        "verify.md": {
+          "hash": "sha256:004f29d177cd6acbdab229a6c8ff227191bbf3ab4027282253a146979584933d",
+          "lastModified": "2026-08-25T15:37:19.357Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# UpdateSpecDeps\n\n## Rules\n- Input: `name`, `specId` (MUST be in `change.specIds`), optional `add`/`remove`/`set` readonly string[].\n- Missing change → `ChangeNotFoundError`. Spec not in change → typed error.\n- `set` MUST NOT combine w/ `add` or `remove`. At least one of add/remove/set required.\n- `set` replaces entire list. `remove` validates each ID exists (first missing aborts). `add` idempotent after removals. Remove before add.\n- Persist via `ChangeRepository.mutate(name, fn)` → `change.setSpecDependsOn(specId, result)`. Result: `{ specId, dependsOn }`.\n- Validation/lookup failures MUST be typed `SpecdError` subclasses (not generic `Error`) per `default:_global/error-handling-conventions`.\n- Config factory via `resolveUpdateSpecDepsDeps` (changes) only.\n\n## Constraints\n- Updating specDependsOn does NOT trigger approval invalidation\n- No actor identity — not actor-attributed events\n- `parseSpecId` for format; lenient, does not throw on invalid formats",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:84b8cedb91fa046e993b4f1bae67aa3214c70585ae681256a2ac653759c18098",
+          "lastModified": "2026-08-25T15:37:19.357Z"
+        },
+        "verify.md": {
+          "hash": "sha256:004f29d177cd6acbdab229a6c8ff227191bbf3ab4027282253a146979584933d",
+          "lastModified": "2026-08-25T15:37:19.357Z"
+        }
+      }
+    }
+  }
 }

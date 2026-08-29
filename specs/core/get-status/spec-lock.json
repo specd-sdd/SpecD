@@ -12,15 +12,39 @@
     "core:lifecycle-engine",
     "core:refresh-implementation-tracking",
     "core:composition-resolver",
-    "core:count-tasks"
+    "core:count-tasks",
+    "core:transition-checks"
   ],
   "implementation": [
     {
       "file": "core:src/application/use-cases/get-status.ts",
-      "symbols": ["GetStatus", "GetStatusInput", "GetStatusResult"]
+      "symbols": ["GetStatus", "Blocker", "_mergeBlockers"]
+    },
+    {
+      "file": "core:src/composition/use-cases/get-status.ts",
+      "symbols": ["createGetStatus"]
+    },
+    {
+      "file": "core:src/composition/use-cases/get-artifact-instruction.ts",
+      "symbols": ["createGetArtifactInstruction"]
+    },
+    {
+      "file": "core:src/composition/use-cases/validate-artifacts.ts",
+      "symbols": ["createValidateArtifacts"]
     },
     {
       "file": "core:test/application/use-cases/get-status.spec.ts"
+    },
+    {
+      "file": "core:test/composition/use-cases/get-status.spec.ts"
+    },
+    {
+      "file": "core:src/application/services/execute-matching-predicates.ts",
+      "symbols": ["executeChecksByLegalTargets"]
+    },
+    {
+      "file": "core:src/application/checks/workflow-check-registry.ts",
+      "symbols": ["createWorkflowCheckRegistry"]
     }
   ],
   "optimizations": {

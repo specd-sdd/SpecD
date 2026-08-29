@@ -19,7 +19,7 @@ export function registerChangeApprove(parent: Command): void {
     .command('spec <name>')
     .allowExcessArguments(false)
     .description(
-      'Record a spec approval for a change, satisfying the spec gate in the specd lifecycle.',
+      'Record spec-gate consent for a change in ready (pending-spec-approval remains valid for drain).',
     )
     .requiredOption('--reason <text>', 'rationale for approval')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
@@ -57,7 +57,7 @@ JSON/TOON output schema:
     .command('signoff <name>')
     .allowExcessArguments(false)
     .description(
-      'Record a sign-off approval for a change, satisfying the signoff gate in the specd lifecycle.',
+      'Record signoff-gate consent for a change in done (pending-signoff remains valid for drain).',
     )
     .requiredOption('--reason <text>', 'rationale for sign-off')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')

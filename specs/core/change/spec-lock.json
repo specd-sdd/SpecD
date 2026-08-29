@@ -11,16 +11,41 @@
     "default:_global/architecture",
     "core:lifecycle-engine",
     "default:_global/logging",
-    "core:implementation-detector-port"
+    "core:implementation-detector-port",
+    "core:transition-checks"
   ],
   "implementation": [
     {
-      "file": "core:src/domain/entities/change.ts",
-      "symbols": ["Change", "touchUpdatedAt"]
+      "file": "core:src/domain/value-objects/change-state.ts",
+      "symbols": ["VALID_TRANSITIONS", "isValidTransition", "HAPPY_PATH_NEXT"]
     },
     {
-      "file": "core:src/application/use-cases/save-change-artifact.ts",
-      "symbols": ["SaveChangeArtifact", "SaveChangeArtifactResult"]
+      "file": "core:src/domain/entities/change.ts",
+      "symbols": ["invalidateSignoff"]
+    },
+    {
+      "file": "core:src/domain/entities/index.ts"
+    },
+    {
+      "file": "core:src/infrastructure/fs/change-repository.ts",
+      "symbols": ["persistableArtifactStatus"]
+    },
+    {
+      "file": "core:src/infrastructure/fs/manifest-change-loader.ts"
+    },
+    {
+      "file": "core:src/infrastructure/fs/manifest.ts"
+    },
+    {
+      "file": "core:test/domain/entities/change.spec.ts"
+    },
+    {
+      "file": "core:src/domain/value-objects/artifact-file.ts",
+      "symbols": ["ArtifactFile"]
+    },
+    {
+      "file": "core:src/domain/entities/change-artifact.ts",
+      "symbols": ["ChangeArtifact"]
     }
   ],
   "optimizations": {

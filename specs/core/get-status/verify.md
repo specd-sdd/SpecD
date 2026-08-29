@@ -8,7 +8,7 @@
 
 - **GIVEN** a change with one artifact in `pending-review`
 - **WHEN** `execute({ name: 'add-login' })` is called
-- **THEN** `GetStatus` uses `LifecycleEngine` to derive lifecycle interpretation
+- **THEN** `GetStatus` uses `evaluateLifecycle` to derive lifecycle interpretation
 - **AND** the artifact entry includes its persisted `state`
 - **AND** it includes `effectiveStatus`
 - **AND** each file entry includes its own persisted `state`
@@ -205,6 +205,30 @@
 - **WHEN** `GetStatus.execute()` is called
 - **THEN** `taskCompletion.incomplete` is `2` and `taskCompletion.total` is `2`
 
+#### Scenario: CountTasks runs inside task-completion execute
+
+- **GIVEN** a change in `implementing` with incomplete tasks
+- **WHEN** `GetStatus.execute()` is called
+- **THEN** `workflow.taskCompletion.execute` invokes `CountTasks`
+- **AND** `GetStatus` does not invoke `CountTasks` again after evaluate
+- **AND** `availableTransitions` omits `verifying`
+- **AND** `GetStatus` does not pass a global snapshot bag into `evaluateLifecycle`
+
+### Requirement: Execute matching predicates then project
+
+#### Scenario: Enter-ready deps check omits ready when extract mismatches
+
+- **GIVEN** a change in `designing` whose extracted `dependsOn` mismatches persisted values
+- **WHEN** `GetStatus.execute()` is called
+- **THEN** `deps.consistent.execute` fails
+- **AND** `ready` is omitted from `availableTransitions`
+
+#### Scenario: Status exposes check rows
+
+- **WHEN** `GetStatus.execute()` completes a full evaluation
+- **THEN** the result includes check rows with `id`, `kind`, and `outcome`
+- **AND** `effect` rows are not required for `allowed`
+
 ### Requirement: Throws ChangeNotFoundError for unknown changes
 
 #### Scenario: Change does not exist
@@ -221,7 +245,7 @@
 - **AND** `spec` hashes match (would be `complete` in isolation)
 - **AND** `proposal` is `in-progress`
 - **WHEN** `execute()` is called for this change
-- **THEN** the `effectiveStatus` for `spec` is `in-progress` (cascaded from its dependency as derived by `LifecycleEngine`)
+- **THEN** the `effectiveStatus` for `spec` is `in-progress` (cascaded from its dependency as derived by `projectArtifacts`)
 - **AND** the `effectiveStatus` for `proposal` is `in-progress`
 
 #### Scenario: Skipped artifacts satisfy dependencies
@@ -306,6 +330,13 @@
 - **WHEN** `execute()` is called
 - **THEN** `review.overlapDetail` is an empty array
 
+#### Scenario: availableTransitions is not protocol-only
+
+- **GIVEN** protocol allows `verifying` but tasks are incomplete
+- **WHEN** `GetStatus.execute()` returns lifecycle context
+- **THEN** `validTransitions` includes `verifying`
+- **AND** `availableTransitions` does not
+
 ### Requirement: Graceful degradation when schema resolution fails
 
 #### Scenario: Schema resolution failure degrades lifecycle fields
@@ -336,11 +367,25 @@
 
 ### Requirement: Constructor dependencies
 
-#### Scenario: GetStatus receives LifecycleEngine through construction
+#### Scenario: GetStatus is constructed without LifecycleEngine
 
-- **GIVEN** `GetStatus` is assembled by the kernel
-- **WHEN** the use case is constructed
-- **THEN** it receives `ChangeRepository`, `SchemaProvider`, approval config, `LifecycleEngine`, and `RefreshImplementationTracking`
+- **WHEN** `GetStatus` is constructed
+- **THEN** it does not receive `LifecycleEngine` or `evaluateLifecycle` as constructor arguments
+- **AND** it receives `transitionBindings` and `archiveBindings`
+
+#### Scenario: Constructor composes create-star checks
+
+- **WHEN** `GetStatus` is constructed
+- **THEN** it receives composed `Check` instances from `create*`
+- **AND** `CountTasks` is a dep of `createWorkflowTaskCompletion`, not a global snapshot gatherer
+- **AND** `transitionBindings` is injected from the workflow check registry
+
+#### Scenario: Drafted status DAG-projects effective status
+
+- **GIVEN** a drafted change whose `proposal` is complete and `specs` is blocked only by that parent being `pending-review`
+- **WHEN** `GetStatus.execute()` runs for that draft-only name
+- **THEN** `effectiveStatus` for the dependent artifact is `pending-parent-artifact-review`
+- **AND** `availableTransitions` is empty
 
 ### Requirement: Config-based factory preserves complete repository bootstrap
 
@@ -359,6 +404,56 @@
 - **WHEN** `execute()` is called
 - **THEN** the returned `blockers` array contains machine-readable blocker entries describing those conditions
 
+#### Scenario: Incomplete tasks produce INCOMPLETE_TASKS
+
+- **GIVEN** a change in `implementing` with incomplete gated tasks
+- **WHEN** `GetStatus.execute()` identifies blockers
+- **THEN** a blocker with code `INCOMPLETE_TASKS` is present
+
+#### Scenario: Open-file IMPLEMENTATION_STATE has no out-of-scope bypass
+
+- **GIVEN** a failed `impl.filesResolved` check with code `IMPLEMENTATION_STATE`
+- **WHEN** `GetStatus` merges blockers from checks
+- **THEN** the blocker does not include `bypassFlag` `--allow-out-of-scope`
+
+#### Scenario: Links-in-scope IMPLEMENTATION_STATE keeps out-of-scope bypass
+
+- **GIVEN** a failed `impl.linksInScope` check with code `IMPLEMENTATION_STATE`
+- **WHEN** `GetStatus` merges blockers from checks
+- **THEN** the blocker is skippable with `bypassFlag` `--allow-out-of-scope`
+
+#### Scenario: Invalidation overlap is review not OVERLAP_CONFLICT blocker
+
+- **GIVEN** `review.reason` is `'spec-overlap-conflict'`
+- **AND** the change is not in `archivable`
+- **WHEN** `GetStatus.execute()` identifies blockers
+- **THEN** `blockers` does not include code `OVERLAP_CONFLICT`
+- **AND** `review.message` is human prose about archived overlapping specs
+- **AND** `nextAction.command` is `/specd-design`
+
+#### Scenario: Archivable status runs archive predicates
+
+- **GIVEN** a change in `archivable` whose specs overlap another active change
+- **WHEN** `GetStatus.execute()` is called
+- **THEN** `spec.overlap.execute` fails
+- **AND** `blockers` includes skippable `OVERLAP_CONFLICT` with `--allow-overlap`
+
+#### Scenario: Archivable live overlap does not advertise Ready to archive
+
+- **GIVEN** a change in `archivable` with a public `OVERLAP_CONFLICT` blocker
+- **WHEN** `GetStatus.execute()` projects `nextAction`
+- **THEN** `nextAction.command` is `/specd-archive`
+- **AND** `nextAction.targetStep` is `archivable`
+- **AND** `nextAction.reason` is not `Ready to archive`
+- **AND** `nextAction.reason` names overlap and `--allow-overlap`
+
+#### Scenario: CountTasks memo is per evaluation pass
+
+- **GIVEN** a long-lived `createWorkflowTaskCompletion` instance
+- **WHEN** `GetStatus.execute()` runs twice with different task file contents
+- **THEN** each execute counts tasks afresh
+- **AND** the check instance does not reuse a previous CountTasks result
+
 ### Requirement: Config-based factory delegates through resolveGetStatusDeps
 
 #### Scenario: createGetStatus config form derives GetStatusDeps through resolveGetStatusDeps
@@ -371,5 +466,7 @@
 - `schemaProvider: SchemaProvider`
 - `approvals: { readonly spec: boolean; readonly signoff: boolean }`
 - `refreshImplementationTracking: RefreshImplementationTracking`
-- `lifecycle: LifecycleEngine`
+- `transitionBindings` from the workflow check registry
+- `archiveBindings` from the workflow check registry
+- **AND** it does not resolve `lifecycle` or `LifecycleEngine`
 - **AND** the factory delegates to canonical `createGetStatus(deps)`

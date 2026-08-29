@@ -1420,6 +1420,9 @@ export class FsChangeRepository extends ChangeRepository {
         ) {
           status = await this._deriveFileStatus(resolvedRawFile, dir, raw.optional, cleanup)
         }
+        if (status === 'pending-parent-artifact-review') {
+          status = 'in-progress'
+        }
 
         filesMap.set(
           rawFile.key,
@@ -1437,7 +1440,7 @@ export class FsChangeRepository extends ChangeRepository {
         type: raw.type,
         optional: raw.optional,
         requires: raw.requires,
-        status: raw.state ?? 'missing',
+        status: persistableArtifactStatus(raw.state ?? 'missing'),
         files: filesMap,
       })
       artifactMap.set(artifact.type, artifact)
@@ -1690,6 +1693,16 @@ function changeToManifest(change: Change): ChangeManifest {
 }
 
 /**
+ * Maps verdict-derived parent-review off the persistable file/artifact status union.
+ *
+ * @param status - Domain artifact status
+ * @returns Status allowed in `manifest.json`
+ */
+function persistableArtifactStatus(status: ArtifactStatus): ArtifactStatus {
+  return status === 'pending-parent-artifact-review' ? 'in-progress' : status
+}
+
+/**
  * Serializes a `ChangeArtifact` entity into a `ManifestArtifact` JSON object.
  *
  * @param artifact - The artifact to serialize
@@ -1698,12 +1711,12 @@ function changeToManifest(change: Change): ChangeManifest {
 function serializeArtifact(artifact: ChangeArtifact): ManifestArtifact {
   const files: ManifestArtifactFile[] = []
   for (const file of artifact.files.values()) {
-    const state =
+    const rawState =
       file.status === 'missing' && file.validatedHash === SKIPPED_SENTINEL ? 'skipped' : file.status
     files.push({
       key: file.key,
       filename: file.filename,
-      state,
+      state: persistableArtifactStatus(rawState),
       validatedHash: file.validatedHash ?? null,
       ...(file.hasDrift ? { hasDrift: true } : {}),
     })
@@ -1712,7 +1725,7 @@ function serializeArtifact(artifact: ChangeArtifact): ManifestArtifact {
     type: artifact.type,
     optional: artifact.optional,
     requires: [...artifact.requires],
-    state: artifact.status,
+    state: persistableArtifactStatus(artifact.status),
     files,
   }
 }
@@ -1757,6 +1770,12 @@ function serializeEvent(event: ChangeEvent): RawChangeEvent {
         by: event.by,
         reason: event.reason,
         artifactHashes: event.artifactHashes,
+      }
+    case 'signoff-invalidated':
+      return {
+        type: 'signoff-invalidated',
+        at: event.at.toISOString(),
+        by: event.by,
       }
     case 'invalidated':
       return {
@@ -1912,6 +1931,12 @@ function deserializeEvent(raw: RawChangeEvent): ChangeEvent {
         by: raw.by,
         reason: raw.reason,
         artifactHashes: raw.artifactHashes,
+      }
+    case 'signoff-invalidated':
+      return {
+        type: 'signoff-invalidated',
+        at: new Date(raw.at),
+        by: raw.by,
       }
     case 'invalidated':
       return {

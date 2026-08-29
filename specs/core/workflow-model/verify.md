@@ -7,8 +7,17 @@
 #### Scenario: Invalid step name rejected
 
 - **GIVEN** a schema with `workflow: [{ step: "designing" }, { step: "reviewing" }]`
-- **WHEN** an agent attempts to transition a change to `reviewing`
-- **THEN** `TransitionChange` throws `InvalidStateTransitionError` because `reviewing` is not a valid Change lifecycle state
+- **WHEN** the schema is built or resolved
+- **THEN** `buildSchema` throws `SchemaValidationError` because `reviewing` is not a valid Change lifecycle state
+- **AND** `TransitionChange` is never invoked with that name
+
+#### Scenario: Omitted workflow row does not delete the protocol state
+
+- **GIVEN** a schema whose `workflow[]` lists `designing` and `ready` but not `implementing`
+- **AND** `VALID_TRANSITIONS` still allows `ready → implementing`
+- **WHEN** `workflowStep("implementing")` is resolved
+- **THEN** the result is null (no extras)
+- **AND** the hop remains protocol-legal
 
 ### Requirement: Step semantics
 
@@ -62,6 +71,13 @@
 - **WHEN** step availability is evaluated
 - **THEN** the step is available
 
+#### Scenario: Status and execute share requires evaluation
+
+- **GIVEN** a step whose `requires` are unsatisfied
+- **WHEN** `GetStatus` and `TransitionChange` evaluate the same attempt
+- **THEN** both reject via `workflow.requires`
+- **AND** they do not disagree on `availableTransitions` versus execute
+
 ### Requirement: Task completion gating
 
 #### Scenario: Transition blocked when requiresTaskCompletion artifact has incomplete tasks
@@ -109,6 +125,13 @@
 - **WHEN** the transition fails
 - **THEN** the error reason includes `incomplete: 2`, `complete: 3`, `total: 5`
 
+#### Scenario: Task-completion check consumes CountTasks rather than the verdict walking files
+
+- **GIVEN** `requiresTaskCompletion` applies to `tasks`
+- **WHEN** predicate evaluation runs
+- **THEN** `workflow.taskCompletion.execute` uses `CountTasks`
+- **AND** `evaluateLifecycleVerdict` does not read the tasks file itself
+
 ### Requirement: Step availability evaluation
 
 #### Scenario: Availability reads persisted artifact state
@@ -142,11 +165,20 @@
 - **WHEN** `TransitionChange` transitions to this step
 - **THEN** pre-hooks execute before the state change occurs
 
-#### Scenario: Post-hooks execute after state change
+#### Scenario: Post-hooks execute before persist
 
 - **GIVEN** a workflow step with `post: [{ id: "teardown", run: "echo teardown" }]`
-- **WHEN** `TransitionChange` transitions to this step
-- **THEN** post-hooks execute after the state change completes
+- **AND** the attempt is `along = forward`
+- **WHEN** `TransitionChange` transitions from this step
+- **THEN** those post effects execute after predicates pass and before persist
+- **AND** they do not run after the state change is already persisted
+
+#### Scenario: Post run effects only match along forward
+
+- **GIVEN** `implementing.hooks.post` is configured
+- **WHEN** the attempt is `implementing → designing`
+- **THEN** those post effects do not match
+- **AND** `along` is `redesign`
 
 ### Requirement: Step requires reference artifact IDs
 
@@ -163,7 +195,7 @@
 - **WHEN** `buildSchema` validates the schema
 - **THEN** it throws `SchemaValidationError` because step gating only accepts artifact IDs
 
-### Requirement: Workflow array order is display order
+### Requirement: Workflow array order is display order and progress axis
 
 #### Scenario: Later step available before earlier step
 
@@ -174,14 +206,48 @@
 - **AND** `implementing` is not available (tasks incomplete)
 - **AND** `verifying` is available (verify complete)
 
+#### Scenario: Axis classifies along without sequential locking
+
+- **GIVEN** `workflow[]` order designing, ready, implementing, verifying
+- **WHEN** the attempt is `verifying → implementing`
+- **THEN** `along` is `backward`
+- **AND** consecutive-step occupancy is not required for that classification
+
+#### Scenario: designing is redesign not previous step
+
+- **WHEN** the attempt is `ready → designing`
+- **THEN** `along` is `redesign`
+
+#### Scenario: Omitted listed step still classifies along via fallback
+
+- **GIVEN** `workflow[]` omits `implementing`
+- **WHEN** the attempt is `ready → verifying`
+- **THEN** `along` is `forward`
+- **AND** `implementing` remains a protocol state
+
+#### Scenario: Omitted implementing keeps retry backward
+
+- **GIVEN** `workflow[]` omits `implementing`
+- **WHEN** the attempt is `verifying → implementing`
+- **THEN** `along` is `backward`
+
 ### Requirement: Two execution modes
 
 #### Scenario: Agent-driven step requires explicit hook invocation
 
-- **GIVEN** an agent-driven step `implementing` with `run:` pre-hooks
-- **WHEN** the agent enters the step
-- **THEN** hooks are NOT automatically executed by the transition
-- **AND** the agent must call `specd change run-hooks` to execute them
+- **GIVEN** an agent-driven step whose `run:` hooks the skill will run manually
+- **WHEN** `TransitionChange` is invoked with `skipHookPhases` covering those effects
+- **THEN** auto-hooks for those phases are skipped
+- **AND** predicates still run
+- **AND** without skip flags, matching `run:` effects still auto-execute
+
+#### Scenario: TransitionChange auto-runs matching run effects
+
+- **GIVEN** a forward transition with matching `run:` post hooks
+- **AND** `skipHookPhases` is empty
+- **WHEN** `TransitionChange` executes
+- **THEN** those effects run after predicates pass
+- **AND** the agent is not required to call `run-hooks` for the default path
 
 #### Scenario: Deterministic step executes hooks internally
 

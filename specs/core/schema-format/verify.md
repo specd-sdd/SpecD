@@ -164,8 +164,15 @@
 
 #### Scenario: Artifact with dependency chain
 
-- **WHEN** artifact B declares `requires: [a]` and artifact A is `in-progress`
-- **THEN** `Change.effectiveStatus('b')` must return `in-progress`
+- **WHEN** artifact B declares `requires: [a]`, artifact A is `in-progress`, and B is `complete`
+- **THEN** `projectArtifacts` effective status for `b` is `in-progress`
+- **AND** there is no `Change.effectiveStatus()` method
+
+#### Scenario: Artifact blocked by parent pending review
+
+- **WHEN** artifact B declares `requires: [a]`, artifact A is `pending-review`, and B is `complete`
+- **THEN** `projectArtifacts` effective status for `b` is `pending-parent-artifact-review`
+- **AND** there is no `Change.effectiveStatus()` method
 
 #### Scenario: Circular dependency in artifact graph
 
@@ -571,15 +578,16 @@
 #### Scenario: Step with unsatisfied prerequisites
 
 - **WHEN** a step's `requires` lists an artifact that is not `complete`
-- **THEN** `CompileContext` must report that the step is blocked
+- **THEN** hop availability for that target is reported by `GetStatus` / `evaluateLifecycle` as blocked
+- **AND** `CompileContext` MUST NOT evaluate that availability
 
 #### Scenario: Step blocked when required artifact deleted mid-lifecycle
 
 - **GIVEN** a workflow step `implementing` with `requires: [proposal, specs, verify, design, tasks]`
 - **AND** a change where `design` artifact has been deleted (status reverts to `missing`)
-- **WHEN** `CompileContext` evaluates step availability for `implementing`
-- **THEN** `stepAvailable` is `false`
-- **AND** `blockingArtifacts` includes `"design"`
+- **WHEN** hop availability for `implementing` is evaluated
+- **THEN** the hop is not in `availableTransitions`
+- **AND** `CompileContext` MUST NOT report `stepAvailable`
 
 #### Scenario: Hook entries require id
 
@@ -592,6 +600,20 @@
 - **AND** artifact `proposal` has `hasTasks: false`
 - **WHEN** the schema is resolved
 - **THEN** `SchemaRegistry.resolve()` must throw a `SchemaValidationError`
+
+#### Scenario: Omitted workflow step is not a deleted lifecycle state
+
+- **GIVEN** a schema whose `workflow[]` omits `implementing`
+- **WHEN** the schema is resolved
+- **THEN** `implementing` remains a valid Change lifecycle state
+- **AND** `workflow[]` still only attaches extras to listed `step` names
+
+#### Scenario: Unknown workflow step is rejected at schema build
+
+- **GIVEN** a schema whose `workflow[]` includes `step: reviewing`
+- **WHEN** `buildSchema` runs
+- **THEN** it throws `SchemaValidationError`
+- **AND** the unknown name does not become an axis slot
 
 ### Requirement: Explicit external hook entries
 

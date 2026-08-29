@@ -81,6 +81,8 @@ specd changes status <name> [options]
 
 Show the full status of a change: associated specs, artifact file statuses, current lifecycle state, available transitions, and any blockers preventing progression.
 
+Available transitions are **check-derived**: the same predicate evaluation used by `change transition` (protocol edge, workflow `requires`, task completion on the target step, enter-`ready` and exit-`implementing` guards, approval on the delivery edge). They are not the protocol list alone.
+
 `changes status` provides high-visibility diagnostics including:
 
 - **Artifact DAG**: An ASCII tree rendering of the artifact dependency hierarchy, showing the status and scope of each artifact.
@@ -89,7 +91,9 @@ Show the full status of a change: associated specs, artifact file statuses, curr
 
 It also exposes both the aggregate state of each artifact and the state of each tracked file inside that artifact. Structured output includes an `artifactDag` array for structural analysis and a `review` block for identifying artifacts that require attention.
 
-In JSON mode, the output includes a `nextAction` object and a `blockers` array. A top-level `approvalGates` object reports whether spec approval and signoff approval are enabled in the project config.
+Drafted changes are read-only. Text mode marks the state as `(drafted)` and prints `transitions: (none — change is drafted)`. JSON/TOON include `isDrafted: true`, empty `availableTransitions`, and `nextAction.command: null`.
+
+In JSON mode, the output includes a `nextAction` object and a `blockers` array. A top-level `approvalGates` object reports whether spec approval and signoff approval are enabled in the project config. Extra-bearing workflow rows appear as `availableSteps` (not protocol membership). Blockers from failed predicates include optional `label` and `checkId`.
 
 Artifact and file states:
 
@@ -116,12 +120,13 @@ specd changes transition <name> --next [options]
 ```
 
 Transition the change to a new lifecycle state. You can either provide an explicit
-`<step>` or use `--next` to resolve the next logical forward transition from the
-change's current state.
+`<step>` or use `--next`. The CLI passes `to: 'next'` into Core `TransitionChange`;
+Core resolves the happy-path next state (`HAPPY_PATH_NEXT`). This is not
+`GetStatus.nextAction`.
 
-When a transition fails (e.g. due to missing artifacts or drifted content), the command renders a **Repair Guide** to stdout, providing the blocker codes and a recommended next command to resolve the issue.
+When a transition fails (e.g. due to missing artifacts or drifted content), the command renders a **Repair Guide** to **stderr**, providing the blocker codes and a recommended next command to resolve the issue.
 
-`--next` currently resolves:
+`--next` happy-path map in Core:
 
 - `drafting -> designing`
 - `designing -> ready`
@@ -130,30 +135,39 @@ When a transition fails (e.g. due to missing artifacts or drifted content), the 
 - `implementing -> verifying`
 - `verifying -> done`
 - `done -> archivable`
+- `signed-off -> archivable`
+
+Core rejects `--next` from `pending-spec-approval`, `pending-signoff`,
+`archivable`, and `archiving`.
 
 The resolved target still goes through the normal `TransitionChange` flow, so
-approval-gate routing, `requires` checks, task completion gating, and hook
-execution behave exactly as they do for an explicit target.
+`requires` checks, task completion gating, approval predicates on the requested
+delivery edge, and hook execution behave exactly as they do for an explicit
+target. The CLI does **not** rewrite `implementing` to `pending-spec-approval`
+or `archivable` to `pending-signoff`. If a spec or signoff gate is on and
+consent is not recorded, the change stays in `ready` / `done` and the command
+fails with `APPROVAL_REQUIRED`.
 
-When transition hooks run, `change transition` uses the same hook-progress
-presentation as `change run-hooks`:
+When transition checks and hooks run, `change transition` uses the generic
+check-progress bus (`stream: "change-transition"`), not the `run-hooks`
+`hook-progress` stream:
 
-- In `text` format, completed hooks stay visible, the active hook shows a
-  running state, recent output remains visible, and quiet hooks still emit
-  liveness updates.
+- In `text` format, each check prints its gerund label, optional progress
+  lines, and a pass/fail mark. Completed checks stay visible.
 - In `json` and `toon`, all machine-readable output is emitted on `stdout` as a
-  newline-delimited stream of structured records. Hook events use
-  `stream: "hook-progress"`. Transition lifecycle events use
-  `stream: "change-transition"`. The final result is emitted as a terminal
-  `complete` event in that same stream. `stderr` is reserved for text-mode
-  progress and non-structured process diagnostics.
+  newline-delimited stream of structured records with `stream: "change-transition"`
+  (`check-start` / `check-progress` / `check-done`, then a terminal `complete`
+  event). `stderr` is reserved for text-mode progress, the Repair Guide, and
+  non-structured process diagnostics. `change run-hooks` remains on
+  `stream: "hook-progress"`.
 
-| Option                      | Description                                                                                                        |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `--next`                    | Resolve the next logical lifecycle target from the current state. Mutually exclusive with `<step>`.                |
-| `--skip-hooks <phases>`     | Skip hooks at the specified phases. Valid values: `source.pre`, `source.post`, `target.pre`, `target.post`, `all`. |
-| `--format text\|json\|toon` | Output format.                                                                                                     |
-| `--config <path>`           | Config file path.                                                                                                  |
+| Option                      | Description                                                                                                                          |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `--next`                    | Resolve the next logical lifecycle target from the current state. Mutually exclusive with `<step>`.                                  |
+| `--allow-out-of-scope`      | Permit the hop when implementation links resolve outside the change scope (`impl.linksInScope`). Does not bypass open tracked files. |
+| `--skip-hooks <phases>`     | Skip hooks at the specified phases. Valid values: `source.pre`, `source.post`, `target.pre`, `target.post`, `all`.                   |
+| `--format text\|json\|toon` | Output format.                                                                                                                       |
+| `--config <path>`           | Config file path.                                                                                                                    |
 
 ```bash
 # Resolve the next transition automatically
@@ -290,7 +304,7 @@ Dependency-blocked failures are status-aware. When validation is blocked by an u
 specd changes approve spec <name> [options]
 ```
 
-Record a spec approval for the change. This command is only meaningful when `approvals.spec: true` in `specd.yaml`. It moves the change from `pending-spec-approval` to `spec-approved`, unblocking the `ready → implementing` transition.
+Record a spec approval for the change. This command is only meaningful when `approvals.spec: true` in `specd.yaml`. From `ready`, it records consent and **leaves the change in `ready`**, unblocking the same `ready → implementing` transition. It does not move the change to `pending-spec-approval`. For in-flight changes already in `pending-spec-approval`, the command still drains to `spec-approved`.
 
 | Option                      | Description                    |
 | --------------------------- | ------------------------------ |
@@ -304,7 +318,7 @@ Record a spec approval for the change. This command is only meaningful when `app
 specd changes approve signoff <name> [options]
 ```
 
-Record a sign-off for the change. This command is only meaningful when `approvals.signoff: true` in `specd.yaml`. It moves the change from `pending-signoff` to `signed-off`, unblocking the `done → archivable` transition.
+Record a sign-off for the change. This command is only meaningful when `approvals.signoff: true` in `specd.yaml`. From `done`, it records consent and **leaves the change in `done`**, unblocking the same `done → archivable` transition. It does not move the change to `pending-signoff`. For in-flight changes already in `pending-signoff`, the command still drains to `signed-off`.
 
 | Option                      | Description                    |
 | --------------------------- | ------------------------------ |
@@ -560,17 +574,22 @@ While archive runs, the change remains `archivable` through guards, pre-archive 
 
 If other active changes target the same specs, the archive is blocked by default. Use `--allow-overlap` to proceed despite the overlap.
 
-If implementation sidecar maintenance would update `spec-lock.json` for specs outside the change scope, archive is also blocked by default. Use `--allow-out-of-scope` only when those extra sidecar updates are intentional.
+If implementation links resolve to specs outside the change scope (`impl.linksInScope`), archive is blocked by default. Use `--allow-out-of-scope` only when that out-of-scope link set is intentional. The flag does not bypass unresolved tracked files (`impl.filesResolved`).
 
 Tracked implementation files must be resolved or ignored before archive succeeds.
 
-| Option                      | Description                                                                  |
-| --------------------------- | ---------------------------------------------------------------------------- |
-| `--skip-hooks <phases>`     | Skip archive hook phases. Valid values: `pre`, `post`, `all`.                |
-| `--allow-overlap`           | Permit archiving despite spec overlap with other active changes.             |
-| `--allow-out-of-scope`      | Permit archive-time implementation sidecar updates outside the change scope. |
-| `--format text\|json\|toon` | Output format.                                                               |
-| `--config <path>`           | Config file path.                                                            |
+When archive checks and hooks run, `change archive` uses the generic check-progress bus (`stream: "change-archive"`), not the `run-hooks` `hook-progress` stream and not `change-transition`:
+
+- In `text` format, each check prints its gerund label, optional progress lines, and a pass/fail mark. Completed checks stay visible.
+- In `json` and `toon`, all machine-readable output is emitted on `stdout` as a newline-delimited stream of structured records with `stream: "change-archive"` (`check-start` / `check-progress` / `check-done`, then a terminal `complete` event whose `result` includes `result: "ok"`, `name`, `archivePath`, and `invalidatedChanges`). `stderr` is reserved for text-mode progress and non-structured process diagnostics.
+
+| Option                      | Description                                                                                                      |
+| --------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `--skip-hooks <phases>`     | Skip archive hook phases. Valid values: `pre`, `post`, `all`.                                                    |
+| `--allow-overlap`           | Permit archiving despite spec overlap with other active changes.                                                 |
+| `--allow-out-of-scope`      | Permit archiving when implementation links resolve outside the change scope. Does not bypass open tracked files. |
+| `--format text\|json\|toon` | Output format.                                                                                                   |
+| `--config <path>`           | Config file path.                                                                                                |
 
 ### change run-hooks
 
@@ -580,8 +599,7 @@ specd changes run-hooks <name> <step> [options]
 
 Execute the `run:` hooks defined for a lifecycle step outside of a transition. Useful for re-running hooks after a failure or for manual invocation.
 
-`change run-hooks` shares the same live hook-progress presentation as
-`change transition`:
+`change run-hooks` keeps a **distinct** public JSON stream (`hook-progress` / terminal `run-hooks`). It does not share a stream name with `change transition` (`change-transition`) or `change archive` (`change-archive`). Text-mode live output is still gerund progress on stderr:
 
 - In `text` format, progress is visible while the hook is still running. The
   active hook shows its command, recent output, and liveness updates. Completed

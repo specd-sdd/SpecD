@@ -1,0 +1,129 @@
+- op: modified
+  description: 'workflow[] is lookup onto existing states, not protocol membership'
+  selector:
+    type: section
+    matches: '^Requirement: Step names reference domain lifecycle states$'
+  content: |
+    The Change entity defines a fixed set of lifecycle states (`drafting`, `designing`, `ready`, `implementing`, `verifying`, `done`, `archivable`, `archiving`). Drain-only approval states (`pending-spec-approval`, `spec-approved`, `pending-signoff`, `signed-off`) exist on `ChangeState` for historical recovery; they are not `workflow[]` extras and MUST NOT be introduced as schema steps. Protocol membership and legal hops SHALL come from `ChangeState` and `VALID_TRANSITIONS`.
+
+    The schema's `workflow[]` array SHALL treat `step` as a lookup key onto an existing state. A matching row SHALL attach only that state's extra configuration (`requires`, `requiresTaskCompletion`, `hooks`). A `workflow[]` entry MUST NOT introduce a new lifecycle state.
+
+    Omitting a known state from `workflow[]` MUST NOT remove that state from the protocol. When no row matches, `workflowStep(state)` SHALL be null: the hop remains legal when `VALID_TRANSITIONS` allows it, with no schema extras.
+
+    If a schema declares a `step` value that does not correspond to a valid Change lifecycle state, `buildSchema` / schema resolve MUST throw `SchemaValidationError`. That string MUST NOT occupy a progress-axis slot (it MUST NOT invert `along` for real states). Resolved schemas never contain unknown step names, so `TransitionChange` is not the rejection site. The domain enforces the state machine; the schema configures flags and hooks for named states.
+
+- op: modified
+  description: 'Purpose does not list CompileContext as availability consumer'
+  selector:
+    type: section
+    matches: '^Purpose$'
+  content: |
+    The schema format defines the YAML structure of workflow step entries, but not what those steps mean semantically — when they are available, how they relate to change state, or how hooks and requires are enforced. Without a dedicated semantic model, `GetStatus`, `TransitionChange`, and related use cases would interpret step semantics independently. `CompileContext` MUST NOT evaluate hop availability. This spec defines the semantic model of workflow steps: how step names relate to change states, how requires-based gating works, and how hooks are executed at step boundaries.
+
+- op: modified
+  description: 'requires is a schema-derived check with to=effective'
+  selector:
+    type: section
+    matches: '^Requirement: Requires-based gating$'
+  content: |
+    Each workflow step declares a `requires` array of artifact IDs. That declaration SHALL be evaluated as the `workflow.requires` check with `to = effective` (see [`core:transition-checks`](../transition-checks/spec.md)). Status and `TransitionChange` MUST share that evaluation.
+
+    If any required artifact has an effective status other than `complete` or `skipped`, the transition is rejected with `InvalidStateTransitionError`.
+
+    An empty or omitted `requires` means the step has no artifact gating — the `workflow.requires` check skips. Other matching predicates (`protocol.edge`, enter-ready deps, approvals, …) MAY still block the hop.
+
+    A skipped optional artifact satisfies the requirement identically to a completed one.
+
+    Artifacts in `missing`, `in-progress`, `pending-review`, or `drifted-pending-review` do not satisfy `requires`.
+
+- op: modified
+  description: 'Step availability from CheckResults not CompileContext'
+  selector:
+    type: section
+    matches: '^Requirement: Step availability evaluation$'
+  content: |
+    Step availability for hops MUST come from `evaluateLifecycleVerdict` projections of predicate `CheckResult`s (`availableTransitions` / `isReady` from `workflow.requires` when those results are present). `GetStatus` reports that projection. `CompileContext` MUST NOT evaluate step availability and MUST NOT call `evaluateLifecycleVerdict`.
+
+    DAG completeness (`complete` / `skipped` vs parent-review) MAY use `projectArtifacts` when `checksByTarget` is empty. Hop consumers MUST NOT independently re-walk `requires` with a different blocker-code algorithm than the check.
+
+    ```
+    stepAvailable(step, change) =
+      matching predicates for the hop all pass or skip
+    ```
+
+    This evaluation is performed dynamically on each invocation — it is not cached or snapshotted. An empty `requires` does not make the hop protocol-legal.
+
+- op: modified
+  description: 'taskCompletion is a schema-derived check with to=effective'
+  selector:
+    type: section
+    matches: '^Requirement: Task completion gating$'
+  content: |
+    When a workflow step declares a `requiresTaskCompletion` array, that declaration SHALL be evaluated as the `workflow.taskCompletion` check with `to = effective`. Only artifacts listed in `requiresTaskCompletion` are content-checked — other artifacts in `requires` are checked only via `effectiveStatus`.
+
+    The `requiresTaskCompletion` array MUST be a subset of the step's `requires` array. Each listed artifact ID MUST reference an artifact type that declares `taskCompletionCheck` on its `ArtifactType`. These constraints are validated at schema build time by `buildSchema`.
+
+    For each artifact ID in `requiresTaskCompletion`:
+
+    1. Look up the `ArtifactType` from the schema to obtain `taskCompletionCheck.incompletePattern`.
+    2. Get the `ChangeArtifact` via `change.getArtifact(artifactId)`. If it does not exist, skip it.
+    3. Iterate the artifact's `files` map. For each `ArtifactFile`, load the file content via `ChangeRepository.artifact(change, file.filename)`.
+    4. If the file does not exist (returns `null`), skip it.
+    5. Compile `incompletePattern` using `safeRegex` with the `'m'` flag.
+    6. If the regex is valid and matches any line in the file content, reject the transition with `InvalidStateTransitionError` including a structured reason (`incomplete-tasks`) with the artifact ID and match counts.
+
+    Application use cases MUST NOT duplicate file walks in `evaluateLifecycleVerdict`. `CountTasks` SHALL be composed into `workflow.taskCompletion` via `createWorkflowTaskCompletion`.
+
+    When `requiresTaskCompletion` is absent or empty on a workflow step, no task completion gating applies — even if the step requires artifacts that declare `taskCompletionCheck`. The `taskCompletionCheck` on the artifact type defines _what_ pattern to check; the workflow step's `requiresTaskCompletion` controls _when_ it applies.
+
+- op: modified
+  description: 'workflow[] order is the progress axis for along, not consecutive-step locking'
+  selector:
+    type: section
+    matches: '^Requirement: Workflow array order is display order$'
+  rename: 'Requirement: Workflow array order is display order and progress axis'
+  content: |
+    The order of entries in the `workflow` array is the intended display order for tooling (e.g. `GetStatus` shows the current step/state). `CompileContext` MAY list steps in this order for display; it MUST NOT evaluate step availability or call `evaluateLifecycleVerdict`.
+
+    That same order SHALL be the **progress axis** used to classify `along` as `forward` or `backward` (see [`core:transition-checks`](../transition-checks/spec.md)). Delivery states absent from `workflow[]` SHALL still appear on the axis, spliced by canonical `AXIS_FALLBACK` index (`buildAxis`), not tail-appended after later listed names. It MUST NOT mean consecutive steps are mandatory. Omitting a row MUST NOT make the corresponding protocol hop illegal. Each listed step remains independently gated by its own `requires` / checks.
+
+    `to = designing` is `redesign`, not “the previous workflow step”. `archiving → archivable` is `recovery`, not backward retry.
+
+    A step appearing later in the array may become available before an earlier one if its `requires` are satisfied first.
+
+- op: modified
+  description: 'Hooks selected by the same from/to/along matcher'
+  selector:
+    type: section
+    matches: '^Requirement: Hook execution at step boundaries$'
+  content: |
+    All workflow steps can declare `run:` and `instruction:` hooks in their `pre` and `post` phases. `run:` entries are **effects** selected with the same `from` / `to` / `along` matcher as predicates: pre matches `to = that step`, `from = *`, `along = any`; post matches `from = that step`, `to = *`, `along = forward` only. `instruction:` entries are not in the predicate/effect pipeline.
+
+    `TransitionChange` executes matching `run:` effects after predicates pass and **before persist** (`hook.post` on transitions is `phase = before-persist`), unless skipped via `skipHookPhases`. The archiving step's archive `run:` hooks are executed by `ArchiveChange` as operation `archive`, not as a lifecycle `along` value.
+
+- op: modified
+  description: 'Auto-run effects is the pipeline; skipHookPhases is the agent override'
+  selector:
+    type: section
+    matches: '^Requirement: Two execution modes$'
+  content: |
+    `TransitionChange` SHALL auto-execute matching `run:` effects after predicates pass unless `skipHookPhases` skips them. `ArchiveChange` SHALL auto-execute operation-`archive` effects according to binding `phase` / `onFailure`.
+
+    Skills MAY pass `skipHookPhases` and invoke `run-hooks` / `hook-instruction` manually. That MUST NOT be a second pipeline where agent-driven steps never auto-run. There is one pipeline: predicates then matching effects.
+
+- op: modified
+  description: 'Axis is not sequential locking'
+  selector:
+    type: section
+    matches: '^Constraints$'
+  content: |
+    - Lifecycle states and legal hops are defined by the Change entity (`ChangeState`, `VALID_TRANSITIONS`). `workflow[]` looks up extra flags/hooks; it does not add, remove, or reorder protocol membership
+    - Step availability is computed dynamically by `evaluateLifecycleVerdict` from predicate `CheckResult`s and DAG `projectArtifacts` — never from `change.effectiveStatus()` (the entity has no such method) and never cached
+    - `workflow` array order is display order **and** the progress axis for `along` (missing delivery states spliced by `AXIS_FALLBACK` index); it does not create implicit sequential dependencies between consecutive steps
+    - A step with an empty `requires` has no artifact gating; `protocol.edge` and other matching predicates may still block the hop
+    - Step `requires` contains artifact IDs, not step names — step-to-step cycles are structurally impossible
+    - The artifact dependency graph is validated as a DAG by `buildSchema()` — cycles are rejected at schema load time
+    - The archiving step is the only step that is both a workflow step and handled by a dedicated use case (`ArchiveChange`)
+    - Task completion gating is controlled by `requiresTaskCompletion` on the workflow step — not by the mere presence of `taskCompletionCheck` on the artifact type
+    - `requiresTaskCompletion` must be a subset of `requires` and reference artifacts with `taskCompletionCheck` — validated at schema build time
+    - Task completion checks use `safeRegex` to compile patterns; patterns that fail compilation or contain nested quantifiers are treated as non-matching (no error thrown)

@@ -7,17 +7,16 @@
     "cli:entrypoint",
     "core:change",
     "core:get-status",
-    "sdk:build-implementation-review"
+    "sdk:build-implementation-review",
+    "core:transition-checks"
   ],
   "implementation": [
     {
-      "file": "cli:src/commands/change/status.ts"
+      "file": "cli:src/commands/change/status.ts",
+      "symbols": ["registerChangeStatus"]
     },
     {
-      "file": "cli:test/commands/change-status.spec.ts"
-    },
-    {
-      "file": "cli:test/commands/change-implementation-review-integration.spec.ts"
+      "file": "cli:test/commands/change.spec.ts"
     }
   ],
   "optimizations": {

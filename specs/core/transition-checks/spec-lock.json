@@ -1,0 +1,174 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "core:change",
+    "core:workflow-model",
+    "core:schema-format",
+    "default:_global/architecture"
+  ],
+  "implementation": [
+    {
+      "file": "core:src/domain/services/transition-checks.ts",
+      "symbols": [
+        "classifyAlong",
+        "CheckId",
+        "CheckResult",
+        "Check",
+        "CHECK_LABELS",
+        "checkLabel",
+        "pass",
+        "fail",
+        "skip",
+        "CheckProgressEvent",
+        "OnCheckProgress",
+        "CheckExecutionContext",
+        "applyBindingSpecs",
+        "CheckBindingSpec",
+        "checkMatches"
+      ]
+    },
+    {
+      "file": "core:src/domain/services/evaluate-transition-predicates.ts",
+      "symbols": ["bindingMatches", "transitionAttempt", "unmatchedSkipResults"]
+    },
+    {
+      "file": "core:src/domain/services/lifecycle-engine.ts",
+      "symbols": ["LifecycleEngine", "_blockersFromFailedChecks"]
+    },
+    {
+      "file": "core:src/domain/value-objects/change-state.ts",
+      "symbols": ["isValidTransition"]
+    },
+    {
+      "file": "core:test/domain/services/transition-checks.spec.ts"
+    },
+    {
+      "file": "core:src/domain/checks/index.ts"
+    },
+    {
+      "file": "core:src/domain/checks/protocol-edge.ts"
+    },
+    {
+      "file": "core:src/domain/checks/workflow-requires.ts"
+    },
+    {
+      "file": "core:src/domain/checks/workflow-task-completion.ts"
+    },
+    {
+      "file": "core:src/domain/checks/deps-consistent.ts",
+      "symbols": ["runDepsConsistent", "DependsOnMismatch"]
+    },
+    {
+      "file": "core:src/domain/checks/workspace-read-only.ts",
+      "symbols": ["runWorkspaceReadOnly", "ReadOnlySpecDetail"]
+    },
+    {
+      "file": "core:src/domain/checks/impl-files-resolved.ts",
+      "symbols": ["formatOpenTrackedFilesMessage", "runImplFilesResolved"]
+    },
+    {
+      "file": "core:src/domain/checks/impl-links-in-scope.ts"
+    },
+    {
+      "file": "core:src/domain/checks/approval-spec.ts"
+    },
+    {
+      "file": "core:src/domain/checks/approval-signoff.ts"
+    },
+    {
+      "file": "core:src/domain/checks/schema-name-match.ts"
+    },
+    {
+      "file": "core:src/domain/checks/archive-archivable.ts"
+    },
+    {
+      "file": "core:src/domain/checks/spec-overlap.ts",
+      "symbols": ["runSpecOverlap", "SpecOverlapPeerDetail"]
+    },
+    {
+      "file": "core:src/domain/services/check-bindings.ts",
+      "symbols": [
+        "TRANSITION_BINDING_SPECS",
+        "ARCHIVE_BINDING_SPECS",
+        "TRANSITION_BINDINGS",
+        "ARCHIVE_BINDINGS",
+        "boundFromStates"
+      ]
+    },
+    {
+      "file": "core:src/application/checks/workflow-check.ts",
+      "symbols": ["WorkflowCheck"]
+    },
+    {
+      "file": "core:src/application/checks/workflow-check-registry.ts",
+      "symbols": ["createWorkflowCheckRegistry"]
+    },
+    {
+      "file": "core:src/application/checks/workflow-task-completion.ts"
+    },
+    {
+      "file": "core:src/application/checks/protocol-edge.ts"
+    },
+    {
+      "file": "core:src/application/checks/workflow-requires.ts"
+    },
+    {
+      "file": "core:src/application/checks/deps-consistent.ts"
+    },
+    {
+      "file": "core:src/application/checks/workspace-read-only.ts"
+    },
+    {
+      "file": "core:src/application/checks/impl-files-resolved.ts"
+    },
+    {
+      "file": "core:src/application/checks/impl-links-in-scope.ts"
+    },
+    {
+      "file": "core:src/application/checks/approval-spec.ts"
+    },
+    {
+      "file": "core:src/application/checks/approval-signoff.ts"
+    },
+    {
+      "file": "core:src/application/checks/schema-name-match.ts"
+    },
+    {
+      "file": "core:src/application/checks/archive-archivable.ts"
+    },
+    {
+      "file": "core:src/application/checks/spec-overlap.ts",
+      "symbols": ["createSpecOverlap", "SpecOverlapDetection"]
+    },
+    {
+      "file": "core:src/application/services/execute-matching-predicates.ts",
+      "symbols": [
+        "executeCheckWithProgress",
+        "buildCheckExecutionContext",
+        "executeMatchingPredicates"
+      ]
+    },
+    {
+      "file": "core:src/composition/use-cases/workflow-check-registry.ts"
+    },
+    {
+      "file": "core:test/application/checks/workflow-check-factories.spec.ts"
+    },
+    {
+      "file": "core:src/application/use-cases/index.ts"
+    },
+    {
+      "file": "core:test/application/services/execute-check-with-progress.spec.ts"
+    },
+    {
+      "file": "core:src/application/services/ready-predicate-facts.ts",
+      "symbols": ["loadReadyPredicateFacts", "ReadyPredicateFactsDeps", "extractDependsOnForSpec"]
+    },
+    {
+      "file": "core:src/domain/services/index.ts"
+    }
+  ]
+}

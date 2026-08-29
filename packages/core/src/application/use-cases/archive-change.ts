@@ -2,7 +2,6 @@ import path from 'node:path'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
 import { SchemaMismatchError } from '../errors/schema-mismatch-error.js'
 import { ParserNotRegisteredError } from '../errors/parser-not-registered-error.js'
-import { HookFailedError } from '../../domain/errors/hook-failed-error.js'
 import { ReadOnlyWorkspaceError } from '../../domain/errors/read-only-workspace-error.js'
 import { type ChangeRepository } from '../ports/change-repository.js'
 import { type SpecRepository } from '../ports/spec-repository.js'
@@ -10,6 +9,7 @@ import { type ArchiveRepository } from '../ports/archive-repository.js'
 import { type ActorResolver } from '../ports/actor-resolver.js'
 import { type ArtifactParserRegistry } from '../ports/artifact-parser.js'
 import { type SchemaProvider } from '../ports/schema-provider.js'
+import { type ContentHasher } from '../ports/content-hasher.js'
 import { type ExtractorTransformRegistry } from '../../domain/services/extract-metadata.js'
 import { type ArchivedChange } from '../../domain/entities/archived-change.js'
 import { type ActorIdentity, type Change } from '../../domain/entities/change.js'
@@ -20,26 +20,41 @@ import { SpecPath } from '../../domain/value-objects/spec-path.js'
 import { parseSpecId } from '../../domain/services/parse-spec-id.js'
 import { detectSpecOverlap } from '../../domain/services/detect-spec-overlap.js'
 import { SpecOverlapError } from '../../domain/errors/spec-overlap-error.js'
+import { type OverlapEntry } from '../../domain/value-objects/overlap-entry.js'
 import { SpecArtifact } from '../../domain/value-objects/spec-artifact.js'
 import { inferFormat } from '../../domain/services/format-inference.js'
 import { type MaterializeSpecMetadata } from './materialize-spec-metadata.js'
 import { applyPersistedSpecStatePatch } from '../../domain/services/apply-persisted-spec-state-patch.js'
-import { readCachedSpecMetadata } from './_shared/read-cached-spec-metadata.js'
-import { type RunStepHooks } from './run-step-hooks.js'
+import { resolveSealedArchiveDependsOn } from '../services/resolve-sealed-archive-depends-on.js'
 import { Logger } from '../logger.js'
 import { type ArchiveBatchSnapshotPort } from '../ports/archive-batch-snapshot.js'
 import { createNoopArchiveBatchSnapshot } from '../archive-batch-snapshot-noop.js'
 import { ArchiveBatchRestoreError } from '../../domain/errors/archive-batch-restore-error.js'
-import { DependsOnOverwriteError } from '../../domain/errors/depends-on-overwrite-error.js'
 import { ArchiveArtifactMissingError } from '../../domain/errors/archive-artifact-missing-error.js'
 import { ArchiveDependencyMismatchError } from '../../domain/errors/archive-dependency-mismatch-error.js'
 import { ArchiveImplementationStateError } from '../../domain/errors/archive-implementation-state-error.js'
+import { runDepsConsistent } from '../../domain/services/evaluate-transition-predicates.js'
+import {
+  type CheckBinding,
+  type CheckProgressEvent,
+  type CheckResult,
+  type OnCheckProgress,
+} from '../../domain/services/transition-checks.js'
+import { throwHookFailed } from '../checks/hook-failed.js'
+import {
+  buildCheckExecutionContext,
+  executeCheckWithProgress,
+  executeMatchingPredicates,
+} from '../services/execute-matching-predicates.js'
+import { collectOutOfScopeImplementationSpecIds } from '../services/detect-impl-links-in-scope.js'
 import {
   extractMetadataFromSpecArtifacts,
   type MetadataArtifactInput,
 } from './_shared/extract-metadata-from-spec-artifacts.js'
 import { type SpecWorkspaceRoute } from './_shared/spec-reference-resolver.js'
+import { isExcludedByPrefix } from '../services/is-excluded-by-prefix.js'
 import { type ListWorkspaces, type ProjectWorkspace } from './list-workspaces.js'
+import { hookFailureMode, matchingEffects } from '../services/execute-hook-effect.js'
 
 /** Selectors for granular hook-phase skipping during archiving. */
 export type ArchiveHookPhaseSelector = 'pre' | 'post' | 'all'
@@ -71,6 +86,9 @@ export interface ArchiveChangeInput {
    */
   readonly allowOutOfScope?: boolean
 }
+
+/** Callback for receiving archive check progress events. */
+export type OnArchiveProgress = (event: CheckProgressEvent) => void
 
 /** Entry describing a change invalidated due to spec overlap during archive. */
 export interface InvalidatedChangesEntry {
@@ -144,6 +162,7 @@ interface PreparedArchivePreflightSpec {
     | readonly { readonly file: string; readonly symbols?: readonly string[] }[]
     | null
   readonly finalDependsOn: readonly string[]
+  readonly extractedDependsOn: readonly string[] | undefined
   readonly publicationPersistedState:
     | import('../../domain/services/apply-persisted-spec-state-patch.js').PersistedSpecState
     | undefined
@@ -167,7 +186,6 @@ export class ArchiveChange {
   private readonly _changes: ChangeRepository
   private readonly _listWorkspaces: ListWorkspaces
   private readonly _archive: ArchiveRepository
-  private readonly _runStepHooks: RunStepHooks
   private readonly _actor: ActorResolver
   private readonly _parsers: ArtifactParserRegistry
   private readonly _schemaProvider: SchemaProvider
@@ -176,6 +194,8 @@ export class ArchiveChange {
   private readonly _workspaceRoutes: readonly SpecWorkspaceRoute[]
   private readonly _projectRoot: string
   private readonly _batchSnapshot: ArchiveBatchSnapshotPort
+  private readonly _archiveBindings: readonly CheckBinding[]
+  private readonly _hasher: ContentHasher | undefined
 
   /**
    * Creates a new `ArchiveChange` use case instance.
@@ -183,7 +203,7 @@ export class ArchiveChange {
    * @param changes - Repository for loading the change
    * @param listWorkspaces - The project orchestrator
    * @param archive - Repository for archiving the change
-   * @param runStepHooks - Use case for executing workflow hooks
+   * @param archiveBindings - Registry archive checks from composition (`create*` + binding table)
    * @param actor - Resolver for the actor identity
    * @param parsers - Registry of artifact format parsers
    * @param schemaProvider - Provider for the fully-resolved schema
@@ -192,12 +212,13 @@ export class ArchiveChange {
    * @param workspaceRoutes - Workspace routing metadata for cross-workspace spec reference resolution
    * @param projectRoot - Project root used to canonicalize raw implementation paths
    * @param batchSnapshot - Batch canonical snapshot adapter for commit rollback
+   * @param hasher - Content hasher for lock-less disk `dependsOn` extraction
    */
   constructor(
     changes: ChangeRepository,
     listWorkspaces: ListWorkspaces,
     archive: ArchiveRepository,
-    runStepHooks: RunStepHooks,
+    archiveBindings: readonly CheckBinding[],
     actor: ActorResolver,
     parsers: ArtifactParserRegistry,
     schemaProvider: SchemaProvider,
@@ -206,11 +227,11 @@ export class ArchiveChange {
     workspaceRoutes: readonly SpecWorkspaceRoute[] = [],
     projectRoot = process.cwd(),
     batchSnapshot: ArchiveBatchSnapshotPort = createNoopArchiveBatchSnapshot(),
+    hasher?: ContentHasher,
   ) {
     this._changes = changes
     this._listWorkspaces = listWorkspaces
     this._archive = archive
-    this._runStepHooks = runStepHooks
     this._actor = actor
     this._parsers = parsers
     this._schemaProvider = schemaProvider
@@ -219,6 +240,8 @@ export class ArchiveChange {
     this._workspaceRoutes = workspaceRoutes
     this._projectRoot = projectRoot
     this._batchSnapshot = batchSnapshot
+    this._archiveBindings = archiveBindings
+    this._hasher = hasher
   }
 
   /**
@@ -226,161 +249,105 @@ export class ArchiveChange {
    * delta artifacts, archives the change, and runs post-hooks.
    *
    * @param input - Archive parameters
+   * @param onProgress - Optional callback for generic check progress events
    * @returns Archive result with the persisted record and any post-hook failures
    * @throws {ChangeNotFoundError} If no change with the given name exists
    * @throws {SchemaNotFoundError} If the schema reference cannot be resolved
-   * @throws {InvalidStateTransitionError} If the change is not in `archivable` state
+   * @throws {InvalidStateTransitionError} If the change is not in `archivable` or `archiving` state
    * @throws {HookFailedError} If a pre-archive `run:` hook exits with a non-zero code
    */
-  async execute(input: ArchiveChangeInput): Promise<ArchiveChangeResult> {
+  async execute(
+    input: ArchiveChangeInput,
+    onProgress?: OnArchiveProgress,
+  ): Promise<ArchiveChangeResult> {
     const loadedChange = await this._changes.get(input.name)
     if (loadedChange === null) throw new ChangeNotFoundError(input.name)
 
     const schema = await this._schemaProvider.get()
 
-    // --- Schema name guard ---
-    if (schema.name() !== loadedChange.schemaName) {
-      throw new SchemaMismatchError(loadedChange.name, loadedChange.schemaName, schema.name())
-    }
-
-    Logger.debug('ArchiveChange passed schema guard', {
-      change: loadedChange.name,
-      schema: schema.name(),
-    })
-
-    // --- Archivable guard (no lifecycle transition yet) ---
-    loadedChange.assertArchivable()
-    Logger.debug('ArchiveChange passed archivable guard', {
-      change: loadedChange.name,
-      state: loadedChange.state,
-    })
-
     let change = loadedChange
-    const archivingActor = await this._actor.identity()
+    const workspaces = await this._listWorkspaces.execute()
+    const workspaceMap = new Map(workspaces.map((ws) => [ws.name, ws]))
 
-    // --- Overlap guard ---
+    const archiveAttempt = { scope: 'archive' as const }
+    const onCheckProgress: OnCheckProgress | undefined =
+      onProgress === undefined ? undefined : (event) => onProgress(event)
+    const archivePredicates = await executeMatchingPredicates(
+      this._archiveBindings,
+      buildCheckExecutionContext({
+        change,
+        schema,
+        attempt: archiveAttempt,
+        approvals: { spec: false, signoff: false },
+        allowOverlap: input.allowOverlap === true,
+        allowOutOfScope: input.allowOutOfScope === true,
+        ...(onCheckProgress !== undefined ? { onCheckProgress } : {}),
+      }),
+      { failFastOn: 'schema.nameMatch' },
+    )
+    const failedPredicates = archivePredicates.checks.filter((check) => check.outcome === 'fail')
+    const needsOverlapScan =
+      failedPredicates.some((check) => check.id === 'spec.overlap') ||
+      (failedPredicates.length === 0 && input.allowOverlap === true)
+    let others: Change[] = []
+    let relevantOverlap: readonly OverlapEntry[] = []
+    if (needsOverlapScan) {
+      const loaded = await this._loadArchiveOverlap(change)
+      others = loaded.others
+      relevantOverlap = loaded.relevantOverlap
+    }
     const invalidatedChanges: InvalidatedChangesEntry[] = []
-    const listed = await this._changes.list()
-    const others: Change[] = []
-    for (const entry of listed.items) {
-      if (entry.name === change.name) continue
-      const loaded = await this._changes.get(entry.name)
-      if (loaded !== null) others.push(loaded)
+    for (const check of failedPredicates) {
+      throwMappedArchiveFailure(check, change, schema, relevantOverlap, workspaceMap)
     }
-    if (others.length > 0) {
-      const combined = [...others, change]
-      const overlapReport = detectSpecOverlap(combined)
-      const relevant = overlapReport.entries.filter((entry) =>
-        entry.changes.some((c) => c.name === change.name),
+    if (input.allowOverlap === true && relevantOverlap.length > 0) {
+      invalidatedChanges.push(
+        ...(await this._invalidateOverlappingChanges(change, schema, others, relevantOverlap)),
       )
-      if (relevant.length > 0) {
-        if (!(input.allowOverlap ?? false)) {
-          throw new SpecOverlapError(relevant)
-        }
-        const overlappingChangeNames = [
-          ...new Set(
-            relevant.flatMap((entry) =>
-              entry.changes.filter((c) => c.name !== change.name).map((c) => c.name),
-            ),
-          ),
-        ]
-        for (const overlappingName of overlappingChangeNames) {
-          const specsForChange = [
-            ...new Set(
-              relevant
-                .filter((entry) => entry.changes.some((c) => c.name === overlappingName))
-                .map((entry) => entry.specId),
-            ),
-          ]
-          const affectedArtifacts = others
-            .find((c) => c.name === overlappingName)!
-            .artifacts.values()
-          const artifactEntries = [...affectedArtifacts]
-            .filter((artifact) =>
-              [...artifact.files.keys()].some((key) => specsForChange.includes(key)),
-            )
-            .map((artifact) => ({
-              type: artifact.type,
-              files: [...artifact.files.keys()].filter((key) => specsForChange.includes(key)),
-            }))
-          const message = `Invalidated because change '${change.name}' was archived with overlapping specs: ${specsForChange.join(', ')}`
-          await this._changes.mutate(overlappingName, (freshOverlapping) => {
-            freshOverlapping.invalidate(
-              'spec-overlap-conflict',
-              SYSTEM_ACTOR,
-              message,
-              artifactEntries.length > 0
-                ? artifactEntries
-                : [...freshOverlapping.artifacts.values()].map((a) => ({
-                    type: a.type,
-                    files: [...a.files.keys()],
-                  })),
-              schema.artifactDag(),
-            )
-            return freshOverlapping
-          })
-          invalidatedChanges.push({ name: overlappingName, specIds: specsForChange })
-        }
-      }
     }
-    Logger.debug('ArchiveChange overlap guard complete', {
+    Logger.debug('ArchiveChange named archive predicates complete', {
       change: change.name,
       overlapCount: invalidatedChanges.length,
       invalidatedChanges: invalidatedChanges.map((entry) => entry.name),
     })
 
-    const workspaces = await this._listWorkspaces.execute()
-    const workspaceMap = new Map(workspaces.map((ws) => [ws.name, ws]))
+    const archivingActor = await this._actor.identity()
 
-    // --- ReadOnly workspace guard ---
-    const readOnlySpecs: Array<{ specId: string; workspace: string }> = []
-    for (const specId of change.specIds) {
-      const { workspace } = parseSpecId(specId)
-      const ws = workspaceMap.get(workspace)
-      if (ws && ws.ownership === 'readOnly') {
-        readOnlySpecs.push({ specId, workspace })
-      }
-    }
-    if (readOnlySpecs.length > 0) {
-      const lines = readOnlySpecs.map(
-        (s) => `  - ${s.specId}  →  workspace "${s.workspace}" (readOnly)`,
-      )
-      throw new ReadOnlyWorkspaceError(
-        `Cannot archive change "${change.name}" — it contains specs from readOnly workspaces:\n\n${lines.join('\n')}\n\nArchiving would write deltas into protected specs.`,
-      )
-    }
-    Logger.debug('ArchiveChange readOnly guard complete', {
-      change: change.name,
-      specCount: change.specIds.length,
-    })
-
-    // --- Pre-archive hooks (delegated to RunStepHooks) ---
+    // --- before-persist effects (binding phase; not check id) ---
     const skip = input.skipHookPhases ?? new Set<ArchiveHookPhaseSelector>()
-    if (!skip.has('all') && !skip.has('pre')) {
-      Logger.debug('ArchiveChange pre-archive hooks started', {
+    for (const binding of matchingEffects(
+      this._archiveBindings,
+      archiveAttempt,
+      'before-persist',
+    )) {
+      Logger.debug('ArchiveChange before-persist effects started', {
         change: change.name,
-        phase: 'pre',
-        skipped: false,
+        checkId: binding.check.id,
+        skipped: skip.has('all') || skip.has('pre'),
       })
-      const preResult = await this._runStepHooks.execute({
-        name: input.name,
-        step: 'archiving',
-        phase: 'pre',
+      const ctx = buildCheckExecutionContext({
+        change,
+        schema,
+        attempt: archiveAttempt,
+        approvals: { spec: false, signoff: false },
+        allowOverlap: input.allowOverlap === true,
+        allowOutOfScope: input.allowOutOfScope === true,
+        skipHookPhases: [...skip],
+        ...(onCheckProgress !== undefined ? { onCheckProgress } : {}),
       })
-      const failedHook = preResult.failedHooks[0]
-      if (!preResult.success && failedHook !== undefined) {
-        throw new HookFailedError(failedHook.command, failedHook.exitCode, failedHook.stderr)
+      const result = await executeCheckWithProgress(binding.check, ctx)
+      if (result.outcome === 'fail' && hookFailureMode(binding.onFailure) === 'fail-fast') {
+        throwHookFailed(result)
       }
-      Logger.debug('ArchiveChange pre-archive hooks completed', {
+      Logger.debug('ArchiveChange before-persist effects completed', {
         change: change.name,
-        phase: 'pre',
+        checkId: binding.check.id,
       })
     }
 
     let preparedPlan: PreparedArchivePlan
     try {
       preparedPlan = await this._prepareArchivePlan(change, schema, workspaceMap)
-      this._assertOutOfScopeImplementationAllowed(change, preparedPlan, input.allowOutOfScope)
       Logger.debug('ArchiveChange prepared archive plan', {
         change: change.name,
         publicationCount: preparedPlan.publications.length,
@@ -388,6 +355,11 @@ export class ArchiveChange {
         outOfScopeImplementationSpecCount: preparedPlan.outOfScopeImplementationSpecIds.length,
       })
     } catch (_error) {
+      const message = _error instanceof Error ? _error.message : 'Archive publication failed'
+      Logger.debug('ArchiveChange publication preflight failed', {
+        code: 'ARCHIVE_PREFLIGHT',
+        message,
+      })
       await this._recordArchiveFailure(input.name, 'prepare', _error, archivingActor, false)
       throw _error
     }
@@ -405,6 +377,11 @@ export class ArchiveChange {
         publicationCount: preparedPreflight.length,
       })
     } catch (_error) {
+      const message = _error instanceof Error ? _error.message : 'Archive publication failed'
+      Logger.debug('ArchiveChange publication preflight failed', {
+        code: 'ARCHIVE_PREFLIGHT',
+        message,
+      })
       await this._recordArchiveFailure(input.name, 'prepare', _error, archivingActor, false)
       throw _error
     }
@@ -545,27 +522,44 @@ export class ArchiveChange {
       }
     }
 
-    // --- Post-archive hooks (delegated to RunStepHooks) ---
+    // --- after-persist effects (binding phase; not check id) ---
 
     const postHookFailures: string[] = []
-    if (!skip.has('all') && !skip.has('post')) {
-      Logger.debug('ArchiveChange post-archive hooks started', {
+    for (const binding of matchingEffects(this._archiveBindings, archiveAttempt, 'after-persist')) {
+      Logger.debug('ArchiveChange after-persist effects started', {
         change: change.name,
-        phase: 'post',
+        checkId: binding.check.id,
       })
-      const postResult = await this._runStepHooks.execute({
-        name: input.name,
-        step: 'archiving',
-        phase: 'post',
+      const ctx = buildCheckExecutionContext({
+        change,
+        schema,
+        attempt: archiveAttempt,
+        approvals: { spec: false, signoff: false },
+        allowOverlap: input.allowOverlap === true,
+        allowOutOfScope: input.allowOutOfScope === true,
+        skipHookPhases: [...skip],
+        ...(onCheckProgress !== undefined ? { onCheckProgress } : {}),
       })
-      for (const hook of postResult.hooks) {
-        if (!hook.success) {
-          postHookFailures.push(hook.command)
+      const result = await executeCheckWithProgress(binding.check, ctx)
+      if (result.outcome === 'fail') {
+        if (hookFailureMode(binding.onFailure) === 'fail-soft') {
+          const commands = result.details?.commands
+          if (Array.isArray(commands)) {
+            postHookFailures.push(
+              ...commands.filter((entry): entry is string => typeof entry === 'string'),
+            )
+          } else {
+            const command =
+              typeof result.details?.command === 'string' ? result.details.command : 'hook'
+            postHookFailures.push(command)
+          }
+        } else {
+          throwHookFailed(result)
         }
       }
-      Logger.debug('ArchiveChange post-archive hooks completed', {
+      Logger.debug('ArchiveChange after-persist effects completed', {
         change: change.name,
-        phase: 'post',
+        checkId: binding.check.id,
         failureCount: postHookFailures.length,
       })
     }
@@ -592,8 +586,6 @@ export class ArchiveChange {
     schema: Schema,
     workspaceMap: Map<string, ProjectWorkspace>,
   ): Promise<PreparedArchivePlan> {
-    this._assertTrackedImplementationFilesResolved(change)
-
     const writesBySpecId = new Map<string, PreparedArchiveWrite[]>()
     const staleSpecIds = new Set<string>()
     const implementationBySpecId = this._materializeImplementationLinks(change, workspaceMap)
@@ -751,8 +743,9 @@ export class ArchiveChange {
       publications,
       staleSpecIds: [...staleSpecIds],
       implementationBySpecId,
-      outOfScopeImplementationSpecIds: [...implementationBySpecId.keys()].filter(
-        (specId) => !change.specIds.includes(specId),
+      outOfScopeImplementationSpecIds: collectOutOfScopeImplementationSpecIds(
+        implementationBySpecId.keys(),
+        change.specIds,
       ),
     }
   }
@@ -784,6 +777,7 @@ export class ArchiveChange {
         }),
       )
     }
+    this._assertArchiveDepsConsistent(preflighted)
     return preflighted
   }
 
@@ -834,28 +828,26 @@ export class ArchiveChange {
         ...(entry.symbols !== undefined ? { symbols: entry.symbols } : {}),
       })) ?? null
 
-    const metadata = await readCachedSpecMetadata(args.publication.specRepo, args.publication.spec)
     const sidecarActive =
       persistedSchema !== null ||
       this._isStructurallyCompatiblePreparedArtifacts(extractionArtifacts)
-    const finalDependsOn = this._resolvePersistedDependsOn({
-      manifestDeps: args.change.specDependsOn.get(args.publication.specId),
-      extractedDeps: preExtracted.metadata.dependsOn,
+    const finalDependsOn = await resolveSealedArchiveDependsOn({
+      change: args.change,
+      specId: args.publication.specId,
+      specRepo: args.publication.specRepo,
+      schema: args.schema,
       persistedDependsOn,
-      metadataDeps: metadata?.dependsOn,
+      parsers: this._parsers,
+      extractorTransforms: this._extractorTransforms,
+      hasher: this._hasher,
+      workspaceRoutes: this._workspaceRoutes,
+      repositories: new Map(
+        Array.from(args.workspaceMap.values()).map((ws) => [ws.name, ws.specRepo]),
+      ),
+      ...(preExtracted.metadata.dependsOn !== undefined
+        ? { extractedDependsOn: preExtracted.metadata.dependsOn }
+        : {}),
     })
-
-    if (
-      sidecarActive &&
-      preExtracted.metadata.dependsOn !== undefined &&
-      !DependsOnOverwriteError.areSame(preExtracted.metadata.dependsOn, finalDependsOn)
-    ) {
-      throw new ArchiveDependencyMismatchError(
-        args.publication.specId,
-        [...finalDependsOn],
-        [...preExtracted.metadata.dependsOn],
-      )
-    }
 
     const publicationPersistedSchema = sidecarActive
       ? (persistedSchema ?? { name: args.schema.name(), version: args.schema.version() })
@@ -903,6 +895,7 @@ export class ArchiveChange {
       persistedDependsOn,
       persistedImplementation,
       finalDependsOn,
+      extractedDependsOn: preExtracted.metadata.dependsOn,
       publicationPersistedState,
       sidecarActive,
     }
@@ -993,40 +986,6 @@ export class ArchiveChange {
   }
 
   /**
-   * Resolves the final persisted dependency set for one archived spec.
-   *
-   * Precedence is: manifest snapshot, existing sidecar, existing metadata,
-   * and finally freshly extracted dependencies.
-   *
-   * @param args - Candidate dependency sources for the spec
-   * @param args.manifestDeps - Dependency snapshot already stored on the change
-   * @param args.extractedDeps - Dependencies extracted from the final merged artifacts
-   * @param args.persistedDependsOn - Existing canonical sidecar dependencies, when present
-   * @param args.metadataDeps - Dependencies currently stored in canonical metadata
-   * @returns Final dependency set to persist
-   */
-  private _resolvePersistedDependsOn(args: {
-    readonly manifestDeps: readonly string[] | undefined
-    readonly extractedDeps: readonly string[] | undefined
-    readonly persistedDependsOn: readonly string[] | null
-    readonly metadataDeps: readonly string[] | undefined
-  }): readonly string[] {
-    if (args.manifestDeps !== undefined) {
-      return [...args.manifestDeps]
-    }
-    if (args.persistedDependsOn !== null) {
-      return [...args.persistedDependsOn]
-    }
-    if (args.metadataDeps !== undefined) {
-      return [...args.metadataDeps]
-    }
-    if (args.extractedDeps !== undefined) {
-      return [...args.extractedDeps]
-    }
-    return []
-  }
-
-  /**
    * Builds the final spec-scoped artifact set used for pre-publication extraction.
    *
    * Publication writes override canonical artifacts; untouched artifacts fall
@@ -1095,43 +1054,123 @@ export class ArchiveChange {
   }
 
   /**
-   * Fails archive when tracked implementation review still has open files.
+   * Loads other active changes and overlap entries involving `change`.
    *
    * @param change - Change being archived
-   * @throws {Error} When one or more tracked implementation files remain open
+   * @returns Peer changes and overlap rows that include this change
    */
-  private _assertTrackedImplementationFilesResolved(change: Change): void {
-    const openFiles = change.trackedImplementationFiles
-      .filter((entry) => entry.state === 'open')
-      .map((entry) => entry.file)
-    if (openFiles.length === 0) return
-
-    throw new ArchiveImplementationStateError(
-      openFiles,
-      `Tracked implementation files remain open for change "${change.name}". Resolve or ignore them first.`,
-    )
+  private async _loadArchiveOverlap(
+    change: Change,
+  ): Promise<{ readonly others: Change[]; readonly relevantOverlap: readonly OverlapEntry[] }> {
+    const listed = await this._changes.list()
+    const others: Change[] = []
+    for (const entry of listed.items) {
+      if (entry.name === change.name) continue
+      const loaded = await this._changes.get(entry.name)
+      if (loaded !== null) others.push(loaded)
+    }
+    const overlapReport =
+      others.length > 0 ? detectSpecOverlap([...others, change]) : detectSpecOverlap([change])
+    return {
+      others,
+      relevantOverlap: overlapReport.entries.filter((entry) =>
+        entry.changes.some((peer) => peer.name === change.name),
+      ),
+    }
   }
 
   /**
-   * Enforces the out-of-scope implementation sidecar guard.
+   * Invalidates peer changes that overlap the archive target after a skippable overlap check.
    *
    * @param change - Change being archived
-   * @param preparedPlan - Prepared archive plan with implementation sidecar targets
-   * @param allowOutOfScope - Whether the explicit override flag was supplied
-   * @throws {Error} When out-of-scope implementation sidecar updates are detected without override
+   * @param schema - Active schema (for artifact DAG invalidation)
+   * @param others - Other loaded active changes
+   * @param relevant - Overlap entries that include the archive target
+   * @returns Invalidated change names and spec ids
    */
-  private _assertOutOfScopeImplementationAllowed(
+  private async _invalidateOverlappingChanges(
     change: Change,
-    preparedPlan: PreparedArchivePlan,
-    allowOutOfScope: boolean | undefined,
-  ): void {
-    if (preparedPlan.outOfScopeImplementationSpecIds.length === 0 || allowOutOfScope === true) {
+    schema: Schema,
+    others: readonly Change[],
+    relevant: readonly OverlapEntry[],
+  ): Promise<readonly InvalidatedChangesEntry[]> {
+    const invalidatedChanges: InvalidatedChangesEntry[] = []
+    const overlappingChangeNames = [
+      ...new Set(
+        relevant.flatMap((entry) =>
+          entry.changes.filter((c) => c.name !== change.name).map((c) => c.name),
+        ),
+      ),
+    ]
+    for (const overlappingName of overlappingChangeNames) {
+      const specsForChange = [
+        ...new Set(
+          relevant
+            .filter((entry) => entry.changes.some((c) => c.name === overlappingName))
+            .map((entry) => entry.specId),
+        ),
+      ]
+      const affectedArtifacts = others.find((c) => c.name === overlappingName)!.artifacts.values()
+      const artifactEntries = [...affectedArtifacts]
+        .filter((artifact) =>
+          [...artifact.files.keys()].some((key) => specsForChange.includes(key)),
+        )
+        .map((artifact) => ({
+          type: artifact.type,
+          files: [...artifact.files.keys()].filter((key) => specsForChange.includes(key)),
+        }))
+      const message = `Invalidated because change '${change.name}' was archived with overlapping specs: ${specsForChange.join(', ')}`
+      await this._changes.mutate(overlappingName, (freshOverlapping) => {
+        freshOverlapping.invalidate(
+          'spec-overlap-conflict',
+          SYSTEM_ACTOR,
+          message,
+          artifactEntries.length > 0
+            ? artifactEntries
+            : [...freshOverlapping.artifacts.values()].map((a) => ({
+                type: a.type,
+                files: [...a.files.keys()],
+              })),
+          schema.artifactDag(),
+        )
+        return freshOverlapping
+      })
+      invalidatedChanges.push({ name: overlappingName, specIds: specsForChange })
+    }
+    return invalidatedChanges
+  }
+
+  /**
+   * Runs shared `deps.consistent` using sidecar `finalDependsOn`, not manifest-only.
+   *
+   * @param preflighted - Per-spec extract and resolved persisted deps
+   * @throws {ArchiveDependencyMismatchError} When extract disagrees with finalDependsOn
+   */
+  private _assertArchiveDepsConsistent(preflighted: readonly PreparedArchivePreflightSpec[]): void {
+    const extractedDependsOnBySpecId = new Map<string, readonly string[] | undefined>()
+    const persistedDependsOnBySpecId = new Map<string, readonly string[] | undefined>()
+    for (const spec of preflighted) {
+      persistedDependsOnBySpecId.set(spec.specId, spec.finalDependsOn)
+      if (spec.sidecarActive && spec.extractedDependsOn !== undefined) {
+        extractedDependsOnBySpecId.set(spec.specId, spec.extractedDependsOn)
+      }
+    }
+    const depsCheck = runDepsConsistent({
+      extractedDependsOnBySpecId,
+      persistedDependsOnBySpecId,
+    })
+    if (depsCheck.outcome !== 'fail') {
       return
     }
-
-    throw new ArchiveImplementationStateError(
-      [],
-      `Implementation sidecar updates would touch specs outside the change "${change.name}" scope (${preparedPlan.outOfScopeImplementationSpecIds.join(', ')}). Re-run with --allow-out-of-scope if intentional.`,
+    const specIds = (depsCheck.details?.specIds as string[] | undefined) ?? []
+    const specId = specIds[0]
+    if (specId === undefined) {
+      return
+    }
+    throw new ArchiveDependencyMismatchError(
+      specId,
+      [...(persistedDependsOnBySpecId.get(specId) ?? [])],
+      [...(extractedDependsOnBySpecId.get(specId) ?? [])],
     )
   }
 
@@ -1168,15 +1207,10 @@ export class ArchiveChange {
         )
       }
 
-      // Graph config is global in specd.yaml, not per ProjectWorkspace in this iteration
-      // Actually ProjectWorkspace could carry it, but let's stick to the proposal.
-      // Wait, ProjectWorkspace DOES carry graphConfig in my latest ListWorkspaces implementation.
-      // Ah, I need to check if I added it. Yes, I did in my first attempt, but then I removed it because of user's instruction.
-      // "está mal, si ves el proposal, graphConfig no entraba a ProjectWorkspace"
-
-      // So I need another way to get graphConfig. Or just use what's available.
-      // For now, let's assume we don't have it and skip the exclusion check here or find another way.
-      // Actually, I can pass the project config to materializeImplementationLinks if needed.
+      const excludePaths = this._listWorkspaces.excludePathsFor(workspace)
+      if (isExcludedByPrefix(relativeToCodeRoot, excludePaths)) {
+        continue
+      }
 
       const entry: MaterializedImplementationLink = {
         file: `${workspace}:${relativeToCodeRoot}`,
@@ -1248,4 +1282,88 @@ function toPortableRelativePath(rootDir: string, absolutePath: string): string |
     return null
   }
   return relative.split(path.sep).join('/')
+}
+
+/**
+ * Maps a failed archive predicate onto the historical typed errors.
+ *
+ * @param check - Failed check
+ * @param change - Change being archived
+ * @param schema - Active schema
+ * @param overlapEntries - Overlap entries involving this change
+ * @param workspaceMap - Workspace ownership map for readOnly errors
+ * @throws Typed archive errors matching prior ArchiveChange behavior
+ */
+function throwMappedArchiveFailure(
+  check: CheckResult,
+  change: Change,
+  schema: Schema,
+  overlapEntries: readonly OverlapEntry[],
+  workspaceMap: ReadonlyMap<string, ProjectWorkspace>,
+): never {
+  switch (check.id) {
+    case 'schema.nameMatch':
+      throw new SchemaMismatchError(change.name, change.schemaName, schema.name())
+    case 'archive.archivable':
+      change.assertArchivable()
+      throw new ArchiveImplementationStateError([], check.message ?? 'Change is not archivable')
+    case 'spec.overlap':
+      throw new SpecOverlapError(overlapEntries)
+    case 'workspace.readOnly': {
+      const readOnlySpecs: Array<{ specId: string; workspace: string }> = []
+      for (const specId of change.specIds) {
+        const workspace = parseSpecId(specId).workspace
+        if (workspaceMap.get(workspace)?.ownership === 'readOnly') {
+          readOnlySpecs.push({ specId, workspace })
+        }
+      }
+      const lines = readOnlySpecs.map(
+        (s) => `  - ${s.specId}  →  workspace "${s.workspace}" (readOnly)`,
+      )
+      throw new ReadOnlyWorkspaceError(
+        `Cannot archive change "${change.name}" — it contains specs from readOnly workspaces:\n\n${lines.join('\n')}\n\nArchiving would write deltas into protected specs.`,
+      )
+    }
+    case 'deps.consistent': {
+      const mismatches = Array.isArray(check.details?.mismatches)
+        ? (check.details.mismatches as readonly {
+            readonly specId: string
+            readonly extracted: readonly string[]
+            readonly persisted: readonly string[]
+          }[])
+        : []
+      const first = mismatches[0]
+      if (first !== undefined) {
+        throw new ArchiveDependencyMismatchError(
+          first.specId,
+          [...first.persisted],
+          [...first.extracted],
+        )
+      }
+      const specIds = (check.details?.specIds as string[] | undefined) ?? []
+      const specId = specIds[0] ?? ''
+      throw new ArchiveDependencyMismatchError(specId, [], [])
+    }
+    case 'impl.filesResolved': {
+      const files = Array.isArray(check.details?.files)
+        ? check.details.files.filter((entry): entry is string => typeof entry === 'string')
+        : []
+      throw new ArchiveImplementationStateError(
+        [...files],
+        check.message ??
+          `Tracked implementation files remain open for change "${change.name}". Resolve or ignore them first.`,
+      )
+    }
+    case 'impl.linksInScope':
+      throw new ArchiveImplementationStateError(
+        [],
+        check.message ??
+          `Implementation sidecar updates would touch specs outside the change "${change.name}" scope.`,
+      )
+    default:
+      throw new ArchiveImplementationStateError(
+        [],
+        check.message ?? `Archive predicate '${check.id}' failed`,
+      )
+  }
 }

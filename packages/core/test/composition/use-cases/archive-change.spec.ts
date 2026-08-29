@@ -31,7 +31,7 @@ describe('createArchiveChange', () => {
       changes: {} as never,
       listWorkspaces: {} as never,
       archive: {} as never,
-      runStepHooks: {} as never,
+      archiveBindings: [],
       actor: {} as never,
       parsers: new Map(),
       schemaProvider: {} as never,
@@ -40,6 +40,7 @@ describe('createArchiveChange', () => {
       workspaceRoutes: [],
       projectRoot: '/tmp/project',
       batchSnapshot: {} as never,
+      contentHasher: {} as never,
     }
 
     expect(createArchiveChange(deps)).toBeInstanceOf(ArchiveChange)
@@ -50,7 +51,7 @@ describe('createArchiveChange', () => {
       changes: {} as never,
       listWorkspaces: {} as never,
       archive: {} as never,
-      runStepHooks: {} as never,
+      archiveBindings: [],
       actor: {} as never,
       parsers: new Map(),
       schemaProvider: {} as never,
@@ -59,6 +60,7 @@ describe('createArchiveChange', () => {
       workspaceRoutes: [],
       projectRoot: '/tmp/project',
       batchSnapshot: {} as never,
+      contentHasher: {} as never,
     }
 
     expect(() =>

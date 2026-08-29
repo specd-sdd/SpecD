@@ -51,6 +51,30 @@ Specifically:
 
 JSON/toon output SHALL include both canonical state and display-state fields when returned by GetStatus; text output SHALL prioritize the display state for human readability.
 
+### Requirement: Lifecycle projections come from GetStatus checks
+
+Displayed `validTransitions`, `availableTransitions`, `nextAction`, and repair-oriented blockers MUST be the check-derived projections from `GetStatus`. The CLI MUST NOT filter the protocol graph locally in a way that reintroduces a list execute would reject (for example advertising `verifying` while tasks are incomplete, or recommending `/specd-implement` when `verifying` is allowed).
+
+### Requirement: Text status omits duplicated review file lists
+
+When rendering `format=text` and `review.required` is true, the CLI MUST print a `review:` header with `required`, `route`, `reason`, and human `message` when Core supplies it. It MUST NOT print `review.affectedArtifacts` file paths. Those files already appear under `artifacts (details):` with `pending-review` and `[drift]`. Invalidation overlap MUST NOT appear as a `OVERLAP_CONFLICT` blocker line.
+
+When `review.reason` is `'spec-overlap-conflict'` and `overlapDetail` is non-empty, `format=text` MUST still print the overlap peers (archived change name and overlapping spec ids). Those peers are not present in `artifacts (details):`.
+
+JSON and TOON MUST still serialize the full `review` object, including `overlapDetail`. Command `--help` JSON schema for `review` MUST list `overlapDetail` alongside `affectedArtifacts`.
+
+### Requirement: Text blockers include check labels
+
+When a blocker comes from a failed predicate and carries a gerund `label`, `format=text` MUST render that label next to the code so agents can interpret opaque codes. Canonical shape:
+
+```text
+! <CODE> — <label>: <message>
+```
+
+Example: `! DEPS_INCONSISTENT — Checking spec dependencies: Extracted dependsOn disagrees with persisted values for: cli:change-archive`.
+
+JSON/TOON MUST serialize `label` (and `checkId` when present) on those blocker objects. Review-only blockers without a check `label` keep `! <CODE>: <message>`.
+
 ### Requirement: Schema version warning
 
 If the change's recorded `schemaName`/`schemaVersion` differs from the currently active schema, the command prints a warning to stderr:
@@ -144,7 +168,10 @@ In structured output (JSON/toon), the `specDependsOn` object from the change man
 - `effectiveStatus` reflects dependency cascading.
 - The CLI serializes lifecycle and tracking state returned by Core and symbol-resolution state returned by the SDK; it recomputes neither.
 - The CLI MUST NOT call `SchemaRegistry`, `config show`, or another use case to recompute lifecycle data.
-- Lifecycle semantics remain projections of `GetStatus` and `LifecycleEngine`.
+- Lifecycle semantics remain projections of `GetStatus` and transition-check evaluation (`evaluateLifecycle`).
+- Drafted status MUST suppress `nextAction.command` (print `(none)` / JSON `null`) even if Core attached a command.
+- Drafted JSON MUST set `availableTransitions` and `availableSteps` to empty arrays even if Core leaked protocol hops.
+- The CLI MUST NOT apply a second `VALID_TRANSITIONS`-only filter that drops or adds steps relative to `GetStatus.availableTransitions`.
 
 ## Examples
 
@@ -152,28 +179,27 @@ In structured output (JSON/toon), the `specDependsOn` object from the change man
 $ specd change status add-oauth-login
 change:      add-oauth-login
 state:       designing
-specs:       auth/oauth
 description: Add OAuth2 login via Google
 
-artifacts:
-  proposal   complete
-  specs      in-progress
-  verify     missing
-  design     missing
-  tasks      missing
+artifacts (DAG):
+  [✓] proposal
+  └── [?] specs
+
+next action:
+  target:  designing
+  command: /specd-design
+  reason:  ...
 
 lifecycle:
   next artifact: specs
   approvals:     spec=off  signoff=off
   path:          .specd/changes/20260310-140000-add-oauth-login
-
-blockers:
-  → ready: requires — specs, verify, design, tasks
 ```
 
 ## Spec Dependencies
 
-- `cli:entrypoint` — output conventions
-- `core:change` — change state model
-- `core:get-status` — lifecycle status projection
-- `sdk:build-implementation-review` — shared implementation resolution projection
+- [`cli:entrypoint`](../entrypoint/spec.md) — output conventions
+- [`core:change`](../../core/change/spec.md) — change state model
+- [`core:get-status`](../../core/get-status/spec.md) — lifecycle status projection
+- [`sdk:build-implementation-review`](../../sdk/build-implementation-review/spec.md) — shared implementation resolution projection
+- [`core:transition-checks`](../../core/transition-checks/spec.md) — check-derived projections and gerund labels

@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   isValidTransition,
   VALID_TRANSITIONS,
+  HAPPY_PATH_NEXT,
   type ChangeState,
 } from '../../../src/domain/value-objects/change-state.js'
 
@@ -27,7 +28,6 @@ describe('ChangeState', () => {
       ['designing', 'ready'],
       ['designing', 'designing'],
       ['ready', 'implementing'],
-      ['ready', 'pending-spec-approval'],
       ['ready', 'designing'],
       ['pending-spec-approval', 'spec-approved'],
       ['pending-spec-approval', 'designing'],
@@ -39,28 +39,44 @@ describe('ChangeState', () => {
       ['verifying', 'done'],
       ['verifying', 'designing'],
       ['done', 'archivable'],
-      ['done', 'pending-signoff'],
       ['done', 'designing'],
+      ['done', 'implementing'],
+      ['done', 'verifying'],
       ['pending-signoff', 'signed-off'],
       ['pending-signoff', 'designing'],
       ['signed-off', 'archivable'],
       ['signed-off', 'designing'],
+      ['signed-off', 'implementing'],
+      ['signed-off', 'verifying'],
       ['archivable', 'designing'],
       ['archivable', 'archiving'],
+      ['archivable', 'implementing'],
+      ['archivable', 'verifying'],
       ['archiving', 'archivable'],
       ['archiving', 'designing'],
     ] as [ChangeState, ChangeState][])('allows %s → %s', (from, to) => {
       expect(isValidTransition(from, to)).toBe(true)
     })
 
-    it('archivable only allows transition to archiving and designing', () => {
+    it('archivable allows archive, redesign, and skill-aligned hops', () => {
+      const allowed = new Set<ChangeState>(['archiving', 'designing', 'implementing', 'verifying'])
       for (const to of ALL_STATES) {
-        if (to === 'archiving' || to === 'designing') {
-          expect(isValidTransition('archivable', to)).toBe(true)
-        } else {
-          expect(isValidTransition('archivable', to)).toBe(false)
-        }
+        expect(isValidTransition('archivable', to)).toBe(allowed.has(to))
       }
+    })
+
+    it('archivable cannot hop to done', () => {
+      expect(isValidTransition('archivable', 'done')).toBe(false)
+    })
+
+    it('HAPPY_PATH_NEXT maps delivery hops and omits pending/archivable', () => {
+      expect(HAPPY_PATH_NEXT.drafting).toBe('designing')
+      expect(HAPPY_PATH_NEXT.implementing).toBe('verifying')
+      expect(HAPPY_PATH_NEXT['signed-off']).toBe('archivable')
+      expect(HAPPY_PATH_NEXT['pending-spec-approval']).toBeUndefined()
+      expect(HAPPY_PATH_NEXT['pending-signoff']).toBeUndefined()
+      expect(HAPPY_PATH_NEXT.archivable).toBeUndefined()
+      expect(HAPPY_PATH_NEXT.archiving).toBeUndefined()
     })
 
     it('archiving allows transition to archivable and designing only', () => {
@@ -83,7 +99,8 @@ describe('ChangeState', () => {
     it('rejects backwards transitions', () => {
       expect(isValidTransition('designing', 'drafting')).toBe(false)
       expect(isValidTransition('spec-approved', 'pending-spec-approval')).toBe(false)
-      expect(isValidTransition('done', 'implementing')).toBe(false)
+      expect(isValidTransition('ready', 'pending-spec-approval')).toBe(false)
+      expect(isValidTransition('done', 'pending-signoff')).toBe(false)
     })
 
     it('rejects self-transitions (except designing)', () => {
@@ -104,22 +121,30 @@ describe('ChangeState', () => {
       }
     })
 
-    it('archivable allows archiving and designing', () => {
-      expect(VALID_TRANSITIONS['archivable']).toEqual(['archiving', 'designing'])
+    it('archivable allows archiving, designing, implementing, and verifying', () => {
+      expect(VALID_TRANSITIONS['archivable']).toEqual([
+        'archiving',
+        'designing',
+        'implementing',
+        'verifying',
+      ])
     })
 
     it('archiving allows archivable and designing escape transitions', () => {
       expect(VALID_TRANSITIONS['archiving']).toEqual(['archivable', 'designing'])
     })
 
-    it('ready has two valid transitions (free path and spec approval gate)', () => {
-      expect(VALID_TRANSITIONS['ready']).toContain('implementing')
-      expect(VALID_TRANSITIONS['ready']).toContain('pending-spec-approval')
+    it('ready allows implementing and designing only', () => {
+      expect(VALID_TRANSITIONS['ready']).toEqual(['implementing', 'designing'])
     })
 
-    it('done has two valid transitions (free path and signoff gate)', () => {
-      expect(VALID_TRANSITIONS['done']).toContain('archivable')
-      expect(VALID_TRANSITIONS['done']).toContain('pending-signoff')
+    it('done allows archivable, designing, and skill-aligned hops', () => {
+      expect(VALID_TRANSITIONS['done']).toEqual([
+        'archivable',
+        'designing',
+        'implementing',
+        'verifying',
+      ])
     })
   })
 })

@@ -478,9 +478,9 @@ approvals:
   signoff: false # require sign-off of the completed work before archiving (default: false)
 ```
 
-**`spec`** — when `true`, a change in `ready` state cannot transition directly to `implementing`. It must first enter `pending-spec-approval` and receive an explicit approval (with approver identity, reason, and timestamp) before transitioning to `spec-approved` and then to `implementing`. When `false` (default), `ready → implementing` is a free transition.
+**`spec`** — when `true`, a change in `ready` cannot take any **forward** leave of `ready` (`approval.spec` is `from=ready`, `to=*`, `along=forward`) until `ApproveSpec` records consent. The change stays in `ready`. That includes `ready → implementing` and `ready → verifying` when `implementing` is omitted from `workflow[]`. Redesign (`ready → designing`) MUST NOT require the spec gate. The `approval.spec` check fails with `APPROVAL_REQUIRED` until that record exists. When `false` (default), forward leave of `ready` is free (`approval.spec` skips). New work MUST NOT enter `pending-spec-approval` as a happy-path hop. When a change is already in `pending-spec-approval`, drain (leave that state) remains legal. `change transition` targeting `pending-spec-approval` is never the next-action path.
 
-**`signoff`** — when `true`, a change in `done` state cannot transition directly to `archivable`, regardless of whether it contains structural modifications or only additions. It must enter `pending-signoff`, receive explicit sign-off, and transition through `signed-off → archivable`. The sign-off record captures what was reviewed — new specs, modified specs, and removed specs alike. When `false` (default), `done → archivable` is a free transition.
+**`signoff`** — when `true`, a change in `done` cannot transition to `archivable` until `ApproveSignoff` records consent. The change stays in `done`. When `false` (default), `done → archivable` is a free transition. New work MUST NOT enter `pending-signoff` as a happy-path hop. When a change is already in `pending-signoff`, drain remains legal. `change transition` targeting `pending-signoff` is never the next-action path.
 
 Both flags are independent — any combination is valid.
 
@@ -778,6 +778,7 @@ schemaOverrides:
 
 - [`core:vcs-adapter-port`](../vcs-adapter-port/spec.md) — configuration bounding relies on vcs adapter
 - [`default:_global/architecture`](../../_global/architecture/spec.md)
+- [`core:transition-checks`](../transition-checks/spec.md) — `approvals.spec` / `approvals.signoff` are in-place checks, not pending hops
 
 ## ADRs
 

@@ -31,11 +31,9 @@ describe('createTransitionChange', () => {
       changes: {} as never,
       actor: {} as never,
       schemaProvider: {} as never,
-      runStepHooks: {} as never,
       refreshImplementationTracking: {} as never,
       approvals: { spec: false, signoff: false },
-      lifecycle: {} as never,
-      countTasks: {} as never,
+      transitionBindings: [],
     }
 
     expect(createTransitionChange(deps)).toBeInstanceOf(TransitionChange)
@@ -46,11 +44,9 @@ describe('createTransitionChange', () => {
       changes: {} as never,
       actor: {} as never,
       schemaProvider: {} as never,
-      runStepHooks: {} as never,
       refreshImplementationTracking: {} as never,
       approvals: { spec: false, signoff: false },
-      lifecycle: {} as never,
-      countTasks: {} as never,
+      transitionBindings: [],
     }
 
     expect(() =>

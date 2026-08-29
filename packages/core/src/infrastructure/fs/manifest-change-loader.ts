@@ -128,6 +128,12 @@ export function deserializeManifestEvent(raw: RawChangeEvent): ChangeEvent {
         reason: raw.reason,
         artifactHashes: raw.artifactHashes,
       }
+    case 'signoff-invalidated':
+      return {
+        type: 'signoff-invalidated',
+        at: new Date(raw.at),
+        by: raw.by,
+      }
     case 'invalidated':
       return {
         type: 'invalidated',

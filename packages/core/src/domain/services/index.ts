@@ -86,18 +86,65 @@ export {
   type RuleEvaluatorNode,
   type RuleEvaluatorParser,
 } from './rule-evaluator.js'
-export { detectSpecOverlap } from './detect-spec-overlap.js'
 export {
-  LifecycleEngine,
-  type LifecycleEngineOptions,
+  detectSpecOverlap,
+  specOverlapDetectionForChange,
+  type SpecOverlapDetectionSummary,
+  type SpecOverlapPeerSummary,
+} from './detect-spec-overlap.js'
+export {
+  evaluateLifecycleVerdict,
+  projectArtifacts,
+  findBlockingParent,
+  resolveLifecycleNextHop,
+  type ArtifactGraphSource,
+  type LifecycleVerdictInput,
   type LifecycleAffectedFile,
   type LifecycleAffectedArtifact,
   type LifecycleBlocker,
   type LifecycleReviewOverlapEntry,
   type LifecycleReviewSummary,
-  type LifecycleNextAction,
+  type LifecycleNextHop,
+  type LifecycleDomainVerdict,
   type LifecycleArtifactVerdict,
   type LifecycleTransitionBlocker,
   type LifecycleStepVerdict,
-  type LifecycleVerdict,
-} from './lifecycle-engine.js'
+} from './lifecycle-verdict.js'
+export {
+  classifyAlong,
+  checkMatches,
+  CHECK_LABELS,
+  checkLabel,
+  type CheckId,
+  type CheckKind,
+  type CheckResult,
+  type CheckApplicability,
+  type TransitionAlong,
+  type TaskCompletionCounts,
+  type Check,
+  type CheckBinding,
+  type CheckBindingSpec,
+  type CheckExecutionContext,
+  type CheckAttempt,
+  type CheckProgressEvent,
+  type OnCheckProgress,
+  type EffectPipelinePhase,
+  type EffectOnFailure,
+  isEffectCheck,
+  applyBindingSpecs,
+} from './transition-checks.js'
+export {
+  TRANSITION_BINDINGS,
+  ARCHIVE_BINDINGS,
+  TRANSITION_BINDING_SPECS,
+  ARCHIVE_BINDING_SPECS,
+  boundFromStates,
+  boundToStates,
+} from './check-bindings.js'
+export {
+  bindingMatches,
+  runDepsConsistent,
+  runWorkspaceReadOnly,
+  runImplFilesResolved,
+  runImplLinksInScope,
+} from './evaluate-transition-predicates.js'

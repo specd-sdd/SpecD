@@ -1,0 +1,157 @@
+- op: modified
+  description: 'Omitted workflow row does not delete protocol state'
+  selector:
+    type: section
+    matches: '^Requirement: Step names reference domain lifecycle states$'
+  content: |
+    #### Scenario: Invalid step name rejected
+
+    - **GIVEN** a schema with `workflow: [{ step: "designing" }, { step: "reviewing" }]`
+    - **WHEN** the schema is built or resolved
+    - **THEN** `buildSchema` throws `SchemaValidationError` because `reviewing` is not a valid Change lifecycle state
+    - **AND** `TransitionChange` is never invoked with that name
+
+    #### Scenario: Omitted workflow row does not delete the protocol state
+
+    - **GIVEN** a schema whose `workflow[]` lists `designing` and `ready` but not `implementing`
+    - **AND** `VALID_TRANSITIONS` still allows `ready → implementing`
+    - **WHEN** `workflowStep("implementing")` is resolved
+    - **THEN** the result is null (no extras)
+    - **AND** the hop remains protocol-legal
+
+- op: added
+  description: 'requires is workflow.requires with to=effective'
+  position:
+    parent:
+      type: section
+      matches: '^Requirement: Requires-based gating$'
+    after:
+      type: section
+      matches: '^Scenario: Skipped optional artifact satisfies requires$'
+  content: |
+    #### Scenario: Status and execute share requires evaluation
+
+    - **GIVEN** a step whose `requires` are unsatisfied
+    - **WHEN** `GetStatus` and `TransitionChange` evaluate the same attempt
+    - **THEN** both reject via `workflow.requires`
+    - **AND** they do not disagree on `availableTransitions` versus execute
+
+- op: added
+  description: 'taskCompletion uses CountTasks snapshot'
+  position:
+    parent:
+      type: section
+      matches: '^Requirement: Task completion gating$'
+    after:
+      type: section
+      matches: '^Scenario: Error includes incomplete and complete counts$'
+  content: |
+    #### Scenario: Task-completion check consumes CountTasks rather than the verdict walking files
+
+    - **GIVEN** `requiresTaskCompletion` applies to `tasks`
+    - **WHEN** predicate evaluation runs
+    - **THEN** `workflow.taskCompletion.execute` uses `CountTasks`
+    - **AND** `evaluateLifecycleVerdict` does not read the tasks file itself
+
+- op: modified
+  description: 'Rename heading to match spec; keep consecutive-steps not mandatory'
+  selector:
+    type: section
+    matches: '^Requirement: Workflow array order is display order$'
+  rename: 'Requirement: Workflow array order is display order and progress axis'
+  content: |
+    #### Scenario: Later step available before earlier step
+
+    - **GIVEN** a workflow with steps `[designing (requires: []), implementing (requires: [tasks]), verifying (requires: [verify])]`
+    - **AND** `verify` is `complete` but `tasks` is `in-progress`
+    - **WHEN** step availability is evaluated for all steps
+    - **THEN** `designing` is available (empty requires)
+    - **AND** `implementing` is not available (tasks incomplete)
+    - **AND** `verifying` is available (verify complete)
+
+    #### Scenario: Axis classifies along without sequential locking
+
+    - **GIVEN** `workflow[]` order designing, ready, implementing, verifying
+    - **WHEN** the attempt is `verifying → implementing`
+    - **THEN** `along` is `backward`
+    - **AND** consecutive-step occupancy is not required for that classification
+
+    #### Scenario: designing is redesign not previous step
+
+    - **WHEN** the attempt is `ready → designing`
+    - **THEN** `along` is `redesign`
+
+    #### Scenario: Omitted listed step still classifies along via fallback
+
+    - **GIVEN** `workflow[]` omits `implementing`
+    - **WHEN** the attempt is `ready → verifying`
+    - **THEN** `along` is `forward`
+    - **AND** `implementing` remains a protocol state
+
+    #### Scenario: Omitted implementing keeps retry backward
+
+    - **GIVEN** `workflow[]` omits `implementing`
+    - **WHEN** the attempt is `verifying → implementing`
+    - **THEN** `along` is `backward`
+
+- op: added
+  description: 'Post hooks only on forward along'
+  position:
+    parent:
+      type: section
+      matches: '^Requirement: Hook execution at step boundaries$'
+    after:
+      type: section
+      matches: '^Scenario: Post-hooks execute after state change$'
+  content: |
+    #### Scenario: Post run effects only match along forward
+
+    - **GIVEN** `implementing.hooks.post` is configured
+    - **WHEN** the attempt is `implementing → designing`
+    - **THEN** those post effects do not match
+    - **AND** `along` is `redesign`
+
+- op: modified
+  description: 'Transition post run is before persist'
+  selector:
+    type: section
+    matches: '^Scenario: Post-hooks execute after state change$'
+  rename: 'Scenario: Post-hooks execute before persist'
+  content: |
+    #### Scenario: Post-hooks execute before persist
+
+    - **GIVEN** a workflow step with `post: [{ id: "teardown", run: "echo teardown" }]`
+    - **AND** the attempt is `along = forward`
+    - **WHEN** `TransitionChange` transitions from this step
+    - **THEN** those post effects execute after predicates pass and before persist
+    - **AND** they do not run after the state change is already persisted
+
+- op: modified
+  description: 'Default path auto-runs; skip is the override'
+  selector:
+    type: section
+    matches: '^Scenario: Agent-driven step requires explicit hook invocation$'
+  content: |
+    - **GIVEN** an agent-driven step whose `run:` hooks the skill will run manually
+    - **WHEN** `TransitionChange` is invoked with `skipHookPhases` covering those effects
+    - **THEN** auto-hooks for those phases are skipped
+    - **AND** predicates still run
+    - **AND** without skip flags, matching `run:` effects still auto-execute
+
+- op: added
+  description: 'Auto-run effects unless skipped'
+  position:
+    parent:
+      type: section
+      matches: '^Requirement: Two execution modes$'
+    after:
+      type: section
+      matches: '^Scenario: Agent-driven step requires explicit hook invocation$'
+  content: |
+    #### Scenario: TransitionChange auto-runs matching run effects
+
+    - **GIVEN** a forward transition with matching `run:` post hooks
+    - **AND** `skipHookPhases` is empty
+    - **WHEN** `TransitionChange` executes
+    - **THEN** those effects run after predicates pass
+    - **AND** the agent is not required to call `run-hooks` for the default path

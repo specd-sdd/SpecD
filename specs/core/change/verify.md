@@ -92,7 +92,7 @@
 #### Scenario: Valid transition — drafting to designing
 
 - **WHEN** a Change in `drafting` state is transitioned to `designing`
-- **THEN** the `LifecycleEngine` confirms the transition is valid
+- **THEN** `isValidTransition('drafting', 'designing')` is true
 - **AND** a `transitioned` event with `from: 'drafting'` and `to: 'designing'` is appended
 
 #### Scenario: Valid transition — verifying back to implementing for implementation-only failure
@@ -125,6 +125,29 @@
 - **AND** no artifact files are downgraded to `pending-review`
 - **AND** the active spec approval remains valid
 - **AND** a `transitioned` event with `from: 'designing'` and `to: 'designing'` is appended
+
+#### Scenario: done can hop to implementing
+
+- **GIVEN** a Change in `done`
+- **WHEN** it is transitioned to `implementing`
+- **THEN** `isValidTransition` is true
+- **AND** a `transitioned` event with `from: 'done'` and `to: 'implementing'` is appended
+
+#### Scenario: archivable cannot hop to done
+
+- **GIVEN** a Change in `archivable`
+- **WHEN** a transition to `done` is attempted
+- **THEN** the entity rejects the pair as invalid
+
+### Requirement: Skill-aligned backward hops
+
+#### Scenario: Hop from done invalidates signoff only
+
+- **GIVEN** a Change in `done` with validated artifacts and an active signoff
+- **WHEN** it transitions to `verifying`
+- **THEN** signoff is invalidated
+- **AND** unchanged artifacts remain `complete`
+- **AND** spec approval is not invalidated
 
 ### Requirement: Archiving escape transitions
 
@@ -171,6 +194,13 @@
 - **THEN** the change is invalidated to `designing`
 - **AND** the drifted file is marked `drifted-pending-review`
 
+#### Scenario: implementation-failure from done uses backward hop
+
+- **GIVEN** a Change in `done` with validated artifacts
+- **AND** a late implementation bug is found
+- **WHEN** the operator retries via `done → implementing`
+- **THEN** the hop succeeds without forcing redesign
+
 ### Requirement: Spec approval gate
 
 #### Scenario: Gate disabled — free transition to implementing
@@ -178,15 +208,18 @@
 - **WHEN** `approvals.spec: false` (default) and a Change is in `ready` state
 - **THEN** it transitions directly to `implementing` with no approval required
 
-#### Scenario: Gate enabled — blocked until spec approved
+#### Scenario: Gate enabled — stays in ready until ApproveSpec
 
 - **WHEN** `approvals.spec: true` and a Change is in `ready` state
-- **THEN** it transitions to `pending-spec-approval`, not `implementing`
+- **AND** no spec approval is recorded
+- **THEN** `ready → implementing` is not allowed
+- **AND** the change does not enter `pending-spec-approval`
 
-#### Scenario: Gate enabled — implementing reachable after approval
+#### Scenario: Gate enabled — implementing after recorded approval in ready
 
-- **WHEN** `approvals.spec: true` and a Change in `pending-spec-approval` receives approval
-- **THEN** a `spec-approved` event is appended, then a `transitioned` event to `spec-approved` state, then to `implementing`
+- **WHEN** `approvals.spec: true` and a Change in `ready` has a recorded spec approval
+- **THEN** `ready → implementing` is allowed
+- **AND** no `transitioned` event to `pending-spec-approval` is required
 
 ### Requirement: Signoff gate
 
@@ -195,19 +228,21 @@
 - **WHEN** `approvals.signoff: false` (default) and a Change is in `done` state
 - **THEN** it transitions directly to `archivable` regardless of change content
 
-#### Scenario: Gate enabled — always blocked at done
+#### Scenario: Gate enabled — stays in done until ApproveSignoff
 
 - **WHEN** `approvals.signoff: true` and a Change is in `done` state
-- **THEN** it transitions to `pending-signoff`, not `archivable` — regardless of whether changes are additions, modifications, or removals
+- **AND** no signoff is recorded
+- **THEN** `done → archivable` is not allowed
+- **AND** the change does not enter `pending-signoff`
 
-#### Scenario: Gate enabled — archivable after signoff
+#### Scenario: Gate enabled — archivable after recorded signoff in done
 
-- **WHEN** `approvals.signoff: true` and a Change in `pending-signoff` receives sign-off
-- **THEN** a `signed-off` event is appended, then a `transitioned` event to `signed-off` state, then to `archivable`
+- **WHEN** `approvals.signoff: true` and a Change in `done` has a recorded signoff
+- **THEN** `done → archivable` is allowed
 
 #### Scenario: Archive from non-archivable state throws
 
-- **WHEN** archiving is attempted on a Change not in `archivable` state
+- **WHEN** archiving is attempted on a Change not in `archivable` or `archiving` state
 - **THEN** `InvalidStateTransitionError` is thrown
 
 ### Requirement: Artifacts
@@ -592,4 +627,4 @@
 - **AND** an upstream dependency requires review under the active schema DAG
 - **WHEN** lifecycle interpretation is requested
 - **THEN** the `Change` entity remains the source of persisted facts only
-- **AND** `LifecycleEngine` is responsible for deriving the dependency-aware lifecycle meaning
+- **AND** `evaluateLifecycleVerdict` / `projectArtifacts` is responsible for deriving the dependency-aware lifecycle meaning

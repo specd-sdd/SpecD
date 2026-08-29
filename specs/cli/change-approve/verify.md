@@ -55,11 +55,12 @@
 
 ### Requirement: Approve spec behaviour
 
-#### Scenario: Successful spec approval
+#### Scenario: Successful spec approval from ready
 
-- **GIVEN** the change is in `pending-spec-approval` state
+- **GIVEN** the change is in `ready` and the spec gate is on
 - **WHEN** `specd change approve spec my-change --reason "looks good"` is run
-- **THEN** the change transitions to `spec-approved`
+- **THEN** the change remains in `ready`
+- **AND** a spec approval is recorded
 - **AND** stdout contains `approved spec for my-change`
 - **AND** the process exits with code 0
 
@@ -72,11 +73,12 @@
 
 ### Requirement: Approve signoff behaviour
 
-#### Scenario: Successful signoff
+#### Scenario: Successful signoff from done
 
-- **GIVEN** the change is in `pending-signoff` state
+- **GIVEN** the change is in `done` and the signoff gate is on
 - **WHEN** `specd change approve signoff my-change --reason "done"` is run
-- **THEN** the change transitions to `signed-off`
+- **THEN** the change remains in `done`
+- **AND** a signoff is recorded
 - **AND** stdout contains `approved signoff for my-change`
 - **AND** the process exits with code 0
 
@@ -92,7 +94,7 @@
 
 #### Scenario: JSON output on successful approval
 
-- **GIVEN** the change is in `pending-spec-approval` state
+- **GIVEN** the change is in `ready` state
 - **WHEN** `specd change approve spec my-change --reason "looks good" --format json` is run
 - **THEN** stdout is valid JSON with `result` equal to `"ok"`, `gate` equal to `"spec"`, and `name` equal to `"my-change"`
 - **AND** the process exits with code 0

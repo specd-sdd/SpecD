@@ -8,5 +8,41 @@
     {
       "file": "core:src/composition/use-cases/edit-change.ts"
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "EditChange add/remove specIds, description, invalidationPolicy; mutate+unscaffold; invalidates approvals only on specIds change.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:e20bf90ee763107c47abe00746ed8c31bdf8cafa51582c6ba76e10a20d6a416c",
+          "lastModified": "2026-08-25T15:37:19.282Z"
+        },
+        "verify.md": {
+          "hash": "sha256:733eca7baa315629e6eb18f9998827134847941c46b5f9f4dfe435f3ad2360c9",
+          "lastModified": "2026-08-25T15:37:19.282Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# EditChange\n\n## Rules\n- Input: `name`, optional `addSpecIds`, `removeSpecIds`, `description`, optional `invalidationPolicy` (`none|surgical|downstream|global`).\n- Policy-only update is persistence-worthy even if specIds/description unchanged. Changing policy MUST NOT invent drift or rewrite artifact/file canonical states.\n- Missing change → `ChangeNotFoundError`. Snapshot `get(name)` MAY early-return; effective `specIds` update MUST use `ChangeRepository.mutate(name, fn)`.\n- Description only (no add/remove) → update description, `invalidated: false`. No spec/desc/policy ops at all → return unchanged, `invalidated: false`, no persist, no actor.\n- Removals before additions. Absent remove ID → `SpecNotInChangeError` (first missing aborts). Add idempotent (skip existing after removals).\n- Newly added spec IDs: seed `change.specDependsOn` via `readPersistedDependsOn` → else `metadata.json.dependsOn` → else `[]`. MUST NOT overwrite existing `specDependsOn` entry.\n- Resulting specIds identical (length+order) → return unchanged, `invalidated: false`, no persist.\n- Effective specIds change: resolve actor, `mutate` → `change.updateSpecIds(specIds, actor)` (invalidates approvals + history). Then `unscaffold(change, removedSpecIds)` for `specs/<ws>/<path>/` and `deltas/<ws>/<path>/`; files removed w/ dirs; missing dirs skipped.\n- Result: `{ change, invalidated }`.\n- Deps: ChangeRepository, ActorResolver, `specs: ReadonlyMap<string, SpecRepository>`. Config factory via `resolveEditChangeDeps` (changes, listWorkspaces, actor, schemaProvider) only.\n\n## Constraints\n- Workspaces always derived from specIds — never modified directly\n- MUST NOT validate spec IDs against filesystem — specs may not exist yet\n- Actor resolved only when persistence-worthy change occurs",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:e20bf90ee763107c47abe00746ed8c31bdf8cafa51582c6ba76e10a20d6a416c",
+          "lastModified": "2026-08-25T15:37:19.282Z"
+        },
+        "verify.md": {
+          "hash": "sha256:733eca7baa315629e6eb18f9998827134847941c46b5f9f4dfe435f3ad2360c9",
+          "lastModified": "2026-08-25T15:37:19.282Z"
+        }
+      }
+    }
+  }
 }

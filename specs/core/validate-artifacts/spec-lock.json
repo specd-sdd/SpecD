@@ -14,9 +14,18 @@
     "default:_global/architecture",
     "core:spec-id-format",
     "core:schema-format",
-    "core:composition-resolver"
+    "core:composition-resolver",
+    "core:transition-checks"
   ],
-  "implementation": [],
+  "implementation": [
+    {
+      "file": "core:src/application/use-cases/validate-artifacts.ts",
+      "symbols": ["ValidateArtifacts"]
+    },
+    {
+      "file": "core:test/application/use-cases/validate-artifacts.spec.ts"
+    }
+  ],
   "optimizations": {
     "optimizedDescription": {
       "value": "Single validation chokepoint enforces schema, dependencies, deltas, metadata, drift, hashes, and artifact completion.",

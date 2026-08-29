@@ -24,10 +24,16 @@
 
 #### Scenario: Change not in archivable state
 
-- **GIVEN** a change `my-change` in `done` state (not yet `archivable`)
+- **GIVEN** a change `my-change` in `done` state (not yet `archivable` or `archiving`)
 - **WHEN** `specd change archive my-change` is run
 - **THEN** the command exits with code 1
 - **AND** stderr contains an `error:` message mentioning the current state
+
+#### Scenario: Change in archiving may retry archive
+
+- **GIVEN** a change `my-change` in `archiving` state
+- **WHEN** `specd change archive my-change` is run
+- **THEN** the CLI forwards to `ArchiveChange` without a CLI-only archivable-only gate
 
 ### Requirement: Behaviour
 
@@ -58,6 +64,23 @@
 - **WHEN** `specd change archive my-change --skip-hooks post` is run
 - **THEN** post-archive hooks are skipped
 - **AND** pre-archive hooks remain enabled
+
+### Requirement: Check progress rendering
+
+#### Scenario: Text shows gerund label then pass mark
+
+- **GIVEN** archive execute emits `check-start` / `check-done` pass for `workspace.readOnly`
+- **WHEN** `specd changes archive <name>` runs in text mode
+- **THEN** stderr or stdout progress includes `Checking workspace ownership (workspace.readOnly)`
+- **AND** a subsequent `✓ Checking workspace ownership` line
+- **AND** no `Executing:` prefix appears
+
+#### Scenario: Hook progress rides the same bus
+
+- **GIVEN** archive `hook.pre` emits streaming hook output
+- **WHEN** archive runs in text mode
+- **THEN** progress uses label `Running pre hooks` with id `hook.pre`
+- **AND** streamed lines appear under that check before `check-done`
 
 ### Requirement: Post-archive hooks
 
@@ -110,5 +133,7 @@
 #### Scenario: JSON output on success
 
 - **WHEN** `specd change archive my-change --format json` succeeds
-- **THEN** stdout is valid JSON with `result` equal to `"ok"`, `name` equal to `"my-change"`, and `archivePath` containing the archive path
+- **THEN** stdout is a structured stream whose terminal record has `stream` equal to `change-archive`, `event.type` equal to `complete`, and `event.result.result` equal to `"ok"`
+- **AND** that result includes `name` equal to `"my-change"` and `archivePath` containing the archive path
+- **AND** callers do not receive a second unwrapped JSON object after the stream
 - **AND** the process exits with code 0

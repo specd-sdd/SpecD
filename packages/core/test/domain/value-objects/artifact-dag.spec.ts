@@ -44,6 +44,13 @@ describe('ArtifactDag', () => {
     expect(dag.childrenOf('specs')).toEqual(['verify', 'design', 'tasks'])
   })
 
+  it('returns direct requirements via parentsOf', () => {
+    const dag = ArtifactDag.from(stdLikeArtifacts)
+    expect(dag.parentsOf('proposal')).toEqual([])
+    expect(dag.parentsOf('specs')).toEqual(['proposal'])
+    expect(dag.parentsOf('design')).toEqual(['proposal', 'specs', 'verify'])
+  })
+
   it('returns descendants excluding seed ids', () => {
     const dag = ArtifactDag.from(stdLikeArtifacts)
     expect(dag.descendantsOf(['specs'])).toEqual(['verify', 'design', 'tasks'])

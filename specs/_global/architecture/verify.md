@@ -21,12 +21,24 @@
 - **WHEN** a file in `domain/` imports `node:fs` or any I/O module
 - **THEN** the TypeScript compiler must reject the import
 
+#### Scenario: Domain imports ambient Logger
+
+- **WHEN** a file in `domain/` imports the ambient `Logger`
+- **THEN** the import is permitted for diagnostic logging
+- **AND** it remains the sole cross-layer import exception
+
 ### Requirement: Application layer uses ports only
 
 #### Scenario: Use case receives port via constructor
 
 - **WHEN** a use case needs to read specs
 - **THEN** it receives a `SpecRepository` port via its constructor, not a concrete `FsSpecRepository`
+
+#### Scenario: Application imports ambient Logger
+
+- **WHEN** a use case imports the ambient `Logger` for diagnostics
+- **THEN** the import is permitted
+- **AND** it is not treated as importing an infrastructure adapter
 
 ### Requirement: Rich domain entities
 

@@ -1,7 +1,7 @@
 {
   "name": "code-graph-symbol-semantic-context",
   "createdAt": "2026-07-15T14:01:36.552Z",
-  "updatedAt": "2026-08-16T08:12:44.010Z",
+  "updatedAt": "2026-08-26T17:44:13.306Z",
   "description": "Add deterministic symbol ownership and range context to support hierarchical purpose extraction and semantic search in code graph.",
   "schema": {
     "name": "schema-std",

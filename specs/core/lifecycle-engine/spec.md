@@ -2,49 +2,67 @@
 
 ## Purpose
 
-Unifying lifecycle validation, artifact status, and repair diagnostics into a single source of truth is critical to preventing "liar context" and ensuring consistent system behavior. The `LifecycleEngine` is a centralized domain service that combines the change's persisted state with schema-defined workflow rules to derive the authoritative effective state, available transitions, and machine-readable blockers.
+Unifying lifecycle validation, artifact status, and repair diagnostics into a single source of truth is critical to preventing "liar context" and ensuring consistent system behavior. Domain lifecycle interpretation is a set of plain functions (`evaluateLifecycleVerdict`, `projectArtifacts`, `findBlockingParent`) that combine the change's persisted state with schema-defined workflow rules. Application `evaluateLifecycle` attaches public `nextAction.command`. There is no `LifecycleEngine` class.
 
 ## Requirements
 
+### Requirement: Stateless domain lifecycle verdict
+
+Lifecycle interpretation in the domain layer MUST be implemented as plain exported functions in `domain/services/lifecycle-verdict.ts`, not as a class:
+
+- `evaluateLifecycleVerdict(change, schema, options)` — projects predicate `CheckResult`s, effective artifact statuses, blockers, review summary, and `nextHop`.
+- `projectArtifacts(source, schema)` — pure DAG effective-status projection (no I/O).
+- `findBlockingParent(...)` — recursive parent-review helper for artifact status.
+
+There MUST NOT be a `LifecycleEngine` class, constructor, injected debug port, or compatibility alias (`LifecycleEngineOptions`). Domain services MAY call `Logger.debug` from [`default:_global/logging`](../../../_global/logging/spec.md) for diagnostics only.
+
+The public domain return type is `LifecycleDomainVerdict`. It MUST NOT include `nextAction.command` or any CLI/skill command string. Commands are application-owned (see Requirement: Application lifecycle guidance).
+
 ### Requirement: Centralized validation logic
 
-The `LifecycleEngine` SHALL be the sole authority for interpreting a change's state within a project's workflow. It MUST unify three validation dimensions:
+`evaluateLifecycleVerdict` SHALL be the sole domain authority for interpreting a change's state within a project's workflow. It MUST unify validation into **one transition-attempt evaluation** as defined by [`core:transition-checks`](../transition-checks/spec.md):
 
-1. **Protocol Validation**: Enforcing the valid state transition graph.
-2. **Artifact Validation**: Verifying structural completion of required artifacts.
-3. **Content Validation**: Checking internal task completion within artifacts.
+1. **Protocol** — `protocol.edge` against `VALID_TRANSITIONS`. `TransitionChange` fail-fasts this check. `GetStatus` MUST still collect every matching predicate for the hop (no fail-fast) so the repair guide can show the full why. The verdict function projects from the `CheckResult`s the caller supplies.
+2. **Schema-derived predicates** — `workflow.requires` and `workflow.taskCompletion` for the requested target.
+3. **Core-bound predicates** — registered `from` / `to` / `along` (and archive operation, which domain evaluation does not execute).
+
+`evaluateLifecycleVerdict` MUST evaluate **predicates** only (project from `CheckResult`s supplied by the caller). It MUST NOT run `run:` effects. It MUST NOT take a global snapshot bag. It MUST NOT fall back to `check.run` against snapshots when `checksByTarget` is missing. Matching checks perform I/O in `execute`; the domain layer MUST NOT perform those I/O reads.
+
+Callers MAY run `projectArtifacts` to compute DAG effective statuses for `CheckExecutionContext` **before** check `execute`. That helper MUST NOT perform I/O and MUST NOT be a second availability algorithm.
 
 ### Requirement: Effective artifact status computation
 
-Artifacts may contain multiple files (e.g., one per spec ID). The `Change` entity persists an _aggregated_ state for the artifact based on its files. The engine MUST compute the logical (effective) status of every artifact by combining this aggregated persisted state with its dependency chain.
+Artifacts may contain multiple files (e.g., one per spec ID). The `Change` entity persists an _aggregated_ state for the artifact based on its files. `projectArtifacts` MUST compute the logical (effective) status of every artifact by combining this aggregated persisted state with its dependency chain.
 
-The public contract remains centered on `LifecycleEngine.evaluate(...)`. Effective artifact statuses are returned as part of that verdict; callers MUST NOT depend on a separate public `computeEffectiveStatus(...)` API.
+The public domain contract is `evaluateLifecycleVerdict(...)` (plus `projectArtifacts` for DAG-only callers). Effective artifact statuses are returned as part of that verdict; callers MUST NOT depend on a separate public `computeEffectiveStatus(...)` API.
 
-The engine exists specifically because the entity does not know the schema artifact DAG. Persisted aggregate status and history remain on `Change`; dependency-aware effective status is derived here.
+These functions exist specifically because the entity does not know the schema artifact DAG. Persisted aggregate status and history remain on `Change`; dependency-aware effective status is derived here.
 
 **Mapping Rules:**
 
 - If the aggregated state is `drifted-pending-review`, its effective status remains `drifted-pending-review`.
 - If the aggregated state is `pending-review`, its effective status remains `pending-review`.
-- If the aggregated state is `complete` but any of its required upstream dependencies is not `complete` or `skipped`, its effective status SHALL be `pending-parent-artifact-review`.
+- If the aggregated state is `complete` but a required upstream effective status is `pending-review`, `drifted-pending-review`, or `pending-parent-artifact-review`, its effective status SHALL be `pending-parent-artifact-review`.
+- If the aggregated state is `complete` but a required upstream is otherwise not `complete` or `skipped` (`missing`, `in-progress`, …), its effective status SHALL be `in-progress`.
+- If both a review-blocked parent and an otherwise-incomplete parent apply, `pending-parent-artifact-review` wins.
 - In any other case, the effective status matches the aggregated persisted state (`missing`, `in-progress`, `complete`, `skipped`).
 
-The engine MUST detect recursive blocks: if Spec B depends on Spec A, and Spec A is `pending-review`, Spec B's effective status becomes `pending-parent-artifact-review`.
+`projectArtifacts` MUST detect recursive blocks: if Spec B depends on Spec A, and Spec A is `pending-review`, Spec B's effective status becomes `pending-parent-artifact-review`.
 
 ### Requirement: Canonical-state-only lifecycle interpretation
 
-LifecycleEngine SHALL interpret only canonical artifact/file workflow states when deriving effective status, blockers, review routing, and transition eligibility.
+`evaluateLifecycleVerdict` / `projectArtifacts` SHALL interpret only canonical artifact/file workflow states when deriving effective status, blockers, review routing, and transition eligibility.
 
 Display-only projections such as `complete-with-drift` and diagnostic fields such as `hasDrift` MUST NOT be treated as additional lifecycle states.
 
 Consequently:
 
-- when policy `none` leaves a file canonically `complete` but drift-visible in status rendering, LifecycleEngine still treats it as `complete`
-- when canonical state becomes `missing`, `pending-review`, or `drifted-pending-review`, LifecycleEngine uses those canonical states normally
+- when policy `none` leaves a file canonically `complete` but drift-visible in status rendering, the verdict still treats it as `complete`
+- when canonical state becomes `missing`, `pending-review`, or `drifted-pending-review`, the verdict uses those canonical states normally
 
 ### Requirement: Machine-readable blockers
 
-For every condition that prevents a transition or marks an artifact as incomplete, the engine MUST provide a structured `Blocker` object containing:
+For every condition that prevents a transition or marks an artifact as incomplete, the verdict function MUST provide a structured `Blocker` object containing:
 
 - `code`: A unique machine-readable identifier.
 - `message`: A human-readable description.
@@ -52,53 +70,87 @@ For every condition that prevents a transition or marks an artifact as incomplet
 - `bypassFlag`: (Optional) The name of the flag that bypasses this blocker (e.g., `--allow-overlap`).
 - `affectedArtifacts` (optional): Detail identifying the specific artifact IDs and files.
 
-If a blocker is skippable and the corresponding bypass is active in the engine's input, the engine SHALL treat the condition as a warning rather than a transition blocker.
+If a blocker is skippable and the corresponding bypass is active in the verdict input, the function MUST omit that blocker from `blockers` (it MUST NOT remain as a transition blocker). `LifecycleDomainVerdict` has no `warnings` field; active bypass MUST NOT invent a warning channel.
 
 **Mandatory Blocker Codes:**
 
-- `MISSING_ARTIFACT`: A required artifact is completely absent (state: `missing`).
-- `INCOMPLETE_ARTIFACT`: An artifact exists but has not been validated (state: `in-progress`).
+- `INCOMPLETE_ARTIFACT`: A required artifact is not ready (`missing` or `in-progress`). There is no separate `MISSING_ARTIFACT` code.
 - `ARTIFACT_DRIFT`: An artifact has changed on disk since its last validation (state: `drifted-pending-review`).
 - `REVIEW_REQUIRED`: An artifact was invalidated or downgraded and requires review (state: `pending-review`).
 - `PENDING_PARENT_REVIEW`: An artifact is blocked because one of its upstream dependencies requires review.
 - `INCOMPLETE_TASKS`: An artifact contains unfinished checklist items (e.g., `- [ ]`).
-- `OVERLAP_CONFLICT`: The change scope overlaps with specs modified by a recently archived change.
-- `INVALID_TRANSITION`: The requested transition is not permitted by the lifecycle state machine.
-- `APPROVAL_REQUIRED`: The transition is gated by a required human approval (spec approval or sign-off).
+- `OVERLAP_CONFLICT`: Live overlap with **other active** changes from archive `spec.overlap` (GetStatus runs those predicates when `state === 'archivable'`). MUST NOT be emitted only because `review.reason` is `'spec-overlap-conflict'` (victim of another archive; that is review + `/specd-design`).
+- `INVALID_TRANSITION`: The requested target is not in `VALID_TRANSITIONS` from the current state.
+- `APPROVAL_REQUIRED`: A bound approval predicate failed (stay in `ready` / `done`).
 
 For file-level blockers (drift, review, parent review), the `affectedArtifacts` field MUST contain a grouped list identifying the specific artifact IDs and the exact filenames/paths that triggered the blocker.
 
-### Requirement: Available steps and next action
+### Requirement: Available steps and domain next hop
 
-The engine MUST derive the set of `AvailableStep` entries and the authoritative `EffectiveTarget` based on the current change state, project configuration (approval gates), and active bypass flags.
+The domain layer MUST derive `validTransitions`, `availableTransitions`, `AvailableStep` entries, and `nextHop` from **one** predicate evaluation of candidate edges (see [`core:transition-checks`](../transition-checks/spec.md)). Callers MUST NOT compute a second availability list that ignores `workflow.taskCompletion` or enter-ready / exit-implementing predicates.
 
 **Approval Gate Routing:**
 
-- If a transition to a gated step (e.g., `implementing`) is requested and the corresponding gate is active (e.g., `approvals.spec: true`), the engine MUST route the transition to the intermediate pending state (e.g., `pending-spec-approval`).
-- If a gate is disabled, any attempt to reach its corresponding pending or approved states MUST be blocked with an `INVALID_TRANSITION` code.
+Target resolution MUST NOT rewrite `implementing` to `pending-spec-approval` or `archivable` to `pending-signoff`. The requested target is the target.
 
 **Step Availability:**
 
-- `isReady`: Whether all required artifacts for the step are logically complete/skipped.
-- `isPermitted`: Whether the lifecycle protocol allows the transition. This check MUST combine the static `VALID_TRANSITIONS` graph with the dynamic approval status and active skippable blockers.
+- `validTransitions` SHALL be protocol-legal targets from the current state (`VALID_TRANSITIONS`).
+- `availableTransitions` SHALL be those targets whose blocking predicates all pass or skip (including task completion and `deps.consistent` / `workspace.readOnly` when evaluating enter-`ready`, and `impl.filesResolved` / `impl.linksInScope` when evaluating **forward** exit-`implementing`). Redesign to `designing` MUST NOT require those impl checks.
+- `availableSteps` SHALL be extras-bearing `schema.workflow()` lookup rows in declaration order. It MUST NOT be treated as the participating-state set. Protocol participation is `validTransitions` / `availableTransitions`. An omitted `implementing` row MAY be absent from `availableSteps` while still present in `validTransitions`.
+- `isReady`: Whether all required artifacts for the step are logically complete/skipped. MUST be projected from `workflow.requires` check results when those results are present — MUST NOT independently re-walk `requires` to emit a second blocker code for the same artifact. When those results are present, `blockingArtifacts` MUST come from the failed `workflow.requires` `details.artifactId` (empty when that check passed or skipped), not a second independent `requires` walk. Required artifacts that are `missing` or `in-progress` both use `INCOMPLETE_ARTIFACT`. When `checksByTarget` is empty or lacks an entry for a transition, `transitionBlockers` for that transition MAY use the DAG-only `requires` walk (same artifact readiness as `projectArtifacts`) without running hop predicates.
+- `isPermitted`: Whether `protocol.edge` allows the pair (`VALID_TRANSITIONS`). Predicate failures affect `availableTransitions` and blockers, not this protocol flag. For `IMPLEMENTATION_STATE`, only `impl.linksInScope` failures are skippable via `--allow-out-of-scope`; `impl.filesResolved` failures are not.
 
-Based on the current state and blockers, the engine MUST recommend a single `NextAction` (cognitive or mechanical) to guide the user or agent toward the next valid state.
+Based on that evaluation plus change-level review blockers, `evaluateLifecycleVerdict` MUST recommend a single domain `nextHop`:
+
+- `nextHop.targetStep` — the recommended next lifecycle hop (not “which skill the agent is already in”).
+- `nextHop.actionType` — `cognitive` or `mechanical`.
+- `nextHop.reason` — human prose explaining why that hop is recommended.
+
+`nextHop` MUST NOT include `command`. Skill/CLI command strings are resolved in the application layer (Requirement: Application lifecycle guidance).
+
+**Domain happy-path hop matrix (when the listed hop is in `availableTransitions`):**
+
+- `designing` (or `drafting` after entering design work) with `ready` available → `targetStep: ready`. While required design artifacts are incomplete → `targetStep: designing`.
+- `implementing` with `verifying` available → `targetStep: verifying`; otherwise `targetStep: implementing`.
+- `verifying` with `done` available → `targetStep: done`; otherwise `targetStep: verifying`.
+- `ready` with missing required spec approval → `targetStep: ready` (MUST NOT recommend a hop to `pending-spec-approval`). When approval is satisfied and `implementing` is available → `targetStep: implementing`.
+- `done` with missing required signoff → `targetStep: done`. When signoff is satisfied (or off) and `archivable` is available → `targetStep: archivable` (MUST NOT recommend the archive operation hop while still in `done` / `signed-off`).
+- `signed-off` with `archivable` available → `targetStep: archivable`.
+- `archivable` → `targetStep: archiving`.
+- When `review.reason` is `'spec-overlap-conflict'`, `nextHop.targetStep` MUST be `designing`.
+
+Skill-aligned backward hops from `done` / `signed-off` / `archivable` to `implementing` / `verifying` MUST appear in `availableTransitions` when predicates allow them. Those hops MUST NOT become the default `nextHop`.
 
 **Archiving state guidance:**
 
 When `change.state` is `archiving`:
 
 - `validTransitions` MUST include `archivable` and `designing`.
-- If the most recent `archive-failed` event has `commitStarted: true` and batch restore did not complete, `nextAction` MUST recommend manual review and transition to `designing` rather than retrying archive blindly.
-- If no blocking restore failure is recorded, `nextAction` MAY recommend retrying archive (`specd change archive <name>`) or transitioning to `designing` when artifact revision is required.
+- If the most recent `archive-failed` event has `commitStarted: true` and batch restore did not complete, `nextHop` MUST recommend manual review and transition to `designing` (`targetStep: designing`) rather than retrying archive blindly.
+- If no blocking restore failure is recorded, `nextHop` MAY recommend retrying archive (`targetStep: archiving`) or transitioning to `designing` when artifact revision is required.
+
+### Requirement: Application lifecycle guidance
+
+Application code MUST map a domain `nextHop` plus change context into a public `NextAction` (`targetStep`, `actionType`, `reason`, `command`) in `application/services/lifecycle-guidance.ts`:
+
+- `resolveLifecycleCommand(nextHop, context)` returns the skill or CLI entry that owns the recommended work.
+- The happy-path command matrix (for example `/specd-design`, `/specd-implement`, `/specd-verify`, `/specd-archive`, `specd changes approve spec`, `specd changes approve signoff`) MUST live here, not in domain services.
+- When the current state is `done` or `signed-off` and `nextHop.targetStep` is `archivable` (or `archivable` is in `availableTransitions`), `command` MUST be `/specd-archive`.
+- When `review.reason` is `'spec-overlap-conflict'`, `command` MUST be `/specd-design`. MUST NOT advertise `--allow-overlap` for that victim path.
+- When public blockers include live `OVERLAP_CONFLICT` from archive predicates while `state === 'archivable'`, `command` MUST remain `/specd-archive` and `targetStep` MUST remain `archivable`.
+
+`application/services/lifecycle-evaluation.ts` MUST expose `evaluateLifecycle(change, schema, options)` that calls `evaluateLifecycleVerdict` then attaches `nextAction` via lifecycle guidance. Use cases that need full public lifecycle answers (`GetStatus`, `TransitionChange` when projecting guidance) MUST consume `evaluateLifecycle`, not the domain functions directly.
+
+DAG-only consumers (`ValidateArtifacts`, `GetArtifactInstruction`) MAY call `evaluateLifecycleVerdict` with empty `checksByTarget` when they need only `projectArtifacts` / `nextArtifact` and MUST NOT attach commands.
 
 ### Requirement: Archiving escape transitions in lifecycle verdict
 
-When evaluating a change in `archiving` state, `LifecycleEngine` MUST expose `archivable` and `designing` in both `validTransitions` and `availableTransitions` unless a non-skippable blocker unrelated to lifecycle validity prevents the target step.
+When evaluating a change in `archiving` state, `evaluateLifecycleVerdict` MUST expose `archivable` and `designing` in both `validTransitions` and `availableTransitions` unless a non-skippable blocker unrelated to lifecycle validity prevents the target step.
 
-Transition blockers for `archiving → archivable` MUST NOT include workflow `requires` checks — returning to `archivable` after a failed commit is a lifecycle recovery move, not entry into a workflow step.
+`archiving → archivable` is `along = recovery`. Transition blockers for that hop MUST NOT include workflow `requires` or `workflow.taskCompletion` — returning to `archivable` after a failed commit is not entry into a workflow step and MUST NOT be treated as `backward`.
 
-Transition blockers for `archiving → designing` MUST follow the same invalidation semantics enforced by `TransitionChange` when entering `designing` from other states.
+Transition blockers for `archiving → designing` MUST follow the same invalidation semantics enforced by `TransitionChange` when entering `designing` from other states (`along = redesign`).
 
 ### Requirement: Review summary integration
 
@@ -106,22 +158,30 @@ The engine MUST detect and report **Drift** (physical content changes since last
 
 ### Requirement: Shared lifecycle interpretation for consumers
 
-Use cases that need DAG-aware lifecycle answers MUST consume `LifecycleEngine` rather than reimplementing schema interpretation locally.
+Use cases that need DAG-aware lifecycle answers MUST consume the lifecycle evaluation surface rather than reimplementing schema interpretation locally.
 
 This includes, at minimum:
 
-- status/reporting consumers that need effective artifact status or blockers
-- transition consumers that need routing and gated availability
-- validation consumers that need dependency-order checks or recursive blocker context
-- instruction consumers that need to determine which artifact is next in the DAG
+- status/reporting consumers that need effective artifact status, blockers, check-derived `availableTransitions`, and public `nextAction` — `evaluateLifecycle`
+- transition consumers that need predicate evaluation and gated availability (then run effects themselves) — `evaluateLifecycleVerdict` for projection; guidance only when returning public `nextAction`
+- validation consumers that need dependency-order checks or recursive blocker context — `evaluateLifecycleVerdict` with empty `checksByTarget`
+- instruction consumers that need to determine which artifact is next in the DAG — `evaluateLifecycleVerdict` with empty `checksByTarget`
+
+`GetStatus` and `TransitionChange` MUST NOT re-run `requires` / task / deps / readOnly / impl-exit as a second independent gate after a green `execute` of matching predicates for the same attempt.
+
+`ValidateArtifacts` and `GetArtifactInstruction` MUST obtain DAG-aware answers from `evaluateLifecycleVerdict` with empty `checksByTarget` (`projectArtifacts` / `nextArtifact` only). They MUST NOT run hop predicates (`executeChecksByLegalTargets`). They MUST NOT gather a global snapshot bag (`gatherPredicateSnapshots` MUST NOT exist).
+
+Hop `availableTransitions` MUST come from predicate `CheckResult`s when those results are supplied. DAG `isReady` / parent-review MAY still use `projectArtifacts` when `checksByTarget` is empty. `CompileContext` MUST NOT be required to call lifecycle evaluation.
+
+There MUST NOT be a `LifecycleEngine` class in domain or application. Public API is `evaluateLifecycleVerdict`, `projectArtifacts`, `findBlockingParent`, `resolveLifecycleNextHop`, and application `evaluateLifecycle`. Domain `lifecycle-engine.ts` MUST only re-export those domain functions and types (input type is `LifecycleVerdictInput`).
 
 ### Requirement: Next artifact topological order
 
-When deriving the recommended next artifact for a change, `LifecycleEngine` MUST scan artifacts in `schema.artifactDag().topologicalOrder()` and return the first artifact id whose effective status is neither `complete` nor `skipped` and whose required dependencies are effectively satisfied (`complete` or `skipped`).
+When deriving the recommended next artifact for a change, `evaluateLifecycleVerdict` MUST scan artifacts in `schema.artifactDag().topologicalOrder()` and return the first artifact id whose effective status is neither `complete` nor `skipped` and whose required dependencies are effectively satisfied (`complete` or `skipped`).
 
 Declaration order in `schema.artifacts()` MUST NOT be used as a proxy for DAG order for this selection.
 
-If every artifact is effectively `complete` or `skipped`, the engine MUST report no next artifact (`null`).
+If every artifact is effectively `complete` or `skipped`, the verdict MUST report no next artifact (`null`).
 
 ## Spec Dependencies
 
@@ -129,3 +189,5 @@ If every artifact is effectively `complete` or `skipped`, the engine MUST report
 - [`core:workflow-model`](../workflow-model/spec.md) — Source of workflow transition rules and task gating requirements.
 - [`core:schema-format`](../schema-format/spec.md) — Source of artifact requirements and schema structure.
 - [`default:_global/architecture`](../../../_global/architecture/spec.md) — Defines service layer boundaries.
+- [`default:_global/logging`](../../../_global/logging/spec.md) — Ambient Logger exception for domain diagnostics.
+- [`core:transition-checks`](../transition-checks/spec.md) — Check identity, `from`/`to`/`along`, predicate evaluation, projections.

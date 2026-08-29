@@ -371,10 +371,10 @@ approvals:
   signoff: false # default
 ```
 
-| Gate      | When `true`                                                                                                    | When `false` (default)                       |
-| --------- | -------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
-| `spec`    | `ready → implementing` is blocked. The change must pass through `pending-spec-approval → spec-approved` first. | `ready → implementing` is a free transition. |
-| `signoff` | `done → archivable` is always blocked. The change must pass through `pending-signoff → signed-off` first.      | `done → archivable` is a free transition.    |
+| Gate      | When `true`                                                                                                        | When `false` (default)                       |
+| --------- | ------------------------------------------------------------------------------------------------------------------ | -------------------------------------------- |
+| `spec`    | `ready → implementing` is blocked until `specd changes approve spec` records consent. The change stays in `ready`. | `ready → implementing` is a free transition. |
+| `signoff` | `done → archivable` is blocked until `specd changes approve signoff` records consent. The change stays in `done`.  | `done → archivable` is a free transition.    |
 
 Both gates are independent — any combination is valid.
 

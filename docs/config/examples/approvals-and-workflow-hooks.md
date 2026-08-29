@@ -63,7 +63,7 @@ schemaOverrides:
             - id: confirm-spec-approval
               instruction: |
                 Before writing any code, confirm that the spec approval has been recorded.
-                Do not begin implementation until SpecD confirms the change is in spec-approved state.
+                Do not begin implementation until SpecD confirms the spec gate is satisfied while the change is still in ready.
       - step: archiving
         hooks:
           pre:
@@ -79,13 +79,13 @@ schemaPlugins:
 
 ## What this configuration does
 
-**Approval gates** — both gates are enabled. The change lifecycle expands to include two mandatory human review points:
+**Approval gates** — both gates are enabled. The change stays on the same delivery path; humans record consent in place:
 
 ```
-ready → pending-spec-approval → spec-approved → implementing → ... → done → pending-signoff → signed-off → archivable
+ready —(approve spec, still ready)—→ ready → implementing → ... → done —(approve signoff, still done)—→ done → archivable
 ```
 
-With `approvals.spec: true`, a human must explicitly run `specd approve spec` for each spec touched by the change before the agent can begin implementation. With `approvals.signoff: true`, a human must run `specd approve signoff` after verification is complete before the change can be archived. Both approval records capture the approver's git identity, a reason, and a hash of the artifacts at approval time.
+With `approvals.spec: true`, a human must explicitly run `specd changes approve spec` before `ready → implementing` is allowed. The change does not move to `pending-spec-approval`. With `approvals.signoff: true`, a human must run `specd changes approve signoff` after verification is complete before `done → archivable` is allowed. The change does not move to `pending-signoff`. Both approval records capture the approver's git identity, a reason, and a hash of the artifacts at approval time.
 
 **LLM-optimised context** — `llmOptimizedContext: true` enables richer metadata generation. When SpecD builds `metadata.json` files for specs, it uses an LLM to produce more precise descriptions, structured scenarios, and accurate `dependsOn` suggestions. This requires LLM access in the automation pipeline.
 
@@ -93,7 +93,7 @@ With `approvals.spec: true`, a human must explicitly run `specd approve spec` fo
 
 **Project-level context spec selection** — `contextIncludeSpecs: ['default:_global/*']` ensures that specs under `specs/_global/` are always in context, for every change, regardless of scope. This is declared at the project level so it applies unconditionally — without it, specs outside the active change's scope would only be included if the change explicitly referenced them.
 
-**Schema overrides** — `schemaOverrides` applies inline changes to the active schema without forking it. Here it uses `append` to add hook entries to two workflow steps. Each hook entry requires an `id` — this is how `schemaOverrides` identifies individual entries for later append, prepend, or removal. The `implementing` pre-hook injects an instruction reminding the agent to confirm spec approval state before writing code. This is belt-and-suspenders: SpecD enforces the gate, but the instruction makes the expectation explicit in the agent's context.
+**Schema overrides** — `schemaOverrides` applies inline changes to the active schema without forking it. Here it uses `append` to add hook entries to two workflow steps. Each hook entry requires an `id` — this is how `schemaOverrides` identifies individual entries for later append, prepend, or removal. The `implementing` pre-hook injects an instruction reminding the agent to confirm that spec approval has been recorded (the change is still in `ready` until `ready → implementing` succeeds). This is belt-and-suspenders: SpecD enforces the gate, but the instruction makes the expectation explicit in the agent's context.
 
 The `archiving` pre-hook runs `pnpm test` before the archive proceeds — if tests fail, the archive is aborted and the user is informed. The post-hook fires after the archive is complete and sends a Slack notification. `{{change.name}}` resolves to the change's slug name at runtime.
 

@@ -23,22 +23,38 @@ export type ChangeState =
  * Each key is a source state; the value is the array of states it may
  * transition to. Transitions not listed here are invalid.
  *
- * Both approval gate paths are listed. Use cases enforce which path
- * is taken based on the active `specd.yaml` configuration.
+ * Pending and approved parking states remain drain-only for in-flight
+ * changes. New work stays in `ready` / `done` until recorded approval
+ * unblocks the delivery edge.
  */
 export const VALID_TRANSITIONS: Record<ChangeState, readonly ChangeState[]> = {
   drafting: ['designing'],
   designing: ['ready', 'designing'],
-  ready: ['implementing', 'pending-spec-approval', 'designing'],
+  ready: ['implementing', 'designing'],
   'pending-spec-approval': ['spec-approved', 'designing'],
   'spec-approved': ['implementing', 'designing'],
   implementing: ['verifying', 'designing'],
   verifying: ['implementing', 'done', 'designing'],
-  done: ['archivable', 'pending-signoff', 'designing'],
+  done: ['archivable', 'designing', 'implementing', 'verifying'],
   'pending-signoff': ['signed-off', 'designing'],
-  'signed-off': ['archivable', 'designing'],
-  archivable: ['archiving', 'designing'],
+  'signed-off': ['archivable', 'designing', 'implementing', 'verifying'],
+  archivable: ['archiving', 'designing', 'implementing', 'verifying'],
   archiving: ['archivable', 'designing'],
+}
+
+/**
+ * Happy-path next lifecycle state for `TransitionChange` `to: 'next'`.
+ * Not `GetStatus.nextAction` (that field may recommend staying, approving, or archiving).
+ */
+export const HAPPY_PATH_NEXT: Partial<Record<ChangeState, ChangeState>> = {
+  drafting: 'designing',
+  designing: 'ready',
+  ready: 'implementing',
+  'spec-approved': 'implementing',
+  implementing: 'verifying',
+  verifying: 'done',
+  done: 'archivable',
+  'signed-off': 'archivable',
 }
 
 /**

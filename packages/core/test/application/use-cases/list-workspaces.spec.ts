@@ -73,6 +73,44 @@ describe('ListWorkspaces', () => {
     })
   })
 
+  it('excludePathsFor merges project and workspace prefixes', () => {
+    const config = {
+      projectRoot: '/project',
+      graph: { excludePaths: ['node_modules'] },
+      workspaces: [
+        {
+          name: 'default',
+          codeRoot: '/project',
+          isExternal: false,
+          ownership: 'owned' as const,
+          specsPath: '/project/specs',
+          specsAdapter: { adapter: 'fs', config: {} },
+          schemasPath: '/project/.specd/schemas',
+          schemasAdapter: { adapter: 'fs', config: {} },
+          graph: { excludePaths: ['dist'] },
+        },
+      ],
+      storage: {
+        changesPath: '/project/.specd/changes',
+        changesAdapter: { adapter: 'fs', config: {} },
+        draftsPath: '/project/.specd/drafts',
+        draftsAdapter: { adapter: 'fs', config: {} },
+        discardedPath: '/project/.specd/discarded',
+        discardedAdapter: { adapter: 'fs', config: {} },
+        archivePath: '/project/.specd/archive',
+        archiveAdapter: { adapter: 'fs', config: {} },
+      },
+      approvals: { spec: false, signoff: false },
+    }
+    const useCase = new ListWorkspaces(
+      config as unknown as SpecdConfig,
+      new Map([['default', makeSpecRepository('owned')]]),
+    )
+
+    expect(useCase.excludePathsFor('default')).toEqual(['node_modules', 'dist'])
+    expect(useCase.excludePathsFor('missing')).toEqual(['node_modules'])
+  })
+
   it('throws when a spec repository is missing for a configured workspace', async () => {
     const config = {
       workspaces: [{ name: 'default' }],

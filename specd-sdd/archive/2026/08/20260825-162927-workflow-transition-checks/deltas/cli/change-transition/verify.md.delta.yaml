@@ -1,0 +1,230 @@
+- op: added
+  description: 'Repair guide uses check-derived nextAction'
+  position:
+    parent:
+      type: section
+      matches: '^Requirement: Invalid transition error$'
+    after:
+      type: section
+      matches: '^Scenario: Transition failure renders Repair Guide$'
+  content: |
+    #### Scenario: Repair guide recommends verify when tasks are complete
+
+    - **GIVEN** a failed transition from `implementing` while tasks are complete
+    - **AND** `GetStatus.nextAction` recommends `/specd-verify`
+    - **WHEN** the command is run in text mode
+    - **THEN** the repair guide command is the verify skill
+    - **AND** it is not `/specd-implement`
+
+- op: added
+  description: 'Status already omitted verifying'
+  position:
+    parent:
+      type: section
+      matches: '^Requirement: Incomplete tasks error$'
+    after:
+      type: section
+      matches: '^Scenario: Unchecked checkboxes block verifying$'
+  content: |
+    #### Scenario: Status omitted verifying before the failed transition
+
+    - **GIVEN** incomplete tasks
+    - **WHEN** `specd changes status` is run before the transition attempt
+    - **THEN** `availableTransitions` already omits `verifying`
+
+- op: added
+  description: 'Generic check progress bus in text mode'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Incomplete tasks error$'
+  content: |
+    ### Requirement: Check progress rendering
+
+    #### Scenario: Predicate progress uses gerund label
+
+    - **GIVEN** transition execute emits `check-start` / `check-done` for `impl.linksInScope`
+    - **WHEN** the command runs in text mode
+    - **THEN** progress includes `Checking implementation links (impl.linksInScope)`
+    - **AND** a `✓` or `✗` line repeats that label
+    - **AND** no `Executing:` prefix appears
+
+    #### Scenario: Hook progress uses Running hooks labels
+
+    - **GIVEN** matching post hooks stream output
+    - **WHEN** the command runs in text mode
+    - **THEN** progress uses `Running post hooks (hook.post)`
+    - **AND** streamed lines appear as `check-progress` under that check
+
+- op: modified
+  description: 'Next from ready stays in ready when spec gate on'
+  selector:
+    type: section
+    matches: '^Scenario: Next flag honors approval routing from ready$'
+  rename: 'Scenario: Next flag from ready requests implementing and stays in ready when spec gate on'
+  content: |
+    #### Scenario: Next flag from ready requests implementing and stays in ready when spec gate on
+
+    - **GIVEN** `approvals.spec: true` and the change is in `ready` state
+    - **AND** no spec approval is recorded
+    - **WHEN** `specd change transition my-change --next` is run
+    - **THEN** the command resolves `implementing` as the logical next target
+    - **AND** the change remains in `ready`
+    - **AND** it does not persist `pending-spec-approval`
+
+- op: modified
+  description: 'Spec gate does not rewrite implementing to pending'
+  selector:
+    type: section
+    matches: '^Scenario: Spec approval gate active$'
+  content: |
+    #### Scenario: Spec approval gate active
+
+    - **GIVEN** `approvals.spec: true` and the change is in `ready` state
+    - **AND** no spec approval is recorded
+    - **WHEN** `specd change transition my-change implementing` is run
+    - **THEN** the command exits with code 1
+    - **AND** the change remains in `ready`
+    - **AND** stdout does not show a transition to `pending-spec-approval`
+
+- op: modified
+  description: 'Signoff gate does not rewrite archivable to pending'
+  selector:
+    type: section
+    matches: '^Scenario: Signoff gate active$'
+  content: |
+    #### Scenario: Signoff gate active
+
+    - **GIVEN** `approvals.signoff: true` and the change is in `done` state
+    - **AND** no signoff is recorded
+    - **WHEN** `specd change transition my-change archivable` is run
+    - **THEN** the command exits with code 1
+    - **AND** the change remains in `done`
+    - **AND** stdout does not show a transition to `pending-signoff`
+
+- op: modified
+  description: 'Repair guide is stderr not stdout'
+  selector:
+    type: section
+    matches: '^Scenario: Transition failure renders Repair Guide$'
+  content: |
+    #### Scenario: Transition failure renders Repair Guide
+
+    - **GIVEN** a transition to `ready` fails because an artifact is missing
+    - **WHEN** the command is run in text mode
+    - **THEN** it prints an error message to stderr
+    - **AND** it renders a `repair guide:` section to stderr
+    - **AND** the guide includes the blocker code (e.g., `! INCOMPLETE_ARTIFACT`) and the recommended command
+    - **AND** stdout does not contain the repair guide
+
+- op: modified
+  description: 'JSON hook events use change-transition stream'
+  selector:
+    type: section
+    matches: '^Scenario: Structured formats emit progress on stdout$'
+  content: |
+    #### Scenario: Structured formats emit progress on stdout
+
+    - **GIVEN** a transition emits check and lifecycle progress events
+    - **WHEN** `specd change transition my-change designing --format json` is run
+    - **THEN** stdout emits newline-delimited structured records during the transition
+    - **AND** hook check events use `stream: "change-transition"`
+    - **AND** no record uses `stream: "hook-progress"`
+
+- op: added
+  description: 'HookFailedError is not a repair guide'
+  position:
+    parent:
+      type: section
+      matches: '^Requirement: Invalid transition error$'
+    after:
+      type: section
+      matches: '^Scenario: Transition failure renders Repair Guide$'
+  content: |
+    #### Scenario: HookFailedError is exit 2 without repair guide
+
+    - **GIVEN** a matching `hook.post` effect fails before persist
+    - **WHEN** the command is run in text mode
+    - **THEN** the process exits with code 2
+    - **AND** the check bus shows `✗` for `Running post hooks`
+    - **AND** stderr does not contain a `repair guide:` section
+
+- op: added
+  description: 'Next from signed-off maps to archivable'
+  position:
+    parent:
+      type: section
+      matches: '^Requirement: Next-transition resolution$'
+    after:
+      type: section
+      matches: '^Scenario: Next flag fails in archivable state$'
+  content: |
+    #### Scenario: Next flag from signed-off maps to archivable
+
+    - **GIVEN** the change is in `signed-off` state
+    - **WHEN** `specd change transition my-change --next` is run
+    - **THEN** the CLI passes `to: 'next'` to `TransitionChange`
+    - **AND** Core resolves `archivable` as the target state
+
+    #### Scenario: CLI does not keep a from-to next table
+
+    - **WHEN** `--next` is used
+    - **THEN** the CLI does not resolve the target via a local from→to switch
+    - **AND** `TransitionChange.execute` receives `to: 'next'`
+
+    #### Scenario: Shared presentation with run-hooks is not the same JSON stream
+
+    - **WHEN** `change transition` emits structured progress
+    - **THEN** records use `stream: "change-transition"`
+    - **AND** they do not use `stream: "hook-progress"`
+
+- op: modified
+  description: 'Verify does not require shared presentation with run-hooks'
+  selector:
+    type: section
+    matches: '^Scenario: Equivalent hook events render with the same presentation contract as run-hooks$'
+  rename: 'Scenario: Transition check bus does not share hook-progress stream'
+  content: |
+    #### Scenario: Transition check bus does not share hook-progress stream
+
+    - **WHEN** `specd change transition` emits structured progress
+    - **THEN** records use `stream: "change-transition"`
+    - **AND** they do not use `stream: "hook-progress"`
+
+- op: modified
+  description: 'Execute omits approval flags but may pass skipHookPhases'
+  selector:
+    type: section
+    matches: '^Scenario: Transition execute omits approval flags$'
+  content: |
+    #### Scenario: Transition execute omits approval flags
+
+    - **GIVEN** `config.approvals.spec: true`
+    - **WHEN** `specd change transition my-change implementing` runs
+    - **THEN** `TransitionChange.execute` is called without approval gate flags on the input
+    - **AND** the input MAY include `skipHookPhases` (empty set when `--skip-hooks` is omitted)
+    - **AND** the input MUST NOT include `allowOutOfScope` unless `--allow-out-of-scope` was passed
+
+- op: added
+  description: 'Allow-out-of-scope forwarded to TransitionChange'
+  position:
+    parent:
+      type: section
+      matches: '^Requirement: Command signature$'
+    after:
+      type: section
+      matches: '^Scenario: Next flag cannot be combined with an explicit step$'
+  content: |
+    #### Scenario: Allow-out-of-scope is forwarded to execute
+
+    - **GIVEN** the change is in `implementing` state
+    - **WHEN** `specd change transition my-change verifying --allow-out-of-scope` is run
+    - **THEN** `TransitionChange.execute` is called with `allowOutOfScope: true`
+
+    #### Scenario: Allow-out-of-scope is omitted by default
+
+    - **WHEN** `specd change transition my-change designing` is run without `--allow-out-of-scope`
+    - **THEN** `TransitionChange.execute` is called without `allowOutOfScope` on the input

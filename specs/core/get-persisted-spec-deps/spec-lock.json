@@ -4,5 +4,41 @@
     "version": 1
   },
   "dependsOn": ["core:spec-repository-port", "core:spec-id-format"],
-  "implementation": []
+  "implementation": [],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "GetPersistedSpecDeps returns lock-owned dependsOn via readPersistedState; uninitialized → [] + initialized:false; no metadata fallback.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:07f4f8e579ddb2cf0d0e728a1d17412de025a9806f7b170812d41ad66e563c81",
+          "lastModified": "2026-08-25T15:37:19.293Z"
+        },
+        "verify.md": {
+          "hash": "sha256:7e2d4f80ad313199bf81b340750640571f6ae21d28bf8096e7f651f435d84978",
+          "lastModified": "2026-08-25T15:37:19.293Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# GetPersistedSpecDeps\n\n## Rules\n- Input: `specId` (required, fully-qualified).\n- Resolve workspace repo; `SpecRepository.readPersistedState(spec)`. MUST NOT read `spec-lock.json`/adapter sidecar directly. MUST NOT read/materialize generated metadata.\n- Initialized: `{ specId, dependsOn }` exact stored `readonly string[]` order. MUST NOT reorder/dedupe/transform. `initialized: true`.\n- `readPersistedState` null → `dependsOn: []`, `initialized: false`. MUST NOT create state. MUST NOT synthesize from artifact projection.\n- Unresolvable spec artifact set → typed `SpecdError` subclass, not empty result.\n- Config factory via `resolveGetPersistedSpecDepsDeps` (`specs: ReadonlyMap<string, SpecRepository>`) only.\n\n## Constraints\n- Read-only — never create/mutate/write persisted state\n- Returned list is canonical persisted value, not deterministic artifact projection\n- `readOnly` workspace ownership does not affect — reads always permitted",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:07f4f8e579ddb2cf0d0e728a1d17412de025a9806f7b170812d41ad66e563c81",
+          "lastModified": "2026-08-25T15:37:19.293Z"
+        },
+        "verify.md": {
+          "hash": "sha256:7e2d4f80ad313199bf81b340750640571f6ae21d28bf8096e7f651f435d84978",
+          "lastModified": "2026-08-25T15:37:19.293Z"
+        }
+      }
+    }
+  }
 }
