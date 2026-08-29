@@ -1,0 +1,442 @@
+{
+  "name": "normalize-pre-hash-whitespace",
+  "createdAt": "2026-08-29T19:54:42.441Z",
+  "updatedAt": "2026-08-29T20:55:20.989Z",
+  "description": "Universally normalize whitespace after pre-hash cleanup across all artifacts to ensure stable content hashing under external formatters.",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": ["core:validate-artifacts", "core:storage"],
+  "specDependsOn": {
+    "core:validate-artifacts": [
+      "core:change",
+      "core:change-layout",
+      "core:change-manifest",
+      "core:lifecycle-engine",
+      "core:delta-format",
+      "core:selector-model",
+      "core:storage",
+      "default:_global/architecture",
+      "core:spec-id-format",
+      "core:schema-format",
+      "core:composition-resolver"
+    ],
+    "core:storage": [
+      "default:_global/architecture",
+      "core:change",
+      "core:change-manifest",
+      "default:_global/logging"
+    ]
+  },
+  "invalidationPolicy": "downstream",
+  "implementationTrackingStartedAt": "2026-08-29T19:54:44.062Z",
+  "trackedImplementationFiles": [
+    {
+      "file": "AGENTS.md",
+      "state": "ignored"
+    },
+    {
+      "file": "CLAUDE.md",
+      "state": "ignored"
+    },
+    {
+      "file": "dev/scripts/spec-completeness-poc.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/project-context/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/cli/spec-optimizations/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/get-graph-health/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/indexer/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/isolated-index-worker/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/code-graph/language-adapter/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/change/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/schema-format/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/spec-lock/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/core/update-persisted-spec-optimizations/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/plugins-manager/agent-plugin-type/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/plugins-manager/specd-plugin-type/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/skills/agent-instruction-template/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/skills/agents/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/skills/resolve-bundle/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/skills/skill-bundle/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/skills/skill-repository-port/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/skills/skill-repository/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "specs/skills/workflow-automation/spec-lock.json",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/domain/services/pre-hash-cleanup.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/_shared/compute-artifact-hash.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/validate-artifacts.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/domain/services/pre-hash-cleanup.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/infrastructure/fs/change-repository.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/core/use-cases.md",
+      "state": "resolved"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "core:validate-artifacts",
+      "file": "packages/core/src/domain/services/pre-hash-cleanup.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["applyPreHashCleanup"]
+    },
+    {
+      "specId": "core:validate-artifacts",
+      "file": "packages/core/src/application/use-cases/_shared/compute-artifact-hash.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["computeArtifactHash"]
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:11aa154f4be3e575302caa31adab72f7c2964bef561ce610734f88830cb9c74e"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:validate-artifacts",
+          "filename": "deltas/core/validate-artifacts/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:e2ec1d96a45033c3d8576907cc3deb47b6e3c6636b7d1e2ad34282dccb4e9825"
+        },
+        {
+          "key": "core:storage",
+          "filename": "deltas/core/storage/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:3c3df6391bca63d817ffbc47fafe483d3f8d26cbe40ff54746aa2e1aa25c9ac7"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:validate-artifacts",
+          "filename": "deltas/core/validate-artifacts/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:93701b4f7a436eb83ff6d01f1848984d7b4d53d711c282ce393bae6464d10c63"
+        },
+        {
+          "key": "core:storage",
+          "filename": "deltas/core/storage/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:1107683b6f96e93f0010409a8408796c7c62899608831ee1fc58939e85ea406c"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:b37fdad912918bb8a266a0b4b2fb69351c2d1fb7a8a52a42781338112050e159"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "verify", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:2a0dd37dd25fcd8fc678fab145be20d1fda0335ab735b0ffd23378a058c98c1a"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-08-29T19:54:42.441Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": [],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-08-29T19:54:42.452Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-29T20:01:44.928Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-29T20:01:56.386Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": []
+        },
+        {
+          "type": "verify",
+          "files": []
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-08-29T20:01:56.402Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:validate-artifacts"
+        },
+        {
+          "type": "specs",
+          "key": "core:storage"
+        },
+        {
+          "type": "verify",
+          "key": "core:validate-artifacts"
+        },
+        {
+          "type": "verify",
+          "key": "core:storage"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-29T20:12:45.248Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-29T20:13:35.913Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-29T20:22:16.675Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-29T20:22:55.914Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-29T20:23:14.527Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "description-updated",
+      "at": "2026-08-29T20:55:18.152Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "description": "Universally normalize whitespace after pre-hash cleanup across all artifacts to ensure stable content hashing under external formatters."
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-29T20:55:20.989Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-08-29T20:55:21.067Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

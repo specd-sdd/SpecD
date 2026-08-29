@@ -1,0 +1,3 @@
+releases:
+  core:validate-artifacts: patch
+  core:storage: patch

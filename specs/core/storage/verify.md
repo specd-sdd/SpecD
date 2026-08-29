@@ -55,7 +55,7 @@
 - **GIVEN** an artifact type with `preHashCleanup: [{ pattern: "- \\[x\\]", replacement: "- [ ]" }]`
 - **AND** the artifact was validated with content `- [ ] task one` (cleaned hash stored as `validatedHash`)
 - **WHEN** the file is edited to `- [x] task one`
-- **THEN** `FsChangeRepository` applies the cleanup before hashing, producing the same hash
+- **THEN** `FsChangeRepository` applies the cleanup and universal whitespace normalization before hashing, producing the same hash
 - **AND** the derived status is `complete`
 
 #### Scenario: Non-normalized edit still triggers in-progress
@@ -66,12 +66,12 @@
 - **THEN** the cleaned hash differs from `validatedHash`
 - **AND** the derived status is `in-progress`
 
-#### Scenario: No preHashCleanup rules hashes raw content
+#### Scenario: Universal whitespace normalization applies when no preHashCleanup rules defined
 
 - **GIVEN** an artifact type with no `preHashCleanup` rules
 - **AND** the artifact was validated with content `some content`
-- **WHEN** the file content is unchanged
-- **THEN** `sha256(rawContent) === validatedHash`
+- **WHEN** the file content is edited with formatting changes such as extra spaces or CRLF newlines
+- **THEN** the whitespace-normalized hash matches `validatedHash`
 - **AND** the derived status is `complete`
 
 #### Scenario: Status derivation bypassed when repository is uninitialized

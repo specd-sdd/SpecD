@@ -19,7 +19,7 @@ export function computeArtifactHash(
   hashContent: (content: string) => string,
   cleanups: readonly PreHashCleanup[] = [],
 ): string {
-  const cleaned = cleanups.length > 0 ? applyPreHashCleanup(content, cleanups) : content
+  const cleaned = applyPreHashCleanup(content, cleanups)
   return hashContent(cleaned)
 }
 

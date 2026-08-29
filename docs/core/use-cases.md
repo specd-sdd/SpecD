@@ -531,6 +531,13 @@ Validation executes in two passes:
 
 Cross-artifact failures and deferred warnings are folded into the existing `failures` and `warnings` arrays in the result.
 
+When marking an artifact complete (`markComplete`), `ValidateArtifacts` calculates the `validatedHash` using a two-step cleanup pipeline (`applyPreHashCleanup`):
+
+1. **Schema cleanups**: applies any artifact-type `preHashCleanup` regex substitutions in declaration order.
+2. **Universal whitespace normalization**: collapses all whitespace sequences (`\s+`, including spaces, tabs `\t`, and newlines `\r\n`, `\r`, `\n`) to a single space `' '` and trims leading and trailing whitespace.
+
+This ensures `validatedHash` is invariant under external formatters (e.g. Prettier, CRLF conversions) across all artifact types.
+
 Validation and file reads happen outside the lock; the final persisted invalidation, `markComplete(...)`, and `setSpecDependsOn(...)` updates are applied through `ChangeRepository.mutate(...)` on a fresh reload.
 
 **Constructor:**

@@ -260,7 +260,7 @@ The extracted metadata is validated only for the artifact being validated — no
 
 If all delta validations, conflict detection, and structural validations pass for a file within an artifact, `ValidateArtifacts` must:
 
-1. Compute the cleaned hash: apply each `preHashCleanup` substitution in declaration order to the raw file content (not the merged content), then compute SHA-256 of the result.
+1. Compute the cleaned hash: apply each `preHashCleanup` substitution in declaration order to the raw file content (not the merged content), then apply universal whitespace normalization (collapsing any whitespace sequence `\s+` into a single space `' '` and trimming leading and trailing whitespace), then compute SHA-256 of the result.
 2. Call `change.getArtifact(type).markComplete(key, cleanedHash)` on the corresponding `ChangeArtifact`, where `key` is the file key (artifact type id for `scope: change`, spec ID for `scope: spec`).
 
 A successful completion sets the file state to `complete`, updates `validatedHash`, and recomputes the persisted aggregate artifact state.

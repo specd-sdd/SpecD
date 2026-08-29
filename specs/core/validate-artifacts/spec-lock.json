@@ -16,7 +16,16 @@
     "core:schema-format",
     "core:composition-resolver"
   ],
-  "implementation": [],
+  "implementation": [
+    {
+      "file": "core:src/domain/services/pre-hash-cleanup.ts",
+      "symbols": ["applyPreHashCleanup"]
+    },
+    {
+      "file": "core:src/application/use-cases/_shared/compute-artifact-hash.ts",
+      "symbols": ["computeArtifactHash"]
+    }
+  ],
   "optimizations": {
     "optimizedDescription": {
       "value": "Single validation chokepoint enforces schema, dependencies, deltas, metadata, drift, hashes, and artifact completion.",

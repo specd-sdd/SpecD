@@ -1,0 +1,28 @@
+- op: modified
+  description: 'Update Hash computation and markComplete verification scenarios'
+  selector:
+    type: section
+    matches: 'Requirement: Hash computation and markComplete'
+  content: |
+    #### Scenario: All validations pass — markComplete sets complete state
+
+    - **GIVEN** all validations pass for a file within artifact `specs`
+    - **WHEN** `ValidateArtifacts.execute` marks that file complete
+    - **THEN** the file state becomes `complete`
+    - **AND** the parent artifact state is recomputed
+    - **AND** the stored `validatedHash` reflects universal post-cleanup whitespace normalization
+
+    #### Scenario: Whitespace and newline variations preserve complete state
+
+    - **GIVEN** a validated artifact file with stored `validatedHash`
+    - **WHEN** external formatting alters whitespace, indentation, or converts between CRLF and LF
+    - **THEN** the cleaned hash remains identical to `validatedHash`
+    - **AND** the file remains `complete`
+
+    #### Scenario: Validation failure preserves non-complete state
+
+    - **GIVEN** a file currently in `pending-review`
+    - **AND** at least one required validation rule fails
+    - **WHEN** `ValidateArtifacts.execute` runs
+    - **THEN** `markComplete` is not called
+    - **AND** the file does not become `complete`

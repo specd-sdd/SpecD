@@ -412,6 +412,14 @@
 - **WHEN** `ValidateArtifacts.execute` marks that file complete
 - **THEN** the file state becomes `complete`
 - **AND** the parent artifact state is recomputed
+- **AND** the stored `validatedHash` reflects universal post-cleanup whitespace normalization
+
+#### Scenario: Whitespace and newline variations preserve complete state
+
+- **GIVEN** a validated artifact file with stored `validatedHash`
+- **WHEN** external formatting alters whitespace, indentation, or converts between CRLF and LF
+- **THEN** the cleaned hash remains identical to `validatedHash`
+- **AND** the file remains `complete`
 
 #### Scenario: Validation failure preserves non-complete state
 

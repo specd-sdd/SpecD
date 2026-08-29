@@ -9,12 +9,7 @@
     "core:change-manifest",
     "default:_global/logging"
   ],
-  "implementation": [
-    {
-      "file": "core:src/infrastructure/fs/fs-validation-result-cache.ts",
-      "symbols": ["FsValidationResultCache"]
-    }
-  ],
+  "implementation": [],
   "optimizations": {
     "optimizedDescription": {
       "value": "Port/adapter storage layer; v1 fs adapter for changes, drafts, archives, indexes under configPath tmp.",
