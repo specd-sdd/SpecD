@@ -716,4 +716,58 @@ describe('FsSpecDepsSuggestionCache', () => {
 
     expect(await cache.get('cli:spec-deps')).not.toBeNull()
   })
+
+  it('merges concurrent writes from multiple cache instances on flush without data loss', async () => {
+    const cache1 = new FsImplementationSuggestionCache({
+      projectDir: testDir,
+      configPath: '.specd',
+    })
+    const cache2 = new FsImplementationSuggestionCache({
+      projectDir: testDir,
+      configPath: '.specd',
+    })
+
+    await cache1.set('cli:spec-a', {
+      title: 'Spec A',
+      suggestions: [{ file: 'a.ts', confidence: 'HIGH', reasons: [], score: 100, alreadyIncluded: false, symbols: [] }],
+    })
+    await cache1.flush()
+
+    await cache2.set('cli:spec-b', {
+      title: 'Spec B',
+      suggestions: [{ file: 'b.ts', confidence: 'HIGH', reasons: [], score: 100, alreadyIncluded: false, symbols: [] }],
+    })
+    await cache2.flush()
+
+    // Third reader should see BOTH spec-a and spec-b preserved
+    const reader = new FsImplementationSuggestionCache({
+      projectDir: testDir,
+      configPath: '.specd',
+    })
+    const all = await reader.getAll()
+    expect(all.has('cli:spec-a')).toBe(true)
+    expect(all.has('cli:spec-b')).toBe(true)
+  })
+
+  it('withLock holds lock during execution and reloads fresh disk state', async () => {
+    const cache1 = new FsImplementationSuggestionCache({
+      projectDir: testDir,
+      configPath: '.specd',
+    })
+    const cache2 = new FsImplementationSuggestionCache({
+      projectDir: testDir,
+      configPath: '.specd',
+    })
+
+    await cache1.set('cli:spec-x', {
+      title: 'Spec X',
+      suggestions: [{ file: 'x.ts', confidence: 'HIGH', reasons: [], score: 100, alreadyIncluded: false, symbols: [] }],
+    })
+    await cache1.flush()
+
+    await cache2.withLock(async () => {
+      const all = await cache2.getAll()
+      expect(all.has('cli:spec-x')).toBe(true)
+    })
+  })
 })

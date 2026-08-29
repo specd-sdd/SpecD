@@ -1,0 +1,118 @@
+- op: modified
+  description: 'Add --count flag to command signature'
+  selector:
+    type: section
+    matches: 'Requirement: Command signature'
+  content: |
+    ```
+    specd specs list [--count] [--workspace <name>] [--summary] [--limit <n|all>] [--page <p>] [--after-key <path>] [--format text|json|toon]
+    ```
+
+    Alias:
+
+    ```
+    specd spec list [--count] [--workspace <name>] [--summary] [--limit <n|all>] [--page <p>] [--after-key <path>] [--format text|json|toon]
+    ```
+
+    - `--count` — optional flag; when present, displays total spec count and per-workspace breakdown instead of listing individual spec rows. Mutually exclusive with `--summary`
+    - `--workspace <name>` — optional, repeatable; include only specs belonging to the named workspace(s). When omitted, all workspaces are included
+    - `--summary` — optional flag; when present, a short summary is included for each spec alongside the title (`includeSummary`). Mutually exclusive with `--count`
+    - `--limit <n|all>` — optional; when a positive integer is given, caps entries **per workspace query**. When omitted or set to `all`, the host MUST NOT pass `limit` to `ListSpecs` (full catalog per workspace). There is **no** CLI default numeric limit. Ignored when `--count` is present
+    - `--page <p>` — optional; 1-based page number; MUST be paired with a numeric `--limit` (not `all`)
+    - `--after-key <path>` — optional; exclusive keyset cursor — capability path (with `/` separators) of the last seen spec in the workspace being paginated
+    - `--format text|json|toon` — optional; output format, defaults to `text`
+
+    `--count` and `--summary` are mutually exclusive; providing both MUST be rejected with a `CliValidationError` (`CLI_VALIDATION_ERROR`) and exit code 1.
+
+    `--page` is mutually exclusive with `--after-key`. `--page` with `--limit all` or without a numeric `--limit` MUST be rejected. Spec list keyset cursors omit `after-id` (path alone is the sort key). `--after-key` with `--limit all` (or omitted limit) is allowed and returns the remainder after the cursor.
+
+    There is no `--metadata-status` flag. The command never implements cache freshness or regeneration logic itself; title and summary are always self-healed through Core materialization when `ListSpecs` needs the normalized projection.
+
+- op: modified
+  description: 'Add --count output specifications for text, json, and toon formats'
+  selector:
+    type: section
+    matches: 'Requirement: Output format'
+  content: |
+    When `--count` is passed:
+
+    - In `text` mode:
+      - If multiple workspaces are visible (or no `--workspace` filter is applied):
+        ```
+        Total: <total>
+
+        Workspaces:
+          <ws1>: <count1>
+          <ws2>: <count2>
+        ```
+      - If filtered to a single workspace via `--workspace <name>`: `<ws>: <count>`.
+      - If no workspaces are configured, prints `no workspaces configured`.
+    - In `json` or `toon` mode:
+      Outputs a structured object containing `total` and `workspaces` array:
+      ```json
+      {
+        "total": 125,
+        "workspaces": [
+          {
+            "name": "default",
+            "count": 125
+          }
+        ]
+      }
+      ```
+      When `--workspace` filters are applied, `workspaces` contains only the matching workspace entries and `total` represents the sum of matching workspace counts.
+
+    When `--count` is not passed:
+
+    In `text` mode (default), specs are grouped by workspace. Each group is rendered as a table:
+
+    - The workspace name is printed as a bold title line above the table.
+    - Each workspace group begins with an inverse-video workspace header row: `  workspace: <name>  `, padded to the same inner width as the column header row below it.
+    - Immediately below the workspace header is an inverse-video column header row. The header includes columns depending on which flags are passed: `PATH  TITLE` (default), with `SUMMARY` appended when `--summary` is present.
+    - Data rows list one spec per line. The PATH column displays the fully-qualified spec identifier `workspace:capability-path` (e.g. `default:auth/login`). All columns are aligned to globally fixed widths (computed across all entries in all workspaces on the current page).
+    - When `--summary` is passed, `SUMMARY` follows as an additional aligned column using wrap overflow (capped at 60 characters).
+    - Workspace groups are separated by a blank line.
+
+    Rows within each workspace appear in canonical order (capability path ascending) as returned by `ListSpecs`; the CLI MUST NOT re-sort.
+
+    When a workspace group's result was truncated by an explicit numeric `--limit` (`meta.count < meta.total`), the command MUST print a trailing hint line after that group's table:
+
+    ```
+    showing <count> of <total> (use --limit/--page)
+    ```
+
+    When no numeric `--limit` was applied (omitted or `all`), the command MUST NOT print a truncation hint.
+
+    When `--workspace` filters are applied, only workspace groups matching the filter are rendered. Column widths are computed across all remaining entries (not across all workspaces).
+
+    In `json` or `toon` mode, each workspace entry includes paginated spec results:
+
+    ```json
+    {
+      "workspaces": [
+        {
+          "name": "...",
+          "specs": [
+            {
+              "path": "workspace:cap/path",
+              "title": "...",
+              "summary": "..."
+            }
+          ],
+          "meta": {
+            "total": 125,
+            "count": 125,
+            "limit": 125
+          }
+        }
+      ]
+    }
+    ```
+
+    When unpaginated, `meta.limit` equals `meta.total`. When a numeric `--limit` is applied, `meta` reflects that page (`limit`, optional `page` / `after`).
+
+    When `--workspace` filters are applied in JSON/toon mode, the `workspaces` array contains entries **only** for the filtered/matching workspace names — non-matching configured workspaces MUST NOT appear, not even as empty stubs. This mirrors text mode, where only matching workspace groups render. When no `--workspace` filter is given, the `workspaces` array contains all configured workspaces, including those with no specs (empty `specs` array).
+
+    When `--summary` is not passed, `summary` is omitted from text rows and from JSON/toon objects. When `--summary` is passed but no summary is available for a spec, the text row shows the title only and the JSON/toon object omits `summary` (does not include `null`).
+
+    There is no `metadataStatus` field or `METADATA STATUS` column: metadata freshness is an internal materialization decision, not a public projection.

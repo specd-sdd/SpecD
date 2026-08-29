@@ -35,7 +35,7 @@
 - **GIVEN** a store containing 10 files with current content hashes
 - **AND** the persisted graph fingerprint matches the fingerprint for the current run
 - **AND** none of the files on disk have changed
-- **WHEN** `IndexCodeGraph.execute()` is called
+- **WHEN** `IndexCodeGraph.execute()` is called without force
 - **THEN** `filesSkipped` is 10 and `filesIndexed` is 0
 - **AND** no language adapter extraction is invoked
 
@@ -50,11 +50,11 @@
 
 #### Scenario: Deleted file removal remains scoped to indexed workspaces
 
-- **GIVEN** a store containing files from workspaces `core`, `cli`, and `code-graph`
+- **GIVEN** a store containing files from workspaces core, cli, and code-graph
 - **AND** the persisted graph fingerprint matches the fingerprint for the current run
-- **WHEN** `IndexCodeGraph.execute()` is called with only workspace `core`
-- **THEN** only files with workspace `core` are considered for deletion
-- **AND** files from `cli` and `code-graph` remain untouched in the store
+- **WHEN** `IndexCodeGraph.execute()` is called with only workspace core
+- **THEN** only files with workspace core are considered for deletion
+- **AND** files from cli and code-graph remain untouched in the store
 
 #### Scenario: Changed files removed from store before bulk load
 
@@ -64,6 +64,48 @@
 - **WHEN** `IndexCodeGraph.execute()` is called
 - **THEN** `core:src/utils.ts` is removed from the store before bulk load
 - **AND** the re-extracted data is inserted via `bulkLoad()`
+
+#### Scenario: Forced run ignores orphaned incremental state
+
+- **GIVEN** logical clear removed all file, document, symbol, spec, and relation nodes
+- **AND** stale index-coverage hashes from a prior generation are still returned by a faulty store test double
+- **WHEN** a forced indexing run discovers unchanged source content
+- **THEN** every selected input is reconsidered and no input is counted as a hash-matched skip
+- **AND** the committed graph contains the nodes and semantic state derived from those inputs
+
+### Requirement: Deterministic implementation coverage projection
+
+#### Scenario: Clean generation projects file and logical-symbol coverage
+
+- **GIVEN** a real persisted spec state links one existing file directly and names one uniquely resolvable symbol in another existing file
+- **WHEN** the project is indexed into an empty store
+- **THEN** the spec has one `COVERS_FILE` relation to the direct file
+- **AND** one `COVERS_SYMBOL` relation targets the resolved logical symbol ID
+- **AND** neither relation targets a missing endpoint
+
+#### Scenario: Implementation-only change reprojects coverage without code analysis
+
+- **GIVEN** code files and their logical symbols are unchanged in the persisted graph
+- **AND** a spec's persisted implementation links change without changing code content
+- **WHEN** an incremental index runs
+- **THEN** semantic state needed for symbol resolution is available to spec indexing
+- **AND** obsolete coverage is removed and the new file and symbol coverage is persisted
+
+#### Scenario: Changed declaration reprojects canonical coverage
+
+- **GIVEN** a spec covers a logical symbol declared in a changed file
+- **WHEN** the file is reanalyzed and its declarations are replaced
+- **THEN** coverage is recomputed from the spec's canonical persisted implementation links
+- **AND** valid coverage targets the refreshed logical symbol
+- **AND** no stale declaration-occurrence target is retained
+
+#### Scenario: Unresolved and ambiguous symbol links are diagnostic
+
+- **GIVEN** one implementation link names a missing symbol and another resolves to multiple logical symbols in its linked file
+- **WHEN** spec coverage is projected
+- **THEN** neither link creates `COVERS_SYMBOL` or fallback `COVERS_FILE`
+- **AND** the index result reports one stable diagnostic per link with spec ID, file, symbol name, and resolution reason
+- **AND** unrelated inputs still commit successfully
 
 ### Requirement: Multi-workspace file discovery
 
@@ -302,10 +344,11 @@
 - **THEN** it calls `repo.count()` to determine the total volume
 - **AND** it emits progress events using the total spec count as the denominator
 
-#### Scenario: Indexer pulls spec data from repository
+#### Scenario: Indexer pulls aggregate persisted state from repository
 
 - **WHEN** indexing specs
-- **THEN** the indexer SHALL directly call `repo.list()`, `GetSpecMetadata.execute({ specId })`, and `repo.readPersistedDependsOn()`
+- **THEN** the indexer SHALL directly call `repo.list()`, `GetSpecMetadata.execute({ specId })`, and `repo.readPersistedState()` once per processed spec
+- **AND** it derives both dependency and implementation coverage links from that persisted-state result
 - **AND** it SHALL NOT rely on the CLI to provide pre-resolved spec objects
 
 #### Scenario: Spec with metadata indexed

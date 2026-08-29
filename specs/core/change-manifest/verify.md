@@ -70,6 +70,12 @@
 - **WHEN** the manifest is validated against the schema
 - **THEN** validation succeeds
 
+#### Scenario: Manifest round-trips implementationTrackingStartedAt and handles legacy fallback
+
+- **WHEN** a change with active implementation tracking is saved
+- **THEN** `implementationTrackingStartedAt` is serialized as an ISO 8601 string
+- **AND** loading a legacy manifest without `implementationTrackingStartedAt` falls back to historical implementing timestamp if present
+
 ### Requirement: Archive outcome history events
 
 #### Scenario: Failed archive attempt appends archive-failed event

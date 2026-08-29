@@ -11,25 +11,18 @@
   ],
   "implementation": [
     {
-      "file": "code-graph:src/infrastructure/sqlite/sqlite-graph-store.ts",
-      "symbols": ["SQLiteGraphStore"]
-    },
-    {
       "file": "code-graph:src/infrastructure/sqlite/sqlite-graph-database.ts",
       "symbols": ["SQLiteGraphDatabase"]
     },
     {
-      "file": "code-graph:test/infrastructure/sqlite/sqlite-worker-lifecycle.spec.ts"
-    },
-    {
-      "file": "code-graph:test/infrastructure/sqlite/sqlite-worker-protocol.spec.ts"
+      "file": "code-graph:src/infrastructure/sqlite/sqlite-graph-store.ts",
+      "symbols": ["SQLiteGraphStore"]
     },
     {
       "file": "code-graph:test/infrastructure/sqlite/sqlite-graph-store.spec.ts"
     },
     {
-      "file": "code-graph:src/infrastructure/sqlite/sqlite-worker.ts",
-      "symbols": ["serializeError"]
+      "file": "code-graph:test/infrastructure/sqlite/sqlite-worker-lifecycle.spec.ts"
     }
   ],
   "optimizations": {

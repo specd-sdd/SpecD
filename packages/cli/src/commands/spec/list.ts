@@ -11,6 +11,7 @@ import {
 import { output, parseFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
 import { colWidth, renderTable } from '../../helpers/table.js'
+import { CliValidationError } from '../../errors/index.js'
 
 /**
  * Collects repeatable option values into an array.
@@ -123,6 +124,7 @@ export function registerSpecList(parent: Command): void {
     .description(
       'List all specs in the project across all workspaces, with their identifiers and titles.',
     )
+    .option('--count', 'show total specs and per-workspace counts')
     .option('--summary', 'include a short description for each spec')
     .option('--workspace <name>', 'filter by workspace (repeatable)', collect, [])
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
@@ -135,6 +137,7 @@ export function registerSpecList(parent: Command): void {
       'after',
       `
 Options:
+  --count              Show total specs and per-workspace counts
   --workspace <name>   Filter results to one or more workspaces (repeatable)
 
 JSON/TOON output schema:
@@ -145,10 +148,20 @@ JSON/TOON output schema:
       meta: { total, count, limit, page?, after? }
     }>
   }
+
+JSON/TOON output schema with --count:
+  {
+    total: number
+    workspaces: Array<{
+      name: string
+      count: number
+    }>
+  }
 `,
     )
     .action(
       async (opts: {
+        count?: boolean
         summary?: boolean
         workspace: string[]
         format: string
@@ -158,14 +171,18 @@ JSON/TOON output schema:
         afterKey?: string
       }) => {
         try {
+          if (opts.count === true && opts.summary === true) {
+            throw new CliValidationError('--count is mutually exclusive with --summary')
+          }
           const { kernel } = await resolveCliContext({ configPath: opts.config })
           const includeSummary = opts.summary === true
+          const isCount = opts.count === true
           const parsedLimit = parseLimitFlag(opts.limit)
           const pagination = parseListPaginationFlags(opts, { allowAfterId: false })
 
           const result = await kernel.specs.list.execute({
-            ...pagination,
-            includeSummary,
+            ...(isCount ? {} : pagination),
+            includeSummary: isCount ? false : includeSummary,
             ...(opts.workspace.length > 0 ? { workspaces: opts.workspace } : {}),
           })
           const fmt = parseFormat(opts.format)
@@ -185,6 +202,46 @@ JSON/TOON output schema:
           const workspaceMeta = new Map(
             result.byWorkspace.map((slice) => [slice.workspace, slice.meta]),
           )
+
+          if (isCount) {
+            const total = visibleWorkspaces.reduce(
+              (sum, name) => sum + (workspaceMeta.get(name)?.total ?? 0),
+              0,
+            )
+
+            if (fmt === 'text') {
+              if (visibleWorkspaces.length === 0) {
+                output('no workspaces configured', 'text')
+                return
+              }
+
+              if (opts.workspace.length > 0 && visibleWorkspaces.length === 1) {
+                output(`${visibleWorkspaces[0]}: ${total}`, 'text')
+              } else {
+                const lines = [
+                  `Total: ${total}`,
+                  '',
+                  'Workspaces:',
+                  ...visibleWorkspaces.map(
+                    (name) => `  ${name}: ${workspaceMeta.get(name)?.total ?? 0}`,
+                  ),
+                ]
+                output(lines.join('\n'), 'text')
+              }
+            } else {
+              output(
+                {
+                  total,
+                  workspaces: visibleWorkspaces.map((name) => ({
+                    name,
+                    count: workspaceMeta.get(name)?.total ?? 0,
+                  })),
+                },
+                fmt,
+              )
+            }
+            return
+          }
 
           if (fmt === 'text') {
             if (visibleWorkspaces.length === 0) {

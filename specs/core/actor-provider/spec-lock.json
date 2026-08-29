@@ -3,7 +3,7 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": ["core:actor-resolver-port", "core:actor-resolver"],
+  "dependsOn": ["core:actor-resolver-port"],
   "implementation": [
     {
       "file": "core:src/composition/actor-resolver.ts",

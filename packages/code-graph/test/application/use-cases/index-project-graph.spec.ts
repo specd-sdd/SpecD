@@ -27,6 +27,18 @@ const INDEX_RESULT: IndexResult = {
     persistence: { count: 0, durationMs: 0 },
     searchIndexRebuild: { count: 0, durationMs: 0 },
   },
+  coverage: {
+    total: 0,
+    byStatus: {
+      indexed: 0,
+      excluded: 0,
+      unsupported: 0,
+      'parse-failed': 0,
+      partial: 0,
+    },
+    reasons: [],
+  },
+  coverageDiagnostics: [],
 }
 
 function makeProvider(): CodeGraphHostPort {

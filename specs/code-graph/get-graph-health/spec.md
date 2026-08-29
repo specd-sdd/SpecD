@@ -55,6 +55,16 @@ Health fields SHALL use stable machine-readable reason codes and distinguish cur
 
 A consumer SHALL be able to determine from this result whether absence for an addressed target is trustworthy enough to declare stale.
 
+### Requirement: Indexed-content integrity assessment
+
+`GetGraphHealth` SHALL assess whether persisted indexed-input coverage agrees with the graph contents that coverage claims were derived from. Each coverage record whose status represents successfully indexed code or text MUST correspond to the expected persisted file or document node in the same logical generation.
+
+Missing physical nodes, impossible aggregate counts, or generation metadata that claims a completed index over an empty or partially absent graph SHALL make `contentFresh` and `coverageComplete` false. The aggregate health state MUST NOT be `current` and the result SHALL include a stable `GRAPH_CONTENT_INCONSISTENT` reason code.
+
+Integrity assessment SHALL distinguish unsupported or intentionally excluded inputs from missing successfully indexed inputs. Unsupported or excluded coverage records MUST NOT require a physical code node merely to make health complete.
+
+The use case SHALL remain read-only with respect to graph contents and MUST NOT attempt repair. Hosts SHALL receive enough diagnostic detail to recommend a full reindex or storage recovery without inferring inconsistency from raw counts themselves.
+
 ### Requirement: Aggregate and workspace health projection
 
 `GetGraphHealthResult` SHALL expose aggregate `state: current | stale | unknown`, `knownStaleSinceLastIndex`, stable reasons, and an ordered workspace collection containing workspace name, state, workspace latch, `vcs | filesystem | hybrid` assessment mode, and reasons.

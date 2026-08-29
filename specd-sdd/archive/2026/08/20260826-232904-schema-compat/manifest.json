@@ -1,0 +1,658 @@
+{
+  "name": "schema-compat",
+  "createdAt": "2026-08-26T23:29:04.161Z",
+  "updatedAt": "2026-08-27T00:12:54.836Z",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "core:schema-format",
+    "core:schema-merge",
+    "core:resolve-schema",
+    "core:archive-change",
+    "core:initialize-persisted-spec-state",
+    "core:generate-metadata",
+    "cli:schema-show"
+  ],
+  "specDependsOn": {
+    "core:schema-format": [
+      "core:delta-format",
+      "core:selector-model",
+      "core:content-extraction",
+      "core:schema-merge"
+    ],
+    "core:schema-merge": [
+      "core:schema-format",
+      "core:build-schema",
+      "default:_global/architecture"
+    ],
+    "core:resolve-schema": [
+      "core:schema-format",
+      "core:schema-merge",
+      "core:build-schema",
+      "core:schema-registry-port",
+      "core:config",
+      "default:_global/architecture",
+      "core:composition-resolver"
+    ],
+    "core:archive-change": [
+      "core:change",
+      "core:schema-format",
+      "core:delta-format",
+      "core:validate-artifacts",
+      "core:storage",
+      "core:run-step-hooks",
+      "core:hook-execution-model",
+      "core:template-variables",
+      "core:spec-metadata",
+      "core:content-extraction",
+      "default:_global/architecture",
+      "core:workspace",
+      "core:spec-id-format",
+      "core:spec-overlap",
+      "default:_global/logging",
+      "core:spec-lock",
+      "default:_global/error-handling-conventions",
+      "core:composition-resolver",
+      "core:regenerate-spec-metadata",
+      "core:spec-optimization",
+      "core:initialize-persisted-spec-state"
+    ],
+    "core:initialize-persisted-spec-state": [
+      "core:spec-repository-port",
+      "core:spec-lock",
+      "core:schema-format",
+      "core:get-active-schema",
+      "core:content-extraction",
+      "core:list-workspaces",
+      "core:spec-id-format",
+      "core:composition-resolver",
+      "core:generate-metadata"
+    ],
+    "core:generate-metadata": [
+      "core:spec-metadata",
+      "core:content-extraction",
+      "core:schema-format",
+      "core:spec-id-format",
+      "core:spec-repository-port",
+      "core:composition-resolver",
+      "core:spec-optimization"
+    ],
+    "cli:schema-show": ["cli:entrypoint", "core:schema-format"]
+  },
+  "invalidationPolicy": "downstream",
+  "implementationTrackingStartedAt": "2026-08-26T23:29:09.277Z",
+  "trackedImplementationFiles": [
+    {
+      "file": "packages/core/src/domain/value-objects/schema.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/infrastructure/schema-yaml-parser.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/services/build-schema.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/services/merge-schema-layers.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/resolve-extends-chain.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/archive-change.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/initialize-persisted-spec-state.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/generate-spec-metadata.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/value-objects/index.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/src/public.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/archive-change.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/helpers.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/resolve-schema.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/domain/services/build-schema.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/core/test/infrastructure/schema-yaml-parser.spec.ts",
+      "state": "ignored"
+    },
+    {
+      "file": "packages/cli/src/commands/schema/show.ts",
+      "state": "resolved"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "core:schema-format",
+      "file": "packages/core/src/domain/value-objects/schema.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["Schema", "SchemaCompatIdentity", "parseSchemaCompat"]
+    },
+    {
+      "specId": "core:schema-format",
+      "file": "packages/core/src/infrastructure/schema-yaml-parser.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["parseSchemaYaml", "parseSchemaCompat"]
+    },
+    {
+      "specId": "core:schema-format",
+      "file": "packages/core/src/domain/services/build-schema.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["buildSchema"]
+    },
+    {
+      "specId": "core:schema-merge",
+      "file": "packages/core/src/domain/services/merge-schema-layers.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["mergeSchemaLayers"]
+    },
+    {
+      "specId": "core:resolve-schema",
+      "file": "packages/core/src/application/use-cases/resolve-extends-chain.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["resolveExtendsChain"]
+    },
+    {
+      "specId": "core:archive-change",
+      "file": "packages/core/src/application/use-cases/archive-change.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["ArchiveChange"]
+    },
+    {
+      "specId": "core:archive-change",
+      "file": "packages/core/src/application/use-cases/initialize-persisted-spec-state.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["InitializePersistedSpecState"]
+    },
+    {
+      "specId": "core:archive-change",
+      "file": "packages/core/src/application/use-cases/generate-spec-metadata.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["GenerateSpecMetadata"]
+    },
+    {
+      "specId": "core:initialize-persisted-spec-state",
+      "file": "packages/core/src/application/use-cases/initialize-persisted-spec-state.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["InitializePersistedSpecState"]
+    },
+    {
+      "specId": "core:generate-metadata",
+      "file": "packages/core/src/application/use-cases/generate-spec-metadata.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["GenerateSpecMetadata"]
+    },
+    {
+      "specId": "cli:schema-show",
+      "file": "packages/cli/src/commands/schema/show.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["formatSchemaText", "serializeSchema"]
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:5413c6abd4d13ccf199aa44f7bc9355e322364ed0619591edd06b2ecedfa8983"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:schema-format",
+          "filename": "deltas/core/schema-format/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:dcba686f068b54d18bc2c048b9f78a88c6d642d2f755740d29963ea5e510866e"
+        },
+        {
+          "key": "core:schema-merge",
+          "filename": "deltas/core/schema-merge/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:070f2b55ed5e02afe210dbcf16058d3cd67fd6db727d6b9f8664a262acef5eee"
+        },
+        {
+          "key": "core:resolve-schema",
+          "filename": "deltas/core/resolve-schema/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:8c4cb5e050d5ac06bdf580a4e12c36de6dc1a54ff1cf2d85c27ee14ce4f3dc1e"
+        },
+        {
+          "key": "core:archive-change",
+          "filename": "deltas/core/archive-change/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:3170a938627c426b29661067571fefea791106e21fd71e418e90c1c707d8d9c1"
+        },
+        {
+          "key": "core:initialize-persisted-spec-state",
+          "filename": "deltas/core/initialize-persisted-spec-state/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:a0882957754de37655797a2d7a7f7a1ec02c2df576bdac1fbb687c69a2704190"
+        },
+        {
+          "key": "core:generate-metadata",
+          "filename": "deltas/core/generate-metadata/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:6483ba0a971b730b93473ed30bb4e42e033431f075657967e85661ec9bb59238"
+        },
+        {
+          "key": "cli:schema-show",
+          "filename": "deltas/cli/schema-show/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:73653939b4c3345de32c57bdc4499842cc49e3b706024f2d42333753d0e54bb7"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "core:schema-format",
+          "filename": "deltas/core/schema-format/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:1bd56daace443af18ad092301e6d394d7f048654a5cfa916d6c67440789e1b3c"
+        },
+        {
+          "key": "core:schema-merge",
+          "filename": "deltas/core/schema-merge/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:c02299f9ab0dc50c5e0d9506f411b5fae909d6665434019560cc2a392f6917f3"
+        },
+        {
+          "key": "core:resolve-schema",
+          "filename": "deltas/core/resolve-schema/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:62ebe087cc5c83b43f6883a6d956fe5ec38b484381c8e9584103f68629beba32"
+        },
+        {
+          "key": "core:archive-change",
+          "filename": "deltas/core/archive-change/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:f2f7f1b5c09f0397f13897ae1e793cf8dde632bf2629ea38c1ce987c1996d6f8"
+        },
+        {
+          "key": "core:initialize-persisted-spec-state",
+          "filename": "deltas/core/initialize-persisted-spec-state/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:3c26a924fac68801097e5ba537cc640e7f3a668d1f996a3adbd50326bd7f63ce"
+        },
+        {
+          "key": "core:generate-metadata",
+          "filename": "deltas/core/generate-metadata/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:ecc8ae03a75365b4de178c373861149f0dad75ef21725f923b40fa403e161621"
+        },
+        {
+          "key": "cli:schema-show",
+          "filename": "deltas/cli/schema-show/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:8dba13d7424acaae19db871bbf24ecd5e3af4afa86f8835d5d4a512e09031381"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:e3ebaf3ba7553a4348fb9d940c8239b14cc3aed0ceb69ded76879ca5d99e5b2c"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:a14e95b5d738b8cc4a0e64aeab3fd3525bf7749876daba9eedf7dc899e74cebc"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-08-26T23:29:04.161Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": [],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-08-26T23:29:04.171Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-26T23:41:25.028Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-26T23:41:36.235Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": []
+        },
+        {
+          "type": "verify",
+          "files": []
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-08-26T23:41:36.243Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:schema-format"
+        },
+        {
+          "type": "specs",
+          "key": "core:schema-merge"
+        },
+        {
+          "type": "specs",
+          "key": "core:resolve-schema"
+        },
+        {
+          "type": "specs",
+          "key": "core:archive-change"
+        },
+        {
+          "type": "verify",
+          "key": "core:schema-format"
+        },
+        {
+          "type": "verify",
+          "key": "core:schema-merge"
+        },
+        {
+          "type": "verify",
+          "key": "core:resolve-schema"
+        },
+        {
+          "type": "verify",
+          "key": "core:archive-change"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-26T23:48:34.380Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "cause": "spec-change",
+      "message": "Invalidated because the change scope changed and artifacts require review.",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "core:schema-format",
+            "core:schema-merge",
+            "core:resolve-schema",
+            "core:archive-change"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:schema-format",
+            "core:schema-merge",
+            "core:resolve-schema",
+            "core:archive-change"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-08-26T23:48:34.384Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": [],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "specs",
+          "key": "core:initialize-persisted-spec-state"
+        },
+        {
+          "type": "specs",
+          "key": "core:generate-metadata"
+        },
+        {
+          "type": "specs",
+          "key": "cli:schema-show"
+        },
+        {
+          "type": "verify",
+          "key": "core:initialize-persisted-spec-state"
+        },
+        {
+          "type": "verify",
+          "key": "core:generate-metadata"
+        },
+        {
+          "type": "verify",
+          "key": "cli:schema-show"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-26T23:55:15.422Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-26T23:55:57.429Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-27T00:02:29.691Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-27T00:10:36.564Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-27T00:10:43.288Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-08-27T00:12:42.030Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Implementation link \"core:schema-format\" points outside workspace \"core\" codeRoot.",
+      "commitStarted": false
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-27T00:12:54.835Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-08-27T00:12:54.997Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

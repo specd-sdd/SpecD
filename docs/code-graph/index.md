@@ -137,6 +137,17 @@ valid when no `COVERS_SYMBOL` relation exists.
 
 ## Coverage, health, and repair
 
+Implementation coverage is rebuilt from canonical persisted spec links whenever code,
+persisted implementation state, or a forced generation changes. `COVERS_SYMBOL` always
+targets a logical symbol ID; it never targets a declaration-occurrence ID. A link with a
+missing file, missing symbol, or ambiguous symbol is reported as diagnostic evidence and
+does not fall back to file coverage.
+
+`graph index --force` clears every logical-generation input, including coverage hashes,
+semantic facts, observations, and freshness metadata, then reconsiders every selected
+input. If indexed coverage names a missing persisted file or document, graph health is
+non-current and reports `GRAPH_CONTENT_INCONSISTENT`; run a forced reindex to recover.
+
 Indexing persists an `IndexCoverage` outcome for every considered source target:
 `indexed`, `excluded`, `unsupported`, `parse-failed`, or `partial`, with content hash,
 reason, and adapter capabilities. It also persists generation-tagged observations for

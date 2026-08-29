@@ -26,122 +26,95 @@
 
 #### Scenario: Text output shows schema name, kind, artifacts, and workflow
 
-- **GIVEN** a valid schema with name `specd-std` version `1`, `kind: schema`, and declared artifacts and workflow steps
-- **WHEN** `specd schema show` is run
-- **THEN** stdout contains the schema name, version, and kind, an `artifacts:` section, and a `workflow:` section
-- **AND** the process exits with code 0
+- **WHEN** `specd schema show` runs in text mode
+- **THEN** it outputs header with schema name, version, and kind
 
-#### Scenario: Text output shows extends when present
+#### Scenario: Text output shows extends and compat when present
 
-- **GIVEN** a schema that declares `extends: '@specd/schema-std'`
-- **WHEN** `specd schema show` is run
-- **THEN** stdout contains `extends: @specd/schema-std`
+- **GIVEN** a schema with `extends` and `compat` declared
+- **WHEN** `specd schema show` runs in text mode
+- **THEN** output includes `extends: <ref>` and `compat: <name>@<version>`
 
 #### Scenario: Text output shows plugin count when plugins are configured
 
-- **GIVEN** `specd.yaml` declares `schemaPlugins: ['@specd/plugin-rfc']`
-- **WHEN** `specd schema show` is run
-- **THEN** stdout contains `plugins: 1 applied`
+- **GIVEN** a project with schema plugins configured
+- **WHEN** `specd schema show` runs in text mode
+- **THEN** it displays the active plugins count
 
 #### Scenario: Plugins line omitted when showing schema by ref
 
-- **GIVEN** `specd.yaml` declares `schemaPlugins: ['@specd/plugin-rfc']`
-- **WHEN** `specd schema show @specd/schema-std` is run
-- **THEN** stdout does NOT contain a `plugins:` line
+- **WHEN** `specd schema show <ref>` runs
+- **THEN** plugins line is omitted
 
 #### Scenario: Optional and required artifacts distinguished
 
-- **GIVEN** the schema declares artifact `proposal` as `optional: true` and `spec` as `optional: false`
-- **WHEN** `specd schema show` is run
-- **THEN** `proposal` is shown as `optional` and `spec` as `required`
+- **WHEN** `specd schema show` displays artifacts
+- **THEN** it distinguishes optional and required artifacts
 
 #### Scenario: Requires listed for artifacts
 
-- **GIVEN** the schema declares artifact `spec` with `requires: ["proposal"]`
-- **WHEN** `specd schema show` is run
-- **THEN** the `spec` line shows `requires=[proposal]`
+- **WHEN** an artifact declares prerequisites
+- **THEN** they are formatted in `requires=[...]`
 
 #### Scenario: Empty requires omitted in text mode
 
-- **GIVEN** the schema declares artifact `proposal` with no `requires`
-- **WHEN** `specd schema show` is run
-- **THEN** the `proposal` line does not show a `requires` field
+- **WHEN** an artifact has no prerequisites
+- **THEN** `requires` is omitted from that artifact line
 
 #### Scenario: JSON output includes all schema fields
 
-- **GIVEN** a schema with artifacts that declare `instruction`, `rules`, `validations`, `hooks`, and `metadataExtraction`
-- **WHEN** `specd schema show --format json` is run
-- **THEN** stdout is valid JSON with `schema`, `plugins`, `mode`, `artifacts`, `workflow`, and `metadataExtraction`
-- **AND** each artifact entry includes all fields from the Schema entity (e.g. `instruction`, `rules`, `validations`, `deltaInstruction`, `preHashCleanup`, `taskCompletionCheck`)
-- **AND** each workflow entry includes `hooks` and `requiresTaskCompletion`
-- **AND** the process exits with code 0
+- **WHEN** `specd schema show --format json` runs
+- **THEN** the JSON output includes `name`, `version`, `kind`, optional `extends`, and optional `compat` inside `schema` object
 
 #### Scenario: Template field shows reference path by default
 
-- **GIVEN** a schema with artifact `proposal` that declares `template: templates/proposal.md`
-- **WHEN** `specd schema show --format json` is run
-- **THEN** the `proposal` artifact entry includes `"template": "templates/proposal.md"`
+- **WHEN** `specd schema show` runs without `--templates`
+- **THEN** template references show the declared path
 
 #### Scenario: Template content resolved with --templates
 
-- **GIVEN** a schema with artifact `proposal` that declares `template: templates/proposal.md`
-- **AND** the template file contains `# Proposal template content`
-- **WHEN** `specd schema show --templates --format json` is run
-- **THEN** the `proposal` artifact entry's `template` field contains the file content `# Proposal template content`
+- **WHEN** `specd schema show --templates` runs
+- **THEN** template content is resolved and displayed
 
 #### Scenario: Show schema by ref displays resolved schema
 
-- **GIVEN** `@specd/schema-std` is installed as an npm package
-- **WHEN** `specd schema show @specd/schema-std` is run
-- **THEN** stdout contains the schema name and version from that package
-- **AND** the process exits with code 0
+- **WHEN** `specd schema show <ref>` runs
+- **THEN** it resolves and displays the schema identified by ref
 
 #### Scenario: Show schema by ref with JSON includes mode ref
 
-- **GIVEN** `@specd/schema-std` is installed
-- **WHEN** `specd schema show @specd/schema-std --format json` is run
-- **THEN** the JSON output contains `"mode": "ref"`
+- **WHEN** `specd schema show <ref> --format json` runs
+- **THEN** `mode` field is `"ref"`
 
 #### Scenario: Show schema by file displays resolved schema
 
-- **GIVEN** a valid schema file at `./test-schema.yaml`
-- **WHEN** `specd schema show --file ./test-schema.yaml` is run
-- **THEN** stdout contains the schema name and version from the file
-- **AND** the process exits with code 0
+- **WHEN** `specd schema show --file <path>` runs
+- **THEN** it resolves and displays the schema loaded from file
 
 #### Scenario: Show schema by file with JSON includes mode file
 
-- **GIVEN** a valid schema file at `./test-schema.yaml`
-- **WHEN** `specd schema show --file ./test-schema.yaml --format json` is run
-- **THEN** the JSON output contains `"mode": "file"`
+- **WHEN** `specd schema show --file <path> --format json` runs
+- **THEN** `mode` field is `"file"`
 
 #### Scenario: Raw mode shows unresolved schema data
 
-- **GIVEN** a schema that declares `extends: '@specd/schema-std'`
-- **WHEN** `specd schema show --raw --format json` is run
-- **THEN** the JSON output contains the `extends` field with the unresolved reference
-- **AND** the output does NOT contain `mode` or `plugins` fields
-- **AND** artifacts from the parent schema are NOT included — only those declared in the schema file itself
+- **WHEN** `specd schema show --raw` runs
+- **THEN** it displays raw unmerged schema data
 
 #### Scenario: Raw mode works with ref
 
-- **GIVEN** `@specd/schema-std` is installed
-- **WHEN** `specd schema show @specd/schema-std --raw --format json` is run
-- **THEN** the JSON output contains the raw parsed data from the schema package file
-- **AND** no extends chain resolution is applied
+- **WHEN** `specd schema show <ref> --raw` runs
+- **THEN** it outputs raw YAML data for the ref
 
 #### Scenario: Raw mode with --templates resolves template references
 
-- **GIVEN** a schema with artifact `proposal` that declares `template: templates/proposal.md`
-- **WHEN** `specd schema show --raw --templates --format json` is run
-- **THEN** the `proposal` artifact's `template` field contains the resolved file content
+- **WHEN** `specd schema show --raw --templates` runs
+- **THEN** raw schema displays resolved templates
 
 #### Scenario: Raw mode in project shows base schema without overrides
 
-- **GIVEN** `specd.yaml` references `@specd/schema-std` and declares `schemaOverrides`
-- **WHEN** `specd schema show --raw --format json` is run
-- **THEN** the output shows the base schema data from `@specd/schema-std`
-- **AND** the `schemaOverrides` are NOT applied
+- **WHEN** `specd schema show --raw` runs in project mode
+- **THEN** it shows base schema data without plugin or override layers
 
 ### Requirement: Error cases
 

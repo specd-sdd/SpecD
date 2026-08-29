@@ -20,7 +20,7 @@
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "Delegates prepared project indexing to an open provider, forwarding force intent while excluding storage lifecycle, locking, and host I/O.",
+      "value": "Forwards prepared project inputs and force intent to an open provider for complete or incremental graph indexing.",
       "schema": {
         "name": "schema-std",
         "version": 1
@@ -28,16 +28,16 @@
       "artifactState": {
         "spec.md": {
           "hash": "sha256:8e40003e614784b050799987dbcf59a856fd81f12478d5d96c192183033cee35",
-          "lastModified": "2026-08-25T15:17:25.387Z"
+          "lastModified": "2026-08-25T14:41:04.252Z"
         },
         "verify.md": {
           "hash": "sha256:8082260b39bef9c547f9c60b710dcdae5298ab18f3499809bdafb6ff95e88d4b",
-          "lastModified": "2026-08-25T15:17:25.388Z"
+          "lastModified": "2026-08-25T14:41:04.253Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# IndexProjectGraph\n\n## Rules\n\n- `IndexProjectGraph.execute(input)` MUST call `provider.index()` with `IndexOptions` built from `projectRoot`, `workspaces`, `graphConfig`, `codeGraphVersion`, `vcsRoot`, optional `vcsRef`, optional `onProgress`; MUST return `IndexResult` unchanged.\n- Forward `force` to `CodeGraphProvider.index()` as complete logical reindex request. Forced run MUST clear reusable indexed contents, bypass incremental reuse, reconsider every selected input.\n- MUST NOT call `CodeGraphProvider.recreate()` or perform physical-storage recovery. Provider already open; SDK lifecycle owner handles recoverable open failures.\n- `IndexProjectGraphInput` MUST include `provider`, `projectRoot`, `workspaces`, `graphConfig`, `codeGraphVersion`, `vcsRoot`; MAY include `vcsRef`, `force`, `onProgress`. Forward `vcsRoot` unchanged.\n- MUST NOT resolve workspaces, acquire locks, spawn processes, open/close/clear/recreate storage, or otherwise own storage lifecycle. Force responsibility: forward intent only.\n- `createIndexProjectGraph()` MUST return stateless `IndexProjectGraph`.\n\n## Constraints\n\n- MUST NOT open/close provider.\n- MUST NOT acquire/release graph indexing lock.\n- Per-file errors remain in `IndexResult.errors`; MUST NOT throw for parse failures.",
+      "value": "# IndexProjectGraph\n\n## Rules\n\n- `IndexProjectGraph.execute(input)` builds `IndexOptions` from `projectRoot`, `workspaces`, `graphConfig`, `codeGraphVersion`, `vcsRoot`, optional `vcsRef`, `onProgress`, and `force`; calls `provider.index()`; returns `IndexResult` unchanged.\n- `force` requests complete logical reindex: provider clears reusable indexed contents and bypasses incremental reuse so every selected input is reconsidered.\n- Input contains already-open `provider` and prepared project values. Forward `vcsRoot` unchanged.\n- MUST NOT resolve workspaces, lock, spawn, open, close, directly clear, recreate, or own storage recovery/lifecycle. SDK lifecycle owner handles recoverable open failures.\n- `createIndexProjectGraph()` returns stateless `IndexProjectGraph`.\n\n## Constraints\n\n- No provider open/close or index-lock acquisition/release.\n- Per-file parse failures remain `IndexResult.errors`; use case does not throw them.",
       "schema": {
         "name": "schema-std",
         "version": 1
@@ -45,11 +45,11 @@
       "artifactState": {
         "spec.md": {
           "hash": "sha256:8e40003e614784b050799987dbcf59a856fd81f12478d5d96c192183033cee35",
-          "lastModified": "2026-08-25T15:17:25.387Z"
+          "lastModified": "2026-08-25T14:41:04.252Z"
         },
         "verify.md": {
           "hash": "sha256:8082260b39bef9c547f9c60b710dcdae5298ab18f3499809bdafb6ff95e88d4b",
-          "lastModified": "2026-08-25T15:17:25.388Z"
+          "lastModified": "2026-08-25T14:41:04.253Z"
         }
       }
     }

@@ -24,6 +24,7 @@ import {
   type ImplementationSuggestionSpecStamp,
 } from '../../domain/value-objects/implementation-suggestion-cache.js'
 import { type ImplementationSuggestionCachePort } from '../ports/implementation-suggestion-cache-port.js'
+import { SpecSymbolClassifier } from '../../domain/services/spec-symbol-classifier.js'
 import {
   extractMarkdownSymbolEvidence,
   type MarkdownEvidenceSource,
@@ -80,6 +81,7 @@ export const suggestImplementationLinksInputSchema = z
 
 /** Progress event emitted during `SuggestImplementationLinks` execution. */
 export type SuggestImplementationProgressEvent =
+  | { type: 'stale-warning'; stale: boolean }
   | { type: 'discovery-start'; message: string }
   | { type: 'discovery-done'; totalSpecs: number }
   | { type: 'start'; totalSpecs: number }
@@ -124,6 +126,7 @@ export interface SpecImplementationSuggestion {
 export interface SuggestImplementationLinksResult {
   readonly result: 'ok'
   readonly targetWorkspace?: string
+  readonly codeGraphStale?: boolean
   readonly specs: readonly SpecImplementationSuggestion[]
   readonly appliedMutations?: {
     readonly updatedSpecsCount: number
@@ -247,20 +250,46 @@ export class SuggestImplementationLinks {
 
     let shouldCloseCodeGraphProvider = false
     const codeGraphProvider = this.deps.codeGraphProvider
+    const isCodeGraphProviderOpen =
+      Boolean((codeGraphProvider as { isOpen?: unknown })?.isOpen) ||
+      Boolean((codeGraphProvider as { _isOpen?: unknown })?._isOpen)
     if (
       codeGraphProvider &&
       typeof codeGraphProvider.open === 'function' &&
-      (codeGraphProvider as { isOpen?: unknown }).isOpen !== true
+      !isCodeGraphProviderOpen
     ) {
       await codeGraphProvider.open().catch(() => {})
       shouldCloseCodeGraphProvider = true
     }
 
-    try {
+    let codeGraphStale = false
+    if (codeGraphProvider && typeof (codeGraphProvider as any).getGraphHealth === 'function') {
+      try {
+        const health = await (codeGraphProvider as any).getGraphHealth()
+        codeGraphStale = Boolean(
+          health?.stale ||
+            health?.state === 'stale' ||
+            health?.knownStaleSinceLastIndex ||
+            (Array.isArray(health?.reasonCodes) && health.reasonCodes.length > 0),
+        )
+      } catch {
+        // Advisory
+      }
+    }
+
+    if (codeGraphStale) {
       validatedInput.onProgress?.({
-        type: 'discovery-start',
-        message: 'Discovering specifications across workspaces...',
+        type: 'stale-warning',
+        stale: true,
       })
+    }
+
+    return await cache.withLock(async () => {
+      try {
+        validatedInput.onProgress?.({
+          type: 'discovery-start',
+          message: 'Discovering specifications across workspaces...',
+        })
       const targetSpecs: Array<{
         specId: string
         workspace: string
@@ -447,6 +476,7 @@ export class SuggestImplementationLinks {
       return {
         result: 'ok',
         ...(validatedInput.workspace ? { targetWorkspace: validatedInput.workspace } : {}),
+        codeGraphStale,
         specs: resultSpecs,
         ...(validatedInput.apply
           ? {
@@ -467,7 +497,8 @@ export class SuggestImplementationLinks {
         await codeGraphProvider.close().catch(() => {})
       }
     }
-  }
+  })
+}
 
   /**
    * Filters suggestions based on confidence threshold.
@@ -557,20 +588,39 @@ export class SuggestImplementationLinks {
     let realContentHash = ''
     let lastModified = ''
     let realContentSize: number | undefined
+
+    const artifactsList =
+      spec.artifacts && spec.artifacts.length > 0
+        ? [...spec.artifacts].sort((a, b) => {
+            if (a.filename === 'spec.md') return -1
+            if (b.filename === 'spec.md') return 1
+            return a.filename.localeCompare(b.filename)
+          })
+        : [{ filename: 'spec.md' }]
+
     if (typeof repo.artifact === 'function') {
-      const mainArtifact = await repo.artifact(spec, 'spec.md')
-      content = mainArtifact?.content ?? ''
+      const loadedParts: string[] = []
+      for (const art of artifactsList) {
+        const loaded = await repo.artifact(spec, art.filename).catch(() => null)
+        if (loaded?.content) {
+          loadedParts.push(loaded.content)
+        }
+      }
+      content = loadedParts.join('\n\n')
     }
+
     if (typeof repo.artifactMeta === 'function') {
-      const meta = await repo.artifactMeta(spec, 'spec.md', { includeHash: true })
-      if (meta?.hash) {
-        realContentHash = meta.hash
-      }
-      if (meta?.lastModified) {
-        lastModified = meta.lastModified
-      }
-      if (meta && typeof meta.size === 'number') {
-        realContentSize = meta.size
+      for (const art of artifactsList) {
+        const meta = await repo.artifactMeta(spec, art.filename, { includeHash: true }).catch(() => null)
+        if (meta?.hash) {
+          realContentHash = realContentHash ? `${realContentHash}:${meta.hash}` : meta.hash
+        }
+        if (meta?.lastModified && (!lastModified || meta.lastModified > lastModified)) {
+          lastModified = meta.lastModified
+        }
+        if (meta && typeof meta.size === 'number') {
+          realContentSize = (realContentSize || 0) + meta.size
+        }
       }
     }
 
@@ -712,6 +762,13 @@ export class SuggestImplementationLinks {
       supportedLanguages,
       reservedKeywords: languageKeywords,
     })
+
+    const fullSpecIdentifier = workspace !== 'default' ? `${workspace}:${capPath}` : capPath
+    const classifiedSymbols = SpecSymbolClassifier.classify(content, fullSpecIdentifier)
+    for (const owned of classifiedSymbols.ownedSymbols) {
+      primaryTargetSymbols.add(owned)
+      extractedSymbols.add(owned)
+    }
 
     const symbolEvidenceMap = new Map<
       string,
@@ -1418,6 +1475,19 @@ export class SuggestImplementationLinks {
                 verifiedSymbols.add(n.name)
               }
             }
+          }
+
+          if (verifiedSymbols.size === 0) {
+            for (const s of data.symbols) {
+              if (isCodeIdentifierCandidate(s)) {
+                verifiedSymbols.add(s)
+              }
+            }
+          }
+
+          if (verifiedSymbols.size === 0) {
+            suggestionMap.delete(filePath)
+            continue
           }
 
           suggestionMap.set(filePath, { ...data, symbols: verifiedSymbols })

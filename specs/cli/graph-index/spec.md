@@ -82,6 +82,14 @@ When the result includes per-workspace breakdowns, text mode also lists each wor
 
 In `json` or `toon` mode, the full `IndexResult` object is output as-is, including `documentsIndexed` and the per-workspace `documentsIndexed` breakdown.
 
+### Requirement: Forced indexing result completeness
+
+A successful `graph index --force` result SHALL identify the run as a forced full logical reindex in text, JSON, and TOON output. Structured output MUST retain the stable full-rebuild flag and reason together with discovered, indexed, unsupported, excluded, skipped, coverage, and error counts.
+
+Inputs reconsidered by a forced run MUST NOT be reported as hash-matched incremental skips. Any input that does not produce a file or document node SHALL instead appear under its actual exclusion, unsupported-language, parse-failure, partial, or per-input error classification.
+
+The CLI SHALL render the result returned by the SDK orchestration and MUST NOT infer successful reconstruction merely from process exit code or an updated index timestamp.
+
 ### Requirement: Error cases
 
 If the provider cannot be opened or indexing fails due to an infrastructure error (I/O, database), the command exits with code 3.

@@ -1,12 +1,12 @@
 import { readFile, unlink } from 'node:fs/promises'
-import { writeJsonAtomic } from './write-json-atomic.js'
+import { withCacheFileLock, writeJsonAtomic } from './write-json-atomic.js'
 import {
   decideFreshness,
   enrichSpecHash,
   readSpecStamp,
   timestampFallback,
 } from './spec-stamp-source.js'
-import { isAbsolute, join } from 'node:path'
+import { dirname, isAbsolute, join } from 'node:path'
 import {
   ImplementationSuggestionCachePort,
   type ImplementationSuggestionCachePortDeps,
@@ -72,6 +72,10 @@ function compareCandidateTuples(
   if (aWsAff !== bWsAff) return aWsAff - bWsAff
 
   if (targetSymbol) {
+    const aHasSym = a.symbols.some((s) => s.toLowerCase() === targetSymbol.toLowerCase()) ? 1 : 0
+    const bHasSym = b.symbols.some((s) => s.toLowerCase() === targetSymbol.toLowerCase()) ? 1 : 0
+    if (aHasSym !== bHasSym) return aHasSym - bHasSym
+
     const symbolKebab = targetSymbol
       .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
       .toLowerCase()
@@ -127,7 +131,8 @@ export class FsImplementationSuggestionCache extends ImplementationSuggestionCac
     if (typeof optionsOrProjectDir === 'string') {
       super({})
       this.projectDir = optionsOrProjectDir
-      const baseDir = isAbsolute(configPath) ? configPath : join(optionsOrProjectDir, configPath)
+      const raw = isAbsolute(configPath) ? configPath : join(optionsOrProjectDir, configPath)
+      const baseDir = raw.endsWith('.yaml') || raw.endsWith('.yml') || raw.endsWith('.json') ? dirname(raw) : raw
       this.cachePath = join(
         baseDir,
         'tmp',
@@ -139,9 +144,10 @@ export class FsImplementationSuggestionCache extends ImplementationSuggestionCac
       super(optionsOrProjectDir)
       this.projectDir = optionsOrProjectDir.projectDir
       const effectiveConfig = optionsOrProjectDir.configPath ?? '.specd'
-      const baseDir = isAbsolute(effectiveConfig)
+      const raw = isAbsolute(effectiveConfig)
         ? effectiveConfig
         : join(optionsOrProjectDir.projectDir, effectiveConfig)
+      const baseDir = raw.endsWith('.yaml') || raw.endsWith('.yml') || raw.endsWith('.json') ? dirname(raw) : raw
       this.cachePath = join(
         baseDir,
         'tmp',
@@ -485,31 +491,61 @@ export class FsImplementationSuggestionCache extends ImplementationSuggestionCac
       return
     }
 
-    const specsRecord: Record<string, ImplementationSuggestionSpecEntry> = {}
-    for (const [specId, entry] of this._data.entries()) {
-      specsRecord[specId] = entry
-    }
+    await withCacheFileLock(`${this.cachePath}.lock`, async () => {
+      let specsRecord: Record<string, ImplementationSuggestionSpecEntry> = {}
+      try {
+        const diskContent = await readFile(this.cachePath, 'utf-8')
+        const diskParsed = JSON.parse(diskContent) as ImplementationSuggestionsCacheFile
+        if (
+          diskParsed &&
+          diskParsed.header &&
+          diskParsed.header.cacheVersion === IMPLEMENTATION_SUGGESTION_CACHE_VERSION &&
+          typeof diskParsed.specs === 'object'
+        ) {
+          specsRecord = { ...diskParsed.specs }
+        }
+      } catch {
+        // Disk file missing or unparseable - start fresh
+      }
 
-    const { fingerprint, lastIndexedAt } = await this.getGraphFingerprint()
+      for (const [specId, entry] of this._data!.entries()) {
+        specsRecord[specId] = entry
+      }
 
-    const header: ImplementationSuggestionCacheHeader = this._header ?? {
-      updatedAt: new Date().toISOString(),
-      projectDir: this.projectDir,
-      cacheVersion: IMPLEMENTATION_SUGGESTION_CACHE_VERSION,
-      graphLastIndexedAt: lastIndexedAt,
-      graphFingerprint: fingerprint,
-    }
+      const { fingerprint, lastIndexedAt } = await this.getGraphFingerprint()
 
-    const filePayload: ImplementationSuggestionsCacheFile = {
-      header: {
-        ...header,
+      const header: ImplementationSuggestionCacheHeader = this._header ?? {
         updatedAt: new Date().toISOString(),
-      },
-      specs: specsRecord,
-    }
+        projectDir: this.projectDir,
+        cacheVersion: IMPLEMENTATION_SUGGESTION_CACHE_VERSION,
+        graphLastIndexedAt: lastIndexedAt,
+        graphFingerprint: fingerprint,
+      }
 
-    await writeJsonAtomic(this.cachePath, JSON.stringify(filePayload, null, 2))
+      const filePayload: ImplementationSuggestionsCacheFile = {
+        header: {
+          ...header,
+          updatedAt: new Date().toISOString(),
+        },
+        specs: specsRecord,
+      }
+
+      await writeJsonAtomic(this.cachePath, JSON.stringify(filePayload, null, 2))
+    })
     this._isDirty = false
+  }
+
+  /** @inheritdoc */
+  override async withLock<T>(fn: () => Promise<T>): Promise<T> {
+    return await withCacheFileLock(`${this.cachePath}.lock`, async () => {
+      this._generation += 1
+      this._data = null
+      this._header = null
+      this._fileToSpecMap = null
+      this._isDirty = false
+      await this.ensureLoaded()
+      return await fn()
+    })
   }
 
   /** @inheritdoc */

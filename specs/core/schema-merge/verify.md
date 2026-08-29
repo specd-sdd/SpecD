@@ -20,11 +20,17 @@
 
 ### Requirement: Operation target structure
 
-#### Scenario: Operations mirror schema hierarchy
+#### Scenario: Set scalar field on top level
 
-- **GIVEN** an operation that targets `workflow[0].hooks.post`
-- **WHEN** the operation entry includes a parent identity (`step`) and nested arrays
-- **THEN** the merge engine locates the parent entry first, then applies the nested operation to the sub-array
+- **GIVEN** a base schema with `name: "base"`, `version: 1`
+- **WHEN** a layer applies `set: { name: "custom", version: 2, compat: "@specd/schema-std@1" }`
+- **THEN** the merged schema data has `name: "custom"`, `version: 2`, and `compat: "@specd/schema-std@1"`
+
+#### Scenario: Set nested hook property
+
+- **GIVEN** a base schema with an existing hook in the `implementing` step
+- **WHEN** a layer sets properties on that hook
+- **THEN** only the specified properties are updated
 
 ### Requirement: Five operations with fixed intra-layer order
 

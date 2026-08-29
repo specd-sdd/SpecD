@@ -1,0 +1,18 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Review subcommand'
+  content: |
+    ### Requirement: Start subcommand
+
+    #### Scenario: Start explicitly activates implementation tracking
+
+    - **GIVEN** an active change where implementation tracking is inactive
+    - **WHEN** running `specd changes implementation start <name>`
+    - **THEN** it executes `UpdateImplementationTracking` with action `'start'`
+    - **AND** tracking becomes active
+    - **AND** re-running `start` succeeds idempotently

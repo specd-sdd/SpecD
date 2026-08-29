@@ -360,6 +360,7 @@ Review or mutate implementation tracking for an active change. Paths are always 
 
 Available subcommands:
 
+- `start` — explicitly activate implementation tracking for a change
 - `list` — show tracked files and confirmed links
 - `review` — show tracked files, confirmed links, stale symbol diagnostics, and out-of-scope sidecar preview
 - `add` — create or enrich a confirmed implementation link
@@ -400,6 +401,7 @@ The `ignore` action is an exception: files that are already tracked (including t
 Examples:
 
 ```bash
+specd changes implementation start my-change
 specd changes implementation list my-change
 specd changes implementation add my-change --spec core:change --file packages/core/src/domain/entities/change.ts
 specd changes implementation add my-change --spec core:change --file packages/core/src/domain/entities/change.ts --symbol Change.transition
@@ -958,6 +960,17 @@ Manage persisted implementation tracking links.
 
 See [spec implementation](spec-implementation.md).
 
+### spec suggest
+
+```
+specd specs suggest [options]
+specd spec suggest [options]
+```
+
+Discover candidate specifications and detect specification coverage gaps across the codebase using graph analysis and capability clustering.
+
+See [spec suggest](spec-suggest.md).
+
 ### spec optimizations
 
 ```
@@ -1205,6 +1218,13 @@ recreating SQLite. If the first open reports the typed recoverable storage condi
 the isolated SDK task closes that transient provider, recreates closed storage, and
 retries once. Non-forced indexes and unrelated failures never delete storage. No change
 manifest, spec, or implementation link is modified by this recovery.
+
+Text output includes a coverage total, counts for `indexed`, `excluded`, `unsupported`,
+`parse-failed`, and `partial`, followed by any stable coverage reasons and per-link
+diagnostics. JSON and TOON preserve the same `coverage` and `coverageDiagnostics` fields
+from SDK orchestration. A forced result must show `fullRebuild: true` and must not classify
+hash-matched selected inputs as skipped; inspect the returned classifications rather than
+using a successful exit code as proof that every input became a graph node.
 Completed results also include counts and elapsed milliseconds for import resolution,
 dependency facts, adapter relations, re-exports, hierarchy/overrides, persistence,
 and search-index rebuilding in text and structured output.

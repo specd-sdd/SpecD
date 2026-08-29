@@ -1,0 +1,34 @@
+- op: added
+  description: 'Add refresh on specIds change scenario'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Directory cleanup on removal'
+  content: |
+    ### Requirement: Implementation tracking refresh on spec change
+
+    #### Scenario: Spec removal triggers implementation tracking refresh
+
+    - **GIVEN** a change with confirmed implementation links and configured `refreshImplementationTracking`
+    - **WHEN** `EditChange.execute` is called removing a spec from `specIds`
+    - **THEN** `refreshImplementationTracking.execute({ name })` is invoked to sweep dangling links
+
+- op: modified
+  description: 'Update factory scenario with refreshImplementationTracking'
+  selector:
+    type: section
+    matches: 'Scenario: createEditChange config form derives EditChangeDeps through resolveEditChangeDeps'
+  content: |
+    - **WHEN** `createEditChange(config, options?)` is invoked
+    - **THEN** it creates a composition resolver for that composition session
+    - **AND** it derives `EditChangeDeps` through `resolveEditChangeDeps(resolver)`
+    - **AND** `resolveEditChangeDeps(resolver)` resolves:
+      - `changes: ChangeRepository`
+      - `listWorkspaces: ListWorkspaces`
+      - `actor: ActorResolver`
+      - `schemaProvider: SchemaProvider`
+      - `refreshImplementationTracking?: RefreshImplementationTracking`
+    - **AND** the factory delegates to canonical `createEditChange(deps)`

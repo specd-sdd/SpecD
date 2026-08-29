@@ -16,24 +16,43 @@
   ],
   "implementation": [
     {
-      "file": "code-graph:src/application/use-cases/in-memory-index-session.ts",
-      "symbols": ["InMemoryIndexSession"]
+      "file": "code-graph:src/public.ts"
+    },
+    {
+      "file": "code-graph:src/domain/value-objects/index.ts"
+    },
+    {
+      "file": "code-graph:src/domain/value-objects/index-result.ts",
+      "symbols": [
+        "IndexCoverageDiagnosticReason",
+        "IndexCoverageDiagnostic",
+        "IndexRunCoverageSummary",
+        "IndexResult"
+      ]
+    },
+    {
+      "file": "code-graph:src/index.ts"
     },
     {
       "file": "code-graph:src/application/use-cases/index-code-graph.ts",
       "symbols": ["IndexCodeGraph"]
     },
     {
-      "file": "code-graph:test/application/use-cases/symbol-index.spec.ts"
+      "file": "code-graph:src/application/services/project-spec-coverage.ts",
+      "symbols": ["projectSpecCoverage"]
+    },
+    {
+      "file": "code-graph:src/composition/code-graph-provider.ts",
+      "symbols": ["CodeGraphProviderImpl"]
+    },
+    {
+      "file": "code-graph:test/application/services/project-spec-coverage.spec.ts"
     },
     {
       "file": "code-graph:test/application/use-cases/workspace-indexing.spec.ts"
     },
     {
       "file": "code-graph:test/application/use-cases/index-project-graph-integration.spec.ts"
-    },
-    {
-      "file": "code-graph:src/domain/value-objects/index-result.ts"
     }
   ],
   "optimizations": {

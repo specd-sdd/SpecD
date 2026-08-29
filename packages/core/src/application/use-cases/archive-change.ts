@@ -596,7 +596,9 @@ export class ArchiveChange {
 
     const writesBySpecId = new Map<string, PreparedArchiveWrite[]>()
     const staleSpecIds = new Set<string>()
-    const implementationBySpecId = this._materializeImplementationLinks(change, workspaceMap)
+    const implementationBySpecId = new Map(
+      this._materializeImplementationLinks(change, workspaceMap),
+    )
     const publicationSpecIds = new Set<string>([
       ...change.specIds,
       ...implementationBySpecId.keys(),
@@ -717,15 +719,24 @@ export class ArchiveChange {
       const { workspace, capPath: capabilityPath } = parseSpecId(specId)
       const ws = workspaceMap.get(workspace)
       if (ws === undefined) {
-        if (implementationBySpecId.has(specId) && !change.specIds.includes(specId)) {
-          throw new ArchiveImplementationStateError(
-            [],
-            `Cannot archive implementation tracking for "${specId}" because workspace "${workspace}" has no spec repository.`,
-          )
-        }
+        implementationBySpecId.delete(specId)
         continue
       }
       const writes = writesBySpecId.get(specId) ?? []
+      const specPath = SpecPath.parse(capabilityPath)
+      const existingSpec = await ws.specRepo.get(specPath)
+
+      if (existingSpec === null) {
+        if (!change.specIds.includes(specId)) {
+          implementationBySpecId.delete(specId)
+          continue
+        }
+        if (writes.length === 0) {
+          implementationBySpecId.delete(specId)
+          continue
+        }
+      }
+
       if (
         writes.length === 0 &&
         change.specDependsOn.get(specId) === undefined &&
@@ -733,15 +744,12 @@ export class ArchiveChange {
       ) {
         continue
       }
+
       publications.push({
         specId,
-        spec: new Spec(
-          workspace,
-          SpecPath.parse(capabilityPath),
-          [],
-          ABSENT_SPEC_SIDECAR,
-          ABSENT_SPEC_SIDECAR,
-        ),
+        spec:
+          existingSpec ??
+          new Spec(workspace, specPath, [], ABSENT_SPEC_SIDECAR, ABSENT_SPEC_SIDECAR),
         specRepo: ws.specRepo,
         writes,
       })
@@ -857,8 +865,9 @@ export class ArchiveChange {
       )
     }
 
+    const canonicalSchema = args.schema.canonicalSpecSchema()
     const publicationPersistedSchema = sidecarActive
-      ? (persistedSchema ?? { name: args.schema.name(), version: args.schema.version() })
+      ? (persistedSchema ?? { name: canonicalSchema.name, version: canonicalSchema.version })
       : undefined
     const publicationPersistedDependsOn = sidecarActive ? [...finalDependsOn] : undefined
     const implementationLinks = args.implementationBySpecId.get(args.publication.specId) ?? []

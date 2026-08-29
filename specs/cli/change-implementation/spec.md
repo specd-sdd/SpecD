@@ -106,6 +106,17 @@ The review flow MUST:
 - surface when sidecar maintenance would require updates outside current spec scope
 - leave active tracking and archived sidecars unchanged
 
+### Requirement: Start subcommand
+
+`specd changes implementation start <name>` SHALL explicitly activate implementation tracking for an active change.
+
+The command MUST:
+
+- delegate execution exclusively to `UpdateImplementationTracking` with action `'start'`
+- succeed idempotently if implementation tracking is already active for the change
+- support `--format text|json|toon` and `--config <path>`
+- render structured confirmation including the change name, active tracking status (`trackingActive: true`), and the timestamp when tracking commenced
+
 ### Requirement: Shared path semantics
 
 Manual implementation management and autodetection MUST use the same raw project-relative file-path semantics during the active change.

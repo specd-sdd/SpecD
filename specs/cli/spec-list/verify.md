@@ -40,6 +40,13 @@
 - **AND** the machine-readable code is `CLI_VALIDATION_ERROR`
 - **AND** `ListSpecs.execute` is not invoked
 
+#### Scenario: --count and --summary are mutually exclusive
+
+- **WHEN** `specd spec list --count --summary` is run
+- **THEN** a typed validation error is thrown (e.g. `CliValidationError`)
+- **AND** the machine-readable code is `CLI_VALIDATION_ERROR`
+- **AND** `ListSpecs.execute` is not invoked
+
 ### Requirement: Workspace filtering
 
 #### Scenario: Workspaces grouped using orchestrated list
@@ -184,6 +191,52 @@
 - **WHEN** `specd spec list --format json` is run
 - **THEN** no entry includes a `metadataStatus` field
 - **AND** in text mode, no `METADATA STATUS` column header is printed
+
+#### Scenario: Count output in text mode for multiple workspaces
+
+- **GIVEN** workspace `alpha` has 1 spec and workspace `beta` has 1 spec
+- **WHEN** `specd spec list --count` is run
+- **THEN** stdout contains `Total: 2`
+- **AND** stdout contains `Workspaces:`
+- **AND** stdout contains `alpha: 1`
+- **AND** stdout contains `beta: 1`
+
+#### Scenario: Count output in text mode for single workspace
+
+- **GIVEN** workspace `default` has 3 specs
+- **WHEN** `specd spec list --count` is run
+- **THEN** stdout contains `Total: 3`
+- **AND** stdout contains `Workspaces:`
+- **AND** stdout contains `default: 3`
+
+#### Scenario: Count output in text mode filtered by workspace
+
+- **GIVEN** workspace `alpha` has 1 spec and workspace `beta` has 1 spec
+- **WHEN** `specd spec list --count --workspace alpha` is run
+- **THEN** stdout contains `alpha: 1`
+- **AND** stdout does not contain `beta`
+
+#### Scenario: Count output in JSON mode
+
+- **GIVEN** workspace `alpha` has 1 spec and workspace `beta` has 1 spec
+- **WHEN** `specd spec list --count --format json` is run
+- **THEN** stdout is valid JSON with `total` equal to 2
+- **AND** `workspaces` contains `[{ name: "alpha", count: 1 }, { name: "beta", count: 1 }]`
+
+#### Scenario: Count output in JSON mode filtered by workspace
+
+- **GIVEN** workspace `alpha` has 1 spec and workspace `beta` has 1 spec
+- **WHEN** `specd spec list --count --workspace alpha --format json` is run
+- **THEN** stdout is valid JSON with `total` equal to 1
+- **AND** `workspaces` contains `[{ name: "alpha", count: 1 }]`
+
+#### Scenario: Count output in TOON mode
+
+- **GIVEN** workspace `default` has 3 specs
+- **WHEN** `specd spec list --count --format toon` is run
+- **THEN** stdout contains `total: 3`
+- **AND** stdout contains `workspaces`
+- **AND** stdout contains `default`
 
 ### Requirement: Empty output
 

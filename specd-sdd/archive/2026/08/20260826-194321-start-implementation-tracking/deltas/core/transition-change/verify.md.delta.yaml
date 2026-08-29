@@ -1,0 +1,17 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Transition event'
+  content: |
+    ### Requirement: Automatic implementation tracking activation on transition to implementing
+
+    #### Scenario: Transition to implementing activates tracking if inactive
+
+    - **GIVEN** a change with `isImplementationTrackingActive = false`
+    - **WHEN** transitioning to `implementing`
+    - **THEN** `isImplementationTrackingActive` becomes `true`
+    - **AND** `implementationTrackingStartedAt` is set to the transition timestamp

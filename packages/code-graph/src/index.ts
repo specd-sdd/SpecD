@@ -141,6 +141,9 @@ export {
   type WorkspaceIndexBreakdown,
   type IndexPhaseMetric,
   type IndexPhaseMetrics,
+  type IndexCoverageDiagnosticReason,
+  type IndexCoverageDiagnostic,
+  type IndexRunCoverageSummary,
 } from './domain/value-objects/index-result.js'
 export {
   type IndexSession,

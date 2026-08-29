@@ -8,6 +8,7 @@ import { Spec } from '../../../src/domain/entities/spec.js'
 import { SpecPath } from '../../../src/domain/value-objects/spec-path.js'
 import { SpecArtifact } from '../../../src/domain/value-objects/spec-artifact.js'
 import { ArtifactConflictError } from '../../../src/domain/errors/artifact-conflict-error.js'
+import { SpecPublicationError } from '../../../src/domain/errors/spec-publication-error.js'
 import { FsSpecRepository } from '../../../src/infrastructure/fs/spec-repository.js'
 import { sha256 } from '../../../src/infrastructure/fs/hash.js'
 import { type PersistedSpecState } from '../../../src/domain/services/apply-persisted-spec-state-patch.js'
@@ -581,6 +582,44 @@ describe('FsSpecRepository', () => {
       const parentDir = path.join(ctx.specsPath, 'auth')
       const entries = await fs.readdir(parentDir)
       expect(entries.some((entry) => entry.startsWith('login.staging-'))).toBe(true)
+    })
+
+    it('rejects publishing a new spec with no artifacts', async () => {
+      const spec = buildTestSpec({
+        workspace: 'default',
+        name: 'auth/nonexistent',
+        filenames: [],
+      })
+
+      await expect(
+        ctx.repo.publish(spec, {
+          artifacts: [],
+          persistedState: defaultPersistedState(),
+        }),
+      ).rejects.toThrow(SpecPublicationError)
+    })
+
+    it('allows publishing an existing spec with no artifact changes', async () => {
+      await writeSpecFile(ctx, 'auth/login', 'spec.md', '# Existing spec')
+      const spec = buildTestSpec({
+        workspace: 'default',
+        name: 'auth/login',
+        filenames: ['spec.md'],
+      })
+
+      const updatedState = {
+        ...defaultPersistedState(),
+        dependsOn: ['default:shared/auth'],
+      }
+
+      await ctx.repo.publish(spec, {
+        artifacts: [],
+        persistedState: updatedState,
+      })
+
+      await expect(readSpecFile(ctx, 'auth/login', 'spec.md')).resolves.toBe('# Existing spec')
+      const lock = await readSpecFile(ctx, 'auth/login', 'spec-lock.json')
+      expect(JSON.parse(lock).dependsOn).toEqual(['default:shared/auth'])
     })
   })
 

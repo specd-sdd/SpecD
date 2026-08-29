@@ -136,12 +136,9 @@ The final metadata object merges:
 - all fields from `extractMetadata()` output
 - canonical `dependsOn` determined by the dependency-resolution rules above
 - implementation projection from persisted repository semantics
-- fresh lock-owned optimization fields, per Requirement: Fresh lock-owned
-  optimizations only
+- fresh lock-owned optimization fields, per Requirement: Fresh lock-owned optimizations only
 - `contentHashes` from the hashing step
-- `provenance` — the exact artifact hashes/lastModified, `persistedStateHash`
-  (or `null` for a lock-less spec), schema identity, projection version, and
-  projection fingerprint used during this generation attempt
+- `provenance` — the exact artifact hashes/lastModified, `persistedStateHash` (or `null` for a lock-less spec), schema identity (resolved from persisted state or fallback `schema.canonicalSpecSchema()`), projection version, and projection fingerprint used during this generation attempt
 - `generatedBy: 'core'`
 
 The result is returned with `hasExtraction: true`.

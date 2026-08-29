@@ -24,6 +24,9 @@ function serializeSchema(
       version: schema.version(),
       kind: schema.kind(),
       ...(schema.extendsRef() !== undefined ? { extends: schema.extendsRef() } : {}),
+      ...(typeof schema.compat === 'function' && schema.compat() !== undefined
+        ? { compat: { name: schema.compat()!.name, version: schema.compat()!.version } }
+        : {}),
     },
     mode,
     plugins: [] as string[],
@@ -90,6 +93,10 @@ function formatSchemaText(schema: Schema, mode: string, includeTemplates: boolea
   lines.push(`schema: ${schema.name()}  version: ${schema.version()}  kind: ${schema.kind()}`)
   if (schema.extendsRef() !== undefined) {
     lines.push(`extends: ${schema.extendsRef()}`)
+  }
+  if (typeof schema.compat === 'function' && schema.compat() !== undefined) {
+    const c = schema.compat()!
+    lines.push(`compat: ${c.name}@${c.version}`)
   }
   if (mode === 'project') {
     // Plugins line — currently no plugin tracking in Schema entity

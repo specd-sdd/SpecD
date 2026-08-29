@@ -1,0 +1,9 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Historical implementing guard'
+  rename: 'Requirement: Implementation tracking active guard'
+  content: |
+    When `Change.isImplementationTrackingActive` is `false`, the use case MUST NOT invoke `ImplementationDetector` and MUST NOT mutate tracked implementation files.
+
+    When `Change.isImplementationTrackingActive` is `true`, the use case MUST run targeted detection and MAY persist tracking updates.

@@ -14,7 +14,8 @@
   ],
   "implementation": [
     {
-      "file": "core:src/composition/use-cases/resolve-schema.ts"
+      "file": "core:src/application/use-cases/resolve-extends-chain.ts",
+      "symbols": ["resolveExtendsChain"]
     }
   ],
   "optimizations": {

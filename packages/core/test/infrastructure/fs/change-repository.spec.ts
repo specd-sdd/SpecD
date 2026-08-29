@@ -2779,4 +2779,46 @@ describe('FsChangeRepository', () => {
       expect(result.items.map((entry) => entry.name)).toEqual(['rebuild-me'])
     })
   })
+
+  describe('implementation tracking persistence', () => {
+    it('persists and hydrates implementationTrackingStartedAt', async () => {
+      const change = makeChange('tracking-persist')
+      const started = new Date('2024-06-01T12:00:00.000Z')
+      change.startImplementationTracking(started)
+
+      await persistChange(ctx.repo, change)
+
+      const loaded = await ctx.repo.get('tracking-persist')
+      expect(loaded).not.toBeNull()
+      expect(loaded!.isImplementationTrackingActive).toBe(true)
+      expect(loaded!.implementationTrackingStartedAt).toEqual(started)
+    })
+
+    it('hydrates legacy manifest without implementationTrackingStartedAt from historical implementing event', async () => {
+      const histDate = new Date('2024-03-01T10:00:00.000Z')
+      const change = new Change({
+        name: 'legacy-hydrate',
+        createdAt: new Date('2024-01-15T10:00:00.000Z'),
+        specIds: ['auth/login'],
+        history: [
+          {
+            type: 'created',
+            at: new Date('2024-01-15T10:00:00.000Z'),
+            by: actor,
+            specIds: ['auth/login'],
+            schemaName: 'std',
+            schemaVersion: 1,
+          },
+          { type: 'transitioned', from: 'ready', to: 'implementing', at: histDate, by: actor },
+        ],
+      })
+
+      await persistChange(ctx.repo, change)
+
+      const loaded = await ctx.repo.get('legacy-hydrate')
+      expect(loaded).not.toBeNull()
+      expect(loaded!.isImplementationTrackingActive).toBe(true)
+      expect(loaded!.implementationTrackingStartedAt).toEqual(histDate)
+    })
+  })
 })

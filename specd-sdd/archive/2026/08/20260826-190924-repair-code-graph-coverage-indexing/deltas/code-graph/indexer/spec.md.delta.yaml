@@ -1,0 +1,84 @@
+- op: modified
+  description: 'Make forced indexing bypass every persisted incremental skip authority'
+  selector:
+    type: section
+    matches: 'Requirement: Incremental indexing'
+  content: |
+    The indexer SHALL compute a content hash for each discovered file and compare it against the hash stored in the `GraphStore`. It SHALL also compare the persisted graph fingerprint against the current fingerprint for the indexing run.
+
+    The current graph fingerprint for this iteration SHALL be computed from:
+
+    - the effective `@specd/code-graph` package version loaded by the running process
+    - a canonical hash of the resolved workspace objects used for indexing
+
+    Only three categories of files are processed during a normal incremental run when the graph fingerprint matches:
+
+    - **New** — file exists on disk but not in the store → extract and upsert
+    - **Changed** — file exists in both but hashes differ → extract and upsert (replaces previous data)
+    - **Deleted** — file exists in the store but not on disk → remove from store. Only files belonging to workspaces being indexed are considered for deletion — files from other workspaces are left untouched. This allows `--workspace <name>` to index a single workspace without destroying data from others.
+
+    Files whose hash matches the stored hash are skipped entirely — no parsing, no I/O beyond the hash comparison — only during a non-forced run when the persisted graph fingerprint matches the current fingerprint and the persisted indexed resource needed by downstream phases still exists.
+
+    When the persisted graph fingerprint differs from the current fingerprint, the indexer SHALL treat the run as a full rebuild of the active graph store rather than a normal incremental skip. The preferred behavior is to recreate the store and re-index every discovered file while surfacing a visible explanation that the code-graph version or resolved workspace configuration changed. If a backend cannot safely recreate in-place, the caller MAY fail fast and require an explicit force-reindex command instead.
+
+    Changed files are removed from the store before bulk load, because CSV `COPY FROM` cannot upsert — it can only insert. Removing changed files first ensures the bulk load inserts fresh data without conflicts.
+
+    A forced run SHALL reconsider every discovered input selected for that run. Persisted file nodes, document nodes, index-coverage hashes, observations, semantic lookup state, or any other reusable artifact MUST NOT authorize an unchanged-file or unchanged-spec skip during that run. The resulting committed generation SHALL contain the nodes, semantic state, coverage relations, coverage records, and derivation metadata produced from that complete reconsideration.
+
+- op: modified
+  description: 'Use the canonical aggregate persisted-state API for spec dependencies and implementation coverage'
+  selector:
+    type: section
+    matches: 'Requirement: IndexCodeGraph use case'
+  content: |
+    `IndexCodeGraph` SHALL be the primary entry point for building and updating the code graph. It is an application-layer use case that orchestrates:
+
+    1. **Discover** — walk the workspace roots AND project-global graph paths to find source files and documents
+    2. **Diff** — compare content hashes (or spec metadata fingerprints) with the store to identify new, changed, and deleted resources
+    3. **Extract** — run the appropriate language adapter on code files, or index textual content as documents
+    4. **Spec Indexing** — consume `SpecRepository` from each workspace plus Core's `GetSpecMetadata` to materialize normalized metadata, dependencies, and coverage links
+    5. **Store** — upsert extracted data and relations into the `GraphStore`
+    6. **Clean** — remove deleted resources from the store
+    7. **Persist VCS ref** — store `lastIndexedRef` after success
+
+    Extraction and storage include hierarchy relations (`EXTENDS`, `IMPLEMENTS`, `OVERRIDES`) alongside existing file, symbol, and dependency relations.
+
+    The indexer SHALL directly consume `SpecRepository` methods (`list`, `artifact`, `readPersistedState`) and Core's `GetSpecMetadata` use case (for title, description, and the semantic `metadataFingerprint`) to build `SpecNode` and coverage relations. The aggregate persisted state SHALL supply both dependency and implementation data. It MUST NOT parse raw sidecar files and MUST NOT read a raw metadata snapshot directly when a materialized, self-healing projection is available through `GetSpecMetadata`.
+
+- op: modified
+  description: 'Align persisted-state loading with the SpecRepository port'
+  selector:
+    type: section
+    matches: 'Requirement: Spec dependency indexing'
+  content: |
+    The indexer SHALL build `SpecNode` entries and relations by directly consuming the `SpecRepository` instance from each workspace, together with Core's `GetSpecMetadata` use case:
+
+    1. Use `repo.count()` to discover the total spec volume upfront for accurate progress reporting
+    2. Use `repo.list()` to enumerate spec identities
+    3. For each spec, call `GetSpecMetadata.execute({ specId })` and compare the returned `metadataFingerprint` against the value stored on the corresponding `SpecNode` to enable incremental skipping — a spec is reprocessed only when its semantic fingerprint changed, not merely because a cache file's raw bytes or timestamp changed
+    4. Load `title` and `description` from the materialized `GetSpecMetadata` result rather than a raw `repo.metadata()` read
+    5. Load `COVERS_FILE`, `COVERS_SYMBOL`, and `DEPENDS_ON` relations from one `repo.readPersistedState()` result
+
+    The indexer SHALL NOT rely on the CLI to pre-extract spec data. It owns the semantic mapping from repository data to graph nodes.
+
+- op: added
+  description: 'Define deterministic coverage projection from canonical persisted implementation state'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Incremental indexing'
+  content: |
+    ### Requirement: Deterministic implementation coverage projection
+
+    Spec indexing SHALL read implementation links through the canonical `SpecRepository` persisted-state API and project coverage against the semantic generation that will be committed by the same indexing run.
+
+    A file-only implementation link SHALL produce `COVERS_FILE` when its canonical workspace-prefixed file target exists in that generation. A symbol-qualified implementation link SHALL produce `COVERS_SYMBOL` only when the named target resolves deterministically to exactly one current logical symbol declared by the linked file. The relation target MUST be that logical symbol identity rather than a declaration-occurrence ID.
+
+    Coverage projection SHALL have access to the current or persisted semantic state required for resolution even when no code file was analyzed in the current run. A persisted implementation-only change MUST therefore be able to add, remove, or replace coverage during an otherwise incremental run.
+
+    When a code file or its declarations change, coverage for affected specs SHALL be reprojected from canonical persisted implementation state against the refreshed logical-symbol generation. The indexer MUST NOT preserve an obsolete physical-symbol relation as a substitute for reprojection.
+
+    An unresolved or ambiguous symbol-qualified link MUST NOT create a guessed `COVERS_SYMBOL` relation and MUST NOT be silently converted into `COVERS_FILE`. The index result SHALL expose a stable per-link diagnostic identifying the spec, linked file, symbol name, and unresolved or ambiguous reason while allowing unrelated inputs to complete.

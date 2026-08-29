@@ -791,7 +791,8 @@ export abstract class GraphStore {
   abstract getFileImporterCounts(): Promise<Map<string, number>>
 
   /**
-   * Removes all data from the store.
+   * Removes every logical-generation artifact, including incremental and semantic
+   * indexing authority, while keeping the opened physical store and its generation.
    * @returns A promise that resolves when the store is cleared.
    */
   abstract clear(): Promise<void>

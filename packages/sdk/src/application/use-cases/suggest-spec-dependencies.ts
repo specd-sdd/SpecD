@@ -13,13 +13,15 @@ import {
 } from '@specd/core'
 import { type CodeGraphProvider } from '@specd/code-graph'
 import { z } from 'zod'
-import { SuggestImplementationLinks } from './suggest-implementation-links.js'
+import { SuggestImplementationLinks, type SuggestImplementationLinksResult } from './suggest-implementation-links.js'
+import { TransitiveReductionEngine } from '../../domain/services/transitive-reduction-engine.js'
 import { type ImplementationSuggestionCachePort } from '../ports/implementation-suggestion-cache-port.js'
 import { type SpecDepsSuggestionCachePort } from '../ports/spec-deps-suggestion-cache-port.js'
 import { type ImplementationSuggestionSpecEntry } from '../../domain/value-objects/implementation-suggestion-cache.js'
 
 /** Progress event emitted during `SuggestSpecDependencies` execution. */
 export type SuggestSpecDepsProgressEvent =
+  | { type: 'stale-warning'; stale: boolean }
   | { type: 'warmup-start'; message: string }
   | {
       type: 'warmup-progress'
@@ -176,6 +178,7 @@ export interface PostApplyValidationDiagnostic {
 export interface SuggestSpecDependenciesResult {
   readonly result: 'ok'
   readonly targetWorkspace?: string
+  readonly codeGraphStale?: boolean
   readonly specs: readonly SpecDependencySuggestion[]
   readonly appliedMutations?: {
     readonly updatedSpecsCount: number
@@ -247,42 +250,70 @@ export class SuggestSpecDependencies {
       await this.deps.codeGraphProvider.open().catch(() => {})
     }
 
+    let codeGraphStale = false
+    const cgProvider = this.deps.codeGraphProvider
+    if (cgProvider && typeof (cgProvider as any).getGraphHealth === 'function') {
+      try {
+        const health = await (cgProvider as any).getGraphHealth()
+        codeGraphStale = Boolean(
+          health?.stale ||
+            health?.state === 'stale' ||
+            health?.knownStaleSinceLastIndex ||
+            (Array.isArray(health?.reasonCodes) && health.reasonCodes.length > 0),
+        )
+      } catch {
+        // Advisory
+      }
+    }
+
+    if (codeGraphStale) {
+      validatedInput.onProgress?.({
+        type: 'stale-warning',
+        stale: true,
+      })
+    }
+
     try {
       // Pass 1: Warm-up implementation suggestion cache across monorepo
       input.onProgress?.({
         type: 'warmup-start',
         message: 'Warming up implementation cache across workspaces...',
       })
-      const implResult = await this.deps.suggestImplementationLinks.execute({
-        all: true,
-        apply: false,
-        ...(input.rebuildCache !== undefined ? { rebuildCache: input.rebuildCache } : {}),
-        onProgress: (evt) => input.onProgress?.({ type: 'warmup-progress', event: evt }),
-      })
-      input.onProgress?.({ type: 'warmup-done', totalSpecs: implResult?.specs?.length ?? 0 })
 
       const implCache = this.deps.cache
       if (implCache === undefined) {
         throw new InvalidInputError('SuggestSpecDependencies requires an implementation cache port')
       }
-      if (implResult?.specs && implResult.specs.length > 0) {
-        const entriesToPrime: ImplementationSuggestionSpecEntry[] = []
-        for (const s of implResult.specs) {
-          // No valid stamp available -> do not persist the entry.
-          if (!s.specStamp || (!s.specStamp.lastModified && !s.specStamp.hash)) continue
-          entriesToPrime.push({
-            specId: s.specId,
-            title: s.title,
-            specStamp: s.specStamp,
-            existing: s.existing,
-            suggestions: s.suggestions,
-          })
+
+      let implResult: SuggestImplementationLinksResult | undefined
+      await implCache.withLock(async () => {
+        implResult = await this.deps.suggestImplementationLinks.execute({
+          all: true,
+          apply: false,
+          ...(input.rebuildCache !== undefined ? { rebuildCache: input.rebuildCache } : {}),
+          onProgress: (evt) => input.onProgress?.({ type: 'warmup-progress', event: evt }),
+        })
+        input.onProgress?.({ type: 'warmup-done', totalSpecs: implResult?.specs?.length ?? 0 })
+
+        if (implResult?.specs && implResult.specs.length > 0) {
+          const entriesToPrime: ImplementationSuggestionSpecEntry[] = []
+          for (const s of implResult.specs) {
+            // No valid stamp available -> do not persist the entry.
+            if (!s.specStamp || (!s.specStamp.lastModified && !s.specStamp.hash)) continue
+            entriesToPrime.push({
+              specId: s.specId,
+              title: s.title,
+              specStamp: s.specStamp,
+              existing: s.existing,
+              suggestions: s.suggestions,
+            })
+          }
+          if (entriesToPrime.length > 0) {
+            await implCache.setMany(entriesToPrime)
+            await implCache.flush()
+          }
         }
-        if (entriesToPrime.length > 0) {
-          await implCache.setMany(entriesToPrime)
-          await implCache.flush()
-        }
-      }
+      })
 
       const specDepsCache = this.deps.specDepsCache
       if (specDepsCache === undefined) {
@@ -292,9 +323,10 @@ export class SuggestSpecDependencies {
         await specDepsCache.invalidate()
       }
 
-      // Snapshot the global file-to-spec ownership after warm-up so cached
-      // dependency suggestions can be invalidated when it shifts.
-      const expectedMapFingerprint = await computeFileToSpecFingerprint(implCache)
+      return await specDepsCache.withLock(async () => {
+        // Snapshot the global file-to-spec ownership after warm-up so cached
+        // dependency suggestions can be invalidated when it shifts.
+        const expectedMapFingerprint = await computeFileToSpecFingerprint(implCache)
 
       // Determine target specs
       const targetSpecs: Array<{
@@ -672,72 +704,35 @@ export class SuggestSpecDependencies {
             }
           }
 
-          // Pass 2.6: Transitive Reduction Pass
-          // If recommendation A directly depends on recommendation B (B in directDeps(A)),
-          // then A is the primary spec in the recommendation chain and B is redundant as a direct recommendation.
+          // Pass 2.6: Transitive Reduction Pass via TransitiveReductionEngine
           if (suggestedMap.size > 1) {
-            const specDepsMemo = new Map<string, Set<string>>()
+            const candidateGraph = new Map<string, Set<string>>()
+            candidateGraph.set(target.specId, new Set(suggestedMap.keys()))
 
-            const getDirectDeps = async (sId: string): Promise<Set<string>> => {
-              const cached = specDepsMemo.get(sId)
-              if (cached) return cached
-
+            for (const candidateSpecId of suggestedMap.keys()) {
               const depsSet = new Set<string>()
               try {
-                const persisted = await this.deps.getPersistedDeps.execute({ specId: sId })
+                const persisted = await this.deps.getPersistedDeps.execute({ specId: candidateSpecId })
                 for (const d of persisted.dependsOn) depsSet.add(d)
               } catch {
                 // ignore
               }
-
-              if (depsSet.size === 0) {
-                const parts = sId.includes(':') ? sId.split(':') : ['default', sId]
-                const ws = parts[0] ?? 'default'
-                const p = parts[1] ?? sId
-                const repo = this.deps.specRepositories.get(ws)
-                if (repo) {
-                  try {
-                    const specData = await repo.get(SpecPath.parse(p))
-                    if (specData) {
-                      if (typeof repo.readPersistedState === 'function') {
-                        const state = await repo.readPersistedState(specData)
-                        for (const d of state?.dependsOn ?? []) depsSet.add(d)
-                      }
-                      const specRec = specData as unknown as Record<string, unknown>
-                      const depArr = specRec?.dependsOn
-                      if (Array.isArray(depArr)) {
-                        for (const d of depArr) if (typeof d === 'string') depsSet.add(d)
-                      }
-                    }
-                  } catch {
-                    // ignore
-                  }
-                }
-              }
-
-              specDepsMemo.set(sId, depsSet)
-              return depsSet
+              candidateGraph.set(candidateSpecId, depsSet)
             }
 
-            const candidateList = Array.from(suggestedMap.keys())
+            const reduced = TransitiveReductionEngine.reduce(candidateGraph)
+            const remainingCandidates = new Set(reduced.get(target.specId) ?? [])
 
-            for (const candidateSpecId of candidateList) {
-              for (const parentCandidateId of candidateList) {
-                if (parentCandidateId === candidateSpecId) continue
-                if (!suggestedMap.has(parentCandidateId)) continue
-                const parentDirectDeps = await getDirectDeps(parentCandidateId)
-                if (parentDirectDeps.has(candidateSpecId)) {
-                  Logger.debug(
-                    '[SuggestSpecDependencies] Pruning redundant recommendation covered by parent candidate',
-                    {
-                      targetSpec: target.specId,
-                      prunedCandidate: candidateSpecId,
-                      coveredBy: parentCandidateId,
-                    },
-                  )
-                  suggestedMap.delete(candidateSpecId)
-                  break
-                }
+            for (const candidateSpecId of Array.from(suggestedMap.keys())) {
+              if (!remainingCandidates.has(candidateSpecId)) {
+                Logger.debug(
+                  '[SuggestSpecDependencies] Pruning redundant recommendation via transitive reduction',
+                  {
+                    targetSpec: target.specId,
+                    prunedCandidate: candidateSpecId,
+                  },
+                )
+                suggestedMap.delete(candidateSpecId)
               }
             }
           }
@@ -870,6 +865,7 @@ export class SuggestSpecDependencies {
       return {
         result: 'ok',
         ...(input.workspace ? { targetWorkspace: input.workspace } : {}),
+        codeGraphStale,
         specs: resultSpecs,
         ...(input.apply
           ? {
@@ -881,12 +877,13 @@ export class SuggestSpecDependencies {
           : {}),
         ...(postApplyValidation ? { postApplyValidation } : {}),
       }
-    } finally {
-      if (this.deps.codeGraphProvider && typeof this.deps.codeGraphProvider.close === 'function') {
-        await this.deps.codeGraphProvider.close().catch(() => {})
-      }
+    })
+  } finally {
+    if (this.deps.codeGraphProvider && typeof this.deps.codeGraphProvider.close === 'function') {
+      await this.deps.codeGraphProvider.close().catch(() => {})
     }
   }
+}
 }
 
 /**

@@ -1453,9 +1453,17 @@ export function graphStoreContractTests(
           column: 0,
         })
         const metadata = { stale: true, reason: 'symbol removed' }
+        const logicalSymbol = createLogicalSymbol({
+          workspace: 'test',
+          surface: 'src/auth.ts',
+          name: 'login',
+          space: SymbolSpace.Value,
+          ownerId: undefined,
+          memberForm: undefined,
+        })
         const rel = createRelation({
           source: spec.specId,
-          target: symbol.id,
+          target: logicalSymbol.id,
           type: RelationType.CoversSymbol,
           metadata,
         })
@@ -1473,8 +1481,33 @@ export function graphStoreContractTests(
           ],
           symbols: [symbol],
           specs: [spec],
-          relations: [rel],
+          relations: [],
         })
+        await store.replaceReferenceFacts({
+          logicalSymbols: [logicalSymbol],
+          declarations: [
+            {
+              logicalSymbolId: logicalSymbol.id,
+              declaration: {
+                logicalId: logicalSymbol.id,
+                symbolId: symbol.id,
+                location: {
+                  filePath: symbol.filePath,
+                  line: 1,
+                  column: 0,
+                  endLine: 1,
+                  endColumn: 0,
+                },
+                kind: symbol.kind,
+              },
+            },
+          ],
+          publicBindings: [],
+          localBindings: [],
+          steps: [],
+          coverage: [],
+        })
+        await store.addRelations([rel])
 
         const retrieved = await store.getCoveredSymbols(spec.specId)
         expect(retrieved).toHaveLength(1)
@@ -1509,6 +1542,16 @@ export function graphStoreContractTests(
             workspace: 'root',
           }),
         )
+        const logicalSymbols = symbols.map((symbol, index) =>
+          createLogicalSymbol({
+            workspace: 'root',
+            surface: files[index]!.path,
+            name: symbol.name,
+            space: SymbolSpace.Value,
+            ownerId: undefined,
+            memberForm: undefined,
+          }),
+        )
         await store.bulkLoad({
           files,
           symbols,
@@ -1524,26 +1567,62 @@ export function graphStoreContractTests(
               target: files[0]!.path,
               type: RelationType.CoversFile,
             }),
-            createRelation({
-              source: 'spec:z',
-              target: symbols[0]!.id,
-              type: RelationType.CoversSymbol,
-            }),
-            createRelation({
-              source: 'spec:a',
-              target: symbols[1]!.id,
-              type: RelationType.CoversSymbol,
-            }),
           ],
         })
+        await store.replaceReferenceFacts({
+          logicalSymbols,
+          declarations: symbols.map((symbol, index) => ({
+            logicalSymbolId: logicalSymbols[index]!.id,
+            declaration: {
+              logicalId: logicalSymbols[index]!.id,
+              symbolId: symbol.id,
+              location: {
+                filePath: symbol.filePath,
+                line: 1,
+                column: 0,
+                endLine: 1,
+                endColumn: 0,
+              },
+              kind: symbol.kind,
+            },
+          })),
+          publicBindings: [],
+          localBindings: [],
+          steps: [],
+          coverage: [],
+        })
+        await store.addRelations([
+          createRelation({
+            source: 'spec:z',
+            target: files[1]!.path,
+            type: RelationType.CoversFile,
+          }),
+          createRelation({
+            source: 'spec:a',
+            target: files[0]!.path,
+            type: RelationType.CoversFile,
+          }),
+          createRelation({
+            source: 'spec:z',
+            target: logicalSymbols[0]!.id,
+            type: RelationType.CoversSymbol,
+          }),
+          createRelation({
+            source: 'spec:a',
+            target: logicalSymbols[1]!.id,
+            type: RelationType.CoversSymbol,
+          }),
+        ])
 
         expect(await store.getCoveringSpecsForFiles(files.map((file) => file.path))).toEqual([
           expect.objectContaining({ source: 'spec:a', target: 'root:a.ts' }),
           expect.objectContaining({ source: 'spec:z', target: 'root:b.ts' }),
         ])
-        expect(await store.getCoveringSpecsForSymbols(symbols.map((symbol) => symbol.id))).toEqual([
-          expect.objectContaining({ source: 'spec:a', target: symbols[1]!.id }),
-          expect.objectContaining({ source: 'spec:z', target: symbols[0]!.id }),
+        expect(
+          await store.getCoveringSpecsForSymbols(logicalSymbols.map((symbol) => symbol.id)),
+        ).toEqual([
+          expect.objectContaining({ source: 'spec:a', target: logicalSymbols[1]!.id }),
+          expect.objectContaining({ source: 'spec:z', target: logicalSymbols[0]!.id }),
         ])
         expect(await store.getCoveringSpecsForFiles([])).toEqual([])
         expect(await store.getCoveringSpecsForSymbols([])).toEqual([])

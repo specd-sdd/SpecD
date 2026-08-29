@@ -95,6 +95,10 @@ Directories to remove follow the change directory layout:
 The `unscaffold` operation is idempotent — if a directory does not exist, it
 is silently skipped.
 
+### Requirement: Implementation tracking refresh on spec change
+
+When `specIds` effectively change (`invalidated: true`), if an optional `refreshImplementationTracking` dependency is provided, `EditChange` MUST invoke `refreshImplementationTracking.execute({ name })` to immediately sweep dangling implementation links referencing removed specs.
+
 ### Requirement: Output contract
 
 `EditChange.execute` MUST return an `EditChangeResult` with:
@@ -120,6 +124,7 @@ The config-based `createEditChange(config, options?)` form MUST derive `EditChan
 - `listWorkspaces: ListWorkspaces`
 - `actor: ActorResolver`
 - `schemaProvider: SchemaProvider`
+- `refreshImplementationTracking?: RefreshImplementationTracking`
 
 The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
 

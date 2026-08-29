@@ -11,11 +11,16 @@
   ],
   "implementation": [
     {
-      "file": "core:src/domain/services/build-schema.ts",
-      "symbols": ["buildArtifactType"]
+      "file": "core:src/domain/value-objects/schema.ts",
+      "symbols": ["Schema", "SchemaCompatIdentity", "parseSchemaCompat"]
     },
     {
-      "file": "core:test/domain/services/build-schema.spec.ts"
+      "file": "core:src/infrastructure/schema-yaml-parser.ts",
+      "symbols": ["parseSchemaYaml", "parseSchemaCompat"]
+    },
+    {
+      "file": "core:src/domain/services/build-schema.ts",
+      "symbols": ["buildSchema"]
     }
   ],
   "optimizations": {

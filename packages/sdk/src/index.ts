@@ -6,8 +6,11 @@ export {
   withOpenGraphProvider,
   createSuggestImplementationLinks,
   createSuggestSpecDependencies,
+  createSuggestSpecs,
+  openSuggestSpecs,
   resolveSuggestImplementationLinksDeps,
   resolveSuggestSpecDependenciesDeps,
+  resolveSuggestSpecsDeps,
   type OpenSpecdHostInput,
   type OpenSpecdHostResult,
   type SdkHostContext,
@@ -65,9 +68,52 @@ export {
   type OnSuggestSpecDepsProgress,
 } from './application/use-cases/suggest-spec-dependencies.js'
 
+export {
+  SuggestSpecs,
+  suggestSpecsInputSchema,
+  type SuggestSpecsInput,
+  type SuggestSpecsResult,
+  type SuggestSpecsDeps,
+  type SuggestSpecsProgressEvent,
+  type OnSuggestSpecsProgress,
+} from './application/use-cases/suggest-specs.js'
+
+export {
+  TransitiveReductionEngine,
+} from './domain/services/transitive-reduction-engine.js'
+
+export {
+  SpecSymbolClassifier,
+  type ClassifiedSpecSymbols,
+} from './domain/services/spec-symbol-classifier.js'
+
+export {
+  CapabilityClusteringEngine,
+  type CapabilityAnchor,
+} from './domain/services/capability-clustering-engine.js'
+
+export {
+  ConfidenceScorer,
+  type ConfidenceInputs,
+} from './domain/services/confidence-scorer.js'
+
+export {
+  DependencyInferenceEngine,
+} from './domain/services/dependency-inference-engine.js'
+
+export {
+  type CandidateSpec,
+  type SpecCategory,
+  type ConfidenceBreakdown,
+  type AnchorSymbol,
+  type HotspotSummary,
+  type SpecRationale,
+  type SuggestSpecsSummary,
+} from './domain/value-objects/candidate-spec.js'
+
 export { ImplementationSuggestionCachePort } from './application/ports/implementation-suggestion-cache-port.js'
 export { SpecDepsSuggestionCachePort } from './application/ports/spec-deps-suggestion-cache-port.js'
-export { InvalidProviderLifecycleError } from './domain/errors/index.js'
+export { CacheLockError, InvalidProviderLifecycleError } from './domain/errors/index.js'
 
 export * from './core-reexports.js'
 

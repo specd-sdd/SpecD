@@ -17,7 +17,16 @@ specd specs implementation suggest [<specPath>] [--spec <id>...] [--all] [--work
 - `add` merges `symbols` additively when the file entry already exists.
 - `remove` with `symbols` drops only those names; without `symbols`, removes the whole entry.
 - `suggest` performs static analysis and Code Graph symbol correlation to deduce candidate implementation files and AST symbols.
-- `suggest` extracts symbol and file candidates from Markdown AST using syntax-aware classifiers:
+- **Code Graph Staleness Diagnostics**:
+  - Automatically probes the freshness of the code graph prior to analysis.
+  - In text mode, outputs an advisory warning if the code graph is stale.
+  - In JSON mode (`--json`), includes a top-level `"codeGraphStale": true | false` field indicating whether the underlying graph was stale during analysis.
+- **Multi-Symbol Files**:
+  - When multiple specifications reference the same source file, each specification explicitly claims only its relevant symbols in `spec-lock.json`.
+- **Multi-Artifact Analysis**: Evaluates all artifacts belonging to a specification (`spec.md`, `verify.md`, etc.) in canonical order for comprehensive evidence gathering.
+- **Symbol Ownership Partitioning**: Distinguishes primary symbols belonging to the specification from referenced collaborator types in constructor/method signatures, prioritizing owned symbols for high-confidence link assignment.
+- **Re-Export Filtering**: Distinguishes original code declarations from re-exports, preventing barrel files from being linked as primary implementation targets.
+- **Evidence Extraction**:
   - **Fenced code blocks**: (`+30` score, reason `fenced-code-evidence`) identifier candidates in supported language code blocks.
   - **Inline code**: (`+20` score, reason `inline-code-evidence`) identifier candidates and file paths with supported extensions.
   - **Graph-validated prose**: (`+5` score, reason `prose-symbol-evidence`) prose terms matching symbol naming conventions that resolve to indexed symbols within the target workspace. Unmatched prose terms are discarded.

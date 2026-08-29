@@ -1,0 +1,56 @@
+- op: modified
+  description: 'Update Resolution pipeline verify scenarios to include compat cascading'
+  selector:
+    type: section
+    matches: 'Requirement: Resolution pipeline'
+  content: |
+    #### Scenario: Base schema with no extends, no plugins, no overrides
+    - **GIVEN** a registry with `#base` containing a valid schema YAML with no extends
+    - **WHEN** `ResolveSchema` executes for `#base`
+    - **THEN** it returns the `Schema` entity matching the base schema directly
+
+    #### Scenario: Base schema with extends chain
+    - **GIVEN** `#child` extending `#parent`
+    - **WHEN** `ResolveSchema` executes for `#child`
+    - **THEN** artifacts from `#parent` are inherited and child artifacts override parent artifacts by id
+
+    #### Scenario: Cascades compat across multi-level extends chain
+    - **GIVEN** `#root` with no compat, `#intermediate` extending `#root` with `compat: '@specd/rfc-std@2'`, and `#leaf` extending `#intermediate`
+    - **WHEN** `ResolveSchema` executes for `#leaf`
+    - **THEN** `leaf.compat()` returns `{ name: '@specd/rfc-std', version: 2 }`
+    - **AND** `leaf.canonicalSpecSchema()` returns `{ name: '@specd/rfc-std', version: 2 }`
+
+    #### Scenario: Base schema with plugins
+    - **GIVEN** a base schema and one plugin reference in `schemaPlugins`
+    - **WHEN** `ResolveSchema` executes
+    - **THEN** plugin operations are applied to the base schema
+
+    #### Scenario: Base schema with overrides
+    - **GIVEN** a base schema and `schemaOverrides` defined
+    - **WHEN** `ResolveSchema` executes
+    - **THEN** override operations are applied after plugins
+
+    #### Scenario: Override workflow hooks are normalized from YAML format
+    - **GIVEN** `schemaOverrides` with workflow hook entries in YAML format
+    - **WHEN** `ResolveSchema` executes
+    - **THEN** hook entries are converted to domain format before layer construction
+
+    #### Scenario: Full pipeline — extends + plugins + overrides
+    - **GIVEN** a schema that extends a parent, has plugins, and has overrides
+    - **WHEN** `ResolveSchema` executes
+    - **THEN** layers are applied in order: extends → plugins → overrides
+
+    #### Scenario: Extends cycle detected
+    - **GIVEN** `#a` extends `#b` and `#b` extends `#a`
+    - **WHEN** `ResolveSchema` executes for `#a`
+    - **THEN** it throws `SchemaValidationError`
+
+    #### Scenario: Plugin not found
+    - **GIVEN** a plugin reference that does not exist in the registry
+    - **WHEN** `ResolveSchema` executes
+    - **THEN** it throws `SchemaNotFoundError`
+
+    #### Scenario: Plugin has wrong kind
+    - **GIVEN** a plugin reference that resolves to a file with `kind: schema`
+    - **WHEN** `ResolveSchema` executes
+    - **THEN** it throws `SchemaValidationError`

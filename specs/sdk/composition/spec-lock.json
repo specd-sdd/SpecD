@@ -10,32 +10,47 @@
     "cli:host-context",
     "sdk:context-markdown",
     "sdk:build-implementation-review",
-    "sdk:suggest-implementation-links",
-    "sdk:suggest-spec-dependencies",
     "code-graph:isolated-index-worker"
   ],
   "implementation": [
     {
-      "file": "sdk:src/composition/index.ts"
+      "file": "sdk:src/index.ts",
+      "symbols": [
+        "runIsolatedGraphIndex",
+        "GraphIndexWorkerStartError",
+        "GraphIndexTaskContractError",
+        "GraphIndexTaskExecutionError",
+        "GraphIndexWorkerProtocolError",
+        "GraphIndexWorkerExitError",
+        "GraphIndexWorkerSignalError",
+        "GraphIndexProgressHandlerError"
+      ]
     },
     {
-      "file": "sdk:src/index.ts"
+      "file": "sdk:test/barrel.spec.ts",
+      "symbols": ["@specd/sdk barrel"]
     },
     {
-      "file": "sdk:src/composition/suggest-implementation-links.ts",
-      "symbols": ["createSuggestImplementationLinks", "resolveSuggestImplementationLinksDeps"]
+      "file": "sdk:test/fixtures/publish-shaped-worker-consumer.ts"
     },
     {
-      "file": "sdk:src/composition/suggest-spec-dependencies.ts",
-      "symbols": ["createSuggestSpecDependencies", "resolveSuggestSpecDependenciesDeps"]
+      "file": "sdk:src/composition/with-open-graph-provider.ts",
+      "symbols": ["withOpenGraphProvider"]
     },
     {
-      "file": "sdk:test/composition/package-boundary.spec.ts"
+      "file": "sdk:src/orchestration/run-index-project-graph.ts",
+      "symbols": ["runIndexProjectGraph"]
+    },
+    {
+      "file": "sdk:test/composition/with-open-graph-provider.spec.ts"
+    },
+    {
+      "file": "sdk:test/orchestration/run-index-project-graph.spec.ts"
     }
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "@specd/sdk curates Core and Code Graph host composition, lifecycle, orchestration, presentation, and implementation review without infrastructure.",
+      "value": "Composes curated Core and Code Graph host APIs without exposing infrastructure or delivery dependencies.",
       "schema": {
         "name": "schema-std",
         "version": 1
@@ -43,16 +58,16 @@
       "artifactState": {
         "spec.md": {
           "hash": "sha256:bb6d8dea7d0399966a88e1f26663473659b6d8e079cb0267f81ce8f52cc3cf75",
-          "lastModified": "2026-08-25T15:17:25.409Z"
+          "lastModified": "2026-08-25T14:41:04.175Z"
         },
         "verify.md": {
           "hash": "sha256:4971edf729ed2dd7caad0ff27cd5c41b7a0b572227ad4a1b1c9bb2840320660b",
-          "lastModified": "2026-08-25T15:17:25.409Z"
+          "lastModified": "2026-08-25T15:08:24.392Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# SDK Composition\n\n## Rules\n\n- Package: `packages/sdk/`; workspace `sdk`. Runtime deps only `@specd/core`, `@specd/code-graph`; never CLI, MCP, plugins.\n- Layers MAY include `composition`, `orchestration`, `presentation`, `shared`, `domain`. Domain only SDK errors/value contracts; no entities, ports, adapters. Shared internal/no subpath; named public-barrel exports allowed.\n- `exports[\".\"]` publishes `dist/index.js` + `dist/index.d.ts` from `src/index.ts`; `./ports` re-exports `@specd/core/ports`; `./extensions` re-exports `@specd/core/extensions`.\n- Root barrel explicitly exports SDK composition, context/input/result/options; project status/index orchestration; Markdown presentation; `SDK_VERSION`; `codeGraphVersion`; `getCodeGraphVersion`.\n- Explicit Core exports track public kernel surface: bootstrap, `Kernel`, kernel-equivalent `createX`/repository factories, use-case I/O, entities, errors, metadata materialize/read/regenerate/init, persisted schema/dependency/implementation/optimization use cases and factories.\n- Never export dependency infrastructure/internal symbols, `SaveSpecMetadata`, `UpdateSpecMetadata`, `InvalidateSpecMetadata`, corresponding factories, or `PersistSpecMetadata`.\n- Explicit Code Graph host exports: `runIsolatedGraphIndex` public contracts; `createGetGraphHealth` and I/O; `IndexResult`, `HotspotResult`, `ImpactResult`, `FileImpactResult`; `GraphSpecNotFoundError`; `SymbolKind`, `SearchOptions`, `HotspotOptions`, `RiskLevel`; `normalizeFileSelectorPath`; `createBootstrapGraphConfig`; fingerprint helpers.\n- Never export graph lock APIs/path helpers/release callbacks/tokens or raw worker IPC. Hosts use isolated worker for writes; provider/use cases for reads.\n- Export `buildImplementationReview`, I/O, and required public graph reference/logical-symbol/binding/member/coverage/health/resolver result types.\n- Hosts combining Core+Graph depend/import only `@specd/sdk`; implementation-review hosts never compose packages independently. Core-only packages MAY use Core. Storage implementers MAY use Core or SDK ports/extensions.\n- `SDK_VERSION` equals package version.\n\n## Constraints\n\n- Thin composition/orchestration layer; no duplicated bootstrap or infrastructure.\n- Presentation performs no I/O.\n- Root barrel curated; no wildcard Core export.",
+      "value": "# SDK Composition\n\n## Rules\n\n- `@specd/sdk` lives `packages/sdk/`; runtime deps only `@specd/core`, `@specd/code-graph`; never CLI, MCP, plugins.\n- Source may use composition/orchestration/presentation/shared/domain. Domain limited to SDK errors/values; no entities, ports, adapters. `src/shared/` has no public subpath, though curated barrel may export named required binding.\n- Package exports: `.` built from curated `src/index.ts`; `./ports` re-exports `@specd/core/ports`; `./extensions` re-exports `@specd/core/extensions`.\n- Root explicitly exports SDK composition (`openSpecdHost`, `createSdkContext`, `withOpenGraphProvider` and types), orchestration (`buildProjectStatusSnapshot`, `runIndexProjectGraph`, implementation review and types), presentation, curated Core/Graph APIs, `SDK_VERSION`, `codeGraphVersion`, `getCodeGraphVersion`.\n- Curated Core surface tracks kernel specs, metadata materialize/read/regenerate/init, persisted schema/dependency/implementation/optimization use cases and factories. Never export removed `SaveSpecMetadata`, `UpdateSpecMetadata`, `InvalidateSpecMetadata`, factories, or internal `PersistSpecMetadata`.\n- Host-adapter Graph exports include `runIsolatedGraphIndex` contracts/typed failures, graph health inputs/results/factory, index/hotspot/impact types, `GraphSpecNotFoundError`, symbol/search/risk options, selector/config/fingerprint helpers, reference/logical-symbol/binding/member/coverage/health/resolver types.\n- Never export raw graph locks/tokens/helpers, worker IPC, infrastructure adapters, internal composition, or dependency `./internal` symbols. Hosts use high-level isolated worker for writes and provider/use cases for reads.\n- Hosts needing Core+Graph depend/import only `@specd/sdk`; Core-only plugins/skills may import Core. Storage implementers may use Core/SDK ports and extensions.\n- `SDK_VERSION` matches package version.\n\n## Constraints\n\n- Thin composition/orchestration; no duplicated bootstrap/infrastructure.\n- Presentation performs no I/O.\n- `src/shared/` private; root barrel explicit, never wildcard Core export.",
       "schema": {
         "name": "schema-std",
         "version": 1
@@ -60,11 +75,11 @@
       "artifactState": {
         "spec.md": {
           "hash": "sha256:bb6d8dea7d0399966a88e1f26663473659b6d8e079cb0267f81ce8f52cc3cf75",
-          "lastModified": "2026-08-25T15:17:25.409Z"
+          "lastModified": "2026-08-25T14:41:04.175Z"
         },
         "verify.md": {
           "hash": "sha256:4971edf729ed2dd7caad0ff27cd5c41b7a0b572227ad4a1b1c9bb2840320660b",
-          "lastModified": "2026-08-25T15:17:25.409Z"
+          "lastModified": "2026-08-25T15:08:24.392Z"
         }
       }
     }

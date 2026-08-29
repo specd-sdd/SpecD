@@ -1,0 +1,7 @@
+releases:
+  core:archive-change: patch
+  core:fs-spec-repository: patch
+  core:update-implementation-tracking: patch
+  core:refresh-implementation-tracking: patch
+  core:edit-change: patch
+  core:spec-lock: patch

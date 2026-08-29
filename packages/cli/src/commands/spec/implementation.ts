@@ -250,26 +250,44 @@ Example:
                 ? { confidenceThreshold: effectiveConfidence }
                 : {}),
               ...(opts.rebuildCache !== undefined ? { rebuildCache: opts.rebuildCache } : {}),
-              ...(s
-                ? {
-                    onProgress: (evt) => {
-                      if (evt.type === 'discovery-start') {
-                        s.message('Discovering specifications across workspaces...')
-                      } else if (evt.type === 'start') {
-                        s.message(
-                          `Analyzing implementation links for ${evt.totalSpecs} specification(s)...`,
-                        )
-                      } else if (evt.type === 'spec-start') {
-                        s.message(`[${evt.index}/${evt.totalSpecs}] Analyzing ${evt.specId}...`)
-                      }
-                    },
+              onProgress: (evt) => {
+                if (evt.type === 'stale-warning') {
+                  if (clack && s) {
+                    s.stop('Code graph index is stale')
+                    clack.log.warn('Code graph index is stale. Run \'specd graph index\' for the most up-to-date analysis.')
+                    s.start('Analyzing codebase implementation links...')
+                  } else if (fmt === 'text') {
+                    output('warning: code graph index is stale. Run \'specd graph index\' to update.', 'text')
                   }
-                : {}),
+                } else if (s) {
+                  if (evt.type === 'discovery-start') {
+                    s.message('Discovering specifications across workspaces...')
+                  } else if (evt.type === 'start') {
+                    s.message(
+                      `Analyzing implementation links for ${evt.totalSpecs} specification(s)...`,
+                    )
+                  } else if (evt.type === 'spec-start') {
+                    s.message(`[${evt.index}/${evt.totalSpecs}] Analyzing ${evt.specId}...`)
+                  }
+                }
+              },
             })
             if (s) {
               s.stop('Implementation link analysis complete')
             }
           } catch (err) {
+            if ((err as { code?: string })?.code === 'CACHE_LOCKED') {
+              if (s) {
+                s.stop('Suggestion cache is busy')
+              }
+              if (clack) {
+                clack.log.info(
+                  'The suggestion cache is currently in use by another process. Please wait for the other process to finish and try again.',
+                )
+                clack.outro('Command ended.')
+                process.exit(1)
+              }
+            }
             if (s) {
               s.stop('Implementation link analysis failed', 1)
             }

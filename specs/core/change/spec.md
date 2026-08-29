@@ -138,6 +138,17 @@ The `Change` entity SHALL expose whether the change has ever entered `implementi
 
 Lifecycle use cases use this historical fact to decide when demand-driven implementation autodetection is meaningful. The `Change` entity itself does not perform implementation detection.
 
+### Requirement: Explicit implementation tracking activation
+
+A `Change` SHALL expose explicit implementation tracking activation state and baseline timing.
+
+The `Change` entity MUST:
+
+- maintain an `implementationTrackingStartedAt: Date | null` property
+- expose `isImplementationTrackingActive: boolean` returning `true` when `implementationTrackingStartedAt` is not `null`
+- provide `startImplementationTracking(at?: Date): void` to record tracking commencement
+- ensure `startImplementationTracking` is idempotent: calling it when tracking is already active MUST preserve the initial `implementationTrackingStartedAt` timestamp
+
 ### Requirement: Spec approval gate
 
 When `approvals.spec: true`, the transition from `ready` to `implementing` is blocked. The change must first transition to `pending-spec-approval`, receive an explicit approval (approver identity, reason, artifact hashes), and then transition to `spec-approved` before `implementing` becomes reachable.

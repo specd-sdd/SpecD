@@ -41,9 +41,9 @@ export class VcsImplementationDetector implements ImplementationDetector {
     change: Change,
     options?: ImplementationDetectorOptions,
   ): Promise<readonly string[]> {
-    const historicalAt = change.getHistoricalImplementationAt()
-    if (historicalAt === null) {
-      Logger.debug('Skipping implementation detection without historical implementing state', {
+    const startedAt = change.implementationTrackingStartedAt
+    if (startedAt === null) {
+      Logger.debug('Skipping implementation detection when tracking is inactive', {
         change: change.name,
       })
       return []
@@ -51,15 +51,15 @@ export class VcsImplementationDetector implements ImplementationDetector {
 
     Logger.debug('Starting VCS-backed implementation detection', {
       change: change.name,
-      historicalAt: historicalAt.toISOString(),
+      startedAt: startedAt.toISOString(),
     })
 
     const vcs = await this._resolveVcs()
-    const baseRef = await this._resolveBaseRef(vcs, historicalAt)
+    const baseRef = await this._resolveBaseRef(vcs, startedAt)
     if (baseRef === null) {
       Logger.debug('Skipping implementation detection because no baseline ref could be resolved', {
         change: change.name,
-        historicalAt: historicalAt.toISOString(),
+        startedAt: startedAt.toISOString(),
       })
       return []
     }

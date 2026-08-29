@@ -142,6 +142,23 @@
 - **WHEN** `readPersistedState(spec)` or `writePersistedState(spec, state, options)` is called
 - **THEN** `ReadOnlyWorkspaceError` is thrown before any I/O, consistent with `save()`
 
+### Requirement: Reject publication of empty spec directories
+
+#### Scenario: Publish rejects new spec directory when artifacts list is empty
+
+- **GIVEN** a spec publication request for a new spec whose directory does not exist
+- **AND** `publication.artifacts` is empty
+- **WHEN** `FsSpecRepository.publish()` is called
+- **THEN** it throws `SpecPublicationError`
+
+#### Scenario: Publish allows existing spec directory with empty artifacts list
+
+- **GIVEN** a spec publication request for an existing spec directory on disk
+- **AND** `publication.artifacts` is empty
+- **AND** `publication.persistedState` contains updated lock state
+- **WHEN** `FsSpecRepository.publish()` is called
+- **THEN** the persisted lock state is updated successfully
+
 ### Requirement: Metadata snapshot persistence
 
 #### Scenario: readMetadataSnapshot reports missing, invalid, and present persistence kinds only

@@ -269,40 +269,58 @@ Example:
                 ? { createAlignmentChange: opts.createChange }
                 : {}),
               ...(opts.rebuildCache !== undefined ? { rebuildCache: opts.rebuildCache } : {}),
-              ...(s
-                ? {
-                    onProgress: (evt) => {
-                      if (evt.type === 'warmup-start') {
-                        s.message('Warming up implementation cache across workspaces...')
-                      } else if (
-                        evt.type === 'warmup-progress' &&
-                        evt.event.type === 'discovery-start'
-                      ) {
-                        s.message('Discovering specifications across workspaces...')
-                      } else if (
-                        evt.type === 'warmup-progress' &&
-                        evt.event.type === 'spec-start'
-                      ) {
-                        s.message(
-                          `[${evt.event.index}/${evt.event.totalSpecs}] Warming cache: ${evt.event.specId}...`,
-                        )
-                      } else if (evt.type === 'start') {
-                        s.message(`Tracing dependencies for ${evt.totalSpecs} specification(s)...`)
-                      } else if (evt.type === 'spec-start') {
-                        s.message(
-                          `[${evt.index}/${evt.totalSpecs}] Tracing dependencies: ${evt.specId}...`,
-                        )
-                      } else if (evt.type === 'validation-start') {
-                        s.message('Validating specifications consistency...')
-                      }
-                    },
+              onProgress: (evt) => {
+                if (evt.type === 'stale-warning') {
+                  if (clack && s) {
+                    s.stop('Code graph index is stale')
+                    clack.log.warn('Code graph index is stale. Run \'specd graph index\' for the most up-to-date analysis.')
+                    s.start('Analyzing specification dependencies...')
+                  } else if (fmt === 'text') {
+                    output('warning: code graph index is stale. Run \'specd graph index\' to update.', 'text')
                   }
-                : {}),
+                } else if (s) {
+                  if (evt.type === 'warmup-start') {
+                    s.message('Warming up implementation cache across workspaces...')
+                  } else if (
+                    evt.type === 'warmup-progress' &&
+                    evt.event.type === 'discovery-start'
+                  ) {
+                    s.message('Discovering specifications across workspaces...')
+                  } else if (
+                    evt.type === 'warmup-progress' &&
+                    evt.event.type === 'spec-start'
+                  ) {
+                    s.message(
+                      `[${evt.event.index}/${evt.event.totalSpecs}] Warming cache: ${evt.event.specId}...`,
+                    )
+                  } else if (evt.type === 'start') {
+                    s.message(`Tracing dependencies for ${evt.totalSpecs} specification(s)...`)
+                  } else if (evt.type === 'spec-start') {
+                    s.message(
+                      `[${evt.index}/${evt.totalSpecs}] Tracing dependencies: ${evt.specId}...`,
+                    )
+                  } else if (evt.type === 'validation-start') {
+                    s.message('Validating specifications consistency...')
+                  }
+                }
+              },
             })
             if (s) {
               s.stop('Dependency analysis complete')
             }
           } catch (err) {
+            if ((err as { code?: string })?.code === 'CACHE_LOCKED') {
+              if (s) {
+                s.stop('Suggestion cache is busy')
+              }
+              if (clack) {
+                clack.log.info(
+                  'The suggestion cache is currently in use by another process. Please wait for the other process to finish and try again.',
+                )
+                clack.outro('Command ended.')
+                process.exit(1)
+              }
+            }
             if (s) {
               s.stop('Dependency analysis failed', 1)
             }

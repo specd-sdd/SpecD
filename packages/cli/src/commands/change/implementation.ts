@@ -39,6 +39,19 @@ export function registerChangeImplementation(parent: Command): void {
     })
 
   command
+    .command('start <name>')
+    .description('Explicitly activate implementation tracking for a change.')
+    .option('--format <fmt>', 'output format: text|json|toon', 'text')
+    .option('--config <path>', 'path to specd.yaml')
+    .action(async (name: string, opts: { format: string; config?: string }) => {
+      await mutateImplementationTracking(name, {
+        action: 'start',
+        format: opts.format,
+        ...(opts.config !== undefined ? { config: opts.config } : {}),
+      })
+    })
+
+  command
     .command('add <name>')
     .description('Add or enrich a confirmed implementation link. Validates file existence on disk.')
     .requiredOption('--spec <id>', 'target spec id')
@@ -256,8 +269,8 @@ async function renderImplementationState(
 async function mutateImplementationTracking(
   name: string,
   input: {
-    action: 'add' | 'remove' | 'ignore' | 'resolve' | 'unresolve'
-    files: string[]
+    action: 'add' | 'remove' | 'ignore' | 'resolve' | 'unresolve' | 'start'
+    files?: string[]
     specId?: string
     symbols?: readonly string[]
     format: string
@@ -267,12 +280,17 @@ async function mutateImplementationTracking(
   try {
     const { kernel } = await resolveCliContext({ configPath: input.config })
 
-    const expandedFiles = input.files.flatMap((f) => f.split(',').map((p) => p.trim()))
-
-    const primaryFile = expandedFiles[0]
-    if (primaryFile === undefined) return
-    const lastResult: UpdateImplementationTrackingResult =
-      await kernel.changes.updateImplementationTracking.execute({
+    let lastResult: UpdateImplementationTrackingResult
+    if (input.action === 'start') {
+      lastResult = await kernel.changes.updateImplementationTracking.execute({
+        name,
+        action: 'start',
+      })
+    } else {
+      const expandedFiles = (input.files ?? []).flatMap((f) => f.split(',').map((p) => p.trim()))
+      const primaryFile = expandedFiles[0]
+      if (primaryFile === undefined) return
+      lastResult = await kernel.changes.updateImplementationTracking.execute({
         name,
         action: input.action,
         file: primaryFile,
@@ -282,10 +300,15 @@ async function mutateImplementationTracking(
           ? { symbols: input.symbols }
           : {}),
       })
+    }
 
     const fmt = parseFormat(input.format)
     if (fmt === 'text') {
-      output(`updated implementation tracking for ${name} (${input.action})`, 'text')
+      if (input.action === 'start') {
+        output(`✓ Implementation tracking is active for '${name}'.`, 'text')
+      } else {
+        output(`updated implementation tracking for ${name} (${input.action})`, 'text')
+      }
       return
     }
     output(

@@ -95,6 +95,7 @@ function overlayData(parent: SchemaYamlData, child: SchemaYamlData): SchemaYamlD
     version: child.version,
     description: child.description ?? parent.description,
     extends: child.extends,
+    compat: child.compat ?? parent.compat,
     artifacts: mergeArtifactArrays(parent.artifacts, child.artifacts),
     workflow: mergeWorkflowArrays(parent.workflow, child.workflow),
     metadataExtraction: child.metadataExtraction ?? parent.metadataExtraction,

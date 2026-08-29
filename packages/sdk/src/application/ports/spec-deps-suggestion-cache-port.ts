@@ -75,4 +75,16 @@ export abstract class SpecDepsSuggestionCachePort {
    * Invalidates and clears the spec dependencies suggestion cache.
    */
   abstract invalidate(): Promise<void>
+
+  /**
+   * Executes an asynchronous operation while holding an exclusive lock on the cache.
+   *
+   * Default implementation in base class executes the callback directly.
+   * Filesystem adapters override this to hold an exclusive kernel-level file lock.
+   *
+   * @param fn - The async operation to execute while the lock is held
+   */
+  async withLock<T>(fn: () => Promise<T>): Promise<T> {
+    return await fn()
+  }
 }

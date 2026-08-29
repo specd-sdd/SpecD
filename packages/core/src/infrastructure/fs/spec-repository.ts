@@ -440,6 +440,13 @@ export class FsSpecRepository extends SpecRepository {
     const backupDir = path.join(parentDir, `${dirName}.backup-${randomUUID()}`)
     const specId = `${this.workspace()}:${spec.name.toString()}`
     const specDirExists = await pathExists(specDir)
+    if (!specDirExists && publication.artifacts.length === 0) {
+      throw new SpecPublicationError(
+        specId,
+        stagingDir,
+        `Cannot publish spec "${specId}" because no artifacts were provided for a new spec.`,
+      )
+    }
 
     await fs.mkdir(parentDir, { recursive: true })
     if (specDirExists) {

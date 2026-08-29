@@ -82,7 +82,8 @@ export class InitializePersistedSpecState {
     input: InitializePersistedSpecStateInput,
   ): Promise<InitializePersistedSpecStateResult> {
     const schema = await this._resolveSchema(input.schemaRef)
-    const schemaIdentity = { name: schema.name(), version: schema.version() }
+    const canonical = schema.canonicalSpecSchema()
+    const schemaIdentity = { name: canonical.name, version: canonical.version }
 
     if (input.target.kind === 'spec') {
       const initialized = await this._initializeOne(input.target.specId, schema, schemaIdentity)

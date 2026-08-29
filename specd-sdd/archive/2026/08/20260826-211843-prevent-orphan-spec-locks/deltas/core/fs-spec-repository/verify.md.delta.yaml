@@ -1,0 +1,26 @@
+- op: added
+  description: 'Add scenarios for empty spec publication rejection and existing spec publication allowance'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Aggregate persisted-state operations and canonical lock serialization'
+  content: |
+    ### Requirement: Reject publication of empty spec directories
+
+    #### Scenario: Publish rejects new spec directory when artifacts list is empty
+
+    - **GIVEN** a spec publication request for a new spec whose directory does not exist
+    - **AND** `publication.artifacts` is empty
+    - **WHEN** `FsSpecRepository.publish()` is called
+    - **THEN** it throws `SpecPublicationError`
+
+    #### Scenario: Publish allows existing spec directory with empty artifacts list
+
+    - **GIVEN** a spec publication request for an existing spec directory on disk
+    - **AND** `publication.artifacts` is empty
+    - **AND** `publication.persistedState` contains updated lock state
+    - **WHEN** `FsSpecRepository.publish()` is called
+    - **THEN** the persisted lock state is updated successfully

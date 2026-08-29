@@ -36,6 +36,7 @@ export interface SchemaOperations {
 
 /** Targets for remove operations. */
 export interface RemoveTargets {
+  readonly compat?: null
   readonly artifacts?: readonly RemoveArtifactEntry[]
   readonly workflow?: readonly RemoveWorkflowEntry[]
   readonly metadataExtraction?: RemoveMetadataExtractionEntry
@@ -98,6 +99,7 @@ export interface SetTargets {
   readonly name?: string
   readonly version?: number
   readonly description?: string
+  readonly compat?: string | { readonly name: string; readonly version?: number }
   readonly artifacts?: readonly Partial<ArtifactYamlData>[]
   readonly workflow?: readonly Partial<WorkflowStep>[]
 }
@@ -747,6 +749,12 @@ function applyLayer(data: SchemaYamlData, layer: SchemaLayer): SchemaYamlData {
         ),
       }
     }
+    if (ops.remove.compat === null) {
+      result = {
+        ...result,
+        compat: undefined,
+      }
+    }
   }
 
   // 2. Create
@@ -875,6 +883,7 @@ function applyLayer(data: SchemaYamlData, layer: SchemaLayer): SchemaYamlData {
     if (ops.set.name !== undefined) result = { ...result, name: ops.set.name }
     if (ops.set.version !== undefined) result = { ...result, version: ops.set.version }
     if (ops.set.description !== undefined) result = { ...result, description: ops.set.description }
+    if (ops.set.compat !== undefined) result = { ...result, compat: ops.set.compat }
 
     // Array entry in-place replacement
     if (ops.set.artifacts) {

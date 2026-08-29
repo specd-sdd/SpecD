@@ -1,0 +1,31 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Input contract'
+  content: |
+    `UpdateImplementationTracking.execute` SHALL accept:
+
+    - `name` — change name
+    - `action` — one of `add`, `remove`, `ignore`, `resolve`, `unresolve`, or `start`
+    - `file` — optional raw project-relative file path (required for `add`, `remove`, `ignore`, `resolve`, and `unresolve`; optional for `start`)
+    - `specId` — optional canonical spec ID for link mutations
+    - `symbols` — optional symbol refinements for link mutations
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Ignore mutation preserves tracked history'
+  content: |
+    ### Requirement: Start mutation activates implementation tracking
+
+    When `action = start`, the use case SHALL activate implementation tracking for the change.
+
+    It MUST:
+
+    - invoke `Change.startImplementationTracking()` within the mutation boundary
+    - succeed idempotently if implementation tracking is already active
+    - not require a `file` path or `specId`

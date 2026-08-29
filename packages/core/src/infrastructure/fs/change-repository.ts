@@ -1505,6 +1505,14 @@ export class FsChangeRepository extends ChangeRepository {
         ? { invalidationPolicy: manifest.invalidationPolicy }
         : {}),
       explorationMeta,
+      ...(manifest.implementationTrackingStartedAt !== undefined
+        ? {
+            implementationTrackingStartedAt:
+              manifest.implementationTrackingStartedAt !== null
+                ? new Date(manifest.implementationTrackingStartedAt)
+                : null,
+          }
+        : {}),
     })
 
     // Sync artifacts against schema to reconcile with current artifact types and specIds.
@@ -1734,6 +1742,9 @@ function changeToManifest(change: Change): ChangeManifest {
     specIds: [...change.specIds],
     ...(Object.keys(specDependsOn).length > 0 ? { specDependsOn } : {}),
     invalidationPolicy: change.invalidationPolicy,
+    ...(change.implementationTrackingStartedAt !== null
+      ? { implementationTrackingStartedAt: change.implementationTrackingStartedAt.toISOString() }
+      : {}),
     ...(trackedImplementationFiles.length > 0 ? { trackedImplementationFiles } : {}),
     ...(implementationLinks.length > 0 ? { implementationLinks } : {}),
     artifacts: [...change.artifacts.values()].map(serializeArtifact),

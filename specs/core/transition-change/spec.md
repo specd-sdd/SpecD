@@ -149,6 +149,12 @@ After routing, pre-transition checks, and successful pre-hooks, the use case MUS
 
 After a successful state transition, the use case MUST emit a `transitioned` progress event with `from` and `to` states.
 
+### Requirement: Automatic implementation tracking activation on transition to implementing
+
+When transitioning to `implementing` (`effectiveTarget === 'implementing'`), `TransitionChange` MUST verify whether implementation tracking is active on the change.
+
+If `!change.isImplementationTrackingActive`, the use case MUST call `change.startImplementationTracking()` within the same mutation boundary to activate implementation tracking and record the transition timestamp as the baseline.
+
 ### Requirement: Post-hook execution
 
 **Before** the state transition (and before pre-hooks), when `'all'` and `'source.post'` are both absent from `skipHookPhases`, the use case MUST look up the workflow step for the **source state** (`fromState`) via `schema.workflowStep(fromState)`. If the step has `run:` post-hooks, the use case MUST execute them via `RunStepHooks.execute({ name, step: fromState, phase: 'post' })`. It MUST emit `hook-start` and `hook-done` progress events (with `phase: 'post'`) for each hook. If any post-hook fails, the use case MUST throw `HookFailedError` — no state transition occurs.

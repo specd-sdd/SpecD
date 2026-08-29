@@ -706,6 +706,8 @@ export function makeSchema(
     | ArtifactType[]
     | {
         name?: string
+        version?: number
+        compat?: import('../../../src/domain/value-objects/schema.js').SchemaCompatIdentity
         artifacts?: ArtifactType[]
         workflow?: WorkflowStep[]
         metadataExtraction?: MetadataExtraction
@@ -714,6 +716,8 @@ export function makeSchema(
   workflow: WorkflowStep[] = [],
   overrides: {
     name?: string
+    version?: number
+    compat?: import('../../../src/domain/value-objects/schema.js').SchemaCompatIdentity
     metadataExtraction?: MetadataExtraction
     crossArtifactValidations?: import('../../../src/domain/value-objects/cross-artifact-validation.js').CrossArtifactValidationRule[]
   } = {},
@@ -722,21 +726,25 @@ export function makeSchema(
     return new Schema(
       'schema',
       overrides.name ?? 'test-schema',
-      1,
+      overrides.version ?? 1,
       artifactsOrOpts,
       workflow,
       overrides.metadataExtraction,
       overrides.crossArtifactValidations ?? [],
+      undefined,
+      overrides.compat,
     )
   }
   return new Schema(
     'schema',
     artifactsOrOpts.name ?? 'test-schema',
-    1,
+    artifactsOrOpts.version ?? 1,
     artifactsOrOpts.artifacts ?? [],
     artifactsOrOpts.workflow ?? [],
     artifactsOrOpts.metadataExtraction,
     artifactsOrOpts.crossArtifactValidations ?? [],
+    undefined,
+    artifactsOrOpts.compat,
   )
 }
 

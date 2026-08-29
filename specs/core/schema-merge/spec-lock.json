@@ -4,7 +4,12 @@
     "version": 1
   },
   "dependsOn": ["core:schema-format", "core:build-schema", "default:_global/architecture"],
-  "implementation": [],
+  "implementation": [
+    {
+      "file": "core:src/domain/services/merge-schema-layers.ts",
+      "symbols": ["mergeSchemaLayers"]
+    }
+  ],
   "optimizations": {
     "optimizedDescription": {
       "value": "mergeSchemaLayers aplica herencia, plugins y overrides a SchemaYamlData de forma pura, ordenada y validada.",

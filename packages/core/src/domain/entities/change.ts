@@ -213,6 +213,8 @@ export interface ChangeProps {
   readonly implementationLinks?: readonly ImplementationLink[]
   /** Cheap metadata indicating whether lazily loaded exploration content exists. */
   readonly explorationMeta?: ExplorationMeta | null
+  /** Timestamp when implementation tracking commenced, or null/undefined if inactive. */
+  readonly implementationTrackingStartedAt?: Date | null
 }
 
 /** Cheap observation metadata for optional exploration content. */
@@ -271,6 +273,7 @@ export class Change {
   private _trackedImplementationFiles: Map<string, TrackedImplementationFileState>
   private _implementationLinks: Map<string, ImplementationLink>
   private readonly _explorationMeta: ExplorationMeta | null
+  private _implementationTrackingStartedAt: Date | null
 
   /**
    * Creates a new `Change` from the given properties.
@@ -315,6 +318,14 @@ export class Change {
       }
     }
     this._explorationMeta = props.explorationMeta ?? null
+    if (props.implementationTrackingStartedAt !== undefined) {
+      this._implementationTrackingStartedAt =
+        props.implementationTrackingStartedAt !== null
+          ? new Date(props.implementationTrackingStartedAt.getTime())
+          : null
+    } else {
+      this._implementationTrackingStartedAt = this.getHistoricalImplementationAt()
+    }
   }
 
   /** Unique slug name identifying this change. */
@@ -425,6 +436,18 @@ export class Change {
     return this.getHistoricalImplementationAt() !== null
   }
 
+  /** Timestamp when implementation tracking started, or null if inactive. */
+  get implementationTrackingStartedAt(): Date | null {
+    return this._implementationTrackingStartedAt !== null
+      ? new Date(this._implementationTrackingStartedAt.getTime())
+      : null
+  }
+
+  /** Whether implementation tracking is currently active for this change. */
+  get isImplementationTrackingActive(): boolean {
+    return this._implementationTrackingStartedAt !== null
+  }
+
   /** Tracked implementation files under review for the active change. */
   get trackedImplementationFiles(): readonly TrackedImplementationFile[] {
     return [...this._trackedImplementationFiles.entries()].map(([file, state]) => ({ file, state }))
@@ -502,6 +525,21 @@ export class Change {
   /** Updates the persisted invalidation policy. Does NOT trigger invalidation. */
   set invalidationPolicy(policy: InvalidationPolicy) {
     this._invalidationPolicy = policy
+  }
+
+  /**
+   * Activates implementation tracking for this change.
+   *
+   * If tracking is already active, this call is idempotent and preserves the
+   * existing `implementationTrackingStartedAt` timestamp.
+   *
+   * @param at - The timestamp to record as the start baseline (defaults to now)
+   */
+  startImplementationTracking(at: Date = new Date()): void {
+    if (this._implementationTrackingStartedAt === null) {
+      this._implementationTrackingStartedAt = new Date(at.getTime())
+      this.touchUpdatedAt(at)
+    }
   }
 
   /**
@@ -685,7 +723,11 @@ export class Change {
     if (!isValidTransition(from, to)) {
       throw new InvalidStateTransitionError(from, to)
     }
-    this._history.push({ type: 'transitioned', from, to, at: new Date(), by: actor })
+    const now = new Date()
+    this._history.push({ type: 'transitioned', from, to, at: now, by: actor })
+    if (to === 'implementing' && this._implementationTrackingStartedAt === null) {
+      this._implementationTrackingStartedAt = new Date(now.getTime())
+    }
   }
 
   /**

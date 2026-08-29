@@ -18,3 +18,8 @@ export {
   createSuggestSpecDependencies,
   resolveSuggestSpecDependenciesDeps,
 } from './suggest-spec-dependencies.js'
+export {
+  createSuggestSpecs,
+  openSuggestSpecs,
+  resolveSuggestSpecsDeps,
+} from './suggest-specs.js'

@@ -12,19 +12,8 @@
   ],
   "implementation": [
     {
-      "file": "cli:src/commands/change/_implementation-tracking.ts"
-    },
-    {
-      "file": "cli:src/commands/change/implementation.ts"
-    },
-    {
-      "file": "cli:test/commands/change-implementation-tracking.spec.ts"
-    },
-    {
-      "file": "cli:test/commands/change-implementation.spec.ts"
-    },
-    {
-      "file": "cli:test/commands/change-implementation-review-integration.spec.ts"
+      "file": "cli:src/commands/change/implementation.ts",
+      "symbols": ["registerChangeImplementation"]
     }
   ],
   "optimizations": {

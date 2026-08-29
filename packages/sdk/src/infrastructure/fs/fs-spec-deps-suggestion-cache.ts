@@ -1,12 +1,12 @@
 import { readFile, unlink } from 'node:fs/promises'
-import { writeJsonAtomic } from './write-json-atomic.js'
+import { withCacheFileLock, writeJsonAtomic } from './write-json-atomic.js'
 import {
   decideFreshness,
   enrichSpecHash,
   readSpecStamp,
   timestampFallback,
 } from './spec-stamp-source.js'
-import { isAbsolute, join } from 'node:path'
+import { dirname, isAbsolute, join } from 'node:path'
 import {
   SpecDepsSuggestionCachePort,
   type SpecDepsSuggestionCachePortDeps,
@@ -56,15 +56,17 @@ export class FsSpecDepsSuggestionCache extends SpecDepsSuggestionCachePort {
     if (typeof optionsOrProjectDir === 'string') {
       super({})
       this.projectDir = optionsOrProjectDir
-      const baseDir = isAbsolute(configPath) ? configPath : join(optionsOrProjectDir, configPath)
+      const raw = isAbsolute(configPath) ? configPath : join(optionsOrProjectDir, configPath)
+      const baseDir = raw.endsWith('.yaml') || raw.endsWith('.yml') || raw.endsWith('.json') ? dirname(raw) : raw
       this.cachePath = join(baseDir, 'tmp', 'fs-cache', 'spec-deps-suggestions', 'suggestions.json')
     } else {
       super(optionsOrProjectDir)
       this.projectDir = optionsOrProjectDir.projectDir
       const effectiveConfig = optionsOrProjectDir.configPath ?? '.specd'
-      const baseDir = isAbsolute(effectiveConfig)
+      const raw = isAbsolute(effectiveConfig)
         ? effectiveConfig
         : join(optionsOrProjectDir.projectDir, effectiveConfig)
+      const baseDir = raw.endsWith('.yaml') || raw.endsWith('.yml') || raw.endsWith('.json') ? dirname(raw) : raw
       this.cachePath = join(baseDir, 'tmp', 'fs-cache', 'spec-deps-suggestions', 'suggestions.json')
     }
   }
@@ -265,31 +267,60 @@ export class FsSpecDepsSuggestionCache extends SpecDepsSuggestionCachePort {
       return
     }
 
-    const specsRecord: Record<string, SpecDepsSuggestionSpecEntry> = {}
-    for (const [specId, entry] of this._data.entries()) {
-      specsRecord[specId] = entry
-    }
+    await withCacheFileLock(`${this.cachePath}.lock`, async () => {
+      let specsRecord: Record<string, SpecDepsSuggestionSpecEntry> = {}
+      try {
+        const diskContent = await readFile(this.cachePath, 'utf-8')
+        const diskParsed = JSON.parse(diskContent) as SpecDepsSuggestionsCacheFile
+        if (
+          diskParsed &&
+          diskParsed.header &&
+          diskParsed.header.cacheVersion === SPEC_DEPS_CACHE_VERSION &&
+          typeof diskParsed.specs === 'object'
+        ) {
+          specsRecord = { ...diskParsed.specs }
+        }
+      } catch {
+        // Disk file missing or unparseable - start fresh
+      }
 
-    const { fingerprint, lastIndexedAt } = await this.getGraphFingerprint()
+      for (const [specId, entry] of this._data!.entries()) {
+        specsRecord[specId] = entry
+      }
 
-    const header: SpecDepsSuggestionCacheHeader = this._header ?? {
-      updatedAt: new Date().toISOString(),
-      projectDir: this.projectDir,
-      cacheVersion: SPEC_DEPS_CACHE_VERSION,
-      graphLastIndexedAt: lastIndexedAt,
-      graphFingerprint: fingerprint,
-    }
+      const { fingerprint, lastIndexedAt } = await this.getGraphFingerprint()
 
-    const filePayload: SpecDepsSuggestionsCacheFile = {
-      header: {
-        ...header,
+      const header: SpecDepsSuggestionCacheHeader = this._header ?? {
         updatedAt: new Date().toISOString(),
-      },
-      specs: specsRecord,
-    }
+        projectDir: this.projectDir,
+        cacheVersion: SPEC_DEPS_CACHE_VERSION,
+        graphLastIndexedAt: lastIndexedAt,
+        graphFingerprint: fingerprint,
+      }
 
-    await writeJsonAtomic(this.cachePath, JSON.stringify(filePayload, null, 2))
+      const filePayload: SpecDepsSuggestionsCacheFile = {
+        header: {
+          ...header,
+          updatedAt: new Date().toISOString(),
+        },
+        specs: specsRecord,
+      }
+
+      await writeJsonAtomic(this.cachePath, JSON.stringify(filePayload, null, 2))
+    })
     this._isDirty = false
+  }
+
+  /** @inheritdoc */
+  override async withLock<T>(fn: () => Promise<T>): Promise<T> {
+    return await withCacheFileLock(`${this.cachePath}.lock`, async () => {
+      this._generation += 1
+      this._data = null
+      this._header = null
+      this._isDirty = false
+      await this.ensureLoaded()
+      return await fn()
+    })
   }
 
   /** @inheritdoc */

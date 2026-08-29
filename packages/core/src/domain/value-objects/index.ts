@@ -48,6 +48,6 @@ export {
   type ArtifactRules,
 } from './artifact-type.js'
 export { ArtifactDag, artifactDagFromChangeArtifacts } from './artifact-dag.js'
-export { Schema, type SchemaKind } from './schema.js'
+export { Schema, type SchemaKind, type SchemaCompatIdentity, parseSchemaCompat } from './schema.js'
 export { OverlapEntry, type OverlapChange } from './overlap-entry.js'
 export { OverlapReport } from './overlap-report.js'
