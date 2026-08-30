@@ -225,14 +225,49 @@ export function wrapForClack(text: string, maxWidth?: number): string {
       for (const word of words) {
         if (!word) continue
         const isLineStart = current === leadingSpaces || current === continuationPrefix
+        const maxAvailable = Math.max(10, width - stripAnsi(current).length - 4)
 
         if (isLineStart) {
-          current += word
+          if (stripAnsi(word).length > maxAvailable && !/^\s+$/.test(word)) {
+            const chunks = word.split(/([/,.-])/).filter(Boolean)
+            for (const chunk of chunks) {
+              const chunkLen = stripAnsi(chunk).length
+              const curLen = stripAnsi(current).length
+              if (curLen === leadingSpaces.length || curLen === continuationPrefix.length) {
+                current += chunk
+              } else if (curLen + chunkLen + 4 <= width) {
+                current += chunk
+              } else {
+                wrapped.push(current + ' ...')
+                current = continuationPrefix + chunk
+              }
+            }
+          } else {
+            current += word
+          }
         } else if (stripAnsi(current).length + 1 + stripAnsi(word).length + 4 <= width) {
           current += ' ' + word
         } else {
           wrapped.push(current + ' ...')
-          current = continuationPrefix + word
+          const continuationMax = Math.max(10, width - continuationPrefix.length - 4)
+          if (stripAnsi(word).length > continuationMax) {
+            const chunks = word.split(/([/,.-])/).filter(Boolean)
+            current = continuationPrefix
+            for (const chunk of chunks) {
+              const chunkLen = stripAnsi(chunk).length
+              const curLen = stripAnsi(current).length
+              if (curLen === continuationPrefix.length) {
+                current += chunk
+              } else if (curLen + chunkLen + 4 <= width) {
+                current += chunk
+              } else {
+                wrapped.push(current + ' ...')
+                current = continuationPrefix + chunk
+              }
+            }
+          } else {
+            current = continuationPrefix + word
+          }
         }
       }
 

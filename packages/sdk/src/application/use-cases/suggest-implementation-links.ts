@@ -87,6 +87,7 @@ export type SuggestImplementationProgressEvent =
   | { type: 'start'; totalSpecs: number }
   | { type: 'spec-start'; specId: string; index: number; totalSpecs: number }
   | { type: 'spec-done'; specId: string; candidatesCount: number }
+  | { type: 'spec-error'; specId: string; error: string }
   | { type: 'done'; totalSpecs: number; totalSuggestions: number }
 
 /** Callback invoked with progress events during suggestion analysis. */
@@ -263,14 +264,22 @@ export class SuggestImplementationLinks {
     }
 
     let codeGraphStale = false
-    if (codeGraphProvider && typeof (codeGraphProvider as any).getGraphHealth === 'function') {
+    const graphHealthProvider = codeGraphProvider as unknown as {
+      getGraphHealth?: () => Promise<{
+        stale?: boolean
+        state?: string
+        knownStaleSinceLastIndex?: boolean
+        reasonCodes?: readonly string[]
+      }>
+    }
+    if (codeGraphProvider && typeof graphHealthProvider.getGraphHealth === 'function') {
       try {
-        const health = await (codeGraphProvider as any).getGraphHealth()
+        const health = await graphHealthProvider.getGraphHealth()
         codeGraphStale = Boolean(
           health?.stale ||
-            health?.state === 'stale' ||
-            health?.knownStaleSinceLastIndex ||
-            (Array.isArray(health?.reasonCodes) && health.reasonCodes.length > 0),
+          health?.state === 'stale' ||
+          health?.knownStaleSinceLastIndex ||
+          (Array.isArray(health?.reasonCodes) && health.reasonCodes.length > 0),
         )
       } catch {
         // Advisory
@@ -290,215 +299,265 @@ export class SuggestImplementationLinks {
           type: 'discovery-start',
           message: 'Discovering specifications across workspaces...',
         })
-      const targetSpecs: Array<{
-        specId: string
-        workspace: string
-        path: string
-        title: string
-      }> = []
+        const targetSpecs: Array<{
+          specId: string
+          workspace: string
+          path: string
+          title: string
+        }> = []
 
-      for (const [wsName, repo] of this.deps.specRepositories.entries()) {
-        if (validatedInput.workspace && validatedInput.workspace !== wsName) {
-          continue
-        }
-
-        await new Promise<void>((resolve) => setImmediate(resolve))
-        const listResult = await repo.list(undefined, { includeMeta: true, includeSummary: true })
-        const entries = Array.isArray(listResult) ? listResult : (listResult?.items ?? [])
-        for (const rawEntry of entries) {
-          const entry = rawEntry as Record<string, unknown>
-          const entryWorkspace = typeof entry.workspace === 'string' ? entry.workspace : ''
-          const entryPath = typeof entry.path === 'string' ? entry.path : ''
-          const entryTitle = typeof entry.title === 'string' ? entry.title : ''
-          const specId = `${entryWorkspace}:${entryPath}`
-
-          if (validatedInput.specId && validatedInput.specId !== specId) {
-            continue
-          }
-          if (validatedInput.specIds && !validatedInput.specIds.includes(specId)) {
+        for (const [wsName, repo] of this.deps.specRepositories.entries()) {
+          if (validatedInput.workspace && validatedInput.workspace !== wsName) {
             continue
           }
 
-          targetSpecs.push({
-            specId,
-            workspace: entryWorkspace,
-            path: entryPath,
-            title: entryTitle,
-          })
-        }
-      }
+          await new Promise<void>((resolve) => setImmediate(resolve))
+          const listResult = await repo.list(undefined, { includeMeta: true, includeSummary: true })
+          const entries = Array.isArray(listResult) ? listResult : (listResult?.items ?? [])
+          for (const rawEntry of entries) {
+            const entry = rawEntry as Record<string, unknown>
+            const entryWorkspace = typeof entry.workspace === 'string' ? entry.workspace : ''
+            const entryPath = typeof entry.path === 'string' ? entry.path : ''
+            const entryTitle = typeof entry.title === 'string' ? entry.title : ''
+            const specId = `${entryWorkspace}:${entryPath}`
 
-      validatedInput.onProgress?.({ type: 'discovery-done', totalSpecs: targetSpecs.length })
+            if (validatedInput.specId && validatedInput.specId !== specId) {
+              continue
+            }
+            if (validatedInput.specIds && !validatedInput.specIds.includes(specId)) {
+              continue
+            }
 
-      if (validatedInput.specId && !targetSpecs.some((s) => s.specId === validatedInput.specId)) {
-        throw new SpecNotFoundError(validatedInput.specId)
-      }
-      if (validatedInput.specIds && validatedInput.specIds.length > 0) {
-        for (const id of validatedInput.specIds) {
-          if (!targetSpecs.some((s) => s.specId === id)) {
-            throw new SpecNotFoundError(id)
+            targetSpecs.push({
+              specId,
+              workspace: entryWorkspace,
+              path: entryPath,
+              title: entryTitle,
+            })
           }
         }
-      }
 
-      const resultSpecs: SpecImplementationSuggestion[] = []
-      let updatedSpecsCount = 0
-      let filesAddedCount = 0
-      let symbolsAddedCount = 0
+        validatedInput.onProgress?.({ type: 'discovery-done', totalSpecs: targetSpecs.length })
 
-      validatedInput.onProgress?.({ type: 'start', totalSpecs: targetSpecs.length })
+        if (validatedInput.specId && !targetSpecs.some((s) => s.specId === validatedInput.specId)) {
+          throw new SpecNotFoundError(validatedInput.specId)
+        }
+        if (validatedInput.specIds && validatedInput.specIds.length > 0) {
+          for (const id of validatedInput.specIds) {
+            if (!targetSpecs.some((s) => s.specId === id)) {
+              throw new SpecNotFoundError(id)
+            }
+          }
+        }
 
-      for (let index = 0; index < targetSpecs.length; index++) {
-        const target = targetSpecs[index]!
-        // Yield to event loop so CLI spinners and TTY output can animate smoothly
-        await new Promise<void>((resolve) => setImmediate(resolve))
-        validatedInput.onProgress?.({
-          type: 'spec-start',
-          specId: target.specId,
-          index: index + 1,
+        const resultSpecs: SpecImplementationSuggestion[] = []
+        let updatedSpecsCount = 0
+        let filesAddedCount = 0
+        let symbolsAddedCount = 0
+        const symbolQueryCache = new Map<string, SymbolNode[]>()
+        const fileCanonicalCache = new Map<string, string>()
+
+        validatedInput.onProgress?.({ type: 'start', totalSpecs: targetSpecs.length })
+
+        Logger.debug('[SuggestImplementationLinks] Target specs discovery complete', {
           totalSpecs: targetSpecs.length,
         })
-        let suggestions: ImplementationSuggestionEntry[] = []
-        let existingLockData: ImplementationSuggestionLockData = {
-          files: [],
-          symbols: [],
-          dependsOn: [],
-        }
 
-        try {
-          const existingImpl = await this.deps.getPersistedImplementation.execute({
+        for (let index = 0; index < targetSpecs.length; index++) {
+          const target = targetSpecs[index]!
+          // Yield to event loop so CLI spinners and TTY output can animate smoothly
+          await new Promise<void>((resolve) => setImmediate(resolve))
+          validatedInput.onProgress?.({
+            type: 'spec-start',
+            specId: target.specId,
+            index: index + 1,
+            totalSpecs: targetSpecs.length,
+          })
+          Logger.debug('[SuggestImplementationLinks] Processing spec', {
+            index: index + 1,
+            totalSpecs: targetSpecs.length,
             specId: target.specId,
           })
-          const existingFiles = existingImpl.implementation.map((link) => link.file)
-          const existingSymbols = existingImpl.implementation.flatMap((link) => link.symbols ?? [])
-          existingLockData = {
-            files: existingFiles,
-            symbols: existingSymbols,
-            dependsOn: [],
-          }
-        } catch {
-          // If not initialized or missing lock
-        }
 
-        const cached = validatedInput.rebuildCache ? null : await cache.get(target.specId)
-
-        let specStamp: ImplementationSuggestionSpecStamp | undefined
-        if (cached) {
-          suggestions = [...cached.suggestions]
-          specStamp = cached.specStamp
-        } else {
-          const analysis = await this.analyzeSpec(target.workspace, target.path, target.title)
-          suggestions = analysis.suggestions
-          await cache.set(target.specId, {
-            title: target.title,
-            existing: existingLockData,
-            suggestions,
-            ...(analysis.realContentHash ? { specContentHash: analysis.realContentHash } : {}),
-          })
-          await cache.flush()
-          if (analysis.lastModified || analysis.realContentHash) {
-            specStamp = {
-              lastModified: analysis.lastModified,
-              hash: analysis.realContentHash,
-              ...(analysis.realContentSize !== undefined ? { size: analysis.realContentSize } : {}),
-              artifacts: [],
+          try {
+            let suggestions: ImplementationSuggestionEntry[] = []
+            let existingLockData: ImplementationSuggestionLockData = {
+              files: [],
+              symbols: [],
+              dependsOn: [],
             }
-          }
-        }
 
-        const filteredSuggestions = this.filterByConfidence(suggestions, normalizedConfidence)
-
-        const canonicalExistingFiles = await Promise.all(
-          existingLockData.files.map((f) => this.toCanonicalWorkspacePath(f)),
-        )
-        const existingFileSet = new Set(canonicalExistingFiles)
-
-        const markedSuggestions = await Promise.all(
-          filteredSuggestions.map(async (sug) => {
-            const canonicalSugPath = await this.toCanonicalWorkspacePath(sug.file)
-            return {
-              ...sug,
-              file: canonicalSugPath,
-              alreadyIncluded: existingFileSet.has(canonicalSugPath),
+            try {
+              const existingImpl = await this.deps.getPersistedImplementation.execute({
+                specId: target.specId,
+              })
+              const existingFiles = existingImpl.implementation.map((link) => link.file)
+              const existingSymbols = existingImpl.implementation.flatMap(
+                (link) => link.symbols ?? [],
+              )
+              existingLockData = {
+                files: existingFiles,
+                symbols: existingSymbols,
+                dependsOn: [],
+              }
+            } catch {
+              // If not initialized or missing lock
             }
-          }),
-        )
 
-        resultSpecs.push({
-          specId: target.specId,
-          title: target.title,
-          existing: existingLockData,
-          suggestions: markedSuggestions,
-          ...(specStamp ? { specStamp } : {}),
-        })
+            const cached = validatedInput.rebuildCache ? null : await cache.get(target.specId)
 
-        validatedInput.onProgress?.({
-          type: 'spec-done',
-          specId: target.specId,
-          candidatesCount: markedSuggestions.length,
-        })
-
-        if (validatedInput.apply && markedSuggestions.length > 0) {
-          let specMutated = false
-          for (const sug of markedSuggestions) {
-            if (sug.alreadyIncluded) continue
-            const updateInput =
-              sug.symbols.length > 0
-                ? {
-                    specId: target.specId,
-                    action: 'add' as const,
-                    file: sug.file,
-                    symbols: sug.symbols,
-                  }
-                : { specId: target.specId, action: 'add' as const, file: sug.file }
-            const res = await this.deps.updatePersistedImplementation.execute(updateInput)
-            if (res.created || res.implementation.length > 0) {
-              specMutated = true
-              filesAddedCount += 1
-              symbolsAddedCount += sug.symbols.length
+            let specStamp: ImplementationSuggestionSpecStamp | undefined
+            if (cached) {
+              suggestions = [...cached.suggestions]
+              specStamp = cached.specStamp
+            } else {
+              const analysis = await this.analyzeSpec(
+                target.workspace,
+                target.path,
+                target.title,
+                symbolQueryCache,
+              )
+              suggestions = analysis.suggestions
+              await cache.set(target.specId, {
+                title: target.title,
+                existing: existingLockData,
+                suggestions,
+                ...(analysis.realContentHash ? { specContentHash: analysis.realContentHash } : {}),
+              })
+              await cache.flush()
+              if (analysis.lastModified || analysis.realContentHash) {
+                specStamp = {
+                  lastModified: analysis.lastModified,
+                  hash: analysis.realContentHash,
+                  ...(analysis.realContentSize !== undefined
+                    ? { size: analysis.realContentSize }
+                    : {}),
+                  artifacts: [],
+                }
+              }
             }
-          }
-          if (specMutated) {
-            updatedSpecsCount += 1
-          }
-        }
-      }
 
-      await cache.flush()
+            const filteredSuggestions = this.filterByConfidence(suggestions, normalizedConfidence)
 
-      const totalDiscovered = resultSpecs.reduce((acc, s) => acc + s.suggestions.length, 0)
-      validatedInput.onProgress?.({
-        type: 'done',
-        totalSpecs: resultSpecs.length,
-        totalSuggestions: totalDiscovered,
-      })
+            const canonicalExistingFiles = await Promise.all(
+              existingLockData.files.map((f) =>
+                this.toCanonicalWorkspacePath(f, fileCanonicalCache),
+              ),
+            )
+            const existingFileSet = new Set(canonicalExistingFiles)
 
-      return {
-        result: 'ok',
-        ...(validatedInput.workspace ? { targetWorkspace: validatedInput.workspace } : {}),
-        codeGraphStale,
-        specs: resultSpecs,
-        ...(validatedInput.apply
-          ? {
-              appliedMutations: {
-                updatedSpecsCount,
-                filesAddedCount,
-                symbolsAddedCount,
+            const markedSuggestions = await Promise.all(
+              filteredSuggestions.map(async (sug) => {
+                const canonicalSugPath = await this.toCanonicalWorkspacePath(
+                  sug.file,
+                  fileCanonicalCache,
+                )
+                return {
+                  ...sug,
+                  file: canonicalSugPath,
+                  alreadyIncluded: existingFileSet.has(canonicalSugPath),
+                }
+              }),
+            )
+
+            resultSpecs.push({
+              specId: target.specId,
+              title: target.title,
+              existing: existingLockData,
+              suggestions: markedSuggestions,
+              ...(specStamp ? { specStamp } : {}),
+            })
+
+            validatedInput.onProgress?.({
+              type: 'spec-done',
+              specId: target.specId,
+              candidatesCount: markedSuggestions.length,
+            })
+            Logger.debug('[SuggestImplementationLinks] Spec analysis complete', {
+              specId: target.specId,
+              suggestionsCount: markedSuggestions.length,
+            })
+          } catch (specError: unknown) {
+            const errMsg = specError instanceof Error ? specError.message : String(specError)
+            validatedInput.onProgress?.({
+              type: 'spec-error',
+              specId: target.specId,
+              error: errMsg,
+            })
+            Logger.error(
+              '[SuggestImplementationLinks] Failed analyzing spec during loop iteration',
+              {
+                specId: target.specId,
+                workspace: target.workspace,
+                path: target.path,
+                error: errMsg,
+                stack: specError instanceof Error ? specError.stack : undefined,
               },
+            )
+          }
+
+          const lastResultSpec = resultSpecs.find((s) => s.specId === target.specId)
+          if (validatedInput.apply && lastResultSpec && lastResultSpec.suggestions.length > 0) {
+            let specMutated = false
+            for (const sug of lastResultSpec.suggestions) {
+              if (sug.alreadyIncluded) continue
+              const updateInput =
+                sug.symbols.length > 0
+                  ? {
+                      specId: target.specId,
+                      action: 'add' as const,
+                      file: sug.file,
+                      symbols: sug.symbols,
+                    }
+                  : { specId: target.specId, action: 'add' as const, file: sug.file }
+              const res = await this.deps.updatePersistedImplementation.execute(updateInput)
+              if (res.created || res.implementation.length > 0) {
+                specMutated = true
+                filesAddedCount += 1
+                symbolsAddedCount += sug.symbols.length
+              }
             }
-          : {}),
+            if (specMutated) {
+              updatedSpecsCount += 1
+            }
+          }
+        }
+
+        await cache.flush()
+
+        const totalDiscovered = resultSpecs.reduce((acc, s) => acc + s.suggestions.length, 0)
+        validatedInput.onProgress?.({
+          type: 'done',
+          totalSpecs: resultSpecs.length,
+          totalSuggestions: totalDiscovered,
+        })
+
+        return {
+          result: 'ok',
+          ...(validatedInput.workspace ? { targetWorkspace: validatedInput.workspace } : {}),
+          codeGraphStale,
+          specs: resultSpecs,
+          ...(validatedInput.apply
+            ? {
+                appliedMutations: {
+                  updatedSpecsCount,
+                  filesAddedCount,
+                  symbolsAddedCount,
+                },
+              }
+            : {}),
+        }
+      } finally {
+        if (
+          shouldCloseCodeGraphProvider &&
+          codeGraphProvider &&
+          typeof codeGraphProvider.close === 'function'
+        ) {
+          await codeGraphProvider.close().catch(() => {})
+        }
       }
-    } finally {
-      if (
-        shouldCloseCodeGraphProvider &&
-        codeGraphProvider &&
-        typeof codeGraphProvider.close === 'function'
-      ) {
-        await codeGraphProvider.close().catch(() => {})
-      }
-    }
-  })
-}
+    })
+  }
 
   /**
    * Filters suggestions based on confidence threshold.
@@ -525,37 +584,89 @@ export class SuggestImplementationLinks {
    * Resolves a file path string to its canonical workspace-qualified form using code-graph file data.
    *
    * @param pathString - File path with optional workspace prefix (e.g. 'core:src/file.ts' or 'core:packages/core/src/file.ts')
+   * @param fileCanonicalCache - Optional in-memory cache for already-resolved canonical paths
    * @returns Canonical workspace path string
    */
-  private async toCanonicalWorkspacePath(pathString: string): Promise<string> {
+  private async toCanonicalWorkspacePath(
+    pathString: string,
+    fileCanonicalCache?: Map<string, string>,
+  ): Promise<string> {
+    if (fileCanonicalCache && fileCanonicalCache.has(pathString)) {
+      return fileCanonicalCache.get(pathString)!
+    }
     const parts = pathString.split(':')
-    if (parts.length < 2) return pathString
+    if (parts.length < 2) {
+      if (fileCanonicalCache) fileCanonicalCache.set(pathString, pathString)
+      return pathString
+    }
     const wsName = parts[0]!
     const relPath = parts.slice(1).join(':')
 
+    let resolved = pathString
     if (this.deps.codeGraphProvider && typeof this.deps.codeGraphProvider.getFile === 'function') {
       try {
         const fileNode = await this.deps.codeGraphProvider.getFile(relPath)
         if (fileNode && fileNode.path) {
-          return `${fileNode.workspace}:${fileNode.path}`
+          resolved = `${fileNode.workspace}:${fileNode.path}`
         }
       } catch {
         // fallback
       }
     }
 
-    const wsConfig = this.deps.workspaces?.find((w) => w.name === wsName)
-    if (wsConfig && wsConfig.codeRoot) {
-      const projectDir = this.deps.projectDir ?? process.cwd()
-      const codeRootAbs = resolve(projectDir, wsConfig.codeRoot)
-      const absPath = relPath.startsWith('/') ? relPath : resolve(projectDir, relPath)
-      if (absPath.startsWith(codeRootAbs)) {
-        const wsRel = relative(codeRootAbs, absPath).replace(/\\/g, '/')
-        return `${wsName}:${wsRel}`
+    if (resolved === pathString) {
+      const wsConfig = this.deps.workspaces?.find((w) => w.name === wsName)
+      if (wsConfig && wsConfig.codeRoot) {
+        const projectDir = this.deps.projectDir ?? process.cwd()
+        const codeRootAbs = resolve(projectDir, wsConfig.codeRoot)
+        const absPath = relPath.startsWith('/') ? relPath : resolve(projectDir, relPath)
+        if (absPath.startsWith(codeRootAbs)) {
+          const wsRel = relative(codeRootAbs, absPath).replace(/\\/g, '/')
+          resolved = `${wsName}:${wsRel}`
+        }
       }
     }
 
-    return pathString
+    if (fileCanonicalCache) {
+      fileCanonicalCache.set(pathString, resolved)
+    }
+    return resolved
+  }
+
+  /**
+   * Caches findSymbols queries in memory during a SuggestImplementationLinks execution session.
+   *
+   * @param query - Symbol query filter (name, file path, or workspace)
+   * @param query.name - Optional symbol name to match
+   * @param query.filePath - Optional file path to filter by
+   * @param query.workspace - Optional workspace to filter by
+   * @param symbolQueryCache - Optional in-memory query cache for session-level lookups
+   * @returns Matching symbols from the code graph
+   */
+  private async cachedFindSymbols(
+    query: { name?: string; filePath?: string; workspace?: string },
+    symbolQueryCache?: Map<string, SymbolNode[]>,
+  ): Promise<SymbolNode[]> {
+    if (!this.deps.codeGraphProvider) return []
+    const cacheKey = `${query.workspace ?? '*'}:${query.filePath ?? ''}:${query.name ?? ''}`
+    if (symbolQueryCache && symbolQueryCache.has(cacheKey)) {
+      return symbolQueryCache.get(cacheKey)!
+    }
+    try {
+      const results = await this.deps.codeGraphProvider.findSymbols(
+        query as { name?: string; filePath?: string; workspace?: string },
+      )
+      const resArr = results ?? []
+      if (symbolQueryCache) {
+        symbolQueryCache.set(cacheKey, resArr)
+      }
+      return resArr
+    } catch {
+      if (symbolQueryCache) {
+        symbolQueryCache.set(cacheKey, [])
+      }
+      return []
+    }
   }
 
   /**
@@ -564,12 +675,14 @@ export class SuggestImplementationLinks {
    * @param workspace - Target workspace name
    * @param capPath - Target spec path
    * @param initialTitle - Optional pre-resolved title from spec list metadata
+   * @param symbolQueryCache - In-memory query cache for session-level findSymbols lookups
    * @returns Array of implementation suggestion entries
    */
   private async analyzeSpec(
     workspace: string,
     capPath: string,
     initialTitle?: string,
+    symbolQueryCache?: Map<string, SymbolNode[]>,
   ): Promise<{
     suggestions: ImplementationSuggestionEntry[]
     realContentHash: string
@@ -611,7 +724,9 @@ export class SuggestImplementationLinks {
 
     if (typeof repo.artifactMeta === 'function') {
       for (const art of artifactsList) {
-        const meta = await repo.artifactMeta(spec, art.filename, { includeHash: true }).catch(() => null)
+        const meta = await repo
+          .artifactMeta(spec, art.filename, { includeHash: true })
+          .catch(() => null)
         if (meta?.hash) {
           realContentHash = realContentHash ? `${realContentHash}:${meta.hash}` : meta.hash
         }
@@ -818,7 +933,7 @@ export class SuggestImplementationLinks {
               if (workspace !== 'default') {
                 query.workspace = workspace
               }
-              const found = await this.deps.codeGraphProvider.findSymbols(query)
+              const found = await this.cachedFindSymbols(query, symbolQueryCache)
               if (found && found.length > 0) {
                 isResolvedInWorkspace = true
               }
@@ -931,7 +1046,7 @@ export class SuggestImplementationLinks {
           if (workspace !== 'default') {
             symbolQuery.workspace = workspace
           }
-          const graphSymbols = await this.deps.codeGraphProvider.findSymbols(symbolQuery)
+          const graphSymbols = await this.cachedFindSymbols(symbolQuery, symbolQueryCache)
           for (const gSym of graphSymbols) {
             const symObj = gSym as unknown as Record<string, unknown>
             const symKind = symObj.kind ?? gSym.kind
@@ -1160,9 +1275,10 @@ export class SuggestImplementationLinks {
             existing.reasons.add('subtoken-content-match')
             existing.reasons.add('exact-token-affinity')
             try {
-              const declared = await this.deps.codeGraphProvider.findSymbols({
-                filePath: cleanRelPath,
-              })
+              const declared = await this.cachedFindSymbols(
+                { filePath: cleanRelPath },
+                symbolQueryCache,
+              )
               for (const d of declared) {
                 if (d.name && isCodeIdentifierCandidate(d.name)) {
                   existing.symbols.add(d.name)
@@ -1307,18 +1423,22 @@ export class SuggestImplementationLinks {
         const cleanRelPath = filePath.replace(/^[^:]+:/, '')
         const shortRelPath = cleanRelPath.replace(/^packages\/[^/]+\//, '')
         try {
-          const declaredNodes1 = await this.deps.codeGraphProvider.findSymbols({
-            filePath: cleanRelPath,
-          })
-          const declaredNodes2 = await this.deps.codeGraphProvider.findSymbols({
-            filePath: shortRelPath,
-          })
-          const declaredNodes3 = await this.deps.codeGraphProvider.findSymbols({
-            filePath: filePath,
-          })
-          const declaredNodes4 = await this.deps.codeGraphProvider.findSymbols({
-            filePath: `*${cleanRelPath}`,
-          })
+          const declaredNodes1 = await this.cachedFindSymbols(
+            { filePath: cleanRelPath },
+            symbolQueryCache,
+          )
+          const declaredNodes2 = await this.cachedFindSymbols(
+            { filePath: shortRelPath },
+            symbolQueryCache,
+          )
+          const declaredNodes3 = await this.cachedFindSymbols(
+            { filePath: filePath },
+            symbolQueryCache,
+          )
+          const declaredNodes4 = await this.cachedFindSymbols(
+            { filePath: `*${cleanRelPath}` },
+            symbolQueryCache,
+          )
           const allNodesRaw = [
             ...declaredNodes1,
             ...declaredNodes2,

@@ -7,17 +7,20 @@ Adopting Spec-Driven Development (SDD) in brownfield or partially-specced projec
 ## Current behaviour
 
 Today, SpecD provides two complementary discovery use cases:
+
 1. `SuggestImplementationLinks` (`@specd/sdk`): Correlates existing specifications with AST implementation files and exported symbols.
 2. `SuggestSpecDependencies` (`@specd/sdk`): Deduces inter-spec `dependsOn` relationships from code import graphs and applies transitive reduction.
 
 However:
+
 - **No Brownfield Discovery**: There is no mechanism to discover and propose high-level architectural specifications for a codebase that has zero existing specifications.
-- **No Gap Analysis**: For partially-specced projects, there is no tool to audit the codebase, determine what percentage of code is covered by specifications, and report missing capability specifications (*unspecced gaps*).
+- **No Gap Analysis**: For partially-specced projects, there is no tool to audit the codebase, determine what percentage of code is covered by specifications, and report missing capability specifications (_unspecced gaps_).
 - **Coupled Primitives**: The AST correlation and transitive reduction logic are tied to individual use cases rather than accessible as reusable Codebase Intelligence domain engines.
 
 ## Proposed solution
 
 We propose introducing a unified `specd specs suggest` CLI command backed by a reusable `SuggestSpecs` use case in `@specd/sdk` that:
+
 1. **Discovers Candidate Specifications**: Clusters source files and structural symbols into cohesive Clean Architecture and DDD capabilities (Use Cases, Domain Entities, Ports/Contracts, Infrastructure Adapters, Domain Services, and Public APIs).
 2. **Early CodeGraph Staleness Diagnostics**: Inspects code graph freshness upfront before running heavy analysis, immediately warning in text mode if the graph is stale (allowing users to abort early) and exposing `codeGraphStale: boolean` in the JSON output.
 3. **Performs Upfront Inverse Code $\rightarrow$ Spec Gap Audit & Implementation Cache Warmup**: Audits existing specifications exclusively through `SpecRepository` ports (never raw disk reads), reading and canonically concatenating all spec artifacts (`spec.artifacts`) into a unified whole. Runs an upfront warmup pass with `SuggestImplementationLinks` to prime the implementation suggestions cache across workspaces, pulling in confirmed `HIGH` confidence implementation links while claiming hierarchical footprints (composition wiring, internal helpers, storage adapters) to eliminate false-positive gaps.
@@ -34,13 +37,13 @@ FUNCTION SuggestSpecs(input: SuggestSpecsInput): SuggestSpecsResult
   1. INITIALIZE ENVIRONMENT, WORKSPACES & PROBE CODE GRAPH HEALTH
      host = openSpecdHost(input.startDir, allowBootstrapFallback: true)
      provider = host.createGraphProvider(); provider.open()
-     
+
      // Early CodeGraph Staleness Diagnostics
      health = provider.getGraphHealth()
      codeGraphStale = health.stale OR health.knownStaleSinceLastIndex OR health.reasonCodes.isNotEmpty()
      IF codeGraphStale:
        onProgress({ type: 'stale-warning', stale: true })
-     
+
      allFiles = provider.store.getAllFiles()
      allSymbols = provider.findSymbols({})
      hotspots = provider.getHotspots({ minScore: 0 })
@@ -61,7 +64,7 @@ FUNCTION SuggestSpecs(input: SuggestSpecsInput): SuggestSpecsResult
            spec = repo.get(entry.path)
            // Unify all artifacts of spec in canonical order
            specContent = loadCanonicalSpecArtifacts(spec, repo)
-           
+
            // Include HIGH confidence cached implementation suggestions
            cached = implementationCache.get(spec.id)
            FOR sug IN cached.suggestions WHERE sug.confidence == 'HIGH':
@@ -82,10 +85,10 @@ FUNCTION SuggestSpecs(input: SuggestSpecsInput): SuggestSpecsResult
 
      FOR file IN targetSourceFiles:
        speccableSymbols = symbolsInFile(file).filter(isSpeccableSymbol)
-       uncoveredSymbols = speccableSymbols.filter(s => 
+       uncoveredSymbols = speccableSymbols.filter(s =>
          NOT symbolCoverageMap.has(s.id) AND NOT symbolNameCoverageMap.has(`${ws}::${s.name}`)
        )
-       
+
        // Skip pure re-export barrels or files where all speccable symbols are claimed
        IF uncoveredSymbols.isEmpty(): CONTINUE
 
@@ -119,7 +122,7 @@ FUNCTION SuggestSpecs(input: SuggestSpecsInput): SuggestSpecsResult
          surface: computePublicSurface(cluster),
          tests: computeTestAlignment(cluster, testFiles)
        })
-       
+
        priority = determinePriority(cluster, hotspots, confidence)
        rationale = synthesizeRationale(cluster, hotspots, minimalDepsMap.get(cluster.specId))
 
@@ -187,11 +190,11 @@ FUNCTION SuggestSpecs(input: SuggestSpecsInput): SuggestSpecsResult
 - **Baseline Prototype Validation**: Verified on full monorepo with 732 source files and 40,207 symbols, accurately identifying capability boundaries and coverage gaps.
 - **Graph-First Semantic Barrel Detection**: Eliminates hardcoded file/folder names by checking owned structural definitions (`isSpeccableSymbol`) in CodeGraph.
 - **Deterministic 5-Factor Confidence Model**:
-  1. *Caller & Hotspot Evidence* (0–25 pts)
-  2. *Architectural Clarity & Invariants* (0–25 pts)
-  3. *Graph Coupling & Cohesion* (0–20 pts)
-  4. *Public Surface & Entrypoints* (0–15 pts)
-  5. *Test Alignment Evidence* (0–15 pts)
+  1. _Caller & Hotspot Evidence_ (0–25 pts)
+  2. _Architectural Clarity & Invariants_ (0–25 pts)
+  3. _Graph Coupling & Cohesion_ (0–20 pts)
+  4. _Public Surface & Entrypoints_ (0–15 pts)
+  5. _Test Alignment Evidence_ (0–15 pts)
 - **Transitive Reduction**: Prunes redundant transitive edges ($A \rightarrow B \land B \rightarrow C \implies A \not\rightarrow C$) to maintain minimal, clean specification architecture DAGs.
 
 ## Open questions

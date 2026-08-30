@@ -87,6 +87,7 @@ export class SuggestSpecs {
 4. Entrypoint and barrel files (`index.ts`, `main.ts`, `app.ts`, `entrypoint.ts`, `ports.ts`) SHALL generate a single unified facade specification (`workspace:entrypoint` or `workspace:program`) rather than being fragmented by internal subcommand wiring functions.
 5. For multi-symbol files containing multiple distinct uncovered structural definitions, each distinct structural symbol SHALL anchor its own candidate capability specification with a sanitized slug derived from `toKebabCase(symbol.name)` (deduplicating repeated words and eliminating double hyphens).
 6. Architectural layer directory names (`use-cases/`, `ports/`, `entities/`, `services/`) SHALL NOT be used as capability slugs; capability slugs SHALL derive directly from concrete file or symbol names.
+7. The capability clustering engine SHALL derive capability slugs, architectural categories, and title suffixes dynamically from Clean Architecture, DDD, and MVC directory structures and symbol identities without hardcoding specific technology names, workspace identities, or domain entities.
 
 ### Requirement: Inter-Spec Dependency Inference & Pure Transitive Reduction
 
@@ -97,6 +98,7 @@ export class SuggestSpecs {
 ### Requirement: Deterministic 5-Factor Confidence Scoring
 
 The use case SHALL calculate candidate confidence deterministically on a $0 - 100\%$ scale summing 5 objective dimensions:
+
 1. **Caller & Hotspot Evidence (0–25 pts)**: Evaluates presence of indexed hotspots, incoming caller volume, and cross-workspace caller impact.
 2. **Architectural Clarity & Invariants (0–25 pts)**: Evaluates explicit domain classes, use cases, ports, and structured I/O interfaces.
 3. **Graph Coupling & Cohesion (0–20 pts)**: Evaluates file-to-symbol ratios and internal cohesion count.

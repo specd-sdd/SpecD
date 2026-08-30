@@ -1,9 +1,5 @@
 import { type Command } from 'commander'
-import {
-  openSuggestSpecs,
-  type SuggestSpecsResult,
-  type CandidateSpec,
-} from '@specd/sdk'
+import { openSuggestSpecs, type SuggestSpecsResult, type CandidateSpec } from '@specd/sdk'
 import { resolveCliContext } from '../../helpers/cli-context.js'
 import { output, parseFormat } from '../../formatter.js'
 import { handleError } from '../../handle-error.js'
@@ -15,6 +11,7 @@ import { collect } from '../../helpers/collect.js'
  * @param result - SuggestSpecsResult returned by SDK
  * @param chalk - Optional chalk instance for formatting
  * @param isGapAnalysis - Whether the execution is auditing gaps vs pure brownfield discovery
+ * @returns Human-readable text lines describing the suggested specs
  */
 function buildSuggestSpecsTextLines(
   result: SuggestSpecsResult,
@@ -83,15 +80,24 @@ export function registerSpecSuggest(parent: Command): void {
   parent
     .command('suggest')
     .description('Discover candidate specifications and detect coverage gaps in codebase.')
-    .option('--ignore-current-specs', 'Ignore existing specs on disk and execute full brownfield capability discovery')
+    .option(
+      '--ignore-current-specs',
+      'Ignore existing specs on disk and execute full brownfield capability discovery',
+    )
     .option(
       '-w, --workspace <name>',
       'Filter specification suggestion to specific workspace(s) (repeatable or comma-separated)',
       collect,
       [],
     )
-    .option('-m, --min-confidence <number>', 'Filter by minimum confidence threshold (0.0 - 1.0)', parseFloat)
-    .option('-l, --limit <number>', 'Limit the number of displayed candidate specifications', (v) => parseInt(v, 10))
+    .option(
+      '-m, --min-confidence <number>',
+      'Filter by minimum confidence threshold (0.0 - 1.0)',
+      parseFloat,
+    )
+    .option('-l, --limit <number>', 'Limit the number of displayed candidate specifications', (v) =>
+      parseInt(v, 10),
+    )
     .option('--rebuild-cache', 'Bypass and overwrite existing suggestion cache entries')
     .option('--config <path>', 'path to specd.yaml')
     .option('--format <fmt>', 'output format: text|json|toon', 'text')
@@ -153,14 +159,19 @@ export function registerSpecSuggest(parent: Command): void {
                 if (evt.type === 'stale-warning') {
                   if (clack && s) {
                     s.stop('Code graph index is stale')
-                    clack.log.warn('Code graph index is stale. Run \'specd graph index\' for the most up-to-date analysis.')
+                    clack.log.warn(
+                      "Code graph index is stale. Run 'specd graph index' for the most up-to-date analysis.",
+                    )
                     s.start(
                       opts.ignoreCurrentSpecs
                         ? 'Analyzing codebase capabilities and discovering specifications...'
                         : 'Auditing codebase capabilities and specification coverage...',
                     )
                   } else if (effectiveFormat === 'text') {
-                    output('warning: code graph index is stale. Run \'specd graph index\' to update.', 'text')
+                    output(
+                      "warning: code graph index is stale. Run 'specd graph index' to update.",
+                      'text',
+                    )
                   }
                 } else if (s) {
                   if (evt.type === 'warmup-start') {
@@ -170,21 +181,44 @@ export function registerSpecSuggest(parent: Command): void {
                     evt.event.type === 'discovery-start'
                   ) {
                     s.message('Discovering specifications across workspaces...')
-                  } else if (
-                    evt.type === 'warmup-progress' &&
-                    evt.event.type === 'spec-start'
-                  ) {
+                  } else if (evt.type === 'warmup-progress' && evt.event.type === 'spec-start') {
                     s.message(
                       `[${evt.event.index}/${evt.event.totalSpecs}] Warming cache: ${evt.event.specId}...`,
                     )
+                  } else if (evt.type === 'warmup-progress' && evt.event.type === 'spec-error') {
+                    if (clack) {
+                      clack.log.warn(
+                        `Warning: Failed analyzing spec ${evt.event.specId}: ${evt.event.error}`,
+                      )
+                    } else if (effectiveFormat === 'text') {
+                      output(
+                        `warning: failed analyzing spec ${evt.event.specId}: ${evt.event.error}`,
+                        'text',
+                      )
+                    }
                   } else if (evt.type === 'start') {
                     s.message('Initializing capability discovery...')
                   } else if (evt.type === 'gap-audit-start') {
-                    s.message(`Auditing existing specifications across ${evt.totalSpecs} workspace(s)...`)
+                    s.message(
+                      `Auditing existing specifications across ${evt.totalSpecs} workspace(s)...`,
+                    )
                   } else if (evt.type === 'clustering-start') {
                     s.message(`Clustering ${evt.totalFiles} source files into capabilities...`)
                   } else if (evt.type === 'done') {
-                    s.message(`Synthesized ${evt.totalSpecsSuggested} candidate specification(s)...`)
+                    s.message(
+                      `Synthesized ${evt.totalSpecsSuggested} candidate specification(s)...`,
+                    )
+                  }
+                } else if (evt.type === 'warmup-progress' && evt.event.type === 'spec-error') {
+                  if (clack) {
+                    clack.log.warn(
+                      `Warning: Failed analyzing spec ${evt.event.specId}: ${evt.event.error}`,
+                    )
+                  } else if (effectiveFormat === 'text') {
+                    output(
+                      `warning: failed analyzing spec ${evt.event.specId}: ${evt.event.error}`,
+                      'text',
+                    )
                   }
                 }
               },
@@ -234,10 +268,7 @@ export function registerSpecSuggest(parent: Command): void {
                 `Found ${result.summary.totalSpecsSuggested} ${summaryNoun} in ${scopeText}.`,
               )
             } else {
-              output(
-                isGapAnalysis ? 'specification gaps:' : 'suggested specifications:',
-                'text',
-              )
+              output(isGapAnalysis ? 'specification gaps:' : 'suggested specifications:', 'text')
               for (const line of lines) {
                 if (line) output(`  ${line}`, 'text')
               }

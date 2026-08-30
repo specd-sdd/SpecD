@@ -127,7 +127,6 @@ describe('prompt-apply helper', () => {
     it('wraps long lines and preserves initial whitespace + 4 on continuation rows with ellipsis markers', async () => {
       const { wrapForClack } = await import('../../src/helpers/prompt-apply.js')
 
-      // 0 initial spaces -> continuation has 4 spaces and ellipsis
       const line0 = 'firstword secondword thirdword fourthword fifthword'
       const wrap0 = wrapForClack(line0, 20)
       const lines0 = wrap0.split('\n')
@@ -135,7 +134,6 @@ describe('prompt-apply helper', () => {
       expect(lines0[0]).toMatch(/\.\.\.$/)
       expect(lines0[1]).toMatch(/^ {4}\.\.\. /)
 
-      // 2 initial spaces -> continuation has 2 + 4 = 6 spaces and ellipsis
       const line2 =
         '  • [new] [HIGH] packages/cli/src/commands/spec/very/long/path/to/file.ts [symbolA, symbolB]'
       const wrap2 = wrapForClack(line2, 45)
@@ -145,7 +143,6 @@ describe('prompt-apply helper', () => {
       expect(lines2[0]).toMatch(/\.\.\.$/)
       expect(lines2[1]).toMatch(/^ {6}\.\.\. /)
 
-      // 4 initial spaces -> continuation has 4 + 4 = 8 spaces and ellipsis
       const line4 =
         '    suggestions: [new] [HIGH] packages/cli/src/commands/spec/very/long/path/to/file.ts'
       const wrap4 = wrapForClack(line4, 40)

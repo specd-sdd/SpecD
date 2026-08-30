@@ -1,0 +1,19 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["sdk:suggest-specs"],
+  "implementation": [
+    {
+      "file": "cli:src/commands/spec/suggest.ts",
+      "symbols": ["registerSpecSuggest"]
+    },
+    {
+      "file": "cli:src/index.ts"
+    },
+    {
+      "file": "cli:test/commands/spec-suggest.spec.ts"
+    }
+  ]
+}

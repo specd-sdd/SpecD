@@ -72,6 +72,14 @@
       `packages/sdk/test/application/use-cases/suggest-specs.spec.ts`: integration test suite
       Approach: test brownfield discovery mode, gap analysis mode, workspace filtering, and error handling (`InvalidInputError`, `WorkspaceNotFoundError`)
       (Req: Use Case Interface, Input Validation & Dynamic Workspace Resolution)
+- [x] 3.7 Enhance Cache Persistence Resilience & Re-entrant File Locking
+      `packages/sdk/src/infrastructure/fs/write-json-atomic.ts`, `packages/sdk/src/application/use-cases/suggest-implementation-links.ts`: re-entrant lock & error isolation
+      Approach: fix re-entrant file lock cleanup so nested `flush()` calls do not unlink `.lock` files prematurely, isolate spec analysis exceptions per-iteration, and emit `spec-error` progress events
+      (Req: Cache Resilience & Concurrency Safety)
+- [x] 3.8 Implement Session-Level Memory Query Caching & Incremental Persistence Resilience
+      `packages/sdk/src/application/use-cases/suggest-implementation-links.ts`, `packages/sdk/src/infrastructure/fs/fs-implementation-suggestion-cache.ts`, `packages/sdk/src/application/use-cases/suggest-specs.ts`: session memory query caching & clean persistence
+      Approach: add `symbolQueryCache` and `fileCanonicalCache` to eliminate thousands of repeated SQLite queries, fix `getGraphFingerprint` syntax, and remove destructive `setMany` cache overwrites in `SuggestSpecs` so 281 specs are 100% preserved incrementally whether cancelled mid-way or completed
+      (Req: Cache Resilience & Concurrency Safety, Performance Optimizations)
 
 ## 4. CLI Command & Output Formatting (@specd/cli)
 

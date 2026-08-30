@@ -43,3 +43,17 @@
     2. **Re-entrant In-Process Locking**: In-process lock acquisition SHALL be re-entrant via reference counting.
     3. **Flush Merging**: On `flush()`, the cache SHALL acquire the lock, re-read the latest disk state, merge in-memory entries with entries written concurrently by other processes, and atomically write the merged payload.
     4. **Typed Error on Contention Timeout**: If the exclusive lock cannot be acquired within the configured timeout, the cache SHALL throw `CacheLockError` (error code `CACHE_LOCKED`).
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Multi-Process Cache Locking and Flush Merging'
+  content: |
+    ### Requirement: Session-Level Query Caching & Incremental Persistence
+
+    1. During a `SuggestImplementationLinks.execute` session, the use case SHALL cache symbol search queries in `symbolQueryCache` (`Map<string, unknown[]>`) and canonical workspace file path resolutions in `fileCanonicalCache` (`Map<string, string>`) to eliminate redundant SQLite roundtrips.
+    2. The use case SHALL incrementally update and flush cache entries spec-by-spec to ensure complete atomic cache state is preserved across process cancellation and full execution runs.

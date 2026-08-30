@@ -95,6 +95,42 @@
 - **WHEN** `SuggestSpecDependencies.execute({ specId: "cli:change-implementation", apply: true, createAlignmentChange: true })` completes
 - **THEN** no alignment change is created
 
+### Requirement: Modular Transitive Reduction & Invariant Graph Engine
+
+#### Scenario: Transitive reduction prunes indirect dependency paths
+
+- **GIVEN** Spec $A$ depending on $B$ and $C$, where $B$ depends directly on $C$
+- **WHEN** `TransitiveReductionEngine.reduce()` executes
+- **THEN** $C$ is pruned from $A$'s direct dependencies, yielding $A \rightarrow B \rightarrow C$.
+
+#### Scenario: Cyclic dependencies in call graphs are handled without infinite loops
+
+- **GIVEN** A cyclic call relationship between specs $X$ and $Y$
+- **WHEN** Transitive reduction evaluates the graph
+- **THEN** The cycle is detected and handled safely without terminating in an infinite loop.
+
+### Requirement: Early Graph Staleness Diagnostics
+
+#### Scenario: Early graph staleness detection and result annotation
+
+- **GIVEN** A code graph provider whose graph index is stale
+- **WHEN** `SuggestSpecDependencies.execute()` is invoked
+- **THEN** It emits a `stale-warning` progress event and returns `codeGraphStale: true` in the result payload.
+
+### Requirement: Multi-Process Cache Locking and Flush Merging
+
+#### Scenario: Concurrent writes from separate processes merge without data loss
+
+- **GIVEN** Multiple cache instances performing concurrent writes to the spec dependencies cache
+- **WHEN** Each instance executes `flush()` under exclusive kernel-level file lock
+- **THEN** All written dependency entries are preserved in the persisted cache file on disk without overwriting concurrent updates.
+
+#### Scenario: Cache lock contention timeout throws CacheLockError
+
+- **GIVEN** A lock file held exclusively by another active process exceeding the timeout
+- **WHEN** An operation attempts to acquire the cache lock
+- **THEN** It throws a typed `CacheLockError` with error code `CACHE_LOCKED`.
+
 ### Requirement: Dependency-injected factory
 
 #### Scenario: Canonical factory accepts resolved dependencies

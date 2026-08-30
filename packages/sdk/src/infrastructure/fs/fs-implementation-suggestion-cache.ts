@@ -132,7 +132,8 @@ export class FsImplementationSuggestionCache extends ImplementationSuggestionCac
       super({})
       this.projectDir = optionsOrProjectDir
       const raw = isAbsolute(configPath) ? configPath : join(optionsOrProjectDir, configPath)
-      const baseDir = raw.endsWith('.yaml') || raw.endsWith('.yml') || raw.endsWith('.json') ? dirname(raw) : raw
+      const baseDir =
+        raw.endsWith('.yaml') || raw.endsWith('.yml') || raw.endsWith('.json') ? dirname(raw) : raw
       this.cachePath = join(
         baseDir,
         'tmp',
@@ -147,7 +148,8 @@ export class FsImplementationSuggestionCache extends ImplementationSuggestionCac
       const raw = isAbsolute(effectiveConfig)
         ? effectiveConfig
         : join(optionsOrProjectDir.projectDir, effectiveConfig)
-      const baseDir = raw.endsWith('.yaml') || raw.endsWith('.yml') || raw.endsWith('.json') ? dirname(raw) : raw
+      const baseDir =
+        raw.endsWith('.yaml') || raw.endsWith('.yml') || raw.endsWith('.json') ? dirname(raw) : raw
       this.cachePath = join(
         baseDir,
         'tmp',
@@ -222,10 +224,10 @@ export class FsImplementationSuggestionCache extends ImplementationSuggestionCac
    * @returns Computed fingerprint and timestamp
    */
   private async getGraphFingerprint(): Promise<{ fingerprint: string; lastIndexedAt: string }> {
-    if (this._cachedGraphFingerprint !== null) {
+    if (this._cachedGraphFingerprint !== null && this._cachedGraphLastIndexedAt !== null) {
       return {
         fingerprint: this._cachedGraphFingerprint,
-        lastIndexedAt: this._cachedGraphLastIndexedAt ?? '',
+        lastIndexedAt: this._cachedGraphLastIndexedAt,
       }
     }
 

@@ -95,4 +95,15 @@ describe('CapabilityClusteringEngine', () => {
     )
     expect(goAnchor.capabilitySlug).toBe('user-repository')
   })
+
+  it('handles workspace-prefixed paths with colons and redundant workspace names cleanly', () => {
+    const anchor = CapabilityClusteringEngine.resolveCapabilityAnchor(
+      'plugin-agent-standard',
+      'plugin-agent-standard:src/index.ts',
+    )
+
+    expect(anchor.capabilitySlug).toBe('entrypoint')
+    expect(anchor.capabilityKey).toBe('plugin-agent-standard::entrypoint')
+    expect(anchor.capabilitySlug.includes(':')).toBe(false)
+  })
 })

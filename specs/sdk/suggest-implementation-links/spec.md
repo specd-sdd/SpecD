@@ -55,6 +55,33 @@ codebase symbol index, infer primary spec ownership, or compare code signatures 
 spec contracts. `code-graph` remains the authoritative source for indexed code symbols and
 files; ownership and contract-completeness analysis are outside this capability.
 
+### Requirement: Spec Symbol Classifier & Ownership Partitioning
+
+The implementation suggestion engine SHALL leverage a shared `SpecSymbolClassifier` to partition extracted markdown symbol evidence into two distinct categories:
+
+1. **Owned / Target Symbols**: Primary class/function matching the spec identity, input/output interfaces (`*Input`, `*Result`, `*Deps`), and domain error types declared in the spec's requirements contract.
+2. **Referenced Symbols**: Collaborators and external port types mentioned in constructor signatures, method parameters, or `### Spec Dependencies`.
+
+The 3-tier analysis algorithm SHALL prioritize **Owned Symbols** for high-confidence link assignment, preventing foreign collaborator references from erroneously linking unrelated implementation files to the target specification.
+
+### Requirement: Early Graph Staleness Diagnostics
+
+Prior to executing AST symbol correlation, the use case SHALL probe the freshness and health of the injected code graph provider via `codeGraphProvider.getGraphHealth()`. If the graph is stale, the use case SHALL emit a `stale-warning` progress event and populate `codeGraphStale: boolean` in `SuggestImplementationLinksResult`.
+
+### Requirement: Multi-Process Cache Locking and Flush Merging
+
+The implementation suggestion filesystem cache SHALL protect all concurrent write and warmup operations across multiple OS processes via kernel-level atomic lock files (`<cachePath>.lock`) using `O_EXCL` file creation (`open(..., 'wx')`) with automatic stale lock reaping:
+
+1. **Warmup & Batch Operations**: The cache port SHALL expose `withLock<T>(fn: () => Promise<T>)` to execute warmup analysis under an exclusive lock, preventing parallel processes from performing redundant analysis.
+2. **Re-entrant In-Process Locking**: In-process lock acquisition SHALL be re-entrant via reference counting.
+3. **Flush Merging**: On `flush()`, the cache SHALL acquire the lock, re-read the latest disk state, merge in-memory entries with entries written concurrently by other processes, and atomically write the merged payload.
+4. **Typed Error on Contention Timeout**: If the exclusive lock cannot be acquired within the configured timeout, the cache SHALL throw `CacheLockError` (error code `CACHE_LOCKED`).
+
+### Requirement: Session-Level Query Caching & Incremental Persistence
+
+1. During a `SuggestImplementationLinks.execute` session, the use case SHALL cache symbol search queries in `symbolQueryCache` (`Map<string, unknown[]>`) and canonical workspace file path resolutions in `fileCanonicalCache` (`Map<string, string>`) to eliminate redundant SQLite roundtrips.
+2. The use case SHALL incrementally update and flush cache entries spec-by-spec to ensure complete atomic cache state is preserved across process cancellation and full execution runs.
+
 ### Requirement: 3-Tier Analysis Algorithm
 
 `SuggestImplementationLinks` MUST execute a 3-tier cascade analysis algorithm with early short-circuiting:
@@ -96,7 +123,7 @@ files; ownership and contract-completeness analysis are outside this capability.
 
 Each `ImplementationSuggestionEntry` in the result MUST include an `alreadyIncluded: boolean` field indicating whether the suggested file is already present in the spec's persisted `spec-lock.json` implementation links. This allows consumers to display all candidates discovered by the algorithm with their inclusion status, analogous to `SuggestSpecDependencies`.
 
-### Requirement: Additive Mutation Semantics (`apply: true`)
+### Requirement: Additive Mutation Semantics (apply: true)
 
 When `apply: true` is passed, `SuggestImplementationLinks` MUST perform a set union merging new discovered files and symbols into `spec-lock.json` via `UpdatePersistedSpecImplementation`, preserving all existing confirmed links. Suggestions with `alreadyIncluded: true` MUST be skipped during mutation.
 

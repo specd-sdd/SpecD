@@ -6,8 +6,8 @@ import { SpecdError } from '@specd/core'
  * the same cache file concurrently.
  */
 export class CacheLockError extends SpecdError {
-  /** The path of the lock file that could not be acquired. */
-  readonly lockPath: string
+  /** @internal stored lock path */
+  private readonly _lockPath: string
 
   /**
    * Machine-readable error code used for programmatic handling.
@@ -18,16 +18,27 @@ export class CacheLockError extends SpecdError {
   }
 
   /**
+   * The path of the lock file that could not be acquired.
+   * @returns Absolute path to the lock file
+   */
+  get lockPath(): string {
+    return this._lockPath
+  }
+
+  /**
    * Creates a new `CacheLockError`.
    *
    * @param lockPath - Absolute path to the lock file
-   * @param timeoutMs - The timeout that elapsed before giving up
+   * @param timeoutMs - Optional maximum time (ms) that was waited for the lock
    */
   constructor(lockPath: string, timeoutMs?: number) {
     super(
-      'The suggestion cache is currently in use by another process. ' +
-        'Please wait for the other process to finish and try again.',
+      timeoutMs !== undefined
+        ? `The suggestion cache is currently in use by another process. ` +
+            `Timed out after ${timeoutMs} ms; please wait for the other process to finish and try again.`
+        : 'The suggestion cache is currently in use by another process. ' +
+            'Please wait for the other process to finish and try again.',
     )
-    this.lockPath = lockPath
+    this._lockPath = lockPath
   }
 }

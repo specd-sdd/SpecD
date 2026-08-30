@@ -54,3 +54,24 @@
     - **GIVEN** A lock file held exclusively by another active process exceeding the timeout
     - **WHEN** An operation attempts to acquire the cache lock
     - **THEN** It throws a typed `CacheLockError` with error code `CACHE_LOCKED`.
+
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Multi-Process Cache Locking and Flush Merging'
+  content: |
+    ### Requirement: Session-Level Query Caching & Incremental Persistence
+
+    #### Scenario: In-memory session query caching eliminates duplicate SQLite queries
+    - **GIVEN** Multiple specs referencing common monorepo symbols and relative file paths
+    - **WHEN** `SuggestImplementationLinks.execute()` runs across target specs
+    - **THEN** Symmetrical queries are served from `symbolQueryCache` and `fileCanonicalCache`, preventing redundant database queries.
+
+    #### Scenario: Incremental spec flushing preserves complete cache state
+    - **GIVEN** A multi-spec analysis session
+    - **WHEN** Execution is cancelled mid-way or completed fully
+    - **THEN** Analyzed spec entries are incrementally persisted to disk without truncation.

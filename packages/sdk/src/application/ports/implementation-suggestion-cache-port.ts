@@ -101,6 +101,7 @@ export abstract class ImplementationSuggestionCachePort {
    * Filesystem adapters override this to hold an exclusive kernel-level file lock.
    *
    * @param fn - The async operation to execute while the lock is held
+   * @returns The value returned by `fn`
    */
   async withLock<T>(fn: () => Promise<T>): Promise<T> {
     return await fn()

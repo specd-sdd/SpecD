@@ -53,6 +53,7 @@ const heldLocksCount = new Map<string, number>()
  * @param lockPath   - Absolute path to the `.lock` file (sibling of the data file)
  * @param fn         - Async operation to run while the lock is held
  * @param timeoutMs  - Maximum time to wait for the lock (default: 10 000 ms)
+ * @returns The value returned by `fn`
  * @throws {CacheLockError} If the lock cannot be acquired within `timeoutMs`
  */
 export async function withCacheFileLock<T>(
@@ -104,7 +105,6 @@ export async function withCacheFileLock<T>(
               const nextCount = (heldLocksCount.get(canonicalLockPath) ?? 1) - 1
               if (nextCount <= 0) {
                 heldLocksCount.delete(canonicalLockPath)
-                await unlink(canonicalLockPath).catch(() => {})
               } else {
                 heldLocksCount.set(canonicalLockPath, nextCount)
               }
@@ -140,7 +140,12 @@ export async function withCacheFileLock<T>(
   }
 }
 
-/** Returns true if the given PID is alive (EPERM counts as alive). */
+/**
+ * Returns true if the given PID is alive (EPERM counts as alive).
+ *
+ * @param pid - Process ID to probe
+ * @returns `true` if the process exists, `false` if it has terminated
+ */
 function isPidAlive(pid: number): boolean {
   if (!Number.isInteger(pid) || pid <= 0) return false
   try {
@@ -151,6 +156,12 @@ function isPidAlive(pid: number): boolean {
   }
 }
 
+/**
+ * Resolves after the given number of milliseconds.
+ *
+ * @param ms - Duration in milliseconds to sleep
+ * @returns A promise that resolves after `ms` milliseconds
+ */
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }

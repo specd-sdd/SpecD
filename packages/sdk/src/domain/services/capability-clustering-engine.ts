@@ -15,11 +15,14 @@ export interface CapabilityAnchor {
 /**
  * Converts a string into a URL/spec-safe kebab-case slug
  * with no consecutive duplicate words and no multiple hyphens.
+ *
+ * @param str - Input string (PascalCase, camelCase, or any mixed form)
+ * @returns Kebab-case slug with deduplicated tokens
  */
 function toKebabCase(str: string): string {
   const raw = str
     .replace(/([a-z0-9]|(?=[A-Z]))([A-Z])/g, '$1-$2')
-    .replace(/[\s_.]+/g, '-')
+    .replace(/[\s_:.]+/g, '-')
     .replace(/-+/g, '-')
     .toLowerCase()
     .replace(/^-+|-+$/g, '')
@@ -41,7 +44,27 @@ function toKebabCase(str: string): string {
 }
 
 /**
+ * Sanitizes a raw slug: converts to kebab-case and strips leading workspace prefix redundancy if present.
+ *
+ * @param rawSlug - Raw slug derived from symbol or file name
+ * @param workspace - Workspace name to strip as prefix if redundant
+ * @returns Cleaned kebab-case slug without workspace prefix redundancy
+ */
+function sanitizeSlug(rawSlug: string, workspace: string): string {
+  const cleanWorkspace = toKebabCase(workspace)
+  let clean = toKebabCase(rawSlug)
+  if (clean.startsWith(`${cleanWorkspace}-`) && clean.length > cleanWorkspace.length + 1) {
+    clean = clean.substring(cleanWorkspace.length + 1)
+  }
+  return clean
+}
+
+/**
  * Strips known file extension from path.
+ *
+ * @param filePath - Source file path (relative or absolute)
+ * @param supportedExtensions - Optional set of extensions to strip (e.g. `.ts`, `.py`)
+ * @returns Path with known extension removed
  */
 function stripExtension(filePath: string, supportedExtensions?: ReadonlySet<string>): string {
   if (supportedExtensions && supportedExtensions.size > 0) {
@@ -74,8 +97,16 @@ export class CapabilityClusteringEngine {
     supportedExtensions?: ReadonlySet<string>,
     primarySymbolName?: string,
   ): CapabilityAnchor {
-    const cleanPath = stripExtension(filePath.replaceAll('\\', '/'), supportedExtensions)
-    const segments = cleanPath.split('/').filter((s) => s !== 'src' && s !== 'lib' && s !== 'dist' && s !== 'app' && Boolean(s))
+    const noWsPath = filePath.includes(':')
+      ? filePath.substring(filePath.indexOf(':') + 1)
+      : filePath
+    const relPath = noWsPath
+      .replace(new RegExp(`^(?:packages|apps)/${workspace}/`, 'i'), '')
+      .replace(new RegExp(`^${workspace}/`, 'i'), '')
+    const cleanPath = stripExtension(relPath.replaceAll('\\', '/'), supportedExtensions)
+    const segments = cleanPath
+      .split('/')
+      .filter((s) => s !== 'src' && s !== 'lib' && s !== 'dist' && s !== 'app' && Boolean(s))
     const rawFileName = segments[segments.length - 1] || 'index'
     const parentDir = segments.length > 1 ? segments[segments.length - 2] : ''
     const lowerPath = cleanPath.toLowerCase()
@@ -101,7 +132,9 @@ export class CapabilityClusteringEngine {
       fileName.endsWith('-interactor') ||
       (primarySymbolName && /usecase|action|workflow|interactor/i.test(primarySymbolName))
     ) {
-      const cleanSlug = toKebabCase(fileName.replace(/-(?:use-case|usecase|action|workflow|interactor)$/, ''))
+      const cleanSlug = toKebabCase(
+        fileName.replace(/-(?:use-case|usecase|action|workflow|interactor)$/, ''),
+      )
       return {
         workspace,
         capabilitySlug: cleanSlug,
@@ -136,85 +169,38 @@ export class CapabilityClusteringEngine {
       }
     }
 
-    // 3. VCS Adapters (Git, Hg, Svn)
-    if (lowerPath.includes('/git/') || lowerPath.includes('infrastructure/git') || fileName.startsWith('git-')) {
-      return {
-        workspace,
-        capabilitySlug: 'git-vcs-adapter',
-        capabilityKey: `${workspace}::git-vcs-adapter`,
-        category: 'INFRASTRUCTURE_SUBSYSTEM',
-        titleSuffix: 'Git Version Control Adapter',
-        layer: 'infrastructure',
+    // 3. Infrastructure Adapters, Drivers & Storage Subsystems
+    if (
+      lowerPath.includes('infrastructure/') ||
+      lowerPath.includes('adapters/') ||
+      lowerPath.includes('drivers/') ||
+      fileName.endsWith('-adapter') ||
+      fileName.endsWith('-driver') ||
+      fileName.endsWith('-store')
+    ) {
+      let rawSlug = fileName
+      if (rawSlug === 'index' || rawSlug === 'exec' || rawSlug === 'helpers' || isGenericFile) {
+        if (
+          parentDir &&
+          parentDir !== 'infrastructure' &&
+          parentDir !== 'adapters' &&
+          parentDir !== 'drivers'
+        ) {
+          rawSlug = parentDir
+        }
       }
-    }
-    if (lowerPath.includes('/hg/') || lowerPath.includes('infrastructure/hg') || fileName.startsWith('hg-')) {
-      return {
-        workspace,
-        capabilitySlug: 'hg-vcs-adapter',
-        capabilityKey: `${workspace}::hg-vcs-adapter`,
-        category: 'INFRASTRUCTURE_SUBSYSTEM',
-        titleSuffix: 'Mercurial Version Control Adapter',
-        layer: 'infrastructure',
-      }
-    }
-    if (lowerPath.includes('/svn/') || lowerPath.includes('infrastructure/svn') || fileName.startsWith('svn-')) {
-      return {
-        workspace,
-        capabilitySlug: 'svn-vcs-adapter',
-        capabilityKey: `${workspace}::svn-vcs-adapter`,
-        category: 'INFRASTRUCTURE_SUBSYSTEM',
-        titleSuffix: 'Subversion Version Control Adapter',
-        layer: 'infrastructure',
-      }
-    }
-
-    // 4. SQLite Storage & Worker Subsystem
-    if (lowerPath.includes('sqlite/') || lowerPath.includes('infrastructure/sqlite') || fileName.includes('sqlite')) {
-      return {
-        workspace,
-        capabilitySlug: 'sqlite-graph-store',
-        capabilityKey: `${workspace}::sqlite-graph-store`,
-        category: 'INFRASTRUCTURE_SUBSYSTEM',
-        titleSuffix: 'SQLite Storage Subsystem',
-        layer: 'infrastructure',
-      }
-    }
-
-    // 5. Tree-Sitter & Language Adapters
-    if (lowerPath.includes('tree-sitter/') || lowerPath.includes('adapters/')) {
-      let slug = fileName
-      if (!fileName.endsWith('-language-adapter') && !fileName.endsWith('-adapter')) {
-        slug = 'tree-sitter-adapter-registry'
-      }
-      const cleanSlug = toKebabCase(slug)
+      const cleanSlug = sanitizeSlug(rawSlug, workspace)
       return {
         workspace,
         capabilitySlug: cleanSlug,
         capabilityKey: `${workspace}::${cleanSlug}`,
         category: 'INFRASTRUCTURE_SUBSYSTEM',
-        titleSuffix: 'Language AST Adapter Subsystem',
+        titleSuffix: 'Infrastructure Subsystem',
         layer: 'infrastructure',
       }
     }
 
-    // 6. Generic File System Storage Infrastructure
-    if (lowerPath.includes('infrastructure/fs') || lowerPath.includes('/fs/')) {
-      let slug = 'fs-storage-adapter'
-      if (fileName.endsWith('-repository') || fileName.endsWith('-cache') || fileName.endsWith('-store')) {
-        slug = fileName.replace(/^(?:fs|memory|mock)-/, '')
-      }
-      const cleanSlug = toKebabCase(slug)
-      return {
-        workspace,
-        capabilitySlug: cleanSlug,
-        capabilityKey: `${workspace}::${cleanSlug}`,
-        category: 'INFRASTRUCTURE_SUBSYSTEM',
-        titleSuffix: 'FileSystem Storage Adapter',
-        layer: 'infrastructure',
-      }
-    }
-
-    // 7. Core Domain Entities & Aggregates
+    // 4. Core Domain Entities & Aggregates
     if (
       lowerPath.includes('entities/') ||
       lowerPath.includes('entity/') ||
@@ -223,11 +209,9 @@ export class CapabilityClusteringEngine {
       fileName.endsWith('-entity') ||
       fileName.endsWith('-aggregate')
     ) {
-      let slug = fileName === 'index' && segments.length > 2 ? segments[segments.length - 2]! : fileName
-      if (slug.includes('archived-change') || slug.includes('change-state') || slug.includes('change-lifecycle')) {
-        slug = 'change'
-      }
-      const cleanSlug = toKebabCase(slug.replace(/-(?:entity|aggregate)$/, ''))
+      const slug =
+        fileName === 'index' && segments.length > 2 ? segments[segments.length - 2]! : fileName
+      const cleanSlug = sanitizeSlug(slug.replace(/-(?:entity|aggregate)$/, ''), workspace)
       return {
         workspace,
         capabilitySlug: cleanSlug,
@@ -245,8 +229,9 @@ export class CapabilityClusteringEngine {
       lowerPath.includes('domain/schemas') ||
       lowerPath.includes('domain/types')
     ) {
-      const slug = parentDir && parentDir !== 'domain' ? `${parentDir}-types` : `${workspace}-domain-types`
-      const cleanSlug = toKebabCase(slug)
+      const slug =
+        parentDir && parentDir !== 'domain' ? `${parentDir}-types` : `${workspace}-domain-types`
+      const cleanSlug = sanitizeSlug(slug, workspace)
       return {
         workspace,
         capabilitySlug: cleanSlug,
@@ -273,7 +258,7 @@ export class CapabilityClusteringEngine {
           commandSuite = `${groupDir}-${baseFileName}`
         }
       }
-      const cleanSlug = toKebabCase(commandSuite)
+      const cleanSlug = sanitizeSlug(commandSuite, workspace)
       return {
         workspace,
         capabilitySlug: cleanSlug,
@@ -296,8 +281,12 @@ export class CapabilityClusteringEngine {
       fileName.endsWith('-evaluator') ||
       fileName.endsWith('-engine')
     ) {
-      const slug = fileName === 'index' && segments.length > 2 ? segments[segments.length - 2]! : fileName
-      const cleanSlug = toKebabCase(slug.replace(/-(?:service|detector|resolver|calculator|evaluator|engine)$/, ''))
+      const slug =
+        fileName === 'index' && segments.length > 2 ? segments[segments.length - 2]! : fileName
+      const cleanSlug = sanitizeSlug(
+        slug.replace(/-(?:service|detector|resolver|calculator|evaluator|engine)$/, ''),
+        workspace,
+      )
       return {
         workspace,
         capabilitySlug: cleanSlug,
@@ -309,15 +298,20 @@ export class CapabilityClusteringEngine {
     }
 
     // 11. Application & Shared CLI Helpers
-    if (lowerPath.includes('/helpers/') || lowerPath.includes('/_shared/') || lowerPath.includes('/utils/')) {
+    if (
+      lowerPath.includes('/helpers/') ||
+      lowerPath.includes('/_shared/') ||
+      lowerPath.includes('/utils/')
+    ) {
       let slug = 'runtime-helpers'
       if (segments.length >= 2) {
         const parent = segments[segments.length - 2]!
-        slug = parent === 'helpers' || parent === '_shared' || parent === 'utils' || parent === workspace
-          ? 'helpers'
-          : `${parent}-helpers`
+        slug =
+          parent === 'helpers' || parent === '_shared' || parent === 'utils' || parent === workspace
+            ? 'helpers'
+            : `${parent}-helpers`
       }
-      const cleanSlug = toKebabCase(slug)
+      const cleanSlug = sanitizeSlug(slug, workspace)
       return {
         workspace,
         capabilitySlug: cleanSlug,
@@ -342,10 +336,8 @@ export class CapabilityClusteringEngine {
           }
         }
       }
-      const slug = domainPrefix.endsWith('errors')
-        ? domainPrefix
-        : `${domainPrefix}-errors`
-      const cleanSlug = toKebabCase(slug)
+      const slug = domainPrefix.endsWith('errors') ? domainPrefix : `${domainPrefix}-errors`
+      const cleanSlug = sanitizeSlug(slug, workspace)
       return {
         workspace,
         capabilitySlug: cleanSlug,
@@ -358,7 +350,7 @@ export class CapabilityClusteringEngine {
 
     // 13. Composition Wiring (Attach to capability if named)
     if (lowerPath.includes('/composition/')) {
-      const cleanSlug = toKebabCase(fileName)
+      const cleanSlug = sanitizeSlug(fileName, workspace)
       return {
         workspace,
         capabilitySlug: cleanSlug,
@@ -374,7 +366,12 @@ export class CapabilityClusteringEngine {
     let category: SpecCategory = 'PUBLIC_INTERFACE_API'
     let layer = 'facade'
 
-    if (fileName === 'index' || fileName === 'public' || fileName === 'ports' || fileName === 'main') {
+    if (
+      fileName === 'index' ||
+      fileName === 'public' ||
+      fileName === 'ports' ||
+      fileName === 'main'
+    ) {
       if (segments.length > 1) {
         const parent = segments[segments.length - 2]!
         if (parent === 'ports') {
@@ -389,6 +386,14 @@ export class CapabilityClusteringEngine {
           defaultSlug = 'use-cases-registry'
           category = 'APPLICATION_USE_CASE'
           layer = 'application'
+        } else if (
+          parent === workspace ||
+          parent === 'src' ||
+          parent === 'lib' ||
+          parent === 'app' ||
+          parent.startsWith(workspace)
+        ) {
+          defaultSlug = `${workspace}-entrypoint`
         } else {
           defaultSlug = `${parent}-facade`
         }
@@ -397,7 +402,7 @@ export class CapabilityClusteringEngine {
       }
     }
 
-    const cleanSlug = toKebabCase(defaultSlug)
+    const cleanSlug = sanitizeSlug(defaultSlug, workspace)
     return {
       workspace,
       capabilitySlug: cleanSlug,

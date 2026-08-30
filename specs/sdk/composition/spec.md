@@ -107,7 +107,6 @@ The SDK root entrypoint MUST expose a curated host API and MUST NOT export concr
 - `cli:host-context` — host consumer
 - `sdk:context-markdown` — presentation helpers
 - `sdk:build-implementation-review` — shared review orchestration
-- `code-graph:isolated-index-worker` — isolated graph-index execution re-exported
-  to delivery hosts
+- `code-graph:isolated-index-worker` — isolated graph-index execution re-exported to delivery hosts
 - `sdk:suggest-implementation-links` — dependency-injected implementation suggestion orchestration
 - `sdk:suggest-spec-dependencies` — dependency-injected spec dependency orchestration

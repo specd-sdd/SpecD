@@ -1,5 +1,5 @@
 import { fromMarkdown } from 'mdast-util-from-markdown'
-import type { Root, Heading, Code, InlineCode, Text, Node } from 'mdast'
+import type { Root, Heading, Code, InlineCode, Node } from 'mdast'
 
 /**
  * Result of classifying symbols from specification markdown.
@@ -29,6 +29,9 @@ function toPascalCase(specId: string): string {
 
 /**
  * Extracts plain text recursively from an AST node.
+ *
+ * @param node - Any mdast Node (heading, paragraph, text, code, etc.)
+ * @returns Concatenated plain-text string from the node and its descendants
  */
 function extractNodeText(node: Node): string {
   if ('value' in node && typeof (node as { value: unknown }).value === 'string') {
@@ -68,7 +71,10 @@ export class SpecSymbolClassifier {
     if (pascalSpecId.length > 0) {
       ownedSymbols.add(pascalSpecId)
       // Also add stem without UseCase, Service, Repository, Port, Adapter
-      const strippedStem = pascalSpecId.replace(/(?:UseCase|Service|Repository|Port|Adapter|LanguageAdapter)$/, '')
+      const strippedStem = pascalSpecId.replace(
+        /(?:UseCase|Service|Repository|Port|Adapter|LanguageAdapter)$/,
+        '',
+      )
       if (strippedStem.length > 2) {
         ownedSymbols.add(strippedStem)
       }
@@ -105,10 +111,19 @@ export class SpecSymbolClassifier {
         const headingWords = text.match(/\b[A-Za-z][A-Za-z0-9_]{2,}\b/g)
         if (headingWords) {
           for (const word of headingWords) {
-            if (/^(?:Requirement|Verification|Scenario|Purpose|Requirements|Context|Rules|Given|When|Then|And)$/i.test(word)) {
+            if (
+              /^(?:Requirement|Verification|Scenario|Purpose|Requirements|Context|Rules|Given|When|Then|And)$/i.test(
+                word,
+              )
+            ) {
               continue
             }
-            if (/^[A-Z]/.test(word) || /^(?:create|detect|get|list|index|search|parse|extract|validate|update|archive|apply)/.test(word)) {
+            if (
+              /^[A-Z]/.test(word) ||
+              /^(?:create|detect|get|list|index|search|parse|extract|validate|update|archive|apply)/.test(
+                word,
+              )
+            ) {
               if (currentSectionPath.some((s) => /spec dependencies/i.test(s))) {
                 referencedSymbols.add(word)
               } else {
@@ -119,9 +134,7 @@ export class SpecSymbolClassifier {
         }
       }
 
-      const inDependenciesSection = currentSectionPath.some((s) =>
-        /spec dependencies/i.test(s),
-      )
+      const inDependenciesSection = currentSectionPath.some((s) => /spec dependencies/i.test(s))
       const inContractOrInterfaceSection = currentSectionPath.some((s) =>
         /contract|interface|use case|purpose|requirements|declaration/i.test(s),
       )
@@ -143,7 +156,10 @@ export class SpecSymbolClassifier {
               ownedSymbols.add(symbolName)
               if (/^[A-Z]/.test(symbolName)) {
                 // If it's a structure or class, extract its base stem (e.g. LoadPluginInput -> LoadPlugin)
-                const baseStem = symbolName.replace(/(?:Input|Output|Result|Deps|Options|Config|Error|Props|Manifest|Report)$/, '')
+                const baseStem = symbolName.replace(
+                  /(?:Input|Output|Result|Deps|Options|Config|Error|Props|Manifest|Report)$/,
+                  '',
+                )
                 if (baseStem.length > 2) {
                   ownedSymbols.add(baseStem)
                 }
@@ -156,9 +172,7 @@ export class SpecSymbolClassifier {
         }
 
         // Extract constructor parameter types or ports (referenced)
-        const constructorMatches = codeText.matchAll(
-          /constructor\s*\([^)]*\)/gs,
-        )
+        const constructorMatches = codeText.matchAll(/constructor\s*\([^)]*\)/gs)
         for (const cMatch of constructorMatches) {
           const cBody = cMatch[0]
           const paramTypeMatches = cBody.matchAll(/:\s*([A-Z][a-zA-Z0-9_]*)/g)
@@ -178,7 +192,10 @@ export class SpecSymbolClassifier {
             referencedSymbols.add(inlineText)
           } else if (inContractOrInterfaceSection) {
             ownedSymbols.add(inlineText)
-            const baseStem = inlineText.replace(/(?:Input|Output|Result|Deps|Options|Config|Error|Props|Manifest|Report|UseCase|Service|Repository|Port)$/, '')
+            const baseStem = inlineText.replace(
+              /(?:Input|Output|Result|Deps|Options|Config|Error|Props|Manifest|Report|UseCase|Service|Repository|Port)$/,
+              '',
+            )
             if (baseStem.length > 2) {
               ownedSymbols.add(baseStem)
             }
@@ -208,8 +225,7 @@ export class SpecSymbolClassifier {
     if (existingLinkedSymbols.length > 0 && primaryOwnerSymbol) {
       const hasPrimary = existingLinkedSymbols.some(
         (sym) =>
-          sym === primaryOwnerSymbol ||
-          sym.toLowerCase() === primaryOwnerSymbol!.toLowerCase(),
+          sym === primaryOwnerSymbol || sym.toLowerCase() === primaryOwnerSymbol!.toLowerCase(),
       )
       if (!hasPrimary) {
         completenessIssues.push(

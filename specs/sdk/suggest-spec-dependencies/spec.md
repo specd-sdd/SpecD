@@ -61,6 +61,27 @@ The input interface MUST support:
    - If `ValidateSpecs` itself throws, the failure MUST remain observable to the caller and MUST NOT be converted to `{ status: "all-valid", invalidSpecs: [] }`. A validator failure cannot prove that mutated specs are valid.
    - If all specs are valid (`status: "all-valid"`), NO alignment change is created under any circumstances.
 
+### Requirement: Modular Transitive Reduction & Invariant Graph Engine
+
+The dependency deduction orchestration SHALL delegate transitive edge pruning to a shared, pure `TransitiveReductionEngine`:
+
+1. Given a dependency adjacency map `Map<string, Set<string>>`, the engine SHALL compute reachability between candidate targets.
+2. If target $B \in \text{directDeps}(A)$ and target $C$ is reachable from $B$, the direct edge $A \rightarrow C$ SHALL be deterministically pruned from $A$'s direct dependency set.
+3. The algorithm SHALL be pure, acyclic, and reusable across both active spec lock deduction and brownfield specification discovery.
+
+### Requirement: Early Graph Staleness Diagnostics
+
+Prior to executing dependency deduction and call-graph tracing, the use case SHALL probe the freshness and health of the injected code graph provider via `codeGraphProvider.getGraphHealth()`. If the graph is stale, the use case SHALL emit a `stale-warning` progress event and populate `codeGraphStale: boolean` in `SuggestSpecDependenciesResult`.
+
+### Requirement: Multi-Process Cache Locking and Flush Merging
+
+The spec dependencies suggestion filesystem cache SHALL protect all concurrent write and warmup operations across multiple OS processes via kernel-level atomic lock files (`<cachePath>.lock`) using `O_EXCL` file creation (`open(..., 'wx')`) with automatic stale lock reaping:
+
+1. **Warmup & Batch Operations**: The cache port SHALL expose `withLock<T>(fn: () => Promise<T>)` to execute warmup analysis under an exclusive lock, preventing parallel processes from performing redundant analysis.
+2. **Re-entrant In-Process Locking**: In-process lock acquisition SHALL be re-entrant via reference counting.
+3. **Flush Merging**: On `flush()`, the cache SHALL acquire the lock, re-read the latest disk state, merge in-memory entries with entries written concurrently by other processes, and atomically write the merged payload.
+4. **Typed Error on Contention Timeout**: If the exclusive lock cannot be acquired within the configured timeout, the cache SHALL throw `CacheLockError` (error code `CACHE_LOCKED`).
+
 ### Requirement: Dependency-injected factory
 
 The application module MUST provide the canonical dependency-injected factory:

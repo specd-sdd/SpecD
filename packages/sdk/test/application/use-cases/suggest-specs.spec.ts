@@ -141,20 +141,16 @@ describe('SuggestSpecs', () => {
 
   it('throws WorkspaceNotFoundError when workspace does not exist', async () => {
     const useCase = new SuggestSpecs(deps)
-    await expect(
-      useCase.execute({ workspaceFilter: 'non-existent' }),
-    ).rejects.toThrowError(WorkspaceNotFoundError)
+    await expect(useCase.execute({ workspaceFilter: 'non-existent' })).rejects.toThrowError(
+      WorkspaceNotFoundError,
+    )
   })
 
   it('throws InvalidInputError on invalid parameters', async () => {
     const useCase = new SuggestSpecs(deps)
-    await expect(
-      useCase.execute({ minConfidence: 1.5 }),
-    ).rejects.toThrowError(InvalidInputError)
+    await expect(useCase.execute({ minConfidence: 1.5 })).rejects.toThrowError(InvalidInputError)
 
-    await expect(
-      useCase.execute({ limit: 0 }),
-    ).rejects.toThrowError(InvalidInputError)
+    await expect(useCase.execute({ limit: 0 })).rejects.toThrowError(InvalidInputError)
   })
 
   it('respects limit and minConfidence options', async () => {
@@ -216,9 +212,13 @@ describe('SuggestSpecs', () => {
           {
             list: async () => [{ path: 'user-login', workspace: 'core' }],
             get: async () => ({ id: 'core:user-login', artifacts: [{ filename: 'spec.md' }] }),
-            artifact: async () => ({ content: '# UserLoginService\n\nHandles user login authentication.' }),
+            artifact: async () => ({
+              content: '# UserLoginService\n\nHandles user login authentication.',
+            }),
             readPersistedState: async () => ({
-              implementation: [{ file: 'src/domain/legacy-services.ts', symbols: ['UserLoginService'] }],
+              implementation: [
+                { file: 'src/domain/legacy-services.ts', symbols: ['UserLoginService'] },
+              ],
             }),
           } as any,
         ],
@@ -238,6 +238,63 @@ describe('SuggestSpecs', () => {
 
     for (const spec of result.suggestedSpecs) {
       expect(spec.primaryFiles).toContain('src/domain/legacy-services.ts')
+    }
+  })
+
+  it('guarantees candidate spec IDs have exactly one colon and no workspace name repetition', async () => {
+    const pluginFiles = [
+      {
+        path: 'plugin-agent-standard:src/index.ts',
+        configRelativePath: 'packages/plugin-agent-standard/src/index.ts',
+        language: 'typescript',
+        workspace: 'plugin-agent-standard',
+        contentHash: 'p1',
+      },
+    ]
+
+    const pluginSymbols = [
+      {
+        id: 'sym:standard-plugin',
+        name: 'standardPlugin',
+        kind: 'const',
+        filePath: 'plugin-agent-standard:src/index.ts',
+      },
+      {
+        id: 'sym:create-plugin',
+        name: 'create',
+        kind: 'function',
+        filePath: 'plugin-agent-standard:src/index.ts',
+      },
+    ]
+
+    const customDeps: SuggestSpecsDeps = {
+      codeGraphProvider: {
+        open: async () => {},
+        close: async () => {},
+        store: { getAllFiles: async () => pluginFiles },
+        findSymbols: async () => pluginSymbols,
+        getHotspots: async () => ({ hotspots: [] }),
+      } as any,
+      adapterRegistry: mockAdapterRegistry,
+      fileObserver: mockFileObserver,
+    }
+
+    const useCase = new SuggestSpecs(customDeps)
+    const result = await useCase.execute({ ignoreCurrentSpecs: true })
+
+    expect(result.result).toBe('ok')
+    expect(result.suggestedSpecs.length).toBeGreaterThan(0)
+
+    for (const spec of result.suggestedSpecs) {
+      // Must have exactly one colon separator
+      const colonCount = (spec.id.match(/:/g) || []).length
+      expect(colonCount).toBe(1)
+
+      // Must not repeat the workspace name in the slug
+      const [workspace, slug] = spec.id.split(':')
+      expect(slug).toBeDefined()
+      expect(slug?.startsWith(`${workspace}-`)).toBe(false)
+      expect(slug?.startsWith(`${workspace}:`)).toBe(false)
     }
   })
 })

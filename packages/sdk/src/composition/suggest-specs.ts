@@ -12,10 +12,7 @@ import {
 import { createCodeGraphProvider, createBuiltinAdapterRegistry } from '@specd/code-graph'
 import { FsImplementationSuggestionCache } from '../infrastructure/fs/fs-implementation-suggestion-cache.js'
 import { createSuggestImplementationLinks } from './suggest-implementation-links.js'
-import {
-  SuggestSpecs,
-  type SuggestSpecsDeps,
-} from '../application/use-cases/suggest-specs.js'
+import { SuggestSpecs, type SuggestSpecsDeps } from '../application/use-cases/suggest-specs.js'
 import { type SuggestionFileObserver } from '../application/use-cases/suggest-implementation-links.js'
 
 const fsSuggestionFileObserver: SuggestionFileObserver = {
@@ -89,6 +86,13 @@ export function createSuggestSpecs(
   config: SpecdConfig,
   options?: CompositionResolutionOptions,
 ): SuggestSpecs
+/**
+ * Creates the SuggestSpecs use case from a deps object or project config.
+ *
+ * @param depsOrConfig - Injected deps object or project config
+ * @param options - Resolution overrides
+ * @returns The wired use case
+ */
 export function createSuggestSpecs(
   depsOrConfig: SuggestSpecsDeps | SpecdConfig,
   options?: CompositionResolutionOptions,
@@ -102,6 +106,9 @@ export function createSuggestSpecs(
 
 /**
  * Type-guard checking whether an argument satisfies SuggestSpecsDeps.
+ *
+ * @param target - Value to test against the SuggestSpecsDeps shape
+ * @returns True when the value satisfies SuggestSpecsDeps
  */
 function isSuggestSpecsDeps(target: unknown): target is SuggestSpecsDeps {
   return (

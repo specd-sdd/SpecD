@@ -3,6 +3,7 @@ import {
   InvalidInputError,
   WorkspaceNotFoundError,
   SpecPath,
+  Logger,
 } from '@specd/core'
 import {
   type CodeGraphProvider,
@@ -22,6 +23,7 @@ import {
   type SuggestSpecsResult,
   type AnchorSymbol,
   type HotspotSummary,
+  type SpecCategory,
 } from '../../domain/value-objects/candidate-spec.js'
 import { CapabilityClusteringEngine } from '../../domain/services/capability-clustering-engine.js'
 import { SpecSymbolClassifier } from '../../domain/services/spec-symbol-classifier.js'
@@ -34,7 +36,6 @@ import {
   type SuggestImplementationProgressEvent,
 } from './suggest-implementation-links.js'
 import { type ImplementationSuggestionCachePort } from '../ports/implementation-suggestion-cache-port.js'
-import { type ImplementationSuggestionSpecEntry } from '../../domain/value-objects/implementation-suggestion-cache.js'
 
 /**
  * Progress event emitted during SuggestSpecs execution.
@@ -86,9 +87,7 @@ export const suggestSpecsInputSchema = z
     limit: z.number().int().min(1, 'limit must be >= 1').optional(),
     rebuildCache: z.boolean().optional(),
     onProgress: z
-      .custom<OnSuggestSpecsProgress>(
-        (val) => val === undefined || typeof val === 'function',
-      )
+      .custom<OnSuggestSpecsProgress>((val) => val === undefined || typeof val === 'function')
       .optional(),
   })
   .strict()
@@ -109,15 +108,55 @@ export interface SuggestSpecsDeps {
 /**
  * Determines whether a code symbol is structurally substantive and eligible for specification.
  * Discards private helpers, internal variables, getters/setters, and anonymous lambdas.
+ *
+ * @param sym - Symbol node from the code graph
+ * @returns `true` if the symbol merits a specification entry
  */
 function isSpeccableSymbol(sym: SymbolNode): boolean {
   if (sym.name.startsWith('_')) return false
   const lower = sym.name.toLowerCase()
   const genericLocalNames = new Set([
-    'usecase', 'use_case', 'handler', 'action', 'fn', 'cb', 'helper', 'opts', 'options',
-    'default', 'fmt', 'pct', 'str', 'len', 'val', 'res', 'req', 'err', 'msg', 'doc',
-    'ctx', 'cfg', 'ptr', 'arg', 'cmd', 'url', 'obj', 'arr', 'map', 'num', 'buf',
-    'tmp', 'tag', 'key', 'init', 'main', 'run', 'execute', 'temp', 'noop', 'self',
+    'usecase',
+    'use_case',
+    'handler',
+    'action',
+    'fn',
+    'cb',
+    'helper',
+    'opts',
+    'options',
+    'default',
+    'fmt',
+    'pct',
+    'str',
+    'len',
+    'val',
+    'res',
+    'req',
+    'err',
+    'msg',
+    'doc',
+    'ctx',
+    'cfg',
+    'ptr',
+    'arg',
+    'cmd',
+    'url',
+    'obj',
+    'arr',
+    'map',
+    'num',
+    'buf',
+    'tmp',
+    'tag',
+    'key',
+    'init',
+    'main',
+    'run',
+    'execute',
+    'temp',
+    'noop',
+    'self',
   ])
   if (genericLocalNames.has(lower)) {
     return false
@@ -135,12 +174,65 @@ function isSpeccableSymbol(sym: SymbolNode): boolean {
   return false
 }
 
+/** Shape of the code graph health status returned by optional `getGraphHealth()`. */
+type GraphHealthResult = {
+  stale?: boolean
+  state?: string
+  knownStaleSinceLastIndex?: boolean
+  reasonCodes?: string[]
+}
+
+/** Shape of a single hotspot entry as returned by various `getHotspots()` response formats. */
+type RawHotspotEntry = {
+  symbol?: { name?: string; kind?: string; filePath?: string }
+  name?: string
+  kind?: string
+  filePath?: string
+  score?: number
+  directCallers?: number
+  crossWorkspaceCallers?: number
+  riskLevel?: string
+}
+
+/** Recognized risk levels for candidate specs. */
+const RISK_LEVELS = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'] as const
+
+/** Union of the recognized risk levels for candidate specs. */
+type RiskLevel = (typeof RISK_LEVELS)[number]
+
+/**
+ * Coerces an arbitrary risk-level string to a known `RiskLevel`, defaulting to `LOW`.
+ *
+ * @param value - Raw risk-level string to normalize
+ * @returns A recognized risk level value
+ */
+function toRiskLevel(value: string | undefined): RiskLevel {
+  return RISK_LEVELS.includes(value as RiskLevel) ? (value as RiskLevel) : 'LOW'
+}
+
+/** Possible shapes for the `getHotspots()` result depending on provider implementation. */
+type RawHotspotsResult = {
+  hotspots?: RawHotspotEntry[]
+  entries?: RawHotspotEntry[]
+}
+
 /**
  * Application use case for discovering candidate specifications and auditing specification gaps.
  */
 export class SuggestSpecs {
+  /**
+   * Creates a new SuggestSpecs use case instance.
+   *
+   * @param deps - Injected runtime dependencies
+   */
   constructor(private readonly deps: SuggestSpecsDeps) {}
 
+  /**
+   * Executes the brownfield capability discovery and gap analysis pipeline.
+   *
+   * @param input - Optional analysis options (workspace filter, confidence threshold, etc.)
+   * @returns Structured result with candidate specs, coverage metrics, and per-workspace breakdown
+   */
   async execute(input?: SuggestSpecsInput): Promise<SuggestSpecsResult> {
     const parseResult = suggestSpecsInputSchema.safeParse(input || {})
     if (!parseResult.success) {
@@ -160,7 +252,10 @@ export class SuggestSpecs {
         ? validatedInput.workspaceFilter
         : [validatedInput.workspaceFilter]
       for (const filter of filters) {
-        for (const ws of filter.split(',').map((s) => s.trim()).filter(Boolean)) {
+        for (const ws of filter
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean)) {
           if (!this.deps.specRepositories.has(ws)) {
             throw new WorkspaceNotFoundError(ws)
           }
@@ -173,11 +268,7 @@ export class SuggestSpecs {
     const isProviderOpen =
       Boolean((provider as { isOpen?: unknown })?.isOpen) ||
       Boolean((provider as { _isOpen?: unknown })?._isOpen)
-    if (
-      provider &&
-      typeof provider.open === 'function' &&
-      !isProviderOpen
-    ) {
+    if (provider && typeof provider.open === 'function' && !isProviderOpen) {
       await provider.open().catch(() => {})
       shouldCloseProvider = true
     }
@@ -189,14 +280,17 @@ export class SuggestSpecs {
       })
 
       let codeGraphStale = false
-      if (provider && typeof (provider as any).getGraphHealth === 'function') {
+      const providerWithHealth = provider as unknown as {
+        getGraphHealth?: () => Promise<GraphHealthResult>
+      }
+      if (provider && typeof providerWithHealth.getGraphHealth === 'function') {
         try {
-          const health = await (provider as any).getGraphHealth()
+          const health = await providerWithHealth.getGraphHealth()
           codeGraphStale = Boolean(
             health?.stale ||
-              health?.state === 'stale' ||
-              health?.knownStaleSinceLastIndex ||
-              (Array.isArray(health?.reasonCodes) && health.reasonCodes.length > 0),
+            health?.state === 'stale' ||
+            health?.knownStaleSinceLastIndex ||
+            (Array.isArray(health?.reasonCodes) && health.reasonCodes.length > 0),
           )
         } catch {
           // Advisory
@@ -212,41 +306,32 @@ export class SuggestSpecs {
 
       // Pass 0: Warm up implementation suggestion cache across monorepo for gap analysis
       if (this.deps.suggestImplementationLinks && !validatedInput.ignoreCurrentSpecs) {
+        Logger.debug('[SuggestSpecs] Phase 0: Warming up implementation cache across workspaces...')
         validatedInput.onProgress?.({
           type: 'warmup-start',
           message: 'Warming up implementation cache across workspaces...',
         })
         const implCache = this.deps.implementationCache
         const executeWarmup = async () => {
+          Logger.debug('[SuggestSpecs] Executing suggestImplementationLinks for cache warmup...')
           const implResult = await this.deps.suggestImplementationLinks!.execute({
             all: true,
             apply: false,
-            ...(validatedInput.rebuildCache !== undefined ? { rebuildCache: validatedInput.rebuildCache } : {}),
-            onProgress: (evt) =>
-              validatedInput.onProgress?.({ type: 'warmup-progress', event: evt }),
+            ...(validatedInput.rebuildCache !== undefined
+              ? { rebuildCache: validatedInput.rebuildCache }
+              : {}),
+            onProgress: (evt) => {
+              Logger.debug('[SuggestSpecs] Warmup progress event', { type: evt.type })
+              validatedInput.onProgress?.({ type: 'warmup-progress', event: evt })
+            },
+          })
+          Logger.debug('[SuggestSpecs] Cache warmup execute complete', {
+            warmedSpecsCount: implResult?.specs?.length ?? 0,
           })
           validatedInput.onProgress?.({
             type: 'warmup-done',
             totalSpecs: implResult?.specs?.length ?? 0,
           })
-
-          if (implCache && implResult?.specs && implResult.specs.length > 0) {
-            const entriesToPrime: ImplementationSuggestionSpecEntry[] = []
-            for (const s of implResult.specs) {
-              if (!s.specStamp || (!s.specStamp.lastModified && !s.specStamp.hash)) continue
-              entriesToPrime.push({
-                specId: s.specId,
-                title: s.title,
-                specStamp: s.specStamp,
-                existing: s.existing,
-                suggestions: s.suggestions,
-              })
-            }
-            if (entriesToPrime.length > 0) {
-              await implCache.setMany(entriesToPrime)
-              await implCache.flush()
-            }
-          }
         }
 
         try {
@@ -259,11 +344,17 @@ export class SuggestSpecs {
           if ((err as { code?: string })?.code === 'CACHE_LOCKED') {
             throw err
           }
+          Logger.warn('[SuggestSpecs] Cache warmup pass encountered an exception', {
+            error: err instanceof Error ? err.message : String(err),
+            stack: err instanceof Error ? err.stack : undefined,
+            code: (err as { code?: string })?.code,
+          })
           // Non-fatal if other warmup failures occur, continue with in-memory AST correlation
         }
       }
 
       // 1. Retrieve all indexed files and symbols from CodeGraph
+      Logger.debug('[SuggestSpecs] Phase 1: Retrieving indexed files and symbols from CodeGraph...')
       let allFiles: FileNode[] = []
       let allSymbols: SymbolNode[] = []
       let hotspots: Array<{
@@ -282,13 +373,17 @@ export class SuggestSpecs {
         }
 
         try {
-          if (typeof (provider as any).getAllFiles === 'function') {
-            allFiles = await (provider as any).getAllFiles()
-          } else {
-            const store = (provider as { store?: { getAllFiles?: () => Promise<FileNode[]> } }).store
-            if (store && typeof store.getAllFiles === 'function') {
-              allFiles = await store.getAllFiles()
-            }
+          const providerWithAllFiles = provider as unknown as {
+            getAllFiles?: () => Promise<FileNode[]>
+            store?: { getAllFiles?: () => Promise<FileNode[]> }
+          }
+          if (typeof providerWithAllFiles.getAllFiles === 'function') {
+            allFiles = await providerWithAllFiles.getAllFiles()
+          } else if (
+            providerWithAllFiles.store &&
+            typeof providerWithAllFiles.store.getAllFiles === 'function'
+          ) {
+            allFiles = await providerWithAllFiles.store.getAllFiles()
           }
         } catch {
           // Fallback if store not accessible directly
@@ -301,12 +396,18 @@ export class SuggestSpecs {
         }
 
         try {
-          const rawResult = await (provider as any).getHotspots?.({ limit: 1000, minScore: 0 })
-          const rawHotspots =
-            rawResult && Array.isArray(rawResult.hotspots)
+          const providerWithHotspots = provider as unknown as {
+            getHotspots?: (opts: {
+              limit: number
+              minScore: number
+            }) => Promise<RawHotspotsResult | RawHotspotEntry[]>
+          }
+          const rawResult = await providerWithHotspots.getHotspots?.({ limit: 1000, minScore: 0 })
+          const rawHotspots: RawHotspotEntry[] =
+            rawResult && !Array.isArray(rawResult) && Array.isArray(rawResult.hotspots)
               ? rawResult.hotspots
-              : rawResult && Array.isArray(rawResult.entries)
-                ? rawResult.entries.map((e: any) => ({
+              : rawResult && !Array.isArray(rawResult) && Array.isArray(rawResult.entries)
+                ? rawResult.entries.map((e) => ({
                     name: e.symbol?.name || e.name || '',
                     kind: e.symbol?.kind || e.kind || 'function',
                     filePath: e.symbol?.filePath || e.filePath || '',
@@ -319,7 +420,7 @@ export class SuggestSpecs {
                   ? rawResult
                   : []
 
-          hotspots = rawHotspots.map((h: any) => ({
+          hotspots = rawHotspots.map((h) => ({
             name: typeof h.name === 'string' ? h.name : '',
             kind: typeof h.kind === 'string' ? h.kind : 'function',
             filePath: typeof h.filePath === 'string' ? h.filePath : '',
@@ -327,7 +428,7 @@ export class SuggestSpecs {
             directCallers: typeof h.directCallers === 'number' ? h.directCallers : 0,
             crossWorkspaceCallers:
               typeof h.crossWorkspaceCallers === 'number' ? h.crossWorkspaceCallers : 0,
-            riskLevel: h.riskLevel || 'LOW',
+            riskLevel: toRiskLevel(h.riskLevel),
           }))
         } catch {
           hotspots = []
@@ -390,7 +491,9 @@ export class SuggestSpecs {
         const activeRepos =
           targetWorkspaces && targetWorkspaces.size > 0
             ? new Map(
-                [...this.deps.specRepositories.entries()].filter(([ws]) => targetWorkspaces.has(ws)),
+                [...this.deps.specRepositories.entries()].filter(([ws]) =>
+                  targetWorkspaces.has(ws),
+                ),
               )
             : this.deps.specRepositories
 
@@ -402,35 +505,45 @@ export class SuggestSpecs {
         const markClaimedFile = (filePath: string, ws: string) => {
           const clean = filePath.replaceAll('\\', '/')
           fullyClaimedFiles.add(clean)
-          const noWs = clean.replace(/^[^:]+:/, '')
-          fullyClaimedFiles.add(noWs)
+          const relativePath = clean
+            .replace(/^[^:]+:/, '')
+            .replace(new RegExp(`^(?:packages|apps)/${ws}/`, 'i'), '')
+            .replace(new RegExp(`^${ws}/`, 'i'), '')
+          fullyClaimedFiles.add(relativePath)
           if (ws) {
-            fullyClaimedFiles.add(`${ws}:${noWs}`)
-            fullyClaimedFiles.add(`packages/${ws}/${noWs}`)
-            fullyClaimedFiles.add(`packages/${ws}/src/${noWs}`)
-            fullyClaimedFiles.add(`apps/${ws}/${noWs}`)
-            fullyClaimedFiles.add(`apps/${ws}/src/${noWs}`)
+            fullyClaimedFiles.add(`${ws}:${relativePath}`)
+            fullyClaimedFiles.add(`packages/${ws}/${relativePath}`)
+            if (!relativePath.startsWith('src/')) {
+              fullyClaimedFiles.add(`packages/${ws}/src/${relativePath}`)
+            }
+            fullyClaimedFiles.add(`apps/${ws}/${relativePath}`)
+            if (!relativePath.startsWith('src/')) {
+              fullyClaimedFiles.add(`apps/${ws}/src/${relativePath}`)
+            }
 
             // Hierarchical claim propagation for composition wiring and helpers
-            if (noWs.includes('application/use-cases/')) {
-              const compPath = noWs.replace('application/use-cases/', 'composition/use-cases/')
+            if (relativePath.includes('application/use-cases/')) {
+              const compPath = relativePath.replace(
+                'application/use-cases/',
+                'composition/use-cases/',
+              )
               fullyClaimedFiles.add(`${ws}:${compPath}`)
               fullyClaimedFiles.add(`packages/${ws}/src/${compPath}`)
-              const compRoot = noWs.replace('application/use-cases/', 'composition/')
+              const compRoot = relativePath.replace('application/use-cases/', 'composition/')
               fullyClaimedFiles.add(`${ws}:${compRoot}`)
               fullyClaimedFiles.add(`packages/${ws}/src/${compRoot}`)
             }
-            if (noWs.includes('application/ports/')) {
-              const fsPath = noWs.replace('application/ports/', 'infrastructure/fs/')
+            if (relativePath.includes('application/ports/')) {
+              const fsPath = relativePath.replace('application/ports/', 'infrastructure/fs/')
               fullyClaimedFiles.add(`${ws}:${fsPath}`)
               fullyClaimedFiles.add(`packages/${ws}/src/${fsPath}`)
-              const fsPrefixed = noWs.replace('application/ports/', 'infrastructure/fs/fs-')
+              const fsPrefixed = relativePath.replace('application/ports/', 'infrastructure/fs/fs-')
               fullyClaimedFiles.add(`${ws}:${fsPrefixed}`)
               fullyClaimedFiles.add(`packages/${ws}/src/${fsPrefixed}`)
-              const nodePath = noWs.replace('application/ports/', 'infrastructure/node/')
+              const nodePath = relativePath.replace('application/ports/', 'infrastructure/node/')
               fullyClaimedFiles.add(`${ws}:${nodePath}`)
               fullyClaimedFiles.add(`packages/${ws}/src/${nodePath}`)
-              const compPath = noWs.replace('application/ports/', 'composition/')
+              const compPath = relativePath.replace('application/ports/', 'composition/')
               fullyClaimedFiles.add(`${ws}:${compPath}`)
               fullyClaimedFiles.add(`packages/${ws}/src/${compPath}`)
             }
@@ -438,7 +551,6 @@ export class SuggestSpecs {
         }
 
         for (const [wsName, repo] of activeRepos.entries()) {
-
           const listResult = await repo.list(undefined, { includeMeta: true })
           const entries = Array.isArray(listResult) ? listResult : (listResult?.items ?? [])
           for (const rawEntry of entries) {
@@ -451,8 +563,12 @@ export class SuggestSpecs {
             const rawSpecSlug = entryPath.split('/').pop() || entryPath
             existingSpecSlugs.add(`${entryWorkspace}::${entryPath}`)
             existingSpecSlugs.add(`${entryWorkspace}::${rawSpecSlug}`)
-            existingSpecSlugs.add(`${entryWorkspace}::${rawSpecSlug.replace(/-(?:use-case|usecase|workflow|action|service|repository|port|adapter|language-adapter)$/, '')}`)
-            existingSpecSlugs.add(`${entryWorkspace}::${rawSpecSlug.replace(/^(?:fs|sqlite|memory|mock|git|hg|svn)-/, '')}`)
+            existingSpecSlugs.add(
+              `${entryWorkspace}::${rawSpecSlug.replace(/-(?:use-case|usecase|workflow|action|service|repository|port|adapter|language-adapter)$/, '')}`,
+            )
+            existingSpecSlugs.add(
+              `${entryWorkspace}::${rawSpecSlug.replace(/^(?:fs|sqlite|memory|mock|git|hg|svn)-/, '')}`,
+            )
 
             // Read spec content and audit links through SpecRepository
             try {
@@ -483,13 +599,19 @@ export class SuggestSpecs {
               if (spec && typeof repo.readPersistedState === 'function') {
                 const state = await repo.readPersistedState(spec)
                 if (state?.implementation) {
+                  for (const link of state.implementation) {
+                    if (link.symbols && link.symbols.length > 0) {
+                      for (const sym of link.symbols) {
+                        symbolNameCoverageMap.set(`${entryWorkspace}::${sym}`, specId)
+                      }
+                    } else {
+                      markClaimedFile(link.file, entryWorkspace)
+                    }
+                  }
                   linkedFiles = state.implementation.map((link) => link.file)
                   linkedSymbols = state.implementation.flatMap((link) =>
                     link.symbols ? [...link.symbols] : [],
                   )
-                  for (const sym of linkedSymbols) {
-                    symbolNameCoverageMap.set(`${entryWorkspace}::${sym}`, specId)
-                  }
                 }
               }
 
@@ -500,8 +622,10 @@ export class SuggestSpecs {
                   if (cached && cached.suggestions) {
                     for (const sug of cached.suggestions) {
                       if (sug.confidence === 'HIGH') {
-                        markClaimedFile(sug.file, entryWorkspace)
-                        for (const sym of sug.symbols) {
+                        if (!sug.symbols || sug.symbols.length === 0) {
+                          markClaimedFile(sug.file, entryWorkspace)
+                        }
+                        for (const sym of sug.symbols || []) {
                           symbolNameCoverageMap.set(`${entryWorkspace}::${sym}`, specId)
                         }
                       }
@@ -518,10 +642,6 @@ export class SuggestSpecs {
                 linkedSymbols,
                 linkedFiles,
               )
-
-              for (const lf of linkedFiles) {
-                markClaimedFile(lf, entryWorkspace)
-              }
 
               // Also claim files and symbols declaring owned symbols of this spec (even if spec-lock is absent)
               const ownedVariants = new Set<string>()
@@ -540,14 +660,15 @@ export class SuggestSpecs {
               for (const s of allSymbols) {
                 if (ownedVariants.has(s.name)) {
                   symbolCoverageMap.set(s.id, specId)
-                  markClaimedFile(s.filePath, entryWorkspace)
                 }
               }
 
               // Semantic token stem matching: claim files containing distinctive spec tokens
               const specTokens = rawSpecSlug
                 .split(/[-_]+/)
-                .filter((t) => t.length >= 4 && !/^(?:spec|usecase|service|repo|port|adapter)$/i.test(t))
+                .filter(
+                  (t) => t.length >= 4 && !/^(?:spec|usecase|service|repo|port|adapter)$/i.test(t),
+                )
               if (specTokens.length > 0) {
                 for (const pFile of productionFiles) {
                   const pWs = pFile.workspace || 'default'
@@ -577,10 +698,11 @@ export class SuggestSpecs {
         this.deps.adapterRegistry.getSupportedExtensions?.() || [],
       )
 
+      /** Aggregated capability cluster grouping related source files and symbols under one spec boundary. */
       interface CapabilityCluster {
         workspace: string
         capabilitySlug: string
-        category: any
+        category: SpecCategory
         titleSuffix: string
         layer: string
         primaryFiles: Set<string>
@@ -593,24 +715,68 @@ export class SuggestSpecs {
       /**
        * Strips architectural role suffixes and action verbs from a symbol name
        * to reveal its underlying domain concept root (OOP + Functional).
-       * E.g.:
-       *   "PasswordResetService" → "PasswordReset"
-       *   "createUser" → "User"
-       *   "registerSpecSuggest" → "SpecSuggest"
-       *   "formatImpactResult" → "Impact"
+       *
+       * @param symbolName - Raw exported symbol name (e.g. `PasswordResetService`, `createUser`)
+       * @returns Canonical concept root (e.g. `PasswordReset`, `User`)
+       *
+       * @example
+       *   extractConceptRoot("PasswordResetService") // → "PasswordReset"
+       *   extractConceptRoot("createUser")           // → "User"
+       *   extractConceptRoot("registerSpecSuggest")  // → "SpecSuggest"
+       *   extractConceptRoot("formatImpactResult")   // → "Impact"
        */
       function extractConceptRoot(symbolName: string): string {
         let name = symbolName
 
         // 1. Strip common functional action/verb prefixes (camelCase or snake_case)
         const verbPrefixes = [
-          'create', 'register', 'get', 'find', 'list', 'fetch', 'read', 'write',
-          'update', 'edit', 'set', 'delete', 'remove', 'validate', 'process',
-          'handle', 'render', 'format', 'parse', 'resolve', 'build', 'open',
-          'close', 'execute', 'run', 'check', 'assert', 'load', 'save', 'send',
-          'calc', 'calculate', 'emit', 'track', 'dispatch', 'warn', 'normalize',
-          'extend', 'fork', 'show', 'discard', 'approve', 'archive', 'skip',
-          'preview', 'install', 'uninstall',
+          'create',
+          'register',
+          'get',
+          'find',
+          'list',
+          'fetch',
+          'read',
+          'write',
+          'update',
+          'edit',
+          'set',
+          'delete',
+          'remove',
+          'validate',
+          'process',
+          'handle',
+          'render',
+          'format',
+          'parse',
+          'resolve',
+          'build',
+          'open',
+          'close',
+          'execute',
+          'run',
+          'check',
+          'assert',
+          'load',
+          'save',
+          'send',
+          'calc',
+          'calculate',
+          'emit',
+          'track',
+          'dispatch',
+          'warn',
+          'normalize',
+          'extend',
+          'fork',
+          'show',
+          'discard',
+          'approve',
+          'archive',
+          'skip',
+          'preview',
+          'install',
+          'uninstall',
         ]
 
         for (const verb of verbPrefixes) {
@@ -625,17 +791,73 @@ export class SuggestSpecs {
 
         // 2. Strip architectural role suffixes
         const roleSuffixes = [
-          'UseCase', 'Workflow', 'Interactor', 'Executor', 'Runner',
-          'Service', 'Repository', 'Controller', 'Factory', 'Manager', 'Handler',
-          'Adapter', 'Resolver', 'Gateway', 'Registry', 'Store', 'Cache',
-          'Builder', 'Validator', 'Formatter', 'Parser', 'Serializer', 'Transformer',
-          'Provider', 'Listener', 'Observer', 'Emitter',
-          'Processor', 'Dispatcher', 'Loader', 'Writer', 'Reader', 'Fetcher',
-          'Command', 'Cmd', 'Query', 'Port',
-          'Input', 'Result', 'Output', 'Options', 'Config', 'Settings', 'Props',
-          'State', 'Event', 'Error', 'Exception', 'Presenter', 'Helper', 'Helpers',
-          'Context', 'Types', 'Type', 'Report', 'Summary', 'Payload', 'Response',
-          'Request', 'Record', 'Entry', 'Manifest', 'Snapshot', 'View', 'DTO', 'Dto', 'Model',
+          'UseCase',
+          'Workflow',
+          'Interactor',
+          'Executor',
+          'Runner',
+          'Service',
+          'Repository',
+          'Controller',
+          'Factory',
+          'Manager',
+          'Handler',
+          'Adapter',
+          'Resolver',
+          'Gateway',
+          'Registry',
+          'Store',
+          'Cache',
+          'Builder',
+          'Validator',
+          'Formatter',
+          'Parser',
+          'Serializer',
+          'Transformer',
+          'Provider',
+          'Listener',
+          'Observer',
+          'Emitter',
+          'Processor',
+          'Dispatcher',
+          'Loader',
+          'Writer',
+          'Reader',
+          'Fetcher',
+          'Command',
+          'Cmd',
+          'Query',
+          'Port',
+          'Input',
+          'Result',
+          'Output',
+          'Options',
+          'Config',
+          'Settings',
+          'Props',
+          'State',
+          'Event',
+          'Error',
+          'Exception',
+          'Presenter',
+          'Helper',
+          'Helpers',
+          'Context',
+          'Types',
+          'Type',
+          'Report',
+          'Summary',
+          'Payload',
+          'Response',
+          'Request',
+          'Record',
+          'Entry',
+          'Manifest',
+          'Snapshot',
+          'View',
+          'DTO',
+          'Dto',
+          'Model',
         ].sort((a, b) => b.length - a.length) // longest first
 
         for (const suffix of roleSuffixes) {
@@ -655,6 +877,9 @@ export class SuggestSpecs {
        *
        * This naturally handles both SRP files (1 group → 1 spec) and legacy multi-concept files
        * (N distinct groups → N specs), with no dependency on file names or folder structure.
+       *
+       * @param symbols - Speccable symbols from a single source file
+       * @returns Map from canonical concept root to the symbols sharing that root
        */
       function groupByConceptRoots(symbols: SymbolNode[]): Map<string, SymbolNode[]> {
         const withRoots = symbols.map((s) => ({ sym: s, root: extractConceptRoot(s.name) }))
@@ -669,10 +894,7 @@ export class SuggestSpecs {
           for (let j = i + 1; j < uniqueRoots.length; j++) {
             const shorter = uniqueRoots[i]!
             const longer = uniqueRoots[j]!
-            if (
-              shorter.length >= 4 &&
-              (longer.startsWith(shorter) || longer.endsWith(shorter))
-            ) {
+            if (shorter.length >= 4 && (longer.startsWith(shorter) || longer.endsWith(shorter))) {
               canonical.set(longer, canonical.get(shorter)!)
             }
           }
@@ -709,15 +931,25 @@ export class SuggestSpecs {
           continue
         }
 
+        const cleanFilePath = file.path.replaceAll('\\', '/')
+        const noWs = cleanFilePath.replace(/^[^:]+:/, '')
+        const isClaimedFile =
+          !validatedInput.ignoreCurrentSpecs &&
+          (fullyClaimedFiles.has(cleanFilePath) ||
+            fullyClaimedFiles.has(noWs) ||
+            fullyClaimedFiles.has(`${ws}:${noWs}`) ||
+            fullyClaimedFiles.has(`packages/${ws}/${noWs}`) ||
+            fullyClaimedFiles.has(`packages/${ws}/src/${noWs}`))
+
+        if (isClaimedFile) continue
+
         const fileSymbols = allSymbols.filter((s) => s.filePath === file.path)
         const speccableSymbols = fileSymbols.filter(isSpeccableSymbol)
 
         const uncoveredSymbols = validatedInput.ignoreCurrentSpecs
           ? speccableSymbols
           : speccableSymbols.filter(
-              (s) =>
-                !symbolCoverageMap.has(s.id) &&
-                !symbolNameCoverageMap.has(`${ws}::${s.name}`),
+              (s) => !symbolCoverageMap.has(s.id) && !symbolNameCoverageMap.has(`${ws}::${s.name}`),
             )
 
         // Skip files with no uncovered speccable definitions
@@ -748,10 +980,7 @@ export class SuggestSpecs {
             conceptGroups.size > 1 ? primaryClass?.name : undefined,
           )
 
-          if (
-            !validatedInput.ignoreCurrentSpecs &&
-            existingSpecSlugs.has(anchor.capabilityKey)
-          ) {
+          if (!validatedInput.ignoreCurrentSpecs && existingSpecSlugs.has(anchor.capabilityKey)) {
             continue
           }
 
@@ -858,7 +1087,11 @@ export class SuggestSpecs {
           cluster.category === 'DOMAIN_SERVICE' ||
           cluster.category === 'INFRASTRUCTURE_SUBSYSTEM'
 
-        if (!hasSubstantiveAnchor && !isPrimaryArchitecturalCategory && clusterHotspots.length === 0) {
+        if (
+          !hasSubstantiveAnchor &&
+          !isPrimaryArchitecturalCategory &&
+          clusterHotspots.length === 0
+        ) {
           continue
         }
 
@@ -939,7 +1172,8 @@ export class SuggestSpecs {
 
         candidateSpecs.push(candidate)
         byPriority[confidenceResult.priority] = (byPriority[confidenceResult.priority] || 0) + 1
-        byCategory[cluster.category] = (byCategory[cluster.category] || 0) + 1
+        const categoryKey = cluster.category as string
+        byCategory[categoryKey] = (byCategory[categoryKey] || 0) + 1
       }
 
       // Sort candidate specs by confidence descending, then ID
@@ -952,10 +1186,7 @@ export class SuggestSpecs {
           : candidateSpecs
 
       // Compute aggregate metrics
-      const totalSuggestedFiles = candidateSpecs.reduce(
-        (sum, s) => sum + s.primaryFiles.length,
-        0,
-      )
+      const totalSuggestedFiles = candidateSpecs.reduce((sum, s) => sum + s.primaryFiles.length, 0)
       const coveredFilesCount = fullyClaimedFiles.size + totalSuggestedFiles
       const codeCoveragePercentage =
         productionFiles.length > 0

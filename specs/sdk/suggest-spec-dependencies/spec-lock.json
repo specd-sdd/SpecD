@@ -12,11 +12,12 @@
   ],
   "implementation": [
     {
-      "file": "sdk:src/application/use-cases/suggest-spec-dependencies.ts",
-      "symbols": ["SuggestSpecDependencies", "createSuggestSpecDependencies"]
+      "file": "sdk:src/domain/services/transitive-reduction-engine.ts",
+      "symbols": ["TransitiveReductionEngine"]
     },
     {
-      "file": "sdk:test/application/use-cases/suggest-spec-dependencies.spec.ts"
+      "file": "sdk:src/application/use-cases/suggest-spec-dependencies.ts",
+      "symbols": ["SuggestSpecDependencies"]
     }
   ]
 }

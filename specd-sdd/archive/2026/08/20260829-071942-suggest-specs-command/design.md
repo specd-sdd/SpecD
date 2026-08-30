@@ -49,12 +49,12 @@ export type SpecCategory =
   | 'UTILITY_SUPPORT'
 
 export interface ConfidenceBreakdown {
-  readonly callerEvidence: number        // 0..25
+  readonly callerEvidence: number // 0..25
   readonly architecturalClarity: number // 0..25
   readonly graphCouplingCohesion: number // 0..20
-  readonly publicSurface: number         // 0..15
+  readonly publicSurface: number // 0..15
   readonly testAlignmentEvidence: number // 0..15
-  readonly total: number                 // 0..100
+  readonly total: number // 0..100
 }
 
 export interface AnchorSymbol {
@@ -149,6 +149,7 @@ export class CapabilityClusteringEngine {
 ```
 
 **Key Invariants**:
+
 1. **Symbol-Level Granularity**: If a file contains multiple distinct structural symbols (e.g. `services.ts`), passing `primarySymbolName` anchors the capability to that specific symbol via `toKebabCase(primarySymbolName)`.
 2. **Layer Folder Independence**: Folder names representing architectural layers (`use-cases/`, `ports/`, `entities/`, `services/`) are never used as capability slugs; slugs are derived from the concrete file or symbol name.
 3. **Polyglot Extension Stripping**: Queries `AdapterRegistryPort` to cleanly strip extensions (`.ts`, `.py`, `.go`, `.php`).
@@ -250,12 +251,31 @@ export class ConfidenceScorer {
 
 ## 4. Deduplication Matrix
 
-| Package | File | Role |
-| :--- | :--- | :--- |
-| `@specd/sdk` | `src/domain/services/transitive-reduction-engine.ts` | Reusable pure DAG transitive reduction for `SuggestSpecs` and `SuggestSpecDependencies`. |
-| `@specd/sdk` | `src/domain/services/spec-symbol-classifier.ts` | Shared AST owned vs. referenced symbol partitioning with heading and stem extraction. |
-| `@specd/sdk` | `src/domain/services/capability-clustering-engine.ts` | Polyglot capability clustering and symbol-level anchoring. |
-| `@specd/sdk` | `src/domain/services/confidence-scorer.ts` | Pure 5-factor confidence scoring. |
-| `@specd/sdk` | `src/application/use-cases/suggest-specs.ts` | SuggestSpecs application use case with implementation warmup and upfront inverse correlation. |
-| `@specd/sdk` | `src/application/use-cases/suggest-implementation-links.ts` | Updated to unify multi-artifact specs canonically. |
-| `@specd/cli` | `src/commands/spec/suggest.ts` | CLI command with `--rebuild-cache`, `@clack/prompts` spinner, and `clack.note` box formatting. |
+| Package      | File                                                        | Role                                                                                           |
+| :----------- | :---------------------------------------------------------- | :--------------------------------------------------------------------------------------------- |
+| `@specd/sdk` | `src/domain/services/transitive-reduction-engine.ts`        | Reusable pure DAG transitive reduction for `SuggestSpecs` and `SuggestSpecDependencies`.       |
+| `@specd/sdk` | `src/domain/services/spec-symbol-classifier.ts`             | Shared AST owned vs. referenced symbol partitioning with heading and stem extraction.          |
+| `@specd/sdk` | `src/domain/services/capability-clustering-engine.ts`       | Polyglot capability clustering and symbol-level anchoring.                                     |
+| `@specd/sdk` | `src/domain/services/confidence-scorer.ts`                  | Pure 5-factor confidence scoring.                                                              |
+| `@specd/sdk` | `src/application/use-cases/suggest-specs.ts`                | SuggestSpecs application use case with implementation warmup and upfront inverse correlation.  |
+| `@specd/sdk` | `src/application/use-cases/suggest-implementation-links.ts` | Updated to unify multi-artifact specs canonically.                                             |
+| `@specd/cli` | `src/commands/spec/suggest.ts`                              | CLI command with `--rebuild-cache`, `@clack/prompts` spinner, and `clack.note` box formatting. |
+
+---
+
+## 5. Performance Optimizations & Resilience Implementations
+
+### 5.1 Session-Level In-Memory Symbol & Path Query Caching (`symbolQueryCache`, `fileCanonicalCache`)
+
+1. **`symbolQueryCache`**: Introduced a session-level lookup map (`Map<string, unknown[]>`) in `SuggestImplementationLinks.execute` for `findSymbols` queries. Reduces tens of thousands of redundant SQLite queries for common monorepo symbols (`Logger`, `SpecRepository`, `Change`, `Config`, `Resolver`, etc.) down to 1 query per unique symbol name, speeding up analysis.
+2. **`fileCanonicalCache`**: Added `fileCanonicalCache: Map<string, string>` to cache `toCanonicalWorkspacePath` workspace resolution across 9,643+ candidate links, eliminating thousands of repetitive `codeGraphProvider.getFile` SQLite queries.
+3. **Incremental Cache Persistence**:
+   - `writeJsonAtomic` re-entrant locking prevents premature `.lock` deletion during nested calls.
+   - Removed destructive `implCache.setMany` cache overwrite at the end of `SuggestSpecs` Pass 0 (Warmup) which previously truncated `suggestions.json` on full runs.
+   - Incremental per-spec flushing ensures 100% of analyzed specs (all 281 specs) remain saved in `suggestions.json` whether execution completes fully or is interrupted mid-way.
+
+### 5.2 Future Performance Optimization Roadmap
+
+1. **Upfront Monorepo Spec Extraction**: Parse all `spec.md` files across all workspaces upfront in a single fast pass, building an in-memory lookup map: `Map<specId, ExtractedSpecTokens>`.
+2. **Bulk SQL Symbol Resolution**: Query CodeGraph's symbol table in bulk (`WHERE name IN (...)` or in-memory index) to resolve symbol locations for all specs in a single unified operation.
+3. **Wildcard Index Optimization**: Replace `LIKE '%cleanRelPath'` wildcard matching with workspace-qualified exact path queries to avoid SQLite full-table scans.

@@ -12,15 +12,12 @@
   ],
   "implementation": [
     {
-      "file": "sdk:src/application/use-cases/suggest-implementation-links.ts",
-      "symbols": [
-        "SuggestImplementationLinks",
-        "createSuggestImplementationLinks",
-        "computePathSpecAffinity"
-      ]
+      "file": "sdk:src/domain/services/spec-symbol-classifier.ts",
+      "symbols": ["SpecSymbolClassifier"]
     },
     {
-      "file": "sdk:test/application/use-cases/suggest-implementation-links.spec.ts"
+      "file": "sdk:src/application/use-cases/suggest-implementation-links.ts",
+      "symbols": ["SuggestImplementationLinks"]
     }
   ]
 }

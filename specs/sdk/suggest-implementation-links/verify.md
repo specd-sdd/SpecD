@@ -68,6 +68,56 @@
 - **AND** indexed symbol and file resolution is delegated to `code-graph`
 - **AND** no ownership inference or code-signature conformance result is produced
 
+### Requirement: Spec Symbol Classifier & Ownership Partitioning
+
+#### Scenario: Primary owned symbols are assigned high-confidence implementation links
+
+- **GIVEN** A spec with primary class `CreateChange` and referenced port `ChangeRepository`
+- **WHEN** Symbol classification and analysis run
+- **THEN** The implementation link for `CreateChange` is assigned high confidence, while `ChangeRepository` is recognized as a collaborator reference and not misattributed as owned code.
+
+#### Scenario: Insufficient implementation links detection
+
+- **GIVEN** A spec whose implementation links only contain external collaborator references
+- **WHEN** The ownership completeness check runs
+- **THEN** It reports the spec links as incomplete due to missing primary owner symbols.
+
+### Requirement: Early Graph Staleness Diagnostics
+
+#### Scenario: Early graph staleness detection and result annotation
+
+- **GIVEN** A code graph provider whose graph index is stale
+- **WHEN** `SuggestImplementationLinks.execute()` is invoked
+- **THEN** It emits a `stale-warning` progress event and returns `codeGraphStale: true` in the result payload.
+
+### Requirement: Multi-Process Cache Locking and Flush Merging
+
+#### Scenario: Concurrent writes from separate processes merge without data loss
+
+- **GIVEN** Multiple cache instances performing concurrent writes to the suggestion cache
+- **WHEN** Each instance executes `flush()` under exclusive kernel-level file lock
+- **THEN** All written spec entries are preserved in the persisted cache file on disk without overwriting concurrent updates.
+
+#### Scenario: Cache lock contention timeout throws CacheLockError
+
+- **GIVEN** A lock file held exclusively by another active process exceeding the timeout
+- **WHEN** An operation attempts to acquire the cache lock
+- **THEN** It throws a typed `CacheLockError` with error code `CACHE_LOCKED`.
+
+### Requirement: Session-Level Query Caching & Incremental Persistence
+
+#### Scenario: In-memory session query caching eliminates duplicate SQLite queries
+
+- **GIVEN** Multiple specs referencing common monorepo symbols and relative file paths
+- **WHEN** `SuggestImplementationLinks.execute()` runs across target specs
+- **THEN** Symmetrical queries are served from `symbolQueryCache` and `fileCanonicalCache`, preventing redundant database queries.
+
+#### Scenario: Incremental spec flushing preserves complete cache state
+
+- **GIVEN** A multi-spec analysis session
+- **WHEN** Execution is cancelled mid-way or completed fully
+- **THEN** Analyzed spec entries are incrementally persisted to disk without truncation.
+
 ### Requirement: 3-Tier Analysis Algorithm
 
 #### Scenario: Incremental cache persistence across multi-spec runs
@@ -139,7 +189,7 @@
 - **THEN** that suggestion entry has `alreadyIncluded: true`
 - **AND** newly discovered candidate files have `alreadyIncluded: false`
 
-### Requirement: Additive Mutation Semantics (`apply: true`)
+### Requirement: Additive Mutation Semantics (apply: true)
 
 #### Scenario: Additive application of implementation links
 

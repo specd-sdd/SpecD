@@ -1,7 +1,7 @@
 {
   "name": "suggest-specs-command",
   "createdAt": "2026-08-29T07:19:42.110Z",
-  "updatedAt": "2026-08-29T14:15:56.083Z",
+  "updatedAt": "2026-08-29T22:53:28.367Z",
   "description": "Add specs suggest command with brownfield discovery, gap analysis, and shared dependency inference",
   "schema": {
     "name": "schema-std",
@@ -28,580 +28,575 @@
       "core:update-persisted-spec-deps",
       "core:create-change"
     ],
-    "cli:spec-suggest": [
-      "sdk:suggest-specs"
-    ],
-    "sdk:suggest-specs": [
-      "sdk:suggest-implementation-links",
-      "sdk:suggest-spec-dependencies"
-    ]
+    "cli:spec-suggest": ["sdk:suggest-specs"],
+    "sdk:suggest-specs": ["sdk:suggest-implementation-links", "sdk:suggest-spec-dependencies"]
   },
   "invalidationPolicy": "downstream",
   "implementationTrackingStartedAt": "2026-08-29T07:40:10.946Z",
   "trackedImplementationFiles": [
     {
       "file": "dev/scripts/suggest-brownfield-specs.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/sdk/src/domain/value-objects/candidate-spec.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/sdk/src/domain/services/transitive-reduction-engine.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/sdk/src/domain/services/spec-symbol-classifier.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/sdk/src/domain/services/capability-clustering-engine.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/sdk/src/domain/services/confidence-scorer.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/sdk/src/domain/services/dependency-inference-engine.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/sdk/test/domain/services/transitive-reduction-engine.spec.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/sdk/test/domain/services/spec-symbol-classifier.spec.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/sdk/test/domain/services/capability-clustering-engine.spec.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/sdk/test/domain/services/confidence-scorer.spec.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/sdk/src/application/use-cases/suggest-specs.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/sdk/src/composition/suggest-specs.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/sdk/src/application/use-cases/suggest-implementation-links.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/sdk/src/application/use-cases/suggest-spec-dependencies.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/sdk/src/index.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/sdk/test/application/use-cases/suggest-specs.spec.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/cli/src/commands/spec/suggest.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/cli/src/index.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/cli/test/commands/spec-suggest.spec.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/cli/README.md",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/sdk/README.md",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/sdk/src/composition/index.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "docs/cli/cli-reference.md",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "docs/cli/spec-suggest.md",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "docs/cli/spec-deps.md",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "docs/cli/spec-implementation.md",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/sdk/src/infrastructure/fs/fs-implementation-suggestion-cache.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/cli/src/commands/spec/deps.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/cli/src/commands/spec/implementation.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/cli/src/handle-error.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/sdk/src/application/ports/implementation-suggestion-cache-port.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/sdk/src/application/ports/spec-deps-suggestion-cache-port.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/sdk/src/domain/errors/cache-lock-error.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/sdk/src/domain/errors/index.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/sdk/src/infrastructure/fs/fs-spec-deps-suggestion-cache.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/sdk/src/infrastructure/fs/write-json-atomic.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/sdk/test/infrastructure/fs/fs-suggestion-cache.spec.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/sdk/test/barrel.spec.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": ".changeset/20260826-cli-specs-list-count-specd.md",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": ".changeset/20260826-cli-specs-list-count.md",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": ".changeset/20260826-prevent-orphan-spec-locks-specd.md",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": ".changeset/20260826-prevent-orphan-spec-locks.md",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": ".changeset/20260826-start-implementation-tracking-specd.md",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": ".changeset/20260826-start-implementation-tracking.md",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": ".changeset/20260827-repair-code-graph-coverage-indexing-specd.md",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": ".changeset/20260827-repair-code-graph-coverage-indexing.md",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": ".changeset/20260827-schema-compat-specd.md",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": ".changeset/20260827-schema-compat.md",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "docs/code-graph/index.md",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/cli/src/commands/change/implementation.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/cli/src/commands/graph/index-graph.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/cli/src/commands/schema/show.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/cli/src/commands/spec/list.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/cli/test/commands/change-implementation.spec.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/cli/test/commands/graph-index.spec.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/cli/test/commands/spec-list.spec.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/code-graph/src/application/services/project-spec-coverage.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/code-graph/src/application/use-cases/get-graph-health.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/code-graph/src/application/use-cases/index-code-graph.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/code-graph/src/domain/ports/graph-store.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/code-graph/src/domain/value-objects/index-result.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/code-graph/src/domain/value-objects/index.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/code-graph/src/index.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/code-graph/src/infrastructure/sqlite/sqlite-graph-database.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/code-graph/src/public.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/code-graph/test/application/services/project-spec-coverage.spec.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/code-graph/test/application/use-cases/get-graph-health.spec.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/code-graph/test/application/use-cases/index-project-graph-integration.spec.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/code-graph/test/application/use-cases/index-project-graph.spec.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/code-graph/test/domain/ports/graph-store.contract.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/code-graph/test/helpers/in-memory-graph-store.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/code-graph/test/helpers/make-mock-spec-repository.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/code-graph/test/integration/sqlite-wide-traversal.spec.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/core/src/application/use-cases/archive-change.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/core/src/application/use-cases/edit-change.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/core/src/application/use-cases/generate-spec-metadata.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/core/src/application/use-cases/initialize-persisted-spec-state.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/core/src/application/use-cases/refresh-implementation-tracking.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/core/src/application/use-cases/resolve-extends-chain.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/core/src/application/use-cases/transition-change.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/core/src/application/use-cases/update-implementation-tracking.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/core/src/composition/use-cases/edit-change.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/core/src/composition/use-cases/refresh-implementation-tracking.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/core/src/composition/use-cases/update-implementation-tracking.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/core/src/domain/entities/change.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/core/src/domain/services/build-schema.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/core/src/domain/services/merge-schema-layers.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/core/src/domain/value-objects/index.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/core/src/domain/value-objects/schema.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/core/src/infrastructure/fs/change-repository.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/core/src/infrastructure/fs/manifest.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/core/src/infrastructure/fs/spec-repository.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/core/src/infrastructure/schema-yaml-parser.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/core/src/infrastructure/vcs/vcs-implementation-detector.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/core/src/public.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/core/test/application/use-cases/archive-change.spec.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/core/test/application/use-cases/edit-change.spec.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/core/test/application/use-cases/helpers.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/core/test/application/use-cases/refresh-implementation-tracking.spec.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/core/test/application/use-cases/resolve-schema.spec.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/core/test/application/use-cases/transition-change.spec.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/core/test/application/use-cases/update-implementation-tracking.spec.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/core/test/domain/entities/change.spec.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/core/test/domain/services/build-schema.spec.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/core/test/infrastructure/fs/change-repository.spec.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/core/test/infrastructure/fs/spec-repository.spec.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "packages/core/test/infrastructure/schema-yaml-parser.spec.ts",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specd.yaml",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/cli/change-implementation/spec-lock.json",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/cli/change-implementation/spec.md",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/cli/change-implementation/verify.md",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/cli/graph-index/spec-lock.json",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/cli/graph-index/spec.md",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/cli/graph-index/verify.md",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/cli/schema-show/spec-lock.json",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/cli/schema-show/spec.md",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/cli/schema-show/verify.md",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/cli/spec-list/spec-lock.json",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/cli/spec-list/spec.md",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/cli/spec-list/verify.md",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/code-graph/composition/spec-lock.json",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/code-graph/get-graph-health/spec-lock.json",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/code-graph/get-graph-health/spec.md",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/code-graph/get-graph-health/verify.md",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/code-graph/graph-store/spec-lock.json",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/code-graph/graph-store/spec.md",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/code-graph/graph-store/verify.md",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/code-graph/index-project-graph/spec-lock.json",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/code-graph/indexer/spec-lock.json",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/code-graph/indexer/spec.md",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/code-graph/indexer/verify.md",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/code-graph/isolated-index-worker/spec-lock.json",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/code-graph/sqlite-graph-store/spec-lock.json",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/code-graph/sqlite-graph-store/spec.md",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/code-graph/sqlite-graph-store/verify.md",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/core/actor-provider/spec-lock.json",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/core/actor-resolver/spec-lock.json",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/core/archive-change/spec-lock.json",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/core/archive-change/spec.md",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/core/archive-change/verify.md",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/core/archive-list-entry/spec-lock.json",
@@ -609,27 +604,27 @@
     },
     {
       "file": "specs/core/change-manifest/spec-lock.json",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/core/change-manifest/spec.md",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/core/change-manifest/verify.md",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/core/change/spec-lock.json",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/core/change/spec.md",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/core/change/verify.md",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/core/core/change-repository/spec-lock.json",
@@ -637,139 +632,551 @@
     },
     {
       "file": "specs/core/edit-change/spec-lock.json",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/core/edit-change/spec.md",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/core/edit-change/verify.md",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/core/fs-spec-repository/spec-lock.json",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/core/fs-spec-repository/spec.md",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/core/fs-spec-repository/verify.md",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/core/generate-metadata/spec.md",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/core/generate-metadata/verify.md",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/core/initialize-persisted-spec-state/spec-lock.json",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/core/initialize-persisted-spec-state/spec.md",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/core/initialize-persisted-spec-state/verify.md",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/core/refresh-implementation-tracking/spec-lock.json",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/core/refresh-implementation-tracking/spec.md",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/core/refresh-implementation-tracking/verify.md",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/core/resolve-schema/spec-lock.json",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/core/resolve-schema/spec.md",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/core/resolve-schema/verify.md",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/core/schema-format/spec-lock.json",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/core/schema-format/spec.md",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/core/schema-format/verify.md",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/core/schema-merge/spec-lock.json",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/core/schema-merge/spec.md",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/core/schema-merge/verify.md",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/core/spec-lock/spec-lock.json",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/core/spec-lock/spec.md",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/core/spec-lock/verify.md",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/core/transition-change/spec-lock.json",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/core/transition-change/spec.md",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/core/transition-change/verify.md",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/core/update-implementation-tracking/spec-lock.json",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/core/update-implementation-tracking/spec.md",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/core/update-implementation-tracking/verify.md",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/sdk/composition/spec-lock.json",
-      "state": "open"
+      "state": "resolved"
     },
     {
       "file": "specs/sdk/with-open-graph-provider/spec-lock.json",
-      "state": "open"
+      "state": "resolved"
+    },
+    {
+      "file": ".changeset/20260827-fasttrack-context-resolution-specd.md",
+      "state": "resolved"
+    },
+    {
+      "file": ".changeset/20260827-fasttrack-context-resolution.md",
+      "state": "resolved"
+    },
+    {
+      "file": ".changeset/20260827-package-fasttrack-skill-specd.md",
+      "state": "resolved"
+    },
+    {
+      "file": ".changeset/20260827-package-fasttrack-skill.md",
+      "state": "resolved"
+    },
+    {
+      "file": ".changeset/20260827-project-context-specs-specd.md",
+      "state": "resolved"
+    },
+    {
+      "file": ".changeset/20260827-project-context-specs.md",
+      "state": "resolved"
+    },
+    {
+      "file": ".changeset/20260828-init-schema-std-and-metapackage-specs-specd.md",
+      "state": "resolved"
+    },
+    {
+      "file": ".changeset/20260828-init-schema-std-and-metapackage-specs.md",
+      "state": "resolved"
+    },
+    {
+      "file": ".changeset/20260828-refine-fasttrack-skill-template-specd.md",
+      "state": "resolved"
+    },
+    {
+      "file": ".changeset/20260828-refine-fasttrack-skill-template.md",
+      "state": "resolved"
+    },
+    {
+      "file": ".changeset/20260828-stabilize-isolated-index-worker-specd.md",
+      "state": "resolved"
+    },
+    {
+      "file": ".changeset/20260828-stabilize-isolated-index-worker.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/cli/project-context-specs.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/core/use-cases.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/guide/_sections/getting-started/context-compilation.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/sdk/index.md",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/project/context-specs.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/helpers.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/project-context-specs.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/package.json",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/fixtures/isolated-index-worker/built-napi-teardown-task.mjs",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/isolated-index-worker/dist.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/_shared/resolve-configured-context-specs.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/compile-context.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/get-project-context.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/resolve-context-specs.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/kernel.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/resolve-context-specs.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/configured-context-parity.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/get-project-context.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/resolve-configured-context-specs.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/resolve-context-specs.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/barrel-kernel-coverage.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-claude/src/domain/frontmatter/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-claude/test/install-skills.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-codex/src/domain/frontmatter/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-codex/test/install-skills.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-copilot/src/domain/frontmatter/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-copilot/test/install-skills.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-opencode/src/domain/frontmatter/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-opencode/test/install-skills.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-standard/src/domain/frontmatter/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-standard/test/install-skills.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/schema-std/schema.yaml",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/schema-std/templates/design.md",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/schema-std/templates/proposal.md",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/core-reexports.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/skills/templates/skills/specd-fasttrack/SKILL.md.tpl",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/skills/templates/skills/specd-fasttrack/skill.meta.json",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/skills/test/infrastructure/skill-repository.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/skills/test/template-workflow.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "pnpm-lock.yaml",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/cli/project-context-specs/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/cli/project-context-specs/spec.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/cli/project-context-specs/verify.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/code-graph/isolated-index-worker/verify.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/compile-context/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/compile-context/spec.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/compile-context/verify.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/get-project-context/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/get-project-context/spec.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/get-project-context/verify.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/resolve-context-specs/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/resolve-context-specs/spec.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/resolve-context-specs/verify.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/plugins-agent-standard/plugin-agent/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/plugins-agent-standard/plugin-agent/spec.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/plugins-agent-standard/plugin-agent/verify.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/plugins-claude/plugin-agent/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/plugins-claude/plugin-agent/spec.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/plugins-claude/plugin-agent/verify.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/plugins-codex/plugin-agent/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/plugins-codex/plugin-agent/spec.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/plugins-codex/plugin-agent/verify.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/plugins-copilot/plugin-agent/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/plugins-copilot/plugin-agent/spec.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/plugins-copilot/plugin-agent/verify.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/plugins-opencode/plugin-agent/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/plugins-opencode/plugin-agent/spec.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/plugins-opencode/plugin-agent/verify.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/schema-std/standard-schema/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/schema-std/standard-schema/spec.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/schema-std/standard-schema/verify.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/schema-std/templates/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/schema-std/templates/spec.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/schema-std/templates/verify.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/sdk/composition/spec.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/skills/resolve-bundle/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/skills/resolve-bundle/spec.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/skills/resolve-bundle/verify.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/skills/skill-repository/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/skills/skill-repository/spec.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/skills/skill-repository/verify.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/skills/skill-templates-source/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/skills/skill-templates-source/spec.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/skills/skill-templates-source/verify.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/specd/metapackage/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/specd/metapackage/spec.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/specd/metapackage/verify.md",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/helpers/prompt-apply.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/helpers/prompt-apply.spec.ts",
+      "state": "resolved"
     }
   ],
   "implementationLinks": [
@@ -777,68 +1184,49 @@
       "specId": "sdk:suggest-specs",
       "file": "packages/sdk/src/domain/value-objects/candidate-spec.ts",
       "fileLinkExplicit": false,
-      "symbols": [
-        "CandidateSpec",
-        "SuggestSpecsResult",
-        "SpecCategory",
-        "ConfidenceBreakdown"
-      ]
+      "symbols": ["CandidateSpec", "SuggestSpecsResult", "SpecCategory", "ConfidenceBreakdown"]
     },
     {
       "specId": "sdk:suggest-specs",
       "file": "packages/sdk/src/domain/services/transitive-reduction-engine.ts",
       "fileLinkExplicit": false,
-      "symbols": [
-        "TransitiveReductionEngine"
-      ]
+      "symbols": ["TransitiveReductionEngine"]
     },
     {
       "specId": "sdk:suggest-spec-dependencies",
       "file": "packages/sdk/src/domain/services/transitive-reduction-engine.ts",
       "fileLinkExplicit": false,
-      "symbols": [
-        "TransitiveReductionEngine"
-      ]
+      "symbols": ["TransitiveReductionEngine"]
     },
     {
       "specId": "sdk:suggest-specs",
       "file": "packages/sdk/src/domain/services/spec-symbol-classifier.ts",
       "fileLinkExplicit": false,
-      "symbols": [
-        "SpecSymbolClassifier"
-      ]
+      "symbols": ["SpecSymbolClassifier"]
     },
     {
       "specId": "sdk:suggest-implementation-links",
       "file": "packages/sdk/src/domain/services/spec-symbol-classifier.ts",
       "fileLinkExplicit": false,
-      "symbols": [
-        "SpecSymbolClassifier"
-      ]
+      "symbols": ["SpecSymbolClassifier"]
     },
     {
       "specId": "sdk:suggest-specs",
       "file": "packages/sdk/src/domain/services/capability-clustering-engine.ts",
       "fileLinkExplicit": false,
-      "symbols": [
-        "CapabilityClusteringEngine"
-      ]
+      "symbols": ["CapabilityClusteringEngine"]
     },
     {
       "specId": "sdk:suggest-specs",
       "file": "packages/sdk/src/domain/services/confidence-scorer.ts",
       "fileLinkExplicit": false,
-      "symbols": [
-        "ConfidenceScorer"
-      ]
+      "symbols": ["ConfidenceScorer"]
     },
     {
       "specId": "sdk:suggest-specs",
       "file": "packages/sdk/src/domain/services/dependency-inference-engine.ts",
       "fileLinkExplicit": false,
-      "symbols": [
-        "DependencyInferenceEngine"
-      ]
+      "symbols": ["DependencyInferenceEngine"]
     },
     {
       "specId": "sdk:suggest-specs",
@@ -864,36 +1252,25 @@
       "specId": "sdk:suggest-specs",
       "file": "packages/sdk/src/application/use-cases/suggest-specs.ts",
       "fileLinkExplicit": false,
-      "symbols": [
-        "SuggestSpecs",
-        "suggestSpecsInputSchema"
-      ]
+      "symbols": ["SuggestSpecs", "suggestSpecsInputSchema"]
     },
     {
       "specId": "sdk:suggest-specs",
       "file": "packages/sdk/src/composition/suggest-specs.ts",
       "fileLinkExplicit": false,
-      "symbols": [
-        "createSuggestSpecs",
-        "resolveSuggestSpecsDeps",
-        "openSuggestSpecs"
-      ]
+      "symbols": ["createSuggestSpecs", "resolveSuggestSpecsDeps", "openSuggestSpecs"]
     },
     {
       "specId": "sdk:suggest-implementation-links",
       "file": "packages/sdk/src/application/use-cases/suggest-implementation-links.ts",
       "fileLinkExplicit": false,
-      "symbols": [
-        "SuggestImplementationLinks"
-      ]
+      "symbols": ["SuggestImplementationLinks"]
     },
     {
       "specId": "sdk:suggest-spec-dependencies",
       "file": "packages/sdk/src/application/use-cases/suggest-spec-dependencies.ts",
       "fileLinkExplicit": false,
-      "symbols": [
-        "SuggestSpecDependencies"
-      ]
+      "symbols": ["SuggestSpecDependencies"]
     },
     {
       "specId": "sdk:suggest-specs",
@@ -919,9 +1296,7 @@
       "specId": "cli:spec-suggest",
       "file": "packages/cli/src/commands/spec/suggest.ts",
       "fileLinkExplicit": false,
-      "symbols": [
-        "registerSpecSuggest"
-      ]
+      "symbols": ["registerSpecSuggest"]
     },
     {
       "specId": "cli:spec-suggest",
@@ -952,16 +1327,14 @@
     {
       "type": "specs",
       "optional": false,
-      "requires": [
-        "proposal"
-      ],
+      "requires": ["proposal"],
       "state": "complete",
       "files": [
         {
           "key": "sdk:suggest-specs",
           "filename": "specs/sdk/suggest-specs/spec.md",
           "state": "complete",
-          "validatedHash": "sha256:ce2c22520239672b515689650ee8465677e563bc0c3d4f1a01abd2d7bbdb290a"
+          "validatedHash": "sha256:ee64a8aa691893b0ce298b5aa4793fadc0e979f1aa02b70443c73b5b206677ee"
         },
         {
           "key": "cli:spec-suggest",
@@ -973,7 +1346,7 @@
           "key": "sdk:suggest-implementation-links",
           "filename": "deltas/sdk/suggest-implementation-links/spec.md.delta.yaml",
           "state": "complete",
-          "validatedHash": "sha256:ff01331b72b7bdcc4b435f82c2b3b630b8294848c122e73acd7472169e5a9498"
+          "validatedHash": "sha256:c3966be1ebef457203715063c29a24fd0088a8c3a1ebc2ff2a3ea5cdddfd9b48"
         },
         {
           "key": "sdk:suggest-spec-dependencies",
@@ -986,16 +1359,14 @@
     {
       "type": "verify",
       "optional": false,
-      "requires": [
-        "specs"
-      ],
+      "requires": ["specs"],
       "state": "complete",
       "files": [
         {
           "key": "sdk:suggest-specs",
           "filename": "specs/sdk/suggest-specs/verify.md",
           "state": "complete",
-          "validatedHash": "sha256:07fb7ede999d3dc8b81b353d4514b4d294d42ebf176641539fcf2bdf39bc670c"
+          "validatedHash": "sha256:216d08ea4aa0ec0917367f77c33c09d3cf630ac49f67201a2b4e0e5268478cba"
         },
         {
           "key": "cli:spec-suggest",
@@ -1007,7 +1378,7 @@
           "key": "sdk:suggest-implementation-links",
           "filename": "deltas/sdk/suggest-implementation-links/verify.md.delta.yaml",
           "state": "complete",
-          "validatedHash": "sha256:a65c5d8591a292fa7c1064b5b08dfee85e8b7fa7da314bb91c2dd7382d3f6b29"
+          "validatedHash": "sha256:28ed9ded3b1014c53cc71fb866834e4752444e1d224de3e2501d8c8d092c4bde"
         },
         {
           "key": "sdk:suggest-spec-dependencies",
@@ -1020,35 +1391,28 @@
     {
       "type": "design",
       "optional": false,
-      "requires": [
-        "proposal",
-        "specs",
-        "verify"
-      ],
+      "requires": ["proposal", "specs", "verify"],
       "state": "complete",
       "files": [
         {
           "key": "design",
           "filename": "design.md",
           "state": "complete",
-          "validatedHash": "sha256:9051a2896f524f46ef32e9f13a68c5ab194fa0154442dd8bca4a35d79e31ba4c"
+          "validatedHash": "sha256:e3e136711af05ee2e07529747187a03edd3cf7ebaccbeace9d4871ffbdd87d48"
         }
       ]
     },
     {
       "type": "tasks",
       "optional": false,
-      "requires": [
-        "specs",
-        "design"
-      ],
+      "requires": ["specs", "design"],
       "state": "complete",
       "files": [
         {
           "key": "tasks",
           "filename": "tasks.md",
           "state": "complete",
-          "validatedHash": "sha256:8b2b731d3604d571469ad66e1f9353baa106aed0cf48f1f041b3892ec07a8a78"
+          "validatedHash": "sha256:9789c9ad860c9db7d4cd216d6f89334059ee98c203f808fc79bd455dfc76d76d"
         }
       ]
     }
@@ -1079,13 +1443,7 @@
         "email": "system@getspecd.dev",
         "provider": "system"
       },
-      "typesAdded": [
-        "proposal",
-        "specs",
-        "verify",
-        "design",
-        "tasks"
-      ],
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
       "typesRemoved": [],
       "filesAdded": [
         {
@@ -1159,9 +1517,7 @@
       "affectedArtifacts": [
         {
           "type": "proposal",
-          "files": [
-            "proposal"
-          ]
+          "files": ["proposal"]
         },
         {
           "type": "specs",
@@ -1183,15 +1539,11 @@
         },
         {
           "type": "design",
-          "files": [
-            "design"
-          ]
+          "files": ["design"]
         },
         {
           "type": "tasks",
-          "files": [
-            "tasks"
-          ]
+          "files": ["tasks"]
         }
       ]
     },
@@ -1208,9 +1560,7 @@
       "affectedArtifacts": [
         {
           "type": "proposal",
-          "files": [
-            "proposal"
-          ]
+          "files": ["proposal"]
         },
         {
           "type": "specs",
@@ -1232,15 +1582,11 @@
         },
         {
           "type": "design",
-          "files": [
-            "design"
-          ]
+          "files": ["design"]
         },
         {
           "type": "tasks",
-          "files": [
-            "tasks"
-          ]
+          "files": ["tasks"]
         }
       ]
     },
@@ -1268,15 +1614,11 @@
       "affectedArtifacts": [
         {
           "type": "design",
-          "files": [
-            "design"
-          ]
+          "files": ["design"]
         },
         {
           "type": "tasks",
-          "files": [
-            "tasks"
-          ]
+          "files": ["tasks"]
         }
       ]
     },
@@ -1315,15 +1657,11 @@
       "affectedArtifacts": [
         {
           "type": "design",
-          "files": [
-            "design"
-          ]
+          "files": ["design"]
         },
         {
           "type": "tasks",
-          "files": [
-            "tasks"
-          ]
+          "files": ["tasks"]
         }
       ]
     },
@@ -1373,9 +1711,7 @@
       "affectedArtifacts": [
         {
           "type": "tasks",
-          "files": [
-            "tasks"
-          ]
+          "files": ["tasks"]
         }
       ]
     },
@@ -1425,35 +1761,23 @@
       "affectedArtifacts": [
         {
           "type": "proposal",
-          "files": [
-            "proposal"
-          ]
+          "files": ["proposal"]
         },
         {
           "type": "specs",
-          "files": [
-            "cli:spec-suggest",
-            "sdk:suggest-specs"
-          ]
+          "files": ["cli:spec-suggest", "sdk:suggest-specs"]
         },
         {
           "type": "verify",
-          "files": [
-            "cli:spec-suggest",
-            "sdk:suggest-specs"
-          ]
+          "files": ["cli:spec-suggest", "sdk:suggest-specs"]
         },
         {
           "type": "design",
-          "files": [
-            "design"
-          ]
+          "files": ["design"]
         },
         {
           "type": "tasks",
-          "files": [
-            "tasks"
-          ]
+          "files": ["tasks"]
         }
       ]
     },
@@ -1481,22 +1805,15 @@
       "affectedArtifacts": [
         {
           "type": "verify",
-          "files": [
-            "cli:spec-suggest",
-            "sdk:suggest-specs"
-          ]
+          "files": ["cli:spec-suggest", "sdk:suggest-specs"]
         },
         {
           "type": "design",
-          "files": [
-            "design"
-          ]
+          "files": ["design"]
         },
         {
           "type": "tasks",
-          "files": [
-            "tasks"
-          ]
+          "files": ["tasks"]
         }
       ]
     },
@@ -1513,22 +1830,15 @@
       "affectedArtifacts": [
         {
           "type": "proposal",
-          "files": [
-            "proposal"
-          ]
+          "files": ["proposal"]
         },
         {
           "type": "specs",
-          "files": [
-            "cli:spec-suggest",
-            "sdk:suggest-specs"
-          ]
+          "files": ["cli:spec-suggest", "sdk:suggest-specs"]
         },
         {
           "type": "design",
-          "files": [
-            "design"
-          ]
+          "files": ["design"]
         },
         {
           "type": "verify",
@@ -1541,9 +1851,7 @@
         },
         {
           "type": "tasks",
-          "files": [
-            "tasks"
-          ]
+          "files": ["tasks"]
         }
       ]
     },
@@ -1560,10 +1868,7 @@
       "affectedArtifacts": [
         {
           "type": "specs",
-          "files": [
-            "cli:spec-suggest",
-            "sdk:suggest-specs"
-          ]
+          "files": ["cli:spec-suggest", "sdk:suggest-specs"]
         },
         {
           "type": "verify",
@@ -1576,15 +1881,11 @@
         },
         {
           "type": "design",
-          "files": [
-            "design"
-          ]
+          "files": ["design"]
         },
         {
           "type": "tasks",
-          "files": [
-            "tasks"
-          ]
+          "files": ["tasks"]
         }
       ]
     },
@@ -1601,15 +1902,11 @@
       "affectedArtifacts": [
         {
           "type": "proposal",
-          "files": [
-            "proposal"
-          ]
+          "files": ["proposal"]
         },
         {
           "type": "design",
-          "files": [
-            "design"
-          ]
+          "files": ["design"]
         },
         {
           "type": "specs",
@@ -1631,9 +1928,7 @@
         },
         {
           "type": "tasks",
-          "files": [
-            "tasks"
-          ]
+          "files": ["tasks"]
         }
       ]
     },
@@ -1650,10 +1945,7 @@
       "affectedArtifacts": [
         {
           "type": "specs",
-          "files": [
-            "cli:spec-suggest",
-            "sdk:suggest-specs"
-          ]
+          "files": ["cli:spec-suggest", "sdk:suggest-specs"]
         },
         {
           "type": "verify",
@@ -1666,15 +1958,11 @@
         },
         {
           "type": "design",
-          "files": [
-            "design"
-          ]
+          "files": ["design"]
         },
         {
           "type": "tasks",
-          "files": [
-            "tasks"
-          ]
+          "files": ["tasks"]
         }
       ]
     },
@@ -1691,21 +1979,15 @@
       "affectedArtifacts": [
         {
           "type": "verify",
-          "files": [
-            "sdk:suggest-specs"
-          ]
+          "files": ["sdk:suggest-specs"]
         },
         {
           "type": "design",
-          "files": [
-            "design"
-          ]
+          "files": ["design"]
         },
         {
           "type": "tasks",
-          "files": [
-            "tasks"
-          ]
+          "files": ["tasks"]
         }
       ]
     },
@@ -1722,15 +2004,11 @@
       "affectedArtifacts": [
         {
           "type": "proposal",
-          "files": [
-            "proposal"
-          ]
+          "files": ["proposal"]
         },
         {
           "type": "design",
-          "files": [
-            "design"
-          ]
+          "files": ["design"]
         },
         {
           "type": "specs",
@@ -1752,9 +2030,7 @@
         },
         {
           "type": "tasks",
-          "files": [
-            "tasks"
-          ]
+          "files": ["tasks"]
         }
       ]
     },
@@ -1788,15 +2064,11 @@
         },
         {
           "type": "design",
-          "files": [
-            "design"
-          ]
+          "files": ["design"]
         },
         {
           "type": "tasks",
-          "files": [
-            "tasks"
-          ]
+          "files": ["tasks"]
         }
       ]
     },
@@ -1813,10 +2085,7 @@
       "affectedArtifacts": [
         {
           "type": "specs",
-          "files": [
-            "sdk:suggest-implementation-links",
-            "sdk:suggest-spec-dependencies"
-          ]
+          "files": ["sdk:suggest-implementation-links", "sdk:suggest-spec-dependencies"]
         },
         {
           "type": "verify",
@@ -1829,15 +2098,11 @@
         },
         {
           "type": "design",
-          "files": [
-            "design"
-          ]
+          "files": ["design"]
         },
         {
           "type": "tasks",
-          "files": [
-            "tasks"
-          ]
+          "files": ["tasks"]
         }
       ]
     },
@@ -1854,22 +2119,15 @@
       "affectedArtifacts": [
         {
           "type": "verify",
-          "files": [
-            "sdk:suggest-implementation-links",
-            "sdk:suggest-spec-dependencies"
-          ]
+          "files": ["sdk:suggest-implementation-links", "sdk:suggest-spec-dependencies"]
         },
         {
           "type": "design",
-          "files": [
-            "design"
-          ]
+          "files": ["design"]
         },
         {
           "type": "tasks",
-          "files": [
-            "tasks"
-          ]
+          "files": ["tasks"]
         }
       ]
     },
@@ -1886,10 +2144,7 @@
       "affectedArtifacts": [
         {
           "type": "specs",
-          "files": [
-            "sdk:suggest-implementation-links",
-            "sdk:suggest-spec-dependencies"
-          ]
+          "files": ["sdk:suggest-implementation-links", "sdk:suggest-spec-dependencies"]
         },
         {
           "type": "verify",
@@ -1902,15 +2157,11 @@
         },
         {
           "type": "design",
-          "files": [
-            "design"
-          ]
+          "files": ["design"]
         },
         {
           "type": "tasks",
-          "files": [
-            "tasks"
-          ]
+          "files": ["tasks"]
         }
       ]
     },
@@ -1927,16 +2178,11 @@
       "affectedArtifacts": [
         {
           "type": "specs",
-          "files": [
-            "cli:spec-suggest",
-            "sdk:suggest-specs"
-          ]
+          "files": ["cli:spec-suggest", "sdk:suggest-specs"]
         },
         {
           "type": "design",
-          "files": [
-            "design"
-          ]
+          "files": ["design"]
         },
         {
           "type": "verify",
@@ -1949,9 +2195,7 @@
         },
         {
           "type": "tasks",
-          "files": [
-            "tasks"
-          ]
+          "files": ["tasks"]
         }
       ]
     },
@@ -1968,22 +2212,15 @@
       "affectedArtifacts": [
         {
           "type": "verify",
-          "files": [
-            "cli:spec-suggest",
-            "sdk:suggest-specs"
-          ]
+          "files": ["cli:spec-suggest", "sdk:suggest-specs"]
         },
         {
           "type": "design",
-          "files": [
-            "design"
-          ]
+          "files": ["design"]
         },
         {
           "type": "tasks",
-          "files": [
-            "tasks"
-          ]
+          "files": ["tasks"]
         }
       ]
     },
@@ -2000,29 +2237,251 @@
       "affectedArtifacts": [
         {
           "type": "specs",
-          "files": [
-            "cli:spec-suggest"
-          ]
+          "files": ["cli:spec-suggest"]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:spec-suggest"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-29T21:16:51.396Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-29T21:27:25.445Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-29T22:02:28.518Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-29T22:03:11.659Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [sdk:suggest-implementation-links]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["sdk:suggest-implementation-links"]
         },
         {
           "type": "verify",
           "files": [
-            "cli:spec-suggest"
+            "sdk:suggest-specs",
+            "cli:spec-suggest",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies"
           ]
         },
         {
           "type": "design",
-          "files": [
-            "design"
-          ]
+          "files": ["design"]
         },
         {
           "type": "tasks",
-          "files": [
-            "tasks"
-          ]
+          "files": ["tasks"]
         }
       ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-29T22:03:19.295Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [sdk:suggest-implementation-links]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["sdk:suggest-implementation-links"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-29T22:32:27.761Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [sdk:suggest-specs]; verify [sdk:suggest-specs]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["sdk:suggest-specs"]
+        },
+        {
+          "type": "verify",
+          "files": ["sdk:suggest-specs"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-29T22:47:00.051Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-29T22:47:03.749Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-29T22:48:14.330Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-29T22:51:43.846Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-29T22:51:47.249Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-08-29T22:52:42.038Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Tracked implementation files remain open for change \"suggest-specs-command\". Resolve or ignore them first.",
+      "commitStarted": false
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-29T22:53:28.366Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
     }
-  ]
+  ],
+  "archivedAt": "2026-08-29T22:53:28.465Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
 }
