@@ -239,7 +239,7 @@ describe('GetGraphHealth', () => {
       ...makeProvider(),
       getAllFiles: vi.fn().mockResolvedValue([
         createFileNode({
-          path: 'core:index.ts',
+          path: 'core:src/index.ts',
           configRelativePath: 'src/index.ts',
           language: 'typescript',
           contentHash: 'indexed-hash',
@@ -276,7 +276,7 @@ describe('GetGraphHealth', () => {
       ...makeProvider(),
       getAllFiles: vi.fn().mockResolvedValue([
         createFileNode({
-          path: 'core:index.ts',
+          path: 'core:src/index.ts',
           configRelativePath: 'not-a-directory/index.ts',
           language: 'typescript',
           contentHash: 'indexed-hash',
@@ -408,6 +408,32 @@ describe('GetGraphHealth', () => {
     expect(result.coverage.byStatus.partial).toBe(1)
     expect(result.reasonCodes).toContain('PARSER_FAILED')
     expect(result.state).not.toBe('current')
+  })
+
+  it('marks indexed coverage without a persisted graph node as inconsistent without mutating storage', async () => {
+    vi.mocked(createVcsAdapter).mockResolvedValue({
+      ref: vi.fn().mockResolvedValue('abc1234'),
+    } as never)
+    const provider = {
+      ...makeProvider({ ...BASE_STATS, graphFingerprint: matchingFingerprint() }),
+      getAllFiles: vi.fn().mockResolvedValue([]),
+      getAllDocuments: vi.fn().mockResolvedValue([]),
+    } as unknown as CodeGraphHostPort
+
+    const result = await getGraphHealth().execute({
+      config,
+      provider,
+      codeGraphVersion,
+      workspaces,
+    })
+
+    expect(result.contentFresh).toBe(false)
+    expect(result.coverageComplete).toBe(false)
+    expect(result.state).toBe('stale')
+    expect(result.coverage.reasons).toContain('indexed-node-missing')
+    expect(result.reasonCodes).toContain('GRAPH_CONTENT_INCONSISTENT')
+    expect(provider.getAllFiles).toHaveBeenCalled()
+    expect(provider.getAllDocuments).toHaveBeenCalled()
   })
 
   it('treats excluded and unsupported outcomes as terminal aggregate coverage', async () => {

@@ -208,6 +208,42 @@ describe('ResolveSchema — extends', () => {
     expect(schema.workflowStep('designing')).not.toBeNull()
   })
 
+  it('cascades compat through multi-level extends chain', async () => {
+    const root = minimalData({ name: 'root', version: 1 })
+    const intermediate = minimalData({
+      name: 'intermediate',
+      version: 1,
+      extends: '#root',
+      compat: '@specd/rfc-std@2',
+    })
+    const leaf = minimalData({
+      name: 'leaf',
+      version: 1,
+      extends: '#intermediate',
+    })
+    const leafOverridingCompat = minimalData({
+      name: 'leaf-override',
+      version: 1,
+      extends: '#intermediate',
+      compat: '@specd/custom-spec@3',
+    })
+
+    const registry = makeRegistry({
+      '#root': rawResult(root, '/schemas/root/schema.yaml'),
+      '#intermediate': rawResult(intermediate, '/schemas/intermediate/schema.yaml'),
+      '#leaf': rawResult(leaf, '/schemas/leaf/schema.yaml'),
+      '#leaf-override': rawResult(leafOverridingCompat, '/schemas/leaf-override/schema.yaml'),
+    })
+
+    const leafSchema = await resolve(registry, '#leaf')
+    expect(leafSchema.compat()).toEqual({ name: '@specd/rfc-std', version: 2 })
+    expect(leafSchema.canonicalSpecSchema()).toEqual({ name: '@specd/rfc-std', version: 2 })
+
+    const overrideSchema = await resolve(registry, '#leaf-override')
+    expect(overrideSchema.compat()).toEqual({ name: '@specd/custom-spec', version: 3 })
+    expect(overrideSchema.canonicalSpecSchema()).toEqual({ name: '@specd/custom-spec', version: 3 })
+  })
+
   it('child inherits workflow from parent', async () => {
     const parent = minimalData({
       name: 'parent',

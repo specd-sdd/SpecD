@@ -581,7 +581,7 @@
 - **GIVEN** a spec has no existing `spec-lock.json`
 - **AND** archive has determined `change.specDependsOn` for that spec
 - **WHEN** `ArchiveChange.execute` archives the spec
-- **THEN** `spec-lock.json` is persisted with `schema.name` and `schema.version` from the active schema
+- **THEN** `spec-lock.json` is persisted with `schema` derived from `schema.canonicalSpecSchema()` (supporting `compat` and `extends` fallbacks)
 - **AND** `dependsOn` is set to the final `change.specDependsOn` value
 
 #### Scenario: Re-archive preserves immutable schema and refreshes dependsOn
@@ -730,6 +730,21 @@
 - **GIVEN** a confirmed implementation link points to a raw file path outside the target workspace `codeRoot`
 - **WHEN** archive materializes links
 - **THEN** archive fails instead of writing an invalid canonical sidecar entry
+
+#### Scenario: Archive discards nonexistent spec candidate without creating orphan sidecar
+
+- **GIVEN** a change has an implementation link for a spec that does not exist in `SpecRepository` and is not being created
+- **WHEN** `ArchiveChange.execute` prepares the archive plan
+- **THEN** that spec is safely discarded from the publication plan
+- **AND** no orphan spec directory or lock sidecar is published
+
+#### Scenario: Archive discards new spec without specification artifacts without creating orphan sidecar
+
+- **GIVEN** a change targets a new spec in `specIds` but has no specification artifacts for that spec
+- **AND** the change contains an implementation link for that new spec
+- **WHEN** `ArchiveChange.execute` prepares the archive plan
+- **THEN** that spec is safely discarded from the publication plan
+- **AND** no orphan spec directory or lock sidecar is published
 
 ### Requirement: Out-of-scope sidecar update guard
 

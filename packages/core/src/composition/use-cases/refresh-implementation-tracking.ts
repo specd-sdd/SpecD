@@ -26,6 +26,11 @@ export interface RefreshImplementationTrackingDeps {
   readonly files: FileReader
   /** Absolute project root path. */
   readonly projectRoot: string
+  /** Spec repositories keyed by workspace name. */
+  readonly specRepositories?: ReadonlyMap<
+    string,
+    import('../../application/ports/spec-repository.js').SpecRepository
+  >
 }
 
 /**
@@ -45,6 +50,7 @@ export function resolveRefreshImplementationTrackingDeps(
     ),
     files: resolver.getFileReader(),
     projectRoot: resolver.config.projectRoot,
+    specRepositories: resolver.getSpecRepositories(),
   }
 }
 
@@ -104,6 +110,7 @@ function createRefreshImplementationTrackingFromNormalized(
       input.deps.implementationDetector,
       input.deps.files,
       input.deps.projectRoot,
+      input.deps.specRepositories,
     )
   }
   const resolver = createCompositionResolver(input.config, input.options)

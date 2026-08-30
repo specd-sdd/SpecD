@@ -1,0 +1,8 @@
+releases:
+  core:schema-format: minor
+  core:schema-merge: minor
+  core:resolve-schema: minor
+  core:archive-change: minor
+  core:initialize-persisted-spec-state: minor
+  core:generate-metadata: minor
+  cli:schema-show: minor

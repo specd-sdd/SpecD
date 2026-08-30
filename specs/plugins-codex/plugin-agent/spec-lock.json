@@ -14,12 +14,7 @@
   ],
   "implementation": [
     {
-      "file": "plugin-agent-codex:src/application/use-cases/install-skills.ts",
-      "symbols": ["InstallSkills"]
-    },
-    {
-      "file": "plugin-agent-codex:src/application/use-cases/uninstall-skills.ts",
-      "symbols": ["UninstallSkills"]
+      "file": "plugin-agent-codex:src/domain/frontmatter/index.ts"
     },
     {
       "file": "plugin-agent-codex:test/install-skills.spec.ts"

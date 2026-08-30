@@ -444,6 +444,16 @@
 - **WHEN** historical implementation detection is evaluated
 - **THEN** it reports that implementation refresh should not run
 
+### Requirement: Explicit implementation tracking activation
+
+#### Scenario: Explicit start records timestamp and activates tracking
+
+- **GIVEN** a new `Change` entity with `isImplementationTrackingActive = false`
+- **WHEN** calling `change.startImplementationTracking(timestamp)`
+- **THEN** `isImplementationTrackingActive` becomes `true`
+- **AND** `implementationTrackingStartedAt` matches the provided timestamp
+- **AND** a subsequent call to `startImplementationTracking` does not overwrite the initial timestamp
+
 ### Requirement: Archive outcome history
 
 #### Scenario: Failed archive attempt appends archive-failed event

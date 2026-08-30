@@ -270,6 +270,9 @@ export {
   type UpdateProjectMetadata,
   type UpdateProjectMetadataInput,
   type UpdateProjectMetadataResult,
+  ResolveContextSpecs,
+  type ResolveContextSpecsInput,
+  type ResolveContextSpecsResult,
 } from './application/use-cases/index.js'
 
 export { NodeContentHasher } from './infrastructure/node/content-hasher.js'
@@ -303,6 +306,8 @@ export {
   type GetActiveSchemaDeps,
   createGetProjectContext,
   type GetProjectContextDeps,
+  createResolveContextSpecs,
+  type ResolveContextSpecsDeps,
   createGetConfig,
   type GetConfigDeps,
   createCreateChange,
@@ -491,6 +496,8 @@ export {
   artifactDagFromChangeArtifacts,
   Schema,
   type SchemaKind,
+  type SchemaCompatIdentity,
+  parseSchemaCompat,
   OverlapEntry,
   type OverlapChange,
   OverlapReport,

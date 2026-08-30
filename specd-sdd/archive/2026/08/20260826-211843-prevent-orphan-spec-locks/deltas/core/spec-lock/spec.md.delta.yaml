@@ -1,0 +1,29 @@
+- op: modified
+  description: 'Clarify sidecar publication lifecycle constraint'
+  selector:
+    type: section
+    matches: 'Requirement: Lock-less specs and explicit initialization'
+  content: |
+    A spec MAY have canonical artifacts without a `spec-lock.json`. This lock-less
+    state is valid and MUST NOT be silently upgraded by an ordinary read.
+
+    Persisted state for a lock-less spec MUST be created only by:
+
+    - archive publication of a change targeting that spec alongside canonical spec artifacts, or
+    - an explicit initialization operation that adopts existing artifacts into
+      persisted state, or
+    - an explicit persisted-state mutation (dependency, implementation, or
+      optimization) that is itself a create-worthy operation for an existing spec
+
+    Persisted lock sidecars MUST NOT be published or created in isolation without canonical spec artifacts.
+
+    Explicit initialization is a one-time adoption: it MUST fail when persisted
+    state already exists for the target spec, regardless of whether the requested
+    schema identity matches. Explicit initialization MUST derive `dependsOn` from
+    the current canonical artifacts under the resolved schema rather than from any
+    cached projection, default `implementation` to an empty array, and omit
+    `optimizations`.
+
+    Semantic no-op mutations against a lock-less spec (e.g. removing a dependency
+    that is not present, removing an implementation link that is not present, or
+    clearing an optimization field that is not set) MUST NOT create persisted state.

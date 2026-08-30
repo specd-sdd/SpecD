@@ -47,6 +47,27 @@
 - **THEN** `ws:ghost` is not registered into the collected set
 - **AND** no warning is emitted during traversal registration
 
+#### Scenario: Steps 1–4 use shared configured-context helper
+
+- **WHEN** `CompileContext` applies project and active-workspace include/exclude patterns
+- **THEN** it invokes `resolveConfiguredContextSpecs` for those steps
+- **AND** does not inline a separate project/workspace glob loop for steps 1–4
+
+#### Scenario: Optimized project context still runs workspace patterns via helper
+
+- **GIVEN** optimized project context is preferred for the call
+- **AND** an active workspace declares include patterns
+- **WHEN** `CompileContext.execute` runs
+- **THEN** the helper is invoked with empty project include/exclude arrays
+- **AND** workspace-level matches from active workspaces are still collected
+
+#### Scenario: Protected change seeds survive helper excludes
+
+- **GIVEN** `includeChangeSpecs: true` seeded `core:config` as protected
+- **AND** a project or workspace exclude pattern matches `core:config`
+- **WHEN** the shared helper runs exclude callbacks owned by `CompileContext`
+- **THEN** `core:config` remains in the collected set
+
 ### Requirement: Context display modes
 
 #### Scenario: Summary mode is the default when contextMode is omitted

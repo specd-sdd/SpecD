@@ -2670,4 +2670,71 @@ describe('TransitionChange', () => {
       expect(result.change.state).toBe('verifying')
     })
   })
+
+  describe('implementation tracking auto-activation', () => {
+    it('activates implementation tracking when transitioning to implementing for the first time', async () => {
+      const change = makeChangeInState('auto-track', [
+        {
+          type: 'transitioned',
+          from: 'drafting',
+          to: 'designing',
+          at: new Date('2024-01-01T00:00:00Z'),
+          by: actor,
+        },
+        {
+          type: 'transitioned',
+          from: 'designing',
+          to: 'ready',
+          at: new Date('2024-01-01T00:00:00Z'),
+          by: actor,
+        },
+      ])
+      const repo = makeChangeRepository([change])
+      const uc = makeUseCase(repo)
+
+      expect(change.isImplementationTrackingActive).toBe(false)
+
+      const result = await uc.execute({
+        name: 'auto-track',
+        to: 'implementing',
+      })
+
+      expect(result.change.state).toBe('implementing')
+      expect(result.change.isImplementationTrackingActive).toBe(true)
+      expect(result.change.implementationTrackingStartedAt).not.toBeNull()
+    })
+
+    it('preserves pre-existing implementationTrackingStartedAt when transitioning to implementing', async () => {
+      const explicitStart = new Date('2024-05-01T12:00:00Z')
+      const change = makeChangeInState('preserve-track', [
+        {
+          type: 'transitioned',
+          from: 'drafting',
+          to: 'designing',
+          at: new Date('2024-01-01T00:00:00Z'),
+          by: actor,
+        },
+        {
+          type: 'transitioned',
+          from: 'designing',
+          to: 'ready',
+          at: new Date('2024-01-01T00:00:00Z'),
+          by: actor,
+        },
+      ])
+      change.startImplementationTracking(explicitStart)
+
+      const repo = makeChangeRepository([change])
+      const uc = makeUseCase(repo)
+
+      const result = await uc.execute({
+        name: 'preserve-track',
+        to: 'implementing',
+      })
+
+      expect(result.change.state).toBe('implementing')
+      expect(result.change.isImplementationTrackingActive).toBe(true)
+      expect(result.change.implementationTrackingStartedAt).toEqual(explicitStart)
+    })
+  })
 })

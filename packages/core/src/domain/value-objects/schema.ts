@@ -8,6 +8,46 @@ import { type WorkflowStep } from './workflow-step.js'
 export type SchemaKind = 'schema' | 'schema-plugin'
 
 /**
+ * Identity of a canonical spec schema that this schema declares compatibility with.
+ */
+export interface SchemaCompatIdentity {
+  readonly name: string
+  readonly version: number
+}
+
+/**
+ * Parses a schema compat declaration (string or object) into a canonical {@link SchemaCompatIdentity}.
+ *
+ * @param raw - The raw string or object declared under `compat`
+ * @returns Parsed name and version
+ */
+export function parseSchemaCompat(
+  raw: string | { readonly name: string; readonly version?: number | undefined },
+): SchemaCompatIdentity {
+  if (typeof raw === 'string') {
+    const atIdx = raw.lastIndexOf('@')
+    if (atIdx > 0 && atIdx < raw.length - 1) {
+      const versionStr = raw.slice(atIdx + 1)
+      const versionNum = parseInt(versionStr, 10)
+      if (!isNaN(versionNum) && String(versionNum) === versionStr) {
+        return {
+          name: raw.slice(0, atIdx),
+          version: versionNum,
+        }
+      }
+    }
+    return {
+      name: raw,
+      version: 1,
+    }
+  }
+  return {
+    name: raw.name,
+    version: raw.version ?? 1,
+  }
+}
+
+/**
  * A fully-parsed schema loaded from a `schema.yaml` file.
  *
  * Schemas are resolved by {@link SchemaRegistry} using a three-level lookup:
@@ -21,6 +61,7 @@ export class Schema {
   private readonly _name: string
   private readonly _version: number
   private readonly _extends: string | undefined
+  private readonly _compat: SchemaCompatIdentity | undefined
   private readonly _artifacts: readonly ArtifactType[]
   private readonly _artifactIndex: ReadonlyMap<string, ArtifactType>
   private readonly _metadataExtraction: MetadataExtraction | undefined
@@ -40,6 +81,7 @@ export class Schema {
    * @param metadataExtraction - Optional metadata extraction declarations
    * @param crossArtifactValidations - Optional cross-artifact structural rules
    * @param extendsRef - Optional parent schema reference
+   * @param compat - Optional compatible canonical spec schema identity
    */
   constructor(
     kind: SchemaKind,
@@ -50,11 +92,13 @@ export class Schema {
     metadataExtraction?: MetadataExtraction,
     crossArtifactValidations: readonly CrossArtifactValidationRule[] = [],
     extendsRef?: string,
+    compat?: SchemaCompatIdentity,
   ) {
     this._kind = kind
     this._name = name
     this._version = version
     this._extends = extendsRef
+    this._compat = compat
     this._artifacts = artifacts
     this._artifactIndex = new Map(artifacts.map((a) => [a.id, a]))
     this._metadataExtraction = metadataExtraction
@@ -167,5 +211,36 @@ export class Schema {
    */
   extendsRef(): string | undefined {
     return this._extends
+  }
+
+  /**
+   * The declared compatible spec schema identity, or `undefined` if this schema
+   * does not declare compatibility with a canonical spec schema.
+   *
+   * @returns The compatible schema identity, or `undefined`
+   */
+  compat(): SchemaCompatIdentity | undefined {
+    return this._compat
+  }
+
+  /**
+   * Returns the canonical spec schema identity used for durable `spec-lock.json`
+   * persistence.
+   *
+   * Resolution hierarchy:
+   * 1. Declared `compat` identity (if present)
+   * 2. Inherited `extends` reference identity (if extending another schema)
+   * 3. This schema's own name and version
+   *
+   * @returns Canonical spec schema identity
+   */
+  canonicalSpecSchema(): SchemaCompatIdentity {
+    if (this._compat !== undefined) {
+      return this._compat
+    }
+    if (this._extends !== undefined) {
+      return parseSchemaCompat(this._extends)
+    }
+    return { name: this._name, version: this._version }
   }
 }

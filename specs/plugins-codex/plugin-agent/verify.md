@@ -148,3 +148,20 @@
 - **WHEN** `uninstall(config)` is executed without filters
 - **THEN** all specd-managed agent files are removed
 - **AND** unrelated user agent files remain
+
+### Requirement: Fast-track skill installation
+
+#### Scenario: Default Codex installation renders fast-track
+
+- **GIVEN** no explicit skill filter
+- **WHEN** Codex installs available standard skills
+- **THEN** `.codex/skills/specd-fasttrack/SKILL.md` is written from `ResolveBundle`
+- **AND** its frontmatter includes only `name` and `description`
+- **AND** its content requires incremental journal updates for resumability
+
+### Requirement: Manual-only fast-track routing
+
+#### Scenario: Installing fast-track for Codex
+
+- **WHEN** the Codex plugin renders fast-track frontmatter
+- **THEN** the description states that explicit `/specd-fasttrack` invocation is required

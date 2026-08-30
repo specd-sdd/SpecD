@@ -20,11 +20,11 @@ Delivery adapters need a single application-layer operation to refresh a change'
 
 `RefreshImplementationTracking` remains the standalone primitive for explicit refresh operations (for example `specd change implementation refresh`).
 
-### Requirement: Historical implementing guard
+### Requirement: Implementation tracking active guard
 
-When `Change.getHistoricalImplementationAt()` is `null`, the use case MUST NOT invoke `ImplementationDetector` and MUST NOT mutate tracked implementation files.
+When `Change.isImplementationTrackingActive` is `false`, the use case MUST NOT invoke `ImplementationDetector` and MUST NOT mutate tracked implementation files.
 
-When the guard is satisfied, the use case MUST run targeted detection and MAY persist tracking updates.
+When `Change.isImplementationTrackingActive` is `true`, the use case MUST run targeted detection and MAY persist tracking updates.
 
 ### Requirement: Detection merge semantics
 
@@ -44,6 +44,12 @@ For every file in `trackedImplementationFiles` that is not in the `ignored` stat
 
 1. Call `Change.trackImplementationFile(file, 'removed')` to update its review state.
 2. Remove all `implementationLinks` (both file-level and symbol-level) that reference the missing file.
+
+### Requirement: Spec sweep prunes dangling implementation links
+
+When refresh runs, the use case MUST perform a spec sweep over `change.implementationLinks`.
+
+For each confirmed implementation link, if the link's `specId` is NOT present in `change.specIds` and NOT found in the workspace's canonical `SpecRepository`, the link MUST be pruned from the change's implementation links.
 
 ### Requirement: Resurrections and re-appearances
 
@@ -110,6 +116,7 @@ The config-based `createRefreshImplementationTracking(config, options?)` form MU
 - `implementationDetector: ImplementationDetector`
 - `files: FileReader`
 - `projectRoot: string`
+- `specRepositories?: ReadonlyMap<string, SpecRepository>`
 
 The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
 

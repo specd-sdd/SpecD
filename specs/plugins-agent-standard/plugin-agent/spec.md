@@ -104,6 +104,16 @@ When `options.skills` is omitted, uninstall MUST remove all specd-managed skill 
 
 Uninstall MUST NOT remove unrelated directories or files under `.agents/skills/` that are not part of the specd-managed skill set.
 
+### Requirement: Fast-track skill installation
+
+Agent Skills Standard installation MUST include `specd-fasttrack` when standard skills are installed without an explicit skill filter. It MUST resolve the skill through `ResolveBundle`, provide its supported `frontmatter` capability and structured standard frontmatter values, and write the rendered skill under `.agents/skills/specd-fasttrack/`.
+
+The per-skill frontmatter entry MUST declare an `allowed-tools` value sufficient for the fast-track workflow's file operations, SpecD/Node/PNPM commands, and delegated-agent use when that capability is available. The output MUST omit capability-dependent instructions that the Standard runtime does not support.
+
+### Requirement: Manual-only fast-track routing
+
+The Agent Skills standard fast-track frontmatter description MUST state that the skill is manual-only and may be used only when the user explicitly invokes `/specd-fasttrack`.
+
 ## Constraints
 
 - The plugin MUST depend on `@specd/skills` for skill repository access.

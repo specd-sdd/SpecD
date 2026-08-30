@@ -267,6 +267,23 @@
 - **WHEN** force indexing runs
 - **THEN** it uses logical clear and full reanalysis without physical recreation
 
+### Requirement: SQLite logical clear parity
+
+#### Scenario: Healthy force clear empties all generation-owned tables
+
+- **GIVEN** an open healthy SQLite store populated with physical nodes, logical symbols, declarations, bindings, reference facts, coverage records, observations, latches, relations, metadata, and FTS content
+- **WHEN** `clear()` commits
+- **THEN** set-based inspection and every abstract read observe no row owned by the prior logical generation
+- **AND** `index_coverage` cannot cause a following run to skip an input
+- **AND** the worker remains open and the storage-generation sidecar is unchanged
+
+#### Scenario: Logical clear rolls back atomically
+
+- **GIVEN** a populated SQLite logical generation
+- **AND** an injected SQLite failure occurs after some clear statements have executed
+- **WHEN** the clear transaction rejects
+- **THEN** the previously committed physical, semantic, incremental, relation, and metadata state remains queryable together
+
 ### Requirement: Storage generation sidecar
 
 #### Scenario: SQLite exposes generation changes through the sidecar
@@ -312,6 +329,24 @@
 - **GIVEN** a persisted `COVERS_SYMBOL` relation with metadata `{ "stale": true }`
 - **WHEN** the relation is loaded through abstract graph-store queries
 - **THEN** the metadata still marks the relation as stale
+
+### Requirement: SQLite logical coverage integrity
+
+#### Scenario: Bulk generation persists logical-symbol coverage
+
+- **GIVEN** one staged generation contains a spec, a logical symbol with declaration, and `COVERS_SYMBOL` targeting that logical ID
+- **WHEN** the SQLite bulk session commits
+- **THEN** endpoint validation accepts the relation after logical symbols are staged
+- **AND** forward and reverse coverage reads return the unchanged logical target and metadata
+- **AND** graph statistics report one `COVERS_SYMBOL`
+
+#### Scenario: Invalid logical coverage is diagnosed without retargeting
+
+- **GIVEN** a staged `COVERS_SYMBOL` references a missing spec or missing logical symbol
+- **WHEN** the generation is validated and committed
+- **THEN** the invalid relation is absent from SQLite
+- **AND** the indexing result identifies the rejected source and target
+- **AND** no physical symbol row is substituted as the relation target
 
 ### Requirement: SQLite full-text search
 

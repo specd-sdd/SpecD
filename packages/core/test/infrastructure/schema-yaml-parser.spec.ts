@@ -104,6 +104,29 @@ describe('parseSchemaYaml — extends field', () => {
 })
 
 // ---------------------------------------------------------------------------
+// Requirement: compat field
+// ---------------------------------------------------------------------------
+
+describe('parseSchemaYaml — compat field', () => {
+  it('accepts string compat on kind: schema', () => {
+    const yaml = `kind: schema\nname: child\nversion: 1\ncompat: '@specd/schema-std@1'\nartifacts:\n  - id: spec\n    scope: spec\n    output: spec.md\n`
+    const data = parseSchemaYaml('#child', yaml)
+    expect(data.compat).toBe('@specd/schema-std@1')
+  })
+
+  it('accepts object compat on kind: schema', () => {
+    const yaml = `kind: schema\nname: child\nversion: 1\ncompat:\n  name: schema-std\n  version: 1\nartifacts:\n  - id: spec\n    scope: spec\n    output: spec.md\n`
+    const data = parseSchemaYaml('#child', yaml)
+    expect(data.compat).toEqual({ name: 'schema-std', version: 1 })
+  })
+
+  it('rejects schema-plugin with compat', () => {
+    const yaml = `kind: schema-plugin\nname: bad\nversion: 1\ncompat: '@specd/schema-std@1'\n`
+    expect(() => parseSchemaYaml('#bad', yaml)).toThrow(SchemaValidationError)
+  })
+})
+
+// ---------------------------------------------------------------------------
 // Requirement: schema-plugin refinement
 // ---------------------------------------------------------------------------
 

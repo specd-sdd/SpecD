@@ -9,7 +9,20 @@
     "core:content-extraction",
     "core:schema-merge"
   ],
-  "implementation": [],
+  "implementation": [
+    {
+      "file": "core:src/domain/value-objects/schema.ts",
+      "symbols": ["Schema", "SchemaCompatIdentity", "parseSchemaCompat"]
+    },
+    {
+      "file": "core:src/infrastructure/schema-yaml-parser.ts",
+      "symbols": ["parseSchemaYaml", "parseSchemaCompat"]
+    },
+    {
+      "file": "core:src/domain/services/build-schema.ts",
+      "symbols": ["buildSchema"]
+    }
+  ],
   "optimizations": {
     "optimizedDescription": {
       "value": "YAML schema format: artifacts, workflow, validations, plugins, extends, metadataExtraction, DAG.",

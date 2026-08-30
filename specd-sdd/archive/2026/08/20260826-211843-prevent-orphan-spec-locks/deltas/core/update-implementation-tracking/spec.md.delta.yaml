@@ -1,0 +1,28 @@
+- op: modified
+  description: 'Validate specId at link addition'
+  selector:
+    type: section
+    matches: 'Requirement: Add mutation creates or enriches implementation links'
+  content: |
+    When `action = add`, the use case MUST require the target file to exist on disk.
+
+    The use case MUST require `input.specId` to be provided. If `input.specId` is not present in `change.specIds`, the use case MUST verify that the spec exists in the canonical `SpecRepository` for the spec's workspace. If the spec is not found in `change.specIds` and not found in `SpecRepository`, the use case MUST throw `SpecNotFoundError(input.specId)`.
+
+    It MUST create or enrich a confirmed implementation link for the given `specId + file` pair, using symbol refinements when provided. When the file is not already tracked, it MUST add a tracked implementation file entry with state `open`.
+
+- op: modified
+  description: 'Add specRepositories to config factory dependencies'
+  selector:
+    type: section
+    matches: 'Requirement: Config-based factory delegates through resolveUpdateImplementationTrackingDeps'
+  content: |
+    The config-based `createUpdateImplementationTracking(config, options?)` form MUST derive `UpdateImplementationTrackingDeps` through `resolveUpdateImplementationTrackingDeps(resolver)` and then delegate to canonical `createUpdateImplementationTracking(deps)`.
+
+    `resolveUpdateImplementationTrackingDeps(resolver)` MUST resolve:
+
+    - `changes: ChangeRepository`
+    - `files: FileReader`
+    - `projectRoot: string`
+    - `specRepositories?: ReadonlyMap<string, SpecRepository>`
+
+    The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.

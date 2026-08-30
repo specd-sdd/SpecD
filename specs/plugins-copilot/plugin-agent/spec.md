@@ -86,6 +86,16 @@ When no filters are provided, uninstall MUST remove all specd-managed skill dire
 
 Uninstall MUST NOT remove unrelated directories or files under `.github/skills/` or `.github/agents/` that are not part of the specd-managed set.
 
+### Requirement: Fast-track skill installation
+
+Copilot installation MUST include `specd-fasttrack` when standard skills are installed without an explicit skill filter. It MUST resolve the skill through `ResolveBundle`, provide only Copilot-supported capabilities and structured frontmatter values, and write the rendered skill under the existing Copilot skill-directory contract.
+
+Runtime branches that need unavailable capabilities MUST be omitted rather than represented as executable instructions, and shared output MUST remain free of skill frontmatter.
+
+### Requirement: Manual-only fast-track routing
+
+The Copilot fast-track frontmatter description MUST state that the skill is manual-only and may be used only when the user explicitly invokes `/specd-fasttrack`. Its frontmatter MUST set `disable-model-invocation: true`.
+
 ## Constraints
 
 - The plugin MUST depend on `@specd/skills` for skill operations.

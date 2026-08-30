@@ -14,7 +14,12 @@
     "core:composition-resolver",
     "core:generate-metadata"
   ],
-  "implementation": [],
+  "implementation": [
+    {
+      "file": "core:src/application/use-cases/initialize-persisted-spec-state.ts",
+      "symbols": ["InitializePersistedSpecState"]
+    }
+  ],
   "optimizations": {
     "optimizedDescription": {
       "value": "Explicitly adopts existing lock-less specs into one schema, deriving dependencies from canonical artifacts.",

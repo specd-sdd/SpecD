@@ -1,0 +1,12 @@
+- op: added
+  description: 'Cover fast-track in Open Code skill installation'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    ### Requirement: Fast-track skill installation
+
+    Open Code installation MUST include `specd-fasttrack` when standard skills are installed without an explicit skill filter. It MUST resolve the skill through `ResolveBundle`, provide Open Code's supported capabilities and structured frontmatter values, and write the rendered skill under the existing Open Code skill-directory contract.
+
+    The rendered output MUST preserve capability-aware workflow branches and MUST include only Open Code-supported frontmatter fields.

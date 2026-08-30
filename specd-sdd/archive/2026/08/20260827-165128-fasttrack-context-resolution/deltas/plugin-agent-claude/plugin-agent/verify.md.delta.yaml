@@ -1,0 +1,17 @@
+- op: added
+  description: Verify Claude emits manual-only fast-track metadata.
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Fast-track skill installation$'
+  content: |
+    ### Requirement: Manual-only fast-track routing
+
+    #### Scenario: Installing fast-track for Claude
+
+    - **WHEN** the Claude plugin renders fast-track frontmatter
+    - **THEN** the description states that explicit `/specd-fasttrack` invocation is required
+    - **AND** `disable_model_invocation` is true

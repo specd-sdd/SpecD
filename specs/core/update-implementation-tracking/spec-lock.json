@@ -6,7 +6,12 @@
   "dependsOn": ["core:change", "core:refresh-implementation-tracking", "core:composition-resolver"],
   "implementation": [
     {
-      "file": "core:src/composition/use-cases/update-implementation-tracking.ts"
+      "file": "core:src/application/use-cases/update-implementation-tracking.ts",
+      "symbols": ["UpdateImplementationTracking._validateMutation"]
+    },
+    {
+      "file": "core:src/composition/use-cases/update-implementation-tracking.ts",
+      "symbols": ["resolveUpdateImplementationTrackingDeps"]
     }
   ],
   "optimizations": {

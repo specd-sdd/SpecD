@@ -149,3 +149,20 @@
 - **WHEN** the Claude install flow is reviewed
 - **THEN** bundle resolution goes through `ResolveBundle`
 - **AND** the plugin does not call `SkillRepository.getBundle(...)` directly from `InstallSkills`
+
+### Requirement: Fast-track skill installation
+
+#### Scenario: Default Claude installation includes fast-track
+
+- **GIVEN** no explicit skill filter
+- **WHEN** Claude installs available standard skills
+- **THEN** `.claude/skills/specd-fasttrack/SKILL.md` is written from `ResolveBundle`
+- **AND** the rendered content includes the incremental journal-resumability contract
+
+### Requirement: Manual-only fast-track routing
+
+#### Scenario: Installing fast-track for Claude
+
+- **WHEN** the Claude plugin renders fast-track frontmatter
+- **THEN** the description states that explicit `/specd-fasttrack` invocation is required
+- **AND** `disable_model_invocation` is true

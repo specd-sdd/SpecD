@@ -26,6 +26,39 @@ describe('createSkillRepository', () => {
     expect(skill?.kind).toBe('skill')
   })
 
+  it('given the fast-track template directory, when discovered and rendered, then emits a skill and shared context separately', async () => {
+    const repository = createSkillRepository()
+
+    const skill = await repository.get('specd-fasttrack')
+    const bundle = await repository.getBundle('specd-fasttrack', {
+      variables: { sharedFolder: '.specd/config/skills/shared' },
+      capabilities: ['frontmatter'],
+    })
+
+    expect(skill?.kind).toBe('skill')
+    expect(skill?.metadata).toMatchObject({
+      supportedCapabilities: ['mcp', 'agents', 'frontmatter'],
+      requiredCapabilities: [],
+      requiredSharedTemplates: ['shared.md'],
+    })
+    expect(bundle.files.find((file) => file.filename === 'SKILL.md')?.content).toContain(
+      '@.specd/config/skills/shared/shared.md',
+    )
+    expect(bundle.files.find((file) => file.filename === 'shared.md')?.shared).toBe(true)
+  })
+
+  it('given standard-only capabilities, when fast-track is rendered, then capability-specific guidance is omitted', async () => {
+    const repository = createSkillRepository()
+    const bundle = await repository.getBundle('specd-fasttrack', {
+      capabilities: ['frontmatter'],
+    })
+    const content = bundle.files.find((file) => file.filename === 'SKILL.md')?.content
+
+    expect(content).toContain('Mandatory live journal rule')
+    expect(content).not.toContain('When an MCP-backed project workflow')
+    expect(content).not.toContain('When independent work can be safely parallelized')
+  })
+
   it('given a valid agent name, when get is called, then returns that agent with kind: agent', async () => {
     const repository = createSkillRepository()
     const agent = await repository.get('specd-project-context-optimizer')

@@ -3096,6 +3096,152 @@
     },
     {
       "type": "invalidated",
+      "at": "2026-08-26T20:39:28.040Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'start-implementation-tracking' was archived with overlapping specs: cli:change-implementation, core:change, core:refresh-implementation-tracking, core:update-implementation-tracking",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "core:change",
+            "core:refresh-implementation-tracking",
+            "core:update-implementation-tracking",
+            "cli:change-implementation"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:change",
+            "core:refresh-implementation-tracking",
+            "core:update-implementation-tracking",
+            "cli:change-implementation"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-26T20:39:36.581Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'start-implementation-tracking' was archived with overlapping specs: cli:change-implementation, core:change, core:refresh-implementation-tracking, core:update-implementation-tracking",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "core:change",
+            "core:refresh-implementation-tracking",
+            "core:update-implementation-tracking",
+            "cli:change-implementation"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:change",
+            "core:refresh-implementation-tracking",
+            "core:update-implementation-tracking",
+            "cli:change-implementation"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-26T20:39:47.782Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'start-implementation-tracking' was archived with overlapping specs: cli:change-implementation, core:change, core:refresh-implementation-tracking, core:update-implementation-tracking",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "core:change",
+            "core:refresh-implementation-tracking",
+            "core:update-implementation-tracking",
+            "cli:change-implementation"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "core:change",
+            "core:refresh-implementation-tracking",
+            "core:update-implementation-tracking",
+            "cli:change-implementation"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-26T22:11:46.693Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'prevent-orphan-spec-locks' was archived with overlapping specs: core:refresh-implementation-tracking, core:update-implementation-tracking",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["core:refresh-implementation-tracking", "core:update-implementation-tracking"]
+        },
+        {
+          "type": "verify",
+          "files": ["core:refresh-implementation-tracking", "core:update-implementation-tracking"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
       "at": "2026-08-29T22:51:54.513Z",
       "by": {
         "name": "specd",

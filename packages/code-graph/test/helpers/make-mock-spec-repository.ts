@@ -1,5 +1,7 @@
 import { type Spec, type SpecPath, type SpecRepository } from '@specd/core'
 
+type PersistedState = Awaited<ReturnType<SpecRepository['readPersistedState']>>
+
 /** Builds a paginated list envelope for mock spec repositories. */
 export function makeListResult(specs: Spec[]) {
   const items = specs.map((spec) => ({
@@ -17,6 +19,7 @@ export function makeListResult(specs: Spec[]) {
 export function makeMockSpecRepository(
   specs: Spec[] = [],
   metadataMap: Map<string, Record<string, unknown>> = new Map(),
+  persistedState: PersistedState = null,
 ): SpecRepository {
   const byPath = new Map(specs.map((spec) => [spec.name.toFsPath('/'), spec]))
 
@@ -43,7 +46,7 @@ export function makeMockSpecRepository(
       }
       return { kind: 'present' as const, metadata: meta as never, revision: 'sha256:test' }
     },
-    readPersistedState: async () => null,
+    readPersistedState: async () => persistedState,
     artifact: async () => ({ content: '# Spec Content' }),
   } as unknown as SpecRepository
 }

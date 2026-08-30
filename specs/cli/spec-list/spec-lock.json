@@ -11,5 +11,10 @@
     "cli:spec-search",
     "core:list-workspaces"
   ],
-  "implementation": []
+  "implementation": [
+    {
+      "file": "cli:src/commands/spec/list.ts",
+      "symbols": ["registerSpecList"]
+    }
+  ]
 }

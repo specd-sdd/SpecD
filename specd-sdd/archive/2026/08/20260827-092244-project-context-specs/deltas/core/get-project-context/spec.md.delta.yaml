@@ -1,0 +1,38 @@
+- op: modified
+  description: 'Require project include/exclude via shared helper with empty activeWorkspaces'
+  selector:
+    type: section
+    matches: 'Requirement: Applies project-level include/exclude patterns'
+  content: |
+    The use case MUST apply `config.contextIncludeSpecs` patterns to collect specs across all workspaces, then apply `config.contextExcludeSpecs` patterns to remove specs from the collected set.
+
+    Pattern matching MUST use the shared configured-context helper defined by [`core:resolve-context-specs`](../resolve-context-specs/spec.md) (`resolveConfiguredContextSpecs`), invoked with an empty `activeWorkspaces` set so only project-level steps run. `GetProjectContext` MUST NOT reimplement a separate project-only `listMatchingSpecs` include/exclude loop.
+
+    The collected set semantics MUST remain equivalent to the previous project-only `listMatchingSpecs` path: same project glob qualification rules as `CompileContext`, treating configured workspaces as available for project-pattern matching.
+
+- op: modified
+  description: 'Clarify workspace skip is enforced via empty activeWorkspaces on shared helper'
+  selector:
+    type: section
+    matches: 'Requirement: Does not apply workspace-level patterns'
+  content: |
+    The use case MUST NOT apply workspace-level `contextIncludeSpecs` or `contextExcludeSpecs` patterns. Those are conditional on a specific change having that workspace active and are the responsibility of `CompileContext` (and of `ResolveContextSpecs` when workspace filters are active).
+
+    When using the shared helper, this MUST be enforced by passing an empty `activeWorkspaces` set (helper steps 3–4 skipped), not by forking a divergent matcher.
+
+- op: modified
+  description: 'Add dependency on core:resolve-context-specs for shared helper'
+  selector:
+    type: section
+    matches: 'Spec Dependencies'
+  content: |
+    - [`core:config`](../config/spec.md)
+    - [`core:compile-context`](../compile-context/spec.md)
+    - [`core:spec-metadata`](../spec-metadata/spec.md)
+    - [`core:schema-format`](../schema-format/spec.md)
+    - [`default:_global/architecture`](../../_global/architecture/spec.md)
+    - [`core:project-metadata`](../project-metadata/spec.md)
+    - [`core:get-spec-metadata`](../get-spec-metadata/spec.md) — self-healing metadata read (`if-needed`) replacing direct freshness checks
+    - [`core:spec-optimization`](../spec-optimization/spec.md) — per-field optimization freshness for included specs
+    - [`core:composition-resolver`](../composition-resolver/spec.md)
+    - [`core:resolve-context-specs`](../resolve-context-specs/spec.md) — shared content-free configured include/exclude helper (project-only via empty activeWorkspaces)

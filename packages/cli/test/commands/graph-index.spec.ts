@@ -33,6 +33,19 @@ const result = {
   fullRebuild: false,
   fullRebuildReason: null,
   phaseMetrics: { importResolution: { count: 0, durationMs: 0 } },
+  coverage: {
+    total: 12,
+    byStatus: { indexed: 10, excluded: 0, unsupported: 2, 'parse-failed': 0, partial: 0 },
+    reasons: ['no-language-adapter'],
+  },
+  coverageDiagnostics: [
+    {
+      specId: 'code-graph:indexer',
+      filePath: 'code-graph:src/index.ts',
+      symbolName: 'missingSymbol',
+      reason: 'SYMBOL_NOT_FOUND',
+    },
+  ],
 }
 
 function makeIndexProgram() {
@@ -112,6 +125,10 @@ describe('graph index', () => {
     onProgress?.({ percent: 12.5, phase: 'symbols' })
     expect(stdout()).toContain('Indexed 10 file(s) in 1234ms')
     expect(stdout()).toContain('bad.ts: parse error')
+    expect(stdout()).toContain('coverage:   12 input(s)')
+    expect(stdout()).toContain(
+      'code-graph:indexer: code-graph:src/index.ts#missingSymbol (SYMBOL_NOT_FOUND)',
+    )
     expect(stdout()).toContain('Indexing: 13% symbols')
   })
 

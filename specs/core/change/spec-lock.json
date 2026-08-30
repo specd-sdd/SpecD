@@ -21,7 +21,12 @@
     },
     {
       "file": "core:src/domain/entities/change.ts",
-      "symbols": ["invalidateSignoff"]
+      "symbols": [
+        "invalidateSignoff",
+        "Change.startImplementationTracking",
+        "Change.implementationTrackingStartedAt",
+        "Change.isImplementationTrackingActive"
+      ]
     },
     {
       "file": "core:src/domain/entities/index.ts"

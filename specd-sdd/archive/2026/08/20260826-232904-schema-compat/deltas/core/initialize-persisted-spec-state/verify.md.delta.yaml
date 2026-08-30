@@ -1,0 +1,15 @@
+- op: modified
+  description: 'Update Per-target initialization algorithm scenarios in initialize-persisted-spec-state verify'
+  selector:
+    type: section
+    matches: 'Requirement: Per-target initialization algorithm'
+  content: |
+    #### Scenario: Schema is resolved once, not per spec, for a batch
+    - **GIVEN** a batch initialization request for multiple specs
+    - **WHEN** `InitializePersistedSpecState` executes
+    - **THEN** it resolves the schema once and applies `schema.canonicalSpecSchema()` across all initialized specs
+
+    #### Scenario: Unparseable canonical artifacts fail that target before any write
+    - **GIVEN** a spec has unparseable canonical artifacts under the selected schema
+    - **WHEN** `InitializePersistedSpecState` attempts to initialize that spec
+    - **THEN** it records a failure for that target without writing `spec-lock.json`

@@ -1,0 +1,18 @@
+- op: modified
+  selector:
+    type: section
+    matches: 'Requirement: Historical implementing guard'
+  rename: 'Requirement: Implementation tracking active guard'
+  content: |
+    #### Scenario: Guard satisfied triggers detector
+
+    - **GIVEN** a change has `isImplementationTrackingActive = true`
+    - **WHEN** `RefreshImplementationTracking.execute()` runs
+    - **THEN** it invokes `ImplementationDetector.detectModifiedFiles`
+
+    #### Scenario: Guard not satisfied skips detector
+
+    - **GIVEN** a change has `isImplementationTrackingActive = false`
+    - **WHEN** `RefreshImplementationTracking.execute()` runs
+    - **THEN** it does not invoke `ImplementationDetector`
+    - **AND** it does not add tracked implementation files

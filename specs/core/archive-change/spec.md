@@ -347,7 +347,7 @@ For each modified spec, during preflight, `ArchiveChange`:
    - Else if a lock exists, the sealed set is the lock's `dependsOn` (re-archive with no snapshot keeps the sidecar).
    - Else if `SpecRepository.get` finds the spec on disk, call `resolveInitialPersistedDependsOn()` **without** `explicitDependsOn` and use its result (legacy / never-initialized canonical spec).
    - Else (new spec, nothing on disk) the sealed set is merge-extract `dependsOn` from the artifacts being published, or `[]` when extract yields nothing. Do not call `resolveInitialPersistedDependsOn()`.
-4. When no lock exists, builds the base as `{ kind: 'initial', schema: <effective schema identity>, dependsOn: <sealed set> }`.
+4. When no lock exists, builds the base as `{ kind: 'initial', schema: <canonicalSpecSchema()>, dependsOn: <sealed set> }` where canonical schema identity is derived from `schema.canonicalSpecSchema()` (following the 3-tier fallback `compat` → `extends` → `name@version`).
 5. Calls the shared `applyPersistedSpecStatePatch(base, patch)` helper with the sealed `dependsOn`, `implementation`, and any confirmed implementation-link changes for this archive attempt as the patch. It MUST NOT use cached `metadata.json` as a fallback. Merge-extract MUST NOT replace a lock or an on-disk `resolveInitialPersistedDependsOn()` result. For a brand-new spec with no plan, merge-extract initializes the lock.
 6. Copies forward any existing `optimizations` unchanged — archive never authors or clears optimization values. A changed artifact naturally makes the corresponding optimization field stale on the next read; archive does not need to detect that itself.
 7. Passes the complete resulting `PersistedSpecState` to `SpecRepository.publish()` together with the observed `expectedRevision` (`null` when no lock existed).
@@ -356,7 +356,7 @@ The revision guard MUST cause publication to fail for that spec if the observed 
 
 Sidecar rules:
 
-- `schema` records the schema identity for the persisted spec. Once a lock exists for a spec, its `schema` object is immutable through this path — schema reassignment is the explicit, separate `UpdatePersistedSpecSchema` operation.
+- `schema` records the schema identity for the persisted spec. For new specs without an existing lock, it is set to `schema.canonicalSpecSchema()`. Once a lock exists for a spec, its `schema` object is immutable through this path — schema reassignment is the explicit, separate `UpdatePersistedSpecSchema` operation.
 - `dependsOn` records the sealed set for that archive attempt; on later re-archives it is replaced when `change.specDependsOn` is present — it is not a set union and it is not preserved as historical baggage.
 - The final sidecar content MUST be determined before canonical publication begins, so publication can stage and publish the merged spec artifacts plus `spec-lock.json` together.
 
@@ -423,6 +423,7 @@ Materialization MUST:
 - persist symbol-level links when a confirmed link has one or more `symbols`
 - ignore links whose raw file path falls under the target workspace `graph.excludePaths`
 - discard links that cannot be normalized into a valid `workspace:path`
+- discard implementation links whose target `specId` does not exist in the canonical repository and is not being created in the change, ensuring nonexistent spec IDs never trigger sidecar publication
 - fail archive when a confirmed link points outside the `codeRoot` of the workspace implied by `specId`
 
 ### Requirement: Out-of-scope sidecar update guard

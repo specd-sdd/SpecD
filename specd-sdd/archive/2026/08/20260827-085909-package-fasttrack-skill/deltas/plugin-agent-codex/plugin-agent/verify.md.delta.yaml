@@ -1,0 +1,16 @@
+- op: added
+  description: 'Verify Codex installs the bounded-frontmatter fast-track skill'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    ### Requirement: Fast-track skill installation
+
+    #### Scenario: Default Codex installation renders fast-track
+
+    - **GIVEN** no explicit skill filter
+    - **WHEN** Codex installs available standard skills
+    - **THEN** `.codex/skills/specd-fasttrack/SKILL.md` is written from `ResolveBundle`
+    - **AND** its frontmatter includes only `name` and `description`
+    - **AND** its content requires incremental journal updates for resumability

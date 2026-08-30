@@ -1,0 +1,34 @@
+- op: added
+  description: 'Add compat field requirement to schema-format'
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Schema extends'
+  content: |
+    ### Requirement: Schema compat field
+
+    A schema YAML MAY declare an optional `compat` field indicating compatibility with a canonical spec schema format for durable `spec-lock.json` persistence.
+
+    - `compat` MAY be specified as a reference string (e.g. `'@specd/schema-std@1'`, `'schema-std@1'`, or `'schema-std'`).
+    - `compat` MAY be specified as an object with `{ name: string, version?: number }`.
+    - If version is omitted from string or object format, it defaults to `1`.
+    - `Schema.compat()` SHALL return `SchemaCompatIdentity` (`{ name: string, version: number }`) or `undefined`.
+    - `Schema.canonicalSpecSchema()` SHALL return `compat` if declared, else parse `extends` if declared, else return `{ name, version }`.
+
+- op: modified
+  description: 'Update schema-plugin kind restrictions to forbid compat'
+  selector:
+    type: section
+    matches: 'Requirement: Schema plugin kind'
+  content: |
+    A schema document MAY declare `kind: schema-plugin`.
+
+    - A schema-plugin MUST NOT declare `artifacts`
+    - A schema-plugin MUST NOT declare `workflow`
+    - A schema-plugin MUST NOT declare `extends`
+    - A schema-plugin MUST NOT declare `compat`
+    - A schema-plugin MAY declare `validations`, `deltaValidations`, `preHashCleanup`, `taskCompletionCheck`, `crossArtifactValidations`, and `metadataExtraction`
+    - Parsers MUST reject schema-plugin documents that declare forbidden fields with `SchemaValidationError`

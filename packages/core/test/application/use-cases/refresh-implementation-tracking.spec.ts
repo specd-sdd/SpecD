@@ -19,6 +19,10 @@ function makeRefresh(
   ) => Promise<readonly string[]> = async () => [],
   files: Record<string, string> = {},
   archives: ReturnType<typeof makeArchiveRepository> = makeArchiveRepository(),
+  specRepositories?: ReadonlyMap<
+    string,
+    ReturnType<typeof import('./helpers.js').makeSpecRepository>
+  >,
 ) {
   return new RefreshImplementationTracking(
     repo,
@@ -26,11 +30,12 @@ function makeRefresh(
     { detectModifiedFiles },
     makeFileReader(files),
     PROJECT_ROOT,
+    specRepositories,
   )
 }
 
-function changeInImplementing(name: string) {
-  const change = makeChange(name)
+function changeInImplementing(name: string, specIds: string[] = ['core:change']) {
+  const change = makeChange(name, { specIds })
   change.transition('designing', testActor)
   change.transition('ready', testActor)
   change.transition('implementing', testActor)
@@ -249,5 +254,81 @@ describe('RefreshImplementationTracking', () => {
       trackedFiles: [],
       links: expect.any(Array),
     })
+  })
+
+  it('removes links for out-of-scope nonexistent specs during spec sweep', async () => {
+    const change = changeInImplementing('spec-sweep')
+    change.trackImplementationFile('src/file.ts', 'open')
+    change.addImplementationLink({
+      specId: 'default:auth/nonexistent',
+      file: 'src/file.ts',
+      fileLinkExplicit: true,
+    })
+    const repo = makeChangeRepository([change])
+    const specRepo = (await import('./helpers.js')).makeSpecRepository({ specs: [] })
+    const uc = makeRefresh(
+      repo,
+      async () => [],
+      { '/test/src/file.ts': 'content' },
+      undefined,
+      new Map([['default', specRepo]]),
+    )
+
+    const result = await uc.execute({ name: 'spec-sweep' })
+
+    expect(result.implementationTracking.links).toEqual([])
+  })
+
+  it('selectively prunes only invalid links while preserving in-scope and valid out-of-scope links during spec sweep', async () => {
+    const change = changeInImplementing('mixed-sweep', ['core:change'])
+    change.trackImplementationFile('src/file1.ts', 'open')
+    change.trackImplementationFile('src/file2.ts', 'open')
+    change.trackImplementationFile('src/file3.ts', 'open')
+    change.trackImplementationFile('src/file4.ts', 'open')
+    change.addImplementationLink({
+      specId: 'core:change',
+      file: 'src/file1.ts',
+      fileLinkExplicit: true,
+    })
+    change.addImplementationLink({
+      specId: 'default:auth/valid',
+      file: 'src/file2.ts',
+      fileLinkExplicit: true,
+    })
+    change.addImplementationLink({
+      specId: 'default:auth/missing',
+      file: 'src/file3.ts',
+      fileLinkExplicit: true,
+    })
+    change.addImplementationLink({
+      specId: 'unknown-ws:some/spec',
+      file: 'src/file4.ts',
+      fileLinkExplicit: true,
+    })
+    const repo = makeChangeRepository([change])
+    const { makeSpec } = await import('../../helpers/make-spec.js')
+    const specRepo = (await import('./helpers.js')).makeSpecRepository({
+      specs: [makeSpec({ workspace: 'default', name: 'auth/valid', filenames: ['spec.md'] })],
+    })
+    const uc = makeRefresh(
+      repo,
+      async () => [],
+      {
+        '/test/src/file1.ts': 'content',
+        '/test/src/file2.ts': 'content',
+        '/test/src/file3.ts': 'content',
+        '/test/src/file4.ts': 'content',
+      },
+      undefined,
+      new Map([['default', specRepo]]),
+    )
+
+    const result = await uc.execute({ name: 'mixed-sweep' })
+
+    expect(result.implementationTracking.links).toHaveLength(2)
+    expect(result.implementationTracking.links.map((l) => l.specId)).toEqual([
+      'core:change',
+      'default:auth/valid',
+    ])
   })
 })

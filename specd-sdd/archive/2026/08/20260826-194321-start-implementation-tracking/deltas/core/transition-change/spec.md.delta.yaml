@@ -1,0 +1,14 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Transition event'
+  content: |
+    ### Requirement: Automatic implementation tracking activation on transition to implementing
+
+    When transitioning to `implementing` (`effectiveTarget === 'implementing'`), `TransitionChange` MUST verify whether implementation tracking is active on the change.
+
+    If `!change.isImplementationTrackingActive`, the use case MUST call `change.startImplementationTracking()` within the same mutation boundary to activate implementation tracking and record the transition timestamp as the baseline.

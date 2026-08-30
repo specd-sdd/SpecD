@@ -43,11 +43,17 @@ Context entries MUST appear in declaration order and before any spec content.
 
 ### Requirement: Applies project-level include/exclude patterns
 
-The use case MUST apply `config.contextIncludeSpecs` patterns to collect specs across all workspaces, then apply `config.contextExcludeSpecs` patterns to remove specs from the collected set. Pattern matching MUST use the same `listMatchingSpecs` logic as `CompileContext`, treating all workspaces as active.
+The use case MUST apply `config.contextIncludeSpecs` patterns to collect specs across all workspaces, then apply `config.contextExcludeSpecs` patterns to remove specs from the collected set.
+
+Pattern matching MUST use the shared configured-context helper defined by [`core:resolve-context-specs`](../resolve-context-specs/spec.md) (`resolveConfiguredContextSpecs`), invoked with an empty `activeWorkspaces` set so only project-level steps run. `GetProjectContext` MUST NOT reimplement a separate project-only `listMatchingSpecs` include/exclude loop.
+
+The collected set semantics MUST remain equivalent to the previous project-only `listMatchingSpecs` path: same project glob qualification rules as `CompileContext`, treating configured workspaces as available for project-pattern matching.
 
 ### Requirement: Does not apply workspace-level patterns
 
-The use case MUST NOT apply workspace-level `contextIncludeSpecs` or `contextExcludeSpecs` patterns. Those are conditional on a specific change having that workspace active and are the responsibility of `CompileContext`.
+The use case MUST NOT apply workspace-level `contextIncludeSpecs` or `contextExcludeSpecs` patterns. Those are conditional on a specific change having that workspace active and are the responsibility of `CompileContext` (and of `ResolveContextSpecs` when workspace filters are active).
+
+When using the shared helper, this MUST be enforced by passing an empty `activeWorkspaces` set (helper steps 3–4 skipped), not by forking a divergent matcher.
 
 ### Requirement: Supports dependsOn traversal when followDeps is true
 
@@ -160,3 +166,4 @@ The helper is the only use-case-specific composition entry for config-based boot
 - [`core:get-spec-metadata`](../get-spec-metadata/spec.md) — self-healing metadata read (`if-needed`) replacing direct freshness checks
 - [`core:spec-optimization`](../spec-optimization/spec.md) — per-field optimization freshness for included specs
 - [`core:composition-resolver`](../composition-resolver/spec.md)
+- [`core:resolve-context-specs`](../resolve-context-specs/spec.md) — shared content-free configured include/exclude helper (project-only via empty activeWorkspaces)

@@ -15,15 +15,7 @@
   "implementation": [
     {
       "file": "core:src/infrastructure/fs/spec-repository.ts",
-      "symbols": ["FsSpecRepository", "projectListMetaFromSourceFiles"]
-    },
-    {
-      "file": "core:src/infrastructure/fs/project-list-meta.ts",
-      "symbols": ["projectListMetaFromSourceFiles"]
-    },
-    {
-      "file": "core:src/infrastructure/fs/fs-spec-index-cache.ts",
-      "symbols": ["FsSpecIndexCache"]
+      "symbols": ["FsSpecRepository.publish"]
     }
   ]
 }

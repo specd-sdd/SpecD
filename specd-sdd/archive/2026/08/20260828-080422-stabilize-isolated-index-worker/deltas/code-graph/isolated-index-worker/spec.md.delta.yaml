@@ -1,0 +1,2 @@
+- op: no-op
+  description: 'Existing isolated-worker requirements already specify clean child exit without post-result crash — no normative spec changes needed.'

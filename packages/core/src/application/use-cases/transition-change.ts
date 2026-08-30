@@ -283,6 +283,10 @@ export class TransitionChange {
       if (!invalidated) {
         freshChange.transition(effectiveTarget, actor)
       }
+
+      if (effectiveTarget === 'implementing' && !freshChange.isImplementationTrackingActive) {
+        freshChange.startImplementationTracking()
+      }
     })
 
     onProgress?.({ type: 'transitioned', from: fromState, to: effectiveTarget })

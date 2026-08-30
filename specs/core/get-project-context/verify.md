@@ -102,6 +102,12 @@
 - **WHEN** `execute` is called
 - **THEN** the `architecture` spec appears exactly once in `specs`
 
+#### Scenario: Project include/exclude uses shared helper
+
+- **WHEN** `GetProjectContext` collects specs from project-level patterns
+- **THEN** it invokes `resolveConfiguredContextSpecs` with an empty `activeWorkspaces` set
+- **AND** does not run a separate inline `listMatchingSpecs` include/exclude loop for those steps
+
 ### Requirement: Does not apply workspace-level patterns
 
 #### Scenario: Workspace-level patterns ignored
@@ -109,6 +115,12 @@
 - **GIVEN** a workspace declares `contextIncludeSpecs: ["extra/*"]` at workspace level
 - **WHEN** `execute` is called
 - **THEN** specs matched only by the workspace-level pattern are not included
+
+#### Scenario: Empty activeWorkspaces prevents workspace helper steps
+
+- **WHEN** `GetProjectContext` calls `resolveConfiguredContextSpecs`
+- **THEN** `activeWorkspaces` is empty
+- **AND** helper workspace include/exclude steps do not run
 
 ### Requirement: Supports dependsOn traversal when followDeps is true
 

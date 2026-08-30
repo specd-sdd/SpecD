@@ -42,6 +42,14 @@
     {
       "file": "core:src/composition/use-cases/archive-change.ts",
       "symbols": ["createArchiveChange", "resolveArchiveChangeDeps", "ArchiveChangeDeps"]
+    },
+    {
+      "file": "core:src/application/use-cases/initialize-persisted-spec-state.ts",
+      "symbols": ["InitializePersistedSpecState"]
+    },
+    {
+      "file": "core:src/application/use-cases/generate-spec-metadata.ts",
+      "symbols": ["GenerateSpecMetadata"]
     }
   ],
   "optimizations": {

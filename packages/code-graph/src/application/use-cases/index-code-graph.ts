@@ -15,6 +15,7 @@ import { type IndexOptions } from '../../domain/value-objects/index-options.js'
 import {
   type IndexResult,
   type IndexError,
+  type IndexRunCoverageSummary,
   type WorkspaceIndexBreakdown,
 } from '../../domain/value-objects/index-result.js'
 import { type AdapterRegistryPort } from '../../domain/ports/adapter-registry-port.js'
@@ -39,6 +40,10 @@ import {
 import { discoverFiles } from './discover-files.js'
 import { computeContentHash } from './compute-content-hash.js'
 import { InMemoryIndexSession } from './in-memory-index-session.js'
+import {
+  projectSpecCoverage,
+  type PersistedImplementationLink,
+} from '../services/project-spec-coverage.js'
 import {
   computeWorkspaceFingerprint,
   computeRootFingerprint,
@@ -73,6 +78,14 @@ interface MutableWorkspaceIndexBreakdown {
   specsIndexed: number
 }
 
+/** Canonical spec state prepared once for node, dependency, and coverage projection. */
+interface PreparedSpecProjection {
+  readonly specNode: SpecNode
+  readonly dependsOn: readonly string[]
+  readonly implementation: readonly PersistedImplementationLink[]
+  readonly changed: boolean
+}
+
 /**
  * Removes duplicate relations while preserving distinct relation semantics.
  * @param relations - Relations to de-duplicate.
@@ -88,6 +101,27 @@ function deduplicateRelations(relations: readonly Relation[]): Relation[] {
     unique.push(relation)
   }
   return unique
+}
+
+/**
+ * Summarizes the complete index-coverage snapshot in stable status and reason order.
+ * @param coverage - Complete per-input coverage snapshot staged by the run.
+ * @returns Stable totals, status counts, and reason codes.
+ */
+function summarizeCoverage(coverage: readonly IndexCoverage[]): IndexRunCoverageSummary {
+  const byStatus: Record<IndexCoverageStatus, number> = {
+    [IndexCoverageStatus.Indexed]: 0,
+    [IndexCoverageStatus.Excluded]: 0,
+    [IndexCoverageStatus.Unsupported]: 0,
+    [IndexCoverageStatus.ParseFailed]: 0,
+    [IndexCoverageStatus.Partial]: 0,
+  }
+  const reasons = new Set<string>()
+  for (const item of coverage) {
+    byStatus[item.status]++
+    if (item.reason !== undefined) reasons.add(item.reason)
+  }
+  return { total: coverage.length, byStatus, reasons: [...reasons].sort() }
 }
 
 /**
@@ -781,21 +815,25 @@ export class IndexCodeGraph {
       const skippedFiles: string[] = []
       const fingerprintInvalidatedPaths = new Set<string>()
 
-      if (fingerprintMismatch) {
+      if (options.force === true || fingerprintMismatch) {
         fullRebuild = true
-        fullRebuildReason =
-          'Graph derivation fingerprint mismatch — code-graph version or workspace configuration changed since last index'
-        progress(5, 'Fingerprint mismatch', 'Forcing re-index of mismatched workspaces')
-        // Remove all files from mismatched workspaces so they get re-processed
-        // but do NOT recreate the store — other workspaces are unaffected
-        for (const ef of [...existingFiles, ...existingDocuments]) {
-          const storedFp = storedFingerprintMap.get(ef.workspace)
-          const currentFp = currentFingerprintMap.get(ef.workspace)
-          if (storedFp !== undefined && currentFp !== undefined && storedFp !== currentFp) {
-            fingerprintInvalidatedPaths.add(ef.path)
+        if (options.force === true) {
+          progress(5, 'Forced reindex', 'Reconsidering every selected input')
+        } else {
+          fullRebuildReason =
+            'Graph derivation fingerprint mismatch — code-graph version or workspace configuration changed since last index'
+          progress(5, 'Fingerprint mismatch', 'Forcing re-index of mismatched workspaces')
+          // Remove all files from mismatched workspaces so they get re-processed
+          // but do NOT recreate the store — other workspaces are unaffected
+          for (const ef of [...existingFiles, ...existingDocuments]) {
+            const storedFp = storedFingerprintMap.get(ef.workspace)
+            const currentFp = currentFingerprintMap.get(ef.workspace)
+            if (storedFp !== undefined && currentFp !== undefined && storedFp !== currentFp) {
+              fingerprintInvalidatedPaths.add(ef.path)
+            }
           }
         }
-        // Treat all discovered files as new — no content hash skip for mismatched workspaces
+        // A forced or fingerprint-invalidated run never permits retained state to skip input.
         newFiles.push(...allDiscoveredPaths)
       } else {
         const observationResources = [
@@ -888,7 +926,7 @@ export class IndexCodeGraph {
       const semanticRefreshRequired =
         existingCoverage.length > 0 &&
         (newFiles.length > 0 || changedFiles.length > 0 || deletedFiles.length > 0)
-      const persistedReferenceFacts = semanticRefreshRequired
+      let persistedReferenceFacts = semanticRefreshRequired
         ? await this.store.getAllReferenceFacts()
         : undefined
       // Native stores enforce relation endpoint integrity, so an import whose target did not
@@ -912,10 +950,6 @@ export class IndexCodeGraph {
       )
       const filesToProcess = [...new Set([...newFiles, ...changedFiles, ...filesToReprocess])]
       const contentChangedPaths = new Set([...newFiles, ...changedFiles])
-      const preservedFileCoverageRelations = await this.store.getCoveringSpecsForFiles([
-        ...changedFiles,
-        ...filesToReprocess,
-      ])
       // ── Cleanup (6%) ──
       const toRemove = [
         ...new Set([
@@ -1379,7 +1413,8 @@ export class IndexCodeGraph {
       let specsIndexed = 0
       const allSpecs: SpecNode[] = []
       const specObservations: IndexedInputObservation[] = []
-      const specRelations: Relation[] = []
+      const specDependencyRelations: Relation[] = []
+      const preparedSpecs: PreparedSpecProjection[] = []
       const obsoleteSpecIds = new Set<string>()
 
       const getAllSpecsStart = performance.now()
@@ -1526,14 +1561,23 @@ export class IndexCodeGraph {
               }
             }
 
-            if (existing?.contentHash === metadataFingerprint) {
-              if (wsBreakdown) wsBreakdown.specsIndexed++
-              continue
-            }
-
             const persisted = await ws.specRepo.readPersistedState(repoSpec)
-            const dependsOn = persisted?.dependsOn
-            const implementationLinks = persisted?.implementation
+            const dependsOn = persisted?.dependsOn ?? []
+            const implementation = persisted?.implementation ?? []
+            const persistedStateObservation = await this.store
+              .getIndexedInputObservations([
+                {
+                  workspace: ws.name,
+                  resourceKind: IndexedResourceKind.Spec,
+                  resourceId: specId,
+                },
+              ])
+              .then((observations) =>
+                observations.find((observation) =>
+                  observation.inputLocator.endsWith('/spec-lock.json'),
+                ),
+              )
+              .catch(() => undefined)
             specMetadataReadDuration += performance.now() - metadataStart
 
             const specNode = createSpecNode({
@@ -1546,65 +1590,30 @@ export class IndexCodeGraph {
               workspace: ws.name,
               optimizedDescription,
             })
+            const persistedStateChanged =
+              persistedStateObservation?.indexedContentHash !== persisted?.originalHash
+            const changed = existing?.contentHash !== metadataFingerprint || persistedStateChanged
+            preparedSpecs.push({ specNode, dependsOn, implementation, changed })
+
+            if (!fullRebuild && !changed) {
+              if (wsBreakdown) wsBreakdown.specsIndexed++
+              continue
+            }
 
             if (existing) {
               specIdsToRemove.push(specId)
             }
 
             // Create relations
-            if (dependsOn) {
-              for (const depId of dependsOn) {
-                if (knownSpecIds.has(depId)) {
-                  specRelations.push(
-                    createRelation({
-                      source: specId,
-                      target: depId,
-                      type: RelationType.DependsOn,
-                    }),
-                  )
-                }
-              }
-            }
-
-            if (implementationLinks) {
-              for (const link of implementationLinks) {
-                if (!link.symbols || link.symbols.length === 0) {
-                  specRelations.push(
-                    createRelation({
-                      source: specId,
-                      target: link.file,
-                      type: RelationType.CoversFile,
-                    }),
-                  )
-                } else {
-                  for (const symbolName of link.symbols) {
-                    const matchingSymbols = session
-                      .findSymbolsByFile(link.file)
-                      .filter((s: SymbolNode) => s.name === symbolName)
-                    const logicalTargets = new Set<string>()
-                    for (const symbol of matchingSymbols) {
-                      for (const [
-                        logicalId,
-                        declarations,
-                      ] of session.getDeclarationsByLogicalId()) {
-                        if (
-                          declarations.some((declaration) => declaration.symbolId === symbol.id)
-                        ) {
-                          logicalTargets.add(logicalId)
-                        }
-                      }
-                    }
-                    if (logicalTargets.size === 1) {
-                      specRelations.push(
-                        createRelation({
-                          source: specId,
-                          target: [...logicalTargets][0]!,
-                          type: RelationType.CoversSymbol,
-                        }),
-                      )
-                    }
-                  }
-                }
+            for (const depId of dependsOn) {
+              if (knownSpecIds.has(depId)) {
+                specDependencyRelations.push(
+                  createRelation({
+                    source: specId,
+                    target: depId,
+                    type: RelationType.DependsOn,
+                  }),
+                )
               }
             }
 
@@ -1624,6 +1633,50 @@ export class IndexCodeGraph {
       }
 
       progress(83, 'Indexing specs', `${String(specsProcessed)}/${String(totalSpecsToProcess)}`)
+
+      const coverageProjectionRequired =
+        fullRebuild ||
+        semanticRefreshRequired ||
+        preparedSpecs.some((prepared) => prepared.changed) ||
+        existingCoverage.length === 0
+      if (coverageProjectionRequired && persistedReferenceFacts === undefined) {
+        persistedReferenceFacts = await this.store.getAllReferenceFacts()
+        const replacedPaths = new Set([...filesToProcess, ...deletedFiles])
+        const retainedFiles = existingFiles.filter((file) => !replacedPaths.has(file.path))
+        const retainedSymbols = await this.store.findSymbols({
+          filePaths: retainedFiles.map((file) => file.path),
+        })
+        const symbolsByFile = new Map<string, SymbolNode[]>()
+        for (const symbol of retainedSymbols) {
+          const symbols = symbolsByFile.get(symbol.filePath) ?? []
+          symbols.push(symbol)
+          symbolsByFile.set(symbol.filePath, symbols)
+        }
+        for (const file of retainedFiles) {
+          session.hydratePersistedFile(file, symbolsByFile.get(file.path) ?? [])
+        }
+        session.hydrateReferenceFacts(
+          retainReferenceFactsOutsidePaths(persistedReferenceFacts, replacedPaths),
+        )
+      }
+
+      const logicalIdByDeclarationSymbolId = new Map<string, string>()
+      for (const [logicalId, declarations] of session.getDeclarationsByLogicalId()) {
+        for (const declaration of declarations) {
+          logicalIdByDeclarationSymbolId.set(declaration.symbolId, logicalId)
+        }
+      }
+      const coverageProjection = coverageProjectionRequired
+        ? projectSpecCoverage({
+            specs: preparedSpecs.map((prepared) => ({
+              specId: prepared.specNode.specId,
+              implementation: prepared.implementation,
+            })),
+            indexedFilePaths: session.getAllFilePaths(),
+            symbolsByFile: (filePath) => session.findSymbolsByFile(filePath),
+            logicalIdByDeclarationSymbolId,
+          })
+        : { relations: [], diagnostics: [] }
 
       // Compute per-workspace skipped counts
       for (const filePath of skippedFiles) {
@@ -1649,7 +1702,7 @@ export class IndexCodeGraph {
       progress(
         83,
         'Bulk loading',
-        `${String(stagedFileCount)} files, ${String(stagedSymbolCount)} symbols, ${String(stagedRelationCount + specRelations.length)} relations`,
+        `${String(stagedFileCount)} files, ${String(stagedSymbolCount)} symbols, ${String(stagedRelationCount + specDependencyRelations.length + coverageProjection.relations.length)} relations`,
       )
       const serializedFingerprintMap = serializeFingerprintMap(currentFingerprintMap)
       const observations: IndexedInputObservation[] = []
@@ -1744,6 +1797,7 @@ export class IndexCodeGraph {
 
       const rebuildSearchIndexes =
         semanticRefreshRequired ||
+        coverageProjectionRequired ||
         stagedFileCount > 0 ||
         allSpecs.length > 0 ||
         obsoleteSpecIds.size > 0 ||
@@ -1786,19 +1840,23 @@ export class IndexCodeGraph {
           const staged = readRelationsStageChunk(stageDir, chunkFile)
           await writeSession.writeRelations(staged.relations)
         }
-        if (semanticRefreshRequired || existingCoverage.length === 0) {
+        if (coverageProjectionRequired) {
           await writeSession.writeReferenceFacts(referenceFacts)
         }
         if (observations.length > 0) await writeSession.writeObservations(observations)
         await writeSession.writeRelations([
-          ...specRelations,
-          ...preservedFileCoverageRelations,
+          ...specDependencyRelations,
+          ...coverageProjection.relations,
           ...crossFileOverrides,
           ...linkedReferences.relations,
         ])
         phaseMetrics.persistence.durationMs += performance.now() - persistenceStart
         phaseMetrics.persistence.count =
-          stagedFileCount + stagedSymbolCount + stagedRelationCount + specRelations.length
+          stagedFileCount +
+          stagedSymbolCount +
+          stagedRelationCount +
+          specDependencyRelations.length +
+          coverageProjection.relations.length
         const commitStart = performance.now()
         await writeSession.commit()
         const commitEnd = performance.now()
@@ -1863,6 +1921,8 @@ export class IndexCodeGraph {
         fullRebuild,
         fullRebuildReason,
         phaseMetrics,
+        coverage: summarizeCoverage(referenceFacts.coverage),
+        coverageDiagnostics: coverageProjection.diagnostics,
       }
     } finally {
       rmSync(stageDir, { recursive: true, force: true })

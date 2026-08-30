@@ -1,0 +1,42 @@
+- op: modified
+  description: 'Update spec-lock sidecar persistence verify scenarios to test canonicalSpecSchema'
+  selector:
+    type: section
+    matches: 'Requirement: spec-lock sidecar persistence'
+  content: |
+    #### Scenario: First archive creates spec-lock sidecar with schema and dependsOn
+    - **GIVEN** a spec has no existing `spec-lock.json`
+    - **AND** archive has determined `change.specDependsOn` for that spec
+    - **WHEN** `ArchiveChange.execute` archives the spec
+    - **THEN** `spec-lock.json` is persisted with `schema` derived from `schema.canonicalSpecSchema()` (supporting `compat` and `extends` fallbacks)
+    - **AND** `dependsOn` is set to the final `change.specDependsOn` value
+
+    #### Scenario: Re-archive preserves immutable schema and refreshes dependsOn
+    - **GIVEN** a spec already has `spec-lock.json` with `schema: { name: "schema-std", version: 1 }`
+    - **AND** the current archive changes `specDependsOn` for that spec
+    - **WHEN** `ArchiveChange.execute` archives the spec
+    - **THEN** `spec-lock.json` retains the original `schema` object unchanged
+    - **AND** `dependsOn` is replaced with the new `change.specDependsOn` value
+
+    #### Scenario: No-lock spec resolves initial dependsOn through resolveInitialPersistedDependsOn
+    - **GIVEN** a spec has no existing `spec-lock.json`
+    - **WHEN** `ArchiveChange` builds the initial persisted-state base for that spec
+    - **THEN** it resolves the initial dependency set through `resolveInitialPersistedDependsOn()`, preferring a complete dependency value supplied by the archive publication plan when one exists
+    - **AND** it does not maintain a second artifact/metadata fallback algorithm for initial dependency resolution
+
+    #### Scenario: Existing optimizations are copied forward unchanged
+    - **GIVEN** a spec's existing `spec-lock.json` has `optimizations.optimizedDescription` set
+    - **WHEN** `ArchiveChange` re-archives that spec with changed artifact content
+    - **THEN** the `optimizations` block is copied forward unchanged
+    - **AND** archive does not clear or mark it stale itself
+
+    #### Scenario: Revision guard rejects a concurrently changed lock at publish time
+    - **GIVEN** `ArchiveChange` observed a persisted-state revision during preflight
+    - **AND** that revision has changed by the time `SpecRepository.publish()` is called
+    - **WHEN** `publish()` is invoked with the stale `expectedRevision`
+    - **THEN** publication fails for that spec instead of silently overwriting the concurrent change
+
+    #### Scenario: Publish is the single write path for persisted state
+    - **WHEN** `ArchiveChange` writes the final `PersistedSpecState` for a spec
+    - **THEN** it passes `persistedState` to `SpecRepository.publish()`
+    - **AND** it does not call `writePersistedState()` separately from `publish()`

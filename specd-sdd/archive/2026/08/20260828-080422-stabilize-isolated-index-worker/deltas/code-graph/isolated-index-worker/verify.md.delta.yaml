@@ -1,0 +1,35 @@
+- op: modified
+  description: 'Add scenario for clean child process exit after heavy native parser workload teardown'
+  selector:
+    type: section
+    matches: 'Requirement: Published ESM worker entrypoint'
+  content: |
+    #### Scenario: Built package can fork its own worker
+
+    - **GIVEN** publish-shaped `@specd/code-graph` ESM output outside the source tree
+    - **AND** a built trusted task module
+    - **WHEN** the public supervisor runs from that installed output
+    - **THEN** it resolves and forks the emitted child relative to its own module
+    - **AND** the child imports the task and returns its result
+    - **AND** resolution does not depend on CWD or repository source paths
+
+    #### Scenario: Forced built index exits cleanly after terminal result
+
+    - **GIVEN** a built CLI task and a project graph requiring a forced rebuild
+    - **WHEN** the public supervisor executes the task through its built child entrypoint
+    - **THEN** the task result is delivered once and the child exits with code 0
+    - **AND** no post-result signal or native crash is reported
+    - **AND** no graph lock remains after the operation resolves
+
+    #### Scenario: Subprocess native parser teardown exits cleanly after terminal result
+
+    - **GIVEN** a built task fixture that parses and retains many native AST roots before release
+    - **WHEN** the isolated worker executes the task and returns its terminal result
+    - **THEN** the child process exits with code 0
+    - **AND** no native finalizer crash or abnormal signal termination occurs during process teardown
+
+    #### Scenario: Worker entry is not a public task-selection subpath
+
+    - **WHEN** package exports are inspected
+    - **THEN** the child file is present in published contents
+    - **AND** no public package export invites hosts to execute or select it directly

@@ -114,6 +114,12 @@ conflict error. On success it returns the newly persisted
 `ReadOnlyWorkspaceError` before any I/O when `ownership()` is `readOnly`,
 consistent with `save()`.
 
+### Requirement: Reject publication of empty spec directories
+
+When `publish` is called to publish a spec whose directory does not yet exist on disk, `FsSpecRepository` MUST verify that `publication.artifacts` contains at least one artifact.
+
+If `!specDirExists && publication.artifacts.length === 0`, `publish` MUST throw `SpecPublicationError` rather than creating a directory containing only `spec-lock.json`.
+
 ### Requirement: Metadata snapshot persistence
 
 `FsSpecRepository` MUST implement `readMetadataSnapshot(spec)` and

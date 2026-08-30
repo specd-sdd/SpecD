@@ -1,0 +1,19 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: 'Requirements'
+    after:
+      type: section
+      matches: 'Requirement: Review subcommand'
+  content: |
+    ### Requirement: Start subcommand
+
+    `specd changes implementation start <name>` SHALL explicitly activate implementation tracking for an active change.
+
+    The command MUST:
+
+    - delegate execution exclusively to `UpdateImplementationTracking` with action `'start'`
+    - succeed idempotently if implementation tracking is already active for the change
+    - support `--format text|json|toon` and `--config <path>`
+    - render structured confirmation including the change name, active tracking status (`trackingActive: true`), and the timestamp when tracking commenced

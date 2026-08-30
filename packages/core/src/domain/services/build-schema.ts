@@ -1,4 +1,4 @@
-import { Schema } from '../value-objects/schema.js'
+import { Schema, parseSchemaCompat } from '../value-objects/schema.js'
 import { VALID_TRANSITIONS } from '../value-objects/change-state.js'
 import {
   ArtifactType,
@@ -216,6 +216,10 @@ export interface SchemaYamlData {
   readonly version: number
   readonly description?: string | undefined
   readonly extends?: string | undefined
+  readonly compat?:
+    | string
+    | { readonly name: string; readonly version?: number | undefined }
+    | undefined
   readonly artifacts?: readonly ArtifactYamlData[] | undefined
   readonly crossArtifactValidations?: readonly CrossArtifactValidationRuleRaw[] | undefined
   readonly workflow?: readonly WorkflowStep[] | undefined
@@ -867,6 +871,8 @@ export function buildSchema(
     }
   }
 
+  const compat = data.compat !== undefined ? parseSchemaCompat(data.compat) : undefined
+
   return new Schema(
     data.kind,
     data.name,
@@ -876,5 +882,6 @@ export function buildSchema(
     metadataExtraction,
     crossArtifactValidations,
     data.extends,
+    compat,
   )
 }

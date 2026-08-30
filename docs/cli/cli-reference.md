@@ -374,6 +374,7 @@ Review or mutate implementation tracking for an active change. Paths are always 
 
 Available subcommands:
 
+- `start` — explicitly activate implementation tracking for a change
 - `list` — show tracked files and confirmed links
 - `review` — show tracked files, confirmed links, stale symbol diagnostics, and out-of-scope sidecar preview
 - `add` — create or enrich a confirmed implementation link
@@ -414,6 +415,7 @@ The `ignore` action is an exception: files that are already tracked (including t
 Examples:
 
 ```bash
+specd changes implementation start my-change
 specd changes implementation list my-change
 specd changes implementation add my-change --spec core:change --file packages/core/src/domain/entities/change.ts
 specd changes implementation add my-change --spec core:change --file packages/core/src/domain/entities/change.ts --symbol Change.transition
@@ -1117,10 +1119,45 @@ Rendering mode is controlled by `contextMode` in `specd.yaml` (`list`, `summary`
 | `--format text\|json\|toon` | Output format.                                                 |
 | `--config <path>`           | Config file path.                                              |
 
-### project update
+### project context-specs
 
-````
-specd project update [options]
+```
+specd project context-specs [options]
+```
+
+List the **spec IDs** selected by resolved project and workspace context patterns, partitioned by **include source**, without rendering context content, metadata, dependency traversal, or warnings.
+
+Use this before a change has selected specs (for example fast-track discovery). Prefer `project context` when you need the rendered instruction block.
+
+Output groups:
+
+- `project` — IDs included by project-level `contextIncludeSpecs` that survived all excludes
+- `workspaces.<name>` — IDs included by that workspace's patterns that survived all excludes
+
+The same ID may appear under both `project` and a workspace group when both layers included it. That is intentional: provenance is preserved.
+
+`--workspace` is optional and **repeatable** (same pattern as `specs list`). When omitted, all configured workspaces are active for workspace-level patterns. Project-level include/exclude patterns still apply and always populate `project` unless `--workspaces-only` is set. Unknown workspace names are rejected.
+
+| Option                      | Description                                                                                                                             |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `--workspace <name>`        | Activate workspace-level patterns for this workspace. Repeatable. Does not suppress `project` unless combined with `--workspaces-only`. |
+| `--workspaces-only`         | Skip project-level patterns; only resolve/print workspace-level includes.                                                               |
+| `--format text\|json\|toon` | Output format. `text` prints nested sections; `json`/`toon` emit `{ project, workspaces }`.                                             |
+| `--config <path>`           | Config file path.                                                                                                                       |
+
+```bash
+# All configured workspaces
+specd project context-specs
+
+# Workspace-level patterns for core and cli only (project patterns still listed)
+specd project context-specs --workspace core --workspace cli --format toon
+
+# Workspace-level patterns only
+specd project context-specs --workspace core --workspaces-only
+```
+
+See also [project context-specs](./project-context-specs.md).
+
 ### project update
 
 Update installed agent skills after upgrading SpecD. Reads the `plugins` list from `specd.yaml` and reinstalls skill files for each declared agent.
@@ -1153,7 +1190,7 @@ Display the full contents of the `project-metadata.json` file.
 
 ```text
 specd project dashboard [options]
-````
+```
 
 Display a project-level dashboard showing schema, workspaces, spec counts, change activity (including archived changes), specs health aggregates in the Specs header, active-change task progress in the Changes box, and Code Graph diagnostics. Also runs automatically when `specd` is invoked with no subcommand and a config is present (see [Invocation](#invocation)). In `json` or `toon` mode, execution delegates directly to `specd project status --format <fmt>`.
 
@@ -1221,6 +1258,13 @@ recreating SQLite. If the first open reports the typed recoverable storage condi
 the isolated SDK task closes that transient provider, recreates closed storage, and
 retries once. Non-forced indexes and unrelated failures never delete storage. No change
 manifest, spec, or implementation link is modified by this recovery.
+
+Text output includes a coverage total, counts for `indexed`, `excluded`, `unsupported`,
+`parse-failed`, and `partial`, followed by any stable coverage reasons and per-link
+diagnostics. JSON and TOON preserve the same `coverage` and `coverageDiagnostics` fields
+from SDK orchestration. A forced result must show `fullRebuild: true` and must not classify
+hash-matched selected inputs as skipped; inspect the returned classifications rather than
+using a successful exit code as proof that every input became a graph node.
 Completed results also include counts and elapsed milliseconds for import resolution,
 dependency facts, adapter relations, re-exports, hierarchy/overrides, persistence,
 and search-index rebuilding in text and structured output.

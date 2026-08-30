@@ -9,35 +9,35 @@ import { SpecPath } from '../../domain/value-objects/spec-path.js'
 import { type SchemaProvider } from '../ports/schema-provider.js'
 import { loadPersistedSpecDependsOn } from './_shared/load-persisted-spec-depends-on.js'
 import { type ListWorkspaces, type ProjectWorkspace } from './list-workspaces.js'
-
-/** Input for the {@link EditChange} use case. */
-export interface EditChangeInput {
-  /** The change to edit. */
-  readonly name: string
-  /** Spec paths to add to `specIds`. */
-  readonly addSpecIds?: string[]
-  /** Spec paths to remove from `specIds`. */
-  readonly removeSpecIds?: string[]
-  /** New description for the change. */
-  readonly description?: string
-  /** Updated invalidation policy for the change. */
-  readonly invalidationPolicy?: InvalidationPolicy
-}
+import { type RefreshImplementationTracking } from './refresh-implementation-tracking.js'
 
 /** Result returned by the {@link EditChange} use case. */
 export interface EditChangeResult {
-  /** The updated change. */
+  /** The updated change entity. */
   readonly change: Change
-  /** Whether approvals were invalidated by the edit. */
+  /** Whether the modification invalidated existing approvals. */
   readonly invalidated: boolean
 }
 
+/** Input for the {@link EditChange} use case. */
+export interface EditChangeInput {
+  /** Name of the change to edit. */
+  readonly name: string
+  /** Optional updated description. */
+  readonly description?: string
+  /** Spec paths to add to the change. */
+  readonly addSpecIds?: readonly string[]
+  /** Spec paths to remove from the change. */
+  readonly removeSpecIds?: readonly string[]
+  /** Invalidation policy override to update on the change. */
+  readonly invalidationPolicy?: InvalidationPolicy
+}
+
 /**
- * Edits the spec scope of an existing change by adding or removing spec paths.
+ * Edits metadata and scope of an active change.
  *
- * Workspaces are derived from the resulting set of `specIds` via the computed
- * `Change.workspaces` getter — they are never managed directly. Any
- * modification to `specIds` triggers approval invalidation via
+ * Any modification to `description` only records a `description-updated` event.
+ * Any modification to `specIds` triggers approval invalidation via
  * {@link Change.updateSpecIds}.
  */
 export class EditChange {
@@ -45,6 +45,7 @@ export class EditChange {
   private readonly _listWorkspaces: ListWorkspaces
   private readonly _actor: ActorResolver
   private readonly _schemaProvider: SchemaProvider
+  private readonly _refresh?: RefreshImplementationTracking | undefined
 
   /**
    * Creates a new `EditChange` use case instance.
@@ -53,17 +54,20 @@ export class EditChange {
    * @param listWorkspaces - The project orchestrator
    * @param actor - Resolver for the actor identity
    * @param schemaProvider - Provider for the active schema DAG
+   * @param refreshImplementationTracking - Optional refresh handler for implementation tracking cleanup
    */
   constructor(
     changes: ChangeRepository,
     listWorkspaces: ListWorkspaces,
     actor: ActorResolver,
     schemaProvider: SchemaProvider,
+    refreshImplementationTracking?: RefreshImplementationTracking,
   ) {
     this._changes = changes
     this._listWorkspaces = listWorkspaces
     this._actor = actor
     this._schemaProvider = schemaProvider
+    this._refresh = refreshImplementationTracking
   }
 
   /**
@@ -94,7 +98,7 @@ export class EditChange {
     const workspaces = await this._listWorkspaces.execute()
     const workspaceMap = new Map(workspaces.map((ws) => [ws.name, ws]))
 
-    const { result: persisted, change: updatedChange } = await this._changes.mutate(
+    const { result: persisted, change: initialChange } = await this._changes.mutate(
       input.name,
       async (freshChange) => {
         let specIdsChanged = false
@@ -152,6 +156,7 @@ export class EditChange {
       },
     )
 
+    let updatedChange = initialChange
     if (persisted.invalidated && persisted.removedSpecIds.length > 0) {
       await this._changes.unscaffold(updatedChange, persisted.removedSpecIds)
     }
@@ -160,6 +165,13 @@ export class EditChange {
       await this._changes.scaffold(updatedChange, (specId) =>
         this._specExists(workspaceMap, specId),
       )
+      if (this._refresh !== undefined) {
+        await this._refresh.execute({ name: input.name })
+        const reloaded = await this._changes.get(input.name)
+        if (reloaded !== null) {
+          updatedChange = reloaded
+        }
+      }
     }
 
     return { change: updatedChange, invalidated: persisted.invalidated }

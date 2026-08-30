@@ -1,0 +1,6 @@
+{
+  "kind": "skill",
+  "supportedCapabilities": ["mcp", "agents", "frontmatter"],
+  "requiredCapabilities": [],
+  "requiredSharedTemplates": ["shared.md"]
+}

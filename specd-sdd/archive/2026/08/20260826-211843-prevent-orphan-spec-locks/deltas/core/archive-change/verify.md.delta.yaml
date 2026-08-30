@@ -1,0 +1,24 @@
+- op: added
+  description: 'Add scenarios for safely discarding invalid spec publication candidates'
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Implementation materialization into spec-lock'
+    after:
+      type: section
+      matches: 'Scenario: File outside target workspace codeRoot fails archive'
+  content: |
+    #### Scenario: Archive discards nonexistent spec candidate without creating orphan sidecar
+
+    - **GIVEN** a change has an implementation link for a spec that does not exist in `SpecRepository` and is not being created
+    - **WHEN** `ArchiveChange.execute` prepares the archive plan
+    - **THEN** that spec is safely discarded from the publication plan
+    - **AND** no orphan spec directory or lock sidecar is published
+
+    #### Scenario: Archive discards new spec without specification artifacts without creating orphan sidecar
+
+    - **GIVEN** a change targets a new spec in `specIds` but has no specification artifacts for that spec
+    - **AND** the change contains an implementation link for that new spec
+    - **WHEN** `ArchiveChange.execute` prepares the archive plan
+    - **THEN** that spec is safely discarded from the publication plan
+    - **AND** no orphan spec directory or lock sidecar is published

@@ -3,6 +3,7 @@ import { type ChangeRepository } from '../../application/ports/change-repository
 import { type SchemaProvider } from '../../application/ports/schema-provider.js'
 import { EditChange } from '../../application/use-cases/edit-change.js'
 import { type ListWorkspaces } from '../../application/use-cases/list-workspaces.js'
+import { type RefreshImplementationTracking } from '../../application/use-cases/refresh-implementation-tracking.js'
 import { type SpecdConfig } from '../../application/specd-config.js'
 import {
   createCompositionResolver,
@@ -19,6 +20,7 @@ export interface EditChangeDeps {
   readonly listWorkspaces: ListWorkspaces
   readonly actor: ActorResolver
   readonly schemaProvider: SchemaProvider
+  readonly refreshImplementationTracking?: RefreshImplementationTracking
 }
 
 /**
@@ -33,6 +35,7 @@ export function resolveEditChangeDeps(resolver: CompositionResolver): EditChange
     listWorkspaces: resolver.getListWorkspaces(),
     actor: resolver.getActorResolver(),
     schemaProvider: resolver.getSchemaProvider(),
+    refreshImplementationTracking: resolver.getRefreshImplementationTracking(),
   }
 }
 
@@ -84,8 +87,15 @@ function createEditChangeFromNormalized(
   input: FactoryInput<EditChangeDeps, CompositionResolutionOptions>,
 ): EditChange {
   if (input.kind === 'deps') {
-    const { changes, listWorkspaces, actor, schemaProvider } = input.deps
-    return new EditChange(changes, listWorkspaces, actor, schemaProvider)
+    const { changes, listWorkspaces, actor, schemaProvider, refreshImplementationTracking } =
+      input.deps
+    return new EditChange(
+      changes,
+      listWorkspaces,
+      actor,
+      schemaProvider,
+      refreshImplementationTracking,
+    )
   }
 
   const resolver = createCompositionResolver(input.config, input.options)

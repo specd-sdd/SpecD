@@ -93,6 +93,39 @@
 - **THEN** the affected scope and aggregate evidence remain unknown
 - **AND** no stale latch is set and no dirty-content mismatch is invented
 
+### Requirement: Indexed-content integrity assessment
+
+#### Scenario: Retained indexed coverage over an empty graph is inconsistent
+
+- **GIVEN** coverage records claim successfully indexed code inputs
+- **AND** the corresponding file and symbol graph contents are absent
+- **WHEN** graph health is computed
+- **THEN** `contentFresh` and `coverageComplete` are false
+- **AND** aggregate state is not `current`
+- **AND** reasons include `GRAPH_CONTENT_INCONSISTENT`
+
+#### Scenario: Complete generation remains current
+
+- **GIVEN** every successfully indexed coverage record has its expected persisted file or document node
+- **AND** VCS, fingerprint, generation, and schema checks are current
+- **WHEN** graph health is computed
+- **THEN** the integrity assessment adds no inconsistency reason
+- **AND** existing health inputs may produce aggregate state `current`
+
+#### Scenario: Unsupported inputs do not require code nodes
+
+- **GIVEN** a discovered textual input has coverage status `unsupported` with reason `no-language-adapter`
+- **AND** it has no persisted code file or symbol node
+- **WHEN** graph health is computed
+- **THEN** that absence alone does not add `GRAPH_CONTENT_INCONSISTENT`
+- **AND** the unsupported coverage reason remains visible
+
+#### Scenario: Integrity failure does not mutate or repair storage
+
+- **GIVEN** health detects inconsistent coverage and graph contents
+- **WHEN** the use case returns diagnostics
+- **THEN** it does not clear, recreate, index, open, or close the provider
+
 ### Requirement: Aggregate and workspace health projection
 
 #### Scenario: Aggregate precedence and workspace projection are stable

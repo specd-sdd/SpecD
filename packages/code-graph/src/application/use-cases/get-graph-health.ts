@@ -103,7 +103,9 @@ export class GetGraphHealth {
         coverage: coverage.summary,
         schemaCompatible: true,
         generationCurrent: true,
-        reasonCodes: ['CONTENT_KNOWN_STALE'],
+        reasonCodes: coverage.inconsistent
+          ? ['CONTENT_KNOWN_STALE', 'GRAPH_CONTENT_INCONSISTENT']
+          : ['CONTENT_KNOWN_STALE'],
       }
     }
 
@@ -162,7 +164,7 @@ export class GetGraphHealth {
         : detailedFreshness.state === FreshnessState.Unknown
           ? null
           : detailedFreshness.state === FreshnessState.Current
-    const contentFresh = indexedContentFresh
+    const contentFresh = coverage.inconsistent ? false : indexedContentFresh
     const stale = isGraphStale(stats.lastIndexedRef, currentRef)
 
     let fingerprintMismatch: boolean | null = null
@@ -190,6 +192,7 @@ export class GetGraphHealth {
       fingerprintMismatch,
       coverageComplete,
       coverageReasons: coverage.summary.reasons,
+      contentInconsistent: coverage.inconsistent,
     })
 
     const state = aggregateCanonicalHealth({
@@ -239,26 +242,42 @@ async function readCoverageHealth(
   readonly complete: boolean | null
   readonly summary: IndexCoverageHealthSummary
   readonly facts: readonly IndexCoverage[]
+  readonly inconsistent: boolean
 }> {
   const empty = emptyCoverageSummary()
-  if (!hasIndexedGeneration) return { complete: null, summary: empty, facts: [] }
+  if (!hasIndexedGeneration) {
+    return { complete: null, summary: empty, facts: [], inconsistent: false }
+  }
   if (provider.getAllIndexCoverage === undefined) {
-    return { complete: null, summary: empty, facts: [] }
+    return { complete: null, summary: empty, facts: [], inconsistent: false }
   }
   try {
     const facts = await provider.getAllIndexCoverage()
-    const summary = summarizeCoverage(facts)
+    const [files, documents] =
+      provider.getAllFiles === undefined || provider.getAllDocuments === undefined
+        ? [[], []]
+        : await Promise.all([provider.getAllFiles(), provider.getAllDocuments()])
+    const persistedPaths = new Set([...files, ...documents].map((item) => item.path))
+    const inconsistent =
+      provider.getAllFiles !== undefined &&
+      provider.getAllDocuments !== undefined &&
+      facts.some(
+        (fact) => fact.status === IndexCoverageStatus.Indexed && !persistedPaths.has(fact.filePath),
+      )
+    const summary = summarizeCoverage(facts, inconsistent)
     return {
-      complete: facts.every(
-        (fact) =>
-          fact.status !== IndexCoverageStatus.ParseFailed &&
-          fact.status !== IndexCoverageStatus.Partial,
-      ),
+      complete:
+        facts.every(
+          (fact) =>
+            fact.status !== IndexCoverageStatus.ParseFailed &&
+            fact.status !== IndexCoverageStatus.Partial,
+        ) && !inconsistent,
       summary,
       facts,
+      inconsistent,
     }
   } catch {
-    return { complete: null, summary: empty, facts: [] }
+    return { complete: null, summary: empty, facts: [], inconsistent: false }
   }
 }
 
@@ -283,9 +302,13 @@ function emptyCoverageSummary(): IndexCoverageHealthSummary {
 /**
  * Aggregates persisted coverage facts into stable counts and reason codes.
  * @param facts - Persisted per-source coverage facts.
+ * @param inconsistent - Whether indexed facts reference absent physical nodes.
  * @returns Deterministic count and reason summary.
  */
-function summarizeCoverage(facts: readonly IndexCoverage[]): IndexCoverageHealthSummary {
+function summarizeCoverage(
+  facts: readonly IndexCoverage[],
+  inconsistent = false,
+): IndexCoverageHealthSummary {
   const summary = emptyCoverageSummary()
   const byStatus = { ...summary.byStatus }
   for (const fact of facts) byStatus[fact.status] += 1
@@ -294,6 +317,7 @@ function summarizeCoverage(facts: readonly IndexCoverage[]): IndexCoverageHealth
     byStatus,
     reasons: [
       ...new Set(facts.flatMap((fact) => (fact.reason === undefined ? [] : [fact.reason]))),
+      ...(inconsistent ? ['indexed-node-missing'] : []),
     ].sort(),
   }
 }
@@ -689,6 +713,7 @@ function isWithinCodeRoot(filePath: string, codeRoot: string): boolean {
  * @param input.fingerprintMismatch - Derivation mismatch state.
  * @param input.coverageComplete - Coverage completeness state.
  * @param input.coverageReasons - Stable reasons from incomplete coverage facts.
+ * @param input.contentInconsistent - Whether indexed coverage lacks a physical graph node.
  * @returns Ordered reason codes for non-fresh or unknown dimensions.
  */
 function graphHealthReasonCodes(input: {
@@ -698,6 +723,7 @@ function graphHealthReasonCodes(input: {
   readonly fingerprintMismatch: boolean | null
   readonly coverageComplete: boolean | null
   readonly coverageReasons: readonly string[]
+  readonly contentInconsistent: boolean
 }): readonly string[] {
   const reasons: string[] = []
   if (input.stale === true) reasons.push('VCS_REF_STALE')
@@ -708,6 +734,7 @@ function graphHealthReasonCodes(input: {
   if (input.fingerprintMismatch === null) reasons.push('DERIVATION_UNKNOWN')
   if (input.coverageComplete === false) reasons.push('COVERAGE_PARTIAL')
   if (input.coverageComplete === null) reasons.push('COVERAGE_UNKNOWN')
+  if (input.contentInconsistent) reasons.push('GRAPH_CONTENT_INCONSISTENT')
   if (input.coverageComplete === false) reasons.push(...input.coverageReasons)
   return [...new Set(reasons)]
 }

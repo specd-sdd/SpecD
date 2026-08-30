@@ -11,14 +11,16 @@ Implementation tracking needs an application-level mutation primitive so deliver
 `UpdateImplementationTracking.execute` SHALL accept:
 
 - `name` — change name
-- `action` — one of `add`, `remove`, `ignore`, `resolve`, or `unresolve`
-- `file` — raw project-relative file path
+- `action` — one of `add`, `remove`, `ignore`, `resolve`, `unresolve`, or `start`
+- `file` — optional raw project-relative file path (required for `add`, `remove`, `ignore`, `resolve`, and `unresolve`; optional for `start`)
 - `specId` — optional canonical spec ID for link mutations
 - `symbols` — optional symbol refinements for link mutations
 
 ### Requirement: Add mutation creates or enriches implementation links
 
 When `action = add`, the use case MUST require the target file to exist on disk.
+
+The use case MUST require `input.specId` to be provided. If `input.specId` is not present in `change.specIds`, the use case MUST verify that the spec exists in the canonical `SpecRepository` for the spec's workspace. If the spec is not found in `change.specIds` and not found in `SpecRepository`, the use case MUST throw `SpecNotFoundError(input.specId)`.
 
 It MUST create or enrich a confirmed implementation link for the given `specId + file` pair, using symbol refinements when provided. When the file is not already tracked, it MUST add a tracked implementation file entry with state `open`.
 
@@ -46,6 +48,16 @@ When `action = ignore`, the use case SHALL mark the tracked file as `ignored`.
 
 It MAY ignore a missing file only when that file is already tracked. For an untracked file, physical existence MUST be validated before adding it as `ignored`. Confirmed implementation links for the file MUST be preserved.
 
+### Requirement: Start mutation activates implementation tracking
+
+When `action = start`, the use case SHALL activate implementation tracking for the change.
+
+It MUST:
+
+- invoke `Change.startImplementationTracking()` within the mutation boundary
+- succeed idempotently if implementation tracking is already active
+- not require a `file` path or `specId`
+
 ### Requirement: Change must exist
 
 If no change with the given name exists, the use case MUST throw `ChangeNotFoundError`.
@@ -69,6 +81,7 @@ The config-based `createUpdateImplementationTracking(config, options?)` form MUS
 - `changes: ChangeRepository`
 - `files: FileReader`
 - `projectRoot: string`
+- `specRepositories?: ReadonlyMap<string, SpecRepository>`
 
 The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
 

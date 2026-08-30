@@ -156,6 +156,12 @@ After routing, pre-transition checks, and successful pre-hooks, the use case MUS
 
 After a successful state transition, the use case MUST emit a `transitioned` progress event with `from` and `to` states.
 
+### Requirement: Automatic implementation tracking activation on transition to implementing
+
+When transitioning to `implementing` (`effectiveTarget === 'implementing'`), `TransitionChange` MUST verify whether implementation tracking is active on the change.
+
+If `!change.isImplementationTrackingActive`, the use case MUST call `change.startImplementationTracking()` within the same mutation boundary to activate implementation tracking and record the transition timestamp as the baseline.
+
 ### Requirement: Post-hook execution
 
 Matching **effects** (`run:` hooks) SHALL run only after all predicates pass. Selection MUST use the same `from` / `to` / `along` matcher as predicates, then binding `phase = before-persist` (see [`core:hook-execution-model`](../hook-execution-model/spec.md)). The use case MUST iterate matching bindings; it MUST NOT choose the slot by `check.id`.

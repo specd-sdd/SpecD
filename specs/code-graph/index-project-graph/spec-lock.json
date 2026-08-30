@@ -20,36 +20,36 @@
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "IndexProjectGraph forwards prepared project indexing inputs to provider, managing force recreate and incompatibility repairs.",
+      "value": "Forwards prepared project inputs and force intent to an open provider for complete or incremental graph indexing.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:3601ee79dd5d23abd42a8e7065505c1a2a4f65f390daf3fc96e4d53b0f14f97a",
-          "lastModified": "2026-08-16T08:12:48.572Z"
+          "hash": "sha256:8e40003e614784b050799987dbcf59a856fd81f12478d5d96c192183033cee35",
+          "lastModified": "2026-08-25T14:41:04.252Z"
         },
         "verify.md": {
-          "hash": "sha256:8b0d86f0df41bd157114d3e913ea37173ce8876a76718470d525f6cf61a8f8a0",
-          "lastModified": "2026-08-16T08:12:48.575Z"
+          "hash": "sha256:8082260b39bef9c547f9c60b710dcdae5298ab18f3499809bdafb6ff95e88d4b",
+          "lastModified": "2026-08-25T14:41:04.253Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# IndexProjectGraph\n\n## Rules\n\n- `IndexProjectGraph.execute(input)` MUST call `provider.index()` once with `IndexOptions` built from `projectRoot`, `workspaces`, `graphConfig`, `codeGraphVersion`, `vcsRoot`, optional `vcsRef`, `onProgress`, and force intent; return `IndexResult` unchanged.\n- When `input.force === true`, forward `force: true` to `provider.index(...)`. NEVER call `provider.recreate()` directly; provider owns destructive reset, generation rotation, and lock policy.\n- `IndexProjectGraphInput` MUST include opened `provider: CodeGraphProvider`, `projectRoot: string`, `workspaces: WorkspaceIndexTarget[]`, `graphConfig: ProjectGraphConfig`, `codeGraphVersion: string`, `vcsRoot: string | null`; MAY include `vcsRef: string`, `force: boolean`, `onProgress: IndexProgressCallback`. Forward `vcsRoot` unchanged.\n- Use case MUST NOT resolve workspaces, acquire locks, spawn subprocesses, or directly reset provider/store.\n- `createIndexProjectGraph()` MUST return stateless `IndexProjectGraph`.\n- Support provider-owned repair on schema/derivation incompatibility. Result MUST report if full rebuild occurred and stable rebuild reason (explicit force, backend schema incompatibility, derivation mismatch). Repair rotates storage generation; MUST NOT expose store ready until indexing and search-index rebuild complete.\n\n## Constraints\n\n- MUST NOT open/close provider.\n- MUST NOT acquire/release graph indexing lock.\n- Parse failures remain in `IndexResult.errors`; use case MUST NOT throw for per-file errors.",
+      "value": "# IndexProjectGraph\n\n## Rules\n\n- `IndexProjectGraph.execute(input)` builds `IndexOptions` from `projectRoot`, `workspaces`, `graphConfig`, `codeGraphVersion`, `vcsRoot`, optional `vcsRef`, `onProgress`, and `force`; calls `provider.index()`; returns `IndexResult` unchanged.\n- `force` requests complete logical reindex: provider clears reusable indexed contents and bypasses incremental reuse so every selected input is reconsidered.\n- Input contains already-open `provider` and prepared project values. Forward `vcsRoot` unchanged.\n- MUST NOT resolve workspaces, lock, spawn, open, close, directly clear, recreate, or own storage recovery/lifecycle. SDK lifecycle owner handles recoverable open failures.\n- `createIndexProjectGraph()` returns stateless `IndexProjectGraph`.\n\n## Constraints\n\n- No provider open/close or index-lock acquisition/release.\n- Per-file parse failures remain `IndexResult.errors`; use case does not throw them.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:3601ee79dd5d23abd42a8e7065505c1a2a4f65f390daf3fc96e4d53b0f14f97a",
-          "lastModified": "2026-08-16T08:12:48.572Z"
+          "hash": "sha256:8e40003e614784b050799987dbcf59a856fd81f12478d5d96c192183033cee35",
+          "lastModified": "2026-08-25T14:41:04.252Z"
         },
         "verify.md": {
-          "hash": "sha256:8b0d86f0df41bd157114d3e913ea37173ce8876a76718470d525f6cf61a8f8a0",
-          "lastModified": "2026-08-16T08:12:48.575Z"
+          "hash": "sha256:8082260b39bef9c547f9c60b710dcdae5298ab18f3499809bdafb6ff95e88d4b",
+          "lastModified": "2026-08-25T14:41:04.253Z"
         }
       }
     }

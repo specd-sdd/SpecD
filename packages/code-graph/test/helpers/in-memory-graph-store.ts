@@ -318,6 +318,10 @@ export class InMemoryGraphStore extends GraphStore {
 
   async replaceReferenceFacts(facts: ReferenceFactsWrite): Promise<void> {
     this.ensureOpen()
+    this.relations = this.relations.filter(
+      (relation) =>
+        relation.type !== RelationType.CoversFile && relation.type !== RelationType.CoversSymbol,
+    )
 
     const logicalSymbols = new Map(facts.logicalSymbols.map((symbol) => [symbol.id, symbol]))
     const declarationsByLogicalSymbol = new Map<string, LogicalDeclaration[]>()

@@ -372,6 +372,7 @@ export const changeManifestSchema = z.object({
   specIds: z.array(z.string()),
   specDependsOn: z.record(z.string(), z.array(z.string())).optional(),
   invalidationPolicy: z.enum(['none', 'surgical', 'downstream', 'global']).optional(),
+  implementationTrackingStartedAt: z.string().datetime().optional().nullable(),
   trackedImplementationFiles: z.array(manifestTrackedImplementationFileSchema).optional(),
   implementationLinks: z.array(manifestImplementationLinkSchema).optional(),
   artifacts: z.array(manifestArtifactSchema),
@@ -430,6 +431,8 @@ export interface ChangeManifest {
   readonly specDependsOn?: Record<string, string[]>
   /** Invalidation policy for this change. Defaults to `'downstream'` when absent. */
   readonly invalidationPolicy?: InvalidationPolicy
+  /** ISO 8601 timestamp when implementation tracking started. */
+  readonly implementationTrackingStartedAt?: string | null
   /** Optional tracked implementation files under review for the active change. */
   readonly trackedImplementationFiles?: ManifestTrackedImplementationFile[]
   /** Optional confirmed implementation links for the active change. */

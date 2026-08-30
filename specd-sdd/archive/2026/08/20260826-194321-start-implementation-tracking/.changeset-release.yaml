@@ -1,0 +1,7 @@
+releases:
+  cli:change-implementation: minor
+  core:change: minor
+  core:change-manifest: minor
+  core:transition-change: minor
+  core:refresh-implementation-tracking: patch
+  core:update-implementation-tracking: minor

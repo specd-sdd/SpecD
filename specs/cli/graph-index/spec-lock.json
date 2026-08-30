@@ -13,66 +13,45 @@
   ],
   "implementation": [
     {
-      "file": "cli:src/graph-index-task.ts",
-      "symbols": [
-        "CliGraphIndexContextDescriptor",
-        "CliGraphIndexTaskInput",
-        "CliGraphIndexProgress",
-        "runGraphIndexTask"
-      ]
-    },
-    {
-      "file": "cli:package.json"
-    },
-    {
       "file": "cli:src/commands/graph/index-graph.ts",
       "symbols": ["registerGraphIndex", "formatTextIndexResult"]
     },
     {
-      "file": "cli:test/graph-index-task.spec.ts",
-      "symbols": ["runGraphIndexTask"]
-    },
-    {
-      "file": "cli:test/commands/graph-index.spec.ts",
-      "symbols": ["graph index"]
-    },
-    {
-      "file": "cli:test/commands/graph-index-integration.spec.ts",
-      "symbols": ["graph index integration"]
+      "file": "cli:test/commands/graph-index.spec.ts"
     }
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "Index project graph through SDK orchestration with parent locking, worker isolation, progress, repair reporting, and complete summaries.",
+      "value": "Indexes project graph through SDK isolation, forwarding force/recovery intent and rendering complete typed results.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:f4892015960ae601423a27bd755e7b8097f25814696300c531b22b31f3b8dc1b",
-          "lastModified": "2026-08-16T08:12:48.423Z"
+          "hash": "sha256:acb1599a617cdc579b769999ba9b43c092f1995dd85e05323a5c69f7d4ca68e1",
+          "lastModified": "2026-08-25T14:41:04.193Z"
         },
         "verify.md": {
-          "hash": "sha256:a4631dddfe3e9233cc7ff077fb468feb15d5249ac63f3845567e8b25ad05c79d",
-          "lastModified": "2026-08-16T08:12:48.426Z"
+          "hash": "sha256:2c4a5721ceac4fba678b34dfcdec48a8537a4392b3b3e744461e14ae3b493a78",
+          "lastModified": "2026-08-25T14:41:04.194Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# Graph Index\n\n## Rules\n\n- Signature: `specd graph index [--force] [--exclude-path <pattern>] [--config <path> | --path <path>] [--format text|json|toon]`; `--config` and `--path` mutually exclusive.\n- Execute indexing through `runIndexProjectGraph(ctx, input)` in `@specd/sdk`; `--force` passes `force: true`.\n- CLI owns parent shared lock, worker isolation (`child_process.spawn`), `onProgress` text output, signals (`SIGINT`/`SIGTERM`), exit propagation. `SPECD_GRAPH_INDEX_NO_WORKER=true` bypasses worker for tests.\n- Visible incompatibility repair: delegates provider-owned repair through `runIndexProjectGraph`. Text reports when destructive full rebuild occurred and reason; JSON/TOON expose rebuild flag and reason code.\n- Text summary reports indexed count/duration, discovered, documents, skipped, removed, specs, error count/details, plus per-workspace breakdown when present.\n- JSON/TOON emit full `IndexResult` including `documentsIndexed` and per-workspace breakdown.\n- Lock contention or infrastructure error exits 3 with retry message; per-file errors remain in `IndexResult.errors` and exit 0.\n- Documentation in `docs/cli/cli-reference.md` under `## graph` covers all flags, `--exclude-path` gitignore merging, replace semantics, bootstrap, and `graph.*` config fields.\n\n## Constraints\n\n- CLI never assembles workspace/VCS/index inputs inline.\n- Lock and worker isolation remain CLI adapter concerns.\n- Platform symbols come from `@specd/sdk`.\n- Call `process.exit(0)` after provider close.",
+      "value": "# Graph Index\n\n## Rules\n\n- Signature: `specd graph index [--force] [--exclude-path <pattern>...] [--config <path> | --path <path>] [--format text|json|toon]`; format defaults text; `--config`/`--path` mutually exclusive.\n- `--force` requests full logical reindex: clear indexed contents, reprocess every selected input. Only typed recoverable storage-open failure plus `--force` authorizes SDK storage recreation and one retry; ordinary/non-recoverable open failures never authorize deletion.\n- Execute through public `runIsolatedGraphIndex` from `@specd/sdk`. Supply graph storage root, trusted packaged task-module URL, serializable explicit configured/bootstrap context descriptor plus force/excludes, progress callback rendering text only.\n- CLI MUST NOT coordinate graph lock, spawn/fork, signals, IPC, termination, or cleanup; code-graph isolated worker owns them. Production always isolated; no `SPECD_GRAPH_INDEX_WORKER` or `SPECD_GRAPH_INDEX_NO_WORKER` behavior. Tests use explicit seams.\n- Child CLI task reconstructs equivalent SDK host context from explicit descriptor, preserving config path/bootstrap root; invokes `runIndexProjectGraph(ctx, input)` exactly once. Kernel object identity cannot cross process. No implicit project substitution.\n- `runIndexProjectGraph` owns workspace/VCS assembly, metadata materialization, provider lifecycle/recovery, and `IndexProjectGraph`; task MUST NOT duplicate.\n- Parent renders typed progress/result/failure. Per-file errors remain successful result; busy, fork, task, protocol, abnormal-exit, signal, provider, and infrastructure failures use system-error path.\n- Text summary reports indexed/duration, discovered, documents, skipped, removed, specs, error details, per-workspace breakdown. JSON/TOON output full result unchanged, including documents, phases, rebuild, coverage, workspace, and file-error fields.\n- Provider/infrastructure or busy lock failure exits 3; busy message advises retry. Per-file parse/unsupported errors remain `IndexResult.errors`, exit 0.\n- Backend schema/derivation repair supported only through `graph index` delegating `runIndexProjectGraph`; CLI never deletes backend files. Text states destructive rebuild and reason; JSON/TOON expose stable rebuild flag/reason.\n- `docs/cli/cli-reference.md` `## graph` documents index/search/hotspots/stats/impact signatures, flags, examples, context model. Index docs cover repeatable gitignore `--exclude-path`, merge over `graph.excludePaths`, config/path exclusivity, bootstrap fallback, `graph.excludePaths`, `graph.respectGitignore`, defaults, replacement semantics, negated re-inclusion.\n\n## Constraints\n\n- CLI imports graph platform only through `@specd/sdk`; no direct `@specd/code-graph`.\n- No CLI-exposed task-module selection or production no-worker mode.\n- Force/excludes cross process as serializable input.\n- Graph runtime never renders CLI output or calls host `process.exit()`.\n- Non-force and non-recoverable force failures preserve typed open error and storage.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:f4892015960ae601423a27bd755e7b8097f25814696300c531b22b31f3b8dc1b",
-          "lastModified": "2026-08-16T08:12:48.423Z"
+          "hash": "sha256:acb1599a617cdc579b769999ba9b43c092f1995dd85e05323a5c69f7d4ca68e1",
+          "lastModified": "2026-08-25T14:41:04.193Z"
         },
         "verify.md": {
-          "hash": "sha256:a4631dddfe3e9233cc7ff077fb468feb15d5249ac63f3845567e8b25ad05c79d",
-          "lastModified": "2026-08-16T08:12:48.426Z"
+          "hash": "sha256:2c4a5721ceac4fba678b34dfcdec48a8537a4392b3b3e744461e14ae3b493a78",
+          "lastModified": "2026-08-25T14:41:04.194Z"
         }
       }
     }

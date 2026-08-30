@@ -1425,4 +1425,59 @@ describe('Change', () => {
       expect(() => c.touchUpdatedAt(new Date('2023-12-31T00:00:00Z'))).toThrow(InvalidChangeError)
     })
   })
+
+  describe('implementation tracking activation', () => {
+    it('initializes as inactive when no timestamp or implementing history exists', () => {
+      const c = makeChange()
+      expect(c.isImplementationTrackingActive).toBe(false)
+      expect(c.implementationTrackingStartedAt).toBeNull()
+    })
+
+    it('startImplementationTracking activates tracking with provided timestamp', () => {
+      const c = makeChange()
+      const start = new Date('2024-05-01T12:00:00Z')
+      c.startImplementationTracking(start)
+      expect(c.isImplementationTrackingActive).toBe(true)
+      expect(c.implementationTrackingStartedAt).toEqual(start)
+    })
+
+    it('startImplementationTracking is idempotent and preserves initial timestamp', () => {
+      const c = makeChange()
+      const first = new Date('2024-05-01T12:00:00Z')
+      const second = new Date('2024-05-02T12:00:00Z')
+      c.startImplementationTracking(first)
+      c.startImplementationTracking(second)
+      expect(c.isImplementationTrackingActive).toBe(true)
+      expect(c.implementationTrackingStartedAt).toEqual(first)
+    })
+
+    it('hydrates tracking from legacy historical implementing event when field omitted', () => {
+      const histDate = new Date('2024-03-01T10:00:00Z')
+      const c = new Change({
+        name: 'legacy-change',
+        createdAt: new Date('2024-01-01T00:00:00Z'),
+        specIds: ['auth/login'],
+        history: [
+          { type: 'transitioned', from: 'ready', to: 'implementing', at: histDate, by: actor },
+        ],
+      })
+      expect(c.isImplementationTrackingActive).toBe(true)
+      expect(c.implementationTrackingStartedAt).toEqual(histDate)
+    })
+
+    it('explicit null in implementationTrackingStartedAt keeps tracking inactive despite historical events', () => {
+      const histDate = new Date('2024-03-01T10:00:00Z')
+      const c = new Change({
+        name: 'explicit-null',
+        createdAt: new Date('2024-01-01T00:00:00Z'),
+        specIds: ['auth/login'],
+        history: [
+          { type: 'transitioned', from: 'ready', to: 'implementing', at: histDate, by: actor },
+        ],
+        implementationTrackingStartedAt: null,
+      })
+      expect(c.isImplementationTrackingActive).toBe(false)
+      expect(c.implementationTrackingStartedAt).toBeNull()
+    })
+  })
 })

@@ -75,6 +75,23 @@
 - **WHEN** `clear()` is called for a forced reindex
 - **THEN** logical graph data is removed without physical recreation or generation rotation
 
+### Requirement: Complete logical clear
+
+#### Scenario: Clear removes every prior indexing authority
+
+- **GIVEN** an open store containing physical and logical nodes, specs, relations, coverage hashes, observations, reference facts, latches, derivation metadata, and search entries
+- **WHEN** `clear()` completes
+- **THEN** all graph and incremental-state queries return no artifact from the prior generation
+- **AND** a subsequent index cannot obtain a prior content hash or semantic row with which to skip a discovered input
+- **AND** the physical store remains open with the same storage generation
+
+#### Scenario: Clear contract is backend-neutral
+
+- **GIVEN** each built-in `GraphStore` contract implementation contains equivalent indexed state
+- **WHEN** the shared clear contract suite runs
+- **THEN** every implementation exposes the same empty logical state
+- **AND** backend-only schema metadata does not appear through abstract graph queries
+
 ### Requirement: Storage generation tracking
 
 #### Scenario: Recreate rotates the persisted storage generation
@@ -460,6 +477,22 @@
 - **WHEN** the complete reference snapshot and direct affected files are requested
 - **THEN** the SQLite backend returns deterministically ordered facts and file paths
 - **AND** affected lookup uses a bounded batch operation rather than one query per relation
+
+### Requirement: Logical-symbol coverage endpoints
+
+#### Scenario: Logical coverage round-trips through the abstract store
+
+- **GIVEN** a committed spec, logical symbol, and declaration occurrence for that logical symbol
+- **WHEN** `COVERS_SYMBOL` is persisted from the spec to the logical symbol ID
+- **THEN** covered-symbol and reverse-covering-spec queries return the relation with the same logical target ID and metadata
+- **AND** relation statistics count it exactly once
+
+#### Scenario: Missing and occurrence-only targets fail endpoint validation
+
+- **GIVEN** one `COVERS_SYMBOL` targets an unknown ID and another targets a physical declaration occurrence without a matching logical target endpoint
+- **WHEN** the relations are validated for commit
+- **THEN** neither invalid relation becomes visible
+- **AND** no backend retargets either relation implicitly
 
 ### Requirement: Incompatible store handling
 

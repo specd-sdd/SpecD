@@ -23,13 +23,13 @@ One invocation MUST resolve and apply exactly one schema across its entire targe
 
 For each target spec, `InitializePersistedSpecState` MUST:
 
-1. resolve the schema once through Core composition (shared across the whole invocation, not re-resolved per spec);
+1. resolve the schema once through Core composition (shared across the whole invocation, not re-resolved per spec) and derive canonical schema identity via `schema.canonicalSpecSchema()`;
 2. discover the raw spec identity without materializing metadata;
 3. read the aggregate persisted-state snapshot for that spec;
 4. reject the target with `SpecAlreadyInitializedError` if any persisted state already exists, regardless of whether its schema identity matches the selected schema;
 5. load the schema-declared canonical `scope: spec` artifacts for that spec and verify that they can be parsed under the selected schema;
 6. resolve initial dependencies through the shared `resolveInitialPersistedDependsOn()` service;
-7. call `applyPersistedSpecStatePatch()` with an `{ kind: 'initial', schema, dependsOn }` base and an empty patch;
+7. call `applyPersistedSpecStatePatch()` with an `{ kind: 'initial', schema: canonicalSpecSchema, dependsOn }` base and an empty patch;
 8. conditionally write the resulting complete state with `expectedRevision: null`.
 
 ### Requirement: No import from generated metadata
