@@ -59,6 +59,7 @@ import { registerSpecSchema } from './commands/spec/schema.js'
 import { registerSpecDeps } from './commands/spec/deps.js'
 import { registerSpecImplementation } from './commands/spec/implementation.js'
 import { registerSpecOptimizations } from './commands/spec/optimizations.js'
+import { registerSpecSuggest } from './commands/spec/suggest.js'
 
 // project
 import { registerProjectInit } from './commands/project/init.js'
@@ -193,6 +194,7 @@ registerSpecSchema(specCmd)
 registerSpecDeps(specCmd)
 registerSpecImplementation(specCmd)
 registerSpecOptimizations(specCmd)
+registerSpecSuggest(specCmd)
 
 // ---- project ----
 const projectCmd = program

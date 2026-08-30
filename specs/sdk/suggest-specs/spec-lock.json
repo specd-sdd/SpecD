@@ -1,0 +1,69 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": ["sdk:suggest-implementation-links", "sdk:suggest-spec-dependencies"],
+  "implementation": [
+    {
+      "file": "sdk:src/domain/value-objects/candidate-spec.ts",
+      "symbols": ["CandidateSpec", "SuggestSpecsResult", "SpecCategory", "ConfidenceBreakdown"]
+    },
+    {
+      "file": "sdk:src/domain/services/transitive-reduction-engine.ts",
+      "symbols": ["TransitiveReductionEngine"]
+    },
+    {
+      "file": "sdk:src/domain/services/spec-symbol-classifier.ts",
+      "symbols": ["SpecSymbolClassifier"]
+    },
+    {
+      "file": "sdk:src/domain/services/capability-clustering-engine.ts",
+      "symbols": ["CapabilityClusteringEngine"]
+    },
+    {
+      "file": "sdk:src/domain/services/confidence-scorer.ts",
+      "symbols": ["ConfidenceScorer"]
+    },
+    {
+      "file": "sdk:src/domain/services/dependency-inference-engine.ts",
+      "symbols": ["DependencyInferenceEngine"]
+    },
+    {
+      "file": "sdk:test/domain/services/transitive-reduction-engine.spec.ts"
+    },
+    {
+      "file": "sdk:test/domain/services/spec-symbol-classifier.spec.ts"
+    },
+    {
+      "file": "sdk:test/domain/services/capability-clustering-engine.spec.ts"
+    },
+    {
+      "file": "sdk:test/domain/services/confidence-scorer.spec.ts"
+    },
+    {
+      "file": "sdk:src/application/use-cases/suggest-specs.ts",
+      "symbols": ["SuggestSpecs", "suggestSpecsInputSchema"]
+    },
+    {
+      "file": "sdk:src/composition/suggest-specs.ts",
+      "symbols": ["createSuggestSpecs", "resolveSuggestSpecsDeps", "openSuggestSpecs"]
+    },
+    {
+      "file": "sdk:src/index.ts",
+      "symbols": [
+        "SuggestSpecs",
+        "openSuggestSpecs",
+        "createSuggestSpecs",
+        "TransitiveReductionEngine",
+        "SpecSymbolClassifier",
+        "CapabilityClusteringEngine",
+        "ConfidenceScorer",
+        "DependencyInferenceEngine"
+      ]
+    },
+    {
+      "file": "sdk:test/application/use-cases/suggest-specs.spec.ts"
+    }
+  ]
+}

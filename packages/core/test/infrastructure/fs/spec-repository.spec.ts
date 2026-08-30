@@ -194,6 +194,8 @@ describe('FsSpecRepository', () => {
       expect(result!.artifacts).toHaveLength(1)
       expect(result!.artifacts[0]!.filename).toBe('spec.md')
       expect(result!.artifacts[0]!.lastModified).toMatch(/^\d{4}-/)
+      // Byte size observed from the same stat as lastModified (no content read).
+      expect(result!.artifacts[0]!.size).toBe(Buffer.byteLength('# Login spec', 'utf8'))
       expect(result!.persistedStateStamp.present).toBe(true)
       expect(result!.persistedStateStamp.lastModified).toMatch(/^\d{4}-/)
       expect(result!.generatedMetadataStamp.present).toBe(true)
@@ -1280,6 +1282,7 @@ describe('FsSpecRepository', () => {
 
       expect(result).toEqual({
         lastModified: expect.stringMatching(/^\d{4}-/),
+        size: expect.any(Number),
       })
     })
 
@@ -1297,6 +1300,7 @@ describe('FsSpecRepository', () => {
       expect(result).toEqual({
         hash: sha256(content),
         lastModified: expect.stringMatching(/^\d{4}-/),
+        size: expect.any(Number),
       })
     })
 

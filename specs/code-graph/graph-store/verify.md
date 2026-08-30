@@ -561,3 +561,12 @@
 - **WHEN** endpoint validation, hierarchy lookup, or persistence fails during a bulk session
 - **THEN** no partial generation becomes readable
 - **AND** validation and lookup are not issued as one Store call per relation
+
+### Requirement: Symbol Query Workspace Scope
+
+#### Scenario: Querying symbols scoped by workspace
+
+- **GIVEN** a graph store pre-populated with symbols across multiple workspaces (`core`, `cli`, `sdk`)
+- **WHEN** `GraphStore.findSymbols({ name: 'create*', workspace: 'core' })` is called
+- **THEN** all returned `SymbolNode` items belong exclusively to the `core` workspace
+- **AND** no symbols from `cli` or `sdk` workspaces are returned

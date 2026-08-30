@@ -13,5 +13,41 @@
     "core:get-spec-metadata",
     "core:composition-resolver"
   ],
-  "implementation": []
+  "implementation": [],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Lists specs across ordered workspaces with optional self-healed summaries and no metadata-status exposure.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:ebd7ab272ce2b64d5af1672654e9cb6bdcd9cd20df69787baf2fd3696cbe627e",
+          "lastModified": "2026-08-17T09:55:42.127Z"
+        },
+        "verify.md": {
+          "hash": "sha256:2c89e75acdf05980eb82037b23439133dd62c87337f3b92ca749e5cdb25cb632",
+          "lastModified": "2026-08-17T09:55:42.127Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# List Specs\n\n## Rules\n\n- `ListSpecs.execute(options?)`: obtain workspaces through `ListWorkspaces`; filter workspace names before calls; invoke each `specRepo.list(options)`.\n- Forward identical `ListOptions` and `includeSummary`; never forward metadata-status flag or add default `limit`; never re-sort, re-filter, or re-paginate repository results.\n- Merge in workspace declaration order; retain repository canonical path order. Cross-workspace pagination excluded; paginate single workspace or filter explicitly.\n- Every `SpecListEntry`: required `workspace`, `path`, `title` from `SpecRepository.list()`; no extra title metadata/file reads.\n- `includeSummary: true`: use repository result only. `FsSpecIndexCache`/index rebuild self-heals metadata with `policy: if-needed`, then projects normalized `description`, or fresh `optimizedDescription` when `llmOptimizedContext` active.\n- Missing/stale `optimizedDescription`: fall back to normalized `description`. Unavailable projection: omit `summary`; do not fail listing.\n- `includeSummary` false/omitted: omit `summary` from every entry; repository listing must not trigger summary materialization.\n- Optional title/summary projection errors remain isolated in repository/index path; omit failed optional projection; never abort merge or propagate optional-field I/O errors.\n- Never expose `metadataStatus`; never filter by metadata freshness.\n- `createListSpecs(config, options?)`: derive `ListSpecsDeps` via `resolveListSpecsDeps(resolver)`, then delegate to canonical `createListSpecs(deps)`.\n- `resolveListSpecsDeps(resolver)` resolves only `listWorkspaces: ListWorkspaces`; never resolve `getMetadata`, `materializeMetadata`, `hasher: ContentHasher`, or `yaml: YamlSerializer`; never reconstruct fs wiring inline.\n\n## Constraints\n\n- Never modify repositories.\n- Depend on `ListWorkspaces` for project traversal.\n- Title requires no redundant I/O.\n- Summary materialization occurs only inside repository/index boundary when requested; stale optimized values prohibited.\n- Metadata freshness projection/filtering prohibited.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:ebd7ab272ce2b64d5af1672654e9cb6bdcd9cd20df69787baf2fd3696cbe627e",
+          "lastModified": "2026-08-17T09:55:42.127Z"
+        },
+        "verify.md": {
+          "hash": "sha256:2c89e75acdf05980eb82037b23439133dd62c87337f3b92ca749e5cdb25cb632",
+          "lastModified": "2026-08-17T09:55:42.127Z"
+        }
+      }
+    }
+  }
 }

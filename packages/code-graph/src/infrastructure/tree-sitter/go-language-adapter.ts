@@ -188,6 +188,49 @@ export class GoLanguageAdapter implements LanguageAdapter {
   }
 
   /**
+   * Returns language-specific reserved keywords and built-in type names for Go.
+   * @returns Array of reserved keyword strings.
+   */
+  keywords(): string[] {
+    return [
+      'func',
+      'package',
+      'import',
+      'type',
+      'struct',
+      'interface',
+      'return',
+      'if',
+      'else',
+      'for',
+      'range',
+      'switch',
+      'case',
+      'default',
+      'select',
+      'chan',
+      'go',
+      'goto',
+      'defer',
+      'fallthrough',
+      'break',
+      'continue',
+      'var',
+      'const',
+      'map',
+      'nil',
+      'true',
+      'false',
+      'bool',
+      'string',
+      'int',
+      'int64',
+      'byte',
+      'error',
+    ]
+  }
+
+  /**
    * Analyzes a single file and extracts its symbols, imports, binding/call facts,
    * namespace, and any optional parser-specific state.
    * @param filePath - The path of the file to analyze.

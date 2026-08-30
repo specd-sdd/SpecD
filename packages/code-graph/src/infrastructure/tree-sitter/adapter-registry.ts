@@ -74,4 +74,28 @@ export class AdapterRegistry implements AdapterRegistryPort {
   getAdapters(): LanguageAdapter[] {
     return [...new Set(this.adapters.values())]
   }
+
+  /**
+   * Returns all file extensions registered across adapters.
+   * @returns An array of unique file extension strings (e.g. ['.ts', '.py', '.go']).
+   */
+  getSupportedExtensions(): string[] {
+    return [...this.extMap.keys()]
+  }
+
+  /**
+   * Returns all reserved keywords and built-in type names aggregated across registered adapters.
+   * @returns Set of unique keyword strings.
+   */
+  getReservedKeywords(): Set<string> {
+    const keywords = new Set<string>()
+    for (const adapter of this.getAdapters()) {
+      if (typeof adapter.keywords === 'function') {
+        for (const kw of adapter.keywords()) {
+          keywords.add(kw)
+        }
+      }
+    }
+    return keywords
+  }
 }

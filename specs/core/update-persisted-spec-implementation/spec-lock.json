@@ -11,5 +11,41 @@
     "core:workspace",
     "core:initialize-persisted-spec-state"
   ],
-  "implementation": []
+  "implementation": [],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Use case adding/enriching/removing persisted implementation links on canonical workspace:path identities with file and boundary checks.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:3105bed729dd811f07b0a026969df38e53cc65a82b0c824cc58e6d99d76a87bd",
+          "lastModified": "2026-08-17T09:55:42.152Z"
+        },
+        "verify.md": {
+          "hash": "sha256:fdfa225314486b370242438df664ed27635e1a9d51bfc091ba9f4e98a3cbe39f",
+          "lastModified": "2026-08-17T09:55:42.152Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# UpdatePersistedSpecImplementation\n\nCanonical-spec counterpart of change-time implementation tracking; mutates canonical persisted lock state only.\n\n## Rules\n\n- `execute` input `UpdatePersistedSpecImplementationInput`: specId (required), action (required, add|remove), file (required, project-relative to specId workspace codeRoot), symbols? (readonly string[], symbol refinements).\n- Add requires target file exist on disk under specId workspace codeRoot; else throw ImplementationFileNotFoundError, no mutation.\n- Before mutation normalize file → canonical workspace:path identity per core:spec-lock: forward-slash normalized, relative to specId workspace codeRoot, using core:workspace lookup + core:storage path resolution. Out-of-codeRoot resolution → ImplementationWorkspaceBoundaryError; never silently coerce/drop out-of-boundary path.\n- Add creates or enriches confirmed link for normalized file identity. With symbols: add to link symbol set without discarding previously recorded symbols for that file. Without symbols: ensure file-level entry exists (no `symbols` field) without altering existing symbol-level entries.\n- Remove with symbols: remove only those symbol names from link symbol set; MAY drop entry entirely when remaining set empty and no separate explicit file-level link recorded. Remove without symbols: remove whole implementation entry incl. symbol-level refinements.\n- Add against missing persisted state: resolve initial base via same resolveInitialPersistedDependsOn() service used by core:initialize-persisted-spec-state, implementation defaults [], then apply addition.\n- Remove against missing state: no-op — MUST NOT create persisted state; return result with implementation [] and created false, never call writePersistedState.\n- Apply mutation through shared pure applyPersistedSpecStatePatch(): compute resulting implementation array as patch, pass complete resulting PersistedSpecState to SpecRepository.writePersistedState() with expectedRevision = observed originalHash (null when state was absent).\n- Repository revision mismatch at write time → propagate ArtifactConflictError; never retry or silently rebase.\n- Spec identity unresolvable to existing spec artifact set in its workspace → throw SpecNotFoundError.\n- Success returns UpdatePersistedSpecImplementationResult: specId (fully-qualified), implementation (resulting link list), created (true only when state newly created by this call).\n- Config factory createUpdatePersistedSpecImplementation(config, options?) derives deps via resolveUpdatePersistedSpecImplementationDeps(resolver) then delegates to canonical createUpdatePersistedSpecImplementation(deps). Resolver provides: specs ReadonlyMap<string, SpecRepository> (one per workspace), workspaces config lookup (codeRoot resolution), files FileReader (existence checks), initializePersistedSpecState collaborator (for resolveInitialPersistedDependsOn on add creation path). Helper is the only use-case-specific composition entry; factory MUST NOT reconstruct fs-shaped wiring inline.\n\n## Constraints\n\n- Never mutates change draft trackedImplementationFiles or in-progress confirmed links — canonical persisted lock state only\n- readOnly workspace ownership rejects write with ReadOnlyWorkspaceError before any persisted-state I/O\n- Normalization + symbol-refinement rules mirror change tracking but always operate/store canonical workspace:path identity, never raw project-relative paths in storage",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:3105bed729dd811f07b0a026969df38e53cc65a82b0c824cc58e6d99d76a87bd",
+          "lastModified": "2026-08-17T09:55:42.152Z"
+        },
+        "verify.md": {
+          "hash": "sha256:fdfa225314486b370242438df664ed27635e1a9d51bfc091ba9f4e98a3cbe39f",
+          "lastModified": "2026-08-17T09:55:42.152Z"
+        }
+      }
+    }
+  }
 }

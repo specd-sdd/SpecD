@@ -12,19 +12,18 @@
 
 ### Requirement: Layer structure
 
-#### Scenario: SDK source tree keeps infrastructure out and domain narrow
+#### Scenario: SDK separates application behaviour from infrastructure composition
 
 - **WHEN** listing `packages/sdk/src/`
-- **THEN** `composition/`, `orchestration/`, `presentation/`, `shared/`, and a
-  narrow `domain/` for SDK-specific error/value contracts may exist
-- **AND** no `infrastructure/` directory exists
-- **AND** `domain/` contains no entities, ports, or infrastructure adapters
+- **THEN** `application/use-cases/`, `infrastructure/`, `composition/`, `orchestration/`, `presentation/`, and `shared/` are permitted SDK layers
+- **AND** each suggestion use case resides in its own `application/use-cases/` file
 
-#### Scenario: Internal shared directory has no package subpath
+#### Scenario: Application use cases do not import SDK infrastructure
 
-- **WHEN** inspecting SDK package exports and its curated root barrel
-- **THEN** `src/shared/` has no public package subpath
-- **AND** explicitly curated root exports may reference named shared bindings
+- **GIVEN** the suggestion application use-case modules
+- **WHEN** their imports are inspected
+- **THEN** they do not import `node:fs`, concrete SDK infrastructure, or config-path conventions
+- **AND** concrete SDK infrastructure is assembled only by composition
 
 ### Requirement: Public barrel exports
 
@@ -133,3 +132,26 @@
 - **WHEN** a delivery host imports implementation review and reference result types
 - **THEN** all are available from `@specd/sdk`
 - **AND** the host needs no direct Core plus Code Graph composition
+
+### Requirement: Suggestion use-case composition
+
+#### Scenario: Config facade resolves concrete dependencies in composition
+
+- **GIVEN** a resolved `SpecdConfig`
+- **WHEN** either suggestion config facade is called
+- **THEN** composition constructs its concrete cache and other dependencies
+- **AND** delegates to the canonical application `createX(deps)` factory
+
+#### Scenario: Application use cases have no filesystem imports
+
+- **GIVEN** the suggestion application use-case modules, each in its own file
+- **WHEN** their dependency graph is inspected
+- **THEN** they contain no imports of `node:fs`, filesystem adapters, filesystem caches, or config-path conventions
+- **AND** only composition imports the concrete SDK infrastructure needed to assemble them
+
+#### Scenario: Root API does not expose concrete filesystem caches
+
+- **GIVEN** the `@specd/sdk` root entrypoint
+- **WHEN** its public bindings are inspected
+- **THEN** `FsImplementationSuggestionCache` and `FsSpecDepsSuggestionCache` are not exported
+- **AND** curated use cases, ports, models, and composition factories remain available

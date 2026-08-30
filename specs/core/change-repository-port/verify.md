@@ -563,3 +563,19 @@
 - **WHEN** `ChangeRepository` is declared
 - **THEN** it is an abstract class with abstract methods for get, list, create, mutate, mutateDraft, and saveArtifact
 - **AND** public `save` is not part of the application-facing abstract surface
+
+### Requirement: Optional exploration metadata and lazy content access
+
+#### Scenario: Get exposes metadata without reading content
+
+- **GIVEN** a persisted change with exploration content
+- **WHEN** `ChangeRepository.get(name)` is called
+- **THEN** the returned change exposes `explorationMeta` with `lastModified` and `size`
+- **AND** exploration content is not loaded or returned
+
+#### Scenario: Exploration content is read explicitly
+
+- **GIVEN** a change whose exploration exists
+- **WHEN** `readExploration(change)` is called
+- **THEN** it returns the content
+- **AND** an absent exploration returns `null`

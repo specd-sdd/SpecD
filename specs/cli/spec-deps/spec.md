@@ -50,6 +50,36 @@ Handlers in this command group MUST NOT implement add/remove/set merge semantics
 
 `SpecNotFoundError` MUST map to exit code 1 with an `error:` message naming the unresolved spec. `ArtifactConflictError` MUST map to exit code 1 with an `error:` message indicating a concurrent modification and instructing the user to retry. `ReadOnlyWorkspaceError` MUST map to exit code 1 without suggesting a configuration workaround, per [`core:workspace`](../../core/workspace/spec.md) readOnly error-message conventions.
 
+### Requirement: Suggest subcommand
+
+`specd specs deps suggest [<spec-id>] [--spec <id>...] [--all] [--workspace <name>] [--apply] [--yes|-y] [--create-change] [--rebuild-cache]` MUST invoke `SuggestSpecDependencies` in `@specd/sdk`.
+
+When `--apply` is passed:
+
+- In interactive text format (TTY) without `--yes`/`-y`, the CLI MUST iterate sequentially spec-by-spec across target specifications. For each specification:
+  - Any deduced dependencies already configured in `spec-lock.json` MUST be displayed informatively above the prompt with the spec ID emphasized in brackets (`[specId]`) and excluded from interactive choices.
+  - Discovered new dependencies MUST be presented via an interactive checkbox prompt (`multiselect`) unselected by default, with the target spec ID formatted as `[specId]` and clear navigation hints (`space: toggle`, `enter: confirm and next spec` or `enter: confirm` for the last/only spec, `ctrl+c: abort`).
+  - If the user aborts (`Ctrl+C`), prompt iteration halts gracefully and previously confirmed mutations remain saved.
+- When `--yes` or `-y` is provided (or in non-interactive execution / machine formats `json` and `toon`), all discovered dependency suggestions MUST be applied automatically without interactive prompts.
+- Mutating `spec-lock.json` MUST delegate additive mutation to `UpdatePersistedSpecDeps`.
+
+In interactive text format, execution MUST be framed with unified Clack components:
+
+- Session start MUST display `SpecD — Suggest spec dependencies`.
+- Cache warming and discovery phases MUST show progress using inline spinners.
+- Text summary output MUST be formatted inside a bordered note with long lines wrapped preserving hierarchical indentation and continuation ellipsis markers (`...`), and closed with an outro summary.
+- The target specification identifier MUST be enclosed in brackets and bolded in prompt headers and result output.
+
+When `--apply` is passed and post-apply validation detects invalid specs:
+
+- If `--create-change` is passed, the SDK use case MUST create a single alignment change gathering ALL invalid specs and supply its exploration content through `CreateChange`.
+- If `--create-change` is NOT passed, the CLI MUST log a suggested alignment command for the user to run manually.
+- Machine-readable formats (`json` and `toon`) MUST NEVER prompt or block stdin.
+
+### Requirement: Suggest structured-output help schema
+
+The `suggest` leaf command MUST register JSON and TOON help examples and response-shape documentation using the shared structured-output help mechanism required by `cli:entrypoint`. Help for `--format json` and `--format toon` MUST describe the actual dependency-suggestion and post-apply validation result shape and MUST remain available without executing the command.
+
 ## Constraints
 
 - These commands never read or write `spec-lock.json` directly — every operation flows through `Kernel.specs.getPersistedDeps` / `Kernel.specs.updatePersistedDeps`
@@ -61,3 +91,4 @@ Handlers in this command group MUST NOT implement add/remove/set merge semantics
 - [`core:get-persisted-spec-deps`](../../core/get-persisted-spec-deps/spec.md) — read-only persisted dependency query
 - [`core:update-persisted-spec-deps`](../../core/update-persisted-spec-deps/spec.md) — persisted dependency mutation semantics
 - [`cli:entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
+- [`sdk:suggest-spec-dependencies`](../../sdk/suggest-spec-dependencies/spec.md) — orchestration use case for inferring spec dependencies

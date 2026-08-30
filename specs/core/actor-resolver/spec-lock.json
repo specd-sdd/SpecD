@@ -3,7 +3,11 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": ["core:actor-provider", "core:actor-resolver-privacy", "core:composition"],
+  "dependsOn": [
+    "core:actor-provider",
+    "core:actor-resolver-privacy",
+    "core:composition"
+  ],
   "implementation": [
     {
       "file": "core:src/composition/actor-resolver.ts",

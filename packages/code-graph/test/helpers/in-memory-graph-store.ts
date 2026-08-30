@@ -734,6 +734,11 @@ export class InMemoryGraphStore extends GraphStore {
       results = results.filter((s) => paths.has(s.filePath))
     }
 
+    if (query.workspace !== undefined) {
+      const prefix = query.workspace + ':'
+      results = results.filter((s) => s.filePath.startsWith(prefix))
+    }
+
     if (query.parentSymbolId !== undefined) {
       results = results.filter((s) => s.parentId === query.parentSymbolId)
     }

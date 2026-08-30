@@ -1,0 +1,11 @@
+- op: added
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    ### Requirement: Symbol Query Workspace Scope
+
+    `SymbolQuery` SHALL include an optional `workspace?: string` property.
+
+    When `workspace` is specified in `SymbolQuery`, `GraphStore.findSymbols(query)` MUST scope returned `SymbolNode` results directly to symbols whose file path begins with the exact, case-sensitive prefix `'<workspace>:'`, using a parameterized prefix comparison in which `%` and `_` are matched as literal characters (`s.filePath STARTS WITH '<workspace>:'`).

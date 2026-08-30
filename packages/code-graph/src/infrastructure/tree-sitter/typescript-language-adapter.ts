@@ -336,6 +336,81 @@ export class TypeScriptLanguageAdapter implements LanguageAdapter {
   }
 
   /**
+   * Returns language-specific reserved keywords and built-in type names for TypeScript/JavaScript.
+   * @returns Array of reserved keyword strings.
+   */
+  keywords(): string[] {
+    return [
+      'import',
+      'export',
+      'class',
+      'interface',
+      'type',
+      'async',
+      'function',
+      'const',
+      'let',
+      'var',
+      'readonly',
+      'string',
+      'boolean',
+      'number',
+      'any',
+      'Promise',
+      'void',
+      'return',
+      'null',
+      'undefined',
+      'true',
+      'false',
+      'if',
+      'else',
+      'from',
+      'of',
+      'in',
+      'new',
+      'this',
+      'super',
+      'extends',
+      'implements',
+      'as',
+      'is',
+      'case',
+      'catch',
+      'try',
+      'finally',
+      'switch',
+      'default',
+      'break',
+      'continue',
+      'do',
+      'while',
+      'for',
+      'yield',
+      'await',
+      'throw',
+      'typeof',
+      'instanceof',
+      'delete',
+      'debugger',
+      'with',
+      'package',
+      'private',
+      'protected',
+      'public',
+      'static',
+      'enum',
+      'namespace',
+      'constructor',
+      'never',
+      'unknown',
+      'symbol',
+      'bigint',
+      'object',
+    ]
+  }
+
+  /**
    * Analyzes a TypeScript file.
    * @param filePath - File path.
    * @param content - File content.

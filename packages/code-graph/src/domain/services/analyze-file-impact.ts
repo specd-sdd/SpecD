@@ -162,7 +162,7 @@ export async function analyzeFileImpactDetails(
  * @param maxDepth - Maximum BFS depth.
  * @returns An impact result based on file-level import relationships.
  */
-async function analyzeFileImportImpact(
+export async function analyzeFileImportImpact(
   store: GraphStore,
   filePath: string,
   direction: 'upstream' | 'downstream' | 'both',

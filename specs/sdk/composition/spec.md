@@ -12,18 +12,17 @@ The `@specd/sdk` package SHALL live at `packages/sdk/` in the monorepo with work
 
 ### Requirement: Layer structure
 
-The SDK source tree MAY contain `src/composition/`, `src/orchestration/`,
-`src/presentation/`, `src/shared/`, and `src/domain/`. `src/domain/` is limited to
-SDK-specific error and value contracts and MUST NOT introduce entities, ports, or
-infrastructure adapters.
+`@specd/sdk` SHALL follow hexagonal boundaries from `default:_global/architecture`:
 
-`src/shared/` is an internal implementation directory and MUST NOT have a public
-package subpath. The curated root barrel MAY explicitly re-export a named binding
-implemented in `src/shared/` when that binding is listed in the public-barrel
-requirement; this does not make the directory itself public.
+- `src/application/use-cases/` — dependency-injected cross-package application behaviour
+- `src/infrastructure/` — concrete SDK adapters, including filesystem-backed caches
+- `src/composition/` — host bootstrap, graph lifecycle, and construction of concrete dependencies for application use cases
+- `src/orchestration/` — existing host-facing cross-package workflows that do not own SDK filesystem adapter construction
+- `src/presentation/` — pure agent-facing formatters over structured Core results
+- `src/shared/` — internal cross-cutting helpers not exported from the public barrel
+- `src/index.ts` — curated public barrel only
 
-Package `exports["."]` SHALL publish `./dist/index.js` and `./dist/index.d.ts`,
-generated from the logical source barrel `src/index.ts`.
+Application use cases MUST depend on ports and MUST NOT import `node:fs`, concrete SDK infrastructure, or configuration-path conventions. Only composition MAY import SDK infrastructure to assemble concrete dependencies. Infrastructure adapters MUST remain internal to the root barrel; presentation helpers MUST remain pure.
 
 ### Requirement: Public barrel exports
 
@@ -90,6 +89,16 @@ The SDK public barrel SHALL export `buildImplementationReview` and its input/res
 
 CLI and other hosts using implementation review MUST import this orchestration through `@specd/sdk`; they MUST NOT compose Core and Code Graph independently.
 
+### Requirement: Suggestion use-case composition
+
+`@specd/sdk` MUST follow the global hexagonal topology: domain models and ports at the center, application use cases depending on ports, infrastructure implementing those ports, composition assembling concrete dependencies, and presentation/shared modules where needed. Orchestration is behaviour performed by application use cases; it is not a layer synonymous with composition.
+
+Config-based construction for `SuggestImplementationLinks` and `SuggestSpecDependencies` MUST live under `src/composition/`. Composition MAY import SDK infrastructure and construct concrete filesystem adapters and caches, including `FsImplementationSuggestionCache` and `FsSpecDepsSuggestionCache`, and SHALL resolve every dependency required by the canonical dependency-injected application factories.
+
+The public SDK MAY preserve `createSuggestImplementationLinks(config, options?)` and `createSuggestSpecDependencies(config, options?)` facades, but each config form MUST delegate through composition and then call the corresponding canonical `createX(deps)` factory. Each application use case MUST live in its own file under `src/application/use-cases/`, receive resolved dependencies, and MUST NOT instantiate filesystem adapters, inspect config paths, or import `node:fs`.
+
+The SDK root entrypoint MUST expose a curated host API and MUST NOT export concrete filesystem cache adapters. Infrastructure implementations MAY be exported only from explicit infrastructure subpath entrypoints when such access is intentionally supported.
+
 ## Spec Dependencies
 
 - `default:_global/architecture` — SDK layering
@@ -98,5 +107,6 @@ CLI and other hosts using implementation review MUST import this orchestration t
 - `cli:host-context` — host consumer
 - `sdk:context-markdown` — presentation helpers
 - `sdk:build-implementation-review` — shared review orchestration
-- `code-graph:isolated-index-worker` — isolated graph-index execution re-exported
-  to delivery hosts
+- `code-graph:isolated-index-worker` — isolated graph-index execution re-exported to delivery hosts
+- `sdk:suggest-implementation-links` — dependency-injected implementation suggestion orchestration
+- `sdk:suggest-spec-dependencies` — dependency-injected spec dependency orchestration

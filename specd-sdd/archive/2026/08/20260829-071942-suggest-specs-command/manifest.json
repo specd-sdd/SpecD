@@ -1,0 +1,2487 @@
+{
+  "name": "suggest-specs-command",
+  "createdAt": "2026-08-29T07:19:42.110Z",
+  "updatedAt": "2026-08-29T22:53:28.367Z",
+  "description": "Add specs suggest command with brownfield discovery, gap analysis, and shared dependency inference",
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "specIds": [
+    "sdk:suggest-specs",
+    "cli:spec-suggest",
+    "sdk:suggest-implementation-links",
+    "sdk:suggest-spec-dependencies"
+  ],
+  "specDependsOn": {
+    "sdk:suggest-implementation-links": [
+      "code-graph:symbol-model",
+      "code-graph:traversal",
+      "code-graph:language-adapter",
+      "core:get-persisted-spec-implementation",
+      "core:update-persisted-spec-implementation"
+    ],
+    "sdk:suggest-spec-dependencies": [
+      "sdk:suggest-implementation-links",
+      "code-graph:traversal",
+      "core:get-persisted-spec-deps",
+      "core:update-persisted-spec-deps",
+      "core:create-change"
+    ],
+    "cli:spec-suggest": ["sdk:suggest-specs"],
+    "sdk:suggest-specs": ["sdk:suggest-implementation-links", "sdk:suggest-spec-dependencies"]
+  },
+  "invalidationPolicy": "downstream",
+  "implementationTrackingStartedAt": "2026-08-29T07:40:10.946Z",
+  "trackedImplementationFiles": [
+    {
+      "file": "dev/scripts/suggest-brownfield-specs.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/domain/value-objects/candidate-spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/domain/services/transitive-reduction-engine.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/domain/services/spec-symbol-classifier.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/domain/services/capability-clustering-engine.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/domain/services/confidence-scorer.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/domain/services/dependency-inference-engine.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/test/domain/services/transitive-reduction-engine.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/test/domain/services/spec-symbol-classifier.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/test/domain/services/capability-clustering-engine.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/test/domain/services/confidence-scorer.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/application/use-cases/suggest-specs.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/composition/suggest-specs.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/application/use-cases/suggest-implementation-links.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/application/use-cases/suggest-spec-dependencies.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/test/application/use-cases/suggest-specs.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/spec/suggest.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/spec-suggest.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/README.md",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/README.md",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/composition/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/cli/cli-reference.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/cli/spec-suggest.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/cli/spec-deps.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/cli/spec-implementation.md",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/infrastructure/fs/fs-implementation-suggestion-cache.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/spec/deps.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/spec/implementation.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/handle-error.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/application/ports/implementation-suggestion-cache-port.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/application/ports/spec-deps-suggestion-cache-port.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/domain/errors/cache-lock-error.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/domain/errors/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/infrastructure/fs/fs-spec-deps-suggestion-cache.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/infrastructure/fs/write-json-atomic.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/test/infrastructure/fs/fs-suggestion-cache.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/test/barrel.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": ".changeset/20260826-cli-specs-list-count-specd.md",
+      "state": "resolved"
+    },
+    {
+      "file": ".changeset/20260826-cli-specs-list-count.md",
+      "state": "resolved"
+    },
+    {
+      "file": ".changeset/20260826-prevent-orphan-spec-locks-specd.md",
+      "state": "resolved"
+    },
+    {
+      "file": ".changeset/20260826-prevent-orphan-spec-locks.md",
+      "state": "resolved"
+    },
+    {
+      "file": ".changeset/20260826-start-implementation-tracking-specd.md",
+      "state": "resolved"
+    },
+    {
+      "file": ".changeset/20260826-start-implementation-tracking.md",
+      "state": "resolved"
+    },
+    {
+      "file": ".changeset/20260827-repair-code-graph-coverage-indexing-specd.md",
+      "state": "resolved"
+    },
+    {
+      "file": ".changeset/20260827-repair-code-graph-coverage-indexing.md",
+      "state": "resolved"
+    },
+    {
+      "file": ".changeset/20260827-schema-compat-specd.md",
+      "state": "resolved"
+    },
+    {
+      "file": ".changeset/20260827-schema-compat.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/code-graph/index.md",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/change/implementation.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/graph/index-graph.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/schema/show.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/spec/list.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/change-implementation.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/graph-index.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/spec-list.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/services/project-spec-coverage.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/use-cases/get-graph-health.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/application/use-cases/index-code-graph.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/ports/graph-store.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/value-objects/index-result.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/domain/value-objects/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/infrastructure/sqlite/sqlite-graph-database.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/src/public.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/services/project-spec-coverage.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/get-graph-health.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/index-project-graph-integration.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/application/use-cases/index-project-graph.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/domain/ports/graph-store.contract.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/helpers/in-memory-graph-store.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/helpers/make-mock-spec-repository.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/integration/sqlite-wide-traversal.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/archive-change.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/edit-change.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/generate-spec-metadata.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/initialize-persisted-spec-state.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/refresh-implementation-tracking.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/resolve-extends-chain.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/transition-change.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/update-implementation-tracking.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/edit-change.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/refresh-implementation-tracking.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/update-implementation-tracking.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/entities/change.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/services/build-schema.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/services/merge-schema-layers.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/value-objects/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/domain/value-objects/schema.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/infrastructure/fs/change-repository.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/infrastructure/fs/manifest.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/infrastructure/fs/spec-repository.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/infrastructure/schema-yaml-parser.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/infrastructure/vcs/vcs-implementation-detector.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/public.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/archive-change.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/edit-change.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/helpers.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/refresh-implementation-tracking.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/resolve-schema.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/transition-change.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/update-implementation-tracking.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/domain/entities/change.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/domain/services/build-schema.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/infrastructure/fs/change-repository.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/infrastructure/fs/spec-repository.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/infrastructure/schema-yaml-parser.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "specd.yaml",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/cli/change-implementation/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/cli/change-implementation/spec.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/cli/change-implementation/verify.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/cli/graph-index/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/cli/graph-index/spec.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/cli/graph-index/verify.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/cli/schema-show/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/cli/schema-show/spec.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/cli/schema-show/verify.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/cli/spec-list/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/cli/spec-list/spec.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/cli/spec-list/verify.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/code-graph/composition/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/code-graph/get-graph-health/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/code-graph/get-graph-health/spec.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/code-graph/get-graph-health/verify.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/code-graph/graph-store/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/code-graph/graph-store/spec.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/code-graph/graph-store/verify.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/code-graph/index-project-graph/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/code-graph/indexer/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/code-graph/indexer/spec.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/code-graph/indexer/verify.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/code-graph/isolated-index-worker/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/code-graph/sqlite-graph-store/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/code-graph/sqlite-graph-store/spec.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/code-graph/sqlite-graph-store/verify.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/actor-provider/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/actor-resolver/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/archive-change/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/archive-change/spec.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/archive-change/verify.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/archive-list-entry/spec-lock.json",
+      "state": "removed"
+    },
+    {
+      "file": "specs/core/change-manifest/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/change-manifest/spec.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/change-manifest/verify.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/change/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/change/spec.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/change/verify.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/core/change-repository/spec-lock.json",
+      "state": "removed"
+    },
+    {
+      "file": "specs/core/edit-change/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/edit-change/spec.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/edit-change/verify.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/fs-spec-repository/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/fs-spec-repository/spec.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/fs-spec-repository/verify.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/generate-metadata/spec.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/generate-metadata/verify.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/initialize-persisted-spec-state/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/initialize-persisted-spec-state/spec.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/initialize-persisted-spec-state/verify.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/refresh-implementation-tracking/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/refresh-implementation-tracking/spec.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/refresh-implementation-tracking/verify.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/resolve-schema/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/resolve-schema/spec.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/resolve-schema/verify.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/schema-format/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/schema-format/spec.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/schema-format/verify.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/schema-merge/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/schema-merge/spec.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/schema-merge/verify.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/spec-lock/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/spec-lock/spec.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/spec-lock/verify.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/transition-change/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/transition-change/spec.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/transition-change/verify.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/update-implementation-tracking/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/update-implementation-tracking/spec.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/update-implementation-tracking/verify.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/sdk/composition/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/sdk/with-open-graph-provider/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": ".changeset/20260827-fasttrack-context-resolution-specd.md",
+      "state": "resolved"
+    },
+    {
+      "file": ".changeset/20260827-fasttrack-context-resolution.md",
+      "state": "resolved"
+    },
+    {
+      "file": ".changeset/20260827-package-fasttrack-skill-specd.md",
+      "state": "resolved"
+    },
+    {
+      "file": ".changeset/20260827-package-fasttrack-skill.md",
+      "state": "resolved"
+    },
+    {
+      "file": ".changeset/20260827-project-context-specs-specd.md",
+      "state": "resolved"
+    },
+    {
+      "file": ".changeset/20260827-project-context-specs.md",
+      "state": "resolved"
+    },
+    {
+      "file": ".changeset/20260828-init-schema-std-and-metapackage-specs-specd.md",
+      "state": "resolved"
+    },
+    {
+      "file": ".changeset/20260828-init-schema-std-and-metapackage-specs.md",
+      "state": "resolved"
+    },
+    {
+      "file": ".changeset/20260828-refine-fasttrack-skill-template-specd.md",
+      "state": "resolved"
+    },
+    {
+      "file": ".changeset/20260828-refine-fasttrack-skill-template.md",
+      "state": "resolved"
+    },
+    {
+      "file": ".changeset/20260828-stabilize-isolated-index-worker-specd.md",
+      "state": "resolved"
+    },
+    {
+      "file": ".changeset/20260828-stabilize-isolated-index-worker.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/cli/project-context-specs.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/core/use-cases.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/guide/_sections/getting-started/context-compilation.md",
+      "state": "resolved"
+    },
+    {
+      "file": "docs/sdk/index.md",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/commands/project/context-specs.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/helpers.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/commands/project-context-specs.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/package.json",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/fixtures/isolated-index-worker/built-napi-teardown-task.mjs",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/code-graph/test/infrastructure/isolated-index-worker/dist.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/_shared/resolve-configured-context-specs.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/compile-context.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/get-project-context.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/application/use-cases/resolve-context-specs.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/kernel.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/src/composition/use-cases/resolve-context-specs.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/configured-context-parity.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/get-project-context.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/resolve-configured-context-specs.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/application/use-cases/resolve-context-specs.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/core/test/barrel-kernel-coverage.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-claude/src/domain/frontmatter/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-claude/test/install-skills.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-codex/src/domain/frontmatter/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-codex/test/install-skills.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-copilot/src/domain/frontmatter/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-copilot/test/install-skills.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-opencode/src/domain/frontmatter/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-opencode/test/install-skills.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-standard/src/domain/frontmatter/index.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/plugin-agent-standard/test/install-skills.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/schema-std/schema.yaml",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/schema-std/templates/design.md",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/schema-std/templates/proposal.md",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/sdk/src/core-reexports.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/skills/templates/skills/specd-fasttrack/SKILL.md.tpl",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/skills/templates/skills/specd-fasttrack/skill.meta.json",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/skills/test/infrastructure/skill-repository.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/skills/test/template-workflow.spec.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "pnpm-lock.yaml",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/cli/project-context-specs/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/cli/project-context-specs/spec.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/cli/project-context-specs/verify.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/code-graph/isolated-index-worker/verify.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/compile-context/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/compile-context/spec.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/compile-context/verify.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/get-project-context/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/get-project-context/spec.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/get-project-context/verify.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/resolve-context-specs/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/resolve-context-specs/spec.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/core/resolve-context-specs/verify.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/plugins-agent-standard/plugin-agent/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/plugins-agent-standard/plugin-agent/spec.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/plugins-agent-standard/plugin-agent/verify.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/plugins-claude/plugin-agent/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/plugins-claude/plugin-agent/spec.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/plugins-claude/plugin-agent/verify.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/plugins-codex/plugin-agent/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/plugins-codex/plugin-agent/spec.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/plugins-codex/plugin-agent/verify.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/plugins-copilot/plugin-agent/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/plugins-copilot/plugin-agent/spec.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/plugins-copilot/plugin-agent/verify.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/plugins-opencode/plugin-agent/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/plugins-opencode/plugin-agent/spec.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/plugins-opencode/plugin-agent/verify.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/schema-std/standard-schema/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/schema-std/standard-schema/spec.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/schema-std/standard-schema/verify.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/schema-std/templates/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/schema-std/templates/spec.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/schema-std/templates/verify.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/sdk/composition/spec.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/skills/resolve-bundle/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/skills/resolve-bundle/spec.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/skills/resolve-bundle/verify.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/skills/skill-repository/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/skills/skill-repository/spec.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/skills/skill-repository/verify.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/skills/skill-templates-source/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/skills/skill-templates-source/spec.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/skills/skill-templates-source/verify.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/specd/metapackage/spec-lock.json",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/specd/metapackage/spec.md",
+      "state": "resolved"
+    },
+    {
+      "file": "specs/specd/metapackage/verify.md",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/src/helpers/prompt-apply.ts",
+      "state": "resolved"
+    },
+    {
+      "file": "packages/cli/test/helpers/prompt-apply.spec.ts",
+      "state": "resolved"
+    }
+  ],
+  "implementationLinks": [
+    {
+      "specId": "sdk:suggest-specs",
+      "file": "packages/sdk/src/domain/value-objects/candidate-spec.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["CandidateSpec", "SuggestSpecsResult", "SpecCategory", "ConfidenceBreakdown"]
+    },
+    {
+      "specId": "sdk:suggest-specs",
+      "file": "packages/sdk/src/domain/services/transitive-reduction-engine.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["TransitiveReductionEngine"]
+    },
+    {
+      "specId": "sdk:suggest-spec-dependencies",
+      "file": "packages/sdk/src/domain/services/transitive-reduction-engine.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["TransitiveReductionEngine"]
+    },
+    {
+      "specId": "sdk:suggest-specs",
+      "file": "packages/sdk/src/domain/services/spec-symbol-classifier.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["SpecSymbolClassifier"]
+    },
+    {
+      "specId": "sdk:suggest-implementation-links",
+      "file": "packages/sdk/src/domain/services/spec-symbol-classifier.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["SpecSymbolClassifier"]
+    },
+    {
+      "specId": "sdk:suggest-specs",
+      "file": "packages/sdk/src/domain/services/capability-clustering-engine.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["CapabilityClusteringEngine"]
+    },
+    {
+      "specId": "sdk:suggest-specs",
+      "file": "packages/sdk/src/domain/services/confidence-scorer.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["ConfidenceScorer"]
+    },
+    {
+      "specId": "sdk:suggest-specs",
+      "file": "packages/sdk/src/domain/services/dependency-inference-engine.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["DependencyInferenceEngine"]
+    },
+    {
+      "specId": "sdk:suggest-specs",
+      "file": "packages/sdk/test/domain/services/transitive-reduction-engine.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "sdk:suggest-specs",
+      "file": "packages/sdk/test/domain/services/spec-symbol-classifier.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "sdk:suggest-specs",
+      "file": "packages/sdk/test/domain/services/capability-clustering-engine.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "sdk:suggest-specs",
+      "file": "packages/sdk/test/domain/services/confidence-scorer.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "sdk:suggest-specs",
+      "file": "packages/sdk/src/application/use-cases/suggest-specs.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["SuggestSpecs", "suggestSpecsInputSchema"]
+    },
+    {
+      "specId": "sdk:suggest-specs",
+      "file": "packages/sdk/src/composition/suggest-specs.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["createSuggestSpecs", "resolveSuggestSpecsDeps", "openSuggestSpecs"]
+    },
+    {
+      "specId": "sdk:suggest-implementation-links",
+      "file": "packages/sdk/src/application/use-cases/suggest-implementation-links.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["SuggestImplementationLinks"]
+    },
+    {
+      "specId": "sdk:suggest-spec-dependencies",
+      "file": "packages/sdk/src/application/use-cases/suggest-spec-dependencies.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["SuggestSpecDependencies"]
+    },
+    {
+      "specId": "sdk:suggest-specs",
+      "file": "packages/sdk/src/index.ts",
+      "fileLinkExplicit": false,
+      "symbols": [
+        "SuggestSpecs",
+        "openSuggestSpecs",
+        "createSuggestSpecs",
+        "TransitiveReductionEngine",
+        "SpecSymbolClassifier",
+        "CapabilityClusteringEngine",
+        "ConfidenceScorer",
+        "DependencyInferenceEngine"
+      ]
+    },
+    {
+      "specId": "sdk:suggest-specs",
+      "file": "packages/sdk/test/application/use-cases/suggest-specs.spec.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:spec-suggest",
+      "file": "packages/cli/src/commands/spec/suggest.ts",
+      "fileLinkExplicit": false,
+      "symbols": ["registerSpecSuggest"]
+    },
+    {
+      "specId": "cli:spec-suggest",
+      "file": "packages/cli/src/index.ts",
+      "fileLinkExplicit": true
+    },
+    {
+      "specId": "cli:spec-suggest",
+      "file": "packages/cli/test/commands/spec-suggest.spec.ts",
+      "fileLinkExplicit": true
+    }
+  ],
+  "artifacts": [
+    {
+      "type": "proposal",
+      "optional": false,
+      "requires": [],
+      "state": "complete",
+      "files": [
+        {
+          "key": "proposal",
+          "filename": "proposal.md",
+          "state": "complete",
+          "validatedHash": "sha256:b9aaa1eaea8b99e70fb7b36e719219ce1a4b21cd63abd1b6d135769db12c043d"
+        }
+      ]
+    },
+    {
+      "type": "specs",
+      "optional": false,
+      "requires": ["proposal"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "sdk:suggest-specs",
+          "filename": "specs/sdk/suggest-specs/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:ee64a8aa691893b0ce298b5aa4793fadc0e979f1aa02b70443c73b5b206677ee"
+        },
+        {
+          "key": "cli:spec-suggest",
+          "filename": "specs/cli/spec-suggest/spec.md",
+          "state": "complete",
+          "validatedHash": "sha256:71bb505ca50cc924c2f24444d6a4f9add2672f05e45b268fc30e41b8f1846d7f"
+        },
+        {
+          "key": "sdk:suggest-implementation-links",
+          "filename": "deltas/sdk/suggest-implementation-links/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:c3966be1ebef457203715063c29a24fd0088a8c3a1ebc2ff2a3ea5cdddfd9b48"
+        },
+        {
+          "key": "sdk:suggest-spec-dependencies",
+          "filename": "deltas/sdk/suggest-spec-dependencies/spec.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:c8dd1f0efc6121001f807b39c8f90424b0ec8af8572dc713f1e201d9b3dbb902"
+        }
+      ]
+    },
+    {
+      "type": "verify",
+      "optional": false,
+      "requires": ["specs"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "sdk:suggest-specs",
+          "filename": "specs/sdk/suggest-specs/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:216d08ea4aa0ec0917367f77c33c09d3cf630ac49f67201a2b4e0e5268478cba"
+        },
+        {
+          "key": "cli:spec-suggest",
+          "filename": "specs/cli/spec-suggest/verify.md",
+          "state": "complete",
+          "validatedHash": "sha256:8a3fa1681234b76b25416afd0392d94953be31c75fabfa05f213ebbc125be477"
+        },
+        {
+          "key": "sdk:suggest-implementation-links",
+          "filename": "deltas/sdk/suggest-implementation-links/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:28ed9ded3b1014c53cc71fb866834e4752444e1d224de3e2501d8c8d092c4bde"
+        },
+        {
+          "key": "sdk:suggest-spec-dependencies",
+          "filename": "deltas/sdk/suggest-spec-dependencies/verify.md.delta.yaml",
+          "state": "complete",
+          "validatedHash": "sha256:7225b4bdb9be2f13baf8735838d4fd0409cf1b4c7f0a75a7cffdcc8c7a5a677d"
+        }
+      ]
+    },
+    {
+      "type": "design",
+      "optional": false,
+      "requires": ["proposal", "specs", "verify"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "design",
+          "filename": "design.md",
+          "state": "complete",
+          "validatedHash": "sha256:e3e136711af05ee2e07529747187a03edd3cf7ebaccbeace9d4871ffbdd87d48"
+        }
+      ]
+    },
+    {
+      "type": "tasks",
+      "optional": false,
+      "requires": ["specs", "design"],
+      "state": "complete",
+      "files": [
+        {
+          "key": "tasks",
+          "filename": "tasks.md",
+          "state": "complete",
+          "validatedHash": "sha256:9789c9ad860c9db7d4cd216d6f89334059ee98c203f808fc79bd455dfc76d76d"
+        }
+      ]
+    }
+  ],
+  "history": [
+    {
+      "type": "created",
+      "at": "2026-08-29T07:19:42.110Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "specIds": [
+        "sdk:suggest-specs",
+        "cli:spec-suggest",
+        "sdk:suggest-implementation-links",
+        "sdk:suggest-spec-dependencies"
+      ],
+      "schemaName": "schema-std",
+      "schemaVersion": 1
+    },
+    {
+      "type": "artifacts-synced",
+      "at": "2026-08-29T07:19:42.126Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "typesAdded": ["proposal", "specs", "verify", "design", "tasks"],
+      "typesRemoved": [],
+      "filesAdded": [
+        {
+          "type": "proposal",
+          "key": "proposal"
+        },
+        {
+          "type": "specs",
+          "key": "sdk:suggest-specs"
+        },
+        {
+          "type": "specs",
+          "key": "cli:spec-suggest"
+        },
+        {
+          "type": "specs",
+          "key": "sdk:suggest-implementation-links"
+        },
+        {
+          "type": "specs",
+          "key": "sdk:suggest-spec-dependencies"
+        },
+        {
+          "type": "verify",
+          "key": "sdk:suggest-specs"
+        },
+        {
+          "type": "verify",
+          "key": "cli:spec-suggest"
+        },
+        {
+          "type": "verify",
+          "key": "sdk:suggest-implementation-links"
+        },
+        {
+          "type": "verify",
+          "key": "sdk:suggest-spec-dependencies"
+        },
+        {
+          "type": "design",
+          "key": "design"
+        },
+        {
+          "type": "tasks",
+          "key": "tasks"
+        }
+      ],
+      "filesRemoved": []
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-29T07:23:30.575Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "drafting",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-29T07:26:35.059Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "sdk:suggest-specs",
+            "cli:spec-suggest",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "sdk:suggest-specs",
+            "cli:spec-suggest",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-29T07:30:22.873Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "sdk:suggest-specs",
+            "cli:spec-suggest",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "sdk:suggest-specs",
+            "cli:spec-suggest",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-29T07:34:09.580Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-29T07:35:22.367Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-29T07:35:22.367Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-29T07:35:34.882Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-29T07:38:22.913Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-29T07:38:22.913Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "ready",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-29T07:38:37.079Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-29T07:40:10.946Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-29T07:48:56.949Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-29T07:48:56.949Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-29T07:49:08.229Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-29T07:49:11.166Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-29T08:46:31.465Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]; specs [cli:spec-suggest, sdk:suggest-specs]; verify [cli:spec-suggest, sdk:suggest-specs]; design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["cli:spec-suggest", "sdk:suggest-specs"]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:spec-suggest", "sdk:suggest-specs"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-29T08:46:31.465Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "from": "implementing",
+      "to": "designing"
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-29T08:46:53.681Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [cli:spec-suggest, sdk:suggest-specs]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["cli:spec-suggest", "sdk:suggest-specs"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-29T09:05:05.772Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]; specs [cli:spec-suggest, sdk:suggest-specs]; design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "specs",
+          "files": ["cli:spec-suggest", "sdk:suggest-specs"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "sdk:suggest-specs",
+            "cli:spec-suggest",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies"
+          ]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-29T09:18:08.592Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:spec-suggest, sdk:suggest-specs]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["cli:spec-suggest", "sdk:suggest-specs"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "sdk:suggest-specs",
+            "cli:spec-suggest",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-29T09:23:10.795Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]; design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "sdk:suggest-specs",
+            "cli:spec-suggest",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "sdk:suggest-specs",
+            "cli:spec-suggest",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies"
+          ]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-29T09:27:13.848Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:spec-suggest, sdk:suggest-specs]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["cli:spec-suggest", "sdk:suggest-specs"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "sdk:suggest-specs",
+            "cli:spec-suggest",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-29T09:27:22.247Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [sdk:suggest-specs]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["sdk:suggest-specs"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-29T09:32:24.327Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: proposal [proposal]; design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "proposal",
+          "files": ["proposal"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "specs",
+          "files": [
+            "sdk:suggest-specs",
+            "cli:spec-suggest",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "sdk:suggest-specs",
+            "cli:spec-suggest",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies"
+          ]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-29T09:39:06.165Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [sdk:suggest-implementation-links, sdk:suggest-spec-dependencies, sdk:suggest-specs]; verify [cli:spec-suggest, sdk:suggest-implementation-links, sdk:suggest-spec-dependencies, sdk:suggest-specs]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": [
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies",
+            "sdk:suggest-specs"
+          ]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "cli:spec-suggest",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies",
+            "sdk:suggest-specs"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-29T12:02:43.886Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [sdk:suggest-implementation-links, sdk:suggest-spec-dependencies]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["sdk:suggest-implementation-links", "sdk:suggest-spec-dependencies"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "sdk:suggest-specs",
+            "cli:spec-suggest",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-29T12:03:05.093Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [sdk:suggest-implementation-links, sdk:suggest-spec-dependencies]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["sdk:suggest-implementation-links", "sdk:suggest-spec-dependencies"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-29T12:03:29.581Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [sdk:suggest-implementation-links, sdk:suggest-spec-dependencies]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["sdk:suggest-implementation-links", "sdk:suggest-spec-dependencies"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "sdk:suggest-specs",
+            "cli:spec-suggest",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-29T13:19:37.064Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:spec-suggest, sdk:suggest-specs]; design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["cli:spec-suggest", "sdk:suggest-specs"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "sdk:suggest-specs",
+            "cli:spec-suggest",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies"
+          ]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-29T13:19:52.632Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [cli:spec-suggest, sdk:suggest-specs]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["cli:spec-suggest", "sdk:suggest-specs"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-29T14:14:35.338Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [cli:spec-suggest]; verify [cli:spec-suggest]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["cli:spec-suggest"]
+        },
+        {
+          "type": "verify",
+          "files": ["cli:spec-suggest"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-29T21:16:51.396Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-29T21:27:25.445Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-29T22:02:28.518Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: design [design]; tasks [tasks]",
+      "affectedArtifacts": [
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-29T22:03:11.659Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [sdk:suggest-implementation-links]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["sdk:suggest-implementation-links"]
+        },
+        {
+          "type": "verify",
+          "files": [
+            "sdk:suggest-specs",
+            "cli:spec-suggest",
+            "sdk:suggest-implementation-links",
+            "sdk:suggest-spec-dependencies"
+          ]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-29T22:03:19.295Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: verify [sdk:suggest-implementation-links]",
+      "affectedArtifacts": [
+        {
+          "type": "verify",
+          "files": ["sdk:suggest-implementation-links"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-29T22:32:27.761Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "artifact-drift",
+      "message": "Invalidated because validated artifacts drifted: specs [sdk:suggest-specs]; verify [sdk:suggest-specs]",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["sdk:suggest-specs"]
+        },
+        {
+          "type": "verify",
+          "files": ["sdk:suggest-specs"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-29T22:47:00.051Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "designing",
+      "to": "ready"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-29T22:47:03.749Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "ready",
+      "to": "implementing"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-29T22:48:14.330Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "implementing",
+      "to": "verifying"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-29T22:51:43.846Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "verifying",
+      "to": "done"
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-29T22:51:47.249Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "done",
+      "to": "archivable"
+    },
+    {
+      "type": "archive-failed",
+      "at": "2026-08-29T22:52:42.038Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com"
+      },
+      "step": "prepare",
+      "message": "Archive failed: implementation state invalid. Tracked implementation files remain open for change \"suggest-specs-command\". Resolve or ignore them first.",
+      "commitStarted": false
+    },
+    {
+      "type": "transitioned",
+      "at": "2026-08-29T22:53:28.366Z",
+      "by": {
+        "name": "M***a",
+        "email": "1***i@u***.com",
+        "provider": "git"
+      },
+      "from": "archivable",
+      "to": "archiving"
+    }
+  ],
+  "archivedAt": "2026-08-29T22:53:28.465Z",
+  "archivedBy": {
+    "name": "M***a",
+    "email": "1***i@u***.com",
+    "provider": "git"
+  }
+}

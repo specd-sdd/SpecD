@@ -53,7 +53,7 @@ specd change archive add-auth-flow
 | `drafts`    | Browse and restore changes that have been shelved with `change draft`.                       |
 | `discarded` | List and inspect changes that were discarded.                                                |
 | `archive`   | Browse changes that have been archived (completed work).                                     |
-| `spec`      | List, show, validate, and manage spec files.                                                 |
+| `spec`      | List, show, suggest, validate, and manage spec files (`spec suggest`).                       |
 | `project`   | Initialize and inspect the specd project (`init`, `context`, `update`, `dashboard`).         |
 | `config`    | Inspect the resolved project configuration.                                                  |
 | `schema`    | Introspect, fork, extend, and validate schemas.                                              |

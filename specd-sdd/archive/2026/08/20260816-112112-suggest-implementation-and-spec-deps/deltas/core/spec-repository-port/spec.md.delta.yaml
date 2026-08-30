@@ -1,0 +1,106 @@
+- op: modified
+  description: 'SpecArtifactEntry gains optional byte-size from the same stat observation'
+  selector:
+    type: section
+    matches: 'Requirement: get returns a Spec or null'
+  content: |
+    `get(name)` MUST accept a `SpecPath` and return the `Spec` metadata for that name within
+    this workspace, or `null` if no such spec exists. Artifact **content** MUST NOT be
+    loaded by `get`.
+
+    The returned `Spec` MUST include:
+
+    - `workspace` — workspace name bound to the repository instance
+    - `name` — `SpecPath` identity within the workspace
+    - `artifacts` — ordered list of `SpecArtifactEntry` values for schema artifacts present
+      in the spec directory. Each entry MUST include:
+      - `filename` — artifact basename
+      - `lastModified` — contractual last-modified stamp for that file (ISO-8601 string or
+        an equivalent stable string representation defined by the adapter family)
+      - `size` — artifact file size in bytes observed from the same stat as `lastModified`.
+        Optional on the wire for adapter families without cheap file metadata; when present
+        it MUST reflect the byte length of the file at the moment of the stamp. Consumers
+        MAY use it as a cheap identity pre-filter before requesting a content hash.
+    - `persistedStateStamp` — `{ present: boolean, lastModified: string | null }` for the
+      persisted semantic lock sidecar (`present: false` and `lastModified: null` when
+      absent)
+    - `generatedMetadataStamp` — `{ present: boolean, lastModified: string | null }` for the
+      generated `metadata.json` sidecar. This stamp is **not** authored spec content; it
+      exists so consumers can hard-gate caches without calling `metadata()` (which parses
+      JSON and may re-hash artifacts for freshness).
+
+    `SpecArtifactEntry` MUST NOT be confused with the content-bearing `SpecArtifact` value
+    object returned by `artifact()`.
+
+    `Spec` MUST expose derived `filenames` and `hasArtifact(filename)` helpers computed from
+    `artifacts` (e.g. `artifacts[].filename`). These preserve the prior presence API; stamp
+    metadata remains on `SpecArtifactEntry` entries only.
+
+    `get` MUST NOT return content hashes, `persistedStateHash`, or `specFingerprint`.
+- op: modified
+  description: 'artifactMeta returns size from the same stat; hash stays opt-in'
+  selector:
+    type: section
+    matches: 'Requirement: Aggregate persisted state, Meta observations, and specFingerprint'
+  content: |
+    `SpecRepository` MUST NOT expose raw sidecar filesystem shapes (like
+    `SpecLockData`) to use cases. Instead, it MUST provide one aggregate semantic
+    operation for reading persisted spec state and one conditional semantic
+    operation for writing it, plus a family of cheap physical `*Meta` observations:
+
+    1. `readPersistedState(spec)` — returns the complete `PersistedSpecStateSnapshot`
+       for the spec, or `null` when no persisted state exists. The snapshot includes
+       `schema`, `dependsOn`, `implementation`, an optional `optimizations` block,
+       and the sidecar's `originalHash`.
+    2. `writePersistedState(spec, state, options)` — conditionally replaces the
+       complete persisted state with `state: PersistedSpecState` in one atomic
+       operation, guarded by `options.expectedRevision`. `expectedRevision: null`
+       means the caller observed persisted state as absent and intends to create it;
+       a present `expectedRevision` means the caller intends to replace exactly that
+       previously observed snapshot. Absence MUST be compared as its own state, not
+       as the hash of an empty document. A mismatch MUST reject with the
+       repository's conflict error rather than silently rebasing the write. The
+       method returns the newly persisted `PersistedSpecStateSnapshot`.
+    3. `persistedStateMeta(spec, options?)` — returns `PersistedStateMeta | null`
+       for the persisted semantic state sidecar. `PersistedStateMeta` MUST include
+       `lastModified` and MAY include `hash` only when `options.includeHash === true`.
+       Absence of the sidecar MUST return `null`. There MUST NOT be a separate
+       `persistedStateHash(spec)` method on this port; callers that need the hash
+       MUST use `persistedStateMeta(spec, { includeHash: true })?.hash ?? null`.
+       (The provenance **field** named `persistedStateHash` inside generated
+       metadata is unrelated and MAY remain.)
+    4. `generatedMetadataMeta(spec, options?)` — returns `GeneratedMetadataMeta | null`
+       for the generated metadata cache observation (not the snapshot body). Same
+       `lastModified` / optional `hash` rules as `PersistedStateMeta`.
+    5. `specFingerprint(spec)` — returns a stable digest of the authored/persisted
+       Spec inputs. The canonical payload MUST be sorted-key JSON of: Construction
+       rules:
+       1. Presence set MUST be the current `Spec.artifacts` entries (present schema
+          artifacts only — not a derived `filenames` list and not schema-wide
+          missing slots).
+       2. For each entry, `contentHash` MUST be the content hash of that artifact's
+          bytes.
+       3. `artifacts` MUST be sorted by `filename` ascending before serialization.
+       4. The fingerprint payload's `persistedStateHash` field MUST be
+          `persistedStateMeta(spec, { includeHash: true })?.hash`, or the literal
+          `"__absent__"` when that API returns `null`.
+       5. `specFingerprint` MUST be the content hash of that canonical JSON string.
+    6. `artifactMeta(spec, filename, options?)` — returns `ArtifactMeta | null`
+       describing the current physical state of one schema-declared artifact,
+       without loading or returning its content. `ArtifactMeta` MUST include
+       `lastModified` and `size` (byte length from the same stat observation);
+       it MAY include `hash` only when `options.includeHash === true`. The `size`
+       field lets cache consumers run a cheap size/mtime identity pre-filter
+       before paying for a content hash. It MUST reuse the same artifact stat/hash
+       path used to populate `SpecArtifactEntry.lastModified` and artifact content
+       hashes elsewhere on this port — it is not a second hashing implementation. A
+       database-backed adapter MAY answer from stored columns without reading
+       artifact content.
+
+    Generated `metadata.json` MUST NOT be an input to `specFingerprint`.
+
+    `readPersistedState` and `writePersistedState` are the only application-facing
+    API for persisted sidecar state at the repository boundary. Callers MUST NOT
+    depend on sidecar filenames, spec-directory scans, field-wise persisted
+    read/write methods, or invent validate-cache stamp helpers on this port to
+    discover or mutate persisted semantics.

@@ -308,6 +308,19 @@ Implementations SHOULD emit debug-level logs when resolving tracked change artif
 
 These logs MUST follow the project's global logging conventions.
 
+### Requirement: Optional exploration metadata and lazy content access
+
+`ChangeRepository.create(change, options?)` SHALL accept optional semantic creation data `{ explorationContent?: string }`. Non-empty content means an initial exploration exists; absent, `undefined`, or empty content means it does not.
+
+An active `Change` loaded by `get(name)` MAY expose `explorationMeta: { lastModified: string; size: number } | null`. This metadata only signals existence and a cheap observation stamp. `get` and list operations MUST NOT load or return exploration content, just as they do not load artifact content.
+
+The port SHALL expose explicit lazy operations:
+
+- `readExploration(change): Promise<string | null>` returns the exploration content, or `null` when none exists.
+- `writeExploration(change, content): Promise<void>` persists non-empty content using the adapter's native representation.
+
+These operations are semantic repository capabilities. Callers MUST NOT depend on filenames or storage layout. Exploration writes do not require an optimistic revision token in this contract.
+
 ## Constraints
 
 - Changes are stored globally, not per-workspace — the inherited workspace context is unused

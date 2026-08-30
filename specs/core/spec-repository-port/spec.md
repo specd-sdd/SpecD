@@ -29,6 +29,10 @@ The returned `Spec` MUST include:
   - `filename` — artifact basename
   - `lastModified` — contractual last-modified stamp for that file (ISO-8601 string or
     an equivalent stable string representation defined by the adapter family)
+  - `size` — artifact file size in bytes observed from the same stat as `lastModified`.
+    Optional on the wire for adapter families without cheap file metadata; when present
+    it MUST reflect the byte length of the file at the moment of the stamp. Consumers
+    MAY use it as a cheap identity pre-filter before requesting a content hash.
 - `persistedStateStamp` — `{ present: boolean, lastModified: string | null }` for the
   persisted semantic lock sidecar (`present: false` and `lastModified: null` when
   absent)
@@ -230,11 +234,14 @@ operation for writing it, plus a family of cheap physical `*Meta` observations:
 6. `artifactMeta(spec, filename, options?)` — returns `ArtifactMeta | null`
    describing the current physical state of one schema-declared artifact,
    without loading or returning its content. `ArtifactMeta` MUST include
-   `lastModified` and MAY include `hash` only when `options.includeHash === true`.
-   It MUST reuse the same artifact stat/hash path used to populate
-   `SpecArtifactEntry.lastModified` and artifact content hashes elsewhere on
-   this port — it is not a second hashing implementation. A database-backed
-   adapter MAY answer from stored columns without reading artifact content.
+   `lastModified` and `size` (byte length from the same stat observation);
+   it MAY include `hash` only when `options.includeHash === true`. The `size`
+   field lets cache consumers run a cheap size/mtime identity pre-filter
+   before paying for a content hash. It MUST reuse the same artifact stat/hash
+   path used to populate `SpecArtifactEntry.lastModified` and artifact content
+   hashes elsewhere on this port — it is not a second hashing implementation. A
+   database-backed adapter MAY answer from stored columns without reading
+   artifact content.
 
 Generated `metadata.json` MUST NOT be an input to `specFingerprint`.
 

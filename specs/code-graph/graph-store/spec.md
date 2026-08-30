@@ -325,6 +325,12 @@ The store SHALL persist one monotonic `knownStaleSinceLastIndex` latch per works
 
 Relation endpoint validation and hierarchy/method lookup SHALL have batch operations. Implementations MUST NOT issue existence or hierarchy queries shaped as one Store call per relation. Equivalent relations SHALL be deduplicated across chunks before persistence, and a failed session MUST NOT expose a partially committed generation.
 
+### Requirement: Symbol Query Workspace Scope
+
+`SymbolQuery` SHALL include an optional `workspace?: string` property.
+
+When `workspace` is specified in `SymbolQuery`, `GraphStore.findSymbols(query)` MUST scope returned `SymbolNode` results directly to symbols whose file path begins with the exact, case-sensitive prefix `'<workspace>:'`, using a parameterized prefix comparison in which `%` and `_` are matched as literal characters (`s.filePath STARTS WITH '<workspace>:'`).
+
 ## Constraints
 
 - `GraphStore` is an abstract class, not an interface — following the project's port convention

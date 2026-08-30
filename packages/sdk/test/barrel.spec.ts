@@ -118,7 +118,7 @@ describe('@specd/sdk barrel', () => {
       ],
       { cwd: packageRoot, stdio: 'pipe' },
     )
-  }, 15_000)
+  }, 30_000)
 
   it('keeps lock, lease, release, token, and raw IPC declarations out of built SDK declarations', () => {
     const declaration = readFileSync(join(packageRoot, 'dist/index.d.ts'), 'utf8')

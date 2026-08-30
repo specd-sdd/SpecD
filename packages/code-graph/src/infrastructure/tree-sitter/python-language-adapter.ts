@@ -250,6 +250,61 @@ export class PythonLanguageAdapter implements LanguageAdapter {
   }
 
   /**
+   * Returns language-specific reserved keywords and built-in type names for Python.
+   * @returns Array of reserved keyword strings.
+   */
+  keywords(): string[] {
+    return [
+      'def',
+      'class',
+      'import',
+      'from',
+      'as',
+      'return',
+      'yield',
+      'lambda',
+      'if',
+      'elif',
+      'else',
+      'while',
+      'for',
+      'in',
+      'try',
+      'except',
+      'finally',
+      'raise',
+      'with',
+      'assert',
+      'pass',
+      'break',
+      'continue',
+      'and',
+      'or',
+      'not',
+      'is',
+      'None',
+      'True',
+      'False',
+      'async',
+      'await',
+      'del',
+      'global',
+      'nonlocal',
+      'match',
+      'case',
+      'str',
+      'int',
+      'float',
+      'bool',
+      'list',
+      'dict',
+      'set',
+      'tuple',
+      'type',
+    ]
+  }
+
+  /**
    * Analyzes a Python file.
    * @param filePath - Path of the file.
    * @param content - File content.

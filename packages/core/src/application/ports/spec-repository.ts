@@ -21,6 +21,8 @@ export type { PersistedImplementationLink }
 /** Physical artifact metadata for one canonical filename. */
 export interface ArtifactMeta {
   readonly lastModified: string
+  /** Byte length from the same stat as `lastModified`; lets caches pre-filter without hashing. */
+  readonly size: number
   readonly hash?: string
 }
 

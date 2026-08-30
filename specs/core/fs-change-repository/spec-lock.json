@@ -13,41 +13,44 @@
   "implementation": [
     {
       "file": "core:src/infrastructure/fs/change-repository.ts",
-      "symbols": ["FsChangeRepository", "deriveManifestUpdatedAt", "changeToManifest"]
+      "symbols": ["FsChangeRepository"]
+    },
+    {
+      "file": "core:test/infrastructure/fs/change-repository.spec.ts"
     }
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "Fs filesystem ChangeRepository: Zod-validated path config, three-bucket FsChangeIndexCache, atomic mutate locks.",
+      "value": "Filesystem ChangeRepository with strict config, atomic indexed buckets, reconciled mutations, and mutation-scoped artifact writes.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:8aa2dea13f56817a1b328022eebf365c20f3f35d6babc954d5d994cafa8b1f78",
-          "lastModified": "2026-07-22T17:25:45.343Z"
+          "hash": "sha256:c39d87899c7412228c16238df7f1fa1e9d15362ff03562a3fe4cef7ef8422e55",
+          "lastModified": "2026-08-17T09:55:42.029Z"
         },
         "verify.md": {
-          "hash": "sha256:c92a087d52737207ae055524da3d66a83e5e3bb1b9482323e36d09e77714291c",
-          "lastModified": "2026-07-22T17:25:45.345Z"
+          "hash": "sha256:9eb4d2c22afaad43929fc359fae2ce7a4bd7a58861d00735fdd57caccf9750e7",
+          "lastModified": "2026-08-17T09:55:42.029Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# FsChangeRepository\n\n## Rules\n- Ctor: `context: ChangeRepositoryConfig` (workspace meta, callbacks, `draftsPath`/`discardedPath`) + `config: FsChangeRepositoryConfig` (`path` only; Zod from `specd.yaml` — no runtime deps).\n- Missing active/drafts/discarded dirs → `StorageDirectoryNotFoundError`.\n- `createFsChangeStorageFactory()` → `ChangeStorageFactory`; `create(context, config)` forwards without merge.\n- List/count/reindex → one `FsChangeIndexCache` per bucket under `{configPath}/tmp/fs-cache/{changes,drafts,discarded}/`. No direct `.specd-index.jsonl` / `.specd-index-meta.json` I/O.\n- Sort: Active `createdAt` oldest→newest; Drafts `draftedAt` newest→oldest; Discarded `discardedAt` newest→oldest.\n- Index writes only via `mutate(fn)`: per-bucket lock (waiters block, no contention fail); temp+rename atomic publish (meta-only; jsonl then meta; both → jsonl first). Fail mid-flight → discard temps. `list`/`count` unlocked.\n- Freshness (no VCS): `isInvalidated` → rebuild; else mtime vs `sourceMtime` → rebuild; else serve. `invalidateCache()` marks all three. Rebuild: scan → stream JSONL → atomic rename + meta.\n- After `save(manifest)`: upsert list row if changed. create/delete update/remove/invalidate. Moves update both buckets. `saveArtifact`/skip/non-listing history: no list update. `reindex*` → helper full rebuild.\n\n## Constraints\n- Lives `infrastructure/fs/`; MUST implement `ChangeRepository` abstract port.",
+      "value": "# FsChangeRepository\n\n## Rules\n- Constructor accepts `context: ChangeRepositoryConfig` (workspace/runtime callbacks, `draftsPath`, `discardedPath`) plus `config: FsChangeRepositoryConfig` (`path: string` only); validate config with Zod. Missing active/drafts/discarded directory → `StorageDirectoryNotFoundError`.\n- `createFsChangeStorageFactory()` returns `ChangeStorageFactory`; `create(context, config)` forwards parameters unmerged.\n- Active/draft/discarded list, count, invalidation, reindex use one `FsChangeIndexCache` per bucket at `{configPath}/tmp/fs-cache/{changes,drafts,discarded}/`; repository MUST NOT directly access index files. Sort active `createdAt` oldest→newest; drafts `draftedAt`, discarded `discardedAt` newest→oldest.\n- Persist `change.updatedAt`; legacy absence derives maximum of `createdAt` and history event timestamps.\n- `FsChangeIndexCache.mutate(fn)` is sole index-write path: per-bucket blocking lock, always released. Atomic temp+rename; JSONL publishes before meta. Failure discards temps, prevents half-published pair. `list`/`count` lock-free.\n- Freshness on list/count: `isInvalidated` → incremental rebuild; else disk presence/mtime vs `sourceMtime` → rebuild if stale; else cached index. `invalidateCache()` invalidates all buckets. Rebuild scans once, streams old JSONL, copies hits, rewrites misses, appends new, atomically publishes, updates meta.\n- Internal manifest persistence projects history-derived list row; equal cached row → no write, changed row → helper upsert. Create/delete update, remove, or invalidate bucket; moves update/invalidate both buckets. `saveArtifact()`, skip, non-listing history cause no list update. Reindex methods delegate full rebuild.\n- `create(change)` creates directory and atomic manifest, rejects name existing in any bucket, updates active index like first save.\n- After internal manifest write in `mutate`/`mutateDraft`, re-enter `get`/`_manifestToChange` reconciliation for post-write bucket, resolve artifact types when available, persist again if reconciliation requests it, return reconciled `Change` in `{ result, change }`.\n- `saveArtifact` requires name in active/draft mutation-in-progress set; otherwise reject before write. Success writes bytes only respecting `originalHash`/`force`; MUST NOT call `setFileStatus`, mutate hashes/history, or write `manifest.json`.\n\n## Constraints\n- Infrastructure implementation under `infrastructure/fs/`.\n- MUST implement `ChangeRepository`, including `create`, reconciled `{ result, change }` mutations, and mutation-window-scoped byte-only `saveArtifact`.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:8aa2dea13f56817a1b328022eebf365c20f3f35d6babc954d5d994cafa8b1f78",
-          "lastModified": "2026-07-22T17:25:45.343Z"
+          "hash": "sha256:c39d87899c7412228c16238df7f1fa1e9d15362ff03562a3fe4cef7ef8422e55",
+          "lastModified": "2026-08-17T09:55:42.029Z"
         },
         "verify.md": {
-          "hash": "sha256:c92a087d52737207ae055524da3d66a83e5e3bb1b9482323e36d09e77714291c",
-          "lastModified": "2026-07-22T17:25:45.345Z"
+          "hash": "sha256:9eb4d2c22afaad43929fc359fae2ce7a4bd7a58861d00735fdd57caccf9750e7",
+          "lastModified": "2026-08-17T09:55:42.029Z"
         }
       }
     }

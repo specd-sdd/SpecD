@@ -1,6 +1,10 @@
 // Composition
-export { createCodeGraphProvider } from './composition/create-code-graph-provider.js'
+export {
+  createCodeGraphProvider,
+  createBuiltinAdapterRegistry,
+} from './composition/create-code-graph-provider.js'
 export { runIsolatedGraphIndex } from './composition/run-isolated-graph-index.js'
+export { type AdapterRegistryPort } from './domain/ports/adapter-registry-port.js'
 export {
   createSqliteGraphStoreFactory,
   type SqliteGraphStoreFactoryOptions,

@@ -68,6 +68,13 @@
 - **WHEN** `get(SpecPath.parse("nonexistent/spec"))` is called and no such spec exists
 - **THEN** `null` is returned
 
+#### Scenario: SpecArtifactEntry carries byte-size from the adapter stat
+
+- **GIVEN** an adapter family with cheap file metadata (filesystem-backed)
+- **WHEN** `get(name)` builds `Spec.artifacts`
+- **THEN** each `SpecArtifactEntry` includes `size` in bytes observed from the same stat as `lastModified`
+- **AND** adapter families without cheap metadata MAY omit `size`
+
 ### Requirement: list returns spec metadata with optional prefix filter
 
 #### Scenario: List all specs as SpecListEntry rows
@@ -395,7 +402,7 @@
 
 - **GIVEN** a schema-declared artifact present on disk
 - **WHEN** `artifactMeta(spec, filename)` is called without `includeHash`
-- **THEN** it returns `{ lastModified }` without `hash`
+- **THEN** it returns `{ lastModified, size }` without `hash`
 - **AND** the artifact's content is not loaded or returned
 
 #### Scenario: artifactMeta returns hash only when includeHash is true
@@ -411,6 +418,13 @@
 - **WHEN** `generatedMetadataMeta(spec)` is called
 - **THEN** it returns `GeneratedMetadataMeta` with `lastModified` when present, or `null` when absent
 - **AND** it does not include `hash` unless `includeHash: true`
+
+#### Scenario: artifactMeta exposes size without hashing
+
+- **GIVEN** a schema-declared artifact present on disk
+- **WHEN** `artifactMeta(spec, filename)` is called without options
+- **THEN** the returned `ArtifactMeta` includes `lastModified` and `size`
+- **AND** `hash` is absent unless `options.includeHash === true`
 
 ### Requirement: Filesystem-backed specs capability
 

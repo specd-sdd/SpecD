@@ -10,7 +10,9 @@
     "cli:host-context",
     "sdk:context-markdown",
     "sdk:build-implementation-review",
-    "code-graph:isolated-index-worker"
+    "code-graph:isolated-index-worker",
+    "sdk:suggest-implementation-links",
+    "sdk:suggest-spec-dependencies"
   ],
   "implementation": [
     {

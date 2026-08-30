@@ -6,6 +6,7 @@ import { type SymbolKind } from './symbol-kind.js'
 export interface SymbolQuery {
   readonly name?: string
   readonly kind?: SymbolKind
+  readonly workspace?: string
   readonly filePath?: string
   /** Multiple file paths to filter by (OR logic). */
   readonly filePaths?: readonly string[]

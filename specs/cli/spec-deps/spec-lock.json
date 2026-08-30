@@ -6,7 +6,52 @@
   "dependsOn": [
     "core:get-persisted-spec-deps",
     "core:update-persisted-spec-deps",
-    "cli:entrypoint"
+    "cli:entrypoint",
+    "sdk:suggest-spec-dependencies"
   ],
-  "implementation": []
+  "implementation": [
+    {
+      "file": "cli:src/commands/spec/deps.ts",
+      "symbols": ["registerSpecDeps"]
+    },
+    {
+      "file": "cli:test/commands/spec-deps.spec.ts"
+    }
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "`specd specs deps` CLI: list/add/remove/set/clear canonical persisted dependsOn via Kernel.specs; no CLI-owned merge logic.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:f9ecfc2ae10d2989984e8238e12bbf1aca5ae7a4df3f4ff21f5ae409366eb625",
+          "lastModified": "2026-08-17T09:55:41.790Z"
+        },
+        "verify.md": {
+          "hash": "sha256:8577ffa98b9aa94dd9cebe2988b4c1f8637233410685eb259d78f5dab7a01a8d",
+          "lastModified": "2026-08-17T09:55:41.790Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Specs Deps CLI\n\n## Rules\n\n- Command group `specd specs deps`; every subcommand accepts `--format text|json|toon` (default text).\n- Signatures: `list <spec-id>`, `add <spec-id> --dep <dependency-id>...`, `remove <spec-id> --dep <dependency-id>...`, `set <spec-id> --dep <dependency-id>...`, `clear <spec-id>`.\n- `list` → `Kernel.specs.getPersistedDeps`, print `dependsOn`. Uninitialized spec: MUST report not-initialized rather than indistinguishable empty list; text distinguishes cases, JSON/TOON include `initialized` field.\n- `add` → `Kernel.specs.updatePersistedDeps` with `add` = supplied IDs; print resulting persisted list.\n- `remove` → `remove` = supplied IDs; print result. Uninitialized state: report no-op outcome, not error.\n- `set` → `set` = supplied IDs (may be empty to clear via set); print result.\n- `clear` → `clear: true`; print resulting empty list.\n- Handlers MUST NOT implement add/remove/set merge semantics, initial-state derivation, or persisted-state writes. Every mutation = one `updatePersistedDeps` call, flags mapped directly onto `UpdatePersistedSpecDepsInput`.\n- Error mapping, exit code 1 with `error:` message: `SpecNotFoundError` names unresolved spec; `ArtifactConflictError` reports concurrent modification, instruct retry; `ReadOnlyWorkspaceError` gives no configuration workaround (per core:workspace readOnly error-message conventions).\n\n## Constraints\n\n- Never read/write spec-lock.json directly; every operation flows through Kernel.specs.getPersistedDeps / Kernel.specs.updatePersistedDeps.\n- Distinct from change scope editing (`change edit --add-spec`): operates on canonical persisted state, not draft specDependsOn.\n- Every leaf subcommand calls `.allowExcessArguments(false)`",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:f9ecfc2ae10d2989984e8238e12bbf1aca5ae7a4df3f4ff21f5ae409366eb625",
+          "lastModified": "2026-08-17T09:55:41.790Z"
+        },
+        "verify.md": {
+          "hash": "sha256:8577ffa98b9aa94dd9cebe2988b4c1f8637233410685eb259d78f5dab7a01a8d",
+          "lastModified": "2026-08-17T09:55:41.790Z"
+        }
+      }
+    }
+  }
 }

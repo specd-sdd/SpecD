@@ -1,0 +1,38 @@
+- op: added
+  description: 'Scenario covering artifact byte-size exposure without content reads'
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Spec stamp population on get'
+  content: |
+    #### Scenario: get stamps include byte-size from the same stat
+
+    - **GIVEN** a spec directory with `spec.md` and sidecar files
+    - **WHEN** `FsSpecRepository.get()` is called
+    - **THEN** every `SpecArtifactEntry` includes `size` equal to the file byte length
+    - **AND** `lastModified` and `size` come from the same single `stat` observation
+    - **AND** no artifact content is read to build the stamps
+- op: added
+  description: 'artifactMeta returns size always; hash only on request'
+  position:
+    parent:
+      type: section
+      matches: 'Requirement: Metadata snapshot persistence'
+  content: |
+    #### Scenario: artifactMeta exposes size from stat without hashing
+
+    - **GIVEN** an existing `spec.md` artifact
+    - **WHEN** `artifactMeta(spec, 'spec.md')` is called without options
+    - **THEN** it returns `lastModified` and `size`
+    - **AND** it does not include `hash`
+    - **WHEN** `artifactMeta(spec, 'spec.md', { includeHash: true })` is called
+    - **THEN** it additionally returns the SHA-256 content `hash`
+- op: modified
+  description: 'Refresh pre-existing scenario: no-hash response now includes size'
+  selector:
+    type: section
+    matches: 'Scenario: artifactMeta reuses the existing stat/hash path'
+  content: |
+    - **WHEN** `artifactMeta(spec, filename, { includeHash: true })` is called
+    - **THEN** it reuses the same stat/hash path used elsewhere on this adapter rather than a second hashing routine
+    - **AND** without `includeHash` it returns `lastModified` and `size`

@@ -4,6 +4,13 @@ export {
   createSdkContext,
   openSpecdHost,
   withOpenGraphProvider,
+  createSuggestImplementationLinks,
+  createSuggestSpecDependencies,
+  createSuggestSpecs,
+  openSuggestSpecs,
+  resolveSuggestImplementationLinksDeps,
+  resolveSuggestSpecDependenciesDeps,
+  resolveSuggestSpecsDeps,
   type OpenSpecdHostInput,
   type OpenSpecdHostResult,
   type SdkHostContext,
@@ -22,9 +29,91 @@ export {
   type ReviewedImplementationSymbol,
   type RunIndexProjectGraphInput,
   type RunIndexProjectGraphResult,
+  type ImplementationSuggestionCacheHeader,
+  type ImplementationSuggestionSpecStamp,
+  type ImplementationSuggestionLockData,
+  type ImplementationSuggestionEntry,
+  type ImplementationSuggestionSpecEntry,
+  type ImplementationSuggestionsCacheFile,
+  type SpecDepsSuggestedItem,
+  type SpecDepsSuggestionSpecEntry,
+  type SpecDepsSuggestionCacheHeader,
+  type SpecDepsSuggestionsCacheFile,
 } from './orchestration/index.js'
 
-export { InvalidProviderLifecycleError } from './domain/errors/index.js'
+export {
+  SuggestImplementationLinks,
+  createSuggestImplementationLinks as createSuggestImplementationLinksFromDeps,
+  suggestImplementationLinksInputSchema,
+  type SuggestImplementationLinksInput,
+  type SuggestImplementationLinksResult,
+  type SpecImplementationSuggestion,
+  type SuggestImplementationLinksDeps,
+  type SuggestImplementationProgressEvent,
+  type OnSuggestImplementationProgress,
+  type SuggestionFileObserver,
+} from './application/use-cases/suggest-implementation-links.js'
+export {
+  SuggestSpecDependencies,
+  createSuggestSpecDependencies as createSuggestSpecDependenciesFromDeps,
+  suggestSpecDependenciesInputSchema,
+  type SuggestSpecDependenciesInput,
+  type SuggestSpecDependenciesResult,
+  type SpecDependencySuggestion,
+  type SuggestedSpecDependency,
+  type PostApplyValidationDiagnostic,
+  type CreatedAlignmentChangeInfo,
+  type SuggestSpecDependenciesDeps,
+  type SuggestSpecDepsProgressEvent,
+  type OnSuggestSpecDepsProgress,
+} from './application/use-cases/suggest-spec-dependencies.js'
+
+export {
+  SuggestSpecs,
+  suggestSpecsInputSchema,
+  type SuggestSpecsInput,
+  type SuggestSpecsResult,
+  type SuggestSpecsDeps,
+  type SuggestSpecsProgressEvent,
+  type OnSuggestSpecsProgress,
+} from './application/use-cases/suggest-specs.js'
+
+export {
+  TransitiveReductionEngine,
+} from './domain/services/transitive-reduction-engine.js'
+
+export {
+  SpecSymbolClassifier,
+  type ClassifiedSpecSymbols,
+} from './domain/services/spec-symbol-classifier.js'
+
+export {
+  CapabilityClusteringEngine,
+  type CapabilityAnchor,
+} from './domain/services/capability-clustering-engine.js'
+
+export {
+  ConfidenceScorer,
+  type ConfidenceInputs,
+} from './domain/services/confidence-scorer.js'
+
+export {
+  DependencyInferenceEngine,
+} from './domain/services/dependency-inference-engine.js'
+
+export {
+  type CandidateSpec,
+  type SpecCategory,
+  type ConfidenceBreakdown,
+  type AnchorSymbol,
+  type HotspotSummary,
+  type SpecRationale,
+  type SuggestSpecsSummary,
+} from './domain/value-objects/candidate-spec.js'
+
+export { ImplementationSuggestionCachePort } from './application/ports/implementation-suggestion-cache-port.js'
+export { SpecDepsSuggestionCachePort } from './application/ports/spec-deps-suggestion-cache-port.js'
+export { CacheLockError, InvalidProviderLifecycleError } from './domain/errors/index.js'
 
 export * from './core-reexports.js'
 

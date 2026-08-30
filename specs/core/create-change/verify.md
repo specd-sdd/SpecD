@@ -225,3 +225,18 @@
 - `getActiveSchema: GetActiveSchema`
 - `detectOverlap: DetectOverlap`
 - **AND** the factory delegates to canonical `createCreateChange(deps)`
+
+### Requirement: Optional initial exploration content
+
+#### Scenario: Initial exploration is delegated to the repository
+
+- **GIVEN** non-empty `explorationContent` on `CreateChangeInput`
+- **WHEN** `CreateChange.execute` persists the new change
+- **THEN** it passes that content to `ChangeRepository.create`
+- **AND** it performs no direct filesystem operation
+
+#### Scenario: Exploration remains optional
+
+- **GIVEN** absent or empty `explorationContent`
+- **WHEN** `CreateChange.execute` persists the new change
+- **THEN** creation succeeds without an initial exploration

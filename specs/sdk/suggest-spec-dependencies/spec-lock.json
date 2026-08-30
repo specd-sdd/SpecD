@@ -1,0 +1,23 @@
+{
+  "schema": {
+    "name": "schema-std",
+    "version": 1
+  },
+  "dependsOn": [
+    "sdk:suggest-implementation-links",
+    "code-graph:traversal",
+    "core:get-persisted-spec-deps",
+    "core:update-persisted-spec-deps",
+    "core:create-change"
+  ],
+  "implementation": [
+    {
+      "file": "sdk:src/domain/services/transitive-reduction-engine.ts",
+      "symbols": ["TransitiveReductionEngine"]
+    },
+    {
+      "file": "sdk:src/application/use-cases/suggest-spec-dependencies.ts",
+      "symbols": ["SuggestSpecDependencies"]
+    }
+  ]
+}

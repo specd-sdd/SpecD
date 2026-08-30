@@ -4,5 +4,41 @@
     "version": 1
   },
   "dependsOn": ["core:spec-repository-port", "core:spec-id-format"],
-  "implementation": []
+  "implementation": [],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Read-only use case returning the exact persisted dependsOn list for a spec without reading lock files or materializing metadata.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:07f4f8e579ddb2cf0d0e728a1d17412de025a9806f7b170812d41ad66e563c81",
+          "lastModified": "2026-08-17T09:55:42.056Z"
+        },
+        "verify.md": {
+          "hash": "sha256:7e2d4f80ad313199bf81b340750640571f6ae21d28bf8096e7f651f435d84978",
+          "lastModified": "2026-08-17T09:55:42.056Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# GetPersistedSpecDeps\n\n## Rules\n\n- Input `GetPersistedSpecDepsInput`: `specId` required.\n- Resolve workspace repository; call `SpecRepository.readPersistedState(spec)`. MUST NOT read `spec-lock.json`/adapter sidecars directly; MUST NOT read or materialize generated metadata.\n- State exists → `{ specId, dependsOn }`: exact `readonly string[]` in stored order; no reorder/dedupe/transform. `initialized: true`.\n- State absent (`readPersistedState` → null) → `dependsOn: []`, `initialized: false`. No side-effect state creation; no deterministic artifact-projection fallback.\n- Unresolvable specId → typed `SpecdError` subclass naming unresolved spec; never empty-result success.\n- Config factory `createGetPersistedSpecDeps(config, options?)` delegates via `resolveGetPersistedSpecDepsDeps(resolver)` resolving `specs: ReadonlyMap<string, SpecRepository>`; factory MUST NOT inline fs wiring.\n\n## Constraints\n\n- Strictly read-only — never creates/mutates/writes persisted state.\n- Returned list = canonical persisted value, NOT deterministic projection from current artifacts.\n- `readOnly` workspace ownership irrelevant — reads always permitted.\n",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:07f4f8e579ddb2cf0d0e728a1d17412de025a9806f7b170812d41ad66e563c81",
+          "lastModified": "2026-08-17T09:55:42.056Z"
+        },
+        "verify.md": {
+          "hash": "sha256:7e2d4f80ad313199bf81b340750640571f6ae21d28bf8096e7f651f435d84978",
+          "lastModified": "2026-08-17T09:55:42.056Z"
+        }
+      }
+    }
+  }
 }

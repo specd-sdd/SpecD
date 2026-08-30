@@ -1,7 +1,7 @@
 {
   "name": "code-graph-symbol-semantic-context",
   "createdAt": "2026-07-15T14:01:36.552Z",
-  "updatedAt": "2026-08-27T08:10:29.879Z",
+  "updatedAt": "2026-08-28T23:34:42.236Z",
   "description": "Add deterministic symbol ownership and range context to support hierarchical purpose extraction and semantic search in code graph.",
   "schema": {
     "name": "schema-std",
@@ -1503,6 +1503,180 @@
         {
           "type": "verify",
           "files": ["code-graph:indexer"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-28T23:25:51.245Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'suggest-implementation-and-spec-deps' was archived with overlapping specs: code-graph:language-adapter",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:language-adapter"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:language-adapter"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-28T23:34:10.820Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'suggest-implementation-and-spec-deps' was archived with overlapping specs: code-graph:language-adapter",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:language-adapter"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:language-adapter"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-28T23:34:17.194Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'suggest-implementation-and-spec-deps' was archived with overlapping specs: code-graph:language-adapter",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:language-adapter"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:language-adapter"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-28T23:34:24.692Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'suggest-implementation-and-spec-deps' was archived with overlapping specs: code-graph:language-adapter",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:language-adapter"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:language-adapter"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-28T23:34:37.271Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'suggest-implementation-and-spec-deps' was archived with overlapping specs: code-graph:language-adapter",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:language-adapter"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:language-adapter"]
+        },
+        {
+          "type": "design",
+          "files": ["design"]
+        },
+        {
+          "type": "tasks",
+          "files": ["tasks"]
+        }
+      ]
+    },
+    {
+      "type": "invalidated",
+      "at": "2026-08-28T23:34:42.230Z",
+      "by": {
+        "name": "specd",
+        "email": "system@getspecd.dev",
+        "provider": "system"
+      },
+      "cause": "spec-overlap-conflict",
+      "message": "Invalidated because change 'suggest-implementation-and-spec-deps' was archived with overlapping specs: code-graph:language-adapter",
+      "affectedArtifacts": [
+        {
+          "type": "specs",
+          "files": ["code-graph:language-adapter"]
+        },
+        {
+          "type": "verify",
+          "files": ["code-graph:language-adapter"]
         },
         {
           "type": "design",

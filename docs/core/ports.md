@@ -128,7 +128,7 @@ abstract class SpecRepository extends Repository {
 
 ### Meta observations
 
-Cheap physical observations use a shared `*Meta` family. Every Meta type exposes `lastModified`; content `hash` is opt-in via `SpecMetaOptions.includeHash`.
+Cheap physical observations use a shared `*Meta` family. Every Meta type exposes `lastModified`; content `hash` is opt-in via `SpecMetaOptions.includeHash`. `ArtifactMeta` additionally always carries the artifact byte `size` (same `stat` observation), enabling cheap size/mtime identity pre-filters before requesting a hash.
 
 | Method                                   | Returns                         | Notes                           |
 | ---------------------------------------- | ------------------------------- | ------------------------------- |

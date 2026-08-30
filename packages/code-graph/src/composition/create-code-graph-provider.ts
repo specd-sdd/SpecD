@@ -1,9 +1,4 @@
 import { type SpecdConfig } from '@specd/core'
-import { AdapterRegistry } from '../infrastructure/tree-sitter/adapter-registry.js'
-import { TypeScriptLanguageAdapter } from '../infrastructure/tree-sitter/typescript-language-adapter.js'
-import { PythonLanguageAdapter } from '../infrastructure/tree-sitter/python-language-adapter.js'
-import { GoLanguageAdapter } from '../infrastructure/tree-sitter/go-language-adapter.js'
-import { PhpLanguageAdapter } from '../infrastructure/tree-sitter/php-language-adapter.js'
 import { IndexCodeGraph } from '../application/use-cases/index-code-graph.js'
 import { CodeGraphProviderImpl, type CodeGraphProvider } from './code-graph-provider.js'
 import {
@@ -14,6 +9,7 @@ import {
 import { GraphStoreRegistryError } from '../domain/errors/graph-store-registry-error.js'
 import { createSqliteGraphStoreFactory } from './create-sqlite-graph-store-factory.js'
 import { createGetGraphHealth } from './use-cases/get-graph-health.js'
+import { createBuiltinAdapterRegistry } from './use-cases/create-builtin-adapter-registry.js'
 import { readInstalledCodeGraphVersion } from '../application/use-cases/_shared/installed-code-graph-version.js'
 import { type WorkspaceIndexTarget } from '../domain/value-objects/index-options.js'
 
@@ -52,17 +48,7 @@ export function createCodeGraphProvider(
   }
 
   const store = graphStoreFactory.create({ storagePath })
-
-  const registry = new AdapterRegistry()
-  registry.register(new TypeScriptLanguageAdapter())
-  registry.register(new PythonLanguageAdapter())
-  registry.register(new GoLanguageAdapter())
-  registry.register(new PhpLanguageAdapter())
-
-  for (const adapter of graphOptions?.adapters ?? []) {
-    registry.register(adapter)
-  }
-
+  const registry = createBuiltinAdapterRegistry(graphOptions?.adapters)
   const indexer = new IndexCodeGraph(store, registry)
 
   const graphHealth = isSpecdConfig(options)
@@ -119,3 +105,5 @@ function createGraphStoreRegistry(
   }
   return registry
 }
+
+export { createBuiltinAdapterRegistry } from './use-cases/create-builtin-adapter-registry.js'
