@@ -18,6 +18,32 @@ type LifecycleSchemaInfo = NonNullable<
   >['lifecycle']['schemaInfo']
 >
 
+/** Lifecycle projection returned by `kernel.changes.status.execute`. */
+type StatusLifecycle = Awaited<
+  ReturnType<import('@specd/sdk').Kernel['changes']['status']['execute']>
+>['lifecycle']
+
+/**
+ * Copies optional check rows from GetStatus when the core payload includes them.
+ *
+ * @param lifecycle - Lifecycle projection from GetStatus
+ * @returns Structured extra fields, or an empty object when both fields are absent
+ */
+function optionalCheckFields(lifecycle: StatusLifecycle): Record<string, unknown> {
+  const extra: Record<string, unknown> = {}
+  const withChecks = lifecycle as StatusLifecycle & {
+    checksByTarget?: unknown
+    checks?: unknown
+  }
+  if ('checksByTarget' in withChecks && withChecks.checksByTarget !== undefined) {
+    extra.checksByTarget = withChecks.checksByTarget
+  }
+  if ('checks' in withChecks && withChecks.checks !== undefined) {
+    extra.checks = withChecks.checks
+  }
+  return extra
+}
+
 /**
  * Resolves the canonical schema DAG for status rendering, falling back to lifecycle schemaInfo.
  *
@@ -67,17 +93,25 @@ JSON/TOON output schema:
   {
     name: string
     state: string
+    isDrafted?: boolean
     specIds: string[]
-    schema: { name: string, version: number }
+    schema: { name: string, version: number, artifactDag: Array<{ id: string, scope: string, requires: string[], children: string[] }> }
     description?: string
-    blockers: Array<{ code: string, message: string }>
+    blockers: Array<{ code: string, message: string, label?: string, checkId?: string }>
     nextAction: { targetStep: string, actionType: string, reason: string, command: string | null }
     specDependsOn: Record<string, string[]>
-    artifactDag: Array<{ id: string, scope: string, state: string, requires: string[], children: string[] }>
+    availableTransitions: string[]  // legacy top-level; active changes use lifecycle.availableTransitions
+    availableSteps: Array<{ step: string, available: boolean, isReady: boolean, isPermitted: boolean }>  // legacy top-level; active changes use lifecycle.availableSteps
+    lifecycle?: {
+      availableTransitions: string[]  // check-derived hops for active (non-drafted) changes
+      availableSteps: Array<{ step: string, available: boolean, isReady: boolean, isPermitted: boolean }>
+    }
+    artifactDag: Array<{ id: string, scope: string, state: string, requires: string[], children: string[], hasTasks?: boolean }>
     artifacts: Array<{
       type: string
       state: string
       effectiveStatus: string
+      displayStatus?: string
       taskCompletion?: { complete: number, incomplete: number, total: number }
       files: Array<{ key: string, filename: string, state: string, validatedHash?: string }>
     }>
@@ -85,6 +119,8 @@ JSON/TOON output schema:
       required: boolean
       route: string | null
       reason: string | null
+      message?: string
+      overlapDetail: Array<{ archivedChangeName: string, overlappingSpecIds: string[] }>
       affectedArtifacts: Array<{
         type: string
         files: Array<{ key: string, filename: string, path: string }>
@@ -103,7 +139,8 @@ JSON/TOON output schema:
 
           if (statusResult.draftView !== undefined) {
             const draftView = statusResult.draftView
-            const { artifactStatuses, lifecycle, nextAction, specDependsOn } = statusResult
+            const { artifactStatuses, lifecycle, specDependsOn } = statusResult
+            const nextAction = { ...statusResult.nextAction, command: null }
             const fmt = parseFormat(opts.format)
             if (fmt === 'text') {
               const lines = [
@@ -137,7 +174,9 @@ JSON/TOON output schema:
                   specIds: [...draftView.specIds],
                   schema: { name: draftView.schemaName, version: draftView.schemaVersion },
                   specDependsOn,
-                  availableTransitions: lifecycle.availableTransitions,
+                  availableTransitions: [],
+                  availableSteps: [],
+                  ...optionalCheckFields(lifecycle),
                   nextAction,
                   artifacts: artifactStatuses,
                 },
@@ -197,11 +236,32 @@ JSON/TOON output schema:
             }
             lines.push('')
 
+            // Invalidation overlap is review, not an OVERLAP_CONFLICT line.
+            const textBlockers =
+              review?.reason === 'spec-overlap-conflict'
+                ? blockers.filter((blocker) => blocker.code !== 'OVERLAP_CONFLICT')
+                : blockers
+
             // Blockers Section
-            if (blockers.length > 0) {
+            if (textBlockers.length > 0) {
               lines.push('blockers:')
-              for (const b of blockers) {
-                lines.push(`  ! ${b.code}: ${b.message}`)
+              for (const b of textBlockers) {
+                lines.push(
+                  b.label !== undefined
+                    ? `  ! ${b.code} — ${b.label}: ${b.message}`
+                    : `  ! ${b.code}: ${b.message}`,
+                )
+              }
+              lines.push('')
+            }
+
+            if (review?.required === true) {
+              lines.push('review:')
+              lines.push(`  required: ${review.required ? 'yes' : 'no'}`)
+              lines.push(`  route:    ${review.route ?? '(none)'}`)
+              lines.push(`  reason:   ${review.reason ?? '(none)'}`)
+              if (review.message !== undefined && review.message !== '') {
+                lines.push(`  message:  ${review.message}`)
               }
               lines.push('')
             }
@@ -217,6 +277,11 @@ JSON/TOON output schema:
             lines.push('lifecycle:')
             if (lifecycle.availableTransitions.length > 0) {
               lines.push(`  transitions:  ${lifecycle.availableTransitions.join(', ')}`)
+            }
+            if ((lifecycle.availableSteps ?? []).length > 0) {
+              lines.push(
+                `  extras:      ${(lifecycle.availableSteps ?? []).map((step) => step.step).join(', ')}`,
+              )
             }
             if (lifecycle.nextArtifact !== null) {
               lines.push(`  next artifact: ${lifecycle.nextArtifact}`)
@@ -271,25 +336,17 @@ JSON/TOON output schema:
               }
             }
 
-            if (review?.required === true) {
+            if (
+              review?.required === true &&
+              review.reason === 'spec-overlap-conflict' &&
+              review.overlapDetail.length > 0
+            ) {
               lines.push('')
-              lines.push('review:')
-              lines.push(`  required: yes`)
-              lines.push(`  route:    ${review.route}`)
-              lines.push(`  reason:   ${review.reason}`)
-              if (review.reason === 'spec-overlap-conflict' && review.overlapDetail.length > 0) {
-                lines.push('  overlap:')
-                for (const entry of review.overlapDetail) {
-                  lines.push(
-                    `    - archived: ${entry.archivedChangeName}, specs: ${entry.overlappingSpecIds.join(', ')}`,
-                  )
-                }
-              }
-              for (const artifact of review.affectedArtifacts) {
-                lines.push(`  ${artifact.type}:`)
-                for (const file of artifact.files) {
-                  lines.push(`    - ${file.path}`)
-                }
+              lines.push('overlap:')
+              for (const entry of review.overlapDetail) {
+                lines.push(
+                  `  - archived: ${entry.archivedChangeName}, specs: ${entry.overlappingSpecIds.join(', ')}`,
+                )
               }
             }
 
@@ -348,7 +405,13 @@ JSON/TOON output schema:
                 specIds: [...change.specIds],
                 schema: { name: change.schemaName, version: change.schemaVersion },
                 ...(change.description !== undefined ? { description: change.description } : {}),
-                blockers: blockers.map((b) => ({ code: b.code, message: b.message })),
+                blockers: blockers.map((b) => ({
+                  code: b.code,
+                  message: b.message,
+                  ...(b.label !== undefined ? { label: b.label } : {}),
+                  ...(b.checkId !== undefined ? { checkId: b.checkId } : {}),
+                  ...(b.bypassFlag !== undefined ? { bypassFlag: b.bypassFlag } : {}),
+                })),
                 nextAction: {
                   targetStep: nextAction.targetStep,
                   actionType: nextAction.actionType,
@@ -397,6 +460,7 @@ JSON/TOON output schema:
                   required: review?.required ?? false,
                   route: review?.route ?? null,
                   reason: review?.reason ?? null,
+                  ...(review?.message !== undefined ? { message: review.message } : {}),
                   overlapDetail: review?.overlapDetail ?? [],
                   affectedArtifacts: (review?.affectedArtifacts ?? []).map((artifact) => ({
                     type: artifact.type,
@@ -410,6 +474,13 @@ JSON/TOON output schema:
                 lifecycle: {
                   validTransitions: [...lifecycle.validTransitions],
                   availableTransitions: [...lifecycle.availableTransitions],
+                  availableSteps: (lifecycle.availableSteps ?? []).map((step) => ({
+                    step: step.step,
+                    available: step.available,
+                    isReady: step.isReady,
+                    isPermitted: step.isPermitted,
+                    blockingArtifacts: [...step.blockingArtifacts],
+                  })),
                   blockers: lifecycle.blockers.map((b) => ({
                     transition: b.transition,
                     reason: b.reason,
@@ -422,6 +493,7 @@ JSON/TOON output schema:
                     lifecycle.schemaInfo !== null
                       ? { name: lifecycle.schemaInfo.name, version: lifecycle.schemaInfo.version }
                       : null,
+                  ...optionalCheckFields(lifecycle),
                 },
                 ...(opts.implementation && implementationTracking !== undefined
                   ? {
@@ -499,7 +571,8 @@ function renderDag(
     const scope = `[scope: ${artifact.scope}]`
 
     const connector = isRoot ? '' : isLast ? '└── ' : '├── '
-    const taskTag = artifact.hasTasks
+    const hasTasks = artifact.hasTasks === true || artifact.taskCompletionCheck !== undefined
+    const taskTag = hasTasks
       ? artifactStatus?.taskCompletion !== undefined
         ? ` [hasTasks - ${artifactStatus.taskCompletion.complete}/${artifactStatus.taskCompletion.total} done]`
         : ' [hasTasks]'

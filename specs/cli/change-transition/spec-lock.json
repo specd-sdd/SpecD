@@ -8,31 +8,53 @@
     "core:change",
     "core:transition-change",
     "core:hook-execution-model",
-    "core:get-status"
+    "core:get-status",
+    "core:transition-checks"
   ],
   "implementation": [
     {
-      "file": "cli:src/commands/change/_hook-progress-presenter.ts",
-      "symbols": ["HookPresenterEvent", "HookProgressPresenter", "createHookProgressPresenter"]
-    },
-    {
       "file": "cli:src/commands/change/transition.ts",
-      "symbols": ["registerChangeTransition"]
+      "symbols": ["registerChangeTransition", "makeProgressRenderer", "writeTextRepairGuide"]
     },
     {
-      "file": "cli:test/commands/change-transition.spec.ts"
-    },
-    {
-      "file": "cli:test/commands/_hook-progress-presenter.spec.ts"
-    },
-    {
-      "file": "cli:src/formatter.ts"
-    },
-    {
-      "file": "cli:test/commands/change.spec.ts"
-    },
-    {
-      "file": "cli:test/formatter.spec.ts"
+      "file": "cli:src/commands/change/_check-progress-presenter.ts",
+      "symbols": ["createCheckProgressPresenter"]
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "CLI `specd change transition` advances lifecycle via TransitionChange; --next, skip-hooks, progress streams, repair guide on fail.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:688ddad94cee1d3e32960623b1ab1c0db18547d02cca0f9f2e8c37e31d48d17c",
+          "lastModified": "2026-08-25T15:37:19.166Z"
+        },
+        "verify.md": {
+          "hash": "sha256:76671be8d2be1689e861733841c1b55e8d71826bfc763b755efa28a4fc4ac17d",
+          "lastModified": "2026-08-25T15:37:19.167Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Change Transition\n\n## Rules\n\n### Signature\n- `specd change transition <name> <step> [--skip-hooks <phases>] [--format text|json|toon]`\n- `specd change transition <name> --next [--skip-hooks <phases>] [--format text|json|toon]`\n- `<name>` required. `<step>` required unless `--next`. `--next` mutually exclusive with `<step>`.\n- `--skip-hooks`: comma-separated `source.pre|source.post|target.pre|target.post|all`; omit = run all. `all` skips every phase.\n- `--format` default `text`.\n\n### `--next` resolution\n- Load current state; map forward target then run normal `TransitionChange` (gates, requires, hooks, errors unchanged):\n  - `drafting` → `designing`\n  - `designing` → `ready`\n  - `ready` → `implementing`\n  - `spec-approved` → `implementing`\n  - `implementing` → `verifying`\n  - `verifying` → `done`\n  - `done` → `archivable`\n- Unavailable (exit 1, stderr `error:`, no synthetic target): `pending-spec-approval`, `pending-signoff`, `archivable`.\n\n### Refresh\n- MUST NOT call `RefreshImplementationTracking` or `ImplementationDetector`.\n- Pre-transition and repair-guide `GetStatus`: `refreshImplementationTracking: false` (`TransitionChange` owns refresh).\n- Invoke `TransitionChange` with default `refreshImplementationTrackingBefore` unless future flag opts out.\n\n### Approval routing\n- MUST NOT pass approval flags to `TransitionChange.execute`. Gates from kernel `config.approvals`.\n- `LifecycleEngine`: `ready` + `approvals.spec` → `implementing` routes to `pending-spec-approval`; `done` + `approvals.signoff` → `archivable` routes to `pending-signoff`.\n- User names logical target; CLI MUST NOT duplicate routing beyond requested/`--next` target.\n\n### Hooks\n- Default order: source.post → target.pre → state transition. Both phases fail-fast.\n- `--skip-hooks` → `skipHookPhases` on `TransitionChangeInput`. `all` → caller uses `specd change run-hooks`.\n\n### Progress / observability\n- Pass `onProgress`. Text: step feedback; structured: preserve progress.\n- MUST show hook start, active hook ID+command, recent output while running, liveness without new output, completion — even if transition later fails.\n- Text running label MAY exist; MUST NOT be sole liveness signal. Completed hooks MUST stay readable (not fully overwritten).\n- `json`/`toon`: NDJSON stdout. Hook events `stream: \"hook-progress\"`; transition events (`requires-check`, `transitioned`) `stream: \"change-transition\"`.\n- MUST share presentation with `specd change run-hooks` (running labels, output tail, liveness, failed-hook full output).\n\n### Success output\n- `text`: final human confirmation on stdout after progress.\n- `json`/`toon`: terminal stdout record `stream: \"change-transition\"`, `event.type: \"complete\"`, `event.result` = `result`, `name`, `from`, `to`. Same stream as in-flight records, not standalone object.\n\n### Failures\n- Hook fail: exit 2, stderr `error:`. No separate post-transition hook warning. Keep visible which hook + prior output.\n- Invalid transition: exit 1, stderr `error:`.\n- Text repair guide from `GetStatusResult.nextAction` + `GetStatus` blocker codes (`MISSING_ARTIFACT`, `ARTIFACT_DRIFT`, …):\n```\nerror: cannot transition to <step>\n! <CODE>: <message>\n\nrepair guide:\n  target:  <targetStep>\n  command: <command>\n  reason:  <reason>\n```\n- `json`/`toon` failure: stdout stream `event.type: \"complete\"`, `event.result` = `result: \"failure\"`, `name`, `from`, `to`, `blockers`, `nextAction`.\n- `InvalidStateTransitionError` approval/signoff reason MUST appear on stderr (not generic invalid-transition).\n- `--next` with no transition-driven next: stderr MUST explain why auto-advance impossible.\n- `implementing → verifying` incomplete tasks (`taskCompletionCheck.incompletePattern`): exit 1, stderr names blocking artifact.\n- Target `requires` not `complete|skipped`: exit 1, stderr `error:`.\n\n## Constraints\n- User specifies logical target; help MUST NOT expose routing.\n- Repair-guide blockers/nextAction from TransitionChange failure + GetStatus — CLI MUST NOT recompute.\n- Text: progress on stderr; final confirmation stdout.\n- json/toon: progress + terminal complete on stdout; stderr for non-structured diagnostics only.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:688ddad94cee1d3e32960623b1ab1c0db18547d02cca0f9f2e8c37e31d48d17c",
+          "lastModified": "2026-08-25T15:37:19.166Z"
+        },
+        "verify.md": {
+          "hash": "sha256:76671be8d2be1689e861733841c1b55e8d71826bfc763b755efa28a4fc4ac17d",
+          "lastModified": "2026-08-25T15:37:19.167Z"
+        }
+      }
+    }
+  }
 }

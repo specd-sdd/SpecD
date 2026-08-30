@@ -2,7 +2,7 @@
 
 ## Purpose
 
-After implementation, a final human signoff is needed to confirm the change is ready for archival, with artifact hashes captured to detect any post-signoff modifications. The `ApproveSignoff` use case records a signoff on a change and transitions it to the `signed-off` state, enforcing that the gate is enabled, computing artifact hashes using schema-defined pre-hash cleanup rules, and persisting the updated change. It is the only path through the signoff gate in the change lifecycle.
+Human signoff MUST record consent on a change that stays in `done` (when the signoff gate is on). This use case hashes in-scope artifacts, appends a signoff history event, and MUST NOT transition into `pending-signoff` or `signed-off` on that happy path. Drain from `pending-signoff` remains for in-flight changes.
 
 ## Requirements
 
@@ -22,31 +22,28 @@ The use case MUST load the change by name from the `ChangeRepository`. If no cha
 
 ### Requirement: Artifact hash computation
 
-Before recording the signoff, the use case MUST compute a content hash for every file across all artifacts in the change. For each artifact, it iterates over the artifact's `files` map. For each file:
+Before recording the signoff, the use case MUST compute a content hash for every file across all artifacts in the change. Obtain the schema once from `SchemaProvider.get()`. Build a cleanup map from that schema. For each artifact, iterate the artifact's `files` map. For each file:
 
 1. Skip files with status `missing` or `skipped`.
 2. Load the file content from the repository via `ChangeRepository.artifact(change, file.filename)`.
 3. If the file cannot be loaded (returns `null`), skip it silently.
-4. Resolve the active schema from the `SchemaRegistry` using the configured schema reference and workspace schema paths.
-5. If the schema resolves, build a cleanup map of artifact-type to pre-hash cleanup rules; if it does not resolve, use an empty cleanup map.
-6. Apply the matching cleanup rules (by artifact type) to the content, then hash the cleaned content via the `ContentHasher`.
+4. Apply the matching cleanup rules (by artifact type) to the content, then hash the cleaned content via the `ContentHasher`.
 
 The result is a `Record<string, string>` mapping `type:key` hash keys to hash strings (e.g. `"proposal:proposal"`, `"specs:default:auth/login"`), where `type` is the artifact type ID and `key` is the file key within the artifact.
 
 ### Requirement: Signoff recording and state transition
 
-The use case MUST resolve the current actor identity via the `ActorResolver`, then:
+The use case MUST resolve the current actor identity via the `ActorResolver`, then call `change.recordSignoff(reason, artifactHashes, actor)` to append a `signed-off` history event.
 
-1. Call `change.recordSignoff(reason, artifactHashes, actor)` to append a `signed-off` history event.
-2. Call `change.transition('signed-off', actor)` to advance the lifecycle state.
+When the change is in a state bound as `from` for `approval.signoff` (check registry bindings; currently `done`), it MUST NOT call `change.transition('signed-off', actor)` or `change.transition('pending-signoff', actor)`. The change remains in that state so `approval.signoff` can pass on the next bound delivery edge.
 
-The `Change` entity enforces that the transition from the current state to `signed-off` is valid. If the change is not in `pending-signoff` state, the entity throws an `InvalidStateTransitionError`.
+Drain: when the change is already in `pending-signoff`, the use case MAY still `change.transition('signed-off', actor)`. Drain states are not `approval.signoff` bindings.
 
 ### Requirement: Persistence and return value
 
-After computing artifact hashes, the use case MUST record the signoff and lifecycle transition through `ChangeRepository.mutate(name, fn)`.
+After computing artifact hashes, the use case MUST record the signoff through `ChangeRepository.mutate(name, fn)`.
 
-Inside the mutation callback, the repository supplies the fresh persisted `Change` for `name`; the use case records the signoff on that instance, transitions it to `signed-off`, and returns the updated change. This ensures the signoff event, artifact hashes, and lifecycle transition are persisted atomically with respect to other mutations of the same change.
+Inside the mutation callback, the use case records the signoff on the fresh change. It MUST NOT transition a change whose state is bound as `from` for `approval.signoff` into `pending-signoff` or `signed-off`. Drain transitions from `pending-signoff` remain allowed.
 
 `ApproveSignoff.execute` returns the updated `Change` entity produced by that serialized mutation.
 
@@ -80,7 +77,7 @@ The config-based `createApproveSignoff(config, options?)` form MUST derive `Appr
 - `changes: ChangeRepository`
 - `actor: ActorResolver`
 - `schemaProvider: SchemaProvider`
-- `hasher: ContentHasher`
+- `contentHasher: ContentHasher`
 - `approvals: ApprovalGates`
 
 The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
@@ -99,3 +96,4 @@ The helper is the only use-case-specific composition entry for config-based boot
 - [`core:composition`](../composition/spec.md)
 - [`core:kernel`](../kernel/spec.md)
 - [`core:composition-resolver`](../composition-resolver/spec.md)
+- [`core:transition-checks`](../transition-checks/spec.md) — `from` states for `approval.signoff` come from check registry bindings

@@ -3,7 +3,6 @@ import * as os from 'node:os'
 import * as path from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { makeSpec } from '../../helpers/make-spec.js'
-import { ArchiveChange } from '../../../src/application/use-cases/archive-change.js'
 import { type MaterializeSpecMetadata } from '../../../src/application/use-cases/materialize-spec-metadata.js'
 import { Logger } from '../../../src/application/logger.js'
 import {
@@ -37,6 +36,7 @@ import {
   makeSchemaProvider,
   makeSpecRepository,
   makeMaterializeMetadata,
+  newArchiveChange,
   testActor,
 } from './helpers.js'
 import {
@@ -258,7 +258,7 @@ describe('ArchiveChange batch snapshot integration', () => {
       },
     })
 
-    const uc = new ArchiveChange(
+    const uc = newArchiveChange(
       repoChanges,
       makeListWorkspaces(new Map([['default', repo]])),
       makeArchiveRepo(),
@@ -332,7 +332,7 @@ describe('ArchiveChange batch snapshot integration', () => {
       },
     })
 
-    const uc = new ArchiveChange(
+    const uc = newArchiveChange(
       repoChanges,
       makeListWorkspaces(new Map([['default', repo]])),
       makeArchiveRepo(),
@@ -397,7 +397,7 @@ describe('ArchiveChange batch snapshot integration', () => {
       },
     })
 
-    const uc = new ArchiveChange(
+    const uc = newArchiveChange(
       repoChanges,
       makeListWorkspaces(new Map([['default', repo]])),
       makeArchiveRepo(),
@@ -471,7 +471,7 @@ describe('ArchiveChange batch snapshot integration', () => {
       },
     })
 
-    const uc = new ArchiveChange(
+    const uc = newArchiveChange(
       repoChanges,
       makeListWorkspaces(new Map([['default', specRepo]])),
       makeArchiveRepo(),
@@ -527,7 +527,7 @@ describe('ArchiveChange batch snapshot integration', () => {
       return archiveImpl(c)
     }
 
-    const uc = new ArchiveChange(
+    const uc = newArchiveChange(
       repoChanges,
       makeListWorkspaces(new Map([['default', repo]])),
       archiveRepo,
@@ -614,7 +614,7 @@ describe('ArchiveChange batch snapshot integration', () => {
       },
     })
 
-    const uc = new ArchiveChange(
+    const uc = newArchiveChange(
       repoChanges,
       makeListWorkspaces(new Map([['default', specRepo]])),
       archiveRepo,
@@ -662,7 +662,7 @@ describe('ArchiveChange batch snapshot integration', () => {
       },
     })
 
-    const uc = new ArchiveChange(
+    const uc = newArchiveChange(
       repoChanges,
       makeListWorkspaces(new Map([['default', repo]])),
       makeArchiveRepo(),
@@ -742,7 +742,7 @@ describe('ArchiveChange batch snapshot integration', () => {
       },
     })
 
-    const uc = new ArchiveChange(
+    const uc = newArchiveChange(
       repoChanges,
       makeListWorkspaces(new Map([['default', repo]])),
       makeArchiveRepo(),
@@ -762,8 +762,8 @@ describe('ArchiveChange batch snapshot integration', () => {
     const messages = debugSpy.mock.calls.map(([message]) => String(message))
     expect(messages.some((m) => m.includes('force materialization started'))).toBe(true)
     expect(messages.some((m) => m.includes('force materialization completed'))).toBe(true)
-    expect(messages.some((m) => m.includes('post-archive hooks started'))).toBe(true)
-    expect(messages.some((m) => m.includes('post-archive hooks completed'))).toBe(true)
+    expect(messages.some((m) => m.includes('after-persist effects started'))).toBe(true)
+    expect(messages.some((m) => m.includes('after-persist effects completed'))).toBe(true)
     expect(postHookSpy).toHaveBeenCalled()
     debugSpy.mockRestore()
   })

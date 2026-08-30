@@ -7,12 +7,17 @@
     "default:_global/architecture",
     "core:change",
     "core:change-manifest",
-    "default:_global/logging"
+    "default:_global/logging",
+    "core:lifecycle-engine",
+    "core:schema-format"
   ],
   "implementation": [
     {
-      "file": "core:src/infrastructure/fs/fs-validation-result-cache.ts",
-      "symbols": ["FsValidationResultCache"]
+      "file": "core:src/domain/services/lifecycle-engine.ts",
+      "symbols": ["projectArtifacts"]
+    },
+    {
+      "file": "core:src/infrastructure/fs/manifest.ts"
     }
   ],
   "optimizations": {

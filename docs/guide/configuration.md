@@ -277,7 +277,7 @@ storage:
 
 ## Schema selection
 
-The `schema` field tells SpecD which workflow schema to use. Schemas define your artifact types, lifecycle steps, and validation rules. There is exactly one active schema per project.
+The `schema` field tells SpecD which workflow schema to use. Schemas define your artifact types, extras on named existing lifecycle states (`workflow[]` lookup rows), and validation rules. There is exactly one active schema per project.
 
 SpecD resolves the `schema` value using a prefix convention:
 
@@ -536,10 +536,10 @@ approvals:
 
 Setting either gate to `true` changes the lifecycle:
 
-| Gate      | Effect when `true`                                                                                                                                     |
-| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `spec`    | `ready → implementing` is blocked until a human runs `specd approve spec`. The change must pass through `pending-spec-approval → spec-approved` first. |
-| `signoff` | `done → archivable` is blocked until a human runs `specd approve signoff`. The change must pass through `pending-signoff → signed-off` first.          |
+| Gate      | Effect when `true`                                                                                                                                                                                                                                                                                                              |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `spec`    | Any **forward** leave of `ready` (`ready → implementing`, or `ready → verifying` if `implementing` is omitted from `workflow[]`) is blocked until a human runs `specd changes approve spec`. Redesign (`ready → designing`) is not gated. The change stays in `ready`; approval records consent, then the same edge is allowed. |
+| `signoff` | `done → archivable` is blocked until a human runs `specd changes approve signoff`. The change stays in `done`; signoff records consent, then the same edge is allowed.                                                                                                                                                          |
 
 The two gates are independent — you can enable either or both.
 

@@ -142,6 +142,20 @@
 - **AND** the CLI exits with code 2 (at least one hook failed)
 - **AND** results for both hooks are returned
 
+#### Scenario: Transition source.post failure does not persist
+
+- **GIVEN** `implementing.hooks.post` exits non-zero on `implementing → verifying`
+- **WHEN** `TransitionChange` executes
+- **THEN** `HookFailedError` is thrown
+- **AND** the change remains in `implementing`
+
+#### Scenario: Archive post collect is binding policy
+
+- **GIVEN** archive `hook.post` is bound with `onFailure = collect`
+- **WHEN** that effect exits non-zero after persist
+- **THEN** `ArchiveChange` continues
+- **AND** the same check id on a transition binding with `onFailure = abort` still throws
+
 ### Requirement: Hook ordering
 
 #### Scenario: Schema hooks execute before project hooks
@@ -152,15 +166,15 @@
 - **THEN** `pnpm lint` executes first
 - **AND** `pnpm typecheck` executes second
 
-### Requirement: change transition does not execute hooks
+### Requirement: Change entity does not execute hooks
 
-#### Scenario: Transition with hooks defined does not run them
+#### Scenario: TransitionChange auto-runs matching run effects
 
 - **GIVEN** the implementing step has `run:` pre-hooks defined
+- **AND** `skipHookPhases` is empty
 - **WHEN** the agent runs `specd change transition <name> implementing`
-- **THEN** the transition succeeds
-- **AND** no hooks are executed
-- **AND** the change state is updated to `implementing`
+- **THEN** matching pre effects execute before persist
+- **AND** the `Change` entity itself does not invoke `HookRunner`
 
 ### Requirement: Default hook execution for transitions and archives
 
@@ -171,12 +185,12 @@
 - **THEN** pre-hooks are executed before the state transition
 - **AND** pre-hook failure aborts the transition
 
-#### Scenario: TransitionChange executes post-hooks after state change
+#### Scenario: TransitionChange executes post-hooks before persist
 
-- **GIVEN** a transition to `implementing` step with post-hooks
+- **GIVEN** a forward transition from a step with post-hooks
 - **WHEN** `TransitionChange.execute` is called
-- **THEN** post-hooks are executed after the state transition
-- **AND** post-hook failures are collected without rollback
+- **THEN** those post effects execute after predicates pass and before persist
+- **AND** post-hook failure with `onFailure = abort` does not persist the state change
 
 #### Scenario: ArchiveChange executes pre-hooks before archive
 
@@ -198,6 +212,26 @@
 - **WHEN** hook execution is triggered
 - **THEN** `RunStepHooks` is used for collection, variable expansion, and execution
 
+#### Scenario: Transition source.post skipped on redesign
+
+- **GIVEN** a change in `implementing` with `implementing.hooks.post`
+- **WHEN** `TransitionChange` targets `designing`
+- **THEN** those post hooks are not executed
+- **AND** predicates still ran
+
+#### Scenario: Transition source.post skipped on backward
+
+- **GIVEN** a change in `verifying` with `verifying.hooks.post`
+- **WHEN** `TransitionChange` targets `implementing`
+- **THEN** those post hooks are not executed
+- **AND** `along` is `backward`
+
+#### Scenario: Recovery omits hook.pre and hook.post
+
+- **WHEN** the attempt is `archiving → archivable`
+- **THEN** `hook.post` does not match
+- **AND** `hook.pre` does not match (`exceptAlong` includes `recovery`)
+
 ### Requirement: Manual hook control with skipHooks
 
 #### Scenario: TransitionChange accepts skipHookPhases selector
@@ -215,6 +249,18 @@
 - **GIVEN** `TransitionChange` accepts phase selectors 'source.pre', 'source.post', 'target.pre', 'target.post'
 - **WHEN** `skipHookPhases: ['target.pre']` is provided
 - **THEN** only target pre-hooks are skipped
+
+#### Scenario: skip source.pre is a no-op on this table
+
+- **GIVEN** `skipHookPhases` contains `source.pre`
+- **WHEN** `TransitionChange.execute` runs a forward hop
+- **THEN** matching `hook.pre` / `hook.post` still execute unless another selector skips them
+
+#### Scenario: skip target.post is a no-op on this table
+
+- **GIVEN** `skipHookPhases` contains `target.post`
+- **WHEN** `TransitionChange.execute` runs a forward hop
+- **THEN** matching `hook.pre` / `hook.post` still execute unless another selector skips them
 
 ### Requirement: Template variable expansion
 

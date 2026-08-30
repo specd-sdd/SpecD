@@ -37,12 +37,9 @@ export type HookEntry =
     }
 
 /**
- * A single entry in a schema's `workflow[]` array, defining a named lifecycle
- * phase, which artifact IDs must be complete before the phase becomes available,
- * and optional pre/post hook arrays.
- *
- * Schema workflow steps fire first; project-level steps (`specd.yaml`) are
- * matched by `step` name and appended after.
+ * A lookup row in schema `workflow[]`. `step` names an existing `ChangeState`;
+ * the row attaches extras (`requires`, `requiresTaskCompletion`, `hooks`).
+ * It does not define protocol membership or legal hops.
  */
 export interface WorkflowStep {
   /**
@@ -51,8 +48,9 @@ export interface WorkflowStep {
   readonly step: string
 
   /**
-   * Artifact IDs (from the same schema) that must have status `complete` before
-   * this step becomes available. Empty array means the step is always available.
+   * Artifact IDs that must be complete/skipped for this lookup row’s extras.
+   * Empty array means no artifact extras (`workflow.requires` skips). Other
+   * predicates may still block the hop.
    */
   readonly requires: readonly string[]
 

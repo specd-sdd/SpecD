@@ -973,6 +973,15 @@ approvals:
       expect(config.approvals).toEqual({ spec: true, signoff: false })
     })
 
+    it('defaults approvals to false when section omitted', async () => {
+      const configPath = await writeConfig(minimalYaml(''))
+
+      const loader = createLoader({ configPath })
+      const config = await loader.load()
+
+      expect(config.approvals).toEqual({ spec: false, signoff: false })
+    })
+
     it('parses llmOptimizedContext boolean from config', async () => {
       const configPath = await writeConfig(
         minimalYaml(`

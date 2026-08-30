@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Changes must advance through a strict lifecycle, and the rules for doing so — approval gates, task completion checks, validation clearing, requires enforcement, and hook execution — are too complex for callers to enforce ad-hoc. The `TransitionChange` use case centralises lifecycle state transitions, delegating schema-aware lifecycle interpretation (approval-gate routing, workflow requires evaluation, recursive blocking, and task gating) to `LifecycleEngine` while still owning hook execution, redesign invalidation, and persistence of the final transitioned state.
+Changes must advance through a strict lifecycle, and the rules for doing so — approval gates, task completion checks, validation clearing, requires enforcement, and hook execution — are too complex for callers to enforce ad-hoc. The `TransitionChange` use case centralises lifecycle state transitions, importing `evaluateLifecycle` for schema-aware interpretation (approval-gate checks, workflow requires, recursive blocking, and task gating) while still owning hook execution, redesign invalidation, and persistence of the final transitioned state.
 
 ## Requirements
 
@@ -11,9 +11,10 @@ Changes must advance through a strict lifecycle, and the rules for doing so — 
 `TransitionChange.execute` SHALL accept a `TransitionChangeInput` with the following fields:
 
 - `name` (string, required) — the change to transition
-- `to` (ChangeState, required) — the requested target state
+- `to` (`ChangeState | 'next'`, required) — the requested target state, or the happy-path next sentinel (see Requirement: to next is the happy-path next state)
 - `skipHookPhases` (ReadonlySet\<HookPhaseSelector>, optional, default empty set) — which hook phases to skip. Valid values: `'source.pre'`, `'source.post'`, `'target.pre'`, `'target.post'`, `'all'`. When `'all'` is in the set, all hook phases are skipped. When the set is empty (default), all applicable hooks execute.
 - `refreshImplementationTrackingBefore` (boolean, optional) — when omitted or `true`, refresh tracked implementation files before transition for **active** changes only; when `false`, skip refresh
+- `allowOutOfScope` (boolean, optional) — when `true`, `impl.linksInScope` is skippable on the forward exit from `implementing`. It MUST NOT skip `impl.filesResolved`.
 
 Approval gate state (`approvalsSpec`, `approvalsSignoff`) MUST NOT appear on `TransitionChangeInput`. Gate state is baked at construction from `SpecdConfig.approvals` (see Requirement: Approval gates baked at construction).
 
@@ -45,36 +46,29 @@ When `refreshImplementationTrackingBefore` is `false`, `TransitionChange` MUST N
 
 Lifecycle rules MUST be evaluated against tracked implementation state after any refresh.
 
-### Requirement: Approval-gate routing for spec approval
+### Requirement: Spec approval is a check not a pending hop
 
-When the change is in `ready` state, the requested target is `implementing`, and the use case was constructed with `approvals.spec: true`, the use case MUST route the transition to `pending-spec-approval` instead of `implementing`.
+When the change is in `ready`, the requested target is `implementing`, and `approvals.spec` is `true`, `TransitionChange` MUST NOT rewrite the target to `pending-spec-approval`. It MUST evaluate `approval.spec`. If no spec approval is recorded, it MUST throw `InvalidStateTransitionError` with reason `{ type: 'approval-required', gate: 'spec' }` and leave the change in `ready`.
 
-The routing decision SHALL be interpreted through `LifecycleEngine` so that approval-gate behavior is derived in the same place as workflow blocking and step availability.
+### Requirement: Signoff is a check not a pending hop
 
-### Requirement: Approval-gate routing for signoff
-
-When the change is in `done` state, the requested target is `archivable`, and the use case was constructed with `approvals.signoff: true`, the use case MUST route the transition to `pending-signoff` instead of `archivable`.
-
-The routing decision SHALL be interpreted through `LifecycleEngine` so that signoff-gate behavior is derived in the same place as workflow blocking and step availability.
+When the change is in `done`, the requested target is `archivable`, and `approvals.signoff` is `true`, `TransitionChange` MUST NOT rewrite the target to `pending-signoff`. It MUST evaluate `approval.signoff`. If no signoff is recorded, it MUST throw `InvalidStateTransitionError` with reason `{ type: 'approval-required', gate: 'signoff' }` and leave the change in `done`.
 
 ### Requirement: Human-approval pending states produce explicit transition failures
 
-When the current change state represents a human approval boundary, `TransitionChange` MUST fail with an `InvalidStateTransitionError` that carries a structured reason explaining why normal lifecycle progression cannot continue through `change transition`.
+For in-flight changes already in `pending-spec-approval` or `pending-signoff`, `TransitionChange` MUST still fail automatic progression except `designing` (and the historic approve-forward targets used by drain). New work MUST NOT enter those states.
 
-Specifically:
-
-- When the change is in `pending-spec-approval` and the requested target is anything other than `designing`, the use case MUST throw `InvalidStateTransitionError` with reason `{ type: 'approval-required', gate: 'spec' }`
-- When the change is in `pending-signoff` and the requested target is anything other than `designing`, the use case MUST throw `InvalidStateTransitionError` with reason `{ type: 'approval-required', gate: 'signoff' }`
-
-This explicit failure happens before delegating to `change.transition(...)`. The goal is to preserve the existing lifecycle rules while giving callers enough information to explain why the transition cannot proceed automatically.
+When the change is in `ready` waiting on spec approval, callers MUST use `ApproveSpec`, not `change transition` to a pending state.
 
 ### Requirement: Direct transition when gates are inactive
 
-When neither approval-gate routing condition is met, the use case MUST transition to the exact target state requested in the input.
+`TransitionChange` MUST persist the requested target when all predicates pass. There is no effective-target rewrite for approval gates.
 
 ### Requirement: Workflow requires enforcement
 
-After resolving the effective target, the use case MUST obtain the active schema via `SchemaProvider` and look up the workflow step for the effective target via `schema.workflowStep(effectiveTarget)`. If the step declares a non-empty `requires` array, the use case MUST check each required artifact through `LifecycleEngine` rather than deriving dependency-aware effective status from `Change` directly. If any required artifact has an effective status other than `complete` or `skipped`, the use case MUST throw `InvalidStateTransitionError` with a structured reason explaining the block.
+After resolving the effective target, `TransitionChange` MUST call `execute` on matching **predicates** for the attempt (see [`core:transition-checks`](../transition-checks/spec.md)). `evaluateLifecycle` SHALL project `allowed` from those results. `workflow.requires` SHALL be that evaluation for the effective target's schema step.
+
+If any required artifact has an effective status other than `complete` or `skipped`, the use case MUST throw `InvalidStateTransitionError` with a structured reason explaining the block. It MUST map the failed predicate — it MUST NOT re-walk `requires` with a different status algorithm after a green `execute` of the same attempt.
 
 The error reason MUST include:
 
@@ -89,13 +83,13 @@ The use case MUST emit a `requires-check` progress event per artifact checked, r
 
 ### Requirement: Task completion check during requires enforcement
 
-For every artifact listed in the effective workflow step's `requiresTaskCompletion`, `TransitionChange` MUST first verify that the schema artifact type declares `hasTasks: true` and `taskCompletionCheck`. If either is absent, it MUST throw `InvalidStateTransitionError` with reason `missing-task-capability`.
+For every artifact listed in the effective workflow step's `requiresTaskCompletion`, the `workflow.taskCompletion` predicate MUST first verify that the schema artifact type declares `hasTasks: true` and `taskCompletionCheck`. If either is absent, `TransitionChange` MUST throw `InvalidStateTransitionError` with reason `missing-task-capability`.
 
-`TransitionChange` MUST obtain task counts once through `CountTasks` and look up each required artifact in `CountTasksResult.byArtifact`. An absent entry after capability validation MUST be treated as no qualifying task content and MUST NOT block the transition.
+Task counts MUST come from `workflow.taskCompletion.execute` (`CountTasks` composed into that check). An absent entry after capability validation MUST be treated as no qualifying task content and MUST NOT block the transition.
 
 When a required artifact's count has `incomplete > 0`, `TransitionChange` MUST emit the `task-completion-failed` progress event and throw `InvalidStateTransitionError` with reason `incomplete-tasks`, including that artifact's complete, incomplete, and total counts.
 
-The target step and the set of completion-gated artifacts SHALL be interpreted in the same lifecycle decision flow as approval routing and requires enforcement. `TransitionChange` MAY ask `LifecycleEngine` to resolve that lifecycle decision context first, but content inspection of task artifacts remains the responsibility of this use case.
+`TransitionChange` MUST NOT invoke `CountTasks` again after a green predicate evaluation of that attempt.
 
 Only artifacts listed in `requiresTaskCompletion` are content-checked. When `requiresTaskCompletion` is absent or empty, no task completion gating applies.
 
@@ -111,17 +105,30 @@ The transition is valid only when the current artifacts still correctly describe
 
 If verification concludes that the artifacts must change, or that new tasks are required before implementation can resume, callers must route to `designing` instead of `implementing`.
 
+### Requirement: Skill-aligned backward hop invalidation
+
+When the source state is `done`, `signed-off`, or `archivable` and the effective target is `implementing` or `verifying`, `TransitionChange` MUST:
+
+- invalidate an active signoff if one exists
+- MUST NOT mass-invalidate or downgrade unchanged artifacts
+- MUST NOT invalidate spec approval unless artifact files actually change
+- MUST NOT run `source.post` effects (`along` is `backward`)
+
+Persistence MUST still go through `ChangeRepository.mutate`.
+
 ### Requirement: Transition to designing from any state
 
 Every state except `drafting` SHALL include `designing` as a valid transition target. This includes `archiving`. This allows the user to return to the design phase at any point in the lifecycle when issues are discovered, including after a failed archive commit or incomplete batch restore.
 
-When the effective target is `designing` and the change is **not already in** `designing` or `drafting`, the use case MUST:
+When the effective target is `designing` and the change is **not already in** `designing` or `drafting`, the use case MUST call `change.invalidate(...)` with cause `artifact-review-required`. That entity method:
 
-1. Invalidate the active spec approval if one exists.
-2. Invalidate the active signoff if one exists — the first invalidation already clears both.
-3. Downgrade every artifact file to `pending-review`, except files already marked `drifted-pending-review`, which keep that more specific state.
-4. Recompute every artifact's aggregate persisted `state`.
-5. Proceed with the transition via `change.transition('designing', actor)`.
+1. Invalidates the active spec approval if one exists.
+2. Invalidates the active signoff if one exists — the first invalidation already clears both.
+3. Downgrades every artifact file to `pending-review`, except files already marked `drifted-pending-review`, which keep that more specific state.
+4. Recomputes every artifact's aggregate persisted `state`.
+5. Appends the `transitioned` event to `designing`.
+
+The use case MUST NOT call `change.transition('designing', actor)` after that invalidate. `invalidate()` **is** the hop.
 
 When the change is **already in** `designing` (a `designing → designing` transition) or in `drafting` (the natural first entry), the use case MUST NOT invalidate approvals, downgrade artifacts, or call `invalidate()`. It MUST proceed directly with the transition via `change.transition('designing', actor)`.
 
@@ -129,17 +136,17 @@ Drift detection (artifact content changes) is handled independently at the repos
 
 ### Requirement: Transition from archiving to archivable
 
-`TransitionChange` MUST permit `archiving → archivable` when the transition is valid in `VALID_TRANSITIONS`.
+`TransitionChange` MUST permit `archiving → archivable` when the transition is valid in `VALID_TRANSITIONS`. The attempt SHALL be classified as `along = recovery`.
 
-This transition is primarily used for manual recovery after a failed archive attempt once canonical storage has been restored to a known-good state. It MUST NOT run archive hooks or workflow `requires` checks associated with the `archivable` step — it is a lifecycle rollback, not re-entry into archive preparation.
+This transition is primarily used for manual recovery after a failed archive attempt once canonical storage has been restored to a known-good state. It MUST NOT run archive operation effects, `source.post` on `archiving`, or workflow `requires` / `workflow.taskCompletion` associated with the `archivable` step — it is a lifecycle rollback, not re-entry into archive preparation.
 
 Automatic invocation of this transition after failed archive commits is owned by `ArchiveChange`, not by callers of `TransitionChange`.
 
 ### Requirement: Pre-hook execution
 
-After source.post hooks succeed (or are skipped), when `'all'` and `'target.pre'` are both absent from `skipHookPhases`, and the target workflow step has `run:` pre-hooks, the use case MUST execute them via `RunStepHooks.execute({ name, step: effectiveTarget, phase: 'pre' })`. It MUST emit `hook-start` and `hook-done` progress events (with `phase: 'pre'`) for each hook. If any pre-hook fails, the use case MUST throw `HookFailedError` — no state transition occurs.
+After matching source.post effects succeed or are skipped (forward only), when `'all'` and `'target.pre'` are both absent from `skipHookPhases`, call `execute` on matching `before-persist` effects for the target workflow step (`hook.pre`: `to = that step`, `along = any`, including redesign). That check’s `execute` SHALL call `RunStepHooks`. The use case MUST NOT invoke `RunStepHooks` by check id. Emit generic check-progress events (`check-start` / `check-done`). `onFailure = abort`: throw `HookFailedError` — no persist.
 
-When `'all'` or `'target.pre'` is in `skipHookPhases`, pre-hook execution is skipped entirely.
+When `'all'` or `'target.pre'` is in `skipHookPhases`, those effects are skipped.
 
 ### Requirement: Transition delegation
 
@@ -157,13 +164,17 @@ If `!change.isImplementationTrackingActive`, the use case MUST call `change.star
 
 ### Requirement: Post-hook execution
 
-**Before** the state transition (and before pre-hooks), when `'all'` and `'source.post'` are both absent from `skipHookPhases`, the use case MUST look up the workflow step for the **source state** (`fromState`) via `schema.workflowStep(fromState)`. If the step has `run:` post-hooks, the use case MUST execute them via `RunStepHooks.execute({ name, step: fromState, phase: 'post' })`. It MUST emit `hook-start` and `hook-done` progress events (with `phase: 'post'`) for each hook. If any post-hook fails, the use case MUST throw `HookFailedError` — no state transition occurs.
+Matching **effects** (`run:` hooks) SHALL run only after all predicates pass. Selection MUST use the same `from` / `to` / `along` matcher as predicates, then binding `phase = before-persist` (see [`core:hook-execution-model`](../hook-execution-model/spec.md)). The use case MUST iterate matching bindings; it MUST NOT choose the slot by `check.id`.
 
-The source state is the state the change was in **before** the transition — post hooks represent "after finishing this step". This means hooks configured as `implementing.post` run when transitioning **out of** implementing (e.g. `implementing → verifying`), not when transitioning **into** implementing.
+**Before** persist, when `'all'` and `'source.post'` are both absent from `skipHookPhases`, call `execute` on matching `before-persist` effects whose schema step is the **source** (default: `hook.post`, `along = forward`). That check’s `execute` SHALL call `RunStepHooks`. The use case MUST NOT invoke `RunStepHooks` by check id. Emit generic check-progress events (`check-start` / `check-done`, with hook detail on `check-progress` when streaming). `onFailure = abort`: throw `HookFailedError` — no persist.
 
-The execution order is: source.post hooks → target.pre hooks → state transition. Both phases are fail-fast — a failure in either aborts the transition.
+When `along` is `backward`, `redesign`, or `recovery`, `hook.post` MUST NOT match.
 
-If no workflow step exists for the source state, or the schema cannot be resolved, post-hook execution is skipped.
+Then, when skip flags allow, execute matching `before-persist` effects for the **target** step (default: `hook.pre`). Order on a forward attempt follows the registry: source.post then target.pre, then persist. Both default to `onFailure = abort`.
+
+If no workflow step exists for the source or target, or the schema cannot be resolved, that effect is skipped.
+
+`--skip-hooks` / `skipHookPhases` SHALL skip effects only, never predicates. Skip matching MUST use binding `phase` (and the skip selector), not `check.id === 'hook.pre'|'hook.post'`.
 
 ### Requirement: Persistence
 
@@ -183,19 +194,35 @@ The previous `postHookFailures` field is removed because both hook phases are no
 
 ### Requirement: Progress callback
 
-`TransitionChange.execute` SHALL accept an optional second parameter `onProgress?: OnTransitionProgress`. Progress events are:
+`TransitionChange.execute` SHALL accept an optional second parameter `onProgress?: OnTransitionProgress`. Public progress is the generic check bus (`check-start`, `check-progress`, `check-done`) plus lifecycle extras:
 
 - `{ type: 'requires-check', artifactId: string, satisfied: boolean }` — emitted per artifact during requires enforcement
 - `{ type: 'task-completion-failed', artifactId: string, incomplete: number, complete: number, total: number }` — emitted when task completion check fails, before throwing
-- `{ type: 'hook-start', phase: 'pre' | 'post', hookId: string, command: string }` — emitted before each hook
-- `{ type: 'hook-done', phase: 'pre' | 'post', hookId: string, success: boolean, exitCode: number }` — emitted after each hook
+- `{ type: 'check-start' | 'check-done' | 'check-progress', id: string, label: string, ... }` — matching predicates and effects, including hooks (`hook.pre` / `hook.post`)
 - `{ type: 'transitioned', from: ChangeState, to: ChangeState }` — emitted after state change
+
+Hook checks MUST NOT emit first-class `{ type: 'hook-start' }` / `{ type: 'hook-done' }` as the public contract. Those names MAY appear only as `check-progress` `detail` values inside hook `execute`.
 
 ### Requirement: Dependencies
 
-`TransitionChange` depends on `ChangeRepository`, `ActorResolver`, `SchemaProvider`, `LifecycleEngine`, `RunStepHooks`, `RefreshImplementationTracking`, and `CountTasks`.
+`TransitionChange` depends on `ChangeRepository`, `ActorResolver`, `SchemaProvider`, `RefreshImplementationTracking`, baked `approvals`, and `transitionBindings` (application `Check` instances). It MUST NOT depend on `LifecycleEngine` as a constructor port.
 
 `TransitionChange` MUST NOT depend on `ImplementationDetector` or invoke implementation autodetection directly.
+`TransitionChange` MUST NOT take `RunStepHooks` or `CountTasks` as use-case constructor ports.
+
+### Requirement: to next is the happy-path next state
+
+`TransitionChange.execute` input `to` MUST accept a lifecycle `ChangeState` or the sentinel `'next'`.
+
+When `to` is `'next'`, Core MUST resolve it to the **happy-path next lifecycle state** from the current state (the forward delivery hop a human would normally take: e.g. `ready` → `implementing`, `implementing` → `verifying`, `signed-off` → `archivable`). This MUST NOT use `GetStatus.nextAction.targetStep` (that field may recommend staying, approving, or archiving).
+
+Core MUST reject `'next'` when there is no such hop, including at least `pending-spec-approval`, `pending-signoff`, `archivable`, and `archiving`, with a typed `SpecdError` (not a CLI-only table). After resolution, evaluation is the same as an explicit `to`.
+
+Predicate `protocol.edge` fail-fast applies to this execute path. GetStatus MUST still collect every matching predicate for the same edge.
+
+### Requirement: Shared runner errors propagate on transition
+
+When a matching predicate or effect check throws during `execute`, `TransitionChange` MUST propagate the typed error from the shared runner (for example `ReadOnlyWorkspaceError`, `ArchiveDependencyMismatchError`, `ArchiveImplementationStateError`) and MUST NOT leave the change in a partially transitioned state.
 
 ### Requirement: Config-based factory delegates through resolveTransitionChangeDeps
 
@@ -206,11 +233,13 @@ The config-based `createTransitionChange(config, options?)` form MUST derive `Tr
 - `changes: ChangeRepository`
 - `actor: ActorResolver`
 - `schemaProvider: SchemaProvider`
-- `runStepHooks: RunStepHooks`
 - `refreshImplementationTracking: RefreshImplementationTracking`
 - `approvals: ApprovalGates`
-- `lifecycle: LifecycleEngine`
-- `countTasks: CountTasks`
+- `transitionBindings` from `resolveWorkflowCheckRegistry` (application `create*` checks)
+
+It MUST NOT resolve `lifecycle` or `LifecycleEngine`. `TransitionChange` imports `evaluateLifecycle` as a module function.
+
+It MUST NOT resolve `runStepHooks` onto the use case. `RunStepHooks` is a constructor dep of `createHookPre` / `createHookPost`.
 
 The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
 
@@ -220,12 +249,21 @@ The helper is the only use-case-specific composition entry for config-based boot
 - Task completion checks are controlled by `requiresTaskCompletion` on the workflow step — only listed artifacts are content-checked
 - Task completion checks use `safeRegex` to compile patterns; patterns that fail compilation or contain nested quantifiers are treated as non-matching (no error thrown)
 - `InvalidStateTransitionError` carries a structured `reason` field: `'incomplete-artifact'`, `'incomplete-tasks'`, `'missing-task-capability'`, `'invalid-transition'`, `'approval-required'`, or `'gate-not-required'`
-- Approval-gate routing is configuration-driven at construction time, but its interpretation is centralized through `LifecycleEngine`
+- Approval-gate routing is configuration-driven at construction time, but its interpretation is centralized through `evaluateLifecycle`
+- Failed predicates MUST map to those existing reasons; `TransitionChange` MUST NOT invent a parallel requires/task/deps/readOnly/impl-exit algorithm after a green `execute` of matching predicates for the same attempt
+- Enter-ready predicates (`deps.consistent`, `workspace.readOnly`) and **forward** exit-implementing predicates (`impl.filesResolved`, `impl.linksInScope`, `along = forward`) MUST use the same runners as `ArchiveChange`. Redesign MUST NOT run those impl checks.
 - Pre-hook failure aborts the transition — no state change occurs
-- Post-hook failure aborts the transition — no state change occurs (both phases are fail-fast)
-- When schema resolution fails or no workflow step exists for the target, requires and hooks are skipped gracefully
+- Post-hook failure aborts the transition — no state change occurs (`onFailure = abort`, `phase = before-persist`). Post effects run only when `along = forward`
 - Artifact validation clearing on `verifying → implementing` reads the `implementing` step's `requires` from the schema — the caller does not supply them
 - A `designing → designing` transition MUST NOT trigger approval invalidation or artifact downgrade — it is a state-preserving transition that only re-enters the same step
+- Input MAY include `allowOutOfScope` for `impl.linksInScope` skippable semantics on transition
+- When the schema cannot be resolved, `TransitionChange` MUST throw (schema miss is not a silent skip of all checks)
+- When no workflow step exists for the target, `workflow.requires` / `workflow.taskCompletion` skip; matching protocol and other predicates still run
+- Constructor / `resolveTransitionChangeDeps` MUST inject application `create*` `transitionBindings`. It MUST NOT default to domain stub `TRANSITION_BINDINGS`
+- `RunStepHooks` SHALL be composed into hook checks (`createHookPre` / `createHookPost`), not as a use-case constructor port
+- When enter-ready runners fail, `TransitionChange` MUST propagate `ReadOnlyWorkspaceError` (`workspace.readOnly`) and `ArchiveDependencyMismatchError` (`deps.consistent`) — the same typed errors as `ArchiveChange`
+- When forward exit-implementing runners fail, `TransitionChange` MUST propagate `ArchiveImplementationStateError` (`impl.filesResolved` / `impl.linksInScope`)
+- When `to` is `'next'` and no happy-path hop exists, `TransitionChange` MUST throw `HappyPathNextUnavailableError` (a typed `SpecdError`)
 
 ## Spec Dependencies
 
@@ -238,3 +276,4 @@ The helper is the only use-case-specific composition entry for config-based boot
 - [`core:refresh-implementation-tracking`](../refresh-implementation-tracking/spec.md)
 - [`core:composition-resolver`](../composition-resolver/spec.md)
 - [`core:count-tasks`](../count-tasks/spec.md) — supplies shared task-completion counts.
+- [`core:transition-checks`](../transition-checks/spec.md) — predicate evaluation then matching effects.

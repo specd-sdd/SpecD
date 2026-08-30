@@ -48,13 +48,6 @@
 - **THEN** stdout shows the artifact aggregate state
 - **AND** it lists the individual file row with `drifted-pending-review`
 
-#### Scenario: Text output shows review section when review is required
-
-- **GIVEN** `GetStatus` returns `review.required: true`
-- **WHEN** `specd change status <name>` is run in text mode
-- **THEN** stdout includes a `review:` section
-- **AND** it shows the route, reason, and affected absolute file paths
-
 #### Scenario: JSON output includes review and file state
 
 - **GIVEN** a change in `designing`
@@ -130,6 +123,69 @@
 - **THEN** the serialized row includes canonical state
 - **AND** it includes the display-state projection
 
+### Requirement: Lifecycle projections come from GetStatus checks
+
+#### Scenario: Incomplete tasks do not list verifying as available
+
+- **GIVEN** `GetStatus` omits `verifying` from `availableTransitions`
+- **WHEN** `specd changes status <name>` is rendered
+- **THEN** the displayed available transitions omit `verifying`
+- **AND** the CLI does not add it from `VALID_TRANSITIONS` alone
+
+#### Scenario: nextAction implements vs verify follows GetStatus
+
+- **GIVEN** `GetStatus.nextAction` recommends `/specd-verify`
+- **WHEN** the status command is rendered
+- **THEN** it does not recommend `/specd-implement` instead
+
+#### Scenario: Drafted JSON empties hops even if Core leaks them
+
+- **GIVEN** a drafted change
+- **AND** `GetStatus.lifecycle.availableTransitions` includes `ready`
+- **AND** `GetStatus.lifecycle.availableSteps` is non-empty
+- **WHEN** `specd change status <name> --format json` is rendered
+- **THEN** JSON `availableTransitions` is `[]`
+- **AND** JSON `availableSteps` is `[]`
+- **AND** JSON `nextAction.command` is `null`
+
+### Requirement: Text status omits duplicated review file lists
+
+#### Scenario: Artifact-review-required does not reprint files under review
+
+- **GIVEN** `GetStatus.review.required` is true
+- **AND** `reason` is `'artifact-review-required'`
+- **AND** `affectedArtifacts` lists pending-review files
+- **WHEN** `specd changes status <name>` is rendered as `format=text`
+- **THEN** `artifacts (details):` still lists those files with `pending-review`
+- **AND** stdout includes a `review:` header with `required` / `route` / `reason`
+- **AND** when Core supplies `review.message`, that message is printed
+- **AND** the output does not list those file paths under `review:`
+- **AND** JSON output still includes `review.affectedArtifacts`
+
+#### Scenario: Drift is shown only in artifacts details
+
+- **GIVEN** `review.reason` is `'artifact-drift'`
+- **WHEN** status is rendered as `format=text`
+- **THEN** drifted files appear under `artifacts (details):` with `[drift]`
+- **AND** the output does not reprint those paths under `review:`
+
+#### Scenario: Overlap peers still print in text
+
+- **GIVEN** `review.reason` is `'spec-overlap-conflict'`
+- **AND** `overlapDetail` contains an archived change name and overlapping spec ids
+- **WHEN** status is rendered as `format=text`
+- **THEN** the output includes those overlap peers
+- **AND** it does not list `affectedArtifacts` file paths under `review:`
+
+### Requirement: Text blockers include check labels
+
+#### Scenario: DEPS_INCONSISTENT blocker shows Checking spec dependencies
+
+- **GIVEN** `GetStatus.blockers` includes `{ code: 'DEPS_INCONSISTENT', label: 'Checking spec dependencies', checkId: 'deps.consistent', message: '…' }`
+- **WHEN** `specd changes status <name>` is rendered as `format=text`
+- **THEN** the blockers section includes `DEPS_INCONSISTENT` and `Checking spec dependencies`
+- **AND** JSON output includes `blockers[].label`
+
 ### Requirement: Schema version warning
 
 #### Scenario: Schema mismatch
@@ -184,13 +240,15 @@
 - **WHEN** `specd change status <name>` is run in text mode
 - **THEN** the `design` subtree appears once in the DAG section (not duplicated under every parent path)
 
-#### Scenario: Text output shows overlap entries when reason is spec-overlap-conflict
+#### Scenario: Text output shows overlap peers without review file lists
 
 - **GIVEN** `GetStatus` returns `review.required: true` with `reason: 'spec-overlap-conflict'`
 - **AND** `review.overlapDetail` has two entries: `[{ archivedChangeName: 'beta', overlappingSpecIds: ['core:config'] }, { archivedChangeName: 'alpha', overlappingSpecIds: ['core:kernel'] }]`
-- **WHEN** `specd change status <name>` is run
-- **THEN** the review section shows `reason: spec-overlap-conflict`
-- **AND** an `overlap:` subsection lists both entries as bullets
+- **WHEN** `specd change status <name>` is run in text mode
+- **THEN** stdout includes an `overlap:` section listing both entries as bullets
+- **AND** stdout includes a `review:` header with `required` / `route` / `reason` / human `message`
+- **AND** stdout does not list `affectedArtifacts` file paths under `review:`
+- **AND** blockers do not include `OVERLAP_CONFLICT` for that invalidation
 
 ### Requirement: Delegates refresh policy to GetStatus
 

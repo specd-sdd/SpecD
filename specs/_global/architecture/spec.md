@@ -14,9 +14,13 @@ Any package containing business logic must be organized in three layers: `domain
 
 The `domain` layer has zero I/O dependencies. No `fs`, no `net`, no `child_process`, no external HTTP. It depends only on the TypeScript standard library and other domain types. This applies to every package's `domain/` layer.
 
+**Exception — ambient Logger:** Any layer in any package MAY import the project's ambient `Logger` (see [`default:_global/logging`](../logging/spec.md)) for diagnostic observability only. This is the sole intentional exception to strict inner-layer import rules. A process-level composition root assigns the implementation; other packages MAY use the facade without re-wiring. Each package chooses how and where to call it. The ambient Logger is a process-level observability facade, not a fourth hexagon layer.
+
 ### Requirement: Application layer uses ports only
 
 The `application` layer (use cases and application services) interacts with the outside world exclusively through port interfaces defined in `application/ports/`. It never imports infrastructure adapters directly. This applies to every package's `application/` layer.
+
+Importing the ambient `Logger` for diagnostics is permitted and is not treated as importing an infrastructure adapter.
 
 ### Requirement: Rich domain entities
 

@@ -34,20 +34,18 @@ The user never supplies artifact hashes.
 
 ### Requirement: Approve spec behaviour
 
-`approve spec` invokes `ApproveSpec`. It is only valid when the change is in `pending-spec-approval` state. On success, the change transitions to `spec-approved`.
+`approve spec` invokes `ApproveSpec`. It is valid when the change is in a binding `from` state for `approval.spec` (currently `ready`) or, for drain, `pending-spec-approval`. On success from `ready`, the change stays in `ready` with a recorded spec approval. It MUST NOT print a transition to `pending-spec-approval`. Help text MUST use bound-`from` language, with `ready` as the current example.
 
 ### Requirement: Approve signoff behaviour
 
-`approve signoff` invokes `ApproveSignoff`. It is only valid when the change is in `pending-signoff` state. On success, the change transitions to `signed-off`.
+`approve signoff` invokes `ApproveSignoff`. It is valid when the change is in a binding `from` state for `approval.signoff` (currently `done`) or, for drain, `pending-signoff`. On success from `done`, the change stays in `done` with a recorded signoff. Help text MUST use bound-`from` language, with `done` as the current example.
 
 ### Requirement: Output on success
 
 On success, output depends on `--format`:
 
-- `text` (default): prints to stdout:
-- `json` or `toon`: outputs the following to stdout (encoded in the respective format):
-
-where `<gate>` is `spec` or `signoff`.
+- `text` (default): prints to stdout `approved <gate> for <name>` where `<gate>` is `spec` or `signoff`
+- `json` or `toon`: outputs `{ "result": "ok", "gate": "<gate>", "name": "<name>" }` to stdout
 
 ### Requirement: Error cases
 
@@ -70,4 +68,5 @@ specd change approve signoff add-oauth-login --reason "implementation verified"
 ## Spec Dependencies
 
 - [`cli:entrypoint`](../entrypoint/spec.md) — config discovery, exit codes, output conventions
-- [`core:change`](../../core/change/spec.md) — approval gates, spec-approved and signed-off states
+- [`core:change`](../../core/change/spec.md) — approval records consumed by transition checks
+- [`core:transition-checks`](../../core/transition-checks/spec.md) — approval.spec / approval.signoff

@@ -43,14 +43,20 @@
 
 ### Requirement: Signoff recording and state transition
 
-#### Scenario: Change is in pending-signoff state
+#### Scenario: Change is in done records signoff without pending
+
+- **GIVEN** the change is in `done` and the signoff gate is on
+- **WHEN** `execute()` completes successfully
+- **THEN** the change history contains a `signed-off` event
+- **AND** the change state remains `done`
+
+#### Scenario: Drain from pending-signoff still reaches signed-off
 
 - **GIVEN** the change is in `pending-signoff` state
 - **WHEN** `execute()` completes successfully
-- **THEN** the change history contains a `signed-off` event with the provided reason, computed artifact hashes, and the resolved actor
-- **AND** the change state is `signed-off`
+- **THEN** the change state is `signed-off`
 
-#### Scenario: Change is not in pending-signoff state
+#### Scenario: Change is not in done or pending-signoff
 
 - **GIVEN** the change is in `drafting` state
 - **WHEN** `execute()` is called
@@ -60,11 +66,10 @@
 
 #### Scenario: Change is saved and returned through serialized mutation
 
-- **GIVEN** a successful signoff
+- **GIVEN** a successful signoff from `done`
 - **WHEN** `execute()` returns
 - **THEN** `ChangeRepository.mutate(input.name, fn)` has been called
-- **AND** the callback records the signoff and transitions the fresh persisted change to `signed-off`
-- **AND** the returned `Change` has state `signed-off`
+- **AND** the returned `Change` has state `done`
 
 ### Requirement: Input contract
 
@@ -102,10 +107,5 @@
 - **WHEN** `createApproveSignoff(config, options?)` is invoked
 - **THEN** it creates a composition resolver for that composition session
 - **AND** it derives `ApproveSignoffDeps` through `resolveApproveSignoffDeps(resolver)`
-- **AND** `resolveApproveSignoffDeps(resolver)` resolves:
-- `changes: ChangeRepository`
-- `actor: ActorResolver`
-- `schemaProvider: SchemaProvider`
-- `hasher: ContentHasher`
-- `approvals: ApprovalGates`
+- **AND** `resolveApproveSignoffDeps(resolver)` resolves `contentHasher: ContentHasher`
 - **AND** the factory delegates to canonical `createApproveSignoff(deps)`

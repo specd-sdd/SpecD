@@ -3,8 +3,25 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": ["skills:skill", "cli:spec-optimizations", "skills:workflow-automation"],
+  "dependsOn": [
+    "skills:skill",
+    "cli:spec-optimizations",
+    "skills:workflow-automation",
+    "core:transition-checks"
+  ],
   "implementation": [
+    {
+      "file": "skills:templates/skills/specd-verify/SKILL.md.tpl"
+    },
+    {
+      "file": "skills:templates/skills/specd-implement/SKILL.md.tpl"
+    },
+    {
+      "file": "skills:templates/skills/specd-new/SKILL.md.tpl"
+    },
+    {
+      "file": "skills:templates/shared/shared.md.tpl"
+    },
     {
       "file": "skills:templates/skills/specd-fasttrack/SKILL.md.tpl"
     },

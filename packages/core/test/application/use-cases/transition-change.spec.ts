@@ -3,15 +3,21 @@ import { TransitionChange } from '../../../src/application/use-cases/transition-
 import { CountTasks } from '../../../src/application/use-cases/count-tasks.js'
 import { type TransitionProgressEvent } from '../../../src/application/use-cases/transition-change.js'
 import { RefreshImplementationTracking } from '../../../src/application/use-cases/refresh-implementation-tracking.js'
+import { SchemaNotFoundError } from '../../../src/application/errors/schema-not-found-error.js'
 import { ChangeNotFoundError } from '../../../src/application/errors/change-not-found-error.js'
 import { InvalidStateTransitionError } from '../../../src/domain/errors/invalid-state-transition-error.js'
+import { HappyPathNextUnavailableError } from '../../../src/domain/errors/happy-path-next-unavailable-error.js'
 import { HookFailedError } from '../../../src/domain/errors/hook-failed-error.js'
 import { Change, type ChangeEvent } from '../../../src/domain/entities/change.js'
 import { ChangeArtifact } from '../../../src/domain/entities/change-artifact.js'
 import { ArtifactFile } from '../../../src/domain/value-objects/artifact-file.js'
 import { SpecArtifact } from '../../../src/domain/value-objects/spec-artifact.js'
-import { LifecycleEngine } from '../../../src/domain/services/lifecycle-engine.js'
+import { evaluateLifecycle } from '../../../src/application/services/lifecycle-evaluation.js'
+import { ArchiveImplementationStateError } from '../../../src/domain/errors/archive-implementation-state-error.js'
+import { ReadOnlyWorkspaceError } from '../../../src/domain/errors/read-only-workspace-error.js'
 import { Logger } from '../../../src/application/logger.js'
+import { createWorkflowCheckRegistry } from '../../../src/application/checks/workflow-check-registry.js'
+import { detectImplLinksInScope } from '../../../src/application/services/detect-impl-links-in-scope.js'
 import {
   makeChangeRepository,
   makeActorResolver,
@@ -20,6 +26,8 @@ import {
   makeArtifactType,
   makeRunStepHooks,
   makeWorkflowStep,
+  makeListWorkspaces,
+  makeNoopParsers,
   testActor,
 } from './helpers.js'
 
@@ -28,7 +36,17 @@ function makeChangeInState(name: string, events: ChangeEvent[]): Change {
     name,
     createdAt: new Date('2024-01-01T00:00:00Z'),
     specIds: ['auth/login'],
-    history: events,
+    history: [
+      {
+        type: 'created',
+        at: new Date('2024-01-01T00:00:00Z'),
+        by: actor,
+        specIds: ['auth/login'],
+        schemaName: '@specd/schema-std',
+        schemaVersion: 1,
+      },
+      ...events,
+    ],
   })
 }
 
@@ -60,15 +78,27 @@ function makeUseCase(
   const schemaProvider = makeSchemaProvider(
     overrides?.schema !== undefined ? overrides.schema : makeSchema(),
   )
+  const runStepHooks = overrides?.runStepHooks ?? makeRunStepHooks()
+  const countTasks = overrides?.countTasks ?? new CountTasks(repo, schemaProvider)
+  const registry = createWorkflowCheckRegistry({
+    countTasks,
+    runStepHooks,
+    readyFacts: {
+      changes: repo,
+      listWorkspaces: makeListWorkspaces(),
+      parsers: makeNoopParsers(),
+      extractorTransforms: new Map(),
+      workspaceRoutes: [],
+    },
+    detectImplLinksInScope,
+  })
   return new TransitionChange(
     repo,
     makeActorResolver(),
     schemaProvider,
-    overrides?.runStepHooks ?? makeRunStepHooks(),
     refresh,
     overrides?.approvals ?? { spec: false, signoff: false },
-    new LifecycleEngine(Logger.debug.bind(Logger)),
-    overrides?.countTasks ?? new CountTasks(repo, schemaProvider),
+    registry.transitionBindings,
   )
 }
 
@@ -108,6 +138,120 @@ describe('TransitionChange', () => {
           to: 'designing',
         }),
       ).rejects.toThrow(ChangeNotFoundError)
+    })
+  })
+
+  describe('given schema cannot be resolved', () => {
+    it('throws SchemaNotFoundError instead of skipping checks', async () => {
+      const change = makeChangeInState('my-change', [])
+      const uc = makeUseCase(makeChangeRepository([change]), { schema: null })
+
+      await expect(
+        uc.execute({
+          name: 'my-change',
+          to: 'designing',
+        }),
+      ).rejects.toThrow(SchemaNotFoundError)
+    })
+  })
+
+  describe('to next happy-path', () => {
+    it('resolves implementing to verifying', async () => {
+      const implementingSchema = makeSchema({
+        workflow: [
+          {
+            step: 'implementing',
+            requires: [],
+            requiresTaskCompletion: [],
+            hooks: { pre: [], post: [] },
+          },
+          {
+            step: 'verifying',
+            requires: [],
+            requiresTaskCompletion: [],
+            hooks: { pre: [], post: [] },
+          },
+        ],
+      })
+      const change = makeChangeInState('my-change', [
+        { type: 'transitioned', from: 'drafting', to: 'designing', at: new Date(), by: actor },
+        { type: 'transitioned', from: 'designing', to: 'ready', at: new Date(), by: actor },
+        { type: 'transitioned', from: 'ready', to: 'implementing', at: new Date(), by: actor },
+      ])
+      const repo = makeChangeRepository([change])
+      const uc = makeUseCase(repo, { schema: implementingSchema })
+
+      const result = await uc.execute({ name: 'my-change', to: 'next' })
+
+      expect(result.change.state).toBe('verifying')
+    })
+
+    it('rejects from archivable', async () => {
+      const change = makeChangeInState('my-change', [
+        { type: 'transitioned', from: 'drafting', to: 'designing', at: new Date(), by: actor },
+        { type: 'transitioned', from: 'designing', to: 'ready', at: new Date(), by: actor },
+        { type: 'transitioned', from: 'ready', to: 'implementing', at: new Date(), by: actor },
+        { type: 'transitioned', from: 'implementing', to: 'verifying', at: new Date(), by: actor },
+        { type: 'transitioned', from: 'verifying', to: 'done', at: new Date(), by: actor },
+        { type: 'transitioned', from: 'done', to: 'archivable', at: new Date(), by: actor },
+      ])
+      const uc = makeUseCase(makeChangeRepository([change]))
+
+      await expect(uc.execute({ name: 'my-change', to: 'next' })).rejects.toThrow(
+        HappyPathNextUnavailableError,
+      )
+    })
+
+    it('rejects from pending-spec-approval', async () => {
+      const change = makeChangeInState('my-change', [
+        { type: 'transitioned', from: 'drafting', to: 'designing', at: new Date(), by: actor },
+        { type: 'transitioned', from: 'designing', to: 'ready', at: new Date(), by: actor },
+        {
+          type: 'transitioned',
+          from: 'ready',
+          to: 'pending-spec-approval',
+          at: new Date(),
+          by: actor,
+        },
+      ])
+      const uc = makeUseCase(makeChangeRepository([change]))
+
+      await expect(uc.execute({ name: 'my-change', to: 'next' })).rejects.toThrow(
+        HappyPathNextUnavailableError,
+      )
+    })
+
+    it('rejects from pending-signoff', async () => {
+      const change = makeChangeInState('my-change', [
+        { type: 'transitioned', from: 'drafting', to: 'designing', at: new Date(), by: actor },
+        { type: 'transitioned', from: 'designing', to: 'ready', at: new Date(), by: actor },
+        { type: 'transitioned', from: 'ready', to: 'implementing', at: new Date(), by: actor },
+        { type: 'transitioned', from: 'implementing', to: 'verifying', at: new Date(), by: actor },
+        { type: 'transitioned', from: 'verifying', to: 'done', at: new Date(), by: actor },
+        { type: 'transitioned', from: 'done', to: 'pending-signoff', at: new Date(), by: actor },
+      ])
+      const uc = makeUseCase(makeChangeRepository([change]))
+
+      await expect(uc.execute({ name: 'my-change', to: 'next' })).rejects.toThrow(
+        HappyPathNextUnavailableError,
+      )
+    })
+
+    it('rejects from archiving', async () => {
+      const change = makeChangeInState('my-change', [
+        { type: 'transitioned', from: 'drafting', to: 'designing', at: new Date(), by: actor },
+        { type: 'transitioned', from: 'designing', to: 'ready', at: new Date(), by: actor },
+        { type: 'transitioned', from: 'ready', to: 'implementing', at: new Date(), by: actor },
+        { type: 'transitioned', from: 'implementing', to: 'verifying', at: new Date(), by: actor },
+        { type: 'transitioned', from: 'verifying', to: 'done', at: new Date(), by: actor },
+        { type: 'transitioned', from: 'done', to: 'archivable', at: new Date(), by: actor },
+        { type: 'transitioned', from: 'archivable', to: 'archiving', at: new Date(), by: actor },
+      ])
+      const uc = makeUseCase(makeChangeRepository([change]))
+
+      await expect(uc.execute({ name: 'my-change', to: 'next' })).rejects.toThrow(
+        HappyPathNextUnavailableError,
+      )
     })
   })
 
@@ -229,8 +373,26 @@ describe('TransitionChange', () => {
       expect(result.change.state).toBe('implementing')
     })
 
-    it('routes ready → pending-spec-approval when approvalsSpec is true', async () => {
+    it('stays in ready and throws approval-required when spec gate is on without consent', async () => {
       const change = makeReadyChange('my-change')
+      const uc = makeUseCase(makeChangeRepository([change]), {
+        approvals: { spec: true, signoff: false },
+      })
+
+      await expect(
+        uc.execute({
+          name: 'my-change',
+          to: 'implementing',
+        }),
+      ).rejects.toMatchObject({
+        reason: { type: 'approval-required', gate: 'spec' },
+      })
+      expect(change.state).toBe('ready')
+    })
+
+    it('transitions ready → implementing when spec gate is on and consent is recorded', async () => {
+      const change = makeReadyChange('my-change')
+      change.recordSpecApproval('ok', {}, actor)
       const uc = makeUseCase(makeChangeRepository([change]), {
         approvals: { spec: true, signoff: false },
       })
@@ -240,7 +402,7 @@ describe('TransitionChange', () => {
         to: 'implementing',
       })
 
-      expect(result.change.state).toBe('pending-spec-approval')
+      expect(result.change.state).toBe('implementing')
     })
   })
 
@@ -269,8 +431,26 @@ describe('TransitionChange', () => {
       expect(result.change.state).toBe('archivable')
     })
 
-    it('routes done → pending-signoff when approvalsSignoff is true', async () => {
+    it('stays in done and throws approval-required when signoff gate is on without consent', async () => {
       const change = makeDoneChange('my-change')
+      const uc = makeUseCase(makeChangeRepository([change]), {
+        approvals: { spec: false, signoff: true },
+      })
+
+      await expect(
+        uc.execute({
+          name: 'my-change',
+          to: 'archivable',
+        }),
+      ).rejects.toMatchObject({
+        reason: { type: 'approval-required', gate: 'signoff' },
+      })
+      expect(change.state).toBe('done')
+    })
+
+    it('transitions done → archivable when signoff gate is on and consent is recorded', async () => {
+      const change = makeDoneChange('my-change')
+      change.recordSignoff('ok', {}, actor)
       const uc = makeUseCase(makeChangeRepository([change]), {
         approvals: { spec: false, signoff: true },
       })
@@ -280,7 +460,7 @@ describe('TransitionChange', () => {
         to: 'archivable',
       })
 
-      expect(result.change.state).toBe('pending-signoff')
+      expect(result.change.state).toBe('archivable')
     })
   })
 
@@ -310,32 +490,32 @@ describe('TransitionChange', () => {
       ])
     }
 
-    it('throws approval-required reason for pending spec approval', async () => {
+    it('drains pending-spec-approval → spec-approved', async () => {
       const change = makePendingSpecApprovalChange('my-change')
-      const uc = makeUseCase(makeChangeRepository([change]))
-
-      await expect(
-        uc.execute({
-          name: 'my-change',
-          to: 'spec-approved',
-        }),
-      ).rejects.toMatchObject({
-        reason: { type: 'approval-required', gate: 'spec' },
+      const uc = makeUseCase(makeChangeRepository([change]), {
+        approvals: { spec: true, signoff: false },
       })
+
+      const result = await uc.execute({
+        name: 'my-change',
+        to: 'spec-approved',
+      })
+
+      expect(result.change.state).toBe('spec-approved')
     })
 
-    it('throws approval-required reason for pending signoff', async () => {
+    it('drains pending-signoff → signed-off', async () => {
       const change = makePendingSignoffChange('my-change')
-      const uc = makeUseCase(makeChangeRepository([change]))
-
-      await expect(
-        uc.execute({
-          name: 'my-change',
-          to: 'signed-off',
-        }),
-      ).rejects.toMatchObject({
-        reason: { type: 'approval-required', gate: 'signoff' },
+      const uc = makeUseCase(makeChangeRepository([change]), {
+        approvals: { spec: false, signoff: true },
       })
+
+      const result = await uc.execute({
+        name: 'my-change',
+        to: 'signed-off',
+      })
+
+      expect(result.change.state).toBe('signed-off')
     })
 
     it('still allows redesign from pending spec approval', async () => {
@@ -1364,7 +1544,8 @@ describe('TransitionChange', () => {
           return { hooks: [], success: true, failedHooks: [] }
         },
       })
-      const uc = makeUseCase(makeChangeRepository([change]), {
+      const repo = makeChangeRepository([change])
+      const uc = makeUseCase(repo, {
         schema: implementingSchema,
         runStepHooks,
       })
@@ -1375,6 +1556,7 @@ describe('TransitionChange', () => {
           to: 'verifying',
         }),
       ).rejects.toThrow(HookFailedError)
+      expect(repo.store.get('my-change')?.state).toBe('implementing')
     })
 
     it('skipHookPhases target.pre skips only pre hooks', async () => {
@@ -1418,6 +1600,98 @@ describe('TransitionChange', () => {
       })
 
       expect(calls).toEqual([{ step: 'implementing', phase: 'post' }])
+    })
+
+    it('skipHookPhases source.pre does not skip hook.pre or hook.post', async () => {
+      const implementingSchema = makeSchema({
+        workflow: [
+          {
+            step: 'implementing',
+            requires: [],
+            requiresTaskCompletion: [],
+            hooks: { pre: [], post: [] },
+          },
+          {
+            step: 'verifying',
+            requires: [],
+            requiresTaskCompletion: [],
+            hooks: { pre: [], post: [] },
+          },
+        ],
+      })
+      const change = makeChangeInState('my-change', [
+        { type: 'transitioned', from: 'drafting', to: 'designing', at: new Date(), by: actor },
+        { type: 'transitioned', from: 'designing', to: 'ready', at: new Date(), by: actor },
+        { type: 'transitioned', from: 'ready', to: 'implementing', at: new Date(), by: actor },
+      ])
+      const calls: Array<{ step: string; phase: string }> = []
+      const runStepHooks = makeRunStepHooks({
+        execute: async (input) => {
+          calls.push({ step: input.step, phase: input.phase })
+          return { hooks: [], success: true, failedHooks: [] }
+        },
+      })
+      const uc = makeUseCase(makeChangeRepository([change]), {
+        schema: implementingSchema,
+        runStepHooks,
+      })
+
+      await uc.execute({
+        name: 'my-change',
+        to: 'verifying',
+        skipHookPhases: new Set(['source.pre']),
+      })
+
+      expect(calls).toEqual([
+        { step: 'implementing', phase: 'post' },
+        { step: 'verifying', phase: 'pre' },
+      ])
+    })
+
+    it('skipHookPhases target.post does not skip hook.pre or hook.post', async () => {
+      const implementingSchema = makeSchema({
+        workflow: [
+          {
+            step: 'implementing',
+            requires: [],
+            requiresTaskCompletion: [],
+            hooks: { pre: [], post: [] },
+          },
+          {
+            step: 'verifying',
+            requires: [],
+            requiresTaskCompletion: [],
+            hooks: { pre: [], post: [] },
+          },
+        ],
+      })
+      const change = makeChangeInState('my-change', [
+        { type: 'transitioned', from: 'drafting', to: 'designing', at: new Date(), by: actor },
+        { type: 'transitioned', from: 'designing', to: 'ready', at: new Date(), by: actor },
+        { type: 'transitioned', from: 'ready', to: 'implementing', at: new Date(), by: actor },
+      ])
+      const calls: Array<{ step: string; phase: string }> = []
+      const runStepHooks = makeRunStepHooks({
+        execute: async (input) => {
+          calls.push({ step: input.step, phase: input.phase })
+          return { hooks: [], success: true, failedHooks: [] }
+        },
+      })
+      const uc = makeUseCase(makeChangeRepository([change]), {
+        schema: implementingSchema,
+        runStepHooks,
+      })
+
+      await uc.execute({
+        name: 'my-change',
+        to: 'verifying',
+        skipHookPhases: new Set(['target.post']),
+      })
+
+      expect(calls).toEqual([
+        { step: 'implementing', phase: 'post' },
+        { step: 'verifying', phase: 'pre' },
+      ])
     })
 
     it('skipHookPhases source.post skips only post hooks', async () => {
@@ -1483,7 +1757,7 @@ describe('TransitionChange', () => {
       })
     })
 
-    it('emits hook-start and hook-done progress events with phase:pre', async () => {
+    it('emits check-start/progress/done for hook.pre on the generic bus', async () => {
       const change = makeReadyChange('my-change')
       const runStepHooks = makeRunStepHooks({
         execute: async (input, onProgress) => {
@@ -1506,21 +1780,28 @@ describe('TransitionChange', () => {
       )
 
       expect(events).toContainEqual({
-        type: 'hook-start',
-        phase: 'pre',
-        hookId: 'lint',
-        command: 'pnpm lint',
+        type: 'check-start',
+        id: 'hook.pre',
+        label: 'Running pre hooks',
       })
       expect(events).toContainEqual({
-        type: 'hook-done',
-        phase: 'pre',
+        type: 'check-progress',
+        id: 'hook.pre',
+        label: 'Running pre hooks',
+        detail: 'hook-start',
         hookId: 'lint',
-        success: true,
-        exitCode: 0,
+        command: 'pnpm lint',
+        message: 'pnpm lint',
+      })
+      expect(events).toContainEqual({
+        type: 'check-done',
+        id: 'hook.pre',
+        label: 'Running pre hooks',
+        outcome: 'pass',
       })
     })
 
-    it('emits hook-output and hook-heartbeat progress events with phase:pre', async () => {
+    it('emits hook output/heartbeat as check-progress under hook.pre', async () => {
       const change = makeReadyChange('my-change')
       const runStepHooks = makeRunStepHooks({
         execute: async (input, onProgress) => {
@@ -1544,21 +1825,26 @@ describe('TransitionChange', () => {
       await uc.execute({ name: 'my-change', to: 'implementing' }, (event) => events.push(event))
 
       expect(events).toContainEqual({
-        type: 'hook-output',
-        phase: 'pre',
+        type: 'check-progress',
+        id: 'hook.pre',
+        label: 'Running pre hooks',
+        detail: 'hook-output',
         hookId: 'lint',
         stream: 'stdout',
         line: 'running lint',
       })
       expect(events).toContainEqual({
-        type: 'hook-heartbeat',
-        phase: 'pre',
+        type: 'check-progress',
+        id: 'hook.pre',
+        label: 'Running pre hooks',
+        detail: 'hook-heartbeat',
         hookId: 'lint',
         elapsedMs: 5000,
+        message: '5s',
       })
     })
 
-    it('emits hook-start and hook-done progress events with phase:post', async () => {
+    it('emits check-start/done for hook.post on the generic bus', async () => {
       const postSchema = makeSchema({
         workflow: [
           {
@@ -1601,17 +1887,15 @@ describe('TransitionChange', () => {
       )
 
       expect(events).toContainEqual({
-        type: 'hook-start',
-        phase: 'post',
-        hookId: 'notify',
-        command: 'notify-slack',
+        type: 'check-start',
+        id: 'hook.post',
+        label: 'Running post hooks',
       })
       expect(events).toContainEqual({
-        type: 'hook-done',
-        phase: 'post',
-        hookId: 'notify',
-        success: true,
-        exitCode: 0,
+        type: 'check-done',
+        id: 'hook.post',
+        label: 'Running post hooks',
+        outcome: 'pass',
       })
     })
 
@@ -1661,17 +1945,75 @@ describe('TransitionChange', () => {
         (evt) => events.push(evt),
       )
 
-      const types = events.map((e) => {
-        if (e.type === 'hook-start' || e.type === 'hook-done') return `${e.type}(${e.phase})`
-        return e.type
-      })
+      const types = events
+        .filter(
+          (e): e is Extract<TransitionProgressEvent, { type: 'check-start' | 'check-done' }> =>
+            (e.type === 'check-start' || e.type === 'check-done') &&
+            (e.id === 'hook.pre' || e.id === 'hook.post'),
+        )
+        .map((e) => `${e.type}(${e.id})`)
+        .concat(events.filter((e) => e.type === 'transitioned').map((e) => e.type))
       expect(types).toEqual([
-        'hook-start(post)',
-        'hook-done(post)',
-        'hook-start(pre)',
-        'hook-done(pre)',
+        'check-start(hook.post)',
+        'check-done(hook.post)',
+        'check-start(hook.pre)',
+        'check-done(hook.pre)',
         'transitioned',
       ])
+    })
+
+    it('emits check-start/done for deps.consistent predicate on the generic bus', async () => {
+      const change = makeChangeInState('my-change', [
+        { type: 'transitioned', from: 'drafting', to: 'designing', at: new Date(), by: actor },
+      ])
+      change.setArtifact(
+        new ChangeArtifact({
+          type: 'proposal',
+          files: new Map([
+            [
+              'proposal',
+              new ArtifactFile({
+                key: 'proposal',
+                filename: 'proposal.md',
+                status: 'complete',
+                validatedHash: 'sha256:abc',
+              }),
+            ],
+          ]),
+        }),
+      )
+      const schema = makeSchema({
+        artifacts: [makeArtifactType('proposal')],
+        workflow: [
+          {
+            step: 'ready',
+            requires: ['proposal'],
+            requiresTaskCompletion: [],
+            hooks: { pre: [], post: [] },
+          },
+        ],
+      })
+      const uc = makeUseCase(makeChangeRepository([change]), { schema })
+
+      const events: TransitionProgressEvent[] = []
+      await uc.execute({ name: 'my-change', to: 'ready' }, (evt) => events.push(evt))
+
+      expect(events).toContainEqual({
+        type: 'check-start',
+        id: 'deps.consistent',
+        label: 'Checking spec dependencies',
+      })
+      expect(events).toContainEqual({
+        type: 'check-done',
+        id: 'deps.consistent',
+        label: 'Checking spec dependencies',
+        outcome: 'pass',
+      })
+      const labeled = events.filter(
+        (e): e is Extract<TransitionProgressEvent, { type: 'check-start' | 'check-done' }> =>
+          e.type === 'check-start' || e.type === 'check-done',
+      )
+      expect(labeled.every((e) => !e.label.startsWith('Executing:'))).toBe(true)
     })
   })
 
@@ -1829,6 +2171,20 @@ describe('TransitionChange', () => {
         expect.any(Array),
         expect.anything(),
       )
+    })
+
+    it('does not call transition after invalidate when returning to designing', async () => {
+      const change = makeImplementingChange('my-change')
+      const transitionSpy = vi.spyOn(change, 'transition')
+      const uc = makeUseCase(makeChangeRepository([change]))
+
+      const result = await uc.execute({
+        name: 'my-change',
+        to: 'designing',
+      })
+
+      expect(result.change.state).toBe('designing')
+      expect(transitionSpy).not.toHaveBeenCalled()
     })
 
     it('does not trigger invalidation for drafting to designing', async () => {
@@ -1991,17 +2347,333 @@ describe('TransitionChange', () => {
     })
   })
 
+  describe('given shared predicate evaluation', () => {
+    it('does not CountTasks a second time after a green evaluate', async () => {
+      const change = makeChangeInState('my-change', [
+        { type: 'transitioned', from: 'drafting', to: 'designing', at: new Date(), by: actor },
+        { type: 'transitioned', from: 'designing', to: 'ready', at: new Date(), by: actor },
+        { type: 'transitioned', from: 'ready', to: 'implementing', at: new Date(), by: actor },
+      ])
+      const repo = makeChangeRepository([change])
+      const schemaProvider = makeSchemaProvider(
+        makeSchema({
+          workflow: [
+            {
+              step: 'verifying',
+              requires: [],
+              requiresTaskCompletion: ['tasks'],
+              hooks: { pre: [], post: [] },
+            },
+          ],
+          artifacts: [
+            makeArtifactType('tasks', {
+              hasTasks: true,
+              taskCompletionCheck: { incompletePattern: '^\\s*-\\s+\\[ \\]' },
+            }),
+          ],
+        }),
+      )
+      const countTasks = new CountTasks(repo, schemaProvider)
+      const executeSpy = vi.spyOn(countTasks, 'execute')
+      const runStepHooks = makeRunStepHooks()
+      const registry = createWorkflowCheckRegistry({
+        countTasks,
+        runStepHooks,
+        readyFacts: {
+          changes: repo,
+          listWorkspaces: makeListWorkspaces(),
+          parsers: makeNoopParsers(),
+          extractorTransforms: new Map(),
+          workspaceRoutes: [],
+        },
+        detectImplLinksInScope,
+      })
+      const uc = new TransitionChange(
+        repo,
+        makeActorResolver(),
+        schemaProvider,
+        makeRefreshImplementationTracking(),
+        { spec: false, signoff: false },
+        registry.transitionBindings,
+      )
+
+      await uc.execute({ name: 'my-change', to: 'verifying' })
+
+      expect(executeSpy).toHaveBeenCalledOnce()
+    })
+
+    it('still fails incomplete tasks when skipHookPhases is all', async () => {
+      const change = makeChangeInState('my-change', [
+        { type: 'transitioned', from: 'drafting', to: 'designing', at: new Date(), by: actor },
+        { type: 'transitioned', from: 'designing', to: 'ready', at: new Date(), by: actor },
+        { type: 'transitioned', from: 'ready', to: 'implementing', at: new Date(), by: actor },
+      ])
+      const tasksFile = new ArtifactFile({
+        key: 'tasks',
+        filename: 'tasks.md',
+        status: 'in-progress',
+      })
+      const tasks = new ChangeArtifact({ type: 'tasks', files: new Map([['tasks', tasksFile]]) })
+      tasks.markComplete('tasks', 'sha256:abc')
+      change.setArtifact(tasks)
+      const repo = makeChangeRepository([change])
+      repo.artifact = async (_c, filename) => {
+        if (filename === 'tasks.md') {
+          return new SpecArtifact('tasks.md', '- [ ] unfinished')
+        }
+        return null
+      }
+      const schema = makeSchema({
+        artifacts: [
+          makeArtifactType('tasks', {
+            hasTasks: true,
+            taskCompletionCheck: { incompletePattern: '^\\s*-\\s+\\[ \\]' },
+          }),
+          makeArtifactType('verify'),
+        ],
+        workflow: [
+          {
+            step: 'verifying',
+            requires: ['tasks'],
+            requiresTaskCompletion: ['tasks'],
+            hooks: { pre: [], post: [] },
+          },
+        ],
+      })
+      const uc = makeUseCase(repo, { schema })
+
+      await expect(
+        uc.execute({
+          name: 'my-change',
+          to: 'verifying',
+          skipHookPhases: new Set(['all']),
+        }),
+      ).rejects.toMatchObject({ reason: { type: 'incomplete-tasks' } })
+    })
+
+    it('skips source.post on redesign into designing', async () => {
+      const change = makeChangeInState('my-change', [
+        { type: 'transitioned', from: 'drafting', to: 'designing', at: new Date(), by: actor },
+        { type: 'transitioned', from: 'designing', to: 'ready', at: new Date(), by: actor },
+        { type: 'transitioned', from: 'ready', to: 'implementing', at: new Date(), by: actor },
+      ])
+      const executeSpy = vi.fn().mockResolvedValue({ hooks: [], success: true, failedHooks: [] })
+      const uc = makeUseCase(makeChangeRepository([change]), {
+        schema: makeSchema({
+          workflow: [
+            {
+              step: 'implementing',
+              requires: [],
+              requiresTaskCompletion: [],
+              hooks: { pre: [], post: [] },
+            },
+            {
+              step: 'designing',
+              requires: [],
+              requiresTaskCompletion: [],
+              hooks: { pre: [], post: [] },
+            },
+          ],
+        }),
+        runStepHooks: makeRunStepHooks({ execute: executeSpy }),
+      })
+
+      await uc.execute({ name: 'my-change', to: 'designing' })
+
+      expect(executeSpy).not.toHaveBeenCalledWith(
+        expect.objectContaining({ step: 'implementing', phase: 'post' }),
+        expect.anything(),
+      )
+    })
+
+    it('clears signoff on done → implementing without downgrading artifacts', async () => {
+      const change = makeChangeInState('my-change', [
+        { type: 'transitioned', from: 'drafting', to: 'designing', at: new Date(), by: actor },
+        { type: 'transitioned', from: 'designing', to: 'ready', at: new Date(), by: actor },
+        { type: 'transitioned', from: 'ready', to: 'implementing', at: new Date(), by: actor },
+        { type: 'transitioned', from: 'implementing', to: 'verifying', at: new Date(), by: actor },
+        { type: 'transitioned', from: 'verifying', to: 'done', at: new Date(), by: actor },
+      ])
+      change.recordSpecApproval('spec ok', {}, actor)
+      change.recordSignoff('ship it', {}, actor)
+      const proposal = new ChangeArtifact({
+        type: 'proposal',
+        files: new Map([
+          [
+            'proposal',
+            new ArtifactFile({
+              key: 'proposal',
+              filename: 'proposal.md',
+              status: 'complete',
+              validatedHash: 'sha256:abc',
+            }),
+          ],
+        ]),
+      })
+      change.setArtifact(proposal)
+      const uc = makeUseCase(makeChangeRepository([change]))
+
+      const result = await uc.execute({ name: 'my-change', to: 'implementing' })
+
+      expect(result.change.state).toBe('implementing')
+      expect(result.change.activeSignoff).toBeUndefined()
+      expect(result.change.activeSpecApproval).toBeDefined()
+      expect(result.change.getArtifact('proposal')?.files.get('proposal')?.status).toBe('complete')
+    })
+
+    it('throws ReadOnlyWorkspaceError on designing → ready', async () => {
+      const change = makeChangeInState('my-change', [
+        { type: 'transitioned', from: 'drafting', to: 'designing', at: new Date(), by: actor },
+      ])
+      const repo = makeChangeRepository([change])
+      const schemaProvider = makeSchemaProvider(makeSchema())
+      const countTasks = new CountTasks(repo, schemaProvider)
+      const runStepHooks = makeRunStepHooks()
+      const registry = createWorkflowCheckRegistry({
+        countTasks,
+        runStepHooks,
+        readyFacts: {
+          changes: repo,
+          listWorkspaces: makeListWorkspaces(),
+          parsers: makeNoopParsers(),
+          extractorTransforms: new Map(),
+          workspaceRoutes: [],
+        },
+        detectImplLinksInScope,
+      })
+      const readOnlyFail: (typeof registry.transitionBindings)[number]['check'] = {
+        id: 'workspace.readOnly',
+        label: 'Checking workspace ownership',
+        kind: 'predicate',
+        execute: async () => ({
+          id: 'workspace.readOnly',
+          label: 'Checking workspace ownership',
+          kind: 'predicate',
+          outcome: 'fail',
+          code: 'READ_ONLY_WORKSPACE',
+          message: 'read-only',
+        }),
+      }
+      const transitionBindings = registry.transitionBindings.map((binding) =>
+        binding.check.id === 'workspace.readOnly' ? { ...binding, check: readOnlyFail } : binding,
+      )
+      const uc = new TransitionChange(
+        repo,
+        makeActorResolver(),
+        schemaProvider,
+        makeRefreshImplementationTracking(),
+        { spec: false, signoff: false },
+        transitionBindings,
+      )
+
+      await expect(uc.execute({ name: 'my-change', to: 'ready' })).rejects.toThrow(
+        ReadOnlyWorkspaceError,
+      )
+    })
+  })
+
+  describe('implementation tracking after refresh', () => {
+    function makeImplementingChange(name: string): Change {
+      return makeChangeInState(name, [
+        { type: 'transitioned', from: 'drafting', to: 'designing', at: new Date(), by: actor },
+        { type: 'transitioned', from: 'designing', to: 'ready', at: new Date(), by: actor },
+        { type: 'transitioned', from: 'ready', to: 'implementing', at: new Date(), by: actor },
+      ])
+    }
+
+    const verifyingSchema = makeSchema({
+      workflow: [makeWorkflowStep('implementing'), makeWorkflowStep('verifying')],
+    })
+
+    it('evaluates impl.filesResolved against post-refresh tracked files', async () => {
+      const change = makeImplementingChange('my-change')
+      const repo = makeChangeRepository([change])
+      const refreshExecute = vi.fn().mockImplementation(async () => {
+        const fresh = makeImplementingChange('my-change')
+        fresh.trackImplementationFile('packages/core/src/foo.ts', 'open')
+        repo.store.set('my-change', fresh)
+        return {
+          trackedFiles: [{ file: 'packages/core/src/foo.ts', state: 'open' }],
+          links: [],
+        }
+      })
+      const uc = makeUseCase(repo, { schema: verifyingSchema, refreshExecute })
+
+      await expect(uc.execute({ name: 'my-change', to: 'verifying' })).rejects.toThrow(
+        ArchiveImplementationStateError,
+      )
+    })
+
+    it('skips impl.linksInScope when allowOutOfScope is true', async () => {
+      const change = makeImplementingChange('my-change')
+      change.addImplementationLink({
+        specId: 'auth/shared',
+        file: 'src/shared.ts',
+        fileLinkExplicit: true,
+      })
+      const uc = makeUseCase(makeChangeRepository([change]), { schema: verifyingSchema })
+
+      const result = await uc.execute({
+        name: 'my-change',
+        to: 'verifying',
+        allowOutOfScope: true,
+      })
+
+      expect(result.change.state).toBe('verifying')
+    })
+
+    it('still fails open tracked files when allowOutOfScope is true', async () => {
+      const change = makeImplementingChange('my-change')
+      change.trackImplementationFile('packages/core/src/foo.ts', 'open')
+      const uc = makeUseCase(makeChangeRepository([change]), { schema: verifyingSchema })
+
+      await expect(
+        uc.execute({ name: 'my-change', to: 'verifying', allowOutOfScope: true }),
+      ).rejects.toThrow(ArchiveImplementationStateError)
+    })
+
+    it('fails impl.linksInScope without allowOutOfScope', async () => {
+      const change = makeImplementingChange('my-change')
+      change.addImplementationLink({
+        specId: 'auth/shared',
+        file: 'src/shared.ts',
+        fileLinkExplicit: true,
+      })
+      const uc = makeUseCase(makeChangeRepository([change]), { schema: verifyingSchema })
+
+      await expect(uc.execute({ name: 'my-change', to: 'verifying' })).rejects.toThrow(
+        ArchiveImplementationStateError,
+      )
+    })
+  })
+
+  describe('Input contract', () => {
+    it('Input accepts transition controls without approval flags', async () => {
+      const change = makeChangeInState('my-change', [
+        { type: 'transitioned', from: 'drafting', to: 'designing', at: new Date(), by: actor },
+        { type: 'transitioned', from: 'designing', to: 'ready', at: new Date(), by: actor },
+        { type: 'transitioned', from: 'ready', to: 'implementing', at: new Date(), by: actor },
+      ])
+      const uc = makeUseCase(makeChangeRepository([change]), {
+        schema: makeSchema({
+          workflow: [makeWorkflowStep('implementing'), makeWorkflowStep('verifying')],
+        }),
+      })
+
+      const result = await uc.execute({
+        name: 'my-change',
+        to: 'next',
+        allowOutOfScope: true,
+        refreshImplementationTrackingBefore: false,
+      })
+
+      expect(result.change.state).toBe('verifying')
+    })
+  })
+
   describe('implementation tracking auto-activation', () => {
     it('activates implementation tracking when transitioning to implementing for the first time', async () => {
       const change = makeChangeInState('auto-track', [
-        {
-          type: 'created',
-          at: new Date('2024-01-01T00:00:00Z'),
-          by: actor,
-          specIds: ['auth/login'],
-          schemaName: 'test-schema',
-          schemaVersion: 1,
-        },
         {
           type: 'transitioned',
           from: 'drafting',
@@ -2035,14 +2707,6 @@ describe('TransitionChange', () => {
     it('preserves pre-existing implementationTrackingStartedAt when transitioning to implementing', async () => {
       const explicitStart = new Date('2024-05-01T12:00:00Z')
       const change = makeChangeInState('preserve-track', [
-        {
-          type: 'created',
-          at: new Date('2024-01-01T00:00:00Z'),
-          by: actor,
-          specIds: ['auth/login'],
-          schemaName: 'test-schema',
-          schemaVersion: 1,
-        },
         {
           type: 'transitioned',
           from: 'drafting',

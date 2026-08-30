@@ -17,5 +17,41 @@
       "file": "core:src/application/use-cases/get-hook-instructions.ts",
       "symbols": ["GetHookInstructions"]
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "GetHookInstructions returns instruction: hook text for a change step/phase; archive fallback only for archiving+post.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:53f1845c5689fead4a65a832f9b2da1e42fd5fb0883b850a09ffa40a4f8324b8",
+          "lastModified": "2026-08-25T15:37:19.292Z"
+        },
+        "verify.md": {
+          "hash": "sha256:34f86afddb90f4fcdb374ea203d68fd3431d65c78c7278086a72920226d8fbd9",
+          "lastModified": "2026-08-25T15:37:19.292Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# GetHookInstructions\n\n## Rules\n- Ctor: `ChangeRepository`, `ArchiveRepository`, `SchemaProvider`, `TemplateExpander`. SchemaProvider = fully-resolved schema (plugins+overrides); all workflow hooks already in steps. Injected at kernel composition.\n- Input: `name` (required), `step` (required), `phase` (`'pre'|'post'`, required), `only` (optional hook `id`).\n- Lookup: `ChangeRepository.get(name)`. If missing AND `step==='archiving'` AND `phase==='post'`, fall back to `ArchiveRepository.get(name)`; archive hit uses `ArchivedChange.name` + `ArchiveRepository.archivePath(archivedChange)` for `change.path`. Else `ChangeNotFoundError`. Other step/phase: missing change → immediate `ChangeNotFoundError` (no archive fallback).\n- MUST NOT build `change.workspace` or inject singular/primary workspace into `change` namespace for `TemplateExpander.expand()`. Per `core:template-variables`, `change.workspace` not a supported token.\n- After schema resolve: `schema.name()` ≠ `change.schemaName` → `SchemaMismatchError`.\n- `step` MUST be valid `ChangeState` (includes `archiving`); else `StepNotValidError`. Then `schema.workflowStep(step)`; no entry → `{ phase, instructions: [] }` (no error).\n- Collect `instruction:` hooks from `workflow[step].hooks[phase]` only (`type: 'instruction'`), declaration order. Skip `run:` (`type: 'run'`). No separate project-level hook collection — ResolveSchema already merged.\n- `only` provided: keep matching `id` only. No match → `HookNotFoundError` reason `'not-found'`. Matches `run:` → `HookNotFoundError` reason `'wrong-type'`.\n- Result: `{ phase, instructions: [{ id, text }] }`. Empty instruction hooks → `{ phase, instructions: [] }`.\n- Config factory `createGetHookInstructions(config, options?)` MUST derive deps via `resolveGetHookInstructionsDeps(resolver)` then canonical `createGetHookInstructions(deps)`. Resolves: `changes`, `archive`, `schemaProvider`, `templates`. MUST NOT reconstruct fs-shaped wiring inline.\n\n## Constraints\n- Read-only — no change mutation, no command execution\n- `run:` hooks always excluded\n- Schema-level hooks precede project-level, consistent w/ hook ordering\n- Does not evaluate step availability — returns instructions even if step currently unavailable",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:53f1845c5689fead4a65a832f9b2da1e42fd5fb0883b850a09ffa40a4f8324b8",
+          "lastModified": "2026-08-25T15:37:19.292Z"
+        },
+        "verify.md": {
+          "hash": "sha256:34f86afddb90f4fcdb374ea203d68fd3431d65c78c7278086a72920226d8fbd9",
+          "lastModified": "2026-08-25T15:37:19.292Z"
+        }
+      }
+    }
+  }
 }

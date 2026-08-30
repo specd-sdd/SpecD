@@ -1,0 +1,19 @@
+- op: modified
+  description: 'Ambient Logger is the sole cross-layer import exception'
+  selector:
+    type: section
+    matches: '^Requirement: Domain layer is pure$'
+  content: |
+    The `domain` layer has zero I/O dependencies. No `fs`, no `net`, no `child_process`, no external HTTP. It depends only on the TypeScript standard library and other domain types. This applies to every package's `domain/` layer.
+
+    **Exception — ambient Logger:** Any layer in any package MAY import the project's ambient `Logger` (see [`default:_global/logging`](../logging/spec.md)) for diagnostic observability only. This is the sole intentional exception to strict inner-layer import rules. A process-level composition root assigns the implementation; other packages MAY use the facade without re-wiring. Each package chooses how and where to call it. The ambient Logger is a process-level observability facade, not a fourth hexagon layer.
+
+- op: modified
+  description: 'Cross-layer Logger import is allowed for observability'
+  selector:
+    type: section
+    matches: '^Requirement: Application layer uses ports only$'
+  content: |
+    The `application` layer (use cases and application services) interacts with the outside world exclusively through port interfaces defined in `application/ports/`. It never imports infrastructure adapters directly. This applies to every package's `application/` layer.
+
+    Importing the ambient `Logger` for diagnostics is permitted and is not treated as importing an infrastructure adapter.

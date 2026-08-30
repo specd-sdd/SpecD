@@ -825,6 +825,14 @@
 - **WHEN** config is loaded
 - **THEN** `approvals.signoff` is `true`
 
+#### Scenario: Spec gate on does not require pending-spec-approval in the graph
+
+- **GIVEN** `specd.yaml` declares `approvals.spec: true`
+- **WHEN** a change in `ready` is evaluated for `implementing`
+- **THEN** the wait is the `approval.spec` check
+- **AND** config MUST NOT be documented as requiring a pending hop
+- **AND** enforcement is verified in `core:transition-change` and `cli:change-transition` tests (in-place stay in `ready`)
+
 ### Requirement: Config writer port
 
 #### Scenario: ConfigWriter port defines initProject method

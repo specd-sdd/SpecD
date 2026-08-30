@@ -8,17 +8,31 @@ import { type ChangeState, VALID_TRANSITIONS } from '../../domain/value-objects/
 import { type ChangeRepository } from '../ports/change-repository.js'
 import { type SchemaProvider } from '../ports/schema-provider.js'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
+import { SchemaNotFoundError } from '../errors/schema-not-found-error.js'
 import {
-  LifecycleEngine,
   type LifecycleReviewSummary,
-} from '../../domain/services/lifecycle-engine.js'
-import { CountTasks, type TaskCompletionStatus } from './count-tasks.js'
+  type LifecycleBlocker,
+  type LifecycleStepVerdict,
+  projectArtifacts,
+} from '../../domain/services/lifecycle-verdict.js'
+import { evaluateLifecycle } from '../services/lifecycle-evaluation.js'
+import {
+  type CheckBinding,
+  type CheckResult,
+  type TaskCompletionCounts,
+} from '../../domain/services/transition-checks.js'
 import { Logger } from '../logger.js'
+import {
+  buildCheckExecutionContext,
+  executeChecksByLegalTargets,
+  executeMatchingPredicates,
+} from '../services/execute-matching-predicates.js'
 import {
   type ImplementationTrackingProjection,
   projectImplementationTracking,
 } from './_shared/implementation-tracking.js'
 import { RefreshImplementationTracking } from './refresh-implementation-tracking.js'
+import { type TaskCompletionStatus } from './count-tasks.js'
 
 /** Input for the {@link GetStatus} use case. */
 export interface GetStatusInput {
@@ -79,6 +93,41 @@ function aggregateDisplayStatus(files: readonly ArtifactFileStatus[]): ArtifactD
   return files[0]!.displayStatus
 }
 
+/**
+ * Paints artifact task counts from `workflow.taskCompletion` details.
+ *
+ * @param checksByTarget - Predicate results per protocol-legal target
+ * @returns Counts keyed by artifact id
+ */
+function taskCompletionFromChecks(
+  checksByTarget: Readonly<Partial<Record<ChangeState, readonly CheckResult[]>>>,
+): Readonly<Record<string, TaskCompletionCounts>> {
+  const painted: Record<string, TaskCompletionCounts> = {}
+  for (const rows of Object.values(checksByTarget)) {
+    for (const check of rows ?? []) {
+      if (check.id !== 'workflow.taskCompletion' || check.details === undefined) {
+        continue
+      }
+      const byArtifact = check.details.byArtifact
+      if (byArtifact !== undefined && typeof byArtifact === 'object' && byArtifact !== null) {
+        for (const [artifactId, counts] of Object.entries(
+          byArtifact as Record<string, TaskCompletionCounts>,
+        )) {
+          if (
+            counts !== undefined &&
+            typeof counts.complete === 'number' &&
+            typeof counts.incomplete === 'number' &&
+            typeof counts.total === 'number'
+          ) {
+            painted[artifactId] = counts
+          }
+        }
+      }
+    }
+  }
+  return painted
+}
+
 /** Completed vs incomplete task counts for one artifact type. */
 export type { TaskCompletionStatus } from './count-tasks.js'
 
@@ -130,6 +179,8 @@ export interface ReviewSummary {
   readonly route: 'designing' | null
   /** Primary review reason derived from current file states. */
   readonly reason: 'artifact-drift' | 'artifact-review-required' | 'spec-overlap-conflict' | null
+  /** Human prose when review is required. */
+  readonly message?: string
   /** Affected artifacts and their concrete file paths. */
   readonly affectedArtifacts: readonly ReviewArtifactSummary[]
   /** Merged overlap entries from unhandled spec-overlap-conflict invalidations. */
@@ -138,10 +189,16 @@ export interface ReviewSummary {
 
 /** Describes a specific condition blocking lifecycle progress. */
 export interface Blocker {
-  /** Machine-readable blocker code (e.g. 'ARTIFACT_DRIFT', 'MISSING_ARTIFACT'). */
+  /** Machine-readable blocker code (e.g. 'ARTIFACT_DRIFT', 'INCOMPLETE_ARTIFACT'). */
   readonly code: string
   /** Human-readable explanation of the blocker. */
   readonly message: string
+  /** CLI flag that skips this blocker when the predicate is skippable. */
+  readonly bypassFlag?: string
+  /** Gerund label from the failed check when projected from a predicate. */
+  readonly label?: string
+  /** Check id that produced this blocker when projected from a predicate. */
+  readonly checkId?: string
 }
 
 /** A recommended next step for the user or agent. */
@@ -170,8 +227,10 @@ export interface TransitionBlocker {
 export interface LifecycleContext {
   /** All structurally valid transitions from the current state. */
   readonly validTransitions: readonly ChangeState[]
-  /** Subset of validTransitions where workflow requires are satisfied. */
+  /** Subset of validTransitions whose blocking predicates passed or skipped. */
   readonly availableTransitions: readonly ChangeState[]
+  /** Extras-bearing `schema.workflow()` rows from evaluateLifecycle (not protocol membership). */
+  readonly availableSteps: readonly LifecycleStepVerdict[]
   /** For each valid-but-unavailable transition, what's blocking it. */
   readonly blockers: readonly TransitionBlocker[]
   /** Whether approval gates are active in the project config. */
@@ -186,6 +245,10 @@ export interface LifecycleContext {
     readonly version: number
     readonly artifacts: readonly ArtifactType[]
   } | null
+  /** Per-target predicate results from the same evaluate pass. */
+  readonly checksByTarget: Readonly<Partial<Record<ChangeState, readonly CheckResult[]>>>
+  /** Predicate rows for the happy-path nextAction candidate. */
+  readonly checks: readonly CheckResult[]
 }
 
 /** Result returned by the {@link GetStatus} use case. */
@@ -226,8 +289,8 @@ export class GetStatus {
   private readonly _schemaProvider: SchemaProvider
   private readonly _approvals: { readonly spec: boolean; readonly signoff: boolean }
   private readonly _refresh: RefreshImplementationTracking
-  private readonly _lifecycle: LifecycleEngine
-  private readonly _countTasks: CountTasks
+  private readonly _transitionBindings: readonly CheckBinding[]
+  private readonly _archiveBindings: readonly CheckBinding[]
 
   /**
    * Creates a new `GetStatus` use case instance.
@@ -238,23 +301,23 @@ export class GetStatus {
    * @param approvals.spec - Whether the spec approval gate is enabled
    * @param approvals.signoff - Whether the signoff gate is enabled
    * @param refreshImplementationTracking - Primitive for optional pre-read refresh
-   * @param lifecycle - Shared lifecycle interpreter
-   * @param countTasks - Shared task-completion query
+   * @param transitionBindings - Composed transition check bindings
+   * @param archiveBindings - Composed archive check bindings (status in `archivable`)
    */
   constructor(
     changes: ChangeRepository,
     schemaProvider: SchemaProvider,
     approvals: { readonly spec: boolean; readonly signoff: boolean },
     refreshImplementationTracking: RefreshImplementationTracking,
-    lifecycle: LifecycleEngine,
-    countTasks: CountTasks,
+    transitionBindings: readonly CheckBinding[],
+    archiveBindings: readonly CheckBinding[],
   ) {
     this._changes = changes
     this._schemaProvider = schemaProvider
     this._approvals = approvals
     this._refresh = refreshImplementationTracking
-    this._lifecycle = lifecycle
-    this._countTasks = countTasks
+    this._transitionBindings = transitionBindings
+    this._archiveBindings = archiveBindings
   }
 
   /**
@@ -274,7 +337,7 @@ export class GetStatus {
       if (draftView === null) {
         throw new ChangeNotFoundError(input.name)
       }
-      return this._buildDraftedResult(draftView)
+      return await this._buildDraftedResult(draftView)
     }
 
     if (input.ifModifiedSince !== undefined) {
@@ -322,75 +385,19 @@ export class GetStatus {
     }
     let validTransitions: readonly ChangeState[] = VALID_TRANSITIONS[change.state]
     let availableTransitions: readonly ChangeState[] = []
+    let availableSteps: readonly LifecycleStepVerdict[] = []
     let transitionBlockers: readonly TransitionBlocker[] = []
     let nextArtifact: string | null = null
+    let checksByTarget: Readonly<Partial<Record<ChangeState, readonly CheckResult[]>>> = {}
+    let checks: readonly CheckResult[] = []
 
+    let schema
     try {
-      const schema = await this._schemaProvider.get()
-      schemaInfo = {
-        name: schema.name(),
-        version: schema.version(),
-        artifacts: schema.artifacts(),
+      schema = await this._schemaProvider.get()
+    } catch (err) {
+      if (!(err instanceof SchemaNotFoundError)) {
+        throw err
       }
-      const verdict = this._lifecycle.evaluate(change, schema, {
-        approvals: this._approvals,
-      })
-      const artifactStatusByType = new Map(
-        verdict.artifacts.map((artifact) => [artifact.type, artifact]),
-      )
-
-      for (const artifactType of schema.artifacts()) {
-        const type = artifactType.id
-        const artifact = change.getArtifact(type)
-        const files: ArtifactFileStatus[] = []
-
-        if (artifact !== null) {
-          for (const file of artifact.files.values()) {
-            files.push({
-              key: file.key,
-              filename: file.filename,
-              state: file.status,
-              ...(file.validatedHash !== undefined ? { validatedHash: file.validatedHash } : {}),
-              hasDrift: file.hasDrift,
-              displayStatus: file.displayStatus(),
-            })
-          }
-        }
-
-        artifactStatuses.push({
-          type,
-          state: artifact?.status ?? 'missing',
-          effectiveStatus: artifactStatusByType.get(type)?.effectiveStatus ?? 'missing',
-          displayStatus: aggregateDisplayStatus(files),
-          files,
-        })
-      }
-
-      const taskCounts = await this._countTasks.execute({ change })
-      for (let index = 0; index < artifactStatuses.length; index += 1) {
-        const entry = artifactStatuses[index]!
-        const taskCompletion = taskCounts.byArtifact[entry.type]
-        if (taskCompletion !== undefined) artifactStatuses[index] = { ...entry, taskCompletion }
-      }
-
-      review = this._projectReview(verdict.review, changePath)
-      blockers = verdict.blockers.map((blocker) => ({
-        code: blocker.code,
-        message: blocker.message,
-      }))
-      nextAction = verdict.nextAction
-      validTransitions = verdict.validTransitions
-      availableTransitions = verdict.availableTransitions
-      transitionBlockers = verdict.transitionBlockers
-      nextArtifact = verdict.nextArtifact
-
-      Logger.debug('GetStatus projected lifecycle engine verdict', {
-        change: change.name,
-        blockerCodes: verdict.blockers.map((blocker) => blocker.code),
-        reviewReason: verdict.review.reason,
-        nextAction: verdict.nextAction.command,
-      })
-    } catch {
       validTransitions = VALID_TRANSITIONS[change.state]
       for (const [type, artifact] of change.artifacts) {
         const files: ArtifactFileStatus[] = [...artifact.files.values()].map((file) => ({
@@ -409,16 +416,135 @@ export class GetStatus {
           files,
         })
       }
+      const lifecycle: LifecycleContext = {
+        validTransitions,
+        availableTransitions,
+        availableSteps,
+        blockers: transitionBlockers,
+        approvals: this._approvals,
+        nextArtifact,
+        changePath,
+        schemaInfo,
+        checksByTarget,
+        checks,
+      }
+      const specDependsOn: Record<string, string[]> = {}
+      for (const [specId, deps] of change.specDependsOn) {
+        specDependsOn[specId] = [...deps]
+      }
+      return {
+        change,
+        artifactStatuses,
+        specDependsOn,
+        lifecycle,
+        implementationTracking: projectImplementationTracking(change),
+        review,
+        blockers,
+        nextAction,
+      }
     }
+
+    schemaInfo = {
+      name: schema.name(),
+      version: schema.version(),
+      artifacts: schema.artifacts(),
+    }
+    const projectedArtifacts = projectArtifacts(change, schema)
+    const effectiveStatusByArtifact = new Map(
+      projectedArtifacts.map((artifact) => [artifact.type, artifact.effectiveStatus]),
+    )
+    const passMemo = new Map<string, unknown>()
+    const checksByTargetMap = await executeChecksByLegalTargets(this._transitionBindings, {
+      change,
+      schema,
+      approvals: this._approvals,
+      effectiveStatusByArtifact,
+      passMemo,
+    })
+    let archiveChecks: readonly CheckResult[] = []
+    if (change.state === 'archivable') {
+      const archiveEvaluation = await executeMatchingPredicates(
+        this._archiveBindings,
+        buildCheckExecutionContext({
+          change,
+          schema,
+          attempt: { scope: 'archive' },
+          approvals: this._approvals,
+          allowOverlap: false,
+          allowOutOfScope: false,
+          effectiveStatusByArtifact,
+          passMemo,
+        }),
+      )
+      archiveChecks = archiveEvaluation.checks
+    }
+    const verdict = evaluateLifecycle(change, schema, {
+      approvals: this._approvals,
+      checksByTarget: checksByTargetMap,
+    })
+    const artifactStatusByType = new Map(
+      verdict.artifacts.map((artifact) => [artifact.type, artifact]),
+    )
+    const taskCompletionByArtifact = taskCompletionFromChecks(checksByTargetMap)
+
+    for (const artifactType of schema.artifacts()) {
+      const type = artifactType.id
+      const artifact = change.getArtifact(type)
+      const files: ArtifactFileStatus[] = []
+
+      if (artifact !== null) {
+        for (const file of artifact.files.values()) {
+          files.push({
+            key: file.key,
+            filename: file.filename,
+            state: file.status,
+            ...(file.validatedHash !== undefined ? { validatedHash: file.validatedHash } : {}),
+            hasDrift: file.hasDrift,
+            displayStatus: file.displayStatus(),
+          })
+        }
+      }
+
+      const taskCompletion = taskCompletionByArtifact[type]
+      artifactStatuses.push({
+        type,
+        state: artifact?.status ?? 'missing',
+        effectiveStatus: artifactStatusByType.get(type)?.effectiveStatus ?? 'missing',
+        displayStatus: aggregateDisplayStatus(files),
+        files,
+        ...(taskCompletion !== undefined ? { taskCompletion } : {}),
+      })
+    }
+
+    review = this._projectReview(verdict.review, changePath)
+    blockers = this._mergeBlockers(verdict.blockers, verdict.checksByTarget, archiveChecks)
+    nextAction = this._nextActionAfterArchiveOverlap(verdict.nextAction, blockers)
+    validTransitions = verdict.validTransitions
+    availableTransitions = verdict.availableTransitions
+    availableSteps = verdict.availableSteps
+    transitionBlockers = verdict.transitionBlockers
+    nextArtifact = verdict.nextArtifact
+    checksByTarget = verdict.checksByTarget
+    checks = verdict.checks
+
+    Logger.debug('GetStatus projected evaluateLifecycle verdict', {
+      change: change.name,
+      blockerCodes: verdict.blockers.map((blocker) => blocker.code),
+      reviewReason: verdict.review.reason,
+      nextAction: verdict.nextAction.command,
+    })
 
     const lifecycle: LifecycleContext = {
       validTransitions,
       availableTransitions,
+      availableSteps,
       blockers: transitionBlockers,
       approvals: this._approvals,
       nextArtifact,
       changePath,
       schemaInfo,
+      checksByTarget,
+      checks,
     }
 
     const specDependsOn: Record<string, string[]> = {}
@@ -459,11 +585,14 @@ export class GetStatus {
       lifecycle: {
         validTransitions: VALID_TRANSITIONS[change.state],
         availableTransitions: [],
+        availableSteps: [],
         blockers: [],
         approvals: this._approvals,
         nextArtifact: null,
         changePath,
         schemaInfo: null,
+        checksByTarget: {},
+        checks: [],
       },
       implementationTracking: projectImplementationTracking(change),
       review: {
@@ -489,23 +618,52 @@ export class GetStatus {
    * @param draftView - Drafted change loaded via `getDraft`
    * @returns Status without lifecycle transitions or mutable `Change`
    */
-  private _buildDraftedResult(draftView: DraftedChangeView): GetStatusResult {
+  private async _buildDraftedResult(draftView: DraftedChangeView): Promise<GetStatusResult> {
     const changePath = this._changes.draftChangePath(draftView)
     const artifactStatuses: ArtifactStatusEntry[] = []
+    const source = {
+      name: draftView.name,
+      artifacts: draftView.artifacts,
+      getArtifact: (type: string) => draftView.artifacts.get(type) ?? null,
+    }
 
-    for (const [type, artifact] of draftView.artifacts) {
-      const files: ArtifactFileStatus[] = [...artifact.files.values()].map((file) => ({
-        key: file.key,
-        filename: file.filename,
-        state: file.status,
-        ...(file.validatedHash !== undefined ? { validatedHash: file.validatedHash } : {}),
-        hasDrift: file.hasDrift,
-        displayStatus: file.displayStatus(),
-      }))
+    let schema
+    try {
+      schema = await this._schemaProvider.get()
+    } catch (err) {
+      if (!(err instanceof SchemaNotFoundError)) {
+        throw err
+      }
+      schema = undefined
+    }
+
+    const projected = schema === undefined ? null : projectArtifacts(source, schema)
+    const verdictByType = new Map((projected ?? []).map((artifact) => [artifact.type, artifact]))
+    const artifactEntries =
+      schema === undefined
+        ? [...draftView.artifacts.entries()].map(([type, artifact]) => ({ type, artifact }))
+        : schema.artifacts().map((artifactType) => ({
+            type: artifactType.id,
+            artifact: draftView.artifacts.get(artifactType.id) ?? null,
+          }))
+
+    for (const { type, artifact } of artifactEntries) {
+      const files: ArtifactFileStatus[] =
+        artifact === null
+          ? []
+          : [...artifact.files.values()].map((file) => ({
+              key: file.key,
+              filename: file.filename,
+              state: file.status,
+              ...(file.validatedHash !== undefined ? { validatedHash: file.validatedHash } : {}),
+              hasDrift: file.hasDrift,
+              displayStatus: file.displayStatus(),
+            }))
+      const projectedArtifact = verdictByType.get(type)
       artifactStatuses.push({
         type,
-        state: artifact.status,
-        effectiveStatus: artifact.status,
+        state: artifact?.status ?? 'missing',
+        effectiveStatus: projectedArtifact?.effectiveStatus ?? artifact?.status ?? 'missing',
         displayStatus: aggregateDisplayStatus(files),
         files,
       })
@@ -514,6 +672,7 @@ export class GetStatus {
     const lifecycle: LifecycleContext = {
       validTransitions: [],
       availableTransitions: [],
+      availableSteps: [],
       blockers: [],
       approvals: this._approvals,
       nextArtifact: null,
@@ -521,8 +680,10 @@ export class GetStatus {
       schemaInfo: {
         name: draftView.schemaName,
         version: draftView.schemaVersion,
-        artifacts: [],
+        artifacts: schema === undefined ? [] : schema.artifacts(),
       },
+      checksByTarget: {},
+      checks: [],
     }
 
     const specDependsOn: Record<string, string[]> = {}
@@ -554,9 +715,89 @@ export class GetStatus {
   }
 
   /**
-   * Projects engine review details into the public GetStatus shape with absolute file paths.
+   * Merges review blockers with failed predicates from every protocol-legal target.
+   * Flattening is required so incomplete `verifying` tasks still surface while
+   * `nextAction` remains `/specd-implement`.
    *
-   * @param review - Engine-derived review summary
+   * @param reviewBlockers - Verdict review/requested-target blockers
+   * @param checksByTarget - Predicate results per protocol-legal target
+   * @param archiveChecks - Archive-scope predicates when `state === 'archivable'`
+   * @returns Deduplicated public blockers
+   */
+  private _mergeBlockers(
+    reviewBlockers: readonly LifecycleBlocker[],
+    checksByTarget: Readonly<Partial<Record<ChangeState, readonly CheckResult[]>>>,
+    archiveChecks: readonly CheckResult[] = [],
+  ): Blocker[] {
+    const merged = new Map<string, Blocker>()
+    for (const blocker of reviewBlockers) {
+      merged.set(`${blocker.code}:${blocker.message}`, {
+        code: blocker.code,
+        message: blocker.message,
+        ...(blocker.bypassFlag !== undefined ? { bypassFlag: blocker.bypassFlag } : {}),
+        ...(blocker.label !== undefined ? { label: blocker.label } : {}),
+        ...(blocker.checkId !== undefined ? { checkId: blocker.checkId } : {}),
+      })
+    }
+
+    const checks = [
+      ...Object.values(checksByTarget).flatMap((rows) => rows ?? []),
+      ...archiveChecks,
+    ]
+
+    for (const check of checks) {
+      if (check.outcome !== 'fail' || check.code === undefined) continue
+      const message = check.message ?? `Check '${check.id}' failed`
+      const key = `${check.code}:${message}`
+      if (merged.has(key)) continue
+      const linksInScopeSkippable =
+        check.code === 'IMPLEMENTATION_STATE' && check.id === 'impl.linksInScope'
+      const overlapSkippable = check.code === 'OVERLAP_CONFLICT'
+      merged.set(key, {
+        code: check.code,
+        message,
+        label: check.label,
+        checkId: check.id,
+        ...(linksInScopeSkippable ? { bypassFlag: '--allow-out-of-scope' } : {}),
+        ...(overlapSkippable ? { bypassFlag: '--allow-overlap' } : {}),
+      })
+    }
+
+    return [...merged.values()]
+  }
+
+  /**
+   * Archive overlap is an operation predicate, not a hop, so the verdict can still
+   * recommend "Ready to archive". Public status must not advertise a clean archive.
+   *
+   * @param nextAction - Application next-action projection
+   * @param blockers - Merged public blockers including archive predicates
+   * @returns Next action with overlap-aware reason when live overlap is present
+   */
+  private _nextActionAfterArchiveOverlap(
+    nextAction: NextAction,
+    blockers: readonly Blocker[],
+  ): NextAction {
+    const overlap = blockers.find((blocker) => blocker.code === 'OVERLAP_CONFLICT')
+    if (overlap === undefined) {
+      return nextAction
+    }
+    const bypass = overlap.bypassFlag ?? '--allow-overlap'
+    const reason = overlap.message.includes(bypass)
+      ? overlap.message
+      : `${overlap.message} Use ${bypass} to archive anyway.`
+    return {
+      targetStep: 'archivable',
+      actionType: 'mechanical',
+      reason,
+      command: '/specd-archive',
+    }
+  }
+
+  /**
+   * Projects verdict review details into the public GetStatus shape with absolute file paths.
+   *
+   * @param review - Verdict-derived review summary
    * @param changePath - Absolute path to the change directory
    * @returns Review summary with absolute file paths
    */
@@ -565,6 +806,7 @@ export class GetStatus {
       required: review.required,
       route: review.route,
       reason: review.reason,
+      ...(review.message !== undefined ? { message: review.message } : {}),
       affectedArtifacts: review.affectedArtifacts.map((artifact) => ({
         type: artifact.type,
         files: artifact.files.map((file) => ({

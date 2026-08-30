@@ -8,5 +8,41 @@
     {
       "file": "core:src/composition/use-cases/get-config.ts"
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "GetConfig returns construction-time structuredClone SpecdConfig snapshot; no disk I/O; not the live kernel wiring reference.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:4a68e3aca2c2bffa59b0acb178e07296af9d594a0dc621bdb8bdb0ff5fadc0ac",
+          "lastModified": "2026-08-25T15:37:19.290Z"
+        },
+        "verify.md": {
+          "hash": "sha256:0f9b776f919990b6a54414ef0a1956a42e6f0e35f1230a60f797f4f682880ab0",
+          "lastModified": "2026-08-25T15:37:19.291Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# GetConfig\n\n## Rules\n- Ctor accepts `SpecdConfig` same object as `createKernel`. Store `structuredClone(config)`. Live reference MUST NOT be returned from `execute()`.\n- `execute()` no params. Returns `Readonly<SpecdConfig>` construction-time snapshot. Referentially identical across calls on same instance.\n- MUST NOT read filesystem, `ConfigLoader`, or `ConfigWriter`. Disk `specd.yaml` changes require kernel recreate.\n- Host-facing read API. Domain use cases MUST NOT re-inject full project config into other `execute` inputs. Persist config via `ConfigWriter` factories, not mutating returned object.\n- Standalone `createGetConfig(config: SpecdConfig)` in `composition/use-cases/` without full kernel.\n- Config factory via `resolveGetConfigDeps` (`config: SpecdConfig`) only.\n\n## Constraints\n- MUST NOT mutate internal snapshot after construction\n- MUST NOT expose live SpecdConfig used by internal kernel wiring (e.g. ListWorkspaces)",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:4a68e3aca2c2bffa59b0acb178e07296af9d594a0dc621bdb8bdb0ff5fadc0ac",
+          "lastModified": "2026-08-25T15:37:19.290Z"
+        },
+        "verify.md": {
+          "hash": "sha256:0f9b776f919990b6a54414ef0a1956a42e6f0e35f1230a60f797f4f682880ab0",
+          "lastModified": "2026-08-25T15:37:19.291Z"
+        }
+      }
+    }
+  }
 }

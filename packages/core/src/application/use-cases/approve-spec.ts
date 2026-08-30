@@ -6,7 +6,9 @@ import { type ContentHasher } from '../ports/content-hasher.js'
 import { ApprovalGateDisabledError } from '../errors/approval-gate-disabled-error.js'
 import { ChangeNotFoundError } from '../errors/change-not-found-error.js'
 import { SchemaMismatchError } from '../errors/schema-mismatch-error.js'
+import { InvalidStateTransitionError } from '../../domain/errors/invalid-state-transition-error.js'
 import { computeArtifactHash, buildCleanupMap } from './_shared/compute-artifact-hash.js'
+import { boundFromStates } from '../../domain/services/check-bindings.js'
 import { type ApprovalGates } from './transition-change.js'
 
 /** Input for the {@link ApproveSpec} use case. */
@@ -18,7 +20,8 @@ export interface ApproveSpecInput {
 }
 
 /**
- * Records a spec approval, then transitions the change to `spec-approved`.
+ * Records spec-gate consent in every state the binding table lists as `from` for
+ * `approval.spec` (today: `ready`). Drain: `pending-spec-approval` → `spec-approved`.
  *
  * Requires the spec approval gate (`approvals.spec: true`) to be active.
  * Artifact hashes are computed internally from the change's artifacts on disk,
@@ -61,7 +64,7 @@ export class ApproveSpec {
    * @returns The updated change
    * @throws {ApprovalGateDisabledError} If the spec approval gate is not enabled
    * @throws {ChangeNotFoundError} If no change with the given name exists
-   * @throws {InvalidStateTransitionError} If the change is not in `pending-spec-approval` state
+   * @throws {InvalidStateTransitionError} If the change is not in an `approval.spec` `from` state or `pending-spec-approval`
    * @throws {SchemaMismatchError} If the change schema differs from the active schema
    */
   async execute(input: ApproveSpecInput): Promise<Change> {
@@ -80,12 +83,19 @@ export class ApproveSpec {
       throw new SchemaMismatchError(change.name, change.schemaName, schema.name())
     }
 
+    const consentFrom = boundFromStates('approval.spec')
+    if (!consentFrom.includes(change.state) && change.state !== 'pending-spec-approval') {
+      throw new InvalidStateTransitionError(change.state, consentFrom[0] ?? 'ready')
+    }
+
     const { change: updatedChange } = await this._changes.mutate(
       input.name,
       async (freshChange) => {
         const artifactHashes = await this._computeArtifactHashes(freshChange)
         freshChange.recordSpecApproval(input.reason, artifactHashes, actor)
-        freshChange.transition('spec-approved', actor)
+        if (freshChange.state === 'pending-spec-approval') {
+          freshChange.transition('spec-approved', actor)
+        }
       },
     )
     return updatedChange

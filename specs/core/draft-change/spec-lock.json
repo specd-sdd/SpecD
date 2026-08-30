@@ -13,5 +13,41 @@
     {
       "file": "core:src/composition/use-cases/draft-change.ts"
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "DraftChange shelves active change via drafted event + mutate(); force required if ever implementing; returns DraftedChangeView.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:05829143da1637946ae404820d0a0a9e8b4777360274a4743d269aa4cac98bd0",
+          "lastModified": "2026-08-25T15:37:19.280Z"
+        },
+        "verify.md": {
+          "hash": "sha256:9cffb3a56786f970b76a5271b7d1a1df4b4b1737dc5c71de6e7f9a2b5224246a",
+          "lastModified": "2026-08-25T15:37:19.280Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# DraftChange\n\n## Rules\n- Input: `name` (required), optional `reason`, optional `force`.\n- Load via `ChangeRepository.get(name)`; missing → `ChangeNotFoundError`. MUST NOT load drafts-only change.\n- Actor via `ActorResolver` on `drafted` event.\n- Historical implementation guard: if change ever reached `implementing`, fail unless `input.force === true`.\n- After guard: `change.draft(actor, reason, force)`. Event: `type: 'drafted'`, `at`, `by`, `reason` only if provided.\n- Persist via `ChangeRepository.mutate(name, fn)`: callback gets fresh active Change; call `draft` and return. Repo persists manifest + relocates to `drafts/`.\n- Return `DraftedChangeView` from persisted drafted state (`getDraft(name)` or equivalent mapper). MUST NOT return mutable `Change`.\n- Deps: ChangeRepository, ActorResolver. Config factory via `resolveDraftChangeDeps` only.\n\n## Constraints\n- No lifecycle state transitions — drafting orthogonal to lifecycle\n- Directory relocation entirely repository-owned\n- `isDrafted` derived from most recent drafted or restored history event",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:05829143da1637946ae404820d0a0a9e8b4777360274a4743d269aa4cac98bd0",
+          "lastModified": "2026-08-25T15:37:19.280Z"
+        },
+        "verify.md": {
+          "hash": "sha256:9cffb3a56786f970b76a5271b7d1a1df4b4b1737dc5c71de6e7f9a2b5224246a",
+          "lastModified": "2026-08-25T15:37:19.280Z"
+        }
+      }
+    }
+  }
 }

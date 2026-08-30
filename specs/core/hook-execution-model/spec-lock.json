@@ -13,9 +13,15 @@
     "core:get-hook-instructions",
     "core:config",
     "cli:change-transition",
-    "cli:change-archive"
+    "cli:change-archive",
+    "core:transition-checks"
   ],
-  "implementation": [],
+  "implementation": [
+    {
+      "file": "core:src/application/services/execute-hook-effect.ts",
+      "symbols": ["matchingEffects"]
+    }
+  ],
   "optimizations": {
     "optimizedDescription": {
       "value": "Defines hook types, dispatch, phase ordering, failures, manual skipping, and safe variable expansion across lifecycle operations.",

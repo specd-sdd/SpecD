@@ -6,13 +6,48 @@
   "dependsOn": [
     "core:change",
     "core:workflow-model",
+    "core:schema-format",
     "default:_global/architecture",
-    "core:schema-format"
+    "default:_global/logging",
+    "core:transition-checks"
   ],
   "implementation": [
     {
       "file": "core:src/domain/services/lifecycle-engine.ts",
-      "symbols": ["LifecycleEngine"]
+      "symbols": [
+        "LifecycleEngine",
+        "evaluate",
+        "LifecycleBlocker",
+        "_blockersFromFailedChecks",
+        "_nextAction",
+        "ArtifactGraphSource",
+        "projectArtifacts"
+      ]
+    },
+    {
+      "file": "core:src/domain/value-objects/change-state.ts",
+      "symbols": ["VALID_TRANSITIONS", "isValidTransition"]
+    },
+    {
+      "file": "core:src/domain/services/transition-checks.ts",
+      "symbols": ["classifyAlong", "CheckId", "CheckResult"]
+    },
+    {
+      "file": "core:src/application/use-cases/get-artifact-instruction.ts",
+      "symbols": ["GetArtifactInstruction"]
+    },
+    {
+      "file": "core:src/application/use-cases/validate-artifacts.ts",
+      "symbols": ["ValidateArtifacts"]
+    },
+    {
+      "file": "core:src/public.ts"
+    },
+    {
+      "file": "core:src/domain/services/index.ts"
+    },
+    {
+      "file": "core:test/domain/value-objects/change-state.spec.ts"
     }
   ],
   "optimizations": {

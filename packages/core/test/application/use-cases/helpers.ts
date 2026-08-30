@@ -93,6 +93,16 @@ import { type PreviewSpec } from '../../../src/application/use-cases/preview-spe
 import { type GetActiveSchema } from '../../../src/application/use-cases/get-active-schema.js'
 import { type DetectOverlap } from '../../../src/application/use-cases/detect-overlap.js'
 import { CreateChange } from '../../../src/application/use-cases/create-change.js'
+import { ArchiveChange } from '../../../src/application/use-cases/archive-change.js'
+import { CountTasks } from '../../../src/application/use-cases/count-tasks.js'
+import { createWorkflowCheckRegistry } from '../../../src/application/checks/workflow-check-registry.js'
+import { detectImplLinksInScope } from '../../../src/application/services/detect-impl-links-in-scope.js'
+import { detectSpecOverlap } from '../../../src/domain/services/detect-spec-overlap.js'
+import { type CheckBinding } from '../../../src/domain/services/transition-checks.js'
+import { type ExtractorTransformRegistry } from '../../../src/domain/services/extract-metadata.js'
+import { type SpecWorkspaceRoute } from '../../../src/application/use-cases/_shared/spec-reference-resolver.js'
+import { type ArchiveBatchSnapshotPort } from '../../../src/application/ports/archive-batch-snapshot.js'
+import { createNoopArchiveBatchSnapshot } from '../../../src/application/archive-batch-snapshot-noop.js'
 import { OverlapReport } from '../../../src/domain/value-objects/overlap-report.js'
 import { type MetadataExtraction } from '../../../src/domain/value-objects/metadata-extraction.js'
 import { type CrossArtifactValidationRule } from '../../../src/domain/value-objects/cross-artifact-validation.js'
@@ -858,12 +868,139 @@ export function makeRunStepHooks(
 }
 
 /**
+ * Archive binding table for unit tests (same wiring composition used to inject).
+ *
+ * @param deps - Ports the archive checks should observe
+ * @returns Archive `CheckBinding` rows
+ */
+export function makeArchiveBindings(deps: {
+  readonly changes: ChangeRepository
+  readonly listWorkspaces: ListWorkspaces
+  readonly runStepHooks?: RunStepHooks
+  readonly parsers: ArtifactParserRegistry
+  readonly schemaProvider: SchemaProvider
+  readonly extractorTransforms?: ExtractorTransformRegistry
+  readonly workspaceRoutes?: readonly SpecWorkspaceRoute[]
+}): readonly CheckBinding[] {
+  const runStepHooks = deps.runStepHooks ?? makeRunStepHooks()
+  const extractorTransforms = deps.extractorTransforms ?? new Map()
+  const workspaceRoutes = deps.workspaceRoutes ?? []
+  const countTasks = new CountTasks(deps.changes, deps.schemaProvider)
+  return createWorkflowCheckRegistry({
+    countTasks,
+    runStepHooks,
+    readyFacts: {
+      changes: deps.changes,
+      listWorkspaces: deps.listWorkspaces,
+      parsers: deps.parsers,
+      extractorTransforms,
+      workspaceRoutes,
+      hasher: makeContentHasher(),
+    },
+    detectImplLinksInScope,
+    detectSpecOverlap: async (change) => {
+      const listed = await deps.changes.list()
+      const others: Change[] = []
+      for (const entry of listed.items) {
+        if (entry.name === change.name) continue
+        const loaded = await deps.changes.get(entry.name)
+        if (loaded !== null) others.push(loaded)
+      }
+      if (others.length === 0) {
+        return { blocked: false }
+      }
+      const report = detectSpecOverlap([...others, change])
+      const relevant = report.entries.filter((entry) =>
+        entry.changes.some((peer) => peer.name === change.name),
+      )
+      if (relevant.length === 0) {
+        return { blocked: false }
+      }
+      const byPeer = new Map<string, string[]>()
+      for (const entry of relevant) {
+        for (const peer of entry.changes) {
+          if (peer.name === change.name) continue
+          let ids = byPeer.get(peer.name)
+          if (ids === undefined) {
+            ids = []
+            byPeer.set(peer.name, ids)
+          }
+          ids.push(entry.specId)
+        }
+      }
+      const peers = [...byPeer.entries()]
+        .map(([changeName, overlappingSpecIds]) => ({
+          changeName,
+          overlappingSpecIds: overlappingSpecIds.sort((a, b) => a.localeCompare(b)),
+        }))
+        .sort((a, b) => a.changeName.localeCompare(b.changeName))
+      return {
+        blocked: true,
+        peers,
+        message: `Specs overlap with other active changes: ${peers
+          .map((peer) => `${peer.changeName} (${peer.overlappingSpecIds.join(', ')})`)
+          .join('; ')}`,
+      }
+    },
+  }).archiveBindings
+}
+
+/**
+ * Constructs {@link ArchiveChange} with required bindings, mapping the former
+ * `RunStepHooks` ctor slot onto `createHook*` inside {@link makeArchiveBindings}.
+ */
+export function newArchiveChange(
+  changes: ChangeRepository,
+  listWorkspaces: ListWorkspaces,
+  archive: ArchiveRepository,
+  runStepHooks: RunStepHooks,
+  actor: ActorResolver,
+  parsers: ArtifactParserRegistry,
+  schemaProvider: SchemaProvider,
+  materializeMetadata: MaterializeSpecMetadata,
+  extractorTransforms: ExtractorTransformRegistry = new Map(),
+  workspaceRoutes: readonly SpecWorkspaceRoute[] = [],
+  projectRoot = process.cwd(),
+  batchSnapshot: ArchiveBatchSnapshotPort = createNoopArchiveBatchSnapshot(),
+  archiveBindings?: readonly CheckBinding[],
+): ArchiveChange {
+  return new ArchiveChange(
+    changes,
+    listWorkspaces,
+    archive,
+    archiveBindings ??
+      makeArchiveBindings({
+        changes,
+        listWorkspaces,
+        runStepHooks,
+        parsers,
+        schemaProvider,
+        extractorTransforms,
+        workspaceRoutes,
+      }),
+    actor,
+    parsers,
+    schemaProvider,
+    materializeMetadata,
+    extractorTransforms,
+    workspaceRoutes,
+    projectRoot,
+    batchSnapshot,
+    makeContentHasher(),
+  )
+}
+
+/**
  * Creates a mock `ListWorkspaces` use case.
  */
 export function makeListWorkspaces(
   repos: Map<string, SpecRepository> = new Map(),
   ownership: Map<string, 'owned' | 'shared' | 'readOnly'> = new Map(),
   codeRoots: Map<string, string> = new Map(),
+  graph?: {
+    readonly excludePaths?: readonly string[]
+    readonly workspaceExcludePaths?: ReadonlyMap<string, readonly string[]>
+  },
 ): ListWorkspaces {
   const config = {
     projectRoot: '/test',
@@ -873,7 +1010,11 @@ export function makeListWorkspaces(
       codeRoot: codeRoots.get(name) ?? `/test/code/${name}`,
       isExternal: false,
       ownership: ownership.get(name) ?? 'owned',
+      ...(graph?.workspaceExcludePaths?.has(name) === true
+        ? { graph: { excludePaths: graph.workspaceExcludePaths.get(name) } }
+        : {}),
     })),
+    ...(graph?.excludePaths !== undefined ? { graph: { excludePaths: graph.excludePaths } } : {}),
   } as any
 
   return new ListWorkspaces(config as unknown as SpecdConfig, repos)

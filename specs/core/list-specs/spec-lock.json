@@ -13,5 +13,41 @@
     "core:get-spec-metadata",
     "core:composition-resolver"
   ],
-  "implementation": []
+  "implementation": [],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "ListSpecs enumerates workspaces via ListWorkspaces; titles from repo.list(); optional summary via index self-heal, never stale optimized.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:ebd7ab272ce2b64d5af1672654e9cb6bdcd9cd20df69787baf2fd3696cbe627e",
+          "lastModified": "2026-08-25T15:37:19.323Z"
+        },
+        "verify.md": {
+          "hash": "sha256:2c89e75acdf05980eb82037b23439133dd62c87337f3b92ca749e5cdb25cb632",
+          "lastModified": "2026-08-25T15:37:19.323Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# List Specs\n\n## Rules\n- `ListSpecs.execute(options?)` gets `ProjectWorkspace` via `ListWorkspaces`; call `SpecRepository.list(options)` per workspace `specRepo`.\n- Forward same `ListOptions` + `includeSummary` to every repo. MUST NOT forward metadata-status flag. MUST NOT apply own default `limit`. MUST NOT re-sort/re-filter/re-paginate after repo returns.\n- Merged result: workspace declaration order from `ListWorkspaces`, each workspace in repo canonical path order. Cross-workspace pagination out of scope v1.\n- Workspace filter: match names against orchestrated list before `list()`.\n- Every `SpecListEntry` MUST include `title` from `SpecRepository.list()`; no extra metadata/file reads.\n- `includeSummary: true`: resolve `summary` from repo.list() result. Projection at index materialization (`FsSpecIndexCache`) self-heals metadata `policy: 'if-needed'`; if `llmOptimizedContext` active and `optimizedDescription` fresh, use optimized else normalized `description`. Stale/missing optimized MUST fall back to `description`. Missing projection → omit that spec's `summary`, do not fail listing. `ListSpecs` MUST NOT call `GetSpecMetadata` or `MaterializeSpecMetadata` directly.\n- `includeSummary` false/omitted: no `summary` on entries; no summary materialization.\n- Per-spec summary errors at repo/index: omit `summary`; MUST NOT abort listing. MUST NOT propagate optional-field I/O errors when merging.\n- Entry: required `workspace`, `path`, `title`. Optional `summary` only when requested AND materialized. MUST NOT include `metadataStatus`.\n- Config factory via `resolveListSpecsDeps` (`listWorkspaces` only). MUST NOT resolve `getMetadata`, `materializeMetadata`, `hasher`, `yaml`.\n\n## Constraints\n- MUST NOT modify repositories\n- Depend on ListWorkspaces for traversal\n- MUST NOT re-resolve title w/ extra I/O\n- summary never a stale optimized value\n- MUST NOT project or filter by metadata freshness status",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:ebd7ab272ce2b64d5af1672654e9cb6bdcd9cd20df69787baf2fd3696cbe627e",
+          "lastModified": "2026-08-25T15:37:19.323Z"
+        },
+        "verify.md": {
+          "hash": "sha256:2c89e75acdf05980eb82037b23439133dd62c87337f3b92ca749e5cdb25cb632",
+          "lastModified": "2026-08-25T15:37:19.323Z"
+        }
+      }
+    }
+  }
 }

@@ -16,6 +16,31 @@ import {
   testActor,
 } from './helpers.js'
 
+function makeDoneChange(name: string, schemaName = 'test-schema'): Change {
+  const createdAt = new Date('2024-01-01T00:00:00Z')
+  const events: ChangeEvent[] = [
+    {
+      type: 'created',
+      at: createdAt,
+      by: testActor,
+      specIds: ['auth/login'],
+      schemaName,
+      schemaVersion: 1,
+    },
+    { type: 'transitioned', from: 'drafting', to: 'designing', at: new Date(), by: testActor },
+    { type: 'transitioned', from: 'designing', to: 'ready', at: new Date(), by: testActor },
+    { type: 'transitioned', from: 'ready', to: 'implementing', at: new Date(), by: testActor },
+    { type: 'transitioned', from: 'implementing', to: 'verifying', at: new Date(), by: testActor },
+    { type: 'transitioned', from: 'verifying', to: 'done', at: new Date(), by: testActor },
+  ]
+  return new Change({
+    name,
+    createdAt,
+    specIds: ['auth/login'],
+    history: events,
+  })
+}
+
 function makePendingSignoffChange(name: string, schemaName = 'test-schema'): Change {
   const createdAt = new Date('2024-01-01T00:00:00Z')
   const events: ChangeEvent[] = [
@@ -43,6 +68,29 @@ function makePendingSignoffChange(name: string, schemaName = 'test-schema'): Cha
 }
 
 describe('ApproveSignoff', () => {
+  describe('given the signoff gate is enabled and change is in done', () => {
+    it('records consent and stays in done', async () => {
+      const change = makeDoneChange('my-change')
+      const repo = makeChangeRepository([change])
+      vi.spyOn(repo, 'artifact').mockResolvedValue(new SpecArtifact('spec.md', '# Spec'))
+      const uc = new ApproveSignoff(
+        repo,
+        makeActorResolver(),
+        makeSchemaProvider(makeSchema()),
+        makeContentHasher(),
+        { spec: false, signoff: true },
+      )
+
+      const result = await uc.execute({
+        name: 'my-change',
+        reason: 'implementation approved',
+      })
+
+      expect(result.state).toBe('done')
+      expect(result.activeSignoff?.reason).toBe('implementation approved')
+    })
+  })
+
   describe('given the signoff gate is enabled and change is in pending-signoff', () => {
     it('records the signoff event', async () => {
       const change = makePendingSignoffChange('my-change')

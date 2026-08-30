@@ -575,7 +575,7 @@ preHashCleanup:
 
 ### taskCompletionCheck
 
-`taskCompletionCheck` declares how to detect incomplete task items in this artifact's content. SpecD uses it to gate the `implementing → verifying` lifecycle transition: the transition is blocked while any item matching `incompletePattern` exists in any artifact listed in the `implementing` step's `requires`.
+`taskCompletionCheck` declares how to detect incomplete task items in this artifact's content. SpecD uses it in the `workflow.taskCompletion` check on the **target** workflow step (typically `verifying`): the transition is blocked while any item matching `incompletePattern` exists in any artifact listed in that step's `requiresTaskCompletion`. It is **not** gated by the `implementing` step's `requires`.
 
 | Field               | Type           | Default                            | Description                      |
 | ------------------- | -------------- | ---------------------------------- | -------------------------------- |
@@ -688,15 +688,16 @@ selector:
 
 ## workflow
 
-`workflow` defines the named lifecycle phases of a change and what artifact conditions gate each one. The order of entries is the intended display order for tooling; it does not enforce sequential blocking between steps — each step is independently gated by its own `requires`.
+`workflow` is a lookup table: each `step` names an existing Change lifecycle state and attaches artifact gates and hooks to it. It does not define which states a change may occupy, and omitting a `step` does not delete that state from the protocol. The order of entries is the **progress axis** used to classify a transition as `forward` or `backward` (`along`); delivery states missing from the list are still classified (spliced by canonical delivery order, not pushed after later listed names). It is also the intended display order for tooling. Sequential blocking still comes from each step's own `requires` / `requiresTaskCompletion`, not from mere adjacency in the list.
 
 ### Step fields
 
-| Field      | Type                  | Required | Description                                                                     |
-| ---------- | --------------------- | -------- | ------------------------------------------------------------------------------- |
-| `step`     | string                | yes      | Step name identifying a phase of the change lifecycle.                          |
-| `requires` | array of artifact IDs | no       | Artifacts that must be `complete` (or `skipped`) before this step is available. |
-| `hooks`    | object                | no       | `pre` and/or `post` arrays of hook entries for this step's boundaries.          |
+| Field                    | Type                  | Required | Description                                                                      |
+| ------------------------ | --------------------- | -------- | -------------------------------------------------------------------------------- |
+| `step`                   | string                | yes      | Lookup key: existing lifecycle state name (`designing`, `implementing`, …).      |
+| `requires`               | array of artifact IDs | no       | Artifacts that must be `complete` (or `skipped`) before this step is available.  |
+| `requiresTaskCompletion` | array of artifact IDs | no       | Artifacts whose `taskCompletionCheck` must pass before **this** step is entered. |
+| `hooks`                  | object                | no       | `pre` and/or `post` arrays of hook entries for this step's boundaries.           |
 
 ### Hook entries
 
@@ -714,6 +715,8 @@ Explicit external hooks are part of the workflow model, not ad hoc shell escapes
 
 - **`pre` hook failure** — if a `run:` or `external:` hook fails, the step is aborted. The agent should offer to fix the problem before retrying.
 - **`post` hook failure** — the step has already completed; it is not rolled back. After each failing executable hook, the user is prompted to continue with the remaining hooks or stop.
+
+Source `post` `run:` hooks execute only when the transition is classified as `along = forward` (progress along `workflow[]`). Pre `run:` hooks for the target step run regardless of `along` (including redesign into `designing`).
 
 ### Template variables in `run:` hooks
 

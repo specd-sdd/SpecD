@@ -21,15 +21,27 @@
     "default:_global/logging",
     "core:spec-lock",
     "default:_global/error-handling-conventions",
-    "core:composition-resolver",
     "core:regenerate-spec-metadata",
     "core:spec-optimization",
-    "core:initialize-persisted-spec-state"
+    "core:initialize-persisted-spec-state",
+    "core:composition-resolver",
+    "core:transition-checks"
   ],
   "implementation": [
     {
       "file": "core:src/application/use-cases/archive-change.ts",
-      "symbols": ["ArchiveChange"]
+      "symbols": ["ArchiveChange", "OnArchiveProgress"]
+    },
+    {
+      "file": "core:src/application/services/detect-impl-links-in-scope.ts",
+      "symbols": ["detectImplLinksInScope"]
+    },
+    {
+      "file": "core:test/application/use-cases/archive-change.spec.ts"
+    },
+    {
+      "file": "core:src/composition/use-cases/archive-change.ts",
+      "symbols": ["createArchiveChange", "resolveArchiveChangeDeps", "ArchiveChangeDeps"]
     },
     {
       "file": "core:src/application/use-cases/initialize-persisted-spec-state.ts",

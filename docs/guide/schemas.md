@@ -1,6 +1,6 @@
 # Schemas
 
-A schema defines the shape of your development workflow. It declares which artifact files exist, what order they are produced in, what rules govern them, and which lifecycle phases gate progression from design to archive.
+A schema defines the shape of your development workflow. It declares which artifact files exist, what order they are produced in, what rules govern them, and which extras (`requires`, task gates, hooks) attach to **existing** lifecycle states. It does not invent or delete those states — the Change protocol owns membership and legal hops.
 
 Every SpecD project has exactly one active schema. You declare it in `specd.yaml` via the `schema` field:
 

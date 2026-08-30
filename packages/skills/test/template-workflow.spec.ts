@@ -108,4 +108,117 @@ describe('workflow skill templates', () => {
     expect(content).toContain('If top-level `llmOptimizedContext` is `true`')
     expect(content).not.toContain('approvals.llmOptimized')
   })
+
+  it('does not teach pending parking as the happy-path wait', () => {
+    const verify = readTemplate('skills', 'specd-verify', 'SKILL.md.tpl')
+    expect(verify).toContain('stay in `done`')
+    expect(verify).toContain('approve signoff')
+    expect(verify).not.toMatch(/pending-signoff/)
+    expect(verify).not.toMatch(/change transition.*pending/)
+
+    const implement = readTemplate('skills', 'specd-implement', 'SKILL.md.tpl')
+    expect(implement).toContain('stay in `ready`')
+    expect(implement).toContain('Do **not** `transition implementing`')
+
+    const shared = readTemplate('shared', 'shared.md.tpl')
+    expect(shared).toContain('**stays** in `ready` or `done`')
+    expect(shared).not.toMatch(/reaches `pending-spec-approval`/)
+    expect(shared).toContain('Do **not**\nlist `pending-spec-approval`')
+
+    const neu = readTemplate('skills', 'specd-new', 'SKILL.md.tpl')
+    expect(neu).toContain('Drain only:')
+    expect(neu).toContain('If spec gate on and unsatisfied')
+
+    const design = readTemplate('skills', 'specd-design', 'SKILL.md.tpl')
+    expect(design).toContain('Stay in `ready`')
+    expect(design).toContain('approve spec')
+    expect(design).not.toMatch(/pending-spec-approval/)
+    expect(design).not.toMatch(/change transition.*pending/)
+
+    const entry = readTemplate('skills', 'specd', 'SKILL.md.tpl')
+    expect(entry).toContain('routes to the right skill')
+    expect(entry).not.toMatch(/signoff/)
+    expect(entry).not.toMatch(/pending-spec-approval/)
+    expect(entry).not.toMatch(/approve spec/)
+
+    const archive = readTemplate('skills', 'specd-archive', 'SKILL.md.tpl')
+    expect(archive).toContain('archivable')
+    expect(archive).toContain('archiving')
+    expect(archive).toContain('approve signoff')
+    expect(archive).not.toMatch(/pending-signoff/)
+    expect(archive).not.toMatch(/change transition.*pending/)
+
+    expect(entry).toMatch(/next action/)
+    expect(entry).toMatch(/command/)
+    expect(entry).not.toMatch(/LifecycleEngine/)
+    const created = readTemplate('skills', 'specd-new', 'SKILL.md.tpl')
+    expect(created).toContain('/specd-archive')
+    expect(created).toContain('archivable')
+    expect(created).not.toMatch(/LifecycleEngine/)
+
+    expect(shared).toContain('MUST NOT run `source.post` on `along` backward')
+  })
+
+  it('verify drains open implementation files; implement gates verify on zero open', () => {
+    const shared = readTemplate('shared', 'shared.md.tpl')
+    expect(shared).toContain('specd changes implementation list <name>')
+    expect(shared).toContain('specd changes implementation resolve <name>')
+    expect(shared).toContain('specd changes implementation ignore <name>')
+    expect(shared).toContain('**`resolve`**')
+    expect(shared).toContain('**`ignore`**')
+    expect(shared).not.toMatch(/Exception — open implementation files/)
+    expect(shared).toContain('top-level')
+    expect(shared).toContain('No catch-all dumps')
+
+    const verify = readTemplate('skills', 'specd-verify', 'SKILL.md.tpl')
+    expect(verify).toContain('IMPLEMENTATION_STATE')
+    expect(verify).toContain('drain tracking')
+    expect(verify).toContain('shared.md')
+    expect(verify).toContain('Do **not** redirect to `/specd-implement` solely for open files')
+    expect(verify).not.toMatch(/If it fails, follow the \*\*Repair Guide\*\* output\.\n/)
+
+    const implement = readTemplate('skills', 'specd-implement', 'SKILL.md.tpl')
+    expect(implement).toContain('zero open')
+    expect(implement).toContain('implementation list')
+    expect(implement).toContain('do **not** tell the user to run `/specd-verify` yet')
+    expect(implement).toContain(
+      'Never recommend `/specd-verify` while `implementation list` still shows `open` files',
+    )
+    expect(implement).toContain('top-level')
+    expect(implement).toContain('Do **not** link local variables')
+    expect(implement).toContain('not a catch-all')
+  })
+
+  it('archive skips only pre hooks so post run inside archive', () => {
+    const archive = readTemplate('skills', 'specd-archive', 'SKILL.md.tpl')
+    expect(archive).toContain('--skip-hooks pre')
+    expect(archive).not.toMatch(/archive <name> --skip-hooks all/)
+    expect(archive).not.toMatch(/```bash\n[^\n]*run-hooks <name> archiving --phase post/)
+    expect(archive).toContain('hook-instruction <name> archiving --phase post')
+  })
+
+  it('design skill does not treat the text review header as a file list', () => {
+    const design = readTemplate('skills', 'specd-design', 'SKILL.md.tpl')
+    expect(design).toContain('review: required: yes')
+    expect(design).not.toMatch(/listed under `review:`/)
+    expect(design).toContain('artifacts (details):')
+    expect(design).toContain('affectedArtifacts')
+  })
+
+  it('does not treat invalidation overlap as OVERLAP_CONFLICT on hop skills', () => {
+    for (const skill of ['specd-design', 'specd-implement', 'specd-verify', 'specd-new'] as const) {
+      const template = readTemplate('skills', skill, 'SKILL.md.tpl')
+      const typical = template.match(/\(e\.g\.[\s\S]*?\)/)
+      expect(typical?.[0] ?? '').not.toContain('OVERLAP_CONFLICT')
+      expect(template).toContain('spec-overlap-conflict')
+      expect(template).toContain('/specd-design')
+      expect(template).toContain('not `--allow-overlap`')
+    }
+
+    const archive = readTemplate('skills', 'specd-archive', 'SKILL.md.tpl')
+    expect(archive.match(/\(e\.g\.[\s\S]*?\)/)?.[0] ?? '').toContain('OVERLAP_CONFLICT')
+    expect(archive).toContain('--allow-overlap')
+    expect(archive).toContain('spec-overlap-conflict')
+    expect(archive).toContain('do not use `--allow-overlap`')
+  })
 })

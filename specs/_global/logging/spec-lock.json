@@ -3,7 +3,7 @@
     "name": "schema-std",
     "version": 1
   },
-  "dependsOn": [],
+  "dependsOn": ["default:_global/architecture"],
   "implementation": [],
   "optimizations": {
     "optimizedDescription": {

@@ -48,20 +48,22 @@ The difference is the dispatch backend, not the lifecycle semantics.
 
 ### Requirement: Default hook execution for transitions and archives
 
-By default, `TransitionChange` and `ArchiveChange` auto-execute `run:` hooks at step boundaries:
+By default, `TransitionChange` and `ArchiveChange` auto-execute matching `run:` **effects** after predicates pass. Slot and failure policy come from the binding (`phase`, `onFailure`), not from check id:
 
-- **`TransitionChange`** — when transitioning to a state that has a workflow step with `run:` hooks, executes pre-hooks before the state change and post-hooks after. Pre-hook failure aborts the transition (fail-fast). Post-hook failures are collected but do not roll back (fail-soft). Hook execution is delegated to `RunStepHooks`.
-- **`ArchiveChange`** — executes pre-archive hooks before any file modifications and post-archive hooks after the archive completes. Pre-hook failure aborts the archive. Post-hook failures are collected. Hook execution is delegated to `RunStepHooks`.
+- **`TransitionChange`** — select effects with the same `from` / `to` / `along` matcher as predicates, then call `execute` on those whose `phase` is `before-persist` (both `hook.post` and `hook.pre` on transitions). `onFailure` is `abort`. `RunStepHooks` SHALL be a constructor dep of the hook checks, not launched by check id in the use case.
+- **`ArchiveChange`** — call `execute` on operation-`archive` effects with `phase = before-persist` before persist; `phase = after-persist` after the archive commits. Default bindings: `hook.pre` abort/before-persist; `hook.post` collect/after-persist.
 
-Both use cases delegate hook execution to `RunStepHooks`, which handles hook collection, variable expansion, and execution semantics.
+Both use cases MUST NOT keep a private “always source.post on any exit” path and MUST NOT branch on `hook.pre` / `hook.post` ids for timing, failure policy, skip mapping, or launching `RunStepHooks`. `skipHookPhases` SHALL select by binding `phase` plus skip selectors (`target.pre` / `source.post` / archive `pre`/`post`). Transition `hook.pre` and `hook.post` share `before-persist`, so skip MUST NOT rely on `binding.phase` alone.
 
 ### Requirement: Two execution modes for run hooks
 
-`RunStepHooks` supports **fail-fast** for pre-hooks and **fail-soft** for post-hooks.
+`RunStepHooks` (standalone CLI) supports **fail-fast** for pre-hooks and **fail-soft** for post-hooks. `TransitionChange` and `ArchiveChange` MUST apply the matching effect binding’s `onFailure` instead of treating every post-hook as fail-soft. Transition `hook.post` is `abort` before persist.
 
-### Requirement: change transition does not execute hooks
+### Requirement: Change entity does not execute hooks
 
-The `Change` entity itself MUST NOT execute hooks. Hook execution is an application-layer responsibility managed by use cases (like `TransitionChange`).
+The `Change` entity itself MUST NOT execute hooks. Hook execution is an application-layer responsibility: matching `run:` effects run through `TransitionChange` / `ArchiveChange` after predicates pass (see [`core:transition-checks`](../transition-checks/spec.md)).
+
+This requirement MUST NOT be read as “`TransitionChange` runs zero hooks”. Default path auto-executes matching effects unless `skipHookPhases` skips them.
 
 ### Requirement: Manual hook control with skipHooks
 
@@ -70,13 +72,15 @@ Manual hook control uses phase selectors rather than a separate boolean flag.
 - `TransitionChange` accepts `skipHookPhases` values `'source.pre'`, `'source.post'`, `'target.pre'`, `'target.post'`, and `'all'`.
 - `ArchiveChange` accepts `skipHookPhases` values `'pre'`, `'post'`, and `'all'`.
 
-When the selector set contains all phases for the current use case, `TransitionChange` or `ArchiveChange` skips every `run:` hook. This gives the caller (typically an LLM agent) manual control over hook timing:
+When the selector set contains all phases for the current use case, `TransitionChange` or `ArchiveChange` skips every matching `run:` **effect**. Predicates still run. This gives the caller (typically an LLM agent) manual control over hook timing:
 
 1. Call `specd change hook-instruction <name> <step> --phase pre` to read `instruction:` hooks
 2. Call `specd change run-hooks <name> <step> --phase pre` to execute `run:` pre-hooks
 3. Call the lifecycle command with `--skip-hooks ...` to perform the transition or archive without the skipped auto-hooks
 4. Call `specd change run-hooks <name> <step> --phase post` to execute `run:` post-hooks
 5. Call `specd change hook-instruction <name> <step> --phase post` to read post-step instructions
+
+Skills and shared templates that skip hooks and run them manually MUST apply the same `along` filter (no source.post on backward / redesign / recovery).
 
 The `--skip-hooks` CLI flag maps to the `skipHookPhases` selector set in the corresponding use case input. The agent is responsible for invoking hooks at the appropriate time.
 
@@ -92,13 +96,12 @@ In all cases, pre-hooks use **fail-fast** semantics: execution stops at the firs
 
 ### Requirement: Post-hook failure semantics
 
-When a `run:` post-hook exits with a non-zero code:
+When a `run:` effect exits with a non-zero code, the use case MUST apply the binding’s `onFailure`:
 
-- **`TransitionChange`** — collects the failure in `postHookFailures` but does not roll back the transition. All remaining post-hooks continue to execute.
-- **`ArchiveChange`** — collects the failure in `postHookFailures` but does not roll back the archive. All remaining post-hooks continue to execute.
-- **`RunStepHooks` (standalone)** — continues executing remaining post-hooks, collecting all failures. The CLI exits with code 2 if any post-hook failed.
+- `abort` — throw `HookFailedError`. If the binding `phase` is `before-persist`, no state change is persisted.
+- `collect` — record the failure and continue remaining effects in that slot.
 
-In all cases, post-hooks use **fail-soft** semantics: all hooks execute regardless of individual failures, and failures are collected rather than thrown.
+Default bindings: transition `hook.pre` / `hook.post` are `abort` and `before-persist`. Archive `hook.pre` is `abort` / `before-persist`. Archive `hook.post` is `collect` / `after-persist`. `RunStepHooks` (standalone) continues executing remaining post-hooks and the CLI exits with code 2 if any post-hook failed.
 
 ### Requirement: Hook ordering
 
@@ -124,14 +127,18 @@ Unknown variable paths are left unexpanded (the original `{{key.path}}` token is
 ## Constraints
 
 - `instruction:` hooks are never executed — they are passive text consumed exclusively by `GetHookInstructions`
+- `instruction:` hooks MUST NOT appear as predicates or effects in transition-check evaluation
 - `run:` hooks are never injected into agent context — they are commands executed by `HookRunner`
 - All workflow steps can have both `instruction:` and `run:` hooks — no restrictions by step type
-- Pre-hooks use fail-fast semantics in all execution contexts
-- Post-hooks use fail-soft semantics in all execution contexts
+- Pre-hooks use fail-fast semantics in all execution contexts (`onFailure = abort`)
+- Transition source.post uses fail-fast before persist (`phase = before-persist`, `onFailure = abort`) and only when `along = forward`
+- Archive post-hooks use fail-soft semantics because the binding is `phase = after-persist`, `onFailure = collect`
 - Schema-level hooks always precede project-level hooks within the same phase
-- `TransitionChange` and `ArchiveChange` delegate hook execution to `RunStepHooks`
-- `RunStepHooks` is the single hook execution engine used by all use cases and the CLI
+- `TransitionChange` and `ArchiveChange` MUST select effects by binding `phase` / `onFailure`, not by check id
+- Hook `execute` SHALL call `RunStepHooks`; use cases MUST NOT launch `RunStepHooks` by check id
+- `RunStepHooks` is the single hook execution engine used by hook checks and the CLI
 - Template variable expansion and shell escaping are handled by `HookRunner`, not by callers
+- `--skip-hooks` skips effects only
 
 ## Examples
 
@@ -140,11 +147,10 @@ Unknown variable paths are left unexpanded (the original `{{key.path}}` token is
 ```
 1. specd change transition <name> implementing
    → TransitionChange internally:
-     a. enforces workflow requires
-     b. runs pre-implementing run: hooks (fail-fast)
-     c. transitions state to implementing
-     d. runs post-implementing run: hooks (fail-soft)
-     e. returns result with change and any postHookFailures
+     a. predicates (including workflow requires)
+     b. matching before-persist effects (source.post then target.pre on forward)
+     c. persist state
+     d. no after-persist slot on TransitionChange
 ```
 
 ### Manual transition hook control (--skip-hooks)
@@ -162,12 +168,14 @@ Unknown variable paths are left unexpanded (the original `{{key.path}}` token is
 ```
 1. specd change archive <name>
    → ArchiveChange internally:
-     a. runs pre-archive run: hooks (fail-fast) via RunStepHooks
+     a. matching archive `hook.pre` execute (before-persist, abort)
      b. merges deltas, syncs specs
      c. archives the change
-     d. runs post-archive run: hooks (fail-soft) via RunStepHooks
+     d. matching archive `hook.post` execute (after-persist, collect)
      e. generates metadata
 ```
+
+`RunStepHooks` runs inside those hook checks. `ArchiveChange` MUST NOT take `RunStepHooks` as a constructor argument.
 
 ### Manual archive hook control (--skip-hooks)
 
@@ -189,3 +197,4 @@ Unknown variable paths are left unexpanded (the original `{{key.path}}` token is
 - [`core:config`](../config/spec.md) — project-level hooks via `schemaOverrides`
 - [`cli:change-transition`](../../cli/change-transition/spec.md) — transition `--skip-hooks` selectors
 - [`cli:change-archive`](../../cli/change-archive/spec.md) — archive `--skip-hooks` selectors
+- [`core:transition-checks`](../transition-checks/spec.md) — shared `from`/`to`/`along` matcher for effects.

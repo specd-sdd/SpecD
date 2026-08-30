@@ -1,0 +1,28 @@
+- op: added
+  description: 'Ambient Logger is the cross-layer observability surface'
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+    after:
+      type: section
+      matches: '^Requirement: Policy on Console Usage$'
+  content: |
+    ### Requirement: Ambient Logger
+
+    Packages MAY expose an ambient `Logger` (static facade over the logging interface defined by this spec).
+
+    - The composition root assigns the active implementation during startup.
+    - Before wiring, `Logger` MUST behave as a no-op so imports are safe during module load.
+    - Any layer MAY import `Logger` for observability (`debug`, `trace`, diagnostic `info`). It MUST NOT be used for control flow, persistence, or side effects beyond logging.
+    - Each package chooses how and where to use it; this spec does not prescribe constructor injection vs ambient access beyond forbidding direct `console.*` in production code (see Requirement: Policy on Console Usage).
+
+    This is the intentional exception documented in [`default:_global/architecture`](../architecture/spec.md).
+
+- op: modified
+  description: 'Depend on architecture for the cross-layer exception'
+  selector:
+    type: section
+    matches: '^Spec Dependencies$'
+  content: |
+    - [`default:_global/architecture`](../architecture/spec.md) — documents the ambient Logger import exception.

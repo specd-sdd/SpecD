@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest'
-import { detectSpecOverlap } from '../../../src/domain/services/detect-spec-overlap.js'
+import {
+  detectSpecOverlap,
+  specOverlapDetectionForChange,
+} from '../../../src/domain/services/detect-spec-overlap.js'
 import { Change } from '../../../src/domain/entities/change.js'
 import type { ChangeState } from '../../../src/domain/value-objects/change-state.js'
 
@@ -118,5 +121,35 @@ describe('detectSpecOverlap', () => {
     ])
     expect(result.entries[0]!.changes[0]!.state).toBe('designing')
     expect(result.entries[0]!.changes[1]!.state).toBe('implementing')
+  })
+})
+
+describe('specOverlapDetectionForChange', () => {
+  it('projects overlapping peers and spec ids for the subject change', () => {
+    const report = detectSpecOverlap([
+      makeChange('alpha', ['core:core/config', 'core:core/kernel']),
+      makeChange('beta', ['core:core/config']),
+      makeChange('gamma', ['core:core/kernel']),
+    ])
+
+    const detection = specOverlapDetectionForChange('alpha', report)
+
+    expect(detection.blocked).toBe(true)
+    expect(detection.peers).toEqual([
+      { changeName: 'beta', overlappingSpecIds: ['core:core/config'] },
+      { changeName: 'gamma', overlappingSpecIds: ['core:core/kernel'] },
+    ])
+  })
+
+  it('returns unblocked when the subject does not overlap', () => {
+    const report = detectSpecOverlap([
+      makeChange('alpha', ['core:core/config']),
+      makeChange('beta', ['core:core/kernel']),
+    ])
+
+    expect(specOverlapDetectionForChange('alpha', report)).toEqual({
+      blocked: false,
+      peers: [],
+    })
   })
 })

@@ -16,6 +16,28 @@ import {
   testActor,
 } from './helpers.js'
 
+function makeReadyChange(name: string, schemaName = 'test-schema'): Change {
+  const createdAt = new Date('2024-01-01T00:00:00Z')
+  const events: ChangeEvent[] = [
+    {
+      type: 'created',
+      at: createdAt,
+      by: testActor,
+      specIds: ['auth/login'],
+      schemaName,
+      schemaVersion: 1,
+    },
+    { type: 'transitioned', from: 'drafting', to: 'designing', at: new Date(), by: testActor },
+    { type: 'transitioned', from: 'designing', to: 'ready', at: new Date(), by: testActor },
+  ]
+  return new Change({
+    name,
+    createdAt,
+    specIds: ['auth/login'],
+    history: events,
+  })
+}
+
 function makePendingSpecApprovalChange(name: string, schemaName = 'test-schema'): Change {
   const createdAt = new Date('2024-01-01T00:00:00Z')
   const events: ChangeEvent[] = [
@@ -46,7 +68,30 @@ function makePendingSpecApprovalChange(name: string, schemaName = 'test-schema')
 }
 
 describe('ApproveSpec', () => {
-  describe('given the spec approval gate is enabled and change is in pending-spec-approval', () => {
+  describe('given the spec approval gate is enabled and change is in ready', () => {
+    it('records consent and stays in ready', async () => {
+      const change = makeReadyChange('my-change')
+      const repo = makeChangeRepository([change])
+      vi.spyOn(repo, 'artifact').mockResolvedValue(new SpecArtifact('spec.md', '# Spec'))
+      const uc = new ApproveSpec(
+        repo,
+        makeActorResolver(),
+        makeSchemaProvider(makeSchema()),
+        makeContentHasher(),
+        { spec: true, signoff: false },
+      )
+
+      const result = await uc.execute({
+        name: 'my-change',
+        reason: 'looks good',
+      })
+
+      expect(result.state).toBe('ready')
+      expect(result.activeSpecApproval?.reason).toBe('looks good')
+    })
+  })
+
+  describe('given the spec approval gate is enabled and change is in pending-spec-approval (drain)', () => {
     it('records the spec approval event', async () => {
       const change = makePendingSpecApprovalChange('my-change')
       const repo = makeChangeRepository([change])
@@ -195,7 +240,7 @@ describe('ApproveSpec', () => {
     })
   })
 
-  describe('given the change is not in pending-spec-approval state', () => {
+  describe('given the change is not in a spec-approval wait state', () => {
     it('throws InvalidStateTransitionError', async () => {
       const change = makeChange('my-change', { specIds: ['auth/login'] })
       const repo = makeChangeRepository([change])

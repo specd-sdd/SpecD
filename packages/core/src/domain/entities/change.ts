@@ -66,6 +66,17 @@ export interface SignedOffEvent {
   readonly artifactHashes: Record<string, string>
 }
 
+/**
+ * Appended when an active signoff is cleared without redesign.
+ *
+ * Does not supersede spec approval and does not reopen artifacts.
+ */
+export interface SignoffInvalidatedEvent {
+  readonly type: 'signoff-invalidated'
+  readonly at: Date
+  readonly by: ActorIdentity
+}
+
 /** Appended when specIds or artifact content changes, superseding approvals. */
 export interface InvalidatedArtifactEntry {
   readonly type: string
@@ -168,6 +179,7 @@ export type ChangeEvent =
   | TransitionedEvent
   | SpecApprovedEvent
   | SignedOffEvent
+  | SignoffInvalidatedEvent
   | InvalidatedEvent
   | ArchiveFailedEvent
   | DraftedEvent
@@ -467,7 +479,7 @@ export class Change {
     let last: SignedOffEvent | undefined
     for (const evt of this._history) {
       if (evt.type === 'signed-off') last = evt
-      if (evt.type === 'invalidated') last = undefined
+      if (evt.type === 'invalidated' || evt.type === 'signoff-invalidated') last = undefined
     }
     return last
   }
@@ -928,6 +940,22 @@ export class Change {
   }
 
   /**
+   * Clears an active signoff without redesign, artifact downgrade, or spec-approval invalidation.
+   *
+   * Used for skill-aligned hops from `done` / `signed-off` / `archivable` back to
+   * `implementing` or `verifying`. A subsequent forward move toward `archivable`
+   * requires signoff again when that gate is enabled.
+   *
+   * @param actor - Identity of the actor clearing signoff
+   */
+  invalidateSignoff(actor: ActorIdentity): void {
+    if (this.activeSignoff === undefined) {
+      return
+    }
+    this._history.push({ type: 'signoff-invalidated', at: new Date(), by: actor })
+  }
+
+  /**
    * Records a failed archive attempt without implying archive completion.
    *
    * @param step - The archive phase that failed
@@ -1077,9 +1105,9 @@ export class Change {
   }
 
   /**
-   * Asserts that this change is in `archivable` state.
+   * Asserts that this change is in `archivable` or `archiving` state.
    *
-   * @throws {InvalidStateTransitionError} If the change is not in `archivable` state
+   * @throws {InvalidStateTransitionError} If the change is not in `archivable` or `archiving` state
    */
   assertArchivable(): void {
     if (!this.isArchivable) {

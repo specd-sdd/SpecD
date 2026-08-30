@@ -56,7 +56,7 @@ When `ifModifiedSince` is omitted, unparseable (`NaN`), or strictly older than `
 
 When `GetStatus` loads a change exclusively via `getDraft`, the result MUST satisfy [`core:drafted-change-view`](../drafted-change-view/spec.md).
 
-The use case MAY use an internal `Change` loaded from drafted storage to compute artifact effective statuses, but that instance MUST NOT appear on `GetStatusResult`.
+The use case MUST compute artifact effective statuses via `projectArtifacts` only (the same DAG cascade as `evaluateLifecycleVerdict` with empty `checksByTarget`) so parent-review cascade appears. It MUST NOT call `evaluateLifecycle` or `evaluateLifecycleVerdict` on drafts. It MUST NOT expose a mutable `Change` to callers and MUST NOT surface mutating hops (`availableTransitions` / `availableSteps` MUST be empty; `nextArtifact` MUST be `null`; `nextAction.command` MUST NOT recommend transition or validate commands).
 
 Drafted status responses MUST be suitable for `drafts show` and read-only CLI inspection without enabling lifecycle mutation.
 
@@ -98,9 +98,11 @@ Each ArtifactStatusEntry MUST include:
 
 ### Requirement: Reports task completion counts for task-capable artifacts
 
-When the schema artifact type has `hasTasks: true` and declares `taskCompletionCheck`, `GetStatus` MUST obtain task-completion counts from `CountTasks`.
+When the schema artifact type has `hasTasks: true` and declares `taskCompletionCheck`, `GetStatus` MUST expose task-completion counts from the `workflow.taskCompletion` check (which SHALL call `CountTasks` in its `execute`).
 
-The task completion counts MUST be exposed as an optional `taskCompletion` field on each `ArtifactStatusEntry` that corresponds to a task-capable artifact with qualifying content. `GetStatus` MUST map that field from `CountTasksResult.byArtifact` by artifact type ID.
+`GetStatus` MUST NOT call `evaluateLifecycle` first and then CountTasks only for painting `taskCompletion` on artifacts. `GetStatus` MUST NOT gather a global snapshot bag for all checks.
+
+The task completion counts MUST be exposed as an optional `taskCompletion` field on each `ArtifactStatusEntry` that corresponds to a task-capable artifact with qualifying content. `GetStatus` MUST map that field from `CountTasksResult.byArtifact` by artifact type ID (from the check result details or the same CountTasks outcome that check already produced — it MUST NOT invoke `CountTasks` a second time).
 
 The `taskCompletion` object MUST contain:
 
@@ -109,6 +111,22 @@ The `taskCompletion` object MUST contain:
 - `total` — sum of complete and incomplete; omitted patterns use the schema defaults.
 
 When the artifact file does not exist or the file content is empty, the `taskCompletion` field MUST be omitted.
+
+### Requirement: Execute matching predicates then project
+
+Before composing lifecycle guidance, `GetStatus` MUST, for each protocol-legal candidate target, select matching **predicates** from the binding table and call `check.execute(ctx)` (see [`core:transition-checks`](../transition-checks/spec.md)). GetStatus MUST collect **every** matching predicate for each hop (no `protocol.edge` fail-fast) so blockers and the repair guide show the full why.
+
+When `change.state` is `archivable`, GetStatus MUST also execute **all archive-scope predicates** (not `hook.pre` / `hook.post` effects) with `allowOverlap` and `allowOutOfScope` false. Live `spec.overlap` failure MAY then appear as public `OVERLAP_CONFLICT` with `--allow-overlap`. Invalidation-from-another-archive MUST NOT use that blocker (see review).
+
+`CountTasks` MUST be memoized on the **current evaluation pass** so one `GetStatus.execute` counts once for all legal targets. The check MUST NOT cache counts on the Kernel-lived instance across executes.
+
+`GetStatus` MUST NOT gather a global snapshot type for all checks. Each check obtains its own I/O through `create*` ports (`CountTasks` inside `workflow.taskCompletion`, extract inside `deps.consistent`, ownership inside `workspace.readOnly`, impl facts inside `impl.*`).
+
+`evaluateLifecycle` MUST project `availableTransitions` / `nextAction` from those `CheckResult`s. Domain projection MUST remain I/O-free.
+
+`GetStatus` MUST call `evaluateLifecycle` (domain verdict + application guidance) to obtain public `nextAction.command`. It MUST NOT read command strings from domain `nextHop`.
+
+The status result MUST expose check-derived `availableTransitions` and `nextAction`. It MUST expose enough check rows (id, kind, outcome, code/message on fail) that a later dry-run UI does not need a second result type. `effect` rows MUST NOT be required for `allowed` on status.
 
 ### Requirement: Throws ChangeNotFoundError for unknown changes
 
@@ -120,10 +138,12 @@ If no change with the given name exists in the repository, `execute()` MUST thro
 
 - `changes: ChangeRepository` — for loading changes by name
 - `schemaProvider: SchemaProvider` — for obtaining the fully-resolved active schema
-- `lifecycle: LifecycleEngine` — for deriving effective artifact status, blockers, routing, and next-action guidance from the change plus active schema
 - `approvals: { readonly spec: boolean; readonly signoff: boolean }` — whether approval gates are active
 - `refreshImplementationTracking: RefreshImplementationTracking` — primitive used for optional pre-read refresh
-- `countTasks: CountTasks` — required shared query for task-completion counts
+- composed transition `Check` instances from `create*` factories (`CountTasks` lives only inside `createWorkflowTaskCompletion`, not as a `GetStatus` constructor gatherer)
+- composed archive `Check` instances (`archiveBindings`) so `archivable` status can run archive predicates
+
+`GetStatus` MUST NOT accept `evaluateLifecycle`, `LifecycleEngine`, or `CountTasks` as constructor dependencies. It MUST import `evaluateLifecycle` as a module function.
 
 It MUST load the change via `ChangeRepository.get(name)` and, when that returns `null`, via `ChangeRepository.getDraft(name)`. It MUST NOT use `getDiscarded`.
 
@@ -139,11 +159,11 @@ The config-based factory MUST NOT assemble a weaker repository variant that can 
 
 ### Requirement: Reports effective status for every artifact
 
-When `unchanged` is not `true`, the `artifactStatuses` array MUST contain exactly one entry per artifact in the change's artifact map. It MUST NOT omit artifacts and MUST NOT include entries for artifacts that do not exist on the change.
+When `unchanged` is not `true`, the `artifactStatuses` array MUST contain exactly one entry per artifact type declared by the active schema (`schema.artifacts()`). Entries for types not yet attached on the change MUST use persisted/effective status `missing`. It MUST NOT omit schema-declared types on the full evaluation path.
 
 When `unchanged` is `true`, `artifactStatuses` MUST be empty (full projection omitted by the revision short-circuit).
 
-On the full evaluation path, `GetStatus` MUST derive each entry's `effectiveStatus` through `LifecycleEngine` so the reported value reflects recursive dependency blocking, workflow requirements, and approval-gate semantics from the active schema rather than only persisted aggregate artifact state.
+On the full evaluation path, `GetStatus` MUST derive each entry's `effectiveStatus` through `evaluateLifecycle` / `projectArtifacts` so the reported value reflects recursive dependency blocking from the active schema rather than only persisted aggregate artifact state.
 
 ### Requirement: Returns lifecycle context
 
@@ -152,11 +172,11 @@ On the full evaluation path, `GetStatus` MUST derive each entry's `effectiveStat
 The review check MUST follow this priority order:
 
 1. **If any artifact file is in `drifted-pending-review` state:** `required` is `true`, `reason` is `'artifact-drift'`, `route` is `'designing'`.
-2. **Else if any artifact file is in `pending-review` state and there are unhandled `spec-overlap-conflict` invalidations:** `required` is `true`, `reason` is `'spec-overlap-conflict'`, `route` is `'designing'`.
+2. **Else if any artifact file is in `pending-review` state and there are unhandled `spec-overlap-conflict` invalidations:** `required` is `true`, `reason` is `'spec-overlap-conflict'`, `route` is `'designing'`. `review.message` MUST be human prose (for example that a conflict was detected with archived overlapping specs). `nextAction.command` MUST be `/specd-design`. MUST NOT advertise `--allow-overlap` for this victim path.
 3. **Else if any artifact file is in `pending-review` state:** `required` is `true`, `reason` is `'artifact-review-required'`, `route` is `'designing'`.
 4. **Else:** `required` is `false`, `reason` is `null`, `route` is `null`.
 
-`GetStatus` MAY compute this summary directly from the loaded change facts or obtain it from `LifecycleEngine`, but the outward-facing result MUST reflect the same authoritative lifecycle interpretation used by transition and validation flows.
+`GetStatus` MAY compute this summary directly from the loaded change facts or obtain it from `evaluateLifecycle`, but the outward-facing result MUST reflect the same authoritative lifecycle interpretation used by transition and validation flows.
 
 **Unhandled overlap collection:** To determine unhandled `spec-overlap-conflict` invalidations, `GetStatus` MUST scan `change.history` in reverse (newest to oldest) collecting `invalidated` events with `cause: 'spec-overlap-conflict'`. The scan MUST stop at the first `transitioned` event whose `to` field is not `'designing'` — this indicates the change moved forward from a prior invalidation and those earlier overlaps were already handled. If no such boundary event is found, the scan includes all matching events back to the beginning of history.
 
@@ -171,6 +191,8 @@ When `reason` is `'spec-overlap-conflict'`, `ReviewSummary` MUST additionally in
 
 When `reason` is not `'spec-overlap-conflict'`, `overlapDetail` MUST be an empty array.
 
+Lifecycle fields `validTransitions`, `availableTransitions`, `availableSteps`, and `nextAction` MUST be the projections from transition-check evaluation, not a protocol-only graph lookup followed by a separate task paint. `availableSteps` MUST be the extras-bearing `schema.workflow()` rows from `evaluateLifecycle` (not protocol membership). Drafted status MUST set `availableSteps` to empty.
+
 ### Requirement: Identifies blockers
 
 `GetStatus` MUST identify explicit blockers that prevent lifecycle progression.
@@ -179,10 +201,18 @@ Blockers MUST be collected for:
 
 - **Artifact Drift**: code `'ARTIFACT_DRIFT'` if `review.reason` is `'artifact-drift'`.
 - **Review Required**: code `'REVIEW_REQUIRED'` if `review.reason` is `'artifact-review-required'`.
-- **Overlap Conflict**: code `'OVERLAP_CONFLICT'` if `review.reason` is `'spec-overlap-conflict'`.
-- **Missing Artifacts**: code `'MISSING_ARTIFACT'` for each artifact in the current state's `requires` list that is in `missing` or `in-progress` state.
+- **Incomplete artifacts**: code `'INCOMPLETE_ARTIFACT'` for each required artifact whose effective status is `missing` or `in-progress`. There is no separate `MISSING_ARTIFACT` code — absence and in-progress share `INCOMPLETE_ARTIFACT`.
+  Failed predicates for candidate hops MUST appear on public `blockers` with their check codes (`INCOMPLETE_ARTIFACT`, `APPROVAL_REQUIRED`, `INCOMPLETE_TASKS`, `DEPS_INCONSISTENT`, `READ_ONLY_WORKSPACE`, `IMPLEMENTATION_STATE`, `INVALID_TRANSITION`, archive codes when in scope including `OVERLAP_CONFLICT` **only** from archive predicates while `state === 'archivable'`). `review.reason === 'spec-overlap-conflict'` MUST NOT add `OVERLAP_CONFLICT` to `blockers`. `GetStatus` MUST NOT drop requires or approval failures from `blockers` while omitting those hops from `availableTransitions`.
 
-`GetStatus` MAY assemble these blockers directly or obtain them from `LifecycleEngine`, but the blocker set MUST be derived from the same authoritative lifecycle interpretation used for effective statuses and transition validation.
+When a failed predicate has code `IMPLEMENTATION_STATE`, `bypassFlag: '--allow-out-of-scope'` (and skippable for that flag) MUST attach only if the failing check id is `impl.linksInScope`. Open-file failures from `impl.filesResolved` MUST NOT advertise that bypass even though they share the same code.
+
+Blockers projected from a failed check MUST include that check’s gerund `label` (and SHOULD include `checkId`) alongside `code` and `message`. Review-only blockers (`ARTIFACT_DRIFT`, `REVIEW_REQUIRED`) MAY omit `label`. Agents use `label` as a human hint for what the machine code means (for example `DEPS_INCONSISTENT` → `Checking spec dependencies`).
+
+When `review.required` is true, `review` MUST include a human `message`. For `spec-overlap-conflict` the message MUST explain conflict with archived overlapping specs (not the kebab token alone). `nextAction.reason` SHOULD use that message.
+
+When public `blockers` include `OVERLAP_CONFLICT`, `nextAction.command` MUST remain `/specd-archive` and `targetStep` MUST remain `archivable`. `nextAction.reason` MUST NOT be `Ready to archive`. It MUST name live overlap and `--allow-overlap`. Overlap is an archive operation predicate, not a hop, so `availableTransitions` MAY still list `archiving`.
+
+`GetStatus` MAY assemble these blockers directly or obtain them from `evaluateLifecycle`, but the blocker set MUST be derived from the same authoritative evaluation used for effective statuses and `availableTransitions`.
 
 ### Requirement: Graceful degradation when schema resolution fails
 
@@ -208,17 +238,20 @@ The config-based `createGetStatus(config, options?)` form MUST derive `GetStatus
 - `schemaProvider: SchemaProvider`
 - `approvals: { readonly spec: boolean; readonly signoff: boolean }`
 - `refreshImplementationTracking: RefreshImplementationTracking`
-- `lifecycle: LifecycleEngine`
-- `countTasks: CountTasks`
+- composed workflow checks from `create*` (ports such as `CountTasks`, deps extract, workspace ownership live on those checks, not on a gather helper)
+- `transitionBindings` from `resolveWorkflowCheckRegistry`
+- `archiveBindings` from `resolveWorkflowCheckRegistry`
+
+It MUST NOT resolve `lifecycle`, `LifecycleEngine`, or `evaluateLifecycle`. `GetStatus` imports `evaluateLifecycle` as a module function.
 
 The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
 
 ## Constraints
 
 - The use case does not modify the change — it is a read-only query.
-- Artifact content is not loaded for lifecycle and artifact-status metadata. When task-completion projection is applicable, `GetStatus` delegates the required content reads to `CountTasks`.
-- The effective status computation may be delegated to `LifecycleEngine`; it is not an entity-owned concern of `Change`.
-- The lifecycle computation adds zero additional I/O beyond schema resolution — `VALID_TRANSITIONS` is a static lookup, while derived lifecycle interpretation is computed in memory from the loaded change, schema, and approval config.
+- Artifact content is not loaded for lifecycle and artifact-status metadata except inside matching check `execute` (for example `CountTasks` from `workflow.taskCompletion`). When task-completion projection is applicable, `GetStatus` MUST reuse that check’s counts and MUST NOT invoke `CountTasks` a second time.
+- The effective status computation may be delegated to `evaluateLifecycle` / `projectArtifacts`; it is not an entity-owned concern of `Change`.
+- Schema resolution failure (`SchemaNotFoundError`) MUST degrade lifecycle fields without throwing. Other errors from `SchemaProvider.get()` MUST propagate. Check `execute` failures MUST NOT be swallowed by that same catch.
 - `changePath` is obtained from `ChangeRepository.changePath(change)` which the repository already exposes.
 
 ## Spec Dependencies
@@ -232,3 +265,4 @@ The helper is the only use-case-specific composition entry for config-based boot
 - [`core:refresh-implementation-tracking`](../refresh-implementation-tracking/spec.md)
 - [`core:composition-resolver`](../composition-resolver/spec.md)
 - [`core:count-tasks`](../count-tasks/spec.md) — supplies shared task-completion counts.
+- [`core:transition-checks`](../transition-checks/spec.md) — shared evaluation consumed by status projections.
