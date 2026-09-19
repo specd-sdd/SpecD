@@ -313,3 +313,16 @@
 - **THEN** progress includes `check-start` for `hook.post` with label `Running post hooks`
 - **AND** `RunStepHooks` output/heartbeats appear as `check-progress` for that id
 - **AND** progress includes `check-done` for `hook.post` when the phase finishes
+
+### Requirement: Approval precedence and production registry composition
+
+#### Scenario: Parked approval is reported before protocol edge failure
+
+- **GIVEN** a historic parked approval state receives a non-drain target
+- **WHEN** transition checks are evaluated
+- **THEN** the public repair reason is the matching approval requirement
+
+#### Scenario: Production composition supplies overlap detection
+
+- **WHEN** status or archive composition resolves its workflow check registry
+- **THEN** the registry receives the overlap detector dependency

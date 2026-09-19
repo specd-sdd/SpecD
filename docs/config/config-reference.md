@@ -451,6 +451,8 @@ schemaPlugins:
 
 Plugins are applied in declaration order. Each plugin's merge operations are applied to the schema resolved from the `schema` field. If a plugin cannot be resolved, SpecD exits with an error.
 
+A schema plugin cannot declare a top-level `metadataExtraction` block. Define extraction in the base schema, or use `schemaOverrides` when a project needs an extraction adjustment.
+
 ## schemaOverrides
 
 `schemaOverrides` applies inline merge operations directly to the active schema without creating or referencing a plugin file. It is applied after all `schemaPlugins` have been merged. This is the recommended way to add project-specific additions to a shared base schema.

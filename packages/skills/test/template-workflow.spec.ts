@@ -21,6 +21,9 @@ describe('workflow skill templates', () => {
     expect(content).toContain('## Activation boundary')
     expect(content).toContain('Use `/specd-fasttrack` only when the user explicitly\ninvokes it.')
     expect(content).toContain('Never select or invoke this skill for normal specd work')
+    expect(content).toContain("**STOP.** Wait for the user's explicit selection.")
+    expect(content).toContain('Blast Radius & Dependents Regression Search')
+    expect(content).not.toMatch(/downstream dependents|downstream regression/i)
     expect(content).toContain('Mandatory live journal rule')
     expect(content).toContain('after **every** decision, scope or contract finding,')
     expect(content).toContain(

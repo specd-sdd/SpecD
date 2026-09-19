@@ -29,27 +29,11 @@
   ],
   "implementation": [
     {
-      "file": "core:src/application/use-cases/archive-change.ts",
-      "symbols": ["ArchiveChange", "OnArchiveProgress"]
-    },
-    {
-      "file": "core:src/application/services/detect-impl-links-in-scope.ts",
-      "symbols": ["detectImplLinksInScope"]
-    },
-    {
-      "file": "core:test/application/use-cases/archive-change.spec.ts"
-    },
-    {
       "file": "core:src/composition/use-cases/archive-change.ts",
-      "symbols": ["createArchiveChange", "resolveArchiveChangeDeps", "ArchiveChangeDeps"]
+      "symbols": ["resolveArchiveBatchSnapshotPort"]
     },
     {
-      "file": "core:src/application/use-cases/initialize-persisted-spec-state.ts",
-      "symbols": ["InitializePersistedSpecState"]
-    },
-    {
-      "file": "core:src/application/use-cases/generate-spec-metadata.ts",
-      "symbols": ["GenerateSpecMetadata"]
+      "file": "core:test/composition/archive-batch-snapshot-port.spec.ts"
     }
   ],
   "optimizations": {

@@ -21,5 +21,41 @@
     {
       "file": "core:test/application/use-cases/get-artifact-instruction.spec.ts"
     }
-  ]
+  ],
+  "optimizations": {
+    "optimizedDescription": {
+      "value": "Resolve expanded artifact instructions, templates, delta guidance, outlines, and DAG-selected next artifact read-only.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:cfdb9093b441351193ef17a359b933c566668164b7ff3af8cd38e2f2a960da35",
+          "lastModified": "2026-08-29T22:53:46.269Z"
+        },
+        "verify.md": {
+          "hash": "sha256:8de41f4d812e448432e4c6eba274604ea86d246ca5c16dfe3c80b3b0981ad3e0",
+          "lastModified": "2026-08-29T22:53:46.270Z"
+        }
+      }
+    },
+    "optimizedContext": {
+      "value": "# Get Artifact Instruction\n\n## Rules\n\n- Constructor: `ChangeRepository`, `ReadonlyMap<string, SpecRepository>`, `SchemaProvider`, `ArtifactParserRegistry`, `TemplateExpander`.\n- `execute(name, artifactId?)`: load change; absent => `ChangeNotFoundError`.\n- Resolve schema; `schema.name() !== change.schemaName` => `SchemaMismatchError`.\n- Omitted `artifactId`: `evaluateLifecycleVerdict` with empty `checksByTarget`; use topological `nextArtifact`; none => `ArtifactNotFoundError`.\n- Find schema artifact `id`; absent => `ArtifactNotFoundError`.\n- Expand via `TemplateExpander.expand()`: instruction, template, `deltaInstruction`, rule text.\n- Result: `artifactId`; `rulesPre`/`rulesPost` declaration-order instructions, `[]` absent; `instruction`/`template`, `null` absent; `delta`, `null` when `delta: false`.\n- Template: read declared path via `SchemaRegistry`; expand content.\n- `delta: true`: `formatInstructions = parsers.get(artifact.format).deltaInstructions()`; `domainInstructions = deltaInstruction ?? null`; `availableOutlines`: only `change.specIds` whose artifact file exists in `SpecRepository`.\n- Missing parser => `ParserNotRegisteredError`.\n- `createGetArtifactInstruction(config, options?)`: derive deps only through `resolveGetArtifactInstructionDeps(resolver)` then canonical `createGetArtifactInstruction(deps)`.\n- Helper resolves `changes`, `specs`, `schemaProvider`, `parsers`, `templateExpander`; never `lifecycle`/`LifecycleEngine`; no inline fs wiring.\n- Next-artifact/effective-status: `evaluateLifecycleVerdict` empty `checksByTarget`; never hop predicates, `availableTransitions`, global snapshot.\n\n## Constraints\n\n- Read-only: no change mutation or command execution.\n- `rules.pre`/`rules.post` augment, never replace instruction.\n- Missing delta artifact files silently skipped.\n- `availableOutlines` is `string[]` spec IDs only; no outline trees. Fetch on demand: `GetSpecOutline` / `specd specs outline <specPath> --artifact <artifactId>`.\n- Caller uses `rulesPre` + instruction + template + `rulesPost` for new artifacts; `rulesPre` + delta + `rulesPost` for deltas.",
+      "schema": {
+        "name": "schema-std",
+        "version": 1
+      },
+      "artifactState": {
+        "spec.md": {
+          "hash": "sha256:cfdb9093b441351193ef17a359b933c566668164b7ff3af8cd38e2f2a960da35",
+          "lastModified": "2026-08-29T22:53:46.269Z"
+        },
+        "verify.md": {
+          "hash": "sha256:8de41f4d812e448432e4c6eba274604ea86d246ca5c16dfe3c80b3b0981ad3e0",
+          "lastModified": "2026-08-29T22:53:46.270Z"
+        }
+      }
+    }
+  }
 }

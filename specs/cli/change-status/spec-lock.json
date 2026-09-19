@@ -16,7 +16,7 @@
       "symbols": ["registerChangeStatus"]
     },
     {
-      "file": "cli:test/commands/change.spec.ts"
+      "file": "cli:test/commands/change/status.spec.ts"
     }
   ],
   "optimizations": {

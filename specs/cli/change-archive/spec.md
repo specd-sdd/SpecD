@@ -91,6 +91,10 @@ When `--format json` or `toon` is specified, success MUST emit a terminal struct
 - If the change is not in `archivable` or `archiving` state, exits with code 1.
 - If a delta merge fails (conflict or parse error), exits with code 1 and prints a descriptive error.
 
+### Requirement: Canonical archive command naming
+
+Documentation and agent guidance MUST use `specd changes archive <name>` as the canonical command. `specd change archive <name>` remains a supported compatibility alias and MUST have identical archive semantics.
+
 ## Constraints
 
 - Only changes in `archivable` or `archiving` state may be archived

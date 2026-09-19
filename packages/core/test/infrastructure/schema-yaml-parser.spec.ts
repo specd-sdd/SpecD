@@ -141,6 +141,11 @@ describe('parseSchemaYaml — schema-plugin restrictions', () => {
     expect(() => parseSchemaYaml('#bad', yaml)).toThrow(SchemaValidationError)
   })
 
+  it('rejects schema-plugin with metadataExtraction', () => {
+    const yaml = `kind: schema-plugin\nname: bad\nversion: 1\nmetadataExtraction:\n  title:\n    artifact: specs\n    extractor:\n      selector: { type: section, level: 1 }\n`
+    expect(() => parseSchemaYaml('#bad', yaml)).toThrow(SchemaValidationError)
+  })
+
   it('rejects schema-plugin with extends', () => {
     const yaml = `kind: schema-plugin\nname: bad\nversion: 1\nextends: '@specd/schema-std'\n`
     expect(() => parseSchemaYaml('#bad', yaml)).toThrow(SchemaValidationError)

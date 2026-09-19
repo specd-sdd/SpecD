@@ -529,6 +529,26 @@ describe('TransitionChange', () => {
 
       expect(result.change.state).toBe('designing')
     })
+
+    it('reports spec approval guidance for a non-drain pending spec transition', async () => {
+      const change = makePendingSpecApprovalChange('my-change')
+      const uc = makeUseCase(makeChangeRepository([change]))
+
+      await expect(uc.execute({ name: 'my-change', to: 'implementing' })).rejects.toMatchObject({
+        reason: { type: 'approval-required', gate: 'spec' },
+      })
+      expect(change.state).toBe('pending-spec-approval')
+    })
+
+    it('reports signoff guidance for a non-drain pending signoff transition', async () => {
+      const change = makePendingSignoffChange('my-change')
+      const uc = makeUseCase(makeChangeRepository([change]))
+
+      await expect(uc.execute({ name: 'my-change', to: 'archivable' })).rejects.toMatchObject({
+        reason: { type: 'approval-required', gate: 'signoff' },
+      })
+      expect(change.state).toBe('pending-signoff')
+    })
   })
 
   describe('given a verifying → implementing transition', () => {

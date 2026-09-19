@@ -415,6 +415,10 @@ When a file is canonically `complete` and `hasDrift=true`, human-facing read mod
 
 When a file is canonically `missing`, `missing` remains the canonical state even if `hasDrift=true`.
 
+### Requirement: Task completion scope
+
+A change MUST require task completion only for artifact types that declare `hasTasks: true` and a task-completion check. It MUST NOT infer that every task-like statement belongs to the tasks artifact or block a lifecycle transition for an artifact without a declared task check.
+
 ## Constraints
 
 - name and createdAt are set at creation and never changed

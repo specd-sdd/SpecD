@@ -1,0 +1,14 @@
+- op: added
+  description: Cover predicate-derived requires blocker identity.
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    ### Requirement: Predicate blocker artifact identity
+
+    #### Scenario: Failed workflow requires exposes its artifact
+
+    - **GIVEN** a matching `workflow.requires` predicate fails with an artifact ID in its details
+    - **WHEN** the lifecycle verdict projects transition blockers
+    - **THEN** the blocker contains that artifact ID in `blocking`

@@ -220,13 +220,13 @@ If `SchemaProvider.get()` throws, the `lifecycle` object MUST still be present w
 
 - `validTransitions` MUST be populated normally (it is a static lookup, independent of schema)
 - `availableTransitions` MUST be an empty array
-- `blockers` MUST be an empty array
+- `lifecycle.blockers` MUST be an empty array because target-specific transition checks cannot run without a schema
 - `approvals` MUST be populated normally (it is injected config, independent of schema)
 - `nextArtifact` MUST be `null`
 - `changePath` MUST be populated normally
 - `schemaInfo` MUST be `null`
 
-The use case MUST NOT throw when schema resolution fails — it degrades the lifecycle fields silently. It MUST wrap the `SchemaProvider.get()` call in a `try/catch` to achieve this.
+The public result `blockers` array MUST contain the stable `SCHEMA_RESOLUTION_FAILED` blocker with actionable recovery guidance. The use case MUST NOT throw when schema resolution fails, MUST remain read-only, and MUST NOT enable a lifecycle mutation or weaken fail-closed transition validation.
 
 ### Requirement: Config-based factory delegates through resolveGetStatusDeps
 

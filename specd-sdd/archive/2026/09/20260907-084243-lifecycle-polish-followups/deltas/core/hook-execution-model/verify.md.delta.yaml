@@ -1,0 +1,19 @@
+- op: modified
+  selector:
+    type: section
+    matches: '^Requirement: Two hook types$'
+  rename: 'Requirement: Three hook entry forms'
+  content: |
+    #### Scenario: instruction hook is not executed by RunStepHooks
+
+    - **GIVEN** a workflow step with hooks `pre: [{ id: "guidance", instruction: "Read the tasks" }, { id: "lint", run: "pnpm lint" }]`
+    - **WHEN** `RunStepHooks` executes pre-hooks for this step
+    - **THEN** only the `lint` hook is executed via `HookRunner`
+    - **AND** the `guidance` instruction hook is skipped entirely
+
+    #### Scenario: External entry remains a schema form without an installed runner
+
+    - **GIVEN** a workflow declares an `external:` hook entry
+    - **WHEN** its matching phase is evaluated without an accepting external runner
+    - **THEN** it is treated as the third declared hook form
+    - **AND** execution fails with the documented unknown external hook type error

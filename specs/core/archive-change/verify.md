@@ -842,3 +842,11 @@
 - **WHEN** `resolveArchiveChangeDeps(resolver)` runs
 - **THEN** it resolves `regenerateMetadata: RegenerateSpecMetadata`
 - **AND** it does not resolve `generateMetadata: GenerateSpecMetadata` or `saveMetadata: SaveSpecMetadata` directly
+
+### Requirement: Shared fallback batch snapshot lifetime
+
+#### Scenario: Restore removes a file recorded after fallback snapshot
+
+- **GIVEN** archive composition uses the fallback batch snapshot port
+- **WHEN** it snapshots, records a newly created file, and restores
+- **THEN** restore removes the newly created file through the same snapshot manifest

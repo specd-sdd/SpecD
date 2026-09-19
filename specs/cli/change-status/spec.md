@@ -162,6 +162,10 @@ specs and dependencies:
 
 In structured output (JSON/toon), the `specDependsOn` object from the change manifest SHALL be included in the top-level response.
 
+### Requirement: Stable display status and drafted JSON compatibility
+
+Change-status text and structured output MUST render an artifact or file display status from `displayStatus`, then `effectiveStatus`, then canonical `state`; they MUST NOT render `undefined`. Active status MUST expose lifecycle transition guidance under `lifecycle`. Drafted inspection MUST retain empty legacy top-level transition arrays and omit an artifact DAG, because it is read-only and has no active schema lifecycle projection.
+
 ## Constraints
 
 - The output includes all artifacts declared by the schema, not only those present on disk.

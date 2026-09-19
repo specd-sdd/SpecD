@@ -180,6 +180,9 @@ describe('evaluateLifecycleVerdict', () => {
     expect(
       domain.availableSteps.find((step) => step.step === 'designing')?.blockingArtifacts,
     ).toEqual(['specs'])
+    expect(domain.transitionBlockers).toEqual([
+      { transition: 'designing', reason: 'requires', blocking: ['specs'] },
+    ])
   })
 
   it('given mixed review and incomplete parents, when projecting, then parent-review wins', () => {

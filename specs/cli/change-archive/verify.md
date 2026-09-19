@@ -137,3 +137,10 @@
 - **AND** that result includes `name` equal to `"my-change"` and `archivePath` containing the archive path
 - **AND** callers do not receive a second unwrapped JSON object after the stream
 - **AND** the process exits with code 0
+
+### Requirement: Canonical archive command naming
+
+#### Scenario: Singular alias preserves archive semantics
+
+- **WHEN** an actor invokes the supported singular archive alias
+- **THEN** it follows the same archive behavior as the canonical plural command

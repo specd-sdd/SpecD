@@ -79,6 +79,10 @@ Delivery mechanisms (CLI, MCP, plugins) MUST obtain a `ConfigWriter` instance th
 
 `listPlugins` on the port remains for infrastructure compatibility but delivery MUST NOT use it for declaration reads when a `SpecdConfig` snapshot is already available.
 
+### Requirement: Optional initialization and plugin configuration
+
+`ConfigWriter.initProject` and plugin operations MUST validate only the configuration they require. Optional plugin configuration MUST remain absent unless the selected plugin contract requires it; initialization MUST NOT synthesize unrelated plugin entries.
+
 ## Constraints
 
 - The port lives in `application/ports/` per the hexagonal architecture rule

@@ -20,36 +20,36 @@
   ],
   "optimizations": {
     "optimizedDescription": {
-      "value": "GetGraphHealth aggregates GraphStatistics, VCS ref staleness, derivation fingerprint mismatches, and workspace health on an open provider.",
+      "value": "GetGraphHealth reports provider statistics, VCS and content freshness, fingerprint compatibility, and aggregate/workspace graph health.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:a83a32a04eb506afef9f60c8008ce61e4c8c36eb111ca54dbceb7137659a28a3",
-          "lastModified": "2026-08-16T08:12:48.242Z"
+          "hash": "sha256:08bde58552e9eb27c03b3604ef6fea16e15de415e0709b10d7632eb7228be34f",
+          "lastModified": "2026-08-30T09:18:36.412Z"
         },
         "verify.md": {
-          "hash": "sha256:d7bd080c049f1afb821c5604a155d2d4a36f1e3c254f5951bd600fcc304e3e20",
-          "lastModified": "2026-08-16T08:12:48.245Z"
+          "hash": "sha256:3ea3a96cb1fb86d467a65d45eaa117752c5e8de1292f8208602d6d7258cf367f",
+          "lastModified": "2026-08-30T09:18:36.413Z"
         }
       }
     },
     "optimizedContext": {
-      "value": "# Get Graph Health\n\n## Rules\n\n- Returns enriched health: `GetGraphHealth.execute(input)` -> `GetGraphHealthResult` containing all `GraphStatistics` plus:\n  - `stale: boolean | null` (VCS staleness via `isGraphStale`).\n  - `currentRef: string | null` (VCS ref via `createVcsAdapter(config.projectRoot)`).\n  - `fingerprintMismatch: boolean | null` (derivation mismatch when workspaces/version allow comparison).\n  - `state: 'current' | 'stale' | 'unknown'`, `knownStaleSinceLastIndex`, stable reason codes, and per-workspace health breakdowns (`name`, `state`, latch, mode, reasons).\n- Provider availability: relies on `provider.getStatistics()`; busy/stale provider errors propagate unchanged. No external lock helpers or lock-assertion escape hatches.\n- Staleness calculation: compares `lastIndexedRef` with `currentRef`. `lastIndexedRef === null` -> `stale: null`.\n- Derivation mismatch: when `workspaces` provided and `stats.graphFingerprint != null`, calls `detectFingerprintMismatch` with `codeGraphVersion`, `projectRoot`, `workspaces`, effective graph config.\n- Input & Lifecycle: `GetGraphHealthInput` contains `config: SpecdConfig`, `provider: CodeGraphProvider` (must be open), `codeGraphVersion: string`, optional `workspaces`. MUST NOT open or close provider.\n- Factory: `createGetGraphHealth()` returns stateless instance; all inputs passed per `execute()`.\n- Scope assessment: VCS workspaces sharing repo root share modified-path evaluation filtered by effective graph config. Non-VCS workspaces compare visible membership and stored observations, stop on first mismatch. Aggregate precedence: `stale > unknown > current`.\n\n## Constraints\n\n- MUST NOT trigger indexing, destructive recreation, or arbitrary graph mutation.\n- MUST NOT open or close the provider.\n- MUST NOT load change entities or compile project context.",
+      "value": "# Get Graph Health\n\n## Rules\n- `GetGraphHealth.execute(input)` returns `GetGraphHealthResult`: all `GraphStatistics`, `stale: boolean | null`, `currentRef: string | null`, `fingerprintMismatch: boolean | null`; aggregate `state: current | stale | unknown`, `knownStaleSinceLastIndex`, stable reason codes, ordered workspace health (`name`, state, latch, `vcs|filesystem|hybrid`, reasons).\n- Use `provider.getStatistics()` for availability; propagate provider busy/stale errors unchanged. No external lock helpers or caller lock-bypass. Input `config: SpecdConfig`, already-open `provider: CodeGraphProvider`, `codeGraphVersion`, optional workspaces; never open/close provider.\n- Get current VCS ref `createVcsAdapter(config.projectRoot)`; `isGraphStale(lastIndexedRef, currentRef)`. `lastIndexedRef === null` → `stale: null`.\n- If workspaces given + `stats.graphFingerprint != null`, parse stored fingerprint, effective graph config, call `detectFingerprintMismatch(codeGraphVersion, projectRoot, workspaces, graphConfig)`; otherwise `null`. `createGetGraphHealth()` returns stateless instance, all input per `execute()`.\n- Report content freshness, backend schema/generation compatibility, partial-index state, coverage/reasons excluded, unsupported, parse-failed, partially indexed. `excluded`/`unsupported` terminal and visible but not incomplete; `parse-failed`/`partial` incomplete + non-current. Reasons aggregate only incomplete coverage.\n- Assessment/stat/content-read/hash failure = unknown affected scope, never false mismatch/stale latch. No indexing; only refresh equal-content observations and atomically set monotonic workspace/global stale latches. Target absence result must show whether trustworthy stale evidence.\n- Successfully indexed coverage record requires expected persisted file/document node same logical generation. Missing nodes, impossible counts, completed generation over empty/partial graph → `contentFresh` and `coverageComplete` false, non-current, `GRAPH_CONTENT_INCONSISTENT`. Excluded/unsupported records require no physical code node. Read-only graph content; diagnostics support reindex/recovery.\n- Aggregate precedence `stale > unknown > current`; true aggregate latch returns stale without rescan. Transient failure unknown without latch mutation; project-wide derivation/input failure may be non-current without false workspace failure. Structured output keeps all workspaces; text only aggregate + non-current; no absolute workspace/VCS roots.\n- VCS workspaces grouped by repository root: one normalized modified-path evaluation filtered effective visibility; excluded-only changes leave latches unchanged. Non-VCS compare visible membership/stored observations, hash only mtime/size differs, refresh equal content, stop first proven mismatch; inspection failure stays unknown unless independent stale proof. Never inspect all symbols or targeted resources graph-wide.\n\n## Constraints\n- Never trigger indexing, destructive recreation, arbitrary graph mutation, load changes, or compile project context.\n- May mutate only semantic freshness cache: equal-content observations; monotonic workspace/global stale latches.\n- Use already-open provider only.",
       "schema": {
         "name": "schema-std",
         "version": 1
       },
       "artifactState": {
         "spec.md": {
-          "hash": "sha256:a83a32a04eb506afef9f60c8008ce61e4c8c36eb111ca54dbceb7137659a28a3",
-          "lastModified": "2026-08-16T08:12:48.242Z"
+          "hash": "sha256:08bde58552e9eb27c03b3604ef6fea16e15de415e0709b10d7632eb7228be34f",
+          "lastModified": "2026-08-30T09:18:36.412Z"
         },
         "verify.md": {
-          "hash": "sha256:d7bd080c049f1afb821c5604a155d2d4a36f1e3c254f5951bd600fcc304e3e20",
-          "lastModified": "2026-08-16T08:12:48.245Z"
+          "hash": "sha256:3ea3a96cb1fb86d467a65d45eaa117752c5e8de1292f8208602d6d7258cf367f",
+          "lastModified": "2026-08-30T09:18:36.413Z"
         }
       }
     }

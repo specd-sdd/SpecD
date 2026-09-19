@@ -13,12 +13,7 @@
   ],
   "implementation": [
     {
-      "file": "cli:src/commands/change/archive.ts",
-      "symbols": ["makeArchiveProgressRenderer", "registerChangeArchive"]
-    },
-    {
-      "file": "cli:src/commands/change/_check-progress-presenter.ts",
-      "symbols": ["createCheckProgressPresenter"]
+      "file": "cli:test/commands/change/archive.spec.ts"
     }
   ],
   "optimizations": {

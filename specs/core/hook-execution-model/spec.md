@@ -6,16 +6,17 @@ Workflow steps declare hooks via `instruction:` and `run:` entries, but the sche
 
 ## Requirements
 
-### Requirement: Two hook types
+### Requirement: Three hook entry forms
 
-Workflow hooks come in exactly two types, distinguished by their key:
+Workflow hooks come in exactly three forms, distinguished by their key: `instruction:`, `run:`, and `external:`.
 
 - **`instruction:`** — a text block consumed by `GetHookInstructions` at query time. It is returned as contextual guidance for the agent or external tool. `instruction:` hooks are never executed at runtime — they have no process, exit code, or side effects.
 - **`run:`** — a shell command executed by the `HookRunner` port. It produces an exit code, stdout, and stderr. `run:` hooks are never injected into agent context — they are operational commands.
+- **`external:`** — an explicit dispatch descriptor with `{ type, config }`, routed only to a registered external runner that accepts its `external.type`. The absence of a production external runner does not remove this schema form.
 
-Every hook entry declares exactly one of these two keys alongside its `id`. An entry with both keys or neither key is a `SchemaValidationError` (enforced by schema validation, not by this model).
+Every hook entry declares exactly one of these three keys alongside its `id`. An entry with more than one key or with none is a `SchemaValidationError` enforced by schema validation.
 
-All workflow steps can declare both `instruction:` and `run:` hooks — there are no restrictions by step type.
+All workflow steps can declare any of the three forms. `HookRunner` executes shell `run:` hooks only; an external hook whose type is not accepted by a registered runner MUST fail with a clear error.
 
 ### Requirement: External hooks are explicit workflow entries
 

@@ -257,3 +257,11 @@
 - **GIVEN** every artifact is effectively `complete` or `skipped`
 - **WHEN** `evaluateLifecycleVerdict` derives the next artifact
 - **THEN** the next artifact is `null`
+
+### Requirement: Predicate blocker artifact identity
+
+#### Scenario: Failed workflow requires exposes its artifact
+
+- **GIVEN** a matching `workflow.requires` predicate fails with an artifact ID in its details
+- **WHEN** the lifecycle verdict projects transition blockers
+- **THEN** the blocker contains that artifact ID in `blocking`

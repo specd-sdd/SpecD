@@ -458,6 +458,10 @@ It MUST NOT resolve `runStepHooks` or `regenerateMetadata` onto `ArchiveChangeDe
 
 The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
 
+### Requirement: Shared fallback batch snapshot lifetime
+
+When archive composition cannot derive explicit workspace layouts, `resolveArchiveBatchSnapshotPort` MUST lazily create one fallback `FsArchiveBatchSnapshot` and reuse it for every snapshot-port method of that composed archive operation. A snapshot, recorded created file, and restore sequence MUST operate on the same fallback manifest so restore removes files created after the snapshot.
+
 ## Constraints
 
 - `change.assertArchivable()` must be called before any hooks, snapshots, or file modifications

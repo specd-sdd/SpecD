@@ -514,3 +514,18 @@
 - **AND** it does not resolve `runStepHooks` onto the use case
 - **AND** it does not resolve `lifecycle` or `LifecycleEngine`
 - **AND** the factory delegates to canonical `createTransitionChange(deps)`
+
+### Requirement: Historic parked approval repair precedence
+
+#### Scenario: Parked spec approval rejects a non-drain target
+
+- **GIVEN** a change is in `pending-spec-approval`
+- **WHEN** it requests `implementing`
+- **THEN** the transition fails with `approval-required` for the `spec` gate
+- **AND** it does not fail with `invalid-transition`
+
+#### Scenario: Parked signoff rejects a non-drain target
+
+- **GIVEN** a change is in `pending-signoff`
+- **WHEN** it requests `archivable`
+- **THEN** the transition fails with `approval-required` for the `signoff` gate

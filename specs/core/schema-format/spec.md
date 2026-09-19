@@ -419,8 +419,11 @@ A schema document MAY declare `kind: schema-plugin`.
 - A schema-plugin MUST NOT declare `workflow`
 - A schema-plugin MUST NOT declare `extends`
 - A schema-plugin MUST NOT declare `compat`
-- A schema-plugin MAY declare `validations`, `deltaValidations`, `preHashCleanup`, `taskCompletionCheck`, `crossArtifactValidations`, and `metadataExtraction`
+- A schema-plugin MUST NOT declare or mutate `metadataExtraction`
+- A schema-plugin MAY declare `validations`, `deltaValidations`, `preHashCleanup`, `taskCompletionCheck`, and `crossArtifactValidations`
 - Parsers MUST reject schema-plugin documents that declare forbidden fields with `SchemaValidationError`
+
+Schema `metadataExtraction` defines declarative extraction only. A schema plugin MAY contribute transforms or resolved schema layers through the documented plugin merge path, but those extension points MUST NOT mutate `metadataExtraction`.
 
 ### Requirement: Schema resolution
 
@@ -489,7 +492,7 @@ The `verify` artifact in the schema should declare `requires: [spec]` — scenar
 - `workflow[].requiresTaskCompletion` MUST ONLY reference artifacts with `hasTasks: true`
 - `artifact.rules.pre` and `artifact.rules.post` are optional arrays of `{ id, instruction }` entries
 - `workflow[].step` must be unique — duplicate step names in the same `workflow` array are a schema validation error
-- Every hook entry must include an `id` field alongside its `instruction` or `run` field
+- Every hook entry must include an `id` field alongside exactly one of its `instruction`, `run`, or `external` fields
 - `requires` must not contain cycles; circular dependencies in the artifact graph are a schema validation error
 - Artifact `requires` feeds `projectArtifacts` DAG effective status and `Schema.artifactDag()`. There is no `Change.effectiveStatus()` method.
 - If artifact A is `optional: true`, any artifact that lists A in its `requires` must also be `optional: true`

@@ -68,35 +68,34 @@ export function resolveArchiveBatchSnapshotPort(
     return new FsArchiveBatchSnapshot(layouts)
   }
 
+  let snapshot: Promise<FsArchiveBatchSnapshot> | undefined
+  const resolveSnapshot = (): Promise<FsArchiveBatchSnapshot> => {
+    snapshot ??= listWorkspaces.execute().then((workspaces) => {
+      const derived = buildWorkspaceSpecLayouts(workspaces)
+      return new FsArchiveBatchSnapshot(derived)
+    })
+    return snapshot
+  }
+
   return {
     snapshot: async (specId, changeName) => {
-      const workspaces = await listWorkspaces.execute()
-      const derived = buildWorkspaceSpecLayouts(workspaces)
-      const port = new FsArchiveBatchSnapshot(derived)
+      const port = await resolveSnapshot()
       return port.snapshot(specId, changeName)
     },
     restoreBatch: async (specIds, publishOrder) => {
-      const workspaces = await listWorkspaces.execute()
-      const derived = buildWorkspaceSpecLayouts(workspaces)
-      const port = new FsArchiveBatchSnapshot(derived)
+      const port = await resolveSnapshot()
       return port.restoreBatch(specIds, publishOrder)
     },
     detectOrphans: async (specIds, changeName) => {
-      const workspaces = await listWorkspaces.execute()
-      const derived = buildWorkspaceSpecLayouts(workspaces)
-      const port = new FsArchiveBatchSnapshot(derived)
+      const port = await resolveSnapshot()
       return port.detectOrphans(specIds, changeName)
     },
     recordCreatedFile: async (specId, filename) => {
-      const workspaces = await listWorkspaces.execute()
-      const derived = buildWorkspaceSpecLayouts(workspaces)
-      const port = new FsArchiveBatchSnapshot(derived)
+      const port = await resolveSnapshot()
       return port.recordCreatedFile(specId, filename)
     },
     cleanup: async (specIds) => {
-      const workspaces = await listWorkspaces.execute()
-      const derived = buildWorkspaceSpecLayouts(workspaces)
-      const port = new FsArchiveBatchSnapshot(derived)
+      const port = await resolveSnapshot()
       return port.cleanup(specIds)
     },
   }

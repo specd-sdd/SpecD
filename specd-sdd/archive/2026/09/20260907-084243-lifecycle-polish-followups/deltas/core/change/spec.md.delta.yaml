@@ -1,0 +1,8 @@
+- op: added
+  description: Limit task completion claims to task-capable artifacts.
+  position:
+    parent: { type: section, matches: '^Requirements$' }
+  content: |
+    ### Requirement: Task completion scope
+
+    A change MUST require task completion only for artifact types that declare `hasTasks: true` and a task-completion check. It MUST NOT infer that every task-like statement belongs to the tasks artifact or block a lifecycle transition for an artifact without a declared task check.

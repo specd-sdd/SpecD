@@ -57,13 +57,15 @@ specd changes list --format toon
 2. Ask the user:
 > Would you like to use an existing active change or create a new one for this fast-track session?
 
-3. If creating a new change, create it without pre-assigning specs and start tracking:
+3. **STOP.** Wait for the user's explicit selection. Do not create a change, start tracking, or continue this workflow until the user responds.
+
+4. If creating a new change, create it without pre-assigning specs and start tracking:
 ```bash
 specd changes create <name>
 specd changes implementation start <name>
 ```
 
-4. If selecting an existing named change, inspect its status and start tracking:
+5. If selecting an existing named change, inspect its status and start tracking:
 ```bash
 specd changes status <name> --format text
 specd changes implementation start <name>
@@ -99,9 +101,9 @@ Create `<changePath>/.specd-exploration.md` if it does not exist using the follo
 >    - You MUST investigate if other parts of the codebase should adopt, reuse, or be updated to use this new feature, capability, refactor, or fix (e.g. eliminating duplicated logic, replacing legacy call patterns, or standardizing behavior across packages/workspaces).
 >    - Search the codebase (`specd graph search`, grep) for adoption candidates.
 >    - Include concrete adoption/migration tasks in the task-bearing artifact and document them in the design artifact.
-> 9. **Blast Radius & Downstream Regression Search (MUST)**:
+> 9. **Blast Radius & Dependents Regression Search (MUST)**:
 >    - You MUST run code graph impact analysis (`specd graph impact`) on all tracked files and symbols to identify callers or modules across the codebase that could suffer side effects or regressions.
->    - Ensure any affected downstream areas have corresponding regression test tasks and design mitigations documented.
+>    - Ensure any affected dependent areas have corresponding regression test tasks and design mitigations documented.
 
 ## Motivation & Problem
 - Summary of the problem or spike goal explored in Step 1.
@@ -125,7 +127,7 @@ Create `<changePath>/.specd-exploration.md` if it does not exist using the follo
 ## Codebase Adoption & Affected Areas (Initial Findings)
 <!-- Other places in the codebase noted during exploration that might need or adopt this change -->
 - Areas identified to adopt this change:
-- Downstream affected modules:
+- Dependent affected modules:
 
 ## Decisions & Code Actions
 <!-- Append in real-time as code is modified (files touched, symbols modified, rationale) -->

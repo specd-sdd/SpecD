@@ -237,6 +237,34 @@ describe('Output format', () => {
     expect(out).toContain('ready, designing')
   })
 
+  it('Text output falls back to canonical status when displayStatus is absent', async () => {
+    const { kernel, stdout } = setup()
+    const change = makeMockChange({ name: 'my-change', state: 'designing' })
+    kernel.changes.status.execute.mockResolvedValue({
+      change,
+      specDependsOn: {},
+      implementationTracking: { trackedFiles: [], links: [] },
+      artifactStatuses: [
+        {
+          type: 'proposal',
+          state: 'in-progress',
+          effectiveStatus: 'in-progress',
+          files: [{ key: 'proposal', filename: 'proposal.md', state: 'in-progress' }],
+        },
+      ],
+      lifecycle: defaultLifecycle,
+      blockers: [],
+      nextAction: defaultNextAction,
+    })
+
+    const program = makeProgram()
+    registerChangeStatus(program.command('change'))
+    await program.parseAsync(['node', 'specd', 'change', 'status', 'my-change'])
+
+    expect(stdout()).toContain('proposal  in-progress  (effective: in-progress)')
+    expect(stdout()).not.toContain('undefined')
+  })
+
   it('Text output omits transitions line when none available', async () => {
     const { kernel, stdout } = setup()
     const change = makeMockChange({ name: 'my-change', state: 'designing' })

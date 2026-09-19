@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { resolveWorkflowCheckRegistry } from '../../../src/composition/use-cases/workflow-check-registry.js'
+import { resolveGetStatusDeps } from '../../../src/composition/use-cases/get-status.js'
 import { type CompositionResolver } from '../../../src/composition/composition-resolver.js'
 import { Change } from '../../../src/domain/entities/change.js'
 import { type CheckExecutionContext } from '../../../src/domain/services/transition-checks.js'
@@ -58,6 +59,23 @@ function archiveCtx(change: Change): CheckExecutionContext {
 }
 
 describe('resolveWorkflowCheckRegistry', () => {
+  it('keeps overlap detection in production GetStatus archive bindings', async () => {
+    const alpha = makeChange('alpha', ['core:core/config'])
+    const beta = makeChange('beta', ['core:core/config'])
+    const resolver = makeResolver([alpha, beta])
+    Object.assign(resolver, {
+      config: { approvals: { spec: false, signoff: false } },
+      getRefreshImplementationTracking: () => ({ execute: async () => undefined }),
+    })
+
+    const deps = resolveGetStatusDeps(resolver)
+    const overlap = deps.archiveBindings.find((binding) => binding.check.id === 'spec.overlap')
+    expect(overlap).toBeDefined()
+    await expect(overlap!.check.execute(archiveCtx(alpha))).resolves.toMatchObject({
+      outcome: 'fail',
+    })
+  })
+
   it('wires spec.overlap peers when includeOverlapDetection is true', async () => {
     const alpha = makeChange('alpha', ['core:core/config'])
     const beta = makeChange('beta', ['core:core/config'])

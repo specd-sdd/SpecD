@@ -124,7 +124,7 @@ When `impl.filesResolved` or `impl.linksInScope` fails, the human-readable `mess
 
 A failing check’s `message` (and `details` when structured data helps) MUST explain **what differs or what is blocked**, not only **which ids are involved** — **except** `impl.filesResolved` / `impl.linksInScope`, which keep the compact-summary rule above.
 
-- `deps.consistent` — for each mismatched spec, MUST include extracted `dependsOn` and persisted `dependsOn` (empty lists shown explicitly). MUST NOT stop at “disagrees for: \<specId\>” alone. `details` SHOULD include per-spec `{ extracted, persisted }` (or equivalent).
+- `deps.consistent` — for each mismatched spec, MUST include extracted `dependsOn` and persisted `dependsOn` (empty lists shown explicitly). MUST NOT stop at “disagrees for: \<specId>” alone. `details` SHOULD include per-spec `{ extracted, persisted }` (or equivalent).
 - `spec.overlap` — MUST name the overlapping change(s) and overlapping spec id(s) when known.
 - `workspace.readOnly` — MUST name the read-only spec ids; SHOULD include workspace name when known.
 - `impl.filesResolved` / `impl.linksInScope` — MUST NOT expand the actionable-diagnostics bar into a full inventory in text; compact summary only (see above).
@@ -201,6 +201,10 @@ There SHALL be no ABI type that enumerates all check facts (`PredicateSnapshots`
 Applicability SHALL be declared **once** (one binding table composed into the application registry). MUST NOT maintain a second copied list of `from`/`to`/`along` rows in domain that can drift from the registry.
 
 Matcher and `classifyAlong` MAY remain domain-pure. `evaluateLifecycleVerdict` SHALL project `validTransitions` / `availableTransitions` / `nextHop` from **predicate** `CheckResult`s supplied by the caller (`checksByTarget`). Application `evaluateLifecycle` attaches `nextAction` (including `command`). It MUST NOT accept a snapshot struct. It MUST NOT fall back to `check.run` against a bag when `checksByTarget` is missing. Use cases MUST NOT launch `RunStepHooks` except by calling matching effect `execute`.
+
+### Requirement: Approval precedence and production registry composition
+
+Transition evaluation for historic parked approval states MUST preserve the approval-required repair contract before protocol-edge rejection of a non-drain target. Production status and archive composition MUST inject the overlap detector into their workflow check registries; a default registry without that injected dependency is permitted only for non-production or isolated use.
 
 ## Constraints
 

@@ -394,3 +394,16 @@
 
 - **WHEN** the user has not explicitly invoked `/specd-fasttrack`
 - **THEN** the workflow directs work to normal specd lifecycle skills
+
+### Requirement: Fast-track Step 2 confirmation and dependents terminology
+
+#### Scenario: Step 2 pauses before formal artifacts
+
+- **WHEN** a rendered fast-track workflow reaches Step 2
+- **THEN** it asks the user to choose the next mode and stops before formal artifact creation
+
+#### Scenario: Blast-radius guidance names dependents
+
+- **WHEN** the template directs a graph impact search
+- **THEN** it uses `--direction dependents`
+- **AND** it does not call the search downstream

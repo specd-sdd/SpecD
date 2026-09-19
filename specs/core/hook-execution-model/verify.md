@@ -2,7 +2,7 @@
 
 ## Requirements
 
-### Requirement: Two hook types
+### Requirement: Three hook entry forms
 
 #### Scenario: instruction hook is not executed by RunStepHooks
 
@@ -10,6 +10,13 @@
 - **WHEN** `RunStepHooks` executes pre-hooks for this step
 - **THEN** only the `lint` hook is executed via `HookRunner`
 - **AND** the `guidance` instruction hook is skipped entirely
+
+#### Scenario: External entry remains a schema form without an installed runner
+
+- **GIVEN** a workflow declares an `external:` hook entry
+- **WHEN** its matching phase is evaluated without an accepting external runner
+- **THEN** it is treated as the third declared hook form
+- **AND** execution fails with the documented unknown external hook type error
 
 ### Requirement: External hooks are explicit workflow entries
 

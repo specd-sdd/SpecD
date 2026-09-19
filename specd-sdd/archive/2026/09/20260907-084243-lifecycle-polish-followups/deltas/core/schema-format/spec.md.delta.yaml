@@ -1,0 +1,41 @@
+- op: modified
+  description: Remove metadata extraction from the schema-plugin allowed-field list.
+  selector:
+    type: section
+    matches: '^Requirement: Schema plugin kind$'
+  content: |
+    A schema document MAY declare `kind: schema-plugin`.
+
+    - A schema-plugin MUST NOT declare `artifacts`
+    - A schema-plugin MUST NOT declare `workflow`
+    - A schema-plugin MUST NOT declare `extends`
+    - A schema-plugin MUST NOT declare `compat`
+    - A schema-plugin MUST NOT declare or mutate `metadataExtraction`
+    - A schema-plugin MAY declare `validations`, `deltaValidations`, `preHashCleanup`, `taskCompletionCheck`, and `crossArtifactValidations`
+    - Parsers MUST reject schema-plugin documents that declare forbidden fields with `SchemaValidationError`
+
+    Schema `metadataExtraction` defines declarative extraction only. A schema plugin MAY contribute transforms or resolved schema layers through the documented plugin merge path, but those extension points MUST NOT mutate `metadataExtraction`.
+- op: modified
+  description: Replace the two-form hook constraint while preserving all remaining schema constraints.
+  selector:
+    type: section
+    matches: '^Constraints$'
+  content: |
+    - `kind` is required on every schema file; must be `schema` or `schema-plugin`
+    - `kind: schema-plugin` must not declare `artifacts`, `workflow`, `metadataExtraction`, or `extends`
+    - `extends` is only valid on `kind: schema`; cycles in extends chains are a validation error
+    - `artifact.id` must match `/^[a-z][a-z0-9-]*$/` and must be unique within a schema
+    - Array entry `id` must match `/^[a-z][a-z0-9]*(-[a-z0-9]+)*$/`, 1–64 characters, unique within its immediate array
+    - `artifact.scope` must be `spec` or `change`; it is required and has no default
+    - `artifact.optional` defaults to `false`; a non-optional artifact with `scope: spec` must be present in every spec directory and every change
+    - `artifact.hasTasks` is optional and defaults to `false`
+    - `workflow[].requiresTaskCompletion` MUST ONLY reference artifacts with `hasTasks: true`
+    - `artifact.rules.pre` and `artifact.rules.post` are optional arrays of `{ id, instruction }` entries
+    - `workflow[].step` must be unique — duplicate step names in the same `workflow` array are a schema validation error
+    - Every hook entry must include an `id` field alongside exactly one of its `instruction`, `run`, or `external` fields
+    - `requires` must not contain cycles; circular dependencies in the artifact graph are a schema validation error
+    - Artifact `requires` feeds `projectArtifacts` DAG effective status and `Schema.artifactDag()`. There is no `Change.effectiveStatus()` method.
+    - If artifact A is `optional: true`, any artifact that lists A in its `requires` must also be `optional: true`
+    - `deltaValidations` is only valid on artifacts with `delta: true`; declaring `deltaValidations` on a non-delta artifact is a schema validation error
+    - The order of entries in `workflow` is the intended display order for tooling and listed names on the `along` progress axis; missing delivery states are spliced by canonical fallback index; it does not remove unlisted states from the protocol and does not enforce sequential blocking between consecutive steps
+    - Delta file format, selector model, and application constraints are defined in `specs/core/delta-format/spec.md`

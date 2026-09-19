@@ -230,6 +230,10 @@ The template MUST use `specd project context-specs` to discover configured proje
 
 The template MUST declare that fast-track is manual-only: it MUST be used only when the user explicitly invokes `/specd-fasttrack`, and MUST NOT be selected or invoked for normal specd work.
 
+### Requirement: Fast-track Step 2 confirmation and dependents terminology
+
+The rendered fast-track workflow MUST stop after Step 2 and ask the user to select the next working mode before it creates formal design artifacts. Its blast-radius guidance MUST call affected callers and modules `dependents` and use `--direction dependents`; it MUST NOT describe that guidance as a downstream search.
+
 ## Constraints
 
 - Templates in the skills package MUST NOT contain static frontmatter YAML blocks.

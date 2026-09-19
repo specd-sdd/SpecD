@@ -353,18 +353,20 @@ JSON/TOON output schema:
             lines.push('')
             lines.push('artifacts (details):')
             for (const a of artifactStatuses) {
+              const displayStatus = a.displayStatus ?? a.effectiveStatus ?? a.state
               const taskSuffix =
                 a.taskCompletion !== undefined
                   ? `  tasks: ${a.taskCompletion.complete}/${a.taskCompletion.total}`
                   : ''
               lines.push(
-                `  ${a.type}  ${a.displayStatus}  (effective: ${a.effectiveStatus})${taskSuffix}`,
+                `  ${a.type}  ${displayStatus}  (effective: ${a.effectiveStatus})${taskSuffix}`,
               )
               for (const file of a.files) {
+                const fileDisplayStatus = file.displayStatus ?? file.state
                 const hash = file.validatedHash !== undefined ? `  ${file.validatedHash}` : ''
                 const drift = file.hasDrift ? '  [drift]' : ''
                 lines.push(
-                  `    - ${file.key}  ${file.displayStatus}  ${file.filename}${hash}${drift}`,
+                  `    - ${file.key}  ${fileDisplayStatus}  ${file.filename}${hash}${drift}`,
                 )
               }
             }
@@ -442,14 +444,14 @@ JSON/TOON output schema:
                 artifacts: artifactStatuses.map((a) => ({
                   type: a.type,
                   state: a.state,
-                  displayStatus: a.displayStatus,
+                  displayStatus: a.displayStatus ?? a.effectiveStatus ?? a.state,
                   effectiveStatus: a.effectiveStatus,
                   ...(a.taskCompletion !== undefined ? { taskCompletion: a.taskCompletion } : {}),
                   files: a.files.map((file) => ({
                     key: file.key,
                     filename: file.filename,
                     state: file.state,
-                    displayStatus: file.displayStatus,
+                    displayStatus: file.displayStatus ?? file.state,
                     hasDrift: file.hasDrift,
                     ...(file.validatedHash !== undefined
                       ? { validatedHash: file.validatedHash }

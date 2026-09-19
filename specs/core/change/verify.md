@@ -638,3 +638,11 @@
 - **WHEN** lifecycle interpretation is requested
 - **THEN** the `Change` entity remains the source of persisted facts only
 - **AND** `evaluateLifecycleVerdict` / `projectArtifacts` is responsible for deriving the dependency-aware lifecycle meaning
+
+### Requirement: Task completion scope
+
+#### Scenario: Non-task artifact does not create a task gate
+
+- **GIVEN** an artifact does not declare a task-completion check
+- **WHEN** lifecycle progress is evaluated
+- **THEN** it is not blocked by inferred task completion

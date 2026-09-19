@@ -1,0 +1,10 @@
+- op: added
+  description: Make the fast-track confirmation boundary and graph terminology explicit.
+  position:
+    parent:
+      type: section
+      matches: '^Requirements$'
+  content: |
+    ### Requirement: Fast-track Step 2 confirmation and dependents terminology
+
+    The rendered fast-track workflow MUST stop after Step 2 and ask the user to select the next working mode before it creates formal design artifacts. Its blast-radius guidance MUST call affected callers and modules `dependents` and use `--direction dependents`; it MUST NOT describe that guidance as a downstream search.

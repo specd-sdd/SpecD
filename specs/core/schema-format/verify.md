@@ -661,10 +661,12 @@
 - **WHEN** the plugin is resolved
 - **THEN** it loads successfully
 
-#### Scenario: Plugin with metadataExtraction is rejected
+#### Scenario: Plugin cannot declare metadata extraction
 
-- **WHEN** a schema-plugin declares `metadataExtraction`
-- **THEN** `SchemaRegistry.resolve()` must throw a `SchemaValidationError`
+- **GIVEN** a schema plugin declares `metadataExtraction`
+- **WHEN** its schema is parsed
+- **THEN** parsing rejects the plugin declaration
+- **AND** transforms and resolved schema layers remain the supported plugin extension points
 
 ### Requirement: Schema resolution
 

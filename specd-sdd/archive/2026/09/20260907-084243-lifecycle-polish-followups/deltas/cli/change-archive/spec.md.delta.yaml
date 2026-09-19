@@ -1,0 +1,8 @@
+- op: added
+  description: State canonical archive command and compatibility alias.
+  position:
+    parent: { type: section, matches: '^Requirements$' }
+  content: |
+    ### Requirement: Canonical archive command naming
+
+    Documentation and agent guidance MUST use `specd changes archive <name>` as the canonical command. `specd change archive <name>` remains a supported compatibility alias and MUST have identical archive semantics.

@@ -1,0 +1,14 @@
+releases:
+  core:transition-change: patch
+  core:lifecycle-engine: patch
+  core:transition-checks: patch
+  core:archive-change: patch
+  cli:change-status: patch
+  skills:skill-templates-source: patch
+  core:hook-execution-model: patch
+  core:schema-format: patch
+  core:change: patch
+  core:get-status: patch
+  cli:change-archive: patch
+  core:config-writer-port: patch
+  cli:change-artifact-instruction: patch

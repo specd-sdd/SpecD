@@ -339,18 +339,17 @@
 
 ### Requirement: Graceful degradation when schema resolution fails
 
-#### Scenario: Schema resolution failure degrades lifecycle fields
+#### Scenario: Schema resolution failure returns actionable read-only status
 
 - **GIVEN** `SchemaProvider.get()` throws `SchemaNotFoundError`
-- **WHEN** `execute()` is called
+- **WHEN** `GetStatus.execute()` is called
 - **THEN** the result does not throw
-- **AND** `lifecycle.validTransitions` is populated normally
+- **AND** `lifecycle.validTransitions` and `lifecycle.approvals` are populated normally
 - **AND** `lifecycle.availableTransitions` is an empty array
 - **AND** `lifecycle.blockers` is an empty array
-- **AND** `lifecycle.approvals` is populated normally
-- **AND** `lifecycle.nextArtifact` is `null`
-- **AND** `lifecycle.changePath` is populated normally
-- **AND** `lifecycle.schemaInfo` is `null`
+- **AND** the public `blockers` array contains `SCHEMA_RESOLUTION_FAILED` with recovery guidance
+- **AND** `lifecycle.nextArtifact` is `null`, `lifecycle.changePath` is populated normally, and `lifecycle.schemaInfo` is `null`
+- **AND** the result does not enable a lifecycle mutation
 
 ### Requirement: Accepts a change name as input
 

@@ -187,6 +187,8 @@ export class TransitionChange {
     }
     const allowOutOfScope = input.allowOutOfScope === true
 
+    this._assertDrainAndGateTargets(fromState, requestedTarget)
+
     const schema = await this._schemaProvider.get()
     const projectedArtifacts = projectArtifacts(change, schema)
     const effectiveStatusByArtifact = toEffectiveStatusMap(projectedArtifacts)
@@ -228,8 +230,6 @@ export class TransitionChange {
       allowed: evaluation.allowed,
       blockerCodes: lifecycle.blockers.map((blocker) => blocker.code),
     })
-
-    this._assertDrainAndGateTargets(fromState, requestedTarget)
 
     if (!evaluation.allowed) {
       const failed = evaluation.checks.find((check) => check.outcome === 'fail')
@@ -342,6 +342,20 @@ export class TransitionChange {
     const isSignoffDrain =
       fromState === 'pending-signoff' &&
       (requestedTarget === 'designing' || requestedTarget === 'signed-off')
+
+    if (fromState === 'pending-spec-approval' && !isSpecDrain) {
+      throw new InvalidStateTransitionError(fromState, requestedTarget, {
+        type: 'approval-required',
+        gate: 'spec',
+      })
+    }
+
+    if (fromState === 'pending-signoff' && !isSignoffDrain) {
+      throw new InvalidStateTransitionError(fromState, requestedTarget, {
+        type: 'approval-required',
+        gate: 'signoff',
+      })
+    }
 
     if (
       (requestedTarget === 'pending-spec-approval' || requestedTarget === 'spec-approved') &&

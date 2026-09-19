@@ -712,7 +712,7 @@ schemaPlugins:
   - '#billing:billing-plugin'
 ```
 
-Plugins are full schema layers — they can add or modify artifacts, workflow steps, and metadata extraction rules in bulk. They are applied in declaration order. `schemaOverrides` is applied after all plugins, so your inline overrides always take final precedence.
+Plugins are schema merge layers. A plugin cannot declare a top-level `metadataExtraction` block; declare extraction on the base schema or use `schemaOverrides` for project-specific extraction changes. Plugins are applied in declaration order. `schemaOverrides` is applied after all plugins, so your inline overrides always take final precedence.
 
 Use plugins when you have a set of schema customisations that is shared across multiple projects and you want to manage it as a versioned package.
 

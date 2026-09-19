@@ -300,3 +300,19 @@
 - **WHEN** `change status --implementation` runs
 - **THEN** it renders the same outcomes and stored values as implementation review
 - **AND** performs no independent graph matching or mutation
+
+### Requirement: Stable display status and drafted JSON compatibility
+
+#### Scenario: Missing display status falls back to canonical state
+
+- **GIVEN** an artifact or file has no `displayStatus`
+- **WHEN** change status renders text or structured output
+- **THEN** it renders effective or canonical state
+- **AND** it does not render `undefined`
+
+#### Scenario: Drafted status stays read-only in JSON
+
+- **GIVEN** the requested change exists only as a draft
+- **WHEN** JSON status is rendered
+- **THEN** legacy top-level transition arrays are empty
+- **AND** no artifact DAG is emitted

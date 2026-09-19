@@ -243,6 +243,10 @@ It MUST NOT resolve `runStepHooks` onto the use case. `RunStepHooks` is a constr
 
 The helper is the only use-case-specific composition entry for config-based bootstrap. The factory MUST NOT reconstruct fs-shaped wiring inline.
 
+### Requirement: Historic parked approval repair precedence
+
+For an in-flight change already in `pending-spec-approval` or `pending-signoff`, `TransitionChange` MUST allow only its documented drain target. Before evaluating `protocol.edge` or any other transition predicate, a request for any non-drain target MUST fail with `InvalidStateTransitionError` whose reason has `type: 'approval-required'` and the matching `gate` (`'spec'` or `'signoff'`). It MUST NOT report `invalid-transition` for that request.
+
 ## Constraints
 
 - The use case MUST NOT bypass the Change entity's transition validation — it only resolves the effective target and delegates

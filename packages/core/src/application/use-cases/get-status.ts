@@ -398,6 +398,13 @@ export class GetStatus {
       if (!(err instanceof SchemaNotFoundError)) {
         throw err
       }
+      blockers = [
+        {
+          code: 'SCHEMA_RESOLUTION_FAILED',
+          message:
+            'Schema resolution failed; lifecycle transitions are unavailable until the schema is restored.',
+        },
+      ]
       validTransitions = VALID_TRANSITIONS[change.state]
       for (const [type, artifact] of change.artifacts) {
         const files: ArtifactFileStatus[] = [...artifact.files.values()].map((file) => ({

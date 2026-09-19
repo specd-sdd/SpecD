@@ -299,6 +299,13 @@ describe('GetStatus', () => {
       expect(result.artifactStatuses).toEqual([])
       expect(result.lifecycle.availableTransitions).toEqual([])
       expect(result.lifecycle.checksByTarget).toEqual({})
+      expect(result.blockers).toEqual([
+        {
+          code: 'SCHEMA_RESOLUTION_FAILED',
+          message:
+            'Schema resolution failed; lifecycle transitions are unavailable until the schema is restored.',
+        },
+      ])
     })
 
     it('rethrows unexpected schema provider errors', async () => {

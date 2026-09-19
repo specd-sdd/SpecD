@@ -183,6 +183,10 @@ Declaration order in `schema.artifacts()` MUST NOT be used as a proxy for DAG or
 
 If every artifact is effectively `complete` or `skipped`, the verdict MUST report no next artifact (`null`).
 
+### Requirement: Predicate blocker artifact identity
+
+When `evaluateLifecycleVerdict` projects `transitionBlockers` from a failed `workflow.requires` predicate, it MUST preserve the blocking artifact ID from the predicate details. The projected `blocking` array MUST contain that artifact ID so lifecycle consumers receive the same actionable target as other blocker projections.
+
 ## Spec Dependencies
 
 - [`core:change`](../change/spec.md) — Source of persisted state facts (hashes, history, base status).

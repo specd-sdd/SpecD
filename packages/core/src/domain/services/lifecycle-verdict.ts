@@ -216,7 +216,19 @@ export function evaluateLifecycleVerdict(
         const requiresFailed = evaluationChecks.some(
           (check) => check.id === 'workflow.requires' && check.outcome === 'fail',
         )
-        return requiresFailed ? [{ transition, reason: 'requires', blocking: [] }] : []
+        if (!requiresFailed) return []
+        const workflowStep = schema.workflowStep(transition)
+        return [
+          {
+            transition,
+            reason: 'requires',
+            blocking: blockingArtifactIds(
+              workflowStep?.requires ?? [],
+              evaluationChecks,
+              verdictByArtifact,
+            ),
+          },
+        ]
       }
       const workflowStep = schema.workflowStep(transition)
       if (workflowStep === null) return []
